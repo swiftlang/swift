@@ -19,6 +19,7 @@
 #define SWIFT_RUNTIME_MUTEX_H
 
 #include <type_traits>
+#include <utility>
 
 #if __has_include(<unistd.h>)
 #include <unistd.h>
@@ -211,10 +212,10 @@ public:
     ///
     /// Precondition: Mutex not held by this thread, undefined otherwise.
     template <typename CriticalSection>
-    auto withLock(CriticalSection criticalSection)
-        -> decltype(criticalSection()) {
+    auto withLock(CriticalSection &&criticalSection)
+        -> decltype(std::forward<CriticalSection>(criticalSection)()) {
       ScopedLock guard(*this);
-      return criticalSection();
+      return std::forward<CriticalSection>(criticalSection)();
     }
 
     /// Acquires lock before calling the supplied critical section. If critical
@@ -242,7 +243,7 @@ public:
     /// Precondition: Mutex not held by this thread, undefined otherwise.
     template <typename CriticalSection>
     void withLockOrWait(ConditionVariable &condition,
-                        CriticalSection criticalSection) {
+                        CriticalSection &&criticalSection) {
       withLock([&] {
         while (!criticalSection()) {
           wait(condition);
@@ -266,11 +267,11 @@ public:
     /// Precondition: Mutex not held by this thread, undefined otherwise.
     template <typename CriticalSection>
     auto withLockThenNotifyOne(ConditionVariable &condition,
-                               CriticalSection criticalSection)
-        -> decltype(criticalSection()) {
+                               CriticalSection &&criticalSection)
+        -> decltype(std::forward<CriticalSection>(criticalSection)()) {
       return withLock([&] {
         ScopedNotifyOne guard(condition);
-        return criticalSection();
+        return std::forward<CriticalSection>(criticalSection)();
       });
     }
 
@@ -290,11 +291,11 @@ public:
     /// Precondition: Mutex not held by this thread, undefined otherwise.
     template <typename CriticalSection>
     auto withLockThenNotifyAll(ConditionVariable &condition,
-                               CriticalSection criticalSection)
-        -> decltype(criticalSection()) {
+                               CriticalSection &&criticalSection)
+        -> decltype(std::forward<CriticalSection>(criticalSection)()) {
       return withLock([&] {
         ScopedNotifyAll guard(condition);
-        return criticalSection();
+        return std::forward<CriticalSection>(criticalSection)();
       });
     }
 
@@ -389,10 +390,10 @@ public:
   ///
   /// Precondition: Mutex not held by this thread, undefined otherwise.
   template <typename CriticalSection>
-  auto withLock(CriticalSection criticalSection)
-      -> decltype(criticalSection()) {
+  auto withLock(CriticalSection &&criticalSection)
+      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
     ScopedLock guard(*this);
-    return criticalSection();
+    return std::forward<CriticalSection>(criticalSection)();
   }
 
   /// A stack based object that locks the supplied mutex on construction
@@ -613,10 +614,10 @@ public:
   ///
   /// Precondition: ReadWriteLock not held by this thread, undefined otherwise.
   template <typename CriticalSection>
-  auto withReadLock(CriticalSection criticalSection)
-      -> decltype(criticalSection()) {
+  auto withReadLock(CriticalSection &&criticalSection)
+      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
     ScopedReadLock guard(*this);
-    return criticalSection();
+    return std::forward<CriticalSection>(criticalSection)();
   }
 
   /// Acquires write lock before calling the supplied critical section and
@@ -633,10 +634,10 @@ public:
   ///
   /// Precondition: ReadWriteLock not held by this thread, undefined otherwise.
   template <typename CriticalSection>
-  auto withWriteLock(CriticalSection criticalSection)
-      -> decltype(criticalSection()) {
+  auto withWriteLock(CriticalSection &&criticalSection)
+      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
     ScopedWriteLock guard(*this);
-    return criticalSection();
+    return std::forward<CriticalSection>(criticalSection)();
   }
 
 private:
@@ -683,7 +684,7 @@ public:
 #if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
     constexpr
 #endif
-        StaticMutex()
+    StaticMutex()
         : Handle(MutexPlatformHelper::conditionStaticInit()) {
     }
 
@@ -706,16 +707,16 @@ public:
 
     /// See Mutex::lock
     template <typename CriticalSection>
-    auto withLock(CriticalSection criticalSection)
-        -> decltype(criticalSection()) {
+    auto withLock(CriticalSection &&criticalSection)
+        -> decltype(std::forward<CriticalSection>(criticalSection)()) {
       ScopedLock guard(*this);
-      return criticalSection();
+      return std::forward<CriticalSection>(criticalSection)();
     }
 
     /// See Mutex::withLockOrWait
     template <typename CriticalSection>
     void withLockOrWait(StaticConditionVariable &condition,
-                        CriticalSection criticalSection) {
+                        CriticalSection &&criticalSection) {
       withLock([&] {
         while (!criticalSection()) {
           wait(condition);
@@ -726,22 +727,22 @@ public:
     /// See Mutex::withLockThenNotifyOne
     template <typename CriticalSection>
     auto withLockThenNotifyOne(StaticConditionVariable &condition,
-                               CriticalSection criticalSection)
-        -> decltype(criticalSection()) {
+                               CriticalSection &&criticalSection)
+        -> decltype(std::forward<CriticalSection>(criticalSection)()) {
       return withLock([&] {
         StaticConditionVariable::ScopedNotifyOne guard(condition);
-        return criticalSection();
+        return std::forward<CriticalSection>(criticalSection)();
       });
     }
 
     /// See Mutex::withLockThenNotifyAll
     template <typename CriticalSection>
     auto withLockThenNotifyAll(StaticConditionVariable &condition,
-                               CriticalSection criticalSection)
-        -> decltype(criticalSection()) {
+                               CriticalSection &&criticalSection)
+        -> decltype(std::forward<CriticalSection>(criticalSection)()) {
       return withLock([&] {
         StaticConditionVariable::ScopedNotifyAll guard(condition);
-        return criticalSection();
+        return std::forward<CriticalSection>(criticalSection)();
       });
     }
 
@@ -779,7 +780,7 @@ public:
 #if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
   constexpr
 #endif
-      StaticMutex()
+  StaticMutex()
       : Handle(MutexPlatformHelper::staticInit()) {
   }
 
@@ -794,10 +795,10 @@ public:
 
   /// See Mutex::lock
   template <typename CriticalSection>
-  auto withLock(CriticalSection criticalSection)
-      -> decltype(criticalSection()) {
+  auto withLock(CriticalSection &&criticalSection)
+      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
     ScopedLock guard(*this);
-    return criticalSection();
+    return std::forward<CriticalSection>(criticalSection)();
   }
 
   /// A stack based object that locks the supplied mutex on construction
@@ -830,7 +831,7 @@ public:
 #if SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR
   constexpr
 #endif
-      StaticReadWriteLock()
+  StaticReadWriteLock()
       : Handle(ReadWriteLockPlatformHelper::staticInit()) {
   }
 
@@ -858,18 +859,18 @@ public:
 
   /// See ReadWriteLock::withReadLock
   template <typename CriticalSection>
-  auto withReadLock(CriticalSection criticalSection)
-      -> decltype(criticalSection()) {
+  auto withReadLock(CriticalSection &&criticalSection)
+      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
     StaticScopedReadLock guard(*this);
-    return criticalSection();
+    return std::forward<CriticalSection>(criticalSection)();
   }
 
   /// See ReadWriteLock::withWriteLock
   template <typename CriticalSection>
-  auto withWriteLock(CriticalSection criticalSection)
-      -> decltype(criticalSection()) {
+  auto withWriteLock(CriticalSection &&criticalSection)
+      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
     StaticScopedWriteLock guard(*this);
-    return criticalSection();
+    return std::forward<CriticalSection>(criticalSection)();
   }
 
 private:
@@ -895,7 +896,7 @@ public:
 #if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
   constexpr
 #endif
-      StaticUnsafeMutex()
+  StaticUnsafeMutex()
       : Handle(MutexPlatformHelper::staticInit()) {
   }
 
@@ -920,6 +921,16 @@ public:
   /// - Ignores errors that may happen, undefined when an error happens.
   void unlock() { MutexPlatformHelper::unsafeUnlock(Handle); }
 
+  template <typename CriticalSection>
+  auto withLock(CriticalSection &&criticalSection)
+      -> decltype(std::forward<CriticalSection>(criticalSection)()) {
+    ScopedLock guard(*this);
+    return std::forward<CriticalSection>(criticalSection)();
+  }
+
+  typedef ScopedLockT<StaticUnsafeMutex, false> ScopedLock;
+  typedef ScopedLockT<StaticUnsafeMutex, true> ScopedUnlock;
+
 private:
   MutexHandle Handle;
 };
@@ -942,6 +953,12 @@ public:
   void unlock() { Ptr->unlock(); }
 
   bool try_lock() { return Ptr->try_lock(); }
+
+  template <typename CriticalSection>
+  auto withLock(CriticalSection &&criticalSection)
+      -> decltype(criticalSection()) {
+    return Ptr->withLock(std::forward<CriticalSection>(criticalSection));
+  }
 
   /// A stack based object that locks the supplied mutex on construction
   /// and unlocks it on destruction.
