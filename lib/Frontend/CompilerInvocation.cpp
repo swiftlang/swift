@@ -1503,7 +1503,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      (enableLexicalBorrowScopesFlag.getValueOr(false))) {
+      !enableLexicalBorrowScopesFlag.getValueOr(true)) {
     // Error if move-only is enabled and lexical borrow scopes--on which it
     // depends--has been disabled.
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
@@ -1513,7 +1513,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      (enableLexicalLifetimesFlag.getValueOr(false))) {
+      !enableLexicalLifetimesFlag.getValueOr(true)) {
     // Error if move-only is enabled and lexical lifetimes--on which it
     // depends--has been disabled.
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
