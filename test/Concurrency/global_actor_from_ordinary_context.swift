@@ -135,3 +135,22 @@ func fromAsync() async {
 func topLevelSyncFunction(_ number: inout Int) { }
 // expected-error@+1{{var 'value' isolated to global actor 'SomeGlobalActor' can not be used 'inout' from this context}}
 topLevelSyncFunction(&value)
+
+// Strict checking based on inferred Sendable/async/etc.
+@_predatesConcurrency @SomeGlobalActor class Super { }
+
+class Sub: Super {
+  func f() { }
+
+  func g() {
+    Task.detached {
+      await self.f() // okay: requires await because f is on @SomeGlobalActor
+    }
+  }
+
+  func g2() {
+    Task.detached {
+      self.f() // EXPECTED ERROR because f is on @SomeGlobalActor
+    }
+  }
+}
