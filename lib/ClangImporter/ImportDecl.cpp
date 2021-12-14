@@ -3923,12 +3923,10 @@ namespace {
       if (foreignReferenceTypePassedByRef(decl))
         return nullptr;
 
-      AbstractStorageDecl *owningStorage;
       switch (importedName.getAccessorKind()) {
       case ImportedAccessorKind::None:
       case ImportedAccessorKind::SubscriptGetter:
       case ImportedAccessorKind::SubscriptSetter:
-        owningStorage = nullptr;
         break;
 
       case ImportedAccessorKind::PropertyGetter: {
