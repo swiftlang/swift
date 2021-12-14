@@ -615,7 +615,9 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   if (dc->getParentModule()->isConcurrencyChecked())
     return true;
 
-  return contextRequiresStrictConcurrencyChecking(dc);
+  return contextRequiresStrictConcurrencyChecking(dc, [](const AbstractClosureExpr *) {
+    return Type();
+  });
 }
 
 /// Determine the default diagnostic behavior for this language mode.
@@ -1843,20 +1845,6 @@ namespace {
       }
     }
 
-    bool isInAsynchronousContext() const {
-      auto *dc = getDeclContext();
-
-      if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-        return func->isAsyncContext();
-      }
-
-      if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-        return closure->isBodyAsync();
-      }
-
-      return false;
-    }
-
     enum class AsyncMarkingResult {
       FoundAsync, // successfully marked an implicitly-async operation
       NotFound,  // fail: no valid implicitly-async operation was found
@@ -1917,7 +1905,7 @@ namespace {
 
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
           if (usageEnv(declRef) == VarRefUseEnv::Read) {
-            if (!isInAsynchronousContext())
+            if (!getDeclContext()->isAsyncContext())
               return AsyncMarkingResult::SyncContext;
 
             declRef->setImplicitlyAsync(target);
@@ -1926,7 +1914,7 @@ namespace {
         } else if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
           if (usageEnv(lookupExpr) == VarRefUseEnv::Read) {
 
-            if (!isInAsynchronousContext())
+            if (!getDeclContext()->isAsyncContext())
               return AsyncMarkingResult::SyncContext;
 
             lookupExpr->setImplicitlyAsync(target);
@@ -1939,7 +1927,7 @@ namespace {
         // actor-isolated non-isolated-self calls are implicitly async
         // and thus OK.
 
-        if (!isInAsynchronousContext())
+        if (!getDeclContext()->isAsyncContext())
           return AsyncMarkingResult::SyncContext;
 
         isAsyncCall = true;
@@ -1955,7 +1943,7 @@ namespace {
           auto concDecl = memberRef->first;
           if (decl == concDecl.getDecl() && !apply->isImplicitlyAsync()) {
 
-            if (!isInAsynchronousContext())
+            if (!getDeclContext()->isAsyncContext())
               return AsyncMarkingResult::SyncContext;
 
             // then this ValueDecl appears as the called value of the ApplyExpr.
@@ -2068,7 +2056,7 @@ namespace {
         return false;
 
       // If we are not in an asynchronous context, complain.
-      if (!isInAsynchronousContext()) {
+      if (!getDeclContext()->isAsyncContext()) {
         if (auto calleeDecl = apply->getCalledValue()) {
           ctx.Diags.diagnose(
               apply->getLoc(), diag::actor_isolated_call_decl,
@@ -3562,7 +3550,9 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   overridden->diagnose(diag::overridden_here);
 }
 
-bool swift::contextRequiresStrictConcurrencyChecking(const DeclContext *dc) {
+bool swift::contextRequiresStrictConcurrencyChecking(
+    const DeclContext *dc,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
   // If Swift >= 6, everything uses strict concurrency checking.
   if (dc->getASTContext().LangOpts.isSwiftVersionAtLeast(6))
     return true;
@@ -3574,6 +3564,12 @@ bool swift::contextRequiresStrictConcurrencyChecking(const DeclContext *dc) {
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
         if (getExplicitGlobalActor(const_cast<ClosureExpr *>(explicitClosure)))
           return true;
+
+        if (auto type = getType(closure)) {
+          if (auto fnType = type->getAs<AnyFunctionType>())
+            if (fnType->isAsync() || fnType->isSendable())
+              return true;
+        }
       }
 
       // Async and @Sendable closures use concurrency features.
@@ -4049,11 +4045,12 @@ static bool hasKnownUnsafeSendableFunctionParams(AbstractFunctionDecl *func) {
 }
 
 Type swift::adjustVarTypeForConcurrency(
-    Type type, VarDecl *var, DeclContext *dc) {
+    Type type, VarDecl *var, DeclContext *dc,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
   if (!var->predatesConcurrency())
     return type;
 
-  if (contextRequiresStrictConcurrencyChecking(dc))
+  if (contextRequiresStrictConcurrencyChecking(dc, getType))
     return type;
 
   bool isLValue = false;
@@ -4172,11 +4169,12 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
 
 AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue) {
+    unsigned numApplies, bool isMainDispatchQueue,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
   // Apply unsafe concurrency features to the given function type.
+  bool strictChecking = contextRequiresStrictConcurrencyChecking(dc, getType);
   fnType = applyUnsafeConcurrencyToFunctionType(
-      fnType, decl, contextRequiresStrictConcurrencyChecking(dc), numApplies,
-      isMainDispatchQueue);
+      fnType, decl, strictChecking, numApplies, isMainDispatchQueue);
 
   Type globalActorType;
   if (decl) {
@@ -4190,7 +4188,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     case ActorIsolation::GlobalActorUnsafe:
       // Only treat as global-actor-qualified within code that has adopted
       // Swift Concurrency features.
-      if (!contextRequiresStrictConcurrencyChecking(dc))
+      if (!strictChecking)
         return fnType;
 
       LLVM_FALLTHROUGH;
@@ -4232,7 +4230,10 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 }
 
 bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {
-  return contextRequiresStrictConcurrencyChecking(dc);
+  return contextRequiresStrictConcurrencyChecking(
+      dc, [](const AbstractClosureExpr *) {
+        return Type();
+      });
 }
 
 AbstractFunctionDecl const *swift::isActorInitOrDeInitContext(

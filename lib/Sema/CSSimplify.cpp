@@ -2171,7 +2171,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   /// Whether to downgrade to a concurrency warning.
   auto isConcurrencyWarning = [&] {
-    if (contextRequiresStrictConcurrencyChecking(DC))
+    if (contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}))
       return false;
 
     switch (kind) {
