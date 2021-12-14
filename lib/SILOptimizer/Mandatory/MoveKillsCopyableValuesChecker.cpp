@@ -458,6 +458,7 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
             auto diag = diag::
                 sil_movekillscopyablevalue_move_applied_to_unsupported_move;
             diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+            mvi->setAllowsDiagnostics(false);
           }
         }
       }
