@@ -1043,8 +1043,8 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   CompilerInvocation Invocation;
   std::string CompilerInvocationError;
   bool CreatingInvocationFailed = getASTManager()->initCompilerInvocation(
-      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
-      CompilerInvocationError);
+      Invocation, Args, FrontendOptions::ActionType::Typecheck, Diags,
+      newBuffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
   if (CreatingInvocationFailed) {
     PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
         CompilerInvocationError));

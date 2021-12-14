@@ -20,6 +20,7 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/StringRef.h"
@@ -85,7 +86,8 @@ SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind
 
 bool initCompilerInvocation(
     CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
-    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
+    FrontendOptions::ActionType Action, DiagnosticEngine &Diags,
+    StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const std::string &runtimeResourcePath,
     const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,

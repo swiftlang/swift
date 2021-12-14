@@ -1200,8 +1200,9 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 
   auto Instance = std::make_unique<swift::CompilerInstance>();
-  if (Instance->setup(Invocation))
-    llvm_unreachable("Failed setup");
+  std::string InstanceSetupError;
+  if (Instance->setup(Invocation, InstanceSetupError))
+    llvm_unreachable(InstanceSetupError.c_str());
 
   unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
   SourceManager &SM = Instance->getSourceMgr();

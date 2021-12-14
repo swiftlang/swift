@@ -561,22 +561,14 @@ void CompletionInstance::performNewOperation(
 
     Invocation.setCodeCompletionPoint(completionBuffer, Offset);
 
-    if (CI.setup(Invocation)) {
+    std::string InstanceSetupError;
+    if (CI.setup(Invocation, InstanceSetupError)) {
       Callback(CancellableResult<CompletionInstanceResult>::failure(
-          "failed to setup compiler instance"));
+          InstanceSetupError));
       return;
     }
     CI.getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI.getASTContext().evaluator);
-
-    // If we're expecting a standard library, but there either isn't one, or it
-    // failed to load, let's bail early and hand back an empty completion
-    // result to avoid any downstream crashes.
-    if (CI.loadStdlibIfNeeded()) {
-      Callback(CancellableResult<CompletionInstanceResult>::failure(
-          "failed to load the standard library"));
-      return;
-    }
 
     CI.performParseAndResolveImportsOnly();
 

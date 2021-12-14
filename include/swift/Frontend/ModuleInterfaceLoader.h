@@ -313,6 +313,9 @@ struct ModuleInterfaceLoaderOptions {
     case FrontendOptions::ActionType::TypecheckModuleFromInterface:
       requestedAction = FrontendOptions::ActionType::Typecheck;
       break;
+    case FrontendOptions::ActionType::ScanDependencies:
+      requestedAction = Opts.RequestedAction;
+      break;
     default:
       requestedAction = FrontendOptions::ActionType::EmitModuleOnly;
       break;

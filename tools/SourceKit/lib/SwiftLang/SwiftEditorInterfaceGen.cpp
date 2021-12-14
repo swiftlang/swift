@@ -225,7 +225,8 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
                 file_types::TY_Swift));
-  return CI.setup(Invocation);
+  std::string InstanceSetupError;
+  return CI.setup(Invocation, InstanceSetupError);
 }
 
 static void reportSyntacticAnnotations(CompilerInstance &CI,
@@ -373,8 +374,7 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
   CI.addDiagnosticConsumer(&IFaceGenCtx->Impl.DiagConsumer);
 
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
-  if (CI.setup(Invocation)) {
-    ErrMsg = "Error during invocation setup";
+  if (CI.setup(Invocation, ErrMsg)) {
     return nullptr;
   }
 
@@ -432,8 +432,7 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
   // Display diagnostics to stderr.
   CI.addDiagnosticConsumer(&IFaceGenCtx->Impl.DiagConsumer);
 
-  if (CI.setup(Invocation)) {
-    ErrorMsg = "Error during invocation setup";
+  if (CI.setup(Invocation, ErrorMsg)) {
     return nullptr;
   }
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
@@ -635,8 +634,9 @@ void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager()->initCompilerInvocation(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), StringRef(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -675,8 +675,9 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
-                                                     CI.getDiags(), Error)) {
+  if (getASTManager()->initCompilerInvocationNoInputs(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -741,7 +742,7 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(
     SourceKitCancellationToken CancellationToken,
     std::shared_ptr<EditorConsumer> Consumer) {
   std::string Error;
-  auto Invocation = ASTMgr->getInvocation(Args, SourceName, Error);
+  auto Invocation = ASTMgr->getTypecheckInvocation(Args, SourceName, Error);
   if (!Invocation) {
     Consumer->handleRequestError(Error.c_str());
     return;
@@ -770,8 +771,9 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   std::string Error;
 
   ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : llvm::None;
-  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, SwiftArgs,
-                                                     CI.getDiags(), Error)) {
+  if (getASTManager()->initCompilerInvocationNoInputs(
+          Invocation, SwiftArgs, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -820,8 +822,9 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager()->initCompilerInvocation(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), StringRef(), Error)) {
     return Receiver(RequestResult<InterfaceDocInfo>::fromError(Error));
   }
 
