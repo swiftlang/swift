@@ -310,6 +310,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-Xcc" "-DSWIFT_STDLIB_HAS_ENVIRON")
   endif()
 
+  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+    list(APPEND result "-D" "SWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
+  endif()
+
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
