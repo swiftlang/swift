@@ -420,6 +420,18 @@ bool MoveKillsCopyableValuesChecker::check() {
 }
 
 //===----------------------------------------------------------------------===//
+//                        Unsupported Use Case Errors
+//===----------------------------------------------------------------------===//
+
+static void emitUnsupportedUseCaseError(MoveValueInst *mvi) {
+  auto &astContext = mvi->getModule().getASTContext();
+  auto diag = diag::
+    sil_movekillscopyablevalue_move_applied_to_unsupported_move;
+  diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+  mvi->setAllowsDiagnostics(false);
+}
+
+//===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
@@ -455,10 +467,7 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
       for (auto &inst : block) {
         if (auto *mvi = dyn_cast<MoveValueInst>(&inst)) {
           if (mvi->getAllowDiagnostics()) {
-            auto diag = diag::
-                sil_movekillscopyablevalue_move_applied_to_unsupported_move;
-            diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
-            mvi->setAllowsDiagnostics(false);
+            emitUnsupportedUseCaseError(mvi);
           }
         }
       }
