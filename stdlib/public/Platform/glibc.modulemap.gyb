@@ -19,17 +19,19 @@
 /// It's not named just Glibc so that it doesn't conflict in the event of a
 /// future official glibc modulemap.
 module SwiftGlibc [system] {
-% if CMAKE_SDK in ["LINUX", "ANDROID"]:
+% if CMAKE_SDK in ["LINUX", "ANDROID", "OPENBSD"]:
       link "m"
 % end
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "OPENBSD", "CYGWIN"]:
   link "pthread"
   // FIXME: util contains rarely used functions and not usually needed. Unfortunately
   // link directive doesn't work in the submodule yet.
+% if CMAKE_SDK != "OPENBSD":
   link "util"
 % end
+% end
 
-% if CMAKE_SDK != "FREEBSD" and CMAKE_SDK != "HAIKU":
+% if CMAKE_SDK not in ["FREEBSD", "OPENBSD", "HAIKU"]:
   link "dl"
 % end
 
