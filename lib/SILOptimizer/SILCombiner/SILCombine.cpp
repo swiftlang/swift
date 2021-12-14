@@ -537,9 +537,11 @@ class SILCombine : public SILFunctionTransform {
     auto *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
     auto *NLABA = PM->getAnalysis<NonLocalAccessBlockAnalysis>();
 
-    bool enableCopyPropagation = getOptions().EnableCopyPropagation;
+    bool enableCopyPropagation =
+        getOptions().CopyPropagation == CopyPropagationOption::On;
     if (getOptions().EnableOSSAModules) {
-      enableCopyPropagation = !getOptions().DisableCopyPropagation;
+      enableCopyPropagation =
+          getOptions().CopyPropagation != CopyPropagationOption::Off;
     }
 
     SILOptFunctionBuilder FuncBuilder(*this);
