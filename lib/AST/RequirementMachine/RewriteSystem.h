@@ -197,44 +197,6 @@ class RewriteSystem final {
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
 
-  /// Constructed from a rule of the form X.[P2:T] => X.[P1:T] by
-  /// checkMergedAssociatedType().
-  struct MergedAssociatedType {
-    /// The *right* hand side of the original rule, X.[P1:T].
-    Term rhs;
-
-    /// The associated type symbol appearing at the end of the *left*
-    /// hand side of the original rule, [P2:T].
-    Symbol lhsSymbol;
-
-    /// The merged associated type symbol, [P1&P2:T].
-    Symbol mergedSymbol;
-  };
-
-  /// A list of pending terms for the associated type merging completion
-  /// heuristic. Entries are added by checkMergedAssociatedType(), and
-  /// consumed in processMergedAssociatedTypes().
-  std::vector<MergedAssociatedType> MergedAssociatedTypes;
-
-  /// Pairs of rules which have already been checked for overlap.
-  llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
-
-  /// Homotopy generators for this rewrite system. These are the
-  /// rewrite loops which rewrite a term back to itself.
-  ///
-  /// In the category theory interpretation, a rewrite rule is a generating
-  /// 2-cell, and a rewrite path is a 2-cell made from a composition of
-  /// generating 2-cells.
-  ///
-  /// Homotopy generators, in turn, are 3-cells. The special case of a
-  /// 3-cell discovered during completion can be viewed as two parallel
-  /// 2-cells; this is actually represented as a single 2-cell forming a
-  /// loop around a base point.
-  ///
-  /// This data is used by the homotopy reduction and generating conformances
-  /// algorithms.
-  std::vector<RewriteLoop> Loops;
-
   DebugOptions Debug;
 
   /// Whether we've initialized the rewrite system with a call to initialize().
@@ -288,10 +250,6 @@ public:
     return Rules[ruleID];
   }
 
-  ArrayRef<RewriteLoop> getLoops() const {
-    return Loops;
-  }
-
   bool addRule(MutableTerm lhs, MutableTerm rhs,
                const RewritePath *path=nullptr);
 
@@ -309,6 +267,9 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
+  /// Pairs of rules which have already been checked for overlap.
+  llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
+
   std::pair<CompletionResult, unsigned>
   computeConfluentCompletion(unsigned maxIterations,
                              unsigned maxDepth);
@@ -325,6 +286,89 @@ public:
   void verifyRewriteRules(ValidityPolicy policy) const;
 
 private:
+  bool
+  computeCriticalPair(
+      ArrayRef<Symbol>::const_iterator from,
+      const Rule &lhs, const Rule &rhs,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &pairs,
+      std::vector<RewritePath> &paths,
+      std::vector<RewriteLoop> &loops) const;
+
+  /// Constructed from a rule of the form X.[P2:T] => X.[P1:T] by
+  /// checkMergedAssociatedType().
+  struct MergedAssociatedType {
+    /// The *right* hand side of the original rule, X.[P1:T].
+    Term rhs;
+
+    /// The associated type symbol appearing at the end of the *left*
+    /// hand side of the original rule, [P2:T].
+    Symbol lhsSymbol;
+
+    /// The merged associated type symbol, [P1&P2:T].
+    Symbol mergedSymbol;
+  };
+
+  /// A list of pending terms for the associated type merging completion
+  /// heuristic. Entries are added by checkMergedAssociatedType(), and
+  /// consumed in processMergedAssociatedTypes().
+  std::vector<MergedAssociatedType> MergedAssociatedTypes;
+
+  void processMergedAssociatedTypes();
+
+  void checkMergedAssociatedType(Term lhs, Term rhs);
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// "Pseudo-rules" for the property map
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+public:
+  struct ConcreteTypeWitness {
+    Symbol ConcreteConformance;
+    Symbol AssocType;
+    Symbol ConcreteType;
+
+    ConcreteTypeWitness(Symbol concreteConformance,
+                        Symbol assocType,
+                        Symbol concreteType);
+
+    friend bool operator==(const ConcreteTypeWitness &lhs,
+                           const ConcreteTypeWitness &rhs);
+  };
+
+private:
+  /// Cache for concrete type witnesses. The value in the map is an index
+  /// into the vector.
+  llvm::DenseMap<std::pair<Symbol, Symbol>, unsigned> ConcreteTypeWitnessMap;
+  std::vector<ConcreteTypeWitness> ConcreteTypeWitnesses;
+
+public:
+  unsigned recordConcreteTypeWitness(ConcreteTypeWitness witness);
+  const ConcreteTypeWitness &getConcreteTypeWitness(unsigned index) const;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Homotopy reduction
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  /// Homotopy generators for this rewrite system. These are the
+  /// rewrite loops which rewrite a term back to itself.
+  ///
+  /// In the category theory interpretation, a rewrite rule is a generating
+  /// 2-cell, and a rewrite path is a 2-cell made from a composition of
+  /// generating 2-cells.
+  ///
+  /// Homotopy generators, in turn, are 3-cells. The special case of a
+  /// 3-cell discovered during completion can be viewed as two parallel
+  /// 2-cells; this is actually represented as a single 2-cell forming a
+  /// loop around a base point.
+  ///
+  /// This data is used by the homotopy reduction and generating conformances
+  /// algorithms.
+  std::vector<RewriteLoop> Loops;
+
   void recordRewriteLoop(RewriteLoop loop) {
     if (!RecordLoops)
       return;
@@ -339,24 +383,6 @@ private:
 
     Loops.emplace_back(basepoint, path);
   }
-
-  bool
-  computeCriticalPair(
-      ArrayRef<Symbol>::const_iterator from,
-      const Rule &lhs, const Rule &rhs,
-      std::vector<std::pair<MutableTerm, MutableTerm>> &pairs,
-      std::vector<RewritePath> &paths,
-      std::vector<RewriteLoop> &loops) const;
-
-  void processMergedAssociatedTypes();
-
-  void checkMergedAssociatedType(Term lhs, Term rhs);
-
-  //////////////////////////////////////////////////////////////////////////////
-  ///
-  /// Homotopy reduction
-  ///
-  //////////////////////////////////////////////////////////////////////////////
 
   void propagateExplicitBits();
 
@@ -377,6 +403,10 @@ private:
       llvm::DenseSet<unsigned> &redundantConformances);
 
 public:
+  ArrayRef<RewriteLoop> getLoops() const {
+    return Loops;
+  }
+
   void minimizeRewriteSystem();
 
   bool hadError() const;

@@ -650,6 +650,50 @@ void PropertyMap::concretizeTypeWitnessInConformance(
   }
 }
 
+RewriteSystem::ConcreteTypeWitness::ConcreteTypeWitness(
+    Symbol concreteConformance,
+    Symbol assocType,
+    Symbol concreteType)
+  : ConcreteConformance(concreteConformance),
+    AssocType(assocType),
+    ConcreteType(concreteType) {
+  assert(concreteConformance.getKind() == Symbol::Kind::ConcreteConformance);
+  assert(assocType.getKind() == Symbol::Kind::AssociatedType);
+  assert(concreteType.getKind() == Symbol::Kind::ConcreteType);
+  assert(assocType.getProtocols().size() == 1);
+  assert(assocType.getProtocols()[0] == concreteConformance.getProtocol());
+}
+
+bool swift::rewriting::operator==(
+    const RewriteSystem::ConcreteTypeWitness &lhs,
+    const RewriteSystem::ConcreteTypeWitness &rhs) {
+  return (lhs.ConcreteConformance == rhs.ConcreteConformance &&
+          lhs.AssocType == rhs.AssocType &&
+          lhs.ConcreteType == rhs.ConcreteType);
+}
+
+unsigned RewriteSystem::recordConcreteTypeWitness(
+    RewriteSystem::ConcreteTypeWitness witness) {
+  auto key = std::make_pair(witness.ConcreteConformance,
+                            witness.AssocType);
+  unsigned index = ConcreteTypeWitnesses.size();
+  auto inserted = ConcreteTypeWitnessMap.insert(std::make_pair(key, index));
+
+  if (!inserted.second) {
+    index = inserted.first->second;
+  } else {
+    ConcreteTypeWitnesses.push_back(witness);
+  }
+
+  assert(ConcreteTypeWitnesses[index] == witness);
+  return index;
+}
+
+const RewriteSystem::ConcreteTypeWitness &
+RewriteSystem::getConcreteTypeWitness(unsigned index) const {
+  return ConcreteTypeWitnesses[index];
+}
+
 /// Given the key of a property bag known to have \p concreteType,
 /// together with a \p typeWitness from a conformance on that concrete
 /// type, return the right hand side of a rewrite rule to relate
