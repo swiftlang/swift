@@ -335,8 +335,7 @@ bool MoveKillsCopyableValuesChecker::check() {
   SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Guaranteed ||
-        arg->getOwnershipKind() == OwnershipKind::Owned)
+    if (arg->getOwnershipKind() == OwnershipKind::Owned)
       valuesToCheck.insert(arg);
   }
 

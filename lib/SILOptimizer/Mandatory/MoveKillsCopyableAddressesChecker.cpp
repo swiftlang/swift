@@ -885,6 +885,20 @@ bool MoveKillsCopyableAddressesObjectChecker::check() {
     if (!visitAccessPathUses(visitor, accessPath, fn))
       continue;
 
+    // See if our base address is an inout. If we found any moves, add as a
+    // liveness use all function terminators.
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(address)) {
+      if (fArg->hasConvention(SILArgumentConvention::Indirect_Inout)) {
+        if (visitor.useState.markMoves.size()) {
+          SmallVector<SILBasicBlock *, 2> exitingBlocks;
+          fn->findExitingBlocks(exitingBlocks);
+          for (auto *block : exitingBlocks) {
+            visitor.useState.livenessUses.insert(block->getTerminator());
+          }
+        }
+      }
+    }
+
     // Now initialize our data structures.
     SWIFT_DEFER {
       useBlocks.clear();
@@ -987,7 +1001,7 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
     for (auto *arg : fn->front().getSILFunctionArguments()) {
       if (arg->getType().isAddress() &&
           (arg->hasConvention(SILArgumentConvention::Indirect_In) ||
-           arg->hasConvention(SILArgumentConvention::Indirect_In)))
+           arg->hasConvention(SILArgumentConvention::Indirect_Inout)))
         checker.addressesToCheck.insert(arg);
     }
 
