@@ -214,7 +214,9 @@ void checkOverrideActorIsolation(ValueDecl *value);
 /// Determine whether the given context requires strict concurrency checking,
 /// e.g., because it uses concurrency features directly or because it's in
 /// code where strict checking has been enabled.
-bool contextRequiresStrictConcurrencyChecking(const DeclContext *dc);
+bool contextRequiresStrictConcurrencyChecking(
+    const DeclContext *dc,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
 
 /// Diagnose the presence of any non-sendable types when referencing a
 /// given declaration from a particular declaration context.
@@ -337,13 +339,9 @@ checkGlobalActorAttributes(
 Type getExplicitGlobalActor(ClosureExpr *closure);
 
 /// Adjust the type of the variable for concurrency.
-Type adjustVarTypeForConcurrency(Type type, VarDecl *var, DeclContext *dc);
-
-/// Adjust the function type of a function / subscript / enum case for
-/// concurrency.
-AnyFunctionType *adjustFunctionTypeForConcurrency(
-    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue);
+Type adjustVarTypeForConcurrency(
+    Type type, VarDecl *var, DeclContext *dc,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
 
 /// Adjust the given function type to account for concurrency-specific
 /// attributes whose affect on the type might differ based on context.
@@ -351,8 +349,9 @@ AnyFunctionType *adjustFunctionTypeForConcurrency(
 /// `@_unsafeSendable` and `@_unsafeMainActor` as well as a global actor
 /// on the declaration itself.
 AnyFunctionType *adjustFunctionTypeForConcurrency(
-    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue);
+    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
 
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.

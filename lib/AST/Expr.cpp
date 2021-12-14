@@ -1708,15 +1708,49 @@ Type AbstractClosureExpr::getResultType(
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
-  if (getType()->hasError())
+  if (!getType() || getType()->hasError()) {
+    // Scan the closure body to infer effects.
+    if (auto closure = dyn_cast<ClosureExpr>(this)) {
+      return evaluateOrDefault(
+          getASTContext().evaluator,
+          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
+          FunctionType::ExtInfo()).isThrowing();
+    }
+
     return false;
+  }
   
   return getType()->castTo<FunctionType>()->getExtInfo().isThrowing();
 }
 
-bool AbstractClosureExpr::isBodyAsync() const {
-  if (getType()->hasError())
+bool AbstractClosureExpr::isSendable() const {
+  if (!getType() || getType()->hasError()) {
+    // Scan the closure body to infer effects.
+    if (auto closure = dyn_cast<ClosureExpr>(this)) {
+      return evaluateOrDefault(
+          getASTContext().evaluator,
+          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
+          FunctionType::ExtInfo()).isSendable();
+    }
+
     return false;
+  }
+
+  return getType()->castTo<FunctionType>()->getExtInfo().isSendable();
+}
+
+bool AbstractClosureExpr::isBodyAsync() const {
+  if (!getType() || getType()->hasError()) {
+    // Scan the closure body to infer effects.
+    if (auto closure = dyn_cast<ClosureExpr>(this)) {
+      return evaluateOrDefault(
+          getASTContext().evaluator,
+          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
+          FunctionType::ExtInfo()).isAsync();
+    }
+
+    return false;
+  }
 
   return getType()->castTo<FunctionType>()->getExtInfo().isAsync();
 }

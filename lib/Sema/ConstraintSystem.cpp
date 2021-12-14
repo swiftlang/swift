@@ -1098,6 +1098,21 @@ doesStorageProduceLValue(AbstractStorageDecl *storage, Type baseType,
           !storage->isSetterMutating());
 }
 
+Type GetClosureType::operator()(const AbstractClosureExpr *expr) const {
+  if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+    // Look through type bindings, if we have them.
+    auto mutableClosure = const_cast<ClosureExpr *>(closure);
+    if (cs.hasType(mutableClosure)) {
+      return cs.getFixedTypeRecursive(
+          cs.getType(mutableClosure), /*wantRValue=*/true);
+    }
+
+    return cs.getClosureTypeIfAvailable(closure);
+  }
+
+  return Type();
+}
+
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     ConstraintLocator *memberLocator, bool wantInterfaceType) {
@@ -1113,18 +1128,20 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      memberLocator, wantInterfaceType);
+      memberLocator, wantInterfaceType, GetClosureType{*this});
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     llvm::function_ref<Type(VarDecl *)> getType,
-    ConstraintLocator *memberLocator, bool wantInterfaceType) {
+    ConstraintLocator *memberLocator, bool wantInterfaceType,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // Adjust the type for concurrency.
-  requestedType = adjustVarTypeForConcurrency(requestedType, value, UseDC);
+  requestedType = adjustVarTypeForConcurrency(
+      requestedType, value, UseDC, getClosureType);
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -1298,6 +1315,13 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
+AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
+    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue) {
+  return swift::adjustFunctionTypeForConcurrency(
+      fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this});
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
@@ -1314,7 +1338,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         ->castTo<AnyFunctionType>();
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(value, false, functionRefKind);
-      funcType = adjustFunctionTypeForConcurrency(funcType, func, useDC, numApplies, false);
+      funcType = adjustFunctionTypeForConcurrency(
+          funcType, func, useDC, numApplies, false);
     }
     auto openedType = openFunctionType(
         funcType, locator, replacements, func->getDeclContext());
@@ -2085,7 +2110,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       } else if (type->hasDynamicSelfType()) {
         type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
       }
-      type = adjustVarTypeForConcurrency(type, var, useDC);
+      type = adjustVarTypeForConcurrency(
+          type, var, useDC, GetClosureType{*this});
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
@@ -2339,20 +2365,18 @@ isInvalidPartialApplication(ConstraintSystem &cs,
   return {true, level};
 }
 
-/// Walk a closure AST to determine its effects.
-///
-/// \returns a function's extended info describing the effects, as
-/// determined syntactically.
 FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
-  auto known = closureEffectsCache.find(expr);
-  if (known != closureEffectsCache.end())
-    return known->second;
+  return evaluateOrDefault(
+      getASTContext().evaluator, ClosureEffectsRequest{expr},
+      FunctionType::ExtInfo());
+}
 
+FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
+  Evaluator &evaluator, ClosureExpr *expr) const {
   // A walker that looks for 'try' and 'throw' expressions
   // that aren't nested within closures, nested declarations,
   // or exhaustive catches.
   class FindInnerThrows : public ASTWalker {
-    ConstraintSystem &CS;
     DeclContext *DC;
     bool FoundThrow = false;
 
@@ -2449,7 +2473,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
       // Okay, now it should be safe to coerce the pattern.
       // Pull the top-level pattern back out.
       pattern = LabelItem.getPattern();
-      Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
+      Type exnType = DC->getASTContext().getErrorDecl()->getDeclaredInterfaceType();
 
       if (!exnType)
         return false;
@@ -2501,8 +2525,8 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
     }
 
   public:
-    FindInnerThrows(ConstraintSystem &cs, DeclContext *dc)
-        : CS(cs), DC(dc) {}
+    FindInnerThrows(DeclContext *dc)
+        : DC(dc) {}
 
     bool foundThrow() { return FoundThrow; }
   };
@@ -2525,23 +2549,27 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   if (!body)
     return ASTExtInfoBuilder().withConcurrent(concurrent).build();
 
-  auto throwFinder = FindInnerThrows(*this, expr);
+  auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
-  auto result = ASTExtInfoBuilder()
-                    .withThrows(throwFinder.foundThrow())
-                    .withAsync(bool(findAsyncNode(expr)))
-                    .withConcurrent(concurrent)
-                    .build();
-  closureEffectsCache[expr] = result;
-  return result;
+  return ASTExtInfoBuilder()
+      .withThrows(throwFinder.foundThrow())
+      .withAsync(bool(findAsyncNode(expr)))
+      .withConcurrent(concurrent)
+      .build();
 }
 
 bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
     return func->isAsyncContext();
 
-  if (auto closure = dyn_cast<ClosureExpr>(dc))
-    return closureEffects(closure).isAsync();
+  if (auto abstractClosure = dyn_cast<AbstractClosureExpr>(dc)) {
+    if (Type type = GetClosureType{*this}(abstractClosure)) {
+      if (auto fnType = type->getAs<AnyFunctionType>())
+        return fnType->isAsync();
+    }
+
+    return abstractClosure->isBodyAsync();
+  }
 
   return false;
 }
