@@ -12,6 +12,9 @@ import StdlibUnittest
 public class Klass {}
 
 var tests = TestSuite("move_function_uniqueness")
+defer {
+    runAllTests()
+}
 
 public enum Enum {
     case foo
@@ -43,8 +46,8 @@ public class Class {
 
 extension Class {
     @inline(never)
-    func readClassTest(_ userHandle: Int) {
-        assert(_isUnique(&self.k2))
+    func readClassSwitchLetTest(_ userHandle: Int) {
+        expectTrue(_isUnique(&self.k2))
 
         let x: K2
         do {
@@ -52,22 +55,22 @@ extension Class {
         }
         switch _move(x)[userHandle] {
         case .foo:
-            assert(_isUnique(&self.k2))
+            expectTrue(_isUnique(&self.k2))
         }
     }
 }
 
-tests.test("classUniquenessTest") {
+tests.test("readClassSwitchLetTest") {
     let c = Class()
     for f in 0..<10_000 {
-        c.readClassTest(f)
+        c.readClassSwitchLetTest(f)
     }
 }
 
 extension Class {
     @inline(never)
-    func readArrayTest(_ userHandle: Int) {
-        assert(self.array._buffer.isUniquelyReferenced())
+    func readArraySwitchLetTest(_ userHandle: Int) {
+        expectTrue(self.array._buffer.isUniquelyReferenced())
 
         let x: [Enum]
         do {
@@ -75,16 +78,39 @@ extension Class {
         }
         switch _move(x)[userHandle] {
         case .foo:
-            assert(self.array._buffer.isUniquelyReferenced())
+            expectTrue(self.array._buffer.isUniquelyReferenced())
         }
     }
 }
 
-tests.test("arrayUniquenessTest") {
+tests.test("readArraySwitchLetTest") {
     let c = Class()
     for f in 0..<10_000 {
-        c.readArrayTest(f)
+        c.readArraySwitchLetTest(f)
     }
 }
 
-runAllTests()
+tests.test("simpleArrayVarTest") {
+    var x: [Enum] = Array(repeating: .foo, count: 10_000)
+    expectTrue(x._buffer.isUniquelyReferenced())
+
+    var y = x
+    expectFalse(x._buffer.isUniquelyReferenced())
+    let _ = _move(y)
+    expectTrue(x._buffer.isUniquelyReferenced())
+    y = []
+    expectTrue(x._buffer.isUniquelyReferenced())
+}
+
+tests.test("simpleArrayInoutVarTest") {
+    func inOutTest(_ x: inout [Enum]) {
+        var y = x
+        expectFalse(x._buffer.isUniquelyReferenced())
+        let _ = _move(y)
+        expectTrue(x._buffer.isUniquelyReferenced())
+        y = []
+        expectTrue(x._buffer.isUniquelyReferenced())
+    }
+    var outerX: [Enum] = Array(repeating: .foo, count: 10_000)
+    inOutTest(&outerX)
+}
