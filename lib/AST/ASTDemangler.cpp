@@ -818,6 +818,24 @@ bool ASTBuilder::validateParentType(TypeDecl *decl, Type parent) {
 GenericTypeDecl *
 ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
                                            Demangle::Node::Kind kind) {
+  // If we found a typealias when we weren't expecting one, check if
+  // we have a non-generic alias for a non-generic type that was
+  // declared with @_originallyDefinedIn.
+  //
+  // FIXME: Either make this work with generic types too, or find a
+  // better way that doesn't require leaving behind "forwarding"
+  // aliases like this.
+  if (kind != Demangle::Node::Kind::TypeAlias) {
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+      if (!aliasDecl->isGeneric() &&
+          aliasDecl->getUnderlyingType()->is<NominalType>()) {
+        auto *otherDecl = aliasDecl->getUnderlyingType()->getAnyNominal();
+        if (otherDecl->getAttrs().hasAttribute<OriginallyDefinedInAttr>())
+          decl = otherDecl;
+      }
+    }
+  }
+
   if (kind == Demangle::Node::Kind::Class) {
     return dyn_cast<ClassDecl>(decl);
   } else if (kind == Demangle::Node::Kind::Enum) {
