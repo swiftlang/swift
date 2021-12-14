@@ -4,8 +4,8 @@
 
 // REQUIRES: PTRSIZE=64
 
-// CHECK-DAG: [[FILENAME:@[0-9]+]] = {{.*}} c"{{.*}}closure.swift\00"
-// OPT: [[FILENAME:@[0-9]+]] = {{.*}} [1 x i8] zeroinitializer
+// CHECK-DAG: [[FILENAME:@.str]] = {{.*}} c"{{.*}}closure.swift\00"
+// OPT: [[FILENAME:@.str]] = {{.*}} [1 x i8] zeroinitializer
 
 // -- partial_apply context metadata
 
