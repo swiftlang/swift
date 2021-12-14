@@ -79,7 +79,9 @@ void ConnectedComponent::buildRequirements(Type subjectType,
                         subjectType, constraintType);
       subjectType = constraintType;
     }
-  } else {
+  } else if (!ConcreteType->hasError()) {
+    // For compatibility with the old GenericSignatureBuilder, drop requirements
+    // containing ErrorTypes.
     reqs.emplace_back(RequirementKind::SameType,
                       subjectType, ConcreteType);
 
@@ -120,14 +122,20 @@ RequirementMachine::buildRequirementsFromRules(
                           prop->getLayoutConstraint());
         return;
 
-      case Symbol::Kind::Superclass:
+      case Symbol::Kind::Superclass: {
+        // For compatibility with the old GenericSignatureBuilder, drop requirements
+        // containing ErrorTypes.
+        auto superclassType = Context.getTypeFromSubstitutionSchema(
+                                prop->getSuperclass(),
+                                prop->getSubstitutions(),
+                                genericParams, MutableTerm());
+        if (superclassType->hasError())
+          return;
+
         reqs.emplace_back(RequirementKind::Superclass,
-                          subjectType,
-                          Context.getTypeFromSubstitutionSchema(
-                              prop->getSuperclass(),
-                              prop->getSubstitutions(),
-                              genericParams, MutableTerm()));
+                          subjectType, superclassType);
         return;
+      }
 
       case Symbol::Kind::ConcreteType: {
         auto concreteType = Context.getTypeFromSubstitutionSchema(

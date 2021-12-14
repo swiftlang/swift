@@ -254,7 +254,7 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 /// Simplify terms appearing in the substitutions of the last symbol of \p term,
 /// which must be a superclass or concrete type symbol.
 bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
-                                          RewritePath &path) const {
+                                          RewritePath *path) const {
   assert(symbol.hasSubstitutions());
 
   auto substitutions = symbol.getSubstitutions();
@@ -263,14 +263,16 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
 
   // Save the original rewrite path length so that we can reset if if we don't
   // find anything to simplify.
-  unsigned oldSize = path.size();
+  unsigned oldSize = (path ? path->size() : 0);
 
-  // The term is on the A stack. Push all substitutions onto the A stack.
-  path.add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/false));
+  if (path) {
+    // The term is on the A stack. Push all substitutions onto the A stack.
+    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/false));
 
-  // Move all substitutions but the first one to the B stack.
-  for (unsigned i = 1; i < substitutions.size(); ++i)
-    path.add(RewriteStep::forShift(/*inverse=*/false));
+    // Move all substitutions but the first one to the B stack.
+    for (unsigned i = 1; i < substitutions.size(); ++i)
+      path->add(RewriteStep::forShift(/*inverse=*/false));
+  }
 
   // Simplify and collect substitutions.
   SmallVector<Term, 2> newSubstitutions;
@@ -280,13 +282,13 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
   bool anyChanged = false;
   for (auto substitution : substitutions) {
     // Move the next substitution from the B stack to the A stack.
-    if (!first)
-      path.add(RewriteStep::forShift(/*inverse=*/true));
+    if (!first && path)
+      path->add(RewriteStep::forShift(/*inverse=*/true));
     first = false;
 
     // The current substitution is at the top of the A stack; simplify it.
     MutableTerm mutTerm(substitution);
-    anyChanged |= simplify(mutTerm, &path);
+    anyChanged |= simplify(mutTerm, path);
 
     // Record the new substitution.
     newSubstitutions.push_back(Term::get(mutTerm, Context));
@@ -294,20 +296,23 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
 
   // All simplified substitutions are now on the A stack. Collect them to
   // produce the new term.
-  path.add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/true));
+  if (path)
+    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/true));
 
   // If nothing changed, we don't have to rebuild the symbol.
   if (!anyChanged) {
-    // The rewrite path should consist of a Decompose, followed by a number
-    // of Shifts, followed by a Compose.
-#ifndef NDEBUG
-    for (auto iter = path.begin() + oldSize; iter < path.end(); ++iter) {
-      assert(iter->Kind == RewriteStep::Shift ||
-             iter->Kind == RewriteStep::Decompose);
-    }
-#endif
+    if (path) {
+      // The rewrite path should consist of a Decompose, followed by a number
+      // of Shifts, followed by a Compose.
+  #ifndef NDEBUG
+      for (auto iter = path->begin() + oldSize; iter < path->end(); ++iter) {
+        assert(iter->Kind == RewriteStep::Shift ||
+               iter->Kind == RewriteStep::Decompose);
+      }
+  #endif
 
-    path.resize(oldSize);
+      path->resize(oldSize);
+    }
     return false;
   }
 
@@ -571,7 +576,7 @@ void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
                                          ruleID, /*inverse=*/true));
 
     // (2) Now, simplify the substitutions to get the new lhs.
-    if (!simplifySubstitutions(symbol, path))
+    if (!simplifySubstitutions(symbol, &path))
       continue;
 
     // We're either going to add a new rule or record an identity, so

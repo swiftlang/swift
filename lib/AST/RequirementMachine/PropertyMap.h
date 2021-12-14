@@ -227,8 +227,11 @@ private:
                    SmallVectorImpl<InducedRule> &inducedRules) const;
 
   MutableTerm computeConstraintTermForTypeWitness(
-      Term key, CanType concreteType, CanType typeWitness,
-      const MutableTerm &subjectType, ArrayRef<Term> substitutions) const;
+      Term key, RequirementKind requirementKind,
+      CanType concreteType, CanType typeWitness,
+      const MutableTerm &subjectType,
+      ArrayRef<Term> substitutions,
+      RewritePath &path) const;
 
   void recordConcreteConformanceRule(
     unsigned concreteRuleID,
