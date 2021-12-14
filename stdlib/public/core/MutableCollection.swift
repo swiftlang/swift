@@ -200,13 +200,13 @@ where SubSequence: MutableCollection
   /// contiguous mutable storage of the entire collection. If no such storage
   /// exists, the collection creates it. If the collection doesn't support an
   /// internal representation in the form of contiguous mutable storage, this
-  /// method doesn't call `body` but instead immediately returns `nil`.
+  /// method doesn't call `body` --- it immediately returns `nil`.
   ///
   /// The optimizer can often eliminate bounds- and uniqueness-checking
   /// within an algorithm. When that fails, however, invoking the same
   /// algorithm on the `buffer` argument may let you trade safety for speed.
   ///
-  /// Your closure should always perform any necessary cleanup, because the
+  /// Always perform any necessary cleanup in the closure, because the
   /// method makes no guarantees about the state of the collection if the
   /// closure throws an error. Your changes to the collection may be absent
   /// from the collection after throwing the error, because the closure could
@@ -215,7 +215,7 @@ where SubSequence: MutableCollection
   ///
   /// - Warning: Your `body` closure must not replace `buffer`. This leads
   ///   to a crash in all implementations of this method within the standard
-  ///   library
+  ///   library.
   ///
   /// Successive calls to this method may provide a different pointer on each
   /// call. Don't store `buffer` outside of this method.

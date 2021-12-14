@@ -387,10 +387,10 @@ public protocol Sequence {
   /// Executes a closure on the sequence’s contiguous storage.
   ///
   /// This method calls `body(buffer)`, where `buffer` is a pointer to the
-  /// collection’s contiguous storage. If no such storage exists, the collection
-  /// creates it. If the collection doesn’t support an internal representation
-  /// in a form of contiguous storage, the method doesn’t call `body` but
-  /// instead immediately returns `nil`.
+  /// collection’s contiguous storage. If the contiguous storage doesn't exist,
+  /// the collection creates it. If the collection doesn’t support an internal
+  /// representation in a form of contiguous storage, the method doesn’t call
+  /// `body` --- it immediately returns `nil`.
   ///
   /// The optimizer can often eliminate bounds- and uniqueness-checking
   /// within an algorithm. When that fails, however, invoking the same
