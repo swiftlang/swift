@@ -197,10 +197,11 @@ where SubSequence: MutableCollection
   /// Executes a closure on the collection's contiguous storage.
   ///
   /// This method calls `body(buffer)`, where `buffer` provides access to the
-  /// contiguous mutable storage of the entire collection. If no such storage
-  /// exists, the collection creates it. If the collection doesn't support an
-  /// internal representation in the form of contiguous mutable storage, this
-  /// method doesn't call `body` --- it immediately returns `nil`.
+  /// contiguous mutable storage of the entire collection. If the contiguous
+  /// storage doesn't exist, the collection creates it. If the collection
+  /// doesn't support an internal representation in the form of contiguous
+  /// mutable storage, this method doesn't call `body` --- it immediately
+  ///  returns `nil`.
   ///
   /// The optimizer can often eliminate bounds- and uniqueness-checking
   /// within an algorithm. When that fails, however, invoking the same
