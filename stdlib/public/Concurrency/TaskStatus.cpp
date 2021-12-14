@@ -471,7 +471,6 @@ swift_task_detachChildImpl(ChildTaskStatusRecord *record) {
 SWIFT_CC(swift)
 static void swift_taskGroup_attachChildImpl(TaskGroup *group,
                                             AsyncTask *child) {
-  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, group);
 
   // We are always called from the context of the parent
   //
