@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-library-evolution -emit-module -emit-module-path %t/resilient_struct.swiftmodule
 // RUN: %target-swift-frontend %S/../Inputs/resilient_enum.swift -I %t -enable-library-evolution -emit-module -emit-module-path %t/resilient_enum.swiftmodule
-// RUN: %target-swift-frontend %s -sil-verify-all -emit-sil -disable-copy-propagation -I %t -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all -emit-sil -enable-copy-propagation=false -I %t -o - | %FileCheck %s
 
-// Using -disable-copy-propagation to pattern match against older SIL
+// Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around
 // long enough in the same form to be worth rewriting CHECK lines.
 
