@@ -164,6 +164,10 @@ option(SWIFT_ENABLE_REFLECTION
   "Build stdlib with support for runtime reflection and mirrors."
   TRUE)
 
+option(SWIFT_BUILD_PRIVATE_STDLIB
+  "Build private part of the Standard Library."
+  TRUE)
+
 if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
 else()
@@ -329,5 +333,7 @@ swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 # the clang resource directory symlink stops installing correctly.
 add_subdirectory(toolchain)
 add_subdirectory(public)
-add_subdirectory(private)
+if(SWIFT_BUILD_PRIVATE_STDLIB)
+  add_subdirectory(private)
+endif()
 add_subdirectory(tools)
