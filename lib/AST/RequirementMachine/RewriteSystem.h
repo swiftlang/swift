@@ -259,7 +259,7 @@ public:
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  bool simplifySubstitutions(Symbol &symbol, RewritePath &path) const;
+  bool simplifySubstitutions(Symbol &symbol, RewritePath *path=nullptr) const;
 
   //////////////////////////////////////////////////////////////////////////////
   ///
