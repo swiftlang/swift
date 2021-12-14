@@ -1849,8 +1849,10 @@ static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines,
   CompilerInstance instance;
   CompilerInvocation invok;
   invok.setModuleName("ForClangImporter");
-  if (instance.setup(invok))
+  std::string InstanceSetupError;
+  if (instance.setup(invok, InstanceSetupError)) {
     return 1;
+  }
   auto importer = ClangImporter::create(instance.getASTContext());
   SmallString<128> preprocessedFilePath;
   if (auto error = llvm::sys::fs::createTemporaryFile(

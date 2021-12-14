@@ -654,7 +654,7 @@ public:
   void setCompilerArgs(ArrayRef<const char *> Args) {
     if (auto ASTMgr = this->ASTMgr.lock()) {
       InvokRef =
-          ASTMgr->getInvocation(Args, Filename, CompilerArgsError);
+          ASTMgr->getTypecheckInvocation(Args, Filename, CompilerArgsError);
     }
   }
 
@@ -2015,8 +2015,8 @@ void SwiftEditorDocument::resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
     Args.push_back("-");
     std::string Error;
     // Ignore possible error(s)
-    Lang.getASTManager()->
-      initCompilerInvocation(CompInv, Args, StringRef(), Error);
+    Lang.getASTManager()->initCompilerInvocation(
+        CompInv, Args, FrontendOptions::ActionType::Parse, StringRef(), Error);
   }
   CompInv.getLangOptions().BuildSyntaxTree = BuildSyntaxTree;
   CompInv.setMainFileSyntaxParsingCache(SyntaxCache);

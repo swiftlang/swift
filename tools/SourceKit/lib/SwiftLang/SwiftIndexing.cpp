@@ -303,10 +303,12 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   bool Failed = true;
   if (IsModuleIndexing) {
     Failed = getASTManager()->initCompilerInvocationNoInputs(
-        Invocation, Args, CI.getDiags(), Error);
+        Invocation, Args, FrontendOptions::ActionType::Typecheck, CI.getDiags(),
+        Error);
   } else {
     Failed = getASTManager()->initCompilerInvocation(
-        Invocation, Args, CI.getDiags(), InputFile, Error);
+        Invocation, Args, FrontendOptions::ActionType::Typecheck, CI.getDiags(),
+        InputFile, Error);
   }
   if (Failed) {
     IdxConsumer.failed(Error);
@@ -314,8 +316,11 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   }
 
   if (IsModuleIndexing) {
-    if (CI.setup(Invocation))
+    std::string InstanceSetupError;
+    if (CI.setup(Invocation, InstanceSetupError)) {
+      IdxConsumer.failed(InstanceSetupError);
       return;
+    }
     // Indexing needs IDE requests
     registerIDERequestFunctions(CI.getASTContext().evaluator);
     bool IsClangModule = (FileExt == ".pcm");
@@ -334,8 +339,11 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     return;
   }
 
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    IdxConsumer.failed(InstanceSetupError);
     return;
+  }
   // Indexing needs IDE requests
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   trace::TracedOperation TracedOp(trace::OperationKind::IndexSource);

@@ -351,6 +351,9 @@ public:
     if (FrontendOpts.InputMode == FrontendOptions::ParseInputMode::SIL) {
       return ImplicitStdlibKind::None;
     }
+    if (FrontendOpts.InputsAndOutputs.shouldTreatAsLLVM()) {
+      return ImplicitStdlibKind::None;
+    }
     if (getParseStdlib()) {
       return ImplicitStdlibKind::Builtin;
     }
@@ -572,7 +575,7 @@ public:
   }
 
   /// Returns true if there was an error during setup.
-  bool setup(const CompilerInvocation &Invocation);
+  bool setup(const CompilerInvocation &Invocation, std::string &Error);
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 

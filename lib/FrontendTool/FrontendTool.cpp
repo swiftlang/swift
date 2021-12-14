@@ -1254,17 +1254,6 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.InputsAndOutputs.shouldTreatAsLLVM())
     return compileLLVMIR(Instance);
 
-  // If we aren't in a parse-only context and expect an implicit stdlib import,
-  // load in the standard library. If we either fail to find it or encounter an
-  // error while loading it, bail early. Continuing the compilation will at best
-  // trigger a bunch of other errors due to the stdlib being missing, or at
-  // worst crash downstream as many call sites don't currently handle a missing
-  // stdlib.
-  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(Action)) {
-    if (Instance.loadStdlibIfNeeded())
-      return true;
-  }
-
   assert([&]() -> bool {
     if (FrontendOptions::shouldActionOnlyParse(Action)) {
       // Parsing gets triggered lazily, but let's make sure we have the right
@@ -2044,7 +2033,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
-  if (Instance->setup(Invocation)) {
+  std::string InstanceSetupError;
+  if (Instance->setup(Invocation, InstanceSetupError)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 

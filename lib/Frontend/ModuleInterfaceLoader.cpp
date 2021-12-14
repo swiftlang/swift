@@ -1682,7 +1682,8 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
 
   ForwardingDiagnosticConsumer FDC(*Diags);
   subInstance.addDiagnosticConsumer(&FDC);
-  if (subInstance.setup(subInvocation)) {
+  std::string InstanceSetupError;
+  if (subInstance.setup(subInvocation, InstanceSetupError)) {
     return std::make_error_code(std::errc::not_supported);
   }
 
