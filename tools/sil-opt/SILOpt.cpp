@@ -524,6 +524,13 @@ int main(int argc, char **argv) {
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
+
+  if (EnableCopyPropagation && DisableCopyPropagation) {
+    fprintf(stderr, "Error! Cannot specify both -enable-copy-propagation "
+                    "and -disable-copy-propagation.");
+    exit(-1);
+  }
+
   SILOpts.EnableCopyPropagation = EnableCopyPropagation;
   SILOpts.DisableCopyPropagation = DisableCopyPropagation;
 
