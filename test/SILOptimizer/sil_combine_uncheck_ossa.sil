@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -remove-runtime-asserts | %FileCheck %s
+// RUN: %target-sil-opt -enable-copy-propagation=requested-passes-only -enable-sil-verify-all %s -sil-combine -remove-runtime-asserts | %FileCheck %s
 
 sil_stage canonical
 
