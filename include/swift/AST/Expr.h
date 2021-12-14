@@ -3615,6 +3615,9 @@ public:
   /// \brief Return whether this closure is async when fully applied.
   bool isBodyAsync() const;
 
+  /// Whether this closure is Sendable.
+  bool isSendable() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 
