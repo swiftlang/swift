@@ -846,7 +846,7 @@ function(_compile_swift_files
   #
   # See stdlib/CMakeLists.txt and TypeConverter::TypeConverter() in
   # lib/IRGen/GenType.cpp.
-  if(SWIFTFILE_IS_STDLIB_CORE)
+  if(SWIFTFILE_IS_STDLIB_CORE AND SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     set(SWIFTFILE_PLATFORM "${SWIFT_SDK_${SWIFTFILE_SDK}_LIB_SUBDIR}")
     set(copy_legacy_layouts_dep
         "copy-legacy-layouts-${SWIFTFILE_PLATFORM}-${SWIFTFILE_ARCHITECTURE}${target_suffix}")

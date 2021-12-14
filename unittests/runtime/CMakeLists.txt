@@ -1,5 +1,5 @@
 # We can't currently build the runtime tests under ASAN
-# The problem is that we want to use the just-build compiler (just like the
+# The problem is that we want to use the just\build compiler (just like the
 # runtime) but ASAN will complain if we link against libgtest and LLVMSupport
 # libraries because they were compiled with the host compiler.
 if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
@@ -132,6 +132,11 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
                              PRIVATE
                                swiftCore_EXPORTS
                                SWIFT_INLINE_NAMESPACE=__runtime)
+
+  if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+    target_compile_definitions(SwiftRuntimeTests
+                               PRIVATE SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+  endif()
 
   target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
     ${SWIFT_SOURCE_DIR}/stdlib/include)
