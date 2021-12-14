@@ -406,22 +406,14 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
     if (selfType->is<GenericTypeParamType>()) {
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-        if (isa<AssociatedTypeDecl>(typeDecl) ||
-            (isa<TypeAliasDecl>(typeDecl) &&
-             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
-          // FIXME: We should use this lookup method for the Interface
-          // stage too, but right now that causes problems with
-          // Sequence.SubSequence vs Collection.SubSequence; the former
-          // is more canonical, but if we return that instead of the
-          // latter, we infer the wrong associated type in some cases,
-          // because we use the Sequence.SubSequence default instead of
-          // the Collection.SubSequence default, even when the conforming
-          // type wants to conform to Collection.
-          if (getStage() == TypeResolutionStage::Structural) {
-            return DependentMemberType::get(selfType, typeDecl->getName());
-          } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-            typeDecl = assocType->getAssociatedTypeAnchor();
-          }
+        auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl);
+        if (getStage() == TypeResolutionStage::Structural &&
+            aliasDecl && !aliasDecl->isGeneric()) {
+          return aliasDecl->getStructuralType();
+        }
+
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+          typeDecl = assocType->getAssociatedTypeAnchor();
         }
       }
 
@@ -2438,14 +2430,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // context, and then set isNoEscape if @escaping is not present.
   if (!ty) ty = resolveType(repr, instanceOptions);
   if (!ty || ty->hasError()) return ty;
-
-  // Type aliases inside protocols are not yet resolved in the structural
-  // stage of type resolution
-  if (ty->is<DependentMemberType>() &&
-      resolution.getStage() == TypeResolutionStage::Structural) {
-    return ty;
-  }
-
+  
   // Handle @escaping
   if (ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
