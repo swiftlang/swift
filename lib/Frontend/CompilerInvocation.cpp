@@ -1551,6 +1551,14 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     }
   }
 
+  if (Args.hasArg(OPT_enable_copy_propagation) &&
+      Args.hasArg(OPT_disable_copy_propagation)) {
+    // Error if copy propagation is enabled and copy propagation is disabled.
+    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
+                   "enable-copy-propagation", "disable-copy-propagation");
+    return true;
+  }
+
   Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
   Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
