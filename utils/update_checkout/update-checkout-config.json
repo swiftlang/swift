@@ -94,6 +94,7 @@
                 "swift-crypto": "1.1.5",
                 "swift-driver": "main",
                 "swift-syntax": "main",
+                "swift-system": "1.1.1",
                 "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "swiftwasm",
                 "swift-corelibs-foundation": "swiftwasm",
