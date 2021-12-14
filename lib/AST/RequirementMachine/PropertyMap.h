@@ -228,7 +228,8 @@ private:
 
   MutableTerm computeConstraintTermForTypeWitness(
       Term key, CanType concreteType, CanType typeWitness,
-      const MutableTerm &subjectType, ArrayRef<Term> substitutions) const;
+      const MutableTerm &subjectType, ArrayRef<Term> substitutions,
+      RewritePath &path) const;
 
   void recordConcreteConformanceRule(
     unsigned concreteRuleID,

@@ -614,6 +614,8 @@ void PropertyMap::concretizeTypeWitnessInConformance(
 
   MutableTerm constraintType;
 
+  RewritePath path;
+
   auto simplify = [&](CanType t) -> CanType {
     return CanType(t.transformRec([&](Type t) -> Optional<Type> {
       if (!t->isTypeParameter())
@@ -640,10 +642,10 @@ void PropertyMap::concretizeTypeWitnessInConformance(
   } else {
     constraintType = computeConstraintTermForTypeWitness(
         key, concreteType, typeWitness, subjectType,
-        substitutions);
+        substitutions, path);
   }
 
-  inducedRules.emplace_back(subjectType, constraintType);
+  inducedRules.emplace_back(constraintType, subjectType, path);
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
     llvm::dbgs() << "^^ Induced rule " << constraintType
                  << " => " << subjectType << "\n";
@@ -720,7 +722,8 @@ RewriteSystem::getConcreteTypeWitness(unsigned index) const {
 ///        T.[P:A] => V
 MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     Term key, CanType concreteType, CanType typeWitness,
-    const MutableTerm &subjectType, ArrayRef<Term> substitutions) const {
+    const MutableTerm &subjectType, ArrayRef<Term> substitutions,
+    RewritePath &path) const {
   if (!typeWitness->hasTypeParameter()) {
     // Check if we have a shorter representative we can use.
     auto domain = key.getRootProtocols();
@@ -766,6 +769,14 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   constraintType.add(
       Symbol::forConcreteType(
           typeWitnessSchema, result, Context));
+
+  RewriteSystem::ConcreteTypeWitness witness(*(constraintType.end() - 3),
+                                             *(constraintType.end() - 2),
+                                             *(constraintType.end() - 1));
+  unsigned index = System.recordConcreteTypeWitness(witness);
+
+  path.add(RewriteStep::forConcreteTypeWitness(
+      index, /*inverse=*/false));
 
   return constraintType;
 }
