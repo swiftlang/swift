@@ -70,8 +70,6 @@ private:
         IncludeDerivedRequirements(0), IncludeProtocolExtensionMembers(0) {}
 
 public:
-  LookupState(const LookupState &) = default;
-
   static LookupState makeQualified() {
     LookupState Result;
     Result.IsQualified = 1;
