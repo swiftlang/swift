@@ -3266,6 +3266,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
     ASTContext &ctx = value->getASTContext();
     switch (inferred) {
     case ActorIsolation::Independent:
+      // Stored properties cannot be non-isolated, so don't infer it.
+      if (auto var = dyn_cast<VarDecl>(value)) {
+        if (!var->isStatic() && var->hasStorage())
+          return ActorIsolation::forUnspecified();
+      }
+
+
       if (onlyGlobal)
         return ActorIsolation::forUnspecified();
 
