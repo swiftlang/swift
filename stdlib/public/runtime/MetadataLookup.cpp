@@ -1893,6 +1893,267 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
                                     {}, {}).getType().getMetadata();
 }
 
+// ==== Function metadata functions ----------------------------------------------
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+unsigned
+swift_func_getParameterCount(const char *typeNameStart, size_t typeNameLength) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  for (char c : typeName) {
+    if (c >= '\x01' && c <= '\x1F')
+      return -1;
+  }
+
+  StackAllocatedDemangler<1024> demangler;
+  auto node = demangler.demangleSymbol(typeName);
+
+  if (!node) {
+    return -1;
+  }
+
+  switch (node->getKind()) {
+  case Node::Kind::Global:
+    if (node->getNumChildren() <= 0)
+      return -1;
+    node = node->getFirstChild();
+    break;
+  default:
+    return -2;
+  }
+
+  if (!node)
+    return -3;
+
+  switch (node->getKind()) {
+  case Node::Kind::Function: {
+    auto i = 0;
+    while (auto n = node->getChild(i)) {
+      if (n->getKind() == Node::Kind::Type) {
+        node = n;
+        break;
+      }
+      ++i;
+    }
+
+    if (node && node->getKind() == Node::Kind::Type &&
+        node->getNumChildren() == 1) {
+      node = node->getFirstChild();
+    }
+
+    break;
+  }
+
+  default:
+    return -1;
+  }
+
+  if (!node)
+    return -3;
+
+  for (auto n : *node) {
+    if (n->getKind() == Node::Kind::ArgumentTuple) {
+      while (n && n->getKind() != Node::Kind::Tuple) {
+        n = n->getFirstChild();
+      }
+
+      return n->getNumChildren();
+    }
+  }
+
+  return -9;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+const Metadata *_Nullable
+swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  for (char c : typeName) {
+    if (c >= '\x01' && c <= '\x1F')
+      return nullptr;
+  }
+
+  StackAllocatedDemangler<1024> demangler;
+  auto node = demangler.demangleSymbol(typeName);
+
+  if (!node) {
+    return nullptr;
+  }
+
+  switch (node->getKind()) {
+  case Node::Kind::Global:
+    if (node->getNumChildren() <= 0)
+      return nullptr;
+    node = node->getFirstChild();
+    break;
+  default:
+    return nullptr;
+  }
+
+  if (!node)
+    return nullptr;
+
+  switch (node->getKind()) {
+  case Node::Kind::Function: {
+    auto i = 0;
+    while (auto n = node->getChild(i)) {
+      if (n->getKind() == Node::Kind::Type) {
+        node = n;
+        break;
+      }
+      ++i;
+    }
+
+    if (node && node->getKind() == Node::Kind::Type &&
+        node->getNumChildren() == 1) {
+      node = node->getFirstChild();
+    }
+
+    break;
+  }
+
+  default:
+    return nullptr;
+  }
+
+  if (!node)
+    return nullptr;
+
+  for (auto n : *node) {
+    if (n->getKind() == Node::Kind::ReturnType) {
+      node = n;
+    }
+  }
+
+  DecodedMetadataBuilder builder(
+      demangler,
+      /*substGenericParam=*/
+      [](unsigned, unsigned) { return nullptr; },
+      /*SubstDependentWitnessTableFn=*/
+      [](const Metadata *, unsigned) { return nullptr; });
+  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+
+  auto builtTypeOrError = decoder.decodeMangledType(node);
+  if (builtTypeOrError.isError()) {
+    auto err = builtTypeOrError.getError();
+    char *errStr = err->copyErrorString();
+    err->freeErrorString(errStr);
+    return nullptr;
+  }
+
+  return builtTypeOrError.getType();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+unsigned
+swift_func_getParameterTypeInfo(
+    const char *typeNameStart, size_t typeNameLength,
+    Metadata const **types, unsigned typesLength) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  for (char c : typeName) {
+    if (c >= '\x01' && c <= '\x1F')
+      return -1;
+  }
+
+  if (typesLength < 0) {
+    return -1;
+  }
+  
+  StackAllocatedDemangler<1024> demangler;
+  auto node = demangler.demangleSymbol(typeName);
+
+  if (!node) {
+    return -1;
+  }
+
+  switch (node->getKind()) {
+  case Node::Kind::Global:
+    node = node->getFirstChild();
+    break;
+  default:
+    return -1;
+  }
+
+  if (!node)
+    return -2;
+
+  switch (node->getKind()) {
+  case Node::Kind::Function: {
+    auto i = 0;
+    while (auto n = node->getChild(i)) {
+      if (n->getKind() == Node::Kind::Type) {
+        node = n;
+        break;
+      }
+      ++i;
+    }
+
+    if (node && node->getKind() == Node::Kind::Type &&
+        node->getNumChildren() == 1) {
+      node = node->getFirstChild();
+    }
+
+    break;
+  }
+
+  default:
+    return -3;
+  }
+
+  if (!node)
+    return -4;
+
+  for (auto n : *node) {
+    if (n->getKind() == Node::Kind::ArgumentTuple) {
+      while (n && n->getKind() != Node::Kind::Tuple) {
+        n = n->getFirstChild();
+      }
+
+      // Only successfully return if the expected parameter count is the same
+      // as space prepared for it in the buffer.
+      if (n->getNumChildren() != typesLength) {
+        return -1 * n->getNumChildren();
+      }
+
+      assert (n->getKind() == Node::Kind::Tuple);
+      auto i = 0;
+      // for each parameter (TupleElement), store it into the provided buffer
+      for (auto tupleElement : *n) {
+        assert(tupleElement->getKind() == Node::Kind::TupleElement);
+        assert(tupleElement->getNumChildren() == 1);
+
+        auto typeNode = tupleElement->getFirstChild();
+        assert(typeNode->getKind() == Node::Kind::Type);
+
+        DecodedMetadataBuilder builder(
+            demangler,
+            /*substGenericParam=*/
+            [](unsigned, unsigned) { return nullptr; },
+            /*SubstDependentWitnessTableFn=*/
+            [](const Metadata *, unsigned) { return nullptr; });
+        TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+
+        auto builtTypeOrError = decoder.decodeMangledType(tupleElement);
+        if (builtTypeOrError.isError()) {
+          auto err = builtTypeOrError.getError();
+          char *errStr = err->copyErrorString();
+          err->freeErrorString(errStr);
+          i += 1;
+          continue;
+        }
+
+        types[i] = builtTypeOrError.getType();
+        i += 1;
+      } // end foreach parameter
+
+      return n->getNumChildren();
+    }
+  }
+
+  return -9;
+}
+
+// ==== End of Function metadata functions ---------------------------------------
+
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 MetadataResponse
 swift_getOpaqueTypeMetadata(MetadataRequest request,
@@ -1959,12 +2220,9 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
       MetadataState::Complete, demangler, node,
       nullptr,
       /* no substitutions */
-      [&](unsigned depth, unsigned index) {
-        return nullptr;
-      },
-      [&](const Metadata *type, unsigned index) {
-        return nullptr;
-      }).getType().getMetadata();
+      [&](unsigned depth, unsigned index) { return nullptr; },
+      [&](const Metadata *type, unsigned index) { return nullptr; }
+    ).getType().getMetadata();
   } else {
     metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
                                                           typeStr.size());
