@@ -538,12 +538,16 @@ SynthesizedExtensionAnalyzer::SynthesizedExtensionAnalyzer(
 
 SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 
-bool SynthesizedExtensionAnalyzer::
-isInSynthesizedExtension(const ValueDecl *VD) {
+bool SynthesizedExtensionAnalyzer::isInSynthesizedExtension(
+    const ValueDecl *VD) {
   if (auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
                                                  getInnermostTypeContext())) {
-    return Impl.InfoMap.count(Ext) != 0 &&
-        Impl.InfoMap.find(Ext)->second.IsSynthesized;
+    auto It = Impl.InfoMap.find(Ext);
+    if (It != Impl.InfoMap.end() && It->second.IsSynthesized) {
+      // A synthesized extension will only be created if the underlying type
+      // is in the same module
+      return VD->getModuleContext() == Impl.Target->getModuleContext();
+    }
   }
   return false;
 }
