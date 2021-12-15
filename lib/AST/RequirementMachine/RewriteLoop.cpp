@@ -92,6 +92,13 @@ void RewriteStep::dump(llvm::raw_ostream &out,
                     : "SameTypeWitness");
     break;
   }
+  case AbstractTypeWitness: {
+    evaluator.applyAbstractTypeWitness(*this, system);
+
+    out << (Inverse ? "AbstractTypeWitness⁻¹"
+                    : "AbstractTypeWitness");
+    break;
+  }
 
   }
 }
@@ -561,6 +568,42 @@ void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
   }
 }
 
+void
+RewritePathEvaluator::applyAbstractTypeWitness(const RewriteStep &step,
+                                               const RewriteSystem &system) {
+  checkA();
+  auto &term = A.back();
+
+  const auto &witness = system.getTypeWitness(step.RuleID);
+  auto fail = [&]() {
+    llvm::errs() << "Bad abstract type witness term:\n";
+    llvm::errs() << term << "\n\n";
+    witness.dump(llvm::errs());
+    abort();
+  };
+
+  auto typeWitness = witness.getAbstractType();
+
+  Term origTerm = (step.Inverse ? witness.LHS : typeWitness);
+  Term substTerm = (step.Inverse ? typeWitness : witness.LHS);
+
+  if (term.size() != step.StartOffset + origTerm.size() + step.EndOffset) {
+    fail();
+  }
+
+  if (!std::equal(origTerm.begin(),
+                  origTerm.end(),
+                  term.begin() + step.StartOffset)) {
+    fail();
+  }
+
+  MutableTerm newTerm(term.begin(), term.begin() + step.StartOffset);
+  newTerm.append(substTerm);
+  newTerm.append(term.end() - step.EndOffset, term.end());
+
+  term = newTerm;
+}
+
 void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
@@ -591,6 +634,10 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
 
   case RewriteStep::SameTypeWitness:
     applySameTypeWitness(step, system);
+    break;
+
+  case RewriteStep::AbstractTypeWitness:
+    applyAbstractTypeWitness(step, system);
     break;
   }
 }

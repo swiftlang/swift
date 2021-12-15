@@ -132,18 +132,31 @@ struct RewriteStep {
     /// The RuleID field is a TypeWitness ID as above.
     /// the step.
     SameTypeWitness,
+
+    /// If not inverted: replaces the abstract type witness term with the
+    /// subject type term.
+    ///
+    /// If inverted: replaces the subject type term with the abstract type
+    /// term.
+    ///
+    /// The RuleID field is a TypeWitness ID as above.
+    AbstractTypeWitness,
   };
 
   /// The rewrite step kind.
-  StepKind Kind : 3;
+  StepKind Kind : 4;
+
+  /// If false, the step replaces an occurrence of the rule's left hand side
+  /// with the right hand side. If true, vice versa.
+  unsigned Inverse : 1;
 
   /// The size of the left whisker, which is the position within the term where
   /// the rule is being applied. In A.(X => Y).B, this is |A|=1.
-  unsigned StartOffset : 14;
+  unsigned StartOffset : 16;
 
   /// The size of the right whisker, which is the length of the remaining suffix
   /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
-  unsigned EndOffset : 14;
+  unsigned EndOffset : 16;
 
   /// If Kind is ApplyRewriteRule, the index of the rule in the rewrite system.
   ///
@@ -151,11 +164,7 @@ struct RewriteStep {
   /// at the beginning of each concrete substitution.
   ///
   /// If Kind is Concrete, the number of substitutions to push or pop.
-  unsigned RuleID : 15;
-
-  /// If false, the step replaces an occurrence of the rule's left hand side
-  /// with the right hand side. If true, vice versa.
-  unsigned Inverse : 1;
+  unsigned RuleID : 16;
 
   RewriteStep(StepKind kind, unsigned startOffset, unsigned endOffset,
               unsigned ruleID, bool inverse) {
@@ -208,6 +217,11 @@ struct RewriteStep {
 
   static RewriteStep forSameTypeWitness(unsigned witnessID, bool inverse) {
     return RewriteStep(SameTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
+                       /*ruleID=*/witnessID, inverse);
+  }
+
+  static RewriteStep forAbstractTypeWitness(unsigned witnessID, bool inverse) {
+    return RewriteStep(AbstractTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
                        /*ruleID=*/witnessID, inverse);
   }
 
@@ -399,6 +413,9 @@ struct RewritePathEvaluator {
 
   void applySameTypeWitness(const RewriteStep &step,
                             const RewriteSystem &system);
+
+  void applyAbstractTypeWitness(const RewriteStep &step,
+                                const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
 };
