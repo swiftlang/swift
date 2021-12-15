@@ -101,7 +101,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
-            '-DSWIFT_BUILD_PRIVATE_STDLIB:BOOL=TRUE',
+            '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -123,7 +123,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
-            '-DSWIFT_BUILD_PRIVATE_STDLIB:BOOL=TRUE',
+            '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 
@@ -397,7 +397,7 @@ class SwiftTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertEqual(
-            ['-DSWIFT_BUILD_PRIVATE_STDLIB:BOOL='
+            ['-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL='
              'FALSE'],
             [x for x in swift.cmake_options
-                if 'SWIFT_BUILD_PRIVATE_STDLIB' in x])
+                if 'SWIFT_STDLIB_BUILD_PRIVATE' in x])

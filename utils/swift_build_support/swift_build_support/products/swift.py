@@ -183,7 +183,7 @@ updated without updating swift.py?")
 
     @property
     def _build_swift_private_stdlib(self):
-        return [('SWIFT_BUILD_PRIVATE_STDLIB:BOOL',
+        return [('SWIFT_STDLIB_BUILD_PRIVATE:BOOL',
                  self.args.build_swift_private_stdlib)]
 
     @classmethod
