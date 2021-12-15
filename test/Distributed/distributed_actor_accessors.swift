@@ -1,10 +1,17 @@
-// RUN: %target-swift-frontend -emit-irgen %s -swift-version 5 -enable-experimental-distributed | %IRGenFileCheck %s
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -emit-irgen -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
+import FakeDistributedActorSystems
+
+@available(SwiftStdlib 5.5, *)
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 enum SimpleE : Codable {
 case a
@@ -36,8 +43,6 @@ struct LargeStruct : Codable {
 
 @available(SwiftStdlib 5.6, *)
 public distributed actor MyActor {
-  public typealias Transport = AnyActorTransport
-
   distributed func simple1(_: Int) {
   }
 
@@ -72,8 +77,6 @@ public distributed actor MyActor {
 
 @available(SwiftStdlib 5.6, *)
 public distributed actor MyOtherActor {
-  public typealias Transport = AnyActorTransport
-
   distributed func empty() {
   }
 }
