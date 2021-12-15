@@ -503,6 +503,18 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     auto *proto = conformsTo[i];
     unsigned conformanceRuleID = conformsToRules[i];
 
+    // If we've already processed this pair of rules, record the conformance
+    // and move on.
+    //
+    // This occurs when a pair of rules are inherited from the property map
+    // entry for this key's suffix.
+    auto pair = std::make_pair(concreteRuleID, conformanceRuleID);
+    auto found = ConcreteConformances.find(pair);
+    if (found != ConcreteConformances.end()) {
+      conformances.push_back(found->second);
+      continue;
+    }
+
     // FIXME: Either remove the ModuleDecl entirely from conformance lookup,
     // or pass the correct one down in here.
     auto *module = proto->getParentModule();
@@ -539,19 +551,16 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // opaque result type?
     assert(!conformance.isAbstract());
 
+    // Save this conformance for later.
     auto *concrete = conformance.getConcrete();
+    auto inserted = ConcreteConformances.insert(
+        std::make_pair(pair, concrete));
+    assert(inserted.second);
+    (void) inserted;
 
     // Record the conformance for use by
     // PropertyBag::getConformsToExcludingSuperclassConformances().
     conformances.push_back(concrete);
-
-    // All subsequent logic just records new rewrite rules, and can be
-    // skipped if we've already processed this pair of rules.
-    if (!ConcreteConformanceRules.insert(
-        std::make_pair(concreteRuleID, conformanceRuleID)).second) {
-      // We've already processed this pair of rules.
-      continue;
-    }
 
     auto concreteConformanceSymbol = Symbol::forConcreteConformance(
         concreteType, substitutions, proto, Context);
