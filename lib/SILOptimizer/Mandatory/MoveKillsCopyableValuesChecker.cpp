@@ -80,8 +80,6 @@ struct CheckerLivenessInfo {
 } // end anonymous namespace
 
 bool CheckerLivenessInfo::compute() {
-  bool foundEscapes = false;
-
   LLVM_DEBUG(llvm::dbgs() << "LivenessVisitor Begin!\n");
   while (SILValue value = defUseWorklist.pop()) {
     LLVM_DEBUG(llvm::dbgs() << "New Value: " << value);
@@ -108,7 +106,8 @@ bool CheckerLivenessInfo::compute() {
       // escape. Is it legal to canonicalize ForwardingUnowned?
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
-        foundEscapes = true;
+        // This is an escape but it is up to the user to handle this, move
+        // checking stops here.
         break;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
@@ -127,8 +126,16 @@ bool CheckerLivenessInfo::compute() {
         consumingUse.insert(use);
         break;
       case OperandOwnership::Borrow: {
-        bool failed = !liveness.updateForBorrowingOperand(use);
-        assert(!failed && "Shouldn't see reborrows this early in the pipeline");
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(user)) {
+          // Only add borrows to liveness if the borrow isn't lexical. If it is
+          // a lexical borrow, we have created an entirely new source level
+          // binding that should be tracked separately.
+          if (!bbi->isLexical()) {
+            bool failed = !liveness.updateForBorrowingOperand(use);
+            if (failed)
+              return false;
+          }
+        }
         break;
       }
       case OperandOwnership::ForwardingBorrow:
@@ -170,8 +177,8 @@ bool CheckerLivenessInfo::compute() {
     }
   }
 
-  // We succeeded if we did not find any escapes.
-  return !foundEscapes;
+  // We succeeded if we reached this point since we handled all uses.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -328,8 +335,7 @@ bool MoveKillsCopyableValuesChecker::check() {
   SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Guaranteed ||
-        arg->getOwnershipKind() == OwnershipKind::Owned)
+    if (arg->getOwnershipKind() == OwnershipKind::Owned)
       valuesToCheck.insert(arg);
   }
 
@@ -372,11 +378,12 @@ bool MoveKillsCopyableValuesChecker::check() {
     // Then compute liveness.
     SWIFT_DEFER { livenessInfo.clear(); };
     livenessInfo.initDef(lexicalValue);
-    // We do not care if we find an escape. We just want to make sure that any
-    // non-escaping users obey our property. If the user does something unsafe
-    // that is on them to manage.
-    bool foundEscape = livenessInfo.compute();
-    (void)foundEscape;
+
+    // We only fail to optimize if for some reason we hit reborrows. This is
+    // temporary since we really should just ban reborrows in Raw SIL.
+    bool canOptimize = livenessInfo.compute();
+    if (!canOptimize)
+      continue;
 
     // Then look at all of our found consuming uses. See if any of these are
     // _move that are within the boundary.
@@ -423,11 +430,6 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
     auto *fn = getFunction();
     auto &astContext = fn->getASTContext();
 
-    // If we do not have experimental move only enabled, do not emit
-    // diagnostics.
-    if (!astContext.LangOpts.EnableExperimentalMoveOnly)
-      return;
-
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
@@ -456,6 +458,7 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
             auto diag = diag::
                 sil_movekillscopyablevalue_move_applied_to_unsupported_move;
             diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+            mvi->setAllowsDiagnostics(false);
           }
         }
       }

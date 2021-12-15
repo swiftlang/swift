@@ -162,7 +162,7 @@ static llvm::cl::opt<bool>
     DisableUnhandledMoveDiagnostic("sil-disable-unknown-moveaddr-diagnostic");
 
 //===----------------------------------------------------------------------===//
-//                            Diagnostic Utilities
+//                                 Utilities
 //===----------------------------------------------------------------------===//
 
 template <typename... T, typename... U>
@@ -171,112 +171,14 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-//===----------------------------------------------------------------------===//
-//                                  Utility
-//===----------------------------------------------------------------------===//
-
-/// Returns false if we found a malformed
-static void tryConvertSimpleMoveFromAllocStackTemporary(
-    MarkUnresolvedMoveAddrInst *markMoveAddr) {
-  LLVM_DEBUG(llvm::dbgs() << "Trying to fix up: " << *markMoveAddr);
-
-  // We need a non-lexical alloc_stack as our source.
-  auto *asi = dyn_cast<AllocStackInst>(markMoveAddr->getSrc());
-  if (!asi || asi->isLexical()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "    Source isnt an alloc_stack or is lexical... Bailing!\n");
-    return;
+namespace llvm {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SmallBitVector &bv) {
+  for (unsigned index : range(bv.size())) {
+    os << (bv[index] ? 1 : 0);
   }
-
-  DestroyAddrInst *dai = nullptr;
-  CopyAddrInst *init = nullptr;
-  for (auto *use : asi->getUses()) {
-    auto *user = use->getUser();
-    LLVM_DEBUG(llvm::dbgs() << "    Visiting User: " << *user);
-
-    // If we find our own instruction or a dealloc stack, just skip.
-    if (user == markMoveAddr || isa<DeallocStackInst>(user)) {
-      LLVM_DEBUG(
-          llvm::dbgs()
-          << "        Found our original inst or a dealloc stack... Ok!\n");
-      continue;
-    }
-
-    if (auto *destroyAddrInst = dyn_cast<DestroyAddrInst>(user)) {
-      if (dai)
-        return;
-      dai = destroyAddrInst;
-      continue;
-    }
-
-    if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "        Found copy_addr... checking if legal...\n");
-      // We require that our copy_addr be an init into our temp and in the same
-      // block as markMoveAddr.
-      if (cai->getDest() == asi && bool(cai->isInitializationOfDest()) &&
-          !bool(cai->isTakeOfSrc()) &&
-          cai->getParent() == markMoveAddr->getParent()) {
-        if (init)
-          return;
-        init = cai;
-        continue;
-      }
-    }
-
-    // If we do not find an instruction that we know about, return we can't
-    // optimize.
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "        Found instruction we did not understand! Bailing!\n");
-    return;
-  }
-
-  // If we did not find an init or destroy_addr, just bail.
-  if (!init || !dai) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "        Did not find a single init! Bailing!\n");
-    return;
-  }
-
-  // Otherwise, lets walk from cai to markMoveAddr and make sure there aren't
-  // any side-effect having instructions in between them.
-  //
-  // NOTE: We know that cai must be before the markMoveAddr in the block since
-  // otherwise we would be moving from uninitialized memory.
-  if (llvm::any_of(llvm::make_range(std::next(init->getIterator()),
-                                    markMoveAddr->getIterator()),
-                   [](SILInstruction &iter) {
-                     if (!iter.mayHaveSideEffects()) {
-                       return false;
-                     }
-
-                     if (isa<DestroyAddrInst>(iter)) {
-                       // We are going to be extending the lifetime of our
-                       // underlying value, not shrinking it so we can ignore
-                       // destroy_addr on other values.
-                       return false;
-                     }
-
-                     // Ignore end of scope markers with side-effects.
-                     if (isEndOfScopeMarker(&iter)) {
-                       return false;
-                     }
-
-                     LLVM_DEBUG(
-                         llvm::dbgs()
-                         << "        Found side-effect inst... Bailing!: "
-                         << iter);
-                     return true;
-                   }))
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << "        Success! Performing optimization!\n");
-  // Ok, we can perform our optimization! Change move_addr's source to be the
-  // original copy_addr's src and add add uses of the stack location to an
-  // instruction deleter. We will eliminate them later.
-  markMoveAddr->setSrc(init->getSrc());
+  return os;
 }
+} // namespace llvm
 
 //===----------------------------------------------------------------------===//
 //                               Use Gathering
@@ -717,11 +619,16 @@ cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
   bool madeChange = false;
   BasicBlockWorklist worklist(fn);
   SILValue daiOperand;
+  LLVM_DEBUG(llvm::dbgs() << "Cleanup up destroy addr!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Visiting destroys!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Destroy Indices: " << destroyIndices << "\n");
   for (int index = destroyIndices.find_first(); index != -1;
        index = destroyIndices.find_next(index)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Index: " << index << "\n");
     auto dai = useState.destroys[index];
     if (!dai)
       continue;
+    LLVM_DEBUG(llvm::dbgs() << "    Destroy: " << *dai);
     SILValue op = (*dai)->getOperand();
     assert(daiOperand == SILValue() || op == daiOperand);
     daiOperand = op;
@@ -729,17 +636,19 @@ cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
       worklist.pushIfNotVisited(predBlock);
     }
   }
-
+  LLVM_DEBUG(llvm::dbgs() << "    Visiting reinit!\n");
   for (int index = reinitIndices.find_first(); index != -1;
        index = reinitIndices.find_next(index)) {
     auto reinit = useState.reinits[index];
     if (!reinit)
       continue;
+    LLVM_DEBUG(llvm::dbgs() << "  Reinit: " << *reinit);
     for (auto *predBlock : (*reinit)->getParent()->getPredecessorBlocks()) {
       worklist.pushIfNotVisited(predBlock);
     }
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "Processing worklist!\n");
   while (auto *next = worklist.pop()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Looking at block: bb" << next->getDebugID() << "\n");
@@ -806,10 +715,6 @@ bool MoveKillsCopyableAddressesObjectChecker::performGlobalDataflow(
   BasicBlockSet blocksWithMovesThatAreNowTakes(fn);
   bool convertedMarkMoveToTake = false;
   for (auto *mvi : markMovesToDataflow) {
-    // At the end of this if we already initialized indices of paired destroys,
-    // clear it.
-    SWIFT_DEFER { getIndicesOfPairedDestroys().clear(); };
-
     bool emittedSingleDiagnostic = false;
 
     LLVM_DEBUG(llvm::dbgs() << "Checking Multi Block Dataflow for: " << *mvi);
@@ -980,6 +885,20 @@ bool MoveKillsCopyableAddressesObjectChecker::check() {
     if (!visitAccessPathUses(visitor, accessPath, fn))
       continue;
 
+    // See if our base address is an inout. If we found any moves, add as a
+    // liveness use all function terminators.
+    if (auto *fArg = dyn_cast<SILFunctionArgument>(address)) {
+      if (fArg->hasConvention(SILArgumentConvention::Indirect_Inout)) {
+        if (visitor.useState.markMoves.size()) {
+          SmallVector<SILBasicBlock *, 2> exitingBlocks;
+          fn->findExitingBlocks(exitingBlocks);
+          for (auto *block : exitingBlocks) {
+            visitor.useState.livenessUses.insert(block->getTerminator());
+          }
+        }
+      }
+    }
+
     // Now initialize our data structures.
     SWIFT_DEFER {
       useBlocks.clear();
@@ -1068,11 +987,6 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
     auto *fn = getFunction();
     auto &astContext = fn->getASTContext();
 
-    // If we do not have experimental move only enabled, do not emit
-    // diagnostics.
-    if (!astContext.LangOpts.EnableExperimentalMoveOnly)
-      return;
-
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
@@ -1087,7 +1001,7 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
     for (auto *arg : fn->front().getSILFunctionArguments()) {
       if (arg->getType().isAddress() &&
           (arg->hasConvention(SILArgumentConvention::Indirect_In) ||
-           arg->hasConvention(SILArgumentConvention::Indirect_In)))
+           arg->hasConvention(SILArgumentConvention::Indirect_Inout)))
         checker.addressesToCheck.insert(arg);
     }
 
@@ -1103,15 +1017,6 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
             checker.addressesToCheck.insert(asi);
             continue;
           }
-        }
-
-        // See if we see a mark_unresolved_move_addr inst from a simple
-        // temporary and move it onto the temporary's source. This ensures that
-        // the mark_unresolved_move_addr is always on the operand regardless if
-        // in the caller we materalized the address into a temporary.
-        if (auto *markMoveAddr = dyn_cast<MarkUnresolvedMoveAddrInst>(inst)) {
-          tryConvertSimpleMoveFromAllocStackTemporary(markMoveAddr);
-          continue;
         }
       }
     }
