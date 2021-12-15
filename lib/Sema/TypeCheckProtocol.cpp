@@ -2862,6 +2862,31 @@ static void emitDeclaredHereIfNeeded(DiagnosticEngine &diags,
   diags.diagnose(value, diag::decl_declared_here, value->getName());
 }
 
+/// Determine if the witness can be made implicitly async.
+static bool isValidImplicitAsync(ValueDecl *witness, ValueDecl *requirement) {
+  if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness)) {
+    if (auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement)) {
+      return requirementFunc->hasAsync() &&
+          !(witnessFunc->hasThrows() && !requirementFunc->hasThrows());
+    }
+
+    return false;
+  }
+
+  if (auto witnessStorage = dyn_cast<AbstractStorageDecl>(witness)) {
+    if (auto requirementStorage = dyn_cast<AbstractStorageDecl>(requirement)) {
+      auto requirementAccessor = requirementStorage->getEffectfulGetAccessor();
+      if (!requirementAccessor || !requirementAccessor->hasAsync())
+        return false;
+
+      return witnessStorage->isLessEffectfulThan(
+          requirementStorage, EffectKind::Throws);
+    }
+  }
+
+  return false;
+}
+
 bool ConformanceChecker::checkActorIsolation(
     ValueDecl *requirement, ValueDecl *witness) {
   /// Retrieve a concrete witness for Sendable checking.
@@ -2986,9 +3011,15 @@ bool ConformanceChecker::checkActorIsolation(
     // A synchronous actor function can witness an asynchronous protocol
     // requirement, since calls "through" the protocol are always cross-actor,
     // in which case the function becomes implicitly async.
+    //
+    // In this case, we're crossing actor boundaries so we need to
+    // perform Sendable checking.
     if (witnessClass && witnessClass->isActor()) {
-      if (requirementFunc && requirementFunc->hasAsync() &&
-          (requirementFunc->hasThrows() == witnessFunc->hasThrows())) {
+      if (isValidImplicitAsync(witness, requirement)) {
+        diagnoseNonSendableTypesInReference(
+            getConcreteWitness(), DC, witness->getLoc(),
+            ConcurrentReferenceKind::CrossActor);
+
         return false;
       }
     }
