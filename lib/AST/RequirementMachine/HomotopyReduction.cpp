@@ -66,9 +66,17 @@ using namespace rewriting;
 
 /// A rewrite rule is redundant if it appears exactly once in a loop
 /// without context.
-llvm::SmallVector<unsigned, 1>
+///
+/// This method will cache the result; markDirty() must be called after
+/// the underlying rewrite path is modified to invalidate the cached
+/// result.
+ArrayRef<unsigned>
 RewriteLoop::findRulesAppearingOnceInEmptyContext(
     const RewriteSystem &system) const {
+  // If we're allowed to use the cached result, return that.
+  if (!Dirty)
+    return RulesInEmptyContext;
+
   // Rules appearing in empty context (possibly more than once).
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
 
@@ -100,17 +108,21 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     evaluator.apply(step, system);
   }
 
+  auto *mutThis = const_cast<RewriteLoop *>(this);
+  mutThis->RulesInEmptyContext.clear();
+
   // Collect all rules that we saw exactly once in empty context.
-  SmallVector<unsigned, 1> result;
   for (auto rule : rulesInEmptyContext) {
     auto found = ruleMultiplicity.find(rule);
     assert(found != ruleMultiplicity.end());
 
     if (found->second == 1)
-      result.push_back(rule);
+      mutThis->RulesInEmptyContext.push_back(rule);
   }
 
-  return result;
+  // Cache the result for later.
+  mutThis->Dirty = 0;
+  return RulesInEmptyContext;
 }
 
 /// If a rewrite loop contains an explicit rule in empty context, propagate the
@@ -145,7 +157,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
 /// explicit bit from the original rule to the canonical rule.
 void RewriteSystem::propagateExplicitBits() {
   for (const auto &loop : Loops) {
-    SmallVector<unsigned, 1> rulesInEmptyContext =
+    auto rulesInEmptyContext =
       loop.findRulesAppearingOnceInEmptyContext(*this);
 
     bool sawExplicitRule = false;
@@ -457,8 +469,8 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     llvm::dbgs() << "\n";
   }
 
-  // Replace all occurrences of the rule with the replacement path and
-  // normalize all loops.
+  // Replace all occurrences of the rule with the replacement path in
+  // all remaining rewrite loops.
   for (auto &loop : Loops) {
     if (loop.isDeleted())
       continue;
@@ -466,6 +478,10 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     bool changed = loop.Path.replaceRuleWithPath(ruleID, replacementPath);
     if (!changed)
       continue;
+
+    // The loop's path has changed, so we must invalidate the cached
+    // result of findRulesAppearingOnceInEmptyContext().
+    loop.markDirty();
 
     if (Debug.contains(DebugFlags::HomotopyReduction)) {
       llvm::dbgs() << "** Updated loop: ";

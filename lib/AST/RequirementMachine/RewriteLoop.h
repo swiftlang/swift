@@ -293,11 +293,23 @@ public:
   RewritePath Path;
 
 private:
-  bool Deleted;
+  unsigned Deleted : 1;
+
+  /// Cached value for findRulesAppearingOnceInEmptyContext().
+  SmallVector<unsigned, 1> RulesInEmptyContext;
+
+  /// If true, RulesInEmptyContext should be recomputed.
+  unsigned Dirty : 1;
 
 public:
   RewriteLoop(MutableTerm basepoint, RewritePath path)
-    : Basepoint(basepoint), Path(path), Deleted(false) {}
+    : Basepoint(basepoint), Path(path) {
+    Deleted = 0;
+
+    // Initially, the RulesInEmptyContext vector is not valid because
+    // it has not been computed yet.
+    Dirty = 1;
+  }
 
   bool isDeleted() const {
     return Deleted;
@@ -305,12 +317,17 @@ public:
 
   void markDeleted() {
     assert(!Deleted);
-    Deleted = true;
+    Deleted = 1;
+  }
+
+  /// This must be called after changing 'Path'.
+  void markDirty() {
+    Dirty = 1;
   }
 
   bool isInContext(const RewriteSystem &system) const;
 
-  llvm::SmallVector<unsigned, 1>
+  ArrayRef<unsigned>
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
 
   void findProtocolConformanceRules(
