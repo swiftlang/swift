@@ -3288,10 +3288,6 @@ public:
         binding->getNumPatternEntries(),
         initContextIDs);
 
-    DeclContext *owningDC = nullptr;
-    if (binding->getDeclContext()->isTypeContext())
-      owningDC = binding->getDeclContext();
-
     for (auto entryIdx : range(binding->getNumPatternEntries())) {
       writePattern(binding->getPattern(entryIdx));
       // Ignore initializer; external clients don't need to know about it.
