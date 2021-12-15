@@ -94,6 +94,17 @@ func testNotAllInP1(nap1: NotAllInP1) { // expected-note{{add '@SomeGlobalActor'
   nap1.other() // okay
 }
 
+// Make sure we don't infer 'nonisolated' for stored properties.
+@MainActor
+protocol Interface {
+  nonisolated var baz: Int { get } // expected-note{{'baz' declared here}}
+}
+
+@MainActor
+class Object: Interface {
+  var baz: Int = 42 // expected-warning{{property 'baz' isolated to global actor 'MainActor' can not satisfy corresponding requirement from protocol 'Interface'}}
+}
+
 
 // ----------------------------------------------------------------------
 // Global actor inference for classes and extensions
