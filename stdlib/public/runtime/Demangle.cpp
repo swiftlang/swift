@@ -13,7 +13,6 @@
 #include "Private.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Range.h"
-#include "swift/Reflection/TypeRef.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"

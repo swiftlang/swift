@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_ENABLE_REFLECTION
+
 #include "swift/Reflection/MetadataSource.h"
 #include <iostream>
 
@@ -103,3 +105,5 @@ void MetadataSource::dump(std::ostream &stream, unsigned Indent) const {
   PrintMetadataSource(stream, Indent).visit(this);
   stream << "\n";
 }
+
+#endif
