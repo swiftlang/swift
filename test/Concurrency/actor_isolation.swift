@@ -967,13 +967,13 @@ func testCrossActorProtocol<T: P>(t: T) async {
 
 @available(SwiftStdlib 5.1, *)
 protocol Server {
-  func send<Message: Codable>(message: Message) async throws -> String
+  func send<Message: Codable & Sendable>(message: Message) async throws -> String
 }
 
 @available(SwiftStdlib 5.1, *)
 actor MyServer : Server {
   // okay, asynchronously accessed from clients of the protocol
-  func send<Message: Codable>(message: Message) throws -> String { "" }
+  func send<Message: Codable & Sendable>(message: Message) throws -> String { "" }
 }
 
 // ----------------------------------------------------------------------

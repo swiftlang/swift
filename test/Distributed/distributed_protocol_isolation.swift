@@ -129,7 +129,7 @@ protocol Server {
   func send<Message: Codable>(message: Message) async throws -> String
 }
 actor MyServer : Server {
-  func send<Message: Codable>(message: Message) throws -> String { "" }  // okay, asynchronously accessed from clients of the protocol
+  func send<Message: Codable>(message: Message) throws -> String { "" }  // expected-warning{{cannot pass argument of non-sendable type 'Message' across actors}}
 }
 
 protocol AsyncThrowsAll {
