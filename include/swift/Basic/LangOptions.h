@@ -283,6 +283,9 @@ namespace swift {
     /// Whether to dump debug info for request evaluator cycles.
     bool DebugDumpCycles = false;
 
+    /// Disable SIL substituted function types.
+    bool DisableSubstSILFunctionTypes = false;
+
     /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
     /// error.
     bool DiagnoseInvalidEphemeralnessAsError = false;
