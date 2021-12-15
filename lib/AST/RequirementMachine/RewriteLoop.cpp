@@ -436,13 +436,11 @@ void RewritePathEvaluator::applyConcreteTypeWitness(const RewriteStep &step,
   checkA();
   auto &term = A.back();
 
-  const auto &witness = system.getConcreteTypeWitness(step.RuleID);
+  const auto &witness = system.getTypeWitness(step.RuleID);
   auto fail = [&]() {
     llvm::errs() << "Bad concrete type witness term:\n";
     llvm::errs() << term << "\n\n";
-    llvm::errs() << "Conformance: " << witness.ConcreteConformance << "\n";
-    llvm::errs() << "Assoc type: " << witness.AssocType << "\n";
-    llvm::errs() << "Concrete type: " << witness.ConcreteType << "\n";
+    witness.dump(llvm::errs());
     llvm::errs() << "End offset: " << step.EndOffset << "\n";
     llvm::errs() << "Inverse: " << step.Inverse << "\n";
     abort();
@@ -453,9 +451,9 @@ void RewritePathEvaluator::applyConcreteTypeWitness(const RewriteStep &step,
     //
     //    U.[concrete: C : P].[P:X].[concrete: C.X].V
     if (term.size() <= step.EndOffset + 3 ||
-        *(term.end() - step.EndOffset - 3) != witness.ConcreteConformance ||
-        *(term.end() - step.EndOffset - 2) != witness.AssocType ||
-        *(term.end() - step.EndOffset - 1) != witness.ConcreteType) {
+        *(term.end() - step.EndOffset - 3) != witness.getConcreteConformance() ||
+        *(term.end() - step.EndOffset - 2) != witness.getAssocType() ||
+        *(term.end() - step.EndOffset - 1) != witness.getConcreteType()) {
       fail();
     }
 
@@ -471,8 +469,8 @@ void RewritePathEvaluator::applyConcreteTypeWitness(const RewriteStep &step,
     //
     //    U.[concrete: C : P].[P:X].V
     if (term.size() <= step.EndOffset + 2 ||
-        *(term.end() - step.EndOffset - 2) != witness.ConcreteConformance ||
-        *(term.end() - step.EndOffset - 1) != witness.AssocType) {
+        *(term.end() - step.EndOffset - 2) != witness.getConcreteConformance() ||
+        *(term.end() - step.EndOffset - 1) != witness.getAssocType()) {
       fail();
     }
 
@@ -480,7 +478,7 @@ void RewritePathEvaluator::applyConcreteTypeWitness(const RewriteStep &step,
     MutableTerm newTerm(term.begin(), term.end() - step.EndOffset);
 
     // Add the symbol [concrete: C.X].
-    newTerm.add(witness.ConcreteType);
+    newTerm.add(witness.getConcreteType());
 
     // Add the subterm V, to get
     //
@@ -496,26 +494,26 @@ void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
   checkA();
   auto &term = A.back();
 
-  const auto &witness = system.getConcreteTypeWitness(step.RuleID);
+  const auto &witness = system.getTypeWitness(step.RuleID);
   auto fail = [&]() {
     llvm::errs() << "Bad same-type witness term:\n";
     llvm::errs() << term << "\n\n";
-    llvm::errs() << "Conformance: " << witness.ConcreteConformance << "\n";
-    llvm::errs() << "Assoc type: " << witness.AssocType << "\n";
-    llvm::errs() << "Concrete type: " << witness.ConcreteType << "\n";
+    witness.dump(llvm::errs());
     abort();
   };
 
+  auto concreteConformanceSymbol = witness.getConcreteConformance();
+
 #ifndef NDEBUG
-  if (witness.ConcreteType.getConcreteType() !=
-      witness.ConcreteConformance.getConcreteType()) {
+  if (witness.getConcreteType().getConcreteType() !=
+      concreteConformanceSymbol.getConcreteType()) {
     fail();
   }
 #endif
 
   auto witnessConcreteType = Symbol::forConcreteType(
-      witness.ConcreteConformance.getConcreteType(),
-      witness.ConcreteConformance.getSubstitutions(),
+      concreteConformanceSymbol.getConcreteType(),
+      concreteConformanceSymbol.getSubstitutions(),
       system.getRewriteContext());
 
   if (!step.Inverse) {
@@ -523,8 +521,8 @@ void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
     //
     //    U.[concrete: C : P].[P:X].[concrete: C].V
     if (term.size() <= step.EndOffset + 3 ||
-        *(term.end() - step.EndOffset - 3) != witness.ConcreteConformance ||
-        *(term.end() - step.EndOffset - 2) != witness.AssocType ||
+        *(term.end() - step.EndOffset - 3) != concreteConformanceSymbol ||
+        *(term.end() - step.EndOffset - 2) != witness.getAssocType() ||
         *(term.end() - step.EndOffset - 1) != witnessConcreteType) {
       fail();
     }
@@ -541,7 +539,7 @@ void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
     //
     //    U.[concrete: C : P].V
     if (term.size() <= step.EndOffset + 1 ||
-        *(term.end() - step.EndOffset - 1) != witness.ConcreteConformance) {
+        *(term.end() - step.EndOffset - 1) != concreteConformanceSymbol) {
       fail();
     }
 
@@ -549,7 +547,7 @@ void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
     MutableTerm newTerm(term.begin(), term.end() - step.EndOffset);
 
     // Add the symbol [P:X].
-    newTerm.add(witness.AssocType);
+    newTerm.add(witness.getAssocType());
 
     // Add the symbol [concrete: C].
     newTerm.add(witnessConcreteType);

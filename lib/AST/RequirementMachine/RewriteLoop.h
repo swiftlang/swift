@@ -118,8 +118,8 @@ struct RewriteStep {
     /// If inverted: the concrete type symbol [concrete: C.X] is introduced.
     ///
     /// The RuleID field is repurposed to store the result of calling
-    /// RewriteSystem::recordConcreteTypeWitness(). This index is then
-    /// passed in to RewriteSystem::getConcreteTypeWitness() when applying
+    /// RewriteSystem::recordTypeWitness(). This index is then passed in
+    /// to RewriteSystem::getTypeWitness() when applying
     /// the step.
     ConcreteTypeWitness,
 
@@ -129,9 +129,7 @@ struct RewriteStep {
     ///
     /// If inverted: the associated type symbol [P:X] is introduced.
     ///
-    /// The RuleID field is repurposed to store the result of calling
-    /// RewriteSystem::recordConcreteTypeWitness(). This index is then
-    /// passed in to RewriteSystem::getConcreteTypeWitness() when applying
+    /// The RuleID field is a TypeWitness ID as above.
     /// the step.
     SameTypeWitness,
   };
