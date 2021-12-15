@@ -261,7 +261,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   bool IncludeUnconditional;
   PrintOptions Options;
   MergeGroupVector AllGroups;
-  std::unique_ptr<ExtensionInfoMap> InfoMap;
+  ExtensionInfoMap InfoMap;
 
   Implementation(NominalTypeDecl *Target,
                  bool IncludeUnconditional,
@@ -416,9 +416,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
   }
 
-  std::unique_ptr<ExtensionInfoMap>
+  ExtensionInfoMap
   collectSynthesizedExtensionInfoForProtocol(MergeGroupVector &AllGroups) {
-    std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
+    ExtensionInfoMap InfoMap;
     ExtensionMergeInfoMap MergeInfoMap;
     for (auto *E : Target->getExtensions()) {
       if (!Options.shouldPrint(E))
@@ -427,12 +427,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
                                /*EnablingExt*/ nullptr,
                                /*Conf*/ nullptr);
       if (Pair.first) {
-        InfoMap->insert({E, Pair.first});
+        InfoMap.insert({E, Pair.first});
         MergeInfoMap.insert({E, Pair.second});
       }
     }
-    populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups,
-                       /*AllowMergeWithDefBody*/false);
+    populateMergeGroup(InfoMap, MergeInfoMap, AllGroups,
+                       /*AllowMergeWithDefBody=*/false);
     std::sort(AllGroups.begin(), AllGroups.end());
     for (auto &Group : AllGroups) {
       Group.sortMembers();
@@ -448,12 +448,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     return false;
   }
 
-  std::unique_ptr<ExtensionInfoMap>
+  ExtensionInfoMap
   collectSynthesizedExtensionInfo(MergeGroupVector &AllGroups) {
     if (isa<ProtocolDecl>(Target)) {
       return collectSynthesizedExtensionInfoForProtocol(AllGroups);
     }
-    std::unique_ptr<ExtensionInfoMap> InfoMap(new ExtensionInfoMap());
+
+    ExtensionInfoMap InfoMap;
     ExtensionMergeInfoMap MergeInfoMap;
     std::vector<NominalTypeDecl*> Unhandled;
 
@@ -470,7 +471,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       if (AdjustedOpts.shouldPrint(E)) {
         auto Pair = isApplicable(E, Synthesized, EnablingE, Conf);
         if (Pair.first) {
-          InfoMap->insert({E, Pair.first});
+          InfoMap.insert({E, Pair.first});
           MergeInfoMap.insert({E, Pair.second});
         }
       }
@@ -515,8 +516,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     }
 
-    populateMergeGroup(*InfoMap, MergeInfoMap, AllGroups,
-                       /*AllowMergeWithDefBody*/true);
+    populateMergeGroup(InfoMap, MergeInfoMap, AllGroups,
+                       /*AllowMergeWithDefBody=*/true);
 
     std::sort(AllGroups.begin(), AllGroups.end());
     for (auto &Group : AllGroups) {
@@ -531,11 +532,9 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   }
 };
 
-SynthesizedExtensionAnalyzer::
-SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
-                             PrintOptions Options,
-                             bool IncludeUnconditional):
-Impl(*(new Implementation(Target, IncludeUnconditional, Options))) {}
+SynthesizedExtensionAnalyzer::SynthesizedExtensionAnalyzer(
+    NominalTypeDecl *Target, PrintOptions Options, bool IncludeUnconditional)
+    : Impl(*(new Implementation(Target, IncludeUnconditional, Options))) {}
 
 SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 
@@ -543,8 +542,8 @@ bool SynthesizedExtensionAnalyzer::
 isInSynthesizedExtension(const ValueDecl *VD) {
   if (auto Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()->
                                                  getInnermostTypeContext())) {
-    return Impl.InfoMap->count(Ext) != 0 &&
-    Impl.InfoMap->find(Ext)->second.IsSynthesized;
+    return Impl.InfoMap.count(Ext) != 0 &&
+        Impl.InfoMap.find(Ext)->second.IsSynthesized;
   }
   return false;
 }
@@ -565,8 +564,7 @@ forEachExtensionMergeGroup(MergeGroupKind Kind, ExtensionGroupOperation Fn) {
   }
 }
 
-bool SynthesizedExtensionAnalyzer::
-hasMergeGroup(MergeGroupKind Kind) {
+bool SynthesizedExtensionAnalyzer::hasMergeGroup(MergeGroupKind Kind) {
   for (auto &Group : Impl.AllGroups) {
     if (Kind == MergeGroupKind::All)
       return true;
