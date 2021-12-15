@@ -484,8 +484,6 @@ void PropertyMap::addProperty(
   }
 
   case Symbol::Kind::Superclass: {
-    // FIXME: Also handle superclass vs concrete
-
     if (checkRuleOnce(ruleID)) {
       // A rule (T.[superclass: C] => T) induces a rule (T.[layout: L] => T),
       // where L is either AnyObject or _NativeObject.
