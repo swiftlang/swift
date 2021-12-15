@@ -89,8 +89,8 @@ option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
 
-option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
-       "Support back-deploying compatibility fixes for newer apps running on older runtimes."
+option(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
+       "Support back-deployment of built binaries to older OS versions."
        TRUE)
 
 option(SWIFT_STDLIB_HAS_DLADDR

@@ -68,13 +68,13 @@ namespace swift {
                        SWIFT_TARGET_LIBRARY_NAME)
 
 // Compatibility overrides are only supported on Darwin.
-#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+#ifdef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 #if !(defined(__APPLE__) && defined(__MACH__))
-#define SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+#undef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 #endif
 #endif
 
-#ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+#ifndef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
 // Call directly through to the original implementation when we don't support
 // overrides.
@@ -84,7 +84,7 @@ namespace swift {
     return swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                  \
   }
 
-#else // #ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+#else // #ifndef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
 // Override section name computation. `COMPATIBILITY_OVERRIDE_SECTION_NAME` will
 // resolve to string literal containing the appropriate section name for the
@@ -129,7 +129,7 @@ namespace swift {
     return swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                  \
   }
 
-#endif // #else SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+#endif // #else SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
 } /* end namespace swift */
 
