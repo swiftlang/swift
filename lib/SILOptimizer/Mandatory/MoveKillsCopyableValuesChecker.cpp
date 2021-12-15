@@ -363,17 +363,7 @@ bool MoveKillsCopyableValuesChecker::check() {
 
     // Before we do anything, see if we can find a name for our value. We do
     // this early since we need this for all of our diagnostics below.
-    StringRef varName = "unknown";
-    if (auto *use = getSingleDebugUse(lexicalValue)) {
-      DebugVarCarryingInst debugVar(use->getUser());
-      if (auto varInfo = debugVar.getVarInfo()) {
-        varName = varInfo->Name;
-      } else {
-        if (auto *decl = debugVar.getDecl()) {
-          varName = decl->getBaseName().userFacingName();
-        }
-      }
-    }
+    StringRef varName = getDebugVarName(lexicalValue);
 
     // Then compute liveness.
     SWIFT_DEFER { livenessInfo.clear(); };
