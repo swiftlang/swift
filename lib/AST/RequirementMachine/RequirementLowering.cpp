@@ -87,6 +87,9 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs,
     }
   } matcher(result);
 
+  if (lhs->hasError() || rhs->hasError())
+    return;
+
   // FIXME: Record redundancy and diagnose upstream
   (void) matcher.match(lhs, rhs);
 }
