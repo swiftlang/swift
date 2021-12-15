@@ -1928,6 +1928,9 @@ static CanSILFunctionType getSILFunctionType(
   }
 
   bool shouldBuildSubstFunctionType = [&]{
+    if (TC.Context.LangOpts.DisableSubstSILFunctionTypes)
+      return false;
+
     // If there is no genericity in the abstraction pattern we're lowering
     // against, we don't need to introduce substitutions into the lowered
     // type.
