@@ -727,8 +727,15 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     //
     // Where S[n] is the nth substitution term.
 
-    // FIXME: Record a rewrite path.
-    return Context.getRelativeTermForType(typeWitness, substitutions);
+    auto result = Context.getRelativeTermForType(typeWitness, substitutions);
+
+    RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
+                                       Term::get(result, Context));
+    unsigned witnessID = System.recordTypeWitness(witness);
+    path.add(RewriteStep::forAbstractTypeWitness(
+        witnessID, /*inverse=*/false));
+
+    return result;
   }
 
   // Otherwise the type witness is concrete, but may contain type
