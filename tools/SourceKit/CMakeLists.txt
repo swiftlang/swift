@@ -1,4 +1,5 @@
 include(CheckSymbolExists)
+include(CheckIncludeFiles)
 
 # Append our own modules to the module path.
 list(APPEND CMAKE_MODULE_PATH
@@ -23,7 +24,16 @@ set(SOURCEKIT_BINARY_DIR ${SWIFT_BINARY_DIR})
 set(SOURCEKIT_RUNTIME_OUTPUT_INTDIR "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 set(SOURCEKIT_LIBRARY_OUTPUT_INTDIR "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
 
-check_symbol_exists(dispatch_block_create "dispatch/dispatch.h" HAVE_DISPATCH_BLOCK_CREATE)
+check_include_files("xpc/xpc.h" HAVE_XPC_H_default)
+option(HAVE_XPC_H
+  "Whether or not the current SDK has xpc.h"
+  ${HAVE_XPC_H_default})
+
+check_symbol_exists(dispatch_block_create "dispatch/dispatch.h" HAVE_DISPATCH_BLOCK_CREATE_default)
+option(HAVE_DISPATCH_BLOCK_CREATE
+  "Whether or not the current SDK has dispatch_block_create"
+  ${HAVE_DISPATCH_BLOCK_CREATE_default})
+
 configure_file(
   ${SOURCEKIT_SOURCE_DIR}/include/SourceKit/Config/config.h.cmake
   ${SOURCEKIT_BINARY_DIR}/include/SourceKit/Config/config.h)
@@ -41,6 +51,16 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
+
+if(HAVE_XPC_H AND SWIFT_BUILD_SOURCEKIT)
+  set(BUILD_SOURCEKIT_XPC_SERVICE_default TRUE)
+else()
+  set(BUILD_SOURCEKIT_XPC_SERVICE_default FALSE)
+endif()
+
+option(BUILD_SOURCEKIT_XPC_SERVICE
+  "Whether or not the SourceKit XPC service should be built"
+  ${BUILD_SOURCEKIT_XPC_SERVICE_default})
 
 # If we were don't have XPC, just build inproc.
 if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" OR NOT HAVE_XPC_H)
