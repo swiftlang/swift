@@ -1,7 +1,6 @@
-
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -emit-irgen -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -module-name distributed_actor_accessors -emit-irgen -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -80,61 +79,6 @@ public distributed actor MyOtherActor {
   distributed func empty() {
   }
 }
-
-
-/// ---> Let's check that distributed accessors and thunks are emitted as accessible functions
-
-/// -> `MyActor.simple1`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTEHF" = private constant
-// CHECK-SAME: @"symbolic Si___________pIetMHygzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETFTu" to i64)
-// CHECK-SAME: , section "__TEXT, __swift5_acfuncs, regular"
-
-/// -> `MyActor.simple2`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTEHF" = private constant
-// CHECK-SAME: @"symbolic Si_____SS______pIetMHygozo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFTu" to i64)
-// CHECK-SAME: , section "__TEXT, __swift5_acfuncs, regular"
-
-/// -> `MyActor.simple3`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTEHF" = private constant
-// CHECK-SAME: @"symbolic SS_____Si______pIetMHggdzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETFTu" to i64)
-// CHECK-SAME: , section "__TEXT, __swift5_acfuncs, regular"
-
-/// -> `MyActor.single_case_enum`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTEHF" = private constant
-// CHECK-SAME: @"symbolic __________AA______pIetMHygdzo_ 27distributed_actor_accessors7SimpleEO AA7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTETFTu" to i64)
-// CHECK-SAME: , section "__TEXT, __swift5_acfuncs, regular"
-
-/// -> `MyActor.with_indirect_enums`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTEHF" = private constant
-// CHECK-SAME: @"symbolic _____Si_____AA______pIetMHgygozo_ 27distributed_actor_accessors9IndirectEO AA7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTETFTu" to i64)
-// CHECK-SAME: , section "__TEXT, __swift5_acfuncs, regular"
-
-/// -> `MyActor.complex`
-// CHECK:      @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTEHF" = private constant
-// CHECK-SAME: @"symbolic SaySiG_____SSSg__________AD______pIetMHgggngrzo_ 27distributed_actor_accessors3ObjC AA11LargeStructV AA7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTETFTu" to i64)
-// CHECK-SAME: , section "__TEXT, __swift5_acfuncs, regular"
-
-/// -> `MyOtherActor.empty`
-// CHECK:      @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTEHF" = private constant
-// CHECK-SAME: @"symbolic ___________pIetMHgzo_ 27distributed_actor_accessors12MyOtherActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETFTu" to i64)
-// CHECK-SAME: , section "__TEXT, __swift5_acfuncs, regular"
-
-// CHECK:      @llvm.used = appending global [{{.*}} x i8*] [
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTEHF"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTEHF"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTEHF"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTEHF"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTEHF"
-// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTEHF"
-// CHECK-SAME: @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTEHF"
-// CHECK-SAME: ], section "llvm.metadata"
 
 /// ---> Thunk and distributed method accessor for `simple1`
 
@@ -313,8 +257,8 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[ARR_PTR:%.*]] = bitcast i8* %elt_offset to %TSa*
 // CHECK-NEXT: %argval = load %TSa, %TSa* [[ARR_PTR]], align 8
 // CHECK: store %TSa %argval, %TSa* %argval.coercion.coerced, align 8
-// CHECK-NEXT: [[PTR_TO_NATIVE_ARR:%.*]] = bitcast %TSa* %argval.coercion.coerced to %swift.bridge**
-// CHECK-NEXT: [[NATIVE_ARR_VAL:%.*]] = load %swift.bridge*, %swift.bridge** [[PTR_TO_NATIVE_ARR]], align 8
+// CHECK-NEXT: [[PTR_TO_NATIVE_ARR:%.*]] = bitcast %TSa* %argval.coercion.coerced to [[NATIVE_ARR_TYPE:%.*]]
+// CHECK-NEXT: [[NATIVE_ARR_VAL:%.*]] = load {{.*}}, [[NATIVE_ARR_TYPE]] [[PTR_TO_NATIVE_ARR]], align 8
 // CHECK: [[ARR_PTR_INT:%.*]] = ptrtoint %TSa* [[ARR_PTR]] to i64
 // CHECK-NEXT: [[NEXT_ELT:%.*]] = add i64 [[ARR_PTR_INT]], 8
 // CHECK-NEXT: [[OPAQUE_NEXT_ELT:%.*]] = inttoptr i64 [[NEXT_ELT]] to i8*
@@ -359,7 +303,7 @@ public distributed actor MyOtherActor {
 
 /// Now let's make sure that distributed thunk call uses the arguments correctly
 
-// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, %T27distributed_actor_accessors11LargeStructV* [[INDIRECT_RESULT_BUFF]], %swift.context* {{.*}}, %swift.bridge* [[NATIVE_ARR_VAL]], %T27distributed_actor_accessors3ObjC* [[NATIVE_OBJ_VAL]], i64 [[NATIVE_OPT_VAL_0]], i64 [[NATIVE_OPT_VAL_1]], %T27distributed_actor_accessors11LargeStructV* [[NATIVE_STRUCT_VAL]], %T27distributed_actor_accessors7MyActorC* {{.*}})
+// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, %T27distributed_actor_accessors11LargeStructV* [[INDIRECT_RESULT_BUFF]], %swift.context* {{.*}}, {{.*}} [[NATIVE_ARR_VAL]], %T27distributed_actor_accessors3ObjC* [[NATIVE_OBJ_VAL]], i64 [[NATIVE_OPT_VAL_0]], i64 [[NATIVE_OPT_VAL_1]], %T27distributed_actor_accessors11LargeStructV* [[NATIVE_STRUCT_VAL]], %T27distributed_actor_accessors7MyActorC* {{.*}})
 
 /// RESULT is returned indirectly so there is nothing to pass to `end`
 
