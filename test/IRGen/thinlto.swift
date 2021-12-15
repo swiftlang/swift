@@ -6,6 +6,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
+// REQUIRES: no_asan
 
 #if MODULE
 
