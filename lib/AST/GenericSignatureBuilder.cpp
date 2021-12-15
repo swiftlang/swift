@@ -3998,8 +3998,16 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                                             ProtocolDecl *proto,
                                             const RequirementSource *source,
                                             bool onlySameTypeConstraints) {
-  auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
-      proto, selfType.getDependentType(*this), ProtocolConformanceRef(proto));
+  auto selfTy = selfType.getDependentType(*this);
+
+  auto subst = [&](Requirement req) -> Optional<Requirement> {
+    return req.subst(
+        [&](SubstitutableType *t) -> Type {
+          assert(isa<GenericTypeParamType>(t));
+          return selfTy;
+        },
+        MakeAbstractConformanceForGenericType());
+  };
 
   auto result = ConstraintResult::Resolved;
 
@@ -4015,7 +4023,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       if (onlySameTypeConstraints && req.getKind() != RequirementKind::SameType)
         continue;
 
-      auto substReq = req.subst(protocolSubMap);
+      auto substReq = subst(req);
       auto reqResult = substReq
                            ? addRequirement(*substReq, innerSource, nullptr)
                            : ConstraintResult::Conflicting;
@@ -4045,8 +4053,9 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
         auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
             source, proto, reqRepr->getSeparatorLoc(), /*inferred=*/false);
-        addRequirement(req, reqRepr, innerSource,
-                       &protocolSubMap, nullptr);
+
+        if (auto substReq = subst(req))
+          addRequirement(*substReq, reqRepr, innerSource, nullptr);
         return false;
       });
 
@@ -4159,7 +4168,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                     source, proto, SourceLoc(), /*inferred=*/true);
 
     auto rawReq = Requirement(RequirementKind::SameType, firstType, secondType);
-    if (auto req = rawReq.subst(protocolSubMap))
+    if (auto req = subst(rawReq))
       addRequirement(*req, inferredSameTypeSource, proto->getParentModule());
   };
 
@@ -4189,8 +4198,10 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
           auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
               source, proto, reqRepr->getSeparatorLoc(), /*inferred=*/false);
-          addRequirement(req, reqRepr, innerSource, &protocolSubMap,
-                         /*inferForModule=*/nullptr);
+          if (auto substReq = subst(req)) {
+            addRequirement(*substReq, reqRepr, innerSource,
+                           /*inferForModule=*/nullptr);
+          }
           return false;
         });
 
@@ -5171,28 +5182,19 @@ ConstraintResult
 GenericSignatureBuilder::addRequirement(const Requirement &req,
                                         FloatingRequirementSource source,
                                         ModuleDecl *inferForModule) {
-  return addRequirement(req, nullptr, source, nullptr, inferForModule);
+  return addRequirement(req, nullptr, source, inferForModule);
 }
 
 ConstraintResult
 GenericSignatureBuilder::addRequirement(const Requirement &req,
                                         const RequirementRepr *reqRepr,
                                         FloatingRequirementSource source,
-                                        const SubstitutionMap *subMap,
                                         ModuleDecl *inferForModule) {
-  // Local substitution for types in the requirement.
-  auto subst = [&](Type t) {
-    if (subMap)
-      return t.subst(*subMap);
-
-    return t;
-  };
-
-  auto firstType = subst(req.getFirstType());
+  auto firstType = req.getFirstType();
   switch (req.getKind()) {
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
-    auto secondType = subst(req.getSecondType());
+    auto secondType = req.getSecondType();
 
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
@@ -5220,7 +5222,7 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
   }
 
   case RequirementKind::SameType: {
-    auto secondType = subst(req.getSecondType());
+    auto secondType = req.getSecondType();
 
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
@@ -8567,8 +8569,8 @@ InferredGenericSignatureRequest::evaluate(
         }
       }
 
-      builder.addRequirement(req, reqRepr, source, nullptr,
-                              lookupDC->getParentModule());
+      builder.addRequirement(req, reqRepr, source,
+                             lookupDC->getParentModule());
       return false;
     };
 
