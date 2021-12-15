@@ -443,6 +443,8 @@ void RewritePathEvaluator::applyConcreteTypeWitness(const RewriteStep &step,
     llvm::errs() << "Conformance: " << witness.ConcreteConformance << "\n";
     llvm::errs() << "Assoc type: " << witness.AssocType << "\n";
     llvm::errs() << "Concrete type: " << witness.ConcreteType << "\n";
+    llvm::errs() << "End offset: " << step.EndOffset << "\n";
+    llvm::errs() << "Inverse: " << step.Inverse << "\n";
     abort();
   };
 
@@ -496,7 +498,7 @@ void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
 
   const auto &witness = system.getConcreteTypeWitness(step.RuleID);
   auto fail = [&]() {
-    llvm::errs() << "Bad concrete type witness term:\n";
+    llvm::errs() << "Bad same-type witness term:\n";
     llvm::errs() << term << "\n\n";
     llvm::errs() << "Conformance: " << witness.ConcreteConformance << "\n";
     llvm::errs() << "Assoc type: " << witness.AssocType << "\n";
@@ -505,26 +507,30 @@ void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
   };
 
 #ifndef NDEBUG
-  if ((witness.ConcreteType.getConcreteType() !=
-       witness.ConcreteConformance.getConcreteType()) ||
-      (witness.ConcreteType.getSubstitutions() !=
-       witness.ConcreteConformance.getSubstitutions())) {
+  if (witness.ConcreteType.getConcreteType() !=
+      witness.ConcreteConformance.getConcreteType()) {
     fail();
   }
 #endif
 
+  auto witnessConcreteType = Symbol::forConcreteType(
+      witness.ConcreteConformance.getConcreteType(),
+      witness.ConcreteConformance.getSubstitutions(),
+      system.getRewriteContext());
+
   if (!step.Inverse) {
     // Make sure the term takes the following form, where |V| == EndOffset:
     //
-    //    U.[concrete: C : P].[P:X].V
-    if (term.size() <= step.EndOffset + 2 ||
-        *(term.end() - step.EndOffset - 2) != witness.ConcreteConformance ||
-        *(term.end() - step.EndOffset - 1) != witness.AssocType) {
+    //    U.[concrete: C : P].[P:X].[concrete: C].V
+    if (term.size() <= step.EndOffset + 3 ||
+        *(term.end() - step.EndOffset - 3) != witness.ConcreteConformance ||
+        *(term.end() - step.EndOffset - 2) != witness.AssocType ||
+        *(term.end() - step.EndOffset - 1) != witnessConcreteType) {
       fail();
     }
 
     // Get the subterm U.[concrete: C : P].
-    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset - 1);
+    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset - 2);
 
     // Add the subterm V, to get U.[concrete: C : P].V.
     newTerm.append(term.end() - step.EndOffset, term.end());
@@ -545,9 +551,12 @@ void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
     // Add the symbol [P:X].
     newTerm.add(witness.AssocType);
 
+    // Add the symbol [concrete: C].
+    newTerm.add(witnessConcreteType);
+
     // Add the subterm V, to get
     //
-    //    U.[concrete: C : P].[P:X].V
+    //    U.[concrete: C : P].[P:X].[concrete: C].V
     newTerm.append(term.end() - step.EndOffset, term.end());
 
     term = newTerm;

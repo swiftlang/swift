@@ -736,7 +736,6 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
                                       Context, result);
   auto typeWitnessSymbol =
       Symbol::forConcreteType(typeWitnessSchema, result, Context);
-  System.simplifySubstitutions(typeWitnessSymbol);
 
   auto concreteConformanceSymbol = *(subjectType.end() - 2);
   auto assocTypeSymbol = *(subjectType.end() - 1);
@@ -745,6 +744,11 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
                                              assocTypeSymbol,
                                              typeWitnessSymbol);
   unsigned witnessID = System.recordConcreteTypeWitness(witness);
+
+  // Simplify the substitution terms in the type witness symbol.
+  RewritePath substPath;
+  System.simplifySubstitutions(typeWitnessSymbol, &substPath);
+  substPath.invert();
 
   // If it is equal to the parent type, introduce a same-type requirement
   // between the two parameters.
@@ -758,12 +762,20 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
       llvm::dbgs() << "^^ Type witness is the same as the concrete type\n";
     }
 
-    // Add a rule T.[concrete: C : P].[P:X] => T.[concrete: C : P].
+    // Add a rule T.[concrete: C : P] => T.[concrete: C : P].[P:X].
     MutableTerm result(key);
     result.add(concreteConformanceSymbol);
 
+    // ([concrete: C : P] => [concrete: C : P].[P:X].[concrete: C])
     path.add(RewriteStep::forSameTypeWitness(
         witnessID, /*inverse=*/true));
+
+    // [concrete: C : P].[P:X].([concrete: C] => [concrete: C.X])
+    path.append(substPath);
+
+    // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
+    path.add(RewriteStep::forConcreteTypeWitness(
+        witnessID, /*inverse=*/false));
 
     return result;
   }
@@ -795,10 +807,16 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   //
   // Add a rule:
   //
-  // T.[concrete: C : P].[P:X].[concrete: C.X] => T.[concrete: C : P].[P:X].
+  // T.[concrete: C : P].[P:X].[concrete: C.X'] => T.[concrete: C : P].[P:X].
+  //
+  // Where C.X' is the canonical form of C.X.
   MutableTerm constraintType = subjectType;
   constraintType.add(typeWitnessSymbol);
 
+  // T.[concrete: C : P].[P:X].([concrete: C.X'] => [concrete: C.X])
+  path.append(substPath);
+
+  // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
   path.add(RewriteStep::forConcreteTypeWitness(
       witnessID, /*inverse=*/false));
 

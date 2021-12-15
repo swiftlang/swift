@@ -249,7 +249,7 @@ public:
   }
 
   // Horizontal composition of paths.
-  void append(RewritePath other) {
+  void append(const RewritePath &other) {
     Steps.append(other.begin(), other.end());
   }
 
