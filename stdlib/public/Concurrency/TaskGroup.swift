@@ -373,8 +373,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// There are no restrictions on where you can call this method.
-  /// Code inside a child task or even another task can cancel a group.
+  /// This method can only be called by the parent task that created the task
+  /// group.
   ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `TaskGroup.isCancelled`

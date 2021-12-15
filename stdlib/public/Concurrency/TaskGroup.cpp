@@ -449,6 +449,10 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
   return reinterpret_cast<TaskGroup*>(group);
 }
 
+TaskGroupTaskStatusRecord * TaskGroup::getTaskRecord() {
+    return asImpl(this)->getTaskRecord();
+}
+
 // =============================================================================
 // ==== initialize -------------------------------------------------------------
 
