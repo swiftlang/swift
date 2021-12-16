@@ -143,6 +143,29 @@ class TypeMatcher {
       return mismatch(firstTuple.getPointer(), secondType, sugaredFirstType);
     }
 
+    bool visitPackType(CanPackType firstTuple, Type secondType,
+                       Type sugaredFirstType) {
+      if (auto secondTuple = secondType->getAs<PackType>()) {
+        auto sugaredFirstTuple = sugaredFirstType->getAs<PackType>();
+        if (firstTuple->getNumElements() != secondTuple->getNumElements())
+          return mismatch(firstTuple.getPointer(), secondTuple,
+                          sugaredFirstType);
+
+        for (unsigned i = 0, n = firstTuple->getNumElements(); i != n; ++i) {
+          Type secondElt = secondTuple->getElementType(i);
+
+          // Recurse on the pack elements.
+          if (!this->visit(firstTuple.getElementType(i), secondElt,
+                           sugaredFirstTuple->getElementType(i)))
+            return false;
+        }
+
+        return true;
+      }
+
+      // Pack/non-pack mismatch.
+      return mismatch(firstTuple.getPointer(), secondType, sugaredFirstType);
+    }
     bool visitReferenceStorageType(CanReferenceStorageType firstStorage,
                                    Type secondType, Type sugaredFirstType) {
       auto _secondStorage = secondType->getCanonicalType();

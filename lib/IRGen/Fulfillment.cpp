@@ -77,6 +77,8 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Tuple:
     return cast<TupleType>(type)->getNumElements() == 0;
 
+  case TypeKind::Pack:
+    return cast<PackType>(type)->getNumElements() == 0;
   // Nominal types might have generic parents.
   case TypeKind::Class:
   case TypeKind::Enum:

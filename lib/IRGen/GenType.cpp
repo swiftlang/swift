@@ -2198,6 +2198,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertBoxType(cast<SILBoxType>(ty));
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
+  case TypeKind::Pack:
+    llvm_unreachable("Unimplemented!");
   }
   }
   llvm_unreachable("bad type kind");

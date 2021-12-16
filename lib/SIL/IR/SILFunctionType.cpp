@@ -3793,6 +3793,19 @@ public:
                             orig.getConvention(), orig.getDifferentiability());
   }
 
+  CanType visitPackType(CanPackType origType) {
+    // Fast-path the empty pack.
+    if (origType->getNumElements() == 0) return origType;
+
+    SmallVector<Type, 8> substElts;
+    substElts.reserve(origType->getNumElements());
+    for (Type origTy : origType->getElementTypes()) {
+      auto substEltType = visit(CanType(origTy));
+      substElts.push_back(substEltType);
+    }
+    return CanType(PackType::get(TC.Context, substElts));
+  }
+
   /// Tuples need to have their component types substituted by these
   /// same rules.
   CanType visitTupleType(CanTupleType origType) {

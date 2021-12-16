@@ -388,6 +388,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
+    llvm::FoldingSet<PackType> PackTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    MetatypeType*> MetatypeTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
@@ -469,6 +470,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
+  llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
@@ -620,6 +622,7 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
       TheUnresolvedType(new (*this, AllocationArena::Permanent)
                             UnresolvedType(*this)),
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
+      TheEmptyPackType(PackType::get(*this, {})),
       TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
                                               /*HasExplicitAnyObject=*/false)),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
@@ -2923,6 +2926,70 @@ TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
 Type TupleTypeElt::getType() const {
   if (Flags.isInOut()) return InOutType::get(ElementType);
   return ElementType;
+}
+
+PackExpansionType *PackExpansionType::get(Type patternTy) {
+  assert(patternTy && "Missing pattern type in expansion");
+
+  auto &context = patternTy->getASTContext();
+  llvm::FoldingSetNodeID id;
+  PackExpansionType::Profile(id, patternTy);
+
+  void *insertPos;
+  if (PackExpansionType *expType =
+          context.getImpl().PackExpansionTypes.FindNodeOrInsertPos(id,
+                                                                   insertPos))
+    return expType;
+
+  const ASTContext *canCtx = patternTy->isCanonical() ? &context : nullptr;
+  PackExpansionType *expansionTy = new (context, AllocationArena::Permanent)
+      PackExpansionType(patternTy, canCtx);
+  context.getImpl().PackExpansionTypes.InsertNode(expansionTy, insertPos);
+  return expansionTy;
+}
+
+void PackExpansionType::Profile(llvm::FoldingSetNodeID &ID, Type patternType) {
+  ID.AddPointer(patternType.getPointer());
+}
+
+PackType *PackType::getEmpty(const ASTContext &C) {
+  return cast<PackType>(CanType(C.TheEmptyPackType));
+}
+
+PackType *PackType::get(const ASTContext &C, ArrayRef<Type> elements) {
+  RecursiveTypeProperties properties;
+  bool isCanonical = true;
+  for (Type eltTy : elements) {
+    properties |= eltTy->getRecursiveProperties();
+    if (!eltTy->isCanonical())
+      isCanonical = false;
+  }
+
+  auto arena = getArena(properties);
+
+  void *InsertPos = nullptr;
+  // Check to see if we've already seen this pack before.
+  llvm::FoldingSetNodeID ID;
+  PackType::Profile(ID, elements);
+
+  if (PackType *TT
+        = C.getImpl().getArena(arena).PackTypes.FindNodeOrInsertPos(ID,InsertPos))
+    return TT;
+
+  size_t bytes = totalSizeToAlloc<Type>(elements.size());
+  // TupleType will copy the fields list into ASTContext owned memory.
+  void *mem = C.Allocate(bytes, alignof(PackType), arena);
+  auto New =
+      new (mem) PackType(elements, isCanonical ? &C : nullptr, properties);
+  C.getImpl().getArena(arena).PackTypes.InsertNode(New, InsertPos);
+  return New;
+}
+
+void PackType::Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Elements) {
+  ID.AddInteger(Elements.size());
+  for (Type Ty : Elements) {
+    ID.AddPointer(Ty.getPointer());
+  }
 }
 
 Type AnyFunctionType::Param::getOldType() const {

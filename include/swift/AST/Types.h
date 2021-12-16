@@ -6126,6 +6126,82 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
 
+/// PackType - The type of a pack of arguments provided to a
+/// \c PackExpansionType to guide the pack expansion process.
+///
+/// A pack type looks a lot like a tuple in the surface language, except there
+/// is no way for the user to spell a pack. Pack types are created by the solver
+/// when it encounters an apply of a variadic generic function, as in
+///
+/// \code
+/// func print<T...>(_ xs: T...) {}
+/// // Creates a pack type <String, Int, String>
+/// print("Macs say Hello in", 42, " different languages")
+/// \endcode
+///
+/// Pack types substituted into the variadic generic arguments of a
+/// \c PackExpansionType "trip" the pack expansion and cause it to produce a
+/// new pack type with the pack expansion pattern applied.
+///
+/// \code
+/// typealias Foo<T...> = (T?...)
+/// Foo<Int, String, Int> // Forces expansion to (Int?, String?, Int?)
+/// \endcode
+class PackType final : public TypeBase, public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<PackType, Type> {
+  friend class ASTContext;
+  friend TrailingObjects;
+
+public:
+  /// Creates a new, empty pack.
+  static PackType *getEmpty(const ASTContext &C);
+  /// Creates a pack from the types in \p elements.
+  static PackType *get(const ASTContext &C, ArrayRef<Type> elements);
+
+public:
+  /// Retrieves the number of elements in this pack.
+  unsigned getNumElements() const { return Bits.PackType.Count; }
+
+  /// Retrieves the type of the elements in the pack.
+  ArrayRef<Type> getElementTypes() const {
+    return {getTrailingObjects<Type>(), getNumElements()};
+  }
+
+  /// Returns the type of the element at the given \p index.
+  Type getElementType(unsigned index) const {
+    return getTrailingObjects<Type>()[index];
+  }
+
+public:
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getElementTypes());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Elements);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Pack;
+  }
+
+private:
+  PackType(ArrayRef<Type> elements, const ASTContext *CanCtx,
+           RecursiveTypeProperties properties)
+     : TypeBase(TypeKind::Pack, CanCtx, properties) {
+     Bits.PackType.Count = elements.size();
+     std::uninitialized_copy(elements.begin(), elements.end(),
+                             getTrailingObjects<Type>());
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
+  CanType getElementType(unsigned elementNo) const {
+    return CanType(getPointer()->getElementType(elementNo));
+  }
+
+  CanTypeArrayRef getElementTypes() const {
+    return CanTypeArrayRef(getPointer()->getElementTypes());
+  }
+END_CAN_TYPE_WRAPPER(PackType, Type)
+
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() {
   // If this type is canonical, it has the ASTContext in it.

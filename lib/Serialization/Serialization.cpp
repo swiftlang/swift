@@ -4380,6 +4380,12 @@ public:
                        S.addTypeRef(wrappedTy));
   }
 
+  void visitPackType(const PackType *pack) {
+    using namespace decls_block;
+//    serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
+    llvm_unreachable("Unimplemented!");
+  }
+
   void visitParenType(const ParenType *parenTy) {
     using namespace decls_block;
     assert(parenTy->getParameterFlags().isNone());

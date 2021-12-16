@@ -1342,6 +1342,11 @@ namespace {
       return emitNominalMetadataRef(IGF, type->getDecl(), type, request);
     }
 
+    MetadataResponse visitPackType(CanPackType type,
+                                   DynamicMetadataRequest request) {
+      llvm_unreachable("Unimplemented!");
+    }
+
     MetadataResponse visitTupleType(CanTupleType type,
                                     DynamicMetadataRequest request) {
       if (auto cached = tryGetLocal(type, request))
@@ -2541,6 +2546,10 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       } else {
         NumCalls += 1;
       }
+    }
+
+    void visitPackType(CanPackType tup) {
+      llvm_unreachable("Unimplemented!");
     }
 
     void visitTupleType(CanTupleType tup) {

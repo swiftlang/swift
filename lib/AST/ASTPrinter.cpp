@@ -4626,6 +4626,19 @@ public:
     Printer << ")";
   }
 
+  void visitPackType(PackType *T) {
+    Printer << "(";
+
+    auto Fields = T->getElementTypes();
+    for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
+      if (i)
+        Printer << ", ";
+      Type EltType = Fields[i];
+      visit(EltType);
+    }
+    Printer << ")";
+  }
+
   void visitTupleType(TupleType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
     SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };

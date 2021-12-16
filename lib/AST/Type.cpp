@@ -230,6 +230,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
+  case TypeKind::Pack:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -1340,6 +1341,21 @@ CanType TypeBase::computeCanonicalType() {
     auto parentTy = nominalTy->getParent()->getCanonicalType();
     Result = NominalType::get(nominalTy->getDecl(), parentTy,
                               parentTy->getASTContext());
+    break;
+  }
+
+  case TypeKind::Pack: {
+    PackType *PT = cast<PackType>(this);
+    assert(PT->getNumElements() != 0 && "Empty packs are always canonical");
+
+    SmallVector<Type, 8> CanTys;
+    CanTys.reserve(PT->getNumElements());
+    for (Type field : PT->getElementTypes()) {
+      CanTys.push_back(field->getCanonicalType());
+    }
+
+    const ASTContext &C = CanTys[0]->getASTContext();
+    Result = PackType::get(C, CanTys)->castTo<PackType>();
     break;
   }
 

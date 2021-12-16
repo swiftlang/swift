@@ -606,6 +606,11 @@ namespace {
                                          isSensitive);
     }
 
+    RetTy visitPackType(CanPackType type, AbstractionPattern origType,
+                        IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("");
+    }
+
     // Tuples depend on their elements.
     RetTy visitTupleType(CanTupleType type, AbstractionPattern origType,
                          IsTypeExpansionSensitive_t isSensitive) {
@@ -1708,6 +1713,12 @@ namespace {
           UnsafeValueBufferTypeLowering(silType, Expansion, isSensitive);
     }
 
+    TypeLowering *visitPackType(CanPackType packType,
+                                AbstractionPattern origType,
+                                IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("");
+    }
+
     TypeLowering *visitTupleType(CanTupleType tupleType,
                                  AbstractionPattern origType,
                                  IsTypeExpansionSensitive_t isSensitive) {
@@ -2205,6 +2216,10 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
 
       return CanExistentialMetatypeType::get(existMetatype.getInstanceType(),
                                              MetatypeRepresentation::Thick);
+    }
+
+    CanType visitPackType(CanPackType substPackType) {
+      llvm_unreachable("");
     }
 
     // Lower tuple element types.

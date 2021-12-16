@@ -49,6 +49,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
   bool visitSILTokenType(SILTokenType *ty) { return false; }
 
+  bool visitPackType(PackType *ty) {
+    for (auto elementTy : ty->getElementTypes())
+      if (doIt(elementTy))
+        return true;
+    return false;
+  }
+
   bool visitParenType(ParenType *ty) {
     return doIt(ty->getUnderlyingType());
   }

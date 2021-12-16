@@ -1948,6 +1948,11 @@ private:
     os << "void";
   }
 
+  void visitPackType(PackType *PT, Optional<OptionalTypeKind> optionalKind) {
+    assert(PT->getNumElements() == 0);
+    os << "void";
+  }
+
   void visitParenType(ParenType *PT, Optional<OptionalTypeKind> optionalKind) {
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
