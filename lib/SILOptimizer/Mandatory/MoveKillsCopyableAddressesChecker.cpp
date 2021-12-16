@@ -484,130 +484,32 @@ static bool upwardScanForInit(SILInstruction *inst, UseState &useState) {
 }
 
 //===----------------------------------------------------------------------===//
-//                              Address Checker
+//                              Global Dataflow
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-struct MoveKillsCopyableAddressesObjectChecker {
-  SILFunction *fn;
-  UseState useState;
+struct DataflowState {
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> useBlocks;
   llvm::DenseSet<SILBasicBlock *> initBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> destroyBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> reinitBlocks;
   SmallVector<MarkUnresolvedMoveAddrInst *, 8> markMovesToDataflow;
+  UseState &useState;
 
-  MoveKillsCopyableAddressesObjectChecker(SILFunction *fn)
-      : fn(fn), useState() {}
-  bool performSingleBasicBlockAnalysisForAllMarkMoves(SILValue address);
-  bool performGlobalDataflow(SILValue address);
-
-  bool check(SILValue address);
-
-  void emitDiagnosticForMove(SILValue borrowedValue,
-                             StringRef borrowedValueName, MoveValueInst *mvi);
-
-  ASTContext &getASTContext() const { return fn->getASTContext(); }
+  DataflowState(UseState &useState) : useState(useState) {}
+  void init();
+  bool process(SILValue address);
+  void clear() {
+    useBlocks.clear();
+    initBlocks.clear();
+    destroyBlocks.clear();
+    reinitBlocks.clear();
+    markMovesToDataflow.clear();
+  }
 };
 
 } // namespace
-
-// Returns true if we emitted a diagnostic and handled the single block
-// case. Returns false if we visited all of the uses and seeded the UseState
-// struct with the information needed to perform our interprocedural dataflow.
-bool MoveKillsCopyableAddressesObjectChecker::
-    performSingleBasicBlockAnalysisForAllMarkMoves(SILValue address) {
-  bool didEmitSingleBlockDiagnostic = false;
-  for (auto *mvi : useState.markMoves) {
-    // First scan downwards to make sure we are move out of this block.
-
-    SILInstruction *interestingUser = nullptr;
-    switch (downwardScanForMoveOut(mvi, useState, &interestingUser)) {
-    case DownwardScanResult::Invalid:
-      llvm_unreachable("invalid");
-    case DownwardScanResult::Destroy: {
-      // If we found a destroy, then we found a single block case that we can
-      // handle. Remove the destroy and convert the mark_unresolved_move_addr
-      // into a true move.
-      auto *dvi = cast<DestroyAddrInst>(interestingUser);
-      SILBuilderWithScope builder(mvi);
-      builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
-                             IsTake, IsInitialization);
-      useState.destroys.erase(dvi);
-      mvi->eraseFromParent();
-      dvi->eraseFromParent();
-      continue;
-    }
-    case DownwardScanResult::UseForDiagnostic: {
-      // Then check if we found a user that violated our dataflow rules. In such
-      // a case, emit an error, cleanup our mark_unresolved_move_addr, and
-      // finally continue.
-      didEmitSingleBlockDiagnostic = true;
-
-      {
-        auto diag =
-            diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
-        StringRef name = getDebugVarName(address);
-        diagnose(getASTContext(), getSourceLocFromValue(address), diag, name);
-      }
-
-      {
-        auto diag = diag::sil_movekillscopyablevalue_move_here;
-        diagnose(getASTContext(), mvi->getLoc().getSourceLoc(), diag);
-      }
-
-      {
-        auto diag = diag::sil_movekillscopyablevalue_use_here;
-        diagnose(getASTContext(), interestingUser->getLoc().getSourceLoc(),
-                 diag);
-      }
-
-      // We purposely continue to see if at least in simple cases, we can flag
-      // mistakes from other moves. Since we are setting emittedDiagnostic to
-      // true, we will not perform the actual dataflow due to a check after
-      // the loop.
-      //
-      // We also clean up mvi by converting it to a copy_addr init so we do not
-      // emit fail errors later.
-      //
-      // TODO: Can we handle multiple errors in the same block for a single
-      // move?
-      SILBuilderWithScope builder(mvi);
-      builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
-                             IsNotTake, IsInitialization);
-      mvi->eraseFromParent();
-      continue;
-    }
-    case DownwardScanResult::Reinit: {
-      convertMemoryReinitToInitForm(interestingUser);
-      useState.reinits.erase(interestingUser);
-      SILBuilderWithScope builder(mvi);
-      builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
-                             IsTake, IsInitialization);
-      mvi->eraseFromParent();
-      continue;
-    }
-    case DownwardScanResult::MoveOut:
-      break;
-    }
-
-    // If we did not found any uses later in the block that was an interesting
-    // use, we need to perform dataflow.
-    LLVM_DEBUG(llvm::dbgs() << "Our move is live out, so we need to process "
-                               "it with the dataflow.\n");
-    markMovesToDataflow.emplace_back(mvi);
-
-    // Now scan up to see if mvi is also a use to seed the dataflow. This could
-    // happen if we have an earlier move.
-    if (upwardScanForUseOut(mvi, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "MVI projects a use up");
-      useBlocks[mvi->getParent()] = mvi;
-    }
-  }
-
-  return didEmitSingleBlockDiagnostic;
-}
 
 static bool
 cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
@@ -692,10 +594,11 @@ cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
   return madeChange;
 }
 
-bool MoveKillsCopyableAddressesObjectChecker::performGlobalDataflow(
-    SILValue address) {
-  bool madeChange = false;
+bool DataflowState::process(SILValue address) {
+  SILFunction *fn = address->getFunction();
+  assert(fn);
 
+  bool madeChange = false;
   SmallBitVector indicesOfPairedDestroys;
   auto getIndicesOfPairedDestroys = [&]() -> SmallBitVector & {
     if (indicesOfPairedDestroys.size() != useState.destroys.size())
@@ -739,7 +642,7 @@ bool MoveKillsCopyableAddressesObjectChecker::performGlobalDataflow(
         LLVM_DEBUG(llvm::dbgs() << "    Is Use Block! Emitting Error!\n");
         // We found one! Emit the diagnostic and continue and see if we can get
         // more diagnostics.
-        auto &astContext = getASTContext();
+        auto &astContext = fn->getASTContext();
         {
           auto diag =
               diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
@@ -849,60 +752,7 @@ bool MoveKillsCopyableAddressesObjectChecker::performGlobalDataflow(
   return madeChange;
 }
 
-bool MoveKillsCopyableAddressesObjectChecker::check(SILValue address) {
-  auto accessPathWithBase = AccessPathWithBase::compute(address);
-  auto accessPath = accessPathWithBase.accessPath;
-
-  // Bail on an invalid AccessPath.
-  //
-  // AccessPath completeness is verified independently--it may be invalid in
-  // extraordinary situations. When AccessPath is valid, we know all its uses
-  // are recognizable.
-  //
-  // NOTE: If due to an invalid access path we fail here, we will just error
-  // on the _move since the _move would not have been handled.
-  if (!accessPath.isValid())
-    return false;
-
-  GatherLexicalLifetimeUseVisitor visitor(useState);
-  SWIFT_DEFER { visitor.clear(); };
-  visitor.reset(address);
-  if (!visitAccessPathUses(visitor, accessPath, fn))
-    return false;
-
-  // See if our base address is an inout. If we found any moves, add as a
-  // liveness use all function terminators.
-  if (auto *fArg = dyn_cast<SILFunctionArgument>(address)) {
-    if (fArg->hasConvention(SILArgumentConvention::Indirect_Inout)) {
-      if (visitor.useState.markMoves.size()) {
-        SmallVector<SILBasicBlock *, 2> exitingBlocks;
-        fn->findExitingBlocks(exitingBlocks);
-        for (auto *block : exitingBlocks) {
-          visitor.useState.livenessUses.insert(block->getTerminator());
-        }
-      }
-    }
-  }
-
-  // Now initialize our data structures.
-  SWIFT_DEFER {
-    useBlocks.clear();
-    initBlocks.clear();
-    destroyBlocks.clear();
-    reinitBlocks.clear();
-    markMovesToDataflow.clear();
-  };
-
-  // Perform the single basic block analysis emitting a diagnostic/pairing
-  // mark_unresolved_move_addr and destroys if needed. If we discover a
-  // mark_move that propagates its state out of the current block, this
-  // routine also prepares the pass for running the multi-basic block
-  // diagnostic.
-  if (performSingleBasicBlockAnalysisForAllMarkMoves(address)) {
-    LLVM_DEBUG(llvm::dbgs() << "Performed single block analysis!\n");
-    return true;
-  }
-
+void DataflowState::init() {
   // Go through all init uses and if we don't see any other of our uses, then
   // mark this as an "init block".
   for (auto *init : useState.inits) {
@@ -952,9 +802,181 @@ bool MoveKillsCopyableAddressesObjectChecker::check(SILValue address) {
       reinitBlocks[reinit->getParent()] = reinit;
     }
   }
+}
 
-  // Ok, we are setup. Perform the global dataflow!
-  return performGlobalDataflow(address);
+//===----------------------------------------------------------------------===//
+//                              Address Checker
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct MoveKillsCopyableAddressesObjectChecker {
+  SILFunction *fn;
+  UseState useState;
+  DataflowState dataflowState;
+
+  MoveKillsCopyableAddressesObjectChecker(SILFunction *fn)
+      : fn(fn), useState(), dataflowState(useState) {}
+  bool performSingleBasicBlockAnalysisForAllMarkMoves(SILValue address);
+
+  bool check(SILValue address);
+
+  void emitDiagnosticForMove(SILValue borrowedValue,
+                             StringRef borrowedValueName, MoveValueInst *mvi);
+
+  ASTContext &getASTContext() const { return fn->getASTContext(); }
+};
+
+} // namespace
+
+// Returns true if we emitted a diagnostic and handled the single block
+// case. Returns false if we visited all of the uses and seeded the UseState
+// struct with the information needed to perform our interprocedural dataflow.
+bool MoveKillsCopyableAddressesObjectChecker::
+    performSingleBasicBlockAnalysisForAllMarkMoves(SILValue address) {
+  bool didEmitSingleBlockDiagnostic = false;
+  for (auto *mvi : useState.markMoves) {
+    // First scan downwards to make sure we are move out of this block.
+
+    SILInstruction *interestingUser = nullptr;
+    switch (downwardScanForMoveOut(mvi, useState, &interestingUser)) {
+    case DownwardScanResult::Invalid:
+      llvm_unreachable("invalid");
+    case DownwardScanResult::Destroy: {
+      // If we found a destroy, then we found a single block case that we can
+      // handle. Remove the destroy and convert the mark_unresolved_move_addr
+      // into a true move.
+      auto *dvi = cast<DestroyAddrInst>(interestingUser);
+      SILBuilderWithScope builder(mvi);
+      builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
+                             IsTake, IsInitialization);
+      useState.destroys.erase(dvi);
+      mvi->eraseFromParent();
+      dvi->eraseFromParent();
+      continue;
+    }
+    case DownwardScanResult::UseForDiagnostic: {
+      // Then check if we found a user that violated our dataflow rules. In such
+      // a case, emit an error, cleanup our mark_unresolved_move_addr, and
+      // finally continue.
+      didEmitSingleBlockDiagnostic = true;
+
+      {
+        auto diag =
+            diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+        StringRef name = getDebugVarName(address);
+        diagnose(getASTContext(), getSourceLocFromValue(address), diag, name);
+      }
+
+      {
+        auto diag = diag::sil_movekillscopyablevalue_move_here;
+        diagnose(getASTContext(), mvi->getLoc().getSourceLoc(), diag);
+      }
+
+      {
+        auto diag = diag::sil_movekillscopyablevalue_use_here;
+        diagnose(getASTContext(), interestingUser->getLoc().getSourceLoc(),
+                 diag);
+      }
+
+      // We purposely continue to see if at least in simple cases, we can flag
+      // mistakes from other moves. Since we are setting emittedDiagnostic to
+      // true, we will not perform the actual dataflow due to a check after
+      // the loop.
+      //
+      // We also clean up mvi by converting it to a copy_addr init so we do not
+      // emit fail errors later.
+      //
+      // TODO: Can we handle multiple errors in the same block for a single
+      // move?
+      SILBuilderWithScope builder(mvi);
+      builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
+                             IsNotTake, IsInitialization);
+      mvi->eraseFromParent();
+      continue;
+    }
+    case DownwardScanResult::Reinit: {
+      convertMemoryReinitToInitForm(interestingUser);
+      useState.reinits.erase(interestingUser);
+      SILBuilderWithScope builder(mvi);
+      builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
+                             IsTake, IsInitialization);
+      mvi->eraseFromParent();
+      continue;
+    }
+    case DownwardScanResult::MoveOut:
+      break;
+    }
+
+    // If we did not found any uses later in the block that was an interesting
+    // use, we need to perform dataflow.
+    LLVM_DEBUG(llvm::dbgs() << "Our move is live out, so we need to process "
+                               "it with the dataflow.\n");
+    dataflowState.markMovesToDataflow.emplace_back(mvi);
+
+    // Now scan up to see if mvi is also a use to seed the dataflow. This could
+    // happen if we have an earlier move.
+    if (upwardScanForUseOut(mvi, useState)) {
+      LLVM_DEBUG(llvm::dbgs() << "MVI projects a use up");
+      dataflowState.useBlocks[mvi->getParent()] = mvi;
+    }
+  }
+
+  return didEmitSingleBlockDiagnostic;
+}
+
+bool MoveKillsCopyableAddressesObjectChecker::check(SILValue address) {
+  auto accessPathWithBase = AccessPathWithBase::compute(address);
+  auto accessPath = accessPathWithBase.accessPath;
+
+  // Bail on an invalid AccessPath.
+  //
+  // AccessPath completeness is verified independently--it may be invalid in
+  // extraordinary situations. When AccessPath is valid, we know all its uses
+  // are recognizable.
+  //
+  // NOTE: If due to an invalid access path we fail here, we will just error
+  // on the _move since the _move would not have been handled.
+  if (!accessPath.isValid())
+    return false;
+
+  GatherLexicalLifetimeUseVisitor visitor(useState);
+  SWIFT_DEFER { visitor.clear(); };
+  visitor.reset(address);
+  if (!visitAccessPathUses(visitor, accessPath, fn))
+    return false;
+
+  // See if our base address is an inout. If we found any moves, add as a
+  // liveness use all function terminators.
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(address)) {
+    if (fArg->hasConvention(SILArgumentConvention::Indirect_Inout)) {
+      if (visitor.useState.markMoves.size()) {
+        SmallVector<SILBasicBlock *, 2> exitingBlocks;
+        fn->findExitingBlocks(exitingBlocks);
+        for (auto *block : exitingBlocks) {
+          visitor.useState.livenessUses.insert(block->getTerminator());
+        }
+      }
+    }
+  }
+
+  // Now initialize our data structures.
+  SWIFT_DEFER { dataflowState.clear(); };
+
+  // Perform the single basic block analysis emitting a diagnostic/pairing
+  // mark_unresolved_move_addr and destroys if needed. If we discover a
+  // mark_move that propagates its state out of the current block, this
+  // routine also prepares the pass for running the multi-basic block
+  // diagnostic.
+  if (performSingleBasicBlockAnalysisForAllMarkMoves(address)) {
+    LLVM_DEBUG(llvm::dbgs() << "Performed single block analysis!\n");
+    return true;
+  }
+
+  // Ok, we need to perform global dataflow. Initialize our dataflow state
+  // engine and then run the dataflow itself.
+  dataflowState.init();
+  return dataflowState.process(address);
 }
 
 //===----------------------------------------------------------------------===//
