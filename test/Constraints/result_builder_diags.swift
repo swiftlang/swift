@@ -815,3 +815,14 @@ func test_missing_member_in_optional_context() {
     }
   }
 }
+
+func test_redeclations() {
+  tuplify(true) { c in
+    let foo = 0 // expected-note {{'foo' previously declared here}}
+    let foo = foo // expected-error {{invalid redeclaration of 'foo'}}
+  }
+
+  tuplify(true) { c in
+    let (foo, foo) = (5, 6) // expected-error {{invalid redeclaration of 'foo'}} expected-note {{'foo' previously declared here}}
+  }
+}
