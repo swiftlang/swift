@@ -440,6 +440,7 @@ void CopyPropagation::run() {
   while (auto *bbi = beginBorrowsToShrink.pop()) {
     changed |= shrinkBorrowScope(bbi, deleter);
   }
+  deleter.cleanupDeadInstructions();
 
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
