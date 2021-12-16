@@ -45,6 +45,7 @@ struct Options {
   bool fuzzyMatching = true;
   bool annotatedDescription = false;
   bool includeObjectLiterals = true;
+  bool addCallWithNoDefaultArgs = true;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 
