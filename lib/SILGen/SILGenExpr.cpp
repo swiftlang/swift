@@ -436,6 +436,7 @@ namespace {
              CollectionUpcastConversionExpr *E,
              SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
+    RValue visitReifyPackExpr(ReifyPackExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                               SGFContext C);
@@ -460,6 +461,7 @@ namespace {
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
+    RValue visitPackExpr(PackExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
     RValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
@@ -1488,6 +1490,11 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
   return RValue(SGF, E, result);
 }
 
+RValue
+RValueEmitter::visitReifyPackExpr(ReifyPackExpr *E, SGFContext C) {
+  llvm_unreachable("Unimplemented!");
+}
+
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
                                                 SGFContext C) {
   ManagedValue archetype = SGF.emitRValueAsSingleValue(E->getSubExpr());
@@ -2181,6 +2188,10 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   }
 
   return result;
+}
+
+RValue RValueEmitter::visitPackExpr(PackExpr *E, SGFContext C) {
+  llvm_unreachable("Unimplemented!");
 }
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,

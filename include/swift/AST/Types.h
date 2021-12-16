@@ -419,6 +419,13 @@ protected:
     Count : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
+    : NumPadBits,
+
+    /// The number of elements of the tuple.
+    Count : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(BoundGenericType, TypeBase, 32,
     : NumPadBits,
 

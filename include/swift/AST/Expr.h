@@ -348,6 +348,10 @@ protected:
     IsPlaceholder : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(PackExpr, Expr, 32,
+    : NumPadBits,
+    NumElements : 32
+  );
   } Bits;
 
 private:
@@ -3314,6 +3318,18 @@ public:
   }
 };
 
+/// ReifyPackExpr - Drop the pack structure and reify it either as a tuple or
+/// single value.
+class ReifyPackExpr : public ImplicitConversionExpr {
+public:
+  ReifyPackExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::ReifyPack, subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ReifyPack;
+  }
+};
+
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
@@ -5758,6 +5774,55 @@ public:
   }
 };
 
+/// An expression node that aggregates a set of heterogeneous arguments into a
+/// parameter pack suitable for passing off to a variadic generic function
+/// argument.
+///
+/// There is no user-visible way to spell a pack expression, they are always
+/// implicitly created at applies. As such, any appearance of pack types outside
+/// of applies are illegal. In general, packs appearing in such positions should
+/// have a \c ReifyPackExpr to convert them to a user-available AST type.
+class PackExpr final : public Expr,
+    private llvm::TrailingObjects<PackExpr, Expr *> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects() const {
+    return getNumElements();
+  }
+
+  PackExpr(ArrayRef<Expr *> SubExprs, Type Ty);
+
+public:
+  /// Create a pack.
+  static PackExpr *create(ASTContext &ctx, ArrayRef<Expr *> SubExprs, Type Ty);
+
+  /// Create an empty pack.
+  static PackExpr *createEmpty(ASTContext &ctx);
+
+  SourceLoc getLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  /// Retrieve the elements of this pack.
+  MutableArrayRef<Expr *> getElements() {
+    return { getTrailingObjects<Expr *>(), getNumElements() };
+  }
+
+  /// Retrieve the elements of this pack.
+  ArrayRef<Expr *> getElements() const {
+    return { getTrailingObjects<Expr *>(), getNumElements() };
+  }
+
+  unsigned getNumElements() const { return Bits.PackExpr.NumElements; }
+
+  Expr *getElement(unsigned i) const {
+    return getElements()[i];
+  }
+  void setElement(unsigned i, Expr *e) {
+    getElements()[i] = e;
+  }
+
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Pack; }
+};
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);

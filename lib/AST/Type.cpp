@@ -231,6 +231,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BoundGenericStruct:
   case TypeKind::SILToken:
   case TypeKind::Pack:
+  case TypeKind::PackExpansion:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
