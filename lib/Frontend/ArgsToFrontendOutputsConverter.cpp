@@ -599,6 +599,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
        paths.PrivateModuleInterfaceOutputPath},
       {file_types::TY_YAMLOptRecord, paths.YAMLOptRecordPath},
       {file_types::TY_BitstreamOptRecord, paths.BitstreamOptRecordPath},
+      {file_types::TY_SwiftABIDescriptor, paths.ABIDescriptorOutputPath},
   };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {
