@@ -365,7 +365,7 @@ public:
   /// 2-cells; this is actually represented as a single 2-cell forming a
   /// loop around a base point.
   ///
-  /// This data is used by the homotopy reduction and generating conformances
+  /// This data is used by the homotopy reduction and minimal conformances
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
@@ -399,7 +399,7 @@ public:
   void performHomotopyReduction(
       const llvm::DenseSet<unsigned> *redundantConformances);
 
-  void computeGeneratingConformances(
+  void computeMinimalConformances(
       llvm::DenseSet<unsigned> &redundantConformances);
 
 public:
