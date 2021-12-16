@@ -2199,6 +2199,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Pack:
+  case TypeKind::PackExpansion:
     llvm_unreachable("Unimplemented!");
   }
   }

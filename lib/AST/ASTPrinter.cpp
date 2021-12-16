@@ -4639,6 +4639,12 @@ public:
     Printer << ")";
   }
 
+  void visitPackExpansionType(PackExpansionType *T) {
+    Printer << "(";
+    visit(T->getPatternType());
+    Printer << "..." << ")";
+  }
+
   void visitTupleType(TupleType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
     SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };

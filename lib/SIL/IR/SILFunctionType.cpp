@@ -3806,6 +3806,10 @@ public:
     return CanType(PackType::get(TC.Context, substElts));
   }
 
+  CanType visitPackExpansionType(CanPackExpansionType origType) {
+    llvm_unreachable("Unimplemented!");
+  }
+
   /// Tuples need to have their component types substituted by these
   /// same rules.
   CanType visitTupleType(CanTupleType origType) {

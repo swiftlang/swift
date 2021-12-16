@@ -6202,6 +6202,63 @@ BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
   }
 END_CAN_TYPE_WRAPPER(PackType, Type)
 
+/// PackExpansionType - The interface type of the explicit expansion of a
+/// corresponding set of variadic generic parameters.
+///
+/// Pack expansions are spelled as single-element tuples with a single variadic
+/// component in most contexts except functions where they are allowed to appear
+/// without parentheses to match normal variadic declaration syntax.
+///
+/// \code
+/// func expand<T...>(_ xs: T...) -> (T...)
+///                         ~~~~     ~~~~~~
+/// \endcode
+///
+/// A pack expansion type comes equipped with a pattern type spelled before
+/// the ellipses - \c T in the examples above. This pattern type is the subject
+/// of the expansion of the pack that is tripped when its variadic generic
+/// parameter is substituted for a \c PackType.
+class PackExpansionType : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  Type patternType;
+
+public:
+  /// Create a pack expansion type from the given pattern type.
+  ///
+  /// It is not required that the pattern type actually contain a reference to
+  /// a variadic generic parameter.
+  static PackExpansionType *get(Type pattern);
+
+public:
+  /// Retrieves the pattern type of this pack expansion.
+  Type getPatternType() const { return patternType; }
+
+public:
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getPatternType());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &ID, Type patternType);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::PackExpansion;
+  }
+
+private:
+  PackExpansionType(Type patternType, const ASTContext *CanCtx)
+    : TypeBase(TypeKind::PackExpansion, CanCtx,
+               patternType->getRecursiveProperties()), patternType(patternType) {
+      assert(patternType);
+    }
+};
+BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+  CanType getPatternType() const {
+    return CanType(getPointer()->getPatternType());
+  }
+END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() {
   // If this type is canonical, it has the ASTContext in it.

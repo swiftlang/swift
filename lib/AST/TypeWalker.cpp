@@ -56,6 +56,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
+  bool visitPackExpansionType(PackExpansionType *ty) {
+    return doIt(ty->getPatternType());
+  }
+
   bool visitParenType(ParenType *ty) {
     return doIt(ty->getUnderlyingType());
   }

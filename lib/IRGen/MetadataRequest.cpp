@@ -1347,6 +1347,12 @@ namespace {
       llvm_unreachable("Unimplemented!");
     }
 
+    MetadataResponse visitPackExpansionType(CanPackExpansionType type,
+                                            DynamicMetadataRequest request) {
+      llvm_unreachable("Unimplemented!");
+    }
+
+
     MetadataResponse visitTupleType(CanTupleType type,
                                     DynamicMetadataRequest request) {
       if (auto cached = tryGetLocal(type, request))
@@ -2552,6 +2558,10 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       llvm_unreachable("Unimplemented!");
     }
 
+    void visitPackExpansionType(CanPackExpansionType tup) {
+      llvm_unreachable("Unimplemented!");
+    }
+
     void visitTupleType(CanTupleType tup) {
       // The empty tuple has trivial metadata.
       if (tup->getNumElements() == 0) {
@@ -2959,6 +2969,14 @@ public:
     return ty;
   }
 
+  CanType visitPackType(CanPackType ty) {
+    llvm_unreachable("");
+  }
+
+  CanType visitPackExpansionType(CanPackExpansionType ty) {
+    llvm_unreachable("");
+  }
+
   CanType visitTupleType(CanTupleType ty) {
     bool changed = false;
     SmallVector<TupleTypeElt, 4> loweredElts;
@@ -3290,6 +3308,16 @@ namespace {
     llvm::Value *visitBoundGenericClassType(CanBoundGenericClassType type,
                                             DynamicMetadataRequest request) {
       return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
+    }
+
+    llvm::Value *visitPackType(CanPackType type,
+                               DynamicMetadataRequest request) {
+      llvm_unreachable("");
+    }
+
+    llvm::Value *visitPackExpansionType(CanPackExpansionType type,
+                                        DynamicMetadataRequest request) {
+      llvm_unreachable("");
     }
 
     llvm::Value *visitTupleType(CanTupleType type,

@@ -53,6 +53,7 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::DynamicSelf:
+  case TypeKind::PackExpansion:
     llvm_unreachable("these types do not have metadata");
 
   // All the builtin types are leaves.
@@ -79,6 +80,7 @@ static bool isLeafTypeMetadata(CanType type) {
 
   case TypeKind::Pack:
     return cast<PackType>(type)->getNumElements() == 0;
+
   // Nominal types might have generic parents.
   case TypeKind::Class:
   case TypeKind::Enum:

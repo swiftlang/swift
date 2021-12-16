@@ -1953,6 +1953,10 @@ private:
     os << "void";
   }
 
+  void visitPackExpansionType(PackExpansionType *PET, Optional<OptionalTypeKind> optionalKind) {
+    os << "void";
+  }
+
   void visitParenType(ParenType *PT, Optional<OptionalTypeKind> optionalKind) {
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }

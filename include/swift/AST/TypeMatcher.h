@@ -166,6 +166,19 @@ class TypeMatcher {
       // Pack/non-pack mismatch.
       return mismatch(firstTuple.getPointer(), secondType, sugaredFirstType);
     }
+
+    bool visitPackExpansionType(CanPackExpansionType firstPE, Type secondType,
+                                Type sugaredFirstType) {
+      if (auto secondInOut = secondType->getAs<PackExpansionType>()) {
+        return this->visit(firstPE.getPatternType(),
+                           secondInOut->getPatternType(),
+                           sugaredFirstType->castTo<PackExpansionType>()
+                             ->getPatternType());
+      }
+
+      return mismatch(firstPE.getPointer(), secondType, sugaredFirstType);
+    }
+
     bool visitReferenceStorageType(CanReferenceStorageType firstStorage,
                                    Type secondType, Type sugaredFirstType) {
       auto _secondStorage = secondType->getCanonicalType();

@@ -1508,6 +1508,7 @@ private:
     }
 
     case TypeKind::Pack:
+    case TypeKind::PackExpansion:
       llvm_unreachable("Unimplemented!");
 
     case TypeKind::Tuple: {

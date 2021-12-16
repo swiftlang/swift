@@ -1700,6 +1700,10 @@ public:
     llvm_unreachable("Unimplemented!");
   }
 
+  CanType visitPackExpansionType(PackExpansionType *pack, AbstractionPattern pattern) {
+    llvm_unreachable("Unimplemented!");
+  }
+
   CanType visitTupleType(TupleType *tuple, AbstractionPattern pattern) {
     if (auto gp = handleTypeParameterInAbstractionPattern(pattern, tuple))
       return gp;
