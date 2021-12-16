@@ -377,6 +377,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
     // If U is not concrete, we have an invalid member type of a dependent
     // type, which is not valid in this generic signature. Give up.
     if (prefixType->isTypeParameter()) {
+#ifndef NDEBUG
       llvm::errs() << "Invalid type parameter in getCanonicalTypeInContext()\n";
       llvm::errs() << "Original type: " << type << "\n";
       llvm::errs() << "Simplified term: " << term << "\n";
@@ -385,6 +386,9 @@ Type RequirementMachine::getCanonicalTypeInContext(
       llvm::errs() << "\n";
       dump(llvm::errs());
       abort();
+#else
+      return type;
+#endif
     }
 
     // Compute the type of the unresolved suffix term V, rooted in the
