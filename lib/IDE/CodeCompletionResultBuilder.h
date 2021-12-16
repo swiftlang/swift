@@ -415,14 +415,14 @@ public:
 
   void addCallArgument(Identifier Name, Identifier LocalName, Type Ty,
                        Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
-                       bool isAutoClosure, bool useUnderscoreLabel,
-                       bool isLabeledTrailingClosure);
+                       bool IsAutoClosure, bool UseUnderscoreLabel,
+                       bool IsLabeledTrailingClosure, bool HasDefault);
 
   void addCallArgument(Identifier Name, Type Ty, Type ContextTy = Type()) {
     addCallArgument(Name, Identifier(), Ty, ContextTy,
-                    /*IsVarArg=*/false, /*IsInOut=*/false, /*isIUO=*/false,
-                    /*isAutoClosure=*/false, /*useUnderscoreLabel=*/false,
-                    /*isLabeledTrailingClosure=*/false);
+                    /*IsVarArg=*/false, /*IsInOut=*/false, /*IsIUO=*/false,
+                    /*IsAutoClosure=*/false, /*UseUnderscoreLabel=*/false,
+                    /*IsLabeledTrailingClosure=*/false, /*HasDefault=*/false);
   }
 
   void addGenericParameter(StringRef Name) {

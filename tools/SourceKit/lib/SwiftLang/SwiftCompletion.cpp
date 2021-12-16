@@ -107,6 +107,7 @@ static void swiftCodeCompleteImpl(
   CompletionContext.setIncludeObjectLiterals(opts.includeObjectLiterals);
   CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
   CompletionContext.setCallPatternHeuristics(opts.callPatternHeuristics);
+  CompletionContext.setAddCallWithNoDefaultArgs(opts.addCallWithNoDefaultArgs);
 
   Lang.performWithParamsToCompletionLikeOperation(
       UnresolvedInputFile, Offset, Args, FileSystem, CancellationToken,

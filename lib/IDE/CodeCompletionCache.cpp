@@ -293,6 +293,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
     OSSLE.write(K.ForTestableLookup);
     OSSLE.write(K.ForPrivateImportLookup);
     OSSLE.write(K.AddInitsInToplevel);
+    OSSLE.write(K.AddCallWithNoDefaultArgs);
     OSSLE.write(K.Annotated);
     LE.write(static_cast<uint32_t>(OSS.tell()));   // Size of debug info
     out.write(OSS.str().data(), OSS.str().size()); // Debug info blob
@@ -399,11 +400,12 @@ static std::string getName(StringRef cacheDirectory,
   llvm::sys::path::append(name, K.ModuleName);
   llvm::raw_svector_ostream OSS(name);
 
-  // name[-dot][-testable][-inits]
+  // name[-with-enabled-options]
   OSS << (K.ResultsHaveLeadingDot ? "-dot" : "")
       << (K.ForTestableLookup ? "-testable" : "")
       << (K.ForPrivateImportLookup ? "-private" : "")
       << (K.AddInitsInToplevel ? "-inits" : "")
+      << (K.AddCallWithNoDefaultArgs ? "-nodefaults" : "")
       << (K.Annotated ? "-annotated" : "");
 
   // name[-access-path-components]
@@ -469,8 +471,9 @@ OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
     return None;
 
   // Make up a key for readCachedModule.
-  CodeCompletionCache::Key K{filename.str(), "<module-name>", {},   false,
-                             false,          false,           false, false};
+  CodeCompletionCache::Key K{filename.str(), "<module-name>", {},
+                             false,          false,           false,
+                             false,          false,           false};
 
   // Read the cached results.
   auto V = CodeCompletionCache::createValue();

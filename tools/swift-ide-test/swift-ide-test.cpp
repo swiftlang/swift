@@ -486,6 +486,12 @@ DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
   llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool> CodeCompletionAddCallWithNoDefaultArgs(
+    "code-complete-add-call-with-no-default-args",
+    llvm::cl::desc("Whether to include a function completion that contains no "
+                   "default arguments"),
+    llvm::cl::cat(Category), llvm::cl::init(true));
+
 // '-conforming-methods' options.
 
 static llvm::cl::list<std::string>
@@ -1137,17 +1143,16 @@ static int printCodeCompletionResults(
       });
 }
 
-static int doCodeCompletion(const CompilerInvocation &InitInvok,
-                            StringRef SourceFilename,
-                            StringRef SecondSourceFileName,
-                            StringRef CodeCompletionToken,
-                            bool CodeCompletionDiagnostics,
-                            bool CodeCompletionKeywords,
-                            bool CodeCompletionComments,
-                            bool CodeCompletionAnnotateResults,
-                            bool CodeCompletionAddInitsToTopLevel,
-                            bool CodeCompletionCallPatternHeuristics,
-                            bool CodeCompletionSourceText) {
+static int
+doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
+                 StringRef SecondSourceFileName, StringRef CodeCompletionToken,
+                 bool CodeCompletionDiagnostics, bool CodeCompletionKeywords,
+                 bool CodeCompletionComments,
+                 bool CodeCompletionAnnotateResults,
+                 bool CodeCompletionAddInitsToTopLevel,
+                 bool CodeCompletionCallPatternHeuristics,
+                 bool CodeCompletionAddCallWithNoDefaultArgs,
+                 bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -1158,6 +1163,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
   CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
+  CompletionContext.setAddCallWithNoDefaultArgs(
+      CodeCompletionAddCallWithNoDefaultArgs);
 
   return performWithCompletionLikeOperationParams(
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
@@ -1359,6 +1366,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionAnnotateResults,
                                  bool CodeCompletionAddInitsToTopLevel,
                                  bool CodeCompletionCallPatternHeuristics,
+                                 bool CodeCompletionAddCallWithNoDefaultArgs,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -1488,6 +1496,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
     CompletionContext.setCallPatternHeuristics(
         CodeCompletionCallPatternHeuristics);
+    CompletionContext.setAddCallWithNoDefaultArgs(
+        CodeCompletionAddCallWithNoDefaultArgs);
 
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
@@ -4415,15 +4425,14 @@ int main(int argc, char *argv[]) {
                    << "'-skip-filecheck'\n";
       return 1;
     }
-    ExitCode = doBatchCodeCompletion(InitInvok,
-                                     options::SourceFilename,
-                                     options::CodeCompletionDiagnostics,
-                                     options::CodeCompletionKeywords,
-                                     options::CodeCompletionComments,
-                                     options::CodeCompletionAnnotateResults,
-                                     options::CodeCompleteInitsInPostfixExpr,
-                                     options::CodeCompleteCallPatternHeuristics,
-                                     options::CodeCompletionSourceText);
+    ExitCode = doBatchCodeCompletion(
+        InitInvok, options::SourceFilename, options::CodeCompletionDiagnostics,
+        options::CodeCompletionKeywords, options::CodeCompletionComments,
+        options::CodeCompletionAnnotateResults,
+        options::CodeCompleteInitsInPostfixExpr,
+        options::CodeCompleteCallPatternHeuristics,
+        options::CodeCompletionAddCallWithNoDefaultArgs,
+        options::CodeCompletionSourceText);
     break;
 
   case ActionType::CodeCompletion:
@@ -4431,17 +4440,15 @@ int main(int argc, char *argv[]) {
       llvm::errs() << "code completion token name required\n";
       return 1;
     }
-    ExitCode = doCodeCompletion(InitInvok,
-                                options::SourceFilename,
-                                options::SecondSourceFilename,
-                                options::CodeCompletionToken,
-                                options::CodeCompletionDiagnostics,
-                                options::CodeCompletionKeywords,
-                                options::CodeCompletionComments,
-                                options::CodeCompletionAnnotateResults,
-                                options::CodeCompleteInitsInPostfixExpr,
-                                options::CodeCompleteCallPatternHeuristics,
-                                options::CodeCompletionSourceText);
+    ExitCode = doCodeCompletion(
+        InitInvok, options::SourceFilename, options::SecondSourceFilename,
+        options::CodeCompletionToken, options::CodeCompletionDiagnostics,
+        options::CodeCompletionKeywords, options::CodeCompletionComments,
+        options::CodeCompletionAnnotateResults,
+        options::CodeCompleteInitsInPostfixExpr,
+        options::CodeCompleteCallPatternHeuristics,
+        options::CodeCompletionAddCallWithNoDefaultArgs,
+        options::CodeCompletionSourceText);
     break;
 
   case ActionType::REPLCodeCompletion:
