@@ -363,6 +363,8 @@ public:
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
 
+  bool isTypeSequence() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///

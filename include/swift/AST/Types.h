@@ -159,7 +159,11 @@ public:
     /// This type contains a type placeholder.
     HasPlaceholder       = 0x800,
 
-    Last_Property = HasPlaceholder
+    /// This type contains a generic type parameter that is declared as a
+    /// type sequence
+    HasTypeSequence = 0x1000,
+
+    Last_Property = HasTypeSequence
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -216,6 +220,8 @@ public:
 
   /// Does a type with these properties structurally contain a placeholder?
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
+
+  bool hasTypeSequence() const { return Bits & HasTypeSequence; }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -605,6 +611,10 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
+  bool hasTypeSequence() const {
+    return getRecursiveProperties().hasTypeSequence();
+  }
+
   /// Determine whether the type involves the given opened existential
   /// archetype.
   bool hasOpenedExistential(OpenedArchetypeType *opened);
@@ -654,6 +664,13 @@ public:
   /// \c X<T> is not a type parameter. Use \c hasTypeParameter to determine
   /// whether a type parameter exists at any position.
   bool isTypeParameter();
+
+  /// Determine whether this type is a type sequence parameter, which is
+  /// either a GenericTypeParamType or a DependentMemberType.
+  ///
+  /// Like \c isTypeParameter, this routine will return \c false for types that
+  /// include type parameters in nested positions e.g. \c X<T...>.
+  bool isTypeSequenceParameter();
 
   /// Determine whether this type can dynamically be an optional type.
   ///
@@ -3431,6 +3448,7 @@ struct ParameterListInfo {
   SmallBitVector propertyWrappers;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
+  SmallBitVector variadicGenerics;
 
 public:
   ParameterListInfo() { }
@@ -3459,6 +3477,8 @@ public:
 
   /// Whether there is any contextual information set on this parameter list.
   bool anyContextualInfo() const;
+
+  bool isVariadicGenericParameter(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
@@ -5883,15 +5903,15 @@ public:
 private:
   friend class GenericTypeParamDecl;
 
-  explicit GenericTypeParamType(GenericTypeParamDecl *param)
-    : SubstitutableType(TypeKind::GenericTypeParam, nullptr,
-                        RecursiveTypeProperties::HasTypeParameter),
+  explicit GenericTypeParamType(GenericTypeParamDecl *param,
+                                RecursiveTypeProperties props)
+    : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
       ParamOrDepthIndex(param) { }
 
   explicit GenericTypeParamType(bool isTypeSequence, unsigned depth,
-                                unsigned index, const ASTContext &ctx)
-      : SubstitutableType(TypeKind::GenericTypeParam, &ctx,
-                          RecursiveTypeProperties::HasTypeParameter),
+                                unsigned index, RecursiveTypeProperties props,
+                                const ASTContext &ctx)
+      : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
         ParamOrDepthIndex(depth << 16 | index |
                           ((isTypeSequence ? 1 : 0) << 30)) {}
 };
@@ -6300,7 +6320,14 @@ inline bool TypeBase::isTypeParameter() {
   return t->is<GenericTypeParamType>();
 }
 
-  return false;
+inline bool TypeBase::isTypeSequenceParameter() {
+  Type t(this);
+
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
+
+  return t->is<GenericTypeParamType>() &&
+         t->castTo<GenericTypeParamType>()->isTypeSequence();
 }
 
 inline bool TypeBase::isMaterializable() {

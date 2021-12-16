@@ -1037,6 +1037,7 @@ ParameterListInfo::ParameterListInfo(
   propertyWrappers.resize(params.size());
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
+  variadicGenerics.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -1096,6 +1097,11 @@ ParameterListInfo::ParameterListInfo(
     if (param->getAttrs().hasAttribute<InheritActorContextAttr>()) {
       inheritActorContext.set(i);
     }
+
+    if (param->isVariadic() &&
+        param->getVarargBaseTy()->hasTypeSequence()) {
+      variadicGenerics.set(i);
+    }
   }
 }
 
@@ -1129,6 +1135,13 @@ bool ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
 bool ParameterListInfo::anyContextualInfo() const {
   return implicitSelfCapture.any() || inheritActorContext.any();
 }
+
+bool ParameterListInfo::isVariadicGenericParameter(unsigned paramIdx) const {
+  return paramIdx < variadicGenerics.size()
+      ? variadicGenerics[paramIdx]
+      : false;
+}
+
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (_:, b:, c:)
@@ -1357,6 +1370,13 @@ CanType TypeBase::computeCanonicalType() {
 
     const ASTContext &C = CanTys[0]->getASTContext();
     Result = PackType::get(C, CanTys)->castTo<PackType>();
+    break;
+  }
+
+  case TypeKind::PackExpansion: {
+    auto *expansion = cast<PackExpansionType>(this);
+    auto pattern = expansion->getPatternType()->getCanonicalType();
+    Result = PackExpansionType::get(pattern);
     break;
   }
 
@@ -5061,18 +5081,152 @@ case TypeKind::Id:
     return ParenType::get(Ptr->getASTContext(), underlying->getInOutObjectType(), otherFlags);
   }
 
+  case TypeKind::Pack: {
+    auto pack = cast<PackType>(base);
+    bool anyChanged = false;
+    SmallVector<Type, 4> elements;
+    unsigned Index = 0;
+    for (Type eltTy : pack->getElementTypes()) {
+      Type transformedEltTy = eltTy.transformRec(fn);
+      if (!transformedEltTy)
+        return Type();
+
+      // If nothing has changed, just keep going.
+      if (!anyChanged &&
+          transformedEltTy.getPointer() == eltTy.getPointer()) {
+        ++Index;
+        continue;
+      }
+
+      // If this is the first change we've seen, copy all of the previous
+      // elements.
+      if (!anyChanged) {
+        // Copy all of the previous elements.
+        elements.append(pack->getElementTypes().begin(),
+                        pack->getElementTypes().begin() + Index);
+        anyChanged = true;
+      }
+
+      elements.push_back(transformedEltTy);
+      ++Index;
+    }
+
+    if (!anyChanged)
+      return *this;
+
+    return PackType::get(Ptr->getASTContext(), elements);
+  }
+
+  case TypeKind::PackExpansion: {
+    auto expand = cast<PackExpansionType>(base);
+    struct ExpansionGatherer {
+      llvm::function_ref<Optional<Type>(TypeBase *)> baselineFn;
+      llvm::DenseMap<TypeBase *, PackType *> cache;
+      unsigned maxArity;
+
+    public:
+      ExpansionGatherer(
+          llvm::function_ref<Optional<Type>(TypeBase *)> baselineFn)
+          : baselineFn(baselineFn), maxArity(0) {}
+
+      Optional<Type> operator()(TypeBase *input) {
+        auto remap = baselineFn(input);
+        if (!remap) {
+          return remap;
+        }
+
+        if (input->is<TypeVariableType>()) {
+          if (auto *PT = (*remap)->getAs<PackType>()) {
+            maxArity = std::max(maxArity, PT->getNumElements());
+            cache.insert({input, PT});
+          }
+        } else if (input->isTypeSequenceParameter()) {
+          if (auto *PT = (*remap)->getAs<PackType>()) {
+            maxArity = std::max(maxArity, PT->getNumElements());
+            cache.insert({input, PT});
+          }
+        }
+        return remap;
+      }
+
+      std::pair<llvm::DenseMap<TypeBase *, PackType *>, unsigned>
+      intoExpansions() && {
+        return std::make_pair(cache, maxArity);
+      }
+    };
+
+    // First, substitute down the pattern type to gather the mapping from
+    // contained substitutable types to packs.
+    auto gather = ExpansionGatherer{fn};
+    Type transformedPat = expand->getPatternType().transformRec(gather);
+    if (!transformedPat)
+      return Type();
+
+    if (transformedPat.getPointer() == expand->getPatternType().getPointer())
+      return *this;
+
+    llvm::DenseMap<TypeBase *, PackType *> expansions;
+    unsigned arity;
+    std::tie(expansions, arity) = std::move(gather).intoExpansions();
+    if (expansions.empty()) {
+      // If we didn't find any expansions, either the caller wasn't interested
+      // in expanding this pack, or something has gone wrong. Leave off the
+      // expansion and return the transformed type.
+      return PackExpansionType::get(transformedPat);
+    }
+
+    SmallVector<Type, 8> elts;
+    elts.reserve(arity);
+    // Perform the expansion element-wise according to the maximum arity we
+    // picked up during the gather step above.
+    //
+    // For a pack expansion (F<... T..., U..., ...>) and mapping
+    //
+    //   T... -> <X, Y, Z>
+    //   U... -> <A, B, C>
+    //
+    // The expected expansion is
+    //
+    // <F<... X, A, ...>, F<... Y, B, ...>, F<... Z, C, ...> ...>
+    for (unsigned i = 0; i < arity; ++i) {
+      struct ElementExpander {
+        const llvm::DenseMap<TypeBase *, PackType *> &expansions;
+        llvm::function_ref<Optional<Type>(TypeBase *)> outerFn;
+        unsigned index;
+
+      public:
+        Optional<Type> operator()(TypeBase *input) {
+          // FIXME: Does this need to do bounds checking?
+          if (PackType *element = expansions.lookup(input))
+            return element->getElementType(index);
+          return outerFn(input);
+        }
+      };
+
+      auto expandedElt = expand->getPatternType().transformRec(
+          ElementExpander{expansions, fn, i});
+      if (!expandedElt)
+        return Type();
+
+      elts.push_back(expandedElt);
+    }
+    return PackType::get(base->getASTContext(), elts);
+  }
+
   case TypeKind::Tuple: {
     auto tuple = cast<TupleType>(base);
     bool anyChanged = false;
     SmallVector<TupleTypeElt, 4> elements;
     unsigned Index = 0;
     for (const auto &elt : tuple->getElements()) {
-      Type eltTy = elt.getType().transformRec(fn);
-      if (!eltTy)
+      Type eltTy = elt.getType();
+      Type transformedEltTy = eltTy.transformRec(fn);
+      if (!transformedEltTy)
         return Type();
 
       // If nothing has changed, just keep going.
-      if (!anyChanged && eltTy.getPointer() == elt.getType().getPointer()) {
+      if (!anyChanged &&
+          transformedEltTy.getPointer() == elt.getType().getPointer()) {
         ++Index;
         continue;
       }
@@ -5086,9 +5240,18 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
-      // Add the new tuple element, with the new type, no initializer,
-      elements.push_back(elt.getWithType(eltTy));
-      ++Index;
+      if (eltTy->isTypeSequenceParameter() &&
+          transformedEltTy->is<PackType>()) {
+        assert(anyChanged);
+        // Splat the tuple in by copying in all of the transformed elements.
+        auto tuple = dyn_cast<PackType>(transformedEltTy.getPointer());
+        elements.append(tuple->getElementTypes().begin(),
+                        tuple->getElementTypes().end());
+      } else {
+        // Add the new tuple element, with the transformed type.
+        elements.push_back(elt.getWithType(transformedEltTy));
+        ++Index;
+      }
     }
 
     if (!anyChanged)
@@ -5505,6 +5668,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::SILToken:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
+  case TypeKind::Pack:
+  case TypeKind::PackExpansion:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
