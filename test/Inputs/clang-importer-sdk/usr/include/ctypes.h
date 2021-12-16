@@ -196,6 +196,11 @@ STDLIB_TYPEDEF(unsigned int, UInt);
 void noreturnFunction() __attribute__((noreturn));
 void couldReturnFunction() __attribute__((noreturn));
 
+// Struct with an __attribute((swift_name)) field.
+struct Rdar86069786 {
+    double c_name __attribute__((swift_name("swiftName")));
+};
+
 
 //===---
 // Function pointers

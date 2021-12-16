@@ -4206,6 +4206,13 @@ namespace {
       if (!importedName) {
         return nullptr;
       }
+      if (correctSwiftName) {
+        // FIXME: We should import this as a variant, but to do that, we'll also
+        // need to make this a computed variable or otherwise fix how the rest
+        // of the compiler thinks about stored properties in imported structs.
+        // For now, just don't import it at all. (rdar://86069786)
+        return nullptr;
+      }
 
       auto name = importedName.getDeclName().getBaseIdentifier();
 
@@ -4248,6 +4255,7 @@ namespace {
 
       // If this is a compatibility stub, handle it as such.
       if (correctSwiftName)
+        // FIXME: Temporarily unreachable because of check above.
         markAsVariant(result, *correctSwiftName);
 
       return result;
