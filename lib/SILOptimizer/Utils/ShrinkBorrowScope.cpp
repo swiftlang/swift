@@ -168,6 +168,12 @@ public:
           bbi->setOperand(borrowee);
           return true;
         }
+      } else if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+        if (canReplaceValueWithBorrowedValue(cvi->getOperand())) {
+          auto borrowee = introducer->getOperand();
+          cvi->setOperand(borrowee);
+          return true;
+        }
       }
       return false;
     }
