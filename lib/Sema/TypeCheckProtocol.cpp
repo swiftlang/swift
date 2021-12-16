@@ -3018,7 +3018,7 @@ bool ConformanceChecker::checkActorIsolation(
       if (isValidImplicitAsync(witness, requirement)) {
         diagnoseNonSendableTypesInReference(
             getConcreteWitness(), DC, witness->getLoc(),
-            ConcurrentReferenceKind::CrossActor);
+            SendableCheckReason::Conformance);
 
         return false;
       }
@@ -3057,7 +3057,7 @@ bool ConformanceChecker::checkActorIsolation(
   case ActorIsolationRestriction::CrossActorSelf: {
     if (diagnoseNonSendableTypesInReference(
             getConcreteWitness(), DC, witness->getLoc(),
-            ConcurrentReferenceKind::CrossActor)) {
+            SendableCheckReason::Conformance)) {
       return true;
     }
 
@@ -3188,7 +3188,7 @@ bool ConformanceChecker::checkActorIsolation(
 
     return diagnoseNonSendableTypesInReference(
         getConcreteWitness(), DC, witness->getLoc(),
-        ConcurrentReferenceKind::CrossActor);
+        SendableCheckReason::Conformance);
   }
 
   // If the witness has a global actor but the requirement does not, we have

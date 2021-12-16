@@ -70,19 +70,21 @@ void checkPropertyWrapperActorIsolation(VarDecl *wrappedVar, Expr *expr);
 ClosureActorIsolation
 determineClosureActorIsolation(AbstractClosureExpr *closure);
 
-/// Describes the kind of operation that introduced the concurrent refernece.
-enum class ConcurrentReferenceKind {
-  /// A synchronous operation that was "promoted" to an asynchronous call
-  /// because it was out of the actor's domain.
-  SynchronousAsAsyncCall,
-  /// A cross-actor reference.
+/// States the reason for checking the Sendability of a given declaration.
+enum class SendableCheckReason {
+  /// A reference to an actor from outside that actor.
   CrossActor,
-  /// A local capture referenced from concurrent code.
-  LocalCapture,
-  /// Concurrent function
-  ConcurrentFunction,
-  /// Nonisolated declaration.
-  Nonisolated,
+
+  /// A synchronous operation that was "promoted" to an asynchronous one
+  /// because it was out of the actor's domain.
+  SynchronousAsAsync,
+
+  /// A protocol conformance where the witness/requirement have different
+  /// actor isolation.
+  Conformance,
+
+  /// The declaration is being exposed to Objective-C.
+  ObjC,
 };
 
 /// The isolation restriction in effect for a given declaration that is
@@ -241,7 +243,7 @@ bool contextRequiresStrictConcurrencyChecking(
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
-    ConcurrentReferenceKind refKind);
+    SendableCheckReason refKind);
 
 /// Produce a diagnostic for a missing conformance to Sendable.
 void diagnoseMissingSendableConformance(

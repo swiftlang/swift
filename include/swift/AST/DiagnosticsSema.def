@@ -4578,8 +4578,15 @@ WARNING(non_sendable_param_type,none,
         "cannot pass argument of non-sendable type %0 across actors",
         (Type))
 WARNING(non_sendable_result_type,none,
-        "cannot call function returning non-sendable type %0 across "
-        "actors", (Type))
+        "non-sendable type %0 returned by %select{call to %4 %2 %3|"
+        "implicitly asynchronous call to %4 %2 %3|"
+        "%4 %2 %3 satisfying non-isolated protocol requirement|"
+        "%4 '@objc' %2 %3}1 cannot cross actor boundary",
+        (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
+WARNING(non_sendable_call_result_type,none,
+        "non-sendable type %0 returned by %select{implicitly asynchronous |}1"
+        "call to %2 function cannot cross actor boundary",
+        (Type, bool, ActorIsolation))
 WARNING(non_sendable_property_type,none,
         "cannot use %1 %2 with a non-sendable type %0 "
         "%select{across actors|from concurrently-executed code}3",
