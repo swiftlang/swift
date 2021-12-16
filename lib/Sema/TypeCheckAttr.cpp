@@ -5514,12 +5514,12 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       // cross-actor, and that means they might be accessing on a remote actor,
       // in which case the stored property storage does not exist.
       //
-      // The synthesized "id" and "actorTransport" are the only exceptions,
+      // The synthesized "id" and "actorSystem" are the only exceptions,
       // because the implementation mirrors them.
       if (nominal && nominal->isDistributedActor() &&
           !(var->isImplicit() &&
             (var->getName() == Ctx.Id_id ||
-             var->getName() == Ctx.Id_actorTransport))) {
+             var->getName() == Ctx.Id_actorSystem))) {
         diagnoseAndRemoveAttr(attr,
                               diag::nonisolated_distributed_actor_storage);
         return;

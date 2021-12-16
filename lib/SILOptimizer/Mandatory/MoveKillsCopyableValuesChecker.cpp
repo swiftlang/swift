@@ -335,8 +335,7 @@ bool MoveKillsCopyableValuesChecker::check() {
   SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Guaranteed ||
-        arg->getOwnershipKind() == OwnershipKind::Owned)
+    if (arg->getOwnershipKind() == OwnershipKind::Owned)
       valuesToCheck.insert(arg);
   }
 
@@ -459,6 +458,7 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
             auto diag = diag::
                 sil_movekillscopyablevalue_move_applied_to_unsupported_move;
             diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+            mvi->setAllowsDiagnostics(false);
           }
         }
       }

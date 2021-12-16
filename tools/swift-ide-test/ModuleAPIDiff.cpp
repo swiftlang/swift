@@ -925,8 +925,11 @@ int swift::doGenerateModuleAPIDescription(StringRef MainExecutablePath,
 
   CompilerInstance CI;
   CI.addDiagnosticConsumer(&PDC);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   CI.performSema();
 
   PrintOptions Options = PrintOptions::printEverything();

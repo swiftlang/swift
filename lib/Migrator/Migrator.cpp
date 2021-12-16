@@ -152,7 +152,8 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
   // rdar://78576743 - Reset LLVM global state for command-line arguments set
   // by prior calls to setup.
   llvm::cl::ResetAllOptionOccurrences();
-  if (Instance->setup(Invocation)) {
+  std::string InstanceSetupError;
+  if (Instance->setup(Invocation, InstanceSetupError)) {
     return nullptr;
   }
 

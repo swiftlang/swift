@@ -139,11 +139,11 @@ static llvm::cl::opt<bool> EnableOSSAModules(
                    "form when optimizing."));
 
 static llvm::cl::opt<bool>
-    EnableCopyPropagation("enable-copy-propagation",
+    EnableCopyPropagation("enable-copy-propagation", llvm::cl::init(false),
                           llvm::cl::desc("Enable the copy propagation pass."));
 
 static llvm::cl::opt<bool> DisableCopyPropagation(
-    "disable-copy-propagation",
+    "disable-copy-propagation", llvm::cl::init(false),
     llvm::cl::desc("Disable the copy propagation pass."));
 
 namespace {
@@ -524,11 +524,23 @@ int main(int argc, char **argv) {
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
-  SILOpts.EnableCopyPropagation = EnableCopyPropagation;
-  SILOpts.DisableCopyPropagation = DisableCopyPropagation;
+
+  if (EnableCopyPropagation && DisableCopyPropagation) {
+    fprintf(stderr, "Error! Cannot specify both -enable-copy-propagation "
+                    "and -disable-copy-propagation.");
+    exit(-1);
+  } else if (EnableCopyPropagation && !DisableCopyPropagation) {
+    SILOpts.CopyPropagation = CopyPropagationOption::On;
+  } else if (!EnableCopyPropagation && DisableCopyPropagation) {
+    SILOpts.CopyPropagation = CopyPropagationOption::Off;
+  } else /*if (!EnableCopyPropagation && !DisableCopyPropagation)*/ {
+    SILOpts.CopyPropagation = CopyPropagationOption::RequestedPassesOnly;
+  }
 
   if (EnableCopyPropagation)
-    SILOpts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
+  if (DisableCopyPropagation)
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
 
   // Enable lexical lifetimes if it is set or if experimental move only is
   // enabled. This is because move only depends on lexical lifetimes being
@@ -536,12 +548,14 @@ int main(int argc, char **argv) {
   bool enableLexicalLifetimes =
       EnableLexicalLifetimes | EnableExperimentalMoveOnly;
   if (enableLexicalLifetimes && !EnableLexicalBorrowScopes) {
-    fprintf(stderr, "Error! Cannot specify both -enable-lexical-lifetimes "
-                    "and either -enable-lexical-borrow-scopes=false");
+    fprintf(
+        stderr,
+        "Error! Cannot specify both -enable-lexical-borrow-scopes=false and "
+        "either -enable-lexical-lifetimes or -enable-experimental-move-only.");
     exit(-1);
   }
   if (enableLexicalLifetimes)
-    SILOpts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
   if (!EnableLexicalBorrowScopes)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::Off;
 
@@ -584,8 +598,11 @@ int main(int argc, char **argv) {
     return retValue ? retValue : diagnosticsError;
   };
 
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return finishDiagProcessing(1);
+  }
 
   CI.performSema();
 

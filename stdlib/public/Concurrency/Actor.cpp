@@ -288,7 +288,9 @@ static HANDLE __initialPthread = INVALID_HANDLE_VALUE;
 /// Determine whether we are currently executing on the main thread
 /// independently of whether we know that we are on the main actor.
 static bool isExecutingOnMainThread() {
-#if defined(__linux__)
+#if SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  return true;
+#elif defined(__linux__)
   return syscall(SYS_gettid) == getpid();
 #elif defined(_WIN32)
   if (__initialPthread == INVALID_HANDLE_VALUE) {
@@ -306,7 +308,9 @@ static bool isExecutingOnMainThread() {
 }
 
 JobPriority swift::swift_task_getCurrentThreadPriority() {
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+  return JobPriority::UserInitiated;
+#elif defined(__APPLE__)
   return static_cast<JobPriority>(qos_class_self());
 #else
   if (isExecutingOnMainThread())

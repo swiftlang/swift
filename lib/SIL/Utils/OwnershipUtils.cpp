@@ -178,10 +178,17 @@ bool swift::findInnerTransitiveGuaranteedUses(
       break;
     }
     case OperandOwnership::Borrow:
-      BorrowingOperand(use).visitExtendedScopeEndingUses([&](Operand *endUse) {
-        leafUse(endUse);
-        return true;
-      });
+      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
+      // borrows are disallowed.
+      if (!BorrowingOperand(use).visitExtendedScopeEndingUses(
+            [&](Operand *endUse) {
+              leafUse(endUse);
+              return true;
+            })) {
+        // Special case for dead borrows. This is dangerous because clients
+        // don't expect a begin_borrow to be in the use list.
+        leafUse(use);
+      }
       break;
     }
   }
@@ -275,10 +282,17 @@ bool swift::findInnerTransitiveGuaranteedUsesOfBorrowedValue(
       break;
     }
     case OperandOwnership::Borrow:
-      BorrowingOperand(use).visitExtendedScopeEndingUses([&](Operand *endUse) {
-        recordUse(endUse);
-        return true;
-      });
+      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
+      // borrows are disallowed.
+      if (!BorrowingOperand(use).visitExtendedScopeEndingUses(
+            [&](Operand *endUse) {
+              recordUse(endUse);
+              return true;
+            })) {
+        // Special case for dead borrows. This is dangerous because clients
+        // don't expect a begin_borrow to be in the use list.
+        recordUse(use);
+      }
       break;
     }
   }
@@ -427,21 +441,29 @@ bool BorrowingOperand::visitScopeEndingUses(
   switch (kind) {
   case BorrowingOperandKind::Invalid:
     llvm_unreachable("Using invalid case");
-  case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BeginBorrow: {
+    bool deadBorrow = true;
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
+        deadBorrow = false;
         if (!func(use))
           return false;
       }
     }
-    return true;
+    // FIXME: special case for dead borrows. This is dangerous because clients
+    // only expect visitScopeEndingUses to return false if the visitor returned
+    // false.
+    return !deadBorrow;
+  }
   case BorrowingOperandKind::BeginApply: {
+    bool deadApply = true;
     auto *user = cast<BeginApplyInst>(op->getUser());
     for (auto *use : user->getTokenResult()->getUses()) {
+      deadApply = false;
       if (!func(use))
         return false;
     }
-    return true;
+    return !deadApply;
   }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
@@ -450,12 +472,16 @@ bool BorrowingOperand::visitScopeEndingUses(
   case BorrowingOperandKind::Yield:
     return true;
   case BorrowingOperandKind::Branch: {
+    bool deadBranch = true;
     auto *br = cast<BranchInst>(op->getUser());
-    for (auto *use : br->getArgForOperand(op)->getUses())
-      if (use->isLifetimeEnding())
+    for (auto *use : br->getArgForOperand(op)->getUses()) {
+      if (use->isLifetimeEnding()) {
+        deadBranch = false;
         if (!func(use))
           return false;
-    return true;
+      }
+    }
+    return !deadBranch;
   }
   }
   llvm_unreachable("Covered switch isn't covered");
@@ -522,10 +548,15 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
 void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *errorFunction) const {
-  visitScopeEndingUses([&](Operand *op) {
-    foundUses.push_back(op);
+  // FIXME: this visitScopeEndingUses should never return false once dead
+  // borrows are disallowed.
+  if (!visitScopeEndingUses([&](Operand *endOp) {
+    foundUses.push_back(endOp);
     return true;
-  });
+  })) {
+    // Special-case for dead borrows.
+    foundUses.push_back(op);
+  }
 }
 
 //===----------------------------------------------------------------------===//

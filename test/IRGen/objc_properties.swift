@@ -269,7 +269,7 @@ class SomeWrapperTests {
 // CHECK:    i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:    @"$s15objc_properties4TreeC6parentACSgvsTo{{(.ptrauth)?}}"
 
-// CHECK: @_PROTOCOL__TtP15objc_properties5Proto_ = internal constant { {{.+}} } {
+// CHECK: @_PROTOCOL__TtP15objc_properties5Proto_ = weak hidden constant { {{.+}} } {
 // CHECK:   i8* null,
 // CHECK:   i8* getelementptr inbounds ([{{.+}} x i8], [{{.+}} x i8]* {{@.+}}, i64 0, i64 0),
 // CHECK:   i8* null,
@@ -289,7 +289,7 @@ class SomeWrapperTests {
 // CHECK: [[PROTOCOLPROPERTY_NAME:@.+]] = private unnamed_addr constant [6 x i8] c"value\00"
 // CHECK: [[PROTOCOLPROPERTY_ATTRS:@.+]] = private unnamed_addr constant [7 x i8] c"Tq,N,R\00"
 
-// CHECK: @_PROTOCOL_PROPERTIES__TtP15objc_properties5Proto_ = internal constant { {{.*}}] } {
+// CHECK: @_PROTOCOL_PROPERTIES__TtP15objc_properties5Proto_ = weak hidden constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8* }] [{
@@ -301,7 +301,7 @@ class SomeWrapperTests {
 // CHECK-NEW: [[PROTOCOLCLASSPROPERTY_NAME:@.+]] = private unnamed_addr constant [15 x i8] c"sharedInstance\00"
 // CHECK-NEW: [[PROTOCOLCLASSPROPERTY_ATTRS:@.+]] = private unnamed_addr constant [7 x i8] c"T@,N,&\00"
 
-// CHECK-NEW: @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_ = internal constant { {{.*}}] } {
+// CHECK-NEW: @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_ = weak hidden constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
 // CHECK-NEW:   i32 1,
 // CHECK-NEW:   [1 x { i8*, i8* }] [{

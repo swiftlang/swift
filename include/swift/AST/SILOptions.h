@@ -31,15 +31,31 @@
 namespace swift {
 
 enum class LexicalLifetimesOption : uint8_t {
-  // Do not insert any lexical lifetimes.
+  // Do not insert lexical markers.
   Off = 0,
 
-  // Insert lexical lifetimes in SILGen, but remove them before leaving Raw SIL.
-  Early,
+  // Insert lexical markers via lexical borrow scopes and the lexical flag on
+  // alloc_stacks produced from alloc_boxes, but strip them when lowering out of
+  // Raw SIL.
+  DiagnosticMarkersOnly,
 
-  // Insert lexical lifetimes and do not remove them until OSSA is lowered. This
-  // is experimental.
-  ExperimentalLate,
+  // Insert lexical markers and use them to lengthen object lifetime based on
+  // lexical scope.
+  On,
+};
+
+enum class CopyPropagationOption : uint8_t {
+  // Do not add any copy propagation passes.
+  Off = 0,
+
+  // Only add the copy propagation passes requested by other flags, currently
+  // just -enable-ossa-modules.
+  RequestedPassesOnly,
+
+  // Add all relevant copy propagation passes.  If a setting, e.g.
+  // -enable-ossa-modules, requests to add copy propagation to the pipeline, do
+  // so.
+  On
 };
 
 class SILModule;
@@ -59,17 +75,15 @@ public:
   bool RemoveRuntimeAsserts = false;
 
   /// Enable experimental support for emitting defined borrow scopes.
-  LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::Early;
+  LexicalLifetimesOption LexicalLifetimes =
+      LexicalLifetimesOption::DiagnosticMarkersOnly;
 
-  /// Force-run SIL copy propagation to shorten object lifetime in whatever
+  /// Whether to run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
-  /// When this is 'false' the pipeline has default behavior.
-  bool EnableCopyPropagation = false;
-
-  /// Disable SIL copy propagation to preserve object lifetime in whatever
-  /// optimization pipeline is currently used.
-  /// When this is 'false' the pipeline has default behavior.
-  bool DisableCopyPropagation = false;
+  ///
+  /// When this is 'RequestedPassesOnly' the pipeline has default behavior.
+  CopyPropagationOption CopyPropagation =
+      CopyPropagationOption::RequestedPassesOnly;
 
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;

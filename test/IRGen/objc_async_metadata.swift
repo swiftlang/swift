@@ -23,7 +23,7 @@ class MyClass: NSObject {
 }
 
 // CHECK: [[ENCODE_ASYNC_STRING_PROTO:@.*]] = private unnamed_addr constant [15 x i8] c"v32@0:8@16@?24\00"
-// CHECK-LABEL: @_PROTOCOL_INSTANCE_METHODS__TtP19objc_async_metadata7MyProto_ = internal constant
+// CHECK-LABEL: @_PROTOCOL_INSTANCE_METHODS__TtP19objc_async_metadata7MyProto_ = weak hidden constant
 // CHECK-SAME: _selector_data(myProtoRequirement:completionHandler:)
 // CHECK-SAME: [15 x i8]* [[ENCODE_ASYNC_STRING_PROTO]]
 

@@ -112,11 +112,18 @@ tryHandlingLoadableVarMovePattern(MarkUnresolvedMoveAddrInst *markMoveAddr,
 
   LLVM_DEBUG(llvm::dbgs() << "Found LI: " << *li);
   SILValue operand = stripAccessMarkers(li->getOperand());
-  auto *originalASI = dyn_cast<AllocStackInst>(operand);
-  if (!originalASI || !originalASI->isLexical() || !originalASI->isVar())
-    return false;
+  if (auto *originalASI = dyn_cast<AllocStackInst>(operand)) {
+    if (!originalASI->isLexical() ||
+        !(originalASI->isVar() || originalASI->isLet()))
+      return false;
+    LLVM_DEBUG(llvm::dbgs() << "Found OriginalASI: " << *originalASI);
+  } else {
+    auto *fArg = dyn_cast<SILFunctionArgument>(operand);
+    if (!fArg || !fArg->hasConvention(SILArgumentConvention::Indirect_Inout))
+      return false;
+    LLVM_DEBUG(llvm::dbgs() << "Found fArg: " << *fArg);
+  }
 
-  LLVM_DEBUG(llvm::dbgs() << "Found OriginalASI: " << *originalASI);
   // Make sure that there aren't any side-effect having instructions in
   // between our load/store.
   LLVM_DEBUG(llvm::dbgs() << "Checking for uses in between LI and SI.\n");
@@ -129,7 +136,7 @@ tryHandlingLoadableVarMovePattern(MarkUnresolvedMoveAddrInst *markMoveAddr,
         }
 
         if (auto *dvi = dyn_cast<DestroyAddrInst>(&iter)) {
-          if (aa->isNoAlias(dvi->getOperand(), originalASI)) {
+          if (aa->isNoAlias(dvi->getOperand(), operand)) {
             // We are going to be extending the lifetime of our
             // underlying value, not shrinking it so we can ignore
             // destroy_addr on other non-aliasing values.
@@ -154,7 +161,7 @@ tryHandlingLoadableVarMovePattern(MarkUnresolvedMoveAddrInst *markMoveAddr,
   // Ok, we know our original lexical alloc_stack is not written to in between
   // the load/store. Move the mark_move_addr onto the lexical alloc_stack.
   LLVM_DEBUG(llvm::dbgs() << "        Doing loadable var!\n");
-  markMoveAddr->setSrc(originalASI);
+  markMoveAddr->setSrc(operand);
   return true;
 }
 
@@ -236,13 +243,13 @@ static bool tryConvertSimpleMoveFromAllocStackTemporary(
   }
 
   // If we have a store [init], see if our src is a load [copy] from an
-  // alloc_stack that is lexical var. In this case, we want to move our
-  // mark_unresolved_move_addr onto that lexical var. This pattern occurs due to
-  // SILGen always loading loadable values from memory when retrieving an
-  // RValue. Calling _move then since _move is generic forces the value to be
-  // re-materialized into an alloc_stack. In this example remembering that
-  // mark_unresolved_move_addr is a copy_addr [init], we try to move the MUMA
-  // onto the original lexical alloc_stack.
+  // alloc_stack that is lexical var or an inout argument. In this case, we want
+  // to move our mark_unresolved_move_addr onto that lexical var. This pattern
+  // occurs due to SILGen always loading loadable values from memory when
+  // retrieving an RValue. Calling _move then since _move is generic forces the
+  // value to be re-materialized into an alloc_stack. In this example
+  // remembering that mark_unresolved_move_addr is a copy_addr [init], we try to
+  // move the MUMA onto the original lexical alloc_stack.
   if (tryHandlingLoadableVarMovePattern(markMoveAddr, si, aa))
     return true;
 

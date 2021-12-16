@@ -571,7 +571,6 @@ public:
   ConstraintResult addRequirement(const Requirement &req,
                                   const RequirementRepr *reqRepr,
                                   FloatingRequirementSource source,
-                                  const SubstitutionMap *subMap,
                                   ModuleDecl *inferForModule);
 
   /// Add all of a generic signature's parameters and requirements.

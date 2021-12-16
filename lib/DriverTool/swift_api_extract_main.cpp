@@ -197,8 +197,9 @@ public:
   }
 
   int extractAPI() {
-    if (Instance.setup(Invocation)) {
-      llvm::outs() << "Failed to setup compiler instance\n";
+    std::string InstanceSetupError;
+    if (Instance.setup(Invocation, InstanceSetupError)) {
+      llvm::outs() << InstanceSetupError << '\n';
       return 1;
     }
 

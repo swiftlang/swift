@@ -101,7 +101,7 @@ import Foundation
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @{{[0-9]+}}, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @.str.{{[0-9]+}}, i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void (%3*, i8*, %4*)* @"$s11objc_bridge3BasC9acceptSetyyShyACGFTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC9acceptSetyyShyACGFTo.ptrauth" to i8*)
 // CHECK:     }

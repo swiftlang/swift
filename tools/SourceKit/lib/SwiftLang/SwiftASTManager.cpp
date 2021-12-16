@@ -650,42 +650,43 @@ convertFileContentsToInputs(ArrayRef<FileContent> contents) {
 
 bool SwiftASTManager::initCompilerInvocation(
     CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
-    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
-    std::string &Error) {
-  return initCompilerInvocation(Invocation, OrigArgs, Diags,
+    swift::FrontendOptions::ActionType Action, DiagnosticEngine &Diags,
+    StringRef UnresolvedPrimaryFile, std::string &Error) {
+  return initCompilerInvocation(Invocation, OrigArgs, Action, Diags,
                                 UnresolvedPrimaryFile,
-                                llvm::vfs::getRealFileSystem(),
-                                Error);
+                                llvm::vfs::getRealFileSystem(), Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(
     CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
-    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
+    FrontendOptions::ActionType Action, DiagnosticEngine &Diags,
+    StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
   return ide::initCompilerInvocation(
-      Invocation, OrigArgs, Diags, UnresolvedPrimaryFile, FileSystem,
+      Invocation, OrigArgs, Action, Diags, UnresolvedPrimaryFile, FileSystem,
       Impl.RuntimeResourcePath, Impl.DiagnosticDocumentationPath,
       Impl.SessionTimestamp, Error);
 }
 
-bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
-                                             ArrayRef<const char *> OrigArgs,
-                                             StringRef PrimaryFile,
-                                             std::string &Error) {
+bool SwiftASTManager::initCompilerInvocation(
+    CompilerInvocation &CompInvok, ArrayRef<const char *> OrigArgs,
+    swift::FrontendOptions::ActionType Action, StringRef PrimaryFile,
+    std::string &Error) {
   DiagnosticEngine Diagnostics(Impl.SourceMgr);
-  return initCompilerInvocation(CompInvok, OrigArgs, Diagnostics, PrimaryFile,
-                                Error);
+  return initCompilerInvocation(CompInvok, OrigArgs, Action, Diagnostics,
+                                PrimaryFile, Error);
 }
 
 bool SwiftASTManager::initCompilerInvocationNoInputs(
     swift::CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
-    swift::DiagnosticEngine &Diags, std::string &Error, bool AllowInputs) {
+    swift::FrontendOptions::ActionType Action, swift::DiagnosticEngine &Diags,
+    std::string &Error, bool AllowInputs) {
 
   SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
   // Use stdin as a .swift input to satisfy the driver.
   Args.push_back("-");
-  if (initCompilerInvocation(Invocation, Args, Diags, "", Error))
+  if (initCompilerInvocation(Invocation, Args, Action, Diags, "", Error))
     return true;
 
   if (!AllowInputs &&
@@ -699,13 +700,15 @@ bool SwiftASTManager::initCompilerInvocationNoInputs(
   return false;
 }
 
-SwiftInvocationRef SwiftASTManager::getInvocation(
-    ArrayRef<const char *> OrigArgs, StringRef PrimaryFile, std::string &Error) {
-  return getInvocation(OrigArgs, PrimaryFile, llvm::vfs::getRealFileSystem(),
-                       Error);
+SwiftInvocationRef
+SwiftASTManager::getTypecheckInvocation(ArrayRef<const char *> OrigArgs,
+                                        StringRef PrimaryFile,
+                                        std::string &Error) {
+  return getTypecheckInvocation(OrigArgs, PrimaryFile,
+                                llvm::vfs::getRealFileSystem(), Error);
 }
 
-SwiftInvocationRef SwiftASTManager::getInvocation(
+SwiftInvocationRef SwiftASTManager::getTypecheckInvocation(
     ArrayRef<const char *> OrigArgs, StringRef PrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
@@ -716,8 +719,9 @@ SwiftInvocationRef SwiftASTManager::getInvocation(
   Diags.addConsumer(CollectDiagConsumer);
 
   CompilerInvocation CompInvok;
-  if (initCompilerInvocation(CompInvok, OrigArgs, Diags, PrimaryFile,
-                             FileSystem, Error)) {
+  if (initCompilerInvocation(CompInvok, OrigArgs,
+                             FrontendOptions::ActionType::Typecheck, Diags,
+                             PrimaryFile, FileSystem, Error)) {
     // We create a traced operation here to represent the failure to parse
     // arguments since we cannot reach `createAST` where that would normally
     // happen.
@@ -1044,18 +1048,13 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     CompIns.getSourceMgr().setFileSystem(FileSystem);
   }
 
-  if (CompIns.setup(Invocation)) {
+  if (CompIns.setup(Invocation, Error)) {
     // FIXME: Report the diagnostic.
     LOG_WARN_FUNC("Compilation setup failed!!!");
     Error = "compilation setup failed";
     return nullptr;
   }
   CompIns.getASTContext().CancellationFlag = CancellationFlag;
-  if (CompIns.loadStdlibIfNeeded()) {
-    LOG_WARN_FUNC("Loading the stdlib failed");
-    Error = "Loading the stdlib failed";
-    return nullptr;
-  }
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
     TracedOp.start(TraceInfo);
@@ -1185,7 +1184,9 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
     std::vector<ImmutableTextSnapshotRef> Snapshots;
     Snapshots.reserve(BuildOp->getFileContents().size());
     for (auto &FileContent : BuildOp->getFileContents()) {
-      Snapshots.push_back(FileContent.Snapshot);
+      if (FileContent.Snapshot) {
+        Snapshots.push_back(FileContent.Snapshot);
+      }
     }
     if (BuildOp->matchesSourceState(FileSystem)) {
       ++Mgr->Impl.Stats->numASTCacheHits;

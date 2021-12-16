@@ -1503,7 +1503,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      (enableLexicalBorrowScopesFlag.getValueOr(false))) {
+      !enableLexicalBorrowScopesFlag.getValueOr(true)) {
     // Error if move-only is enabled and lexical borrow scopes--on which it
     // depends--has been disabled.
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
@@ -1513,7 +1513,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_enable_experimental_move_only) &&
-      (enableLexicalLifetimesFlag.getValueOr(false))) {
+      !enableLexicalLifetimesFlag.getValueOr(true)) {
     // Error if move-only is enabled and lexical lifetimes--on which it
     // depends--has been disabled.
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
@@ -1525,30 +1525,50 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -enable-copy-propagation implies -enable-lexical-lifetimes unless
   // otherwise specified.
   if (Args.hasArg(OPT_enable_copy_propagation))
-    Opts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    Opts.LexicalLifetimes = LexicalLifetimesOption::On;
+
+  // -disable-copy-propagation implies -enable-lexical-lifetimes=false
+  if (Args.hasArg(OPT_disable_copy_propagation))
+    Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
 
   // If move-only is enabled, always enable lexical lifetime as well.  Move-only
   // depends on lexical lifetimes.
   if (Args.hasArg(OPT_enable_experimental_move_only))
-    Opts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    Opts.LexicalLifetimes = LexicalLifetimesOption::On;
 
   if (enableLexicalLifetimesFlag) {
     if (*enableLexicalLifetimesFlag) {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+      Opts.LexicalLifetimes = LexicalLifetimesOption::On;
     } else {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::Early;
+      Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
     }
   }
   if (enableLexicalBorrowScopesFlag) {
     if (*enableLexicalBorrowScopesFlag) {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::Early;
+      Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
     } else {
       Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
     }
   }
 
-  Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
-  Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
+  if (Args.hasArg(OPT_enable_copy_propagation) &&
+      Args.hasArg(OPT_disable_copy_propagation)) {
+    // Error if copy propagation is enabled and copy propagation is disabled.
+    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
+                   "enable-copy-propagation", "disable-copy-propagation");
+    return true;
+  } else if (Args.hasArg(OPT_enable_copy_propagation) &&
+             !Args.hasArg(OPT_disable_copy_propagation)) {
+    Opts.CopyPropagation = CopyPropagationOption::On;
+  } else if (!Args.hasArg(OPT_enable_copy_propagation) &&
+             Args.hasArg(OPT_disable_copy_propagation)) {
+    Opts.CopyPropagation = CopyPropagationOption::Off;
+  } else /*if (!Args.hasArg(OPT_enable_copy_propagation) &&
+            !Args.hasArg(OPT_disable_copy_propagation))*/
+  {
+    Opts.CopyPropagation = CopyPropagationOption::RequestedPassesOnly;
+  }
+
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);

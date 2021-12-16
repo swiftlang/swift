@@ -156,7 +156,6 @@ struct SupplementaryOutputPaths {
   std::string BitstreamOptRecordPath;
 
   SupplementaryOutputPaths() = default;
-  SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
   /// Apply a given function for each existing (non-empty string) supplementary output
   void forEachSetOutput(llvm::function_ref<void(const std::string&)> fn) const {

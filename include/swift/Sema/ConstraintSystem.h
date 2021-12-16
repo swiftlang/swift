@@ -2217,6 +2217,13 @@ enum class SolutionApplicationToFunctionResult {
   Delay,
 };
 
+/// Retrieve the closure type from the constraint system.
+struct GetClosureType {
+  ConstraintSystem &cs;
+
+  Type operator()(const AbstractClosureExpr *expr) const;
+};
+
 /// Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -2442,9 +2449,6 @@ private:
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
-
-  /// Cache of the effects any closures visited.
-  llvm::SmallDenseMap<ClosureExpr *, FunctionType::ExtInfo, 4> closureEffectsCache;
 
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
@@ -3099,9 +3103,16 @@ public:
   }
 
   FunctionType *getClosureType(const ClosureExpr *closure) const {
+    auto result = getClosureTypeIfAvailable(closure);
+    assert(result);
+    return result;
+  }
+
+  FunctionType *getClosureTypeIfAvailable(const ClosureExpr *closure) const {
     auto result = ClosureTypes.find(closure);
-    assert(result != ClosureTypes.end());
-    return result->second;
+    if (result != ClosureTypes.end())
+      return result->second;
+    return nullptr;
   }
 
   TypeBase* getFavoredType(Expr *E) {
@@ -4119,6 +4130,12 @@ public:
          ConstraintLocatorBuilder locator,
          const OpenedTypeMap &replacements);
 
+  /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
+  /// the appropriate closure-type extraction function.
+  AnyFunctionType *adjustFunctionTypeForConcurrency(
+    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue);
+
   /// Retrieve the type of a reference to the given value declaration.
   ///
   /// For references to polymorphic function types, this routine "opens up"
@@ -4167,10 +4184,15 @@ public:
   ///
   /// \param getType Optional callback to extract a type for given declaration.
   static Type
-  getUnopenedTypeOfReference(VarDecl *value, Type baseType, DeclContext *UseDC,
-                             llvm::function_ref<Type(VarDecl *)> getType,
-                             ConstraintLocator *memberLocator = nullptr,
-                             bool wantInterfaceType = false);
+  getUnopenedTypeOfReference(
+      VarDecl *value, Type baseType, DeclContext *UseDC,
+      llvm::function_ref<Type(VarDecl *)> getType,
+      ConstraintLocator *memberLocator = nullptr,
+      bool wantInterfaceType = false,
+      llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
+        [](const AbstractClosureExpr *) {
+          return Type();
+        });
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.

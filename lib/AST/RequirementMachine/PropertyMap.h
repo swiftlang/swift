@@ -100,7 +100,7 @@ class PropertyBag {
 
   explicit PropertyBag(Term key) : Key(key) {}
 
-  void addProperty(Symbol property,
+  bool addProperty(Symbol property,
                    unsigned ruleID,
                    RewriteContext &ctx,
                    SmallVectorImpl<InducedRule> &inducedRules,
@@ -202,32 +202,43 @@ public:
 
 private:
   void clear();
-  void addProperty(Term key, Symbol property, unsigned ruleID,
+  bool addProperty(Term key, Symbol property, unsigned ruleID,
                    SmallVectorImpl<InducedRule> &inducedRules);
 
   void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(
-                   SmallVectorImpl<InducedRule> &inducedRules) const;
+                   SmallVectorImpl<InducedRule> &inducedRules);
 
   void concretizeNestedTypesFromConcreteParent(
                    Term key, RequirementKind requirementKind,
-                   CanType concreteType, ArrayRef<Term> substitutions,
+                   unsigned concreteRuleID,
+                   CanType concreteType,
+                   ArrayRef<Term> substitutions,
+                   ArrayRef<unsigned> conformsToRules,
                    ArrayRef<const ProtocolDecl *> conformsTo,
                    llvm::TinyPtrVector<ProtocolConformance *> &conformances,
+                   SmallVectorImpl<InducedRule> &inducedRules);
+
+  void concretizeTypeWitnessInConformance(
+                   Term key, RequirementKind requirementKind,
+                   Symbol concreteConformanceSymbol,
+                   ProtocolConformance *concrete,
+                   AssociatedTypeDecl *assocType,
                    SmallVectorImpl<InducedRule> &inducedRules) const;
 
   MutableTerm computeConstraintTermForTypeWitness(
-      Term key, CanType concreteType, CanType typeWitness,
-      const MutableTerm &subjectType, ArrayRef<Term> substitutions) const;
-
-  void recordConcreteConformanceRules(
-      SmallVectorImpl<InducedRule> &inducedRules);
+      Term key, RequirementKind requirementKind,
+      CanType concreteType, CanType typeWitness,
+      const MutableTerm &subjectType,
+      ArrayRef<Term> substitutions,
+      RewritePath &path) const;
 
   void recordConcreteConformanceRule(
     unsigned concreteRuleID,
     unsigned conformanceRuleID,
-    const ProtocolDecl *proto,
-    SmallVectorImpl<InducedRule> &inducedRules);
+    RequirementKind requirementKind,
+    Symbol concreteConformanceSymbol,
+    SmallVectorImpl<InducedRule> &inducedRules) const;
 
   void verify() const;
 };

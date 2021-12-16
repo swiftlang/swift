@@ -523,6 +523,7 @@ swift::matchWitness(
              llvm::function_ref<
                      RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
                    > finalize) {
+
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -542,12 +543,14 @@ swift::matchWitness(
   }
 
   // If we're currently validating the witness, bail out.
-  if (witness->isRecursiveValidation())
+  if (witness->isRecursiveValidation()) {
     return RequirementMatch(witness, MatchKind::Circularity);
+  }
   
   // If the witness is invalid, record that and stop now.
-  if (witness->isInvalid())
+  if (witness->isInvalid()) {
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
+  }
 
   // Get the requirement and witness attributes.
   const auto &reqAttrs = req->getAttrs();
@@ -2862,6 +2865,31 @@ static void emitDeclaredHereIfNeeded(DiagnosticEngine &diags,
   diags.diagnose(value, diag::decl_declared_here, value->getName());
 }
 
+/// Determine if the witness can be made implicitly async.
+static bool isValidImplicitAsync(ValueDecl *witness, ValueDecl *requirement) {
+  if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness)) {
+    if (auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement)) {
+      return requirementFunc->hasAsync() &&
+          !(witnessFunc->hasThrows() && !requirementFunc->hasThrows());
+    }
+
+    return false;
+  }
+
+  if (auto witnessStorage = dyn_cast<AbstractStorageDecl>(witness)) {
+    if (auto requirementStorage = dyn_cast<AbstractStorageDecl>(requirement)) {
+      auto requirementAccessor = requirementStorage->getEffectfulGetAccessor();
+      if (!requirementAccessor || !requirementAccessor->hasAsync())
+        return false;
+
+      return witnessStorage->isLessEffectfulThan(
+          requirementStorage, EffectKind::Throws);
+    }
+  }
+
+  return false;
+}
+
 bool ConformanceChecker::checkActorIsolation(
     ValueDecl *requirement, ValueDecl *witness) {
   /// Retrieve a concrete witness for Sendable checking.
@@ -2917,29 +2945,27 @@ bool ConformanceChecker::checkActorIsolation(
       // If the distributed instance method is well-formed (passed checks) then it can
       // witness this requirement. I.e. since checks to the distributed function
       // passed, it can be called through this protocol.
-      if (witnessFunc && witnessFunc->isDistributed()) {
+      if (requirementFunc && witnessFunc && witnessFunc->isDistributed()) {
         // If the requirement was also a 'distributed func' we most definitely
         // can witness it with our 'distributed func' witness.
-        if (requirementFunc && requirementFunc->isDistributed()) {
+        if (requirementFunc->isDistributed()) {
           return false;
         }
         if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
           return false;
         }
 
-        if (requirementFunc) {
-          // The witness was distributed, but the requirement func was not
-          // 'async throws', so we can suggest adding those to the protocol
-          int suggestAddingModifiers = 0;
-          if (!requirementFunc->hasAsync()) suggestAddingModifiers += 1;
-          if (!requirementFunc->hasThrows()) suggestAddingModifiers += 2;
-          requirementFunc->diagnose(diag::note_add_async_and_throws_to_decl,
-                                    witness->getName(),
-                                    suggestAddingModifiers,
-                                    witnessClass ? witnessClass->getName() :
-                                                   nominal->getName());
-          // TODO(distributed): fixit inserts for the async/throws
-        }
+        // The witness was distributed, but the requirement func was not
+        // 'async throws', so we can suggest adding those to the protocol
+        int suggestAddingModifiers = 0;
+        if (!requirementFunc->hasAsync()) suggestAddingModifiers += 1;
+        if (!requirementFunc->hasThrows()) suggestAddingModifiers += 2;
+        requirementFunc->diagnose(diag::note_add_async_and_throws_to_decl,
+                                  witness->getName(),
+                                  suggestAddingModifiers,
+                                  witnessClass ? witnessClass->getName() :
+                                                 nominal->getName());
+        // TODO(distributed): fixit inserts for the async/throws
       }
 
       // The witness definitely is distributed actor isolated,
@@ -2951,6 +2977,10 @@ bool ConformanceChecker::checkActorIsolation(
 
       // witness is not 'distributed', if the requirement was though,
       // then we definitely must mark the witness distributed as well.
+      if (!requirementFunc) {
+        return true;
+      }
+
       if (requirementFunc->isDistributed()) {
         witness->diagnose(diag::note_add_distributed_to_decl,
                           witness->getName(),
@@ -2986,9 +3016,15 @@ bool ConformanceChecker::checkActorIsolation(
     // A synchronous actor function can witness an asynchronous protocol
     // requirement, since calls "through" the protocol are always cross-actor,
     // in which case the function becomes implicitly async.
+    //
+    // In this case, we're crossing actor boundaries so we need to
+    // perform Sendable checking.
     if (witnessClass && witnessClass->isActor()) {
-      if (requirementFunc && requirementFunc->hasAsync() &&
-          (requirementFunc->hasThrows() == witnessFunc->hasThrows())) {
+      if (isValidImplicitAsync(witness, requirement)) {
+        diagnoseNonSendableTypesInReference(
+            getConcreteWitness(), DC, witness->getLoc(),
+            ConcurrentReferenceKind::CrossActor);
+
         return false;
       }
     }
@@ -3646,21 +3682,23 @@ filterProtocolRequirements(
 
 /// Prune the set of missing witnesses for the given conformance, eliminating
 /// any requirements that do not actually need to satisfied.
-static ArrayRef<MissingWitness> pruneMissingWitnesses(
+static ArrayRef<MissingWitness> pruneMissingWitnesses( // FIXME: this does not remove the missing witness note here!!!
     ConformanceChecker &checker,
     ProtocolDecl *proto,
     NormalProtocolConformance *conformance,
     ArrayRef<MissingWitness> missingWitnesses,
     SmallVectorImpl<MissingWitness> &scratch) {
-  if (missingWitnesses.empty())
+  if (missingWitnesses.empty()) {
     return missingWitnesses;
+  }
 
   // For an @objc protocol defined in Objective-C, the Clang importer might
   // have imported the same underlying Objective-C declaration as more than
   // one Swift declaration. If we aren't in an imported @objc protocol, there
   // is nothing to do.
-  if (!proto->isObjC())
+  if (!proto->isObjC()) {
     return missingWitnesses;
+  }
 
   // Consider each of the missing witnesses to remove any that should not
   // longer be considered "missing".
@@ -3672,8 +3710,9 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses(
 
     // Local function to skip this particular witness.
     auto skipWitness = [&] {
-      if (removedAny)
+      if (removedAny) {
         return;
+      }
 
       // This is the first witness we skipped. Copy all of the earlier
       // missing witnesses over.
@@ -3722,8 +3761,9 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses(
     skipWitness();
   }
 
-  if (removedAny)
+  if (removedAny) {
     return scratch;
+  }
 
   return missingWitnesses;
 }
@@ -3745,6 +3785,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     auto requirement = Missing.requirement;
     auto matches = Missing.matches;
     auto nominal = Adoptee->getAnyNominal();
+
     diagnoseOrDefer(requirement, true,
       [requirement, matches, nominal](NormalProtocolConformance *conformance) {
         auto dc = conformance->getDeclContext();
@@ -3752,8 +3793,9 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
         // Possibly diagnose reason for automatic derivation failure
         DerivedConformance::tryDiagnoseFailedDerivation(dc, nominal, protocol);
         // Diagnose each of the matches.
-        for (const auto &match : matches)
+        for (const auto &match : matches) {
           diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
+        }
       });
   }
 
@@ -4147,7 +4189,6 @@ static bool isRawRepresentableGenericFunction(
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
-
   auto *nominal = Adoptee->getAnyNominal();
 
   // Resolve all associated types before trying to resolve this witness.
@@ -4200,7 +4241,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   auto &ctx = getASTContext();
   bool isEquatableConformance = (Conformance->getProtocol() ==
                                  ctx.getProtocol(KnownProtocolKind::Equatable));
-
   if (findBestWitness(requirement,
                       considerRenames ? &ignoringNames : nullptr,
                       Conformance,
@@ -4515,8 +4555,10 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   // Attempt to derive the witness.
   auto derived =
       TypeChecker::deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
-  if (!derived)
+
+  if (!derived) {
     return ResolveWitnessResult::ExplicitFailed;
+  }
 
   // Try to match the derived requirement.
   auto match = matchWitness(ReqEnvironmentCache, Proto, Conformance, DC,
@@ -4896,12 +4938,15 @@ void ConformanceChecker::resolveValueWitnesses() {
     auto finalizeWitness = [&] {
       // Find the witness.
       auto witness = Conformance->getWitnessUncached(requirement).getDecl();
-      if (!witness) return;
+      if (!witness) {
+        return;
+      }
 
       auto &C = witness->getASTContext();
 
-      if (checkActorIsolation(requirement, witness))
+      if (checkActorIsolation(requirement, witness)) {
         return;
+      }
 
       // Ensure that Actor.unownedExecutor is implemented within the
       // actor class itself.  But if this somehow resolves to the
@@ -5322,6 +5367,7 @@ void ConformanceChecker::diagnoseOrDefer(
   if (SuppressDiagnostics) {
     // Stash this in the ASTContext for later emission.
     auto conformance = Conformance;
+
     getASTContext().addDelayedConformanceDiag(
         conformance,
         {requirement, [conformance, fn] { fn(conformance); }, isError});

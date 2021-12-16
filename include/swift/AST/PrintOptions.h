@@ -95,7 +95,6 @@ public:
     static_assert(DAK_Count < UINT_MAX, "DeclAttrKind is > 31 bits");
   }
   AnyAttrKind() : kind(TAK_Count), isType(1) {}
-  AnyAttrKind(const AnyAttrKind &) = default;
 
   /// Returns the TypeAttrKind, or TAK_Count if this is not a type attribute.
   TypeAttrKind type() const {

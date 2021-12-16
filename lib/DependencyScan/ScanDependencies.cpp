@@ -1093,7 +1093,8 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
-      if (pInstance->setup(subInvok)) {
+      std::string InstanceSetupError;
+      if (pInstance->setup(subInvok, InstanceSetupError)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;

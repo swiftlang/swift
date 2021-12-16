@@ -92,6 +92,8 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     case RewriteStep::Decompose:
     case RewriteStep::ConcreteConformance:
     case RewriteStep::SuperclassConformance:
+    case RewriteStep::ConcreteTypeWitness:
+    case RewriteStep::SameTypeWitness:
       break;
     }
 
@@ -208,6 +210,8 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
     case RewriteStep::Decompose:
     case RewriteStep::ConcreteConformance:
     case RewriteStep::SuperclassConformance:
+    case RewriteStep::ConcreteTypeWitness:
+    case RewriteStep::SameTypeWitness:
       break;
     }
 
@@ -306,6 +310,8 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
     case RewriteStep::Decompose:
     case RewriteStep::ConcreteConformance:
     case RewriteStep::SuperclassConformance:
+    case RewriteStep::ConcreteTypeWitness:
+    case RewriteStep::SameTypeWitness:
       newSteps.push_back(step);
       break;
     }
@@ -523,16 +529,19 @@ void RewriteSystem::minimizeRewriteSystem() {
 
 /// In a conformance-valid rewrite system, any rule with unresolved symbols on
 /// the left or right hand side should have been simplified by another rule.
-bool RewriteSystem::hasNonRedundantUnresolvedRules() const {
+bool RewriteSystem::hadError() const {
   assert(Complete);
   assert(Minimized);
 
   for (const auto &rule : Rules) {
-    if (!rule.isRedundant() &&
-        !rule.isPermanent() &&
-        rule.containsUnresolvedSymbols()) {
+    if (rule.isPermanent())
+      continue;
+
+    if (rule.isConflicting())
       return true;
-    }
+
+    if (!rule.isRedundant() && rule.containsUnresolvedSymbols())
+      return true;
   }
 
   return false;
@@ -555,6 +564,7 @@ RewriteSystem::getMinimizedProtocolRules(
 
     if (rule.isPermanent() ||
         rule.isRedundant() ||
+        rule.isConflicting() ||
         rule.containsUnresolvedSymbols()) {
       continue;
     }
@@ -584,6 +594,7 @@ RewriteSystem::getMinimizedGenericSignatureRules() const {
 
     if (rule.isPermanent() ||
         rule.isRedundant() ||
+        rule.isConflicting() ||
         rule.containsUnresolvedSymbols()) {
       continue;
     }

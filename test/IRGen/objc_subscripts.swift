@@ -42,7 +42,7 @@
 // CHECK:       { i8*, i8*, i8* } 
 // CHECK:         {
 // CHECK:           i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0),
-// CHECK:           i8* getelementptr inbounds ([8 x i8], [8 x i8]* @{{[0-9]+}}, i64 0, i64 0),
+// CHECK:           i8* getelementptr inbounds ([8 x i8], [8 x i8]* @.str.{{[0-9]+}}, i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast ([[OPAQUE8:%.*]]* ([[OPAQUE9:%.*]]*, i8*)* @"$s15objc_subscripts10SomeObjectCACycfcTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s15objc_subscripts10SomeObjectCACycfcTo.ptrauth" to i8*)
 // CHECK:         }

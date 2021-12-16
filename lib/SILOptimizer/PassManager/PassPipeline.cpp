@@ -180,7 +180,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Now that we have finished performing diagnostics that rely on lexical
   // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.
-  if (Options.LexicalLifetimes != LexicalLifetimesOption::ExperimentalLate) {
+  if (Options.LexicalLifetimes != LexicalLifetimesOption::On) {
     P.addLexicalLifetimeEliminator();
   }
 
@@ -194,10 +194,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Only issue weak lifetime warnings for users who select object lifetime
   // optimization. The risk of spurious warnings outweighs the benefits.
-  if (P.getOptions().EnableCopyPropagation) {
+  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
     P.addDiagnoseLifetimeIssues();
   }
-  
+
   P.addGlobalOpt();
   P.addPerformanceDiagnostics();
   
@@ -412,7 +412,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   if (P.getOptions().EnableOSSAModules) {
     // We earlier eliminated ownership if we are not compiling the stdlib. Now
     // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
-    if (!P.getOptions().DisableCopyPropagation) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
@@ -436,7 +436,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Clean up Semantic ARC before we perform additional post-inliner opts.
   if (P.getOptions().EnableOSSAModules) {
-    if (!P.getOptions().DisableCopyPropagation) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
@@ -503,7 +503,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Run a final round of ARC opts when ownership is enabled.
   if (P.getOptions().EnableOSSAModules) {
-    if (!P.getOptions().DisableCopyPropagation) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
@@ -539,7 +539,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
   // Cleanup after SILGen: remove unneeded borrows/copies.
-  if (P.getOptions().EnableCopyPropagation) {
+  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
@@ -863,7 +863,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // Run one last copy propagation/semantic arc opts run before serialization/us
   // lowering ownership.
   if (P.getOptions().EnableOSSAModules) {
-    if (!P.getOptions().DisableCopyPropagation) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
@@ -915,7 +915,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
-  if (P.getOptions().EnableCopyPropagation) {
+  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
     // MandatoryCopyPropagation should only be run at -Onone, not -O.
     P.addMandatoryCopyPropagation();
   }

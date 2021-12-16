@@ -5177,7 +5177,9 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     return entry.second;
   }
 
-  entry = createStringConstant(data, willBeRelativelyAddressed);
+  entry = createStringConstant(data, willBeRelativelyAddressed,
+                               /*sectionName*/ "",
+                               ".str" /* match how Clang creates strings */);
   return entry.second;
 }
 
@@ -5206,9 +5208,9 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   ArrayRef<llvm::UTF16> utf16(&buffer[0], utf16Length + 1);
 
   auto init = llvm::ConstantDataArray::get(getLLVMContext(), utf16);
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::PrivateLinkage,
-                                         init);
+  auto global = new llvm::GlobalVariable(
+      Module, init->getType(), true, llvm::GlobalValue::PrivateLinkage, init,
+      ".str" /* match how Clang creates strings */);
   global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   // Drill down to make an i16*.

@@ -150,6 +150,8 @@ void Rule::dump(llvm::raw_ostream &out) const {
     out << " [simplified]";
   if (Redundant)
     out << " [redundant]";
+  if (Conflicting)
+    out << "[conflicting]";
 }
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
@@ -205,24 +207,23 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
       auto ruleID = Trie.find(from, end);
       if (ruleID) {
         const auto &rule = getRule(*ruleID);
-        if (!rule.isSimplified()) {
-          auto to = from + rule.getLHS().size();
-          assert(std::equal(from, to, rule.getLHS().begin()));
 
-          unsigned startOffset = (unsigned)(from - term.begin());
-          unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
+        auto to = from + rule.getLHS().size();
+        assert(std::equal(from, to, rule.getLHS().begin()));
 
-          term.rewriteSubTerm(from, to, rule.getRHS());
+        unsigned startOffset = (unsigned)(from - term.begin());
+        unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
 
-          if (path || debug) {
-            subpath.add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
-                                                    /*inverse=*/false));
-          }
+        term.rewriteSubTerm(from, to, rule.getRHS());
 
-          changed = true;
-          tryAgain = true;
-          break;
+        if (path || debug) {
+          subpath.add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
+                                                  /*inverse=*/false));
         }
+
+        changed = true;
+        tryAgain = true;
+        break;
       }
 
       ++from;
@@ -252,25 +253,26 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 
 /// Simplify terms appearing in the substitutions of the last symbol of \p term,
 /// which must be a superclass or concrete type symbol.
-void RewriteSystem::simplifySubstitutions(MutableTerm &term,
-                                          RewritePath &path) const {
-  auto symbol = term.back();
+bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
+                                          RewritePath *path) const {
   assert(symbol.hasSubstitutions());
 
   auto substitutions = symbol.getSubstitutions();
   if (substitutions.empty())
-    return;
+    return false;
 
   // Save the original rewrite path length so that we can reset if if we don't
   // find anything to simplify.
-  unsigned oldSize = path.size();
+  unsigned oldSize = (path ? path->size() : 0);
 
-  // The term is on the A stack. Push all substitutions onto the A stack.
-  path.add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/false));
+  if (path) {
+    // The term is on the A stack. Push all substitutions onto the A stack.
+    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/false));
 
-  // Move all substitutions but the first one to the B stack.
-  for (unsigned i = 1; i < substitutions.size(); ++i)
-    path.add(RewriteStep::forShift(/*inverse=*/false));
+    // Move all substitutions but the first one to the B stack.
+    for (unsigned i = 1; i < substitutions.size(); ++i)
+      path->add(RewriteStep::forShift(/*inverse=*/false));
+  }
 
   // Simplify and collect substitutions.
   SmallVector<Term, 2> newSubstitutions;
@@ -280,13 +282,13 @@ void RewriteSystem::simplifySubstitutions(MutableTerm &term,
   bool anyChanged = false;
   for (auto substitution : substitutions) {
     // Move the next substitution from the B stack to the A stack.
-    if (!first)
-      path.add(RewriteStep::forShift(/*inverse=*/true));
+    if (!first && path)
+      path->add(RewriteStep::forShift(/*inverse=*/true));
     first = false;
 
     // The current substitution is at the top of the A stack; simplify it.
     MutableTerm mutTerm(substitution);
-    anyChanged |= simplify(mutTerm, &path);
+    anyChanged |= simplify(mutTerm, path);
 
     // Record the new substitution.
     newSubstitutions.push_back(Term::get(mutTerm, Context));
@@ -294,25 +296,29 @@ void RewriteSystem::simplifySubstitutions(MutableTerm &term,
 
   // All simplified substitutions are now on the A stack. Collect them to
   // produce the new term.
-  path.add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/true));
+  if (path)
+    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/true));
 
   // If nothing changed, we don't have to rebuild the symbol.
   if (!anyChanged) {
-    // The rewrite path should consist of a Decompose, followed by a number
-    // of Shifts, followed by a Compose.
-#ifndef NDEBUG
-    for (auto iter = path.begin() + oldSize; iter < path.end(); ++iter) {
-      assert(iter->Kind == RewriteStep::Shift ||
-             iter->Kind == RewriteStep::Decompose);
-    }
-#endif
+    if (path) {
+      // The rewrite path should consist of a Decompose, followed by a number
+      // of Shifts, followed by a Compose.
+  #ifndef NDEBUG
+      for (auto iter = path->begin() + oldSize; iter < path->end(); ++iter) {
+        assert(iter->Kind == RewriteStep::Shift ||
+               iter->Kind == RewriteStep::Decompose);
+      }
+  #endif
 
-    path.resize(oldSize);
-    return;
+      path->resize(oldSize);
+    }
+    return false;
   }
 
   // Build the new symbol with simplified substitutions.
-  term.back() = symbol.withConcreteSubstitutions(newSubstitutions, Context);
+  symbol = symbol.withConcreteSubstitutions(newSubstitutions, Context);
+  return true;
 }
 
 /// Adds a rewrite rule, returning true if the new rule was non-trivial.
@@ -341,12 +347,6 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
   // This avoids unnecessary work in the completion algorithm.
   RewritePath lhsPath;
   RewritePath rhsPath;
-
-  if (lhs.back().hasSubstitutions())
-    simplifySubstitutions(lhs, lhsPath);
-
-  if (rhs.back().hasSubstitutions())
-    simplifySubstitutions(rhs, rhsPath);
 
   simplify(lhs, &lhsPath);
   simplify(rhs, &rhsPath);
@@ -433,6 +433,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     MutableTerm term = lhs;
     simplify(lhs);
 
+    dump(llvm::errs());
     abort();
   }
 
@@ -460,13 +461,11 @@ bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs) {
   return added;
 }
 
-/// Delete any rules whose left hand sides can be reduced by other rules,
-/// and reduce the right hand sides of all remaining rules as much as
-/// possible.
+/// Delete any rules whose left hand sides can be reduced by other rules.
 ///
 /// Must be run after the completion procedure, since the deletion of
 /// rules is only valid to perform if the rewrite system is confluent.
-void RewriteSystem::simplifyRewriteSystem() {
+void RewriteSystem::simplifyLeftHandSides() {
   assert(Complete);
 
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
@@ -500,8 +499,19 @@ void RewriteSystem::simplifyRewriteSystem() {
         break;
       }
     }
+  }
+}
 
-    // If the rule was deleted above, skip the rest.
+/// Reduce the right hand sides of all remaining rules as much as
+/// possible.
+///
+/// Must be run after the completion procedure, since the deletion of
+/// rules is only valid to perform if the rewrite system is confluent.
+void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
+  assert(Complete);
+
+  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+    auto &rule = getRule(ruleID);
     if (rule.isSimplified())
       continue;
 
@@ -510,6 +520,8 @@ void RewriteSystem::simplifyRewriteSystem() {
     MutableTerm rhs(rule.getRHS());
     if (!simplify(rhs, &rhsPath))
       continue;
+
+    auto lhs = rule.getLHS();
 
     // We're adding a new rule, so the old rule won't apply anymore.
     rule.markSimplified();
@@ -543,6 +555,41 @@ void RewriteSystem::simplifyRewriteSystem() {
     }
 
     recordRewriteLoop(MutableTerm(lhs), loop);
+  }
+
+  // Finally try to simplify substitutions in superclass, concrete type and
+  // concrete conformance symbols.
+  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+    auto &rule = getRule(ruleID);
+    if (rule.isSimplified())
+      continue;
+
+    auto lhs = rule.getLHS();
+    auto symbol = lhs.back();
+    if (!symbol.hasSubstitutions())
+      continue;
+
+    RewritePath path;
+
+    // (1) First, apply the original rule to produce the original lhs.
+    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
+                                         ruleID, /*inverse=*/true));
+
+    // (2) Now, simplify the substitutions to get the new lhs.
+    if (!simplifySubstitutions(symbol, &path))
+      continue;
+
+    // We're either going to add a new rule or record an identity, so
+    // mark the old rule as simplified.
+    rule.markSimplified();
+
+    MutableTerm newLHS(lhs.begin(), lhs.end() - 1);
+    newLHS.add(symbol);
+
+    // Invert the path to get a path from the new lhs to the old rhs.
+    path.invert();
+
+    addRule(newLHS, MutableTerm(rule.getRHS()), &path);
   }
 }
 
