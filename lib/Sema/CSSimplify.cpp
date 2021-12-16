@@ -1239,6 +1239,85 @@ public:
   }
 };
 
+namespace {
+class OpenTypeSequenceElements {
+  ConstraintSystem &CS;
+  int64_t argIdx;
+  Type patternTy;
+  // A map that relates a type variable opened for a reference to a type
+  // sequence to an array of parallel type variables, one for each argument.
+  llvm::MapVector<TypeVariableType *, SmallVector<TypeVariableType *, 2>> SequenceElementCache;
+
+public:
+  OpenTypeSequenceElements(ConstraintSystem &CS, PackExpansionType *PET)
+      : CS(CS), argIdx(-1), patternTy(PET->getPatternType()) {}
+
+public:
+  Type expandParameter() {
+    argIdx += 1;
+    return patternTy.transform(*this);
+  }
+
+  void intoPackTypes(llvm::function_ref<void(TypeVariableType *, Type)> fn) && {
+    if (argIdx == -1) {
+      (void)patternTy.transform(*this);
+      for (auto &entry : SequenceElementCache) {
+        entry.second.clear();
+      }
+    }
+
+    for (const auto &entry : SequenceElementCache) {
+      SmallVector<Type, 8> elements;
+      llvm::transform(entry.second, std::back_inserter(elements), [](Type t) {
+        return t;
+      });
+      auto packType = PackType::get(CS.getASTContext(), elements);
+      fn(entry.first, packType);
+    }
+  }
+
+  Type operator()(Type Ty) {
+    if (!Ty || !Ty->isTypeVariableOrMember())
+      return Ty;
+
+    auto *TV = Ty->getAs<TypeVariableType>();
+    if (!TV)
+      return Ty;
+
+    // Leave plain opened type variables alone.
+    if (!TV->getImpl().getGenericParameter()->isTypeSequence())
+      return TV;
+
+    // Create a clone of the type sequence type variable.
+    auto *clonedTV = CS.createTypeVariable(TV->getImpl().getLocator(),
+                                           TV->getImpl().getRawOptions());
+
+    // Is there an entry for this type sequence?
+    const auto &entries = SequenceElementCache.find(TV);
+    if (entries == SequenceElementCache.end()) {
+      // We're just seeing this type sequence fresh, so enter a new type
+      // variable in its place and cache down the fact we just saw it.
+      SequenceElementCache[TV] = {clonedTV};
+    } else if ((int64_t)entries->second.size() <= argIdx) {
+      // We've seen this type sequence before, but we have a brand new element.
+      // Expand the cache entry.
+      SequenceElementCache[TV].push_back(clonedTV);
+    } else {
+      // Not only have we seen this type sequence before, we've seen this
+      // argument index before. Extract the old cache entry, emplace the new
+      // one, and bind them together.
+      auto *oldEntry = SequenceElementCache[TV][argIdx];
+      SequenceElementCache[TV][argIdx] = clonedTV;
+
+      CS.addConstraint(ConstraintKind::Bind, oldEntry, clonedTV,
+                       TV->getImpl().getLocator());
+    }
+
+    return clonedTV;
+  }
+};
+}
+
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType,
@@ -1376,14 +1455,47 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
-    // Skip unfulfilled parameters. There's nothing to do for them.
-    if (parameterBindings[paramIdx].empty())
-      continue;
-
     // Determine the parameter type.
     const auto &param = params[paramIdx];
     auto paramTy = param.getOldType();
 
+    // Type sequences ingest the entire set of argument bindings as
+    // a pack type bound to the sequence archetype for the parameter.
+    //
+    // We pull these out special because variadic parameters ban lots of
+    // the more interesting typing constructs called out below like
+    // inout and @autoclosure.
+    if (paramInfo.isVariadicGenericParameter(paramIdx)) {
+      auto *PET = paramTy->castTo<PackExpansionType>();
+      OpenTypeSequenceElements openTypeSequence{cs, PET};
+      for (auto argIdx : parameterBindings[paramIdx]) {
+        const auto &argument = argsWithLabels[argIdx];
+        auto argTy = argument.getPlainType();
+
+        // First, re-open the parameter type so we bind the elements of the type
+        // sequence into their proper positions.
+        auto substParamTy = openTypeSequence.expandParameter();
+
+        cs.addConstraint(
+            subKind, argTy, substParamTy, loc, /*isFavored=*/false);
+      }
+
+      // Now that we have the pack mappings, bind the raw type sequence to the
+      // whole parameter pack. This ensures references to the type sequence in
+      // return position refer to the whole pack of elements we just gathered.
+      std::move(openTypeSequence)
+          .intoPackTypes([&](TypeVariableType *tsParam, Type pack) {
+            cs.addConstraint(ConstraintKind::Bind, pack, tsParam, loc,
+                             /*isFavored=*/false);
+          });
+
+      continue;
+    }
+
+    // Skip unfulfilled parameters. There's nothing to do for them.
+    if (parameterBindings[paramIdx].empty())
+      continue;
+    
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::ApplyArgToParam(
@@ -1505,6 +1617,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           }
         }
       }
+
       if (!argument.isCompileTimeConst() && param.isCompileTimeConst()) {
         auto *locator = cs.getConstraintLocator(loc);
         SourceRange range;
@@ -1530,6 +1643,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   return cs.getTypeMatchSuccess();
 }
+
 
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionResultTypes(Type expectedResult, Type fnResult,
@@ -1746,6 +1860,29 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     auto result = matchTypes(elt1.getType(), elt2.getType(), subKind, subflags,
                        locator.withPathElement(
                                         LocatorPathElt::TupleElement(idx1)));
+    if (result.isFailure())
+      return result;
+  }
+
+  return getTypeMatchSuccess();
+}
+
+ConstraintSystem::TypeMatchResult
+ConstraintSystem::matchPackTypes(PackType *pack1, PackType *pack2,
+                                 ConstraintKind kind, TypeMatchOptions flags,
+                                 ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+  if (pack1->getNumElements() != pack2->getNumElements())
+    return getTypeMatchFailure(locator);
+
+  for (unsigned i = 0, n = pack1->getNumElements(); i != n; ++i) {
+    Type ty1 = pack1->getElementType(i);
+    Type ty2 = pack2->getElementType(i);
+
+    // Compare the element types.
+    auto result =
+        matchTypes(ty1, ty2, kind, subflags,
+                   locator.withPathElement(LocatorPathElt::PackElement(i)));
     if (result.isFailure())
       return result;
   }
@@ -5780,6 +5917,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // completely different decls, then there's nothing else we can do.
       return getTypeMatchFailure(locator);
     }
+    case TypeKind::Pack: {
+      auto tmpPackLoc = locator.withPathElement(LocatorPathElt::PackType(type1));
+      auto packLoc = tmpPackLoc.withPathElement(LocatorPathElt::PackType(type2));
+      return matchPackTypes(cast<PackType>(desugar1),
+                            cast<PackType>(desugar2),
+                            kind, subflags, packLoc);
+    }
+    case TypeKind::PackExpansion: {
+      return matchTypes(cast<PackExpansionType>(desugar1)->getPatternType(),
+                        cast<PackExpansionType>(desugar2)->getPatternType(),
+                        kind, subflags, locator);
+    }
     }
   }
 
@@ -6096,6 +6245,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
     }
+
+    // A Pack of (Ts...) is convertible to a tuple (X, Y, Z) as long as there
+    // is an element-wise match.
+    if (auto *expansionTy = type1->getAs<PackType>()) {
+      if (!type2->isTypeVariableOrMember()) {
+        conversionsOrFixes.push_back(
+            ConversionRestrictionKind::ReifyPackToType);
+      }
+    }
   }
 
   if (kind >= ConstraintKind::OperatorArgumentConversion) {
@@ -6340,7 +6498,9 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::Function:
   case TypeKind::LValue:
   case TypeKind::InOut:
-  case TypeKind::Module: {
+  case TypeKind::Module:
+  case TypeKind::Pack:
+  case TypeKind::PackExpansion: {
     // If solver is in the diagnostic mode and this is an invalid base,
     // let's give solver a chance to repair it to produce a good diagnostic.
     if (shouldAttemptFixes())

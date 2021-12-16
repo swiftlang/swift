@@ -68,3 +68,23 @@ func invalidPacks() {
   func monovariadic2<T>() -> (T...) {} // expected-error 2 {{cannot create expansion with non-variadic type 'T'}}
   func monovariadic3<T, U>() -> (T, U...) {} // expected-error {{cannot create a variadic tuple}}
 }
+
+func call() {
+  func multipleParameters<@_typeSequence T>(xs: T..., ys: T...) -> (T...) { return xs }
+  // expected-note@-1 {{in call to function 'multipleParameters(xs:ys:)'}}
+  _ = multipleParameters()
+  // expected-error@-1 2 {{generic parameter 'T' could not be inferred}}
+  let x: (String) = multipleParameters(xs: "", ys: "")
+  let (one, two) = multipleParameters(xs: "", 5.0, ys: "", 5.0)
+  multipleParameters(xs: "", 5.0, ys: 5.0, "") // expected-error {{type of expression is ambiguous without more context}}
+
+  func multipleSequences<@_typeSequence T, @_typeSequence U>(xs: T..., ys: U...) -> (T...) { return ys }
+  // expected-note@-1 {{in call to function 'multipleSequences(xs:ys:)'}}
+  // expected-error@-2 {{cannot convert return expression of type 'U' to return type 'T'}}
+
+  _ = multipleSequences()
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'U' could not be inferred}}
+  _ = multipleSequences(xs: "", ys: "")
+  _ = multipleSequences(xs: "", 5.0, ys: 5.0, "")
+}

@@ -3404,6 +3404,10 @@ namespace {
       return simplifyExprType(expr);
     }
 
+    Expr *visitPackExpr(PackExpr *expr) {
+      return simplifyExprType(expr);
+    }
+
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
       auto *memberLocator =
           cs.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
@@ -5667,7 +5671,53 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     const auto &param = params[paramIdx];
     auto paramLabel = param.getLabel();
 
-    // Handle variadic parameters.
+    // Handle variadic generic parameters.
+    if (paramInfo.isVariadicGenericParameter(paramIdx)) {
+      assert(param.isVariadic());
+      assert(!param.isInOut());
+
+      SmallVector<Expr *, 4> variadicArgs;
+
+      // The first argument of this vararg parameter may have had a label;
+      // save its location.
+      auto &varargIndices = parameterBindings[paramIdx];
+      SourceLoc labelLoc;
+      if (!varargIndices.empty())
+        labelLoc = args->getLabelLoc(varargIndices[0]);
+
+      // Convert the arguments.
+      auto paramTuple = param.getPlainType()->castTo<PackType>();
+      for (auto varargIdx : indices(varargIndices)) {
+        auto argIdx = varargIndices[varargIdx];
+        auto *arg = args->getExpr(argIdx);
+        auto argType = cs.getType(arg);
+
+        // If the argument type exactly matches, this just works.
+        auto paramTy = paramTuple->getElementType(varargIdx);
+        if (argType->isEqual(paramTy)) {
+          variadicArgs.push_back(arg);
+          continue;
+        }
+
+        // Convert the argument.
+        auto convertedArg = coerceToType(
+            arg, paramTy,
+            getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
+        if (!convertedArg)
+          return nullptr;
+
+        // Add the converted argument.
+        variadicArgs.push_back(convertedArg);
+      }
+
+      // Collect them into a PackExpr.
+      auto *packExpr = PackExpr::create(ctx, variadicArgs, paramTuple);
+      packExpr->setType(paramTuple);
+      cs.cacheType(packExpr);
+
+      newArgs.push_back(Argument(labelLoc, paramLabel, packExpr));
+      continue;
+    }
     if (param.isVariadic()) {
       assert(!param.isInOut());
 
@@ -6667,6 +6717,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                             /*isImplicit*/ true));
   }
 
+  case TypeKind::Pack:
+  case TypeKind::PackExpansion: {
+    llvm_unreachable("Unimplemented!");
+  }
+
   // Coerce from a tuple to a tuple.
   case TypeKind::Tuple: {
     auto fromTuple = cast<TupleType>(desugaredFromType);
@@ -7018,6 +7073,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::GenericFunction:
   case TypeKind::LValue:
   case TypeKind::InOut:
+  case TypeKind::Pack:
+  case TypeKind::PackExpansion:
     break;
   }
 
