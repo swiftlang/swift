@@ -1035,6 +1035,12 @@ def create_argument_parser():
     option('--build-external-benchmarks', toggle_true,
            help='skip building Swift Benchmark Suite')
 
+    option('--build-swift-private-stdlib', toggle_true,
+           default=True,
+           help='build the private part of the Standard Library. '
+                'This can be useful to reduce build times when e.g. '
+                'tests do not need to run')
+
     # -------------------------------------------------------------------------
     in_group('Skip testing specified targets')
 
