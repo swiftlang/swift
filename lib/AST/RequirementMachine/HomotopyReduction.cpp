@@ -46,9 +46,8 @@
 //
 // Also, for a conformance rule (V.[P] => V) to be redundant, a stronger
 // condition is needed than appearing once in a loop and without context;
-// the rule must not be a _generating conformance_. The algorithm for computing
-// a minimal set of generating conformances is implemented in
-// GeneratingConformances.cpp.
+// the rule must not be a _minimal conformance_. The algorithm for computing
+// minimal conformances is implemented in MinimalConformances.cpp.
 //
 //===----------------------------------------------------------------------===//
 
@@ -129,7 +128,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
 /// explicit bit to all other rules appearing in empty context within the same
 /// loop.
 ///
-/// When computing generating conformances we prefer to eliminate non-explicit
+/// When computing minimal conformances we prefer to eliminate non-explicit
 /// rules, as a heuristic to ensure that minimized conformance requirements
 /// remain in the same protocol as originally written, in cases where they can
 /// be moved between protocols.
@@ -359,17 +358,18 @@ isCandidateForDeletion(unsigned ruleID,
     return true;
 
   // Protocol conformance rules are eliminated via a different
-  // algorithm which computes "generating conformances".
+  // algorithm which computes "minimal conformances". This runs between
+  // two passes of homotopy reduction.
   //
   // The first pass skips protocol conformance rules.
   //
   // The second pass eliminates any protocol conformance rule which is
-  // redundant according to both homotopy reduction and the generating
+  // redundant according to both homotopy reduction and the minimal
   // conformances algorithm.
   //
-  // Later on, we verify that any conformance redundant via generating
+  // Later on, we verify that any conformance redundant via minimal
   // conformances was also redundant via homotopy reduction. This
-  // means that the set of generating conformances is always a superset
+  // means that the set of minimal conformances is always a superset
   // (or equal to) of the set of minimal protocol conformance
   // requirements that homotopy reduction alone would produce.
   if (rule.isAnyConformanceRule()) {
@@ -392,11 +392,11 @@ isCandidateForDeletion(unsigned ruleID,
 /// 1) First, rules that are not conformance rules are deleted, with
 ///    \p redundantConformances equal to nullptr.
 ///
-/// 2) Second, generating conformances are computed.
+/// 2) Second, minimal conformances are computed.
 ///
 /// 3) Finally, redundant conformance rules are deleted, with
 /// \p redundantConformances equal to the set of conformance rules that are
-///    not generating conformances.
+///    not minimal conformances.
 Optional<unsigned> RewriteSystem::
 findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
                  RewritePath &replacementPath) {
@@ -524,15 +524,15 @@ void RewriteSystem::minimizeRewriteSystem() {
   // First pass: Eliminate all redundant rules that are not conformance rules.
   performHomotopyReduction(/*redundantConformances=*/nullptr);
 
-  // Now find a minimal set of generating conformances.
+  // Now compute a set of minimal conformances.
   //
   // FIXME: For now this just produces a set of redundant conformances, but
-  // it should actually output the canonical generating conformance equation
-  // for each non-generating conformance. We can then use information to
+  // it should actually output the canonical minimal conformance equation
+  // for each non-minimal conformance. We can then use information to
   // compute conformance access paths, instead of the current "brute force"
   // algorithm used for that purpose.
   llvm::DenseSet<unsigned> redundantConformances;
-  computeGeneratingConformances(redundantConformances);
+  computeMinimalConformances(redundantConformances);
 
   // Second pass: Eliminate all redundant conformance rules.
   performHomotopyReduction(/*redundantConformances=*/&redundantConformances);

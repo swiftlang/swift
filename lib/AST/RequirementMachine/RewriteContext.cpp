@@ -35,7 +35,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
-      .Case("generating-conformances", DebugFlags::GeneratingConformances)
+      .Case("minimal-conformances", DebugFlags::MinimalConformances)
       .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
       .Case("minimization", DebugFlags::Minimization)
       .Default(None);
@@ -61,7 +61,7 @@ RewriteContext::RewriteContext(ASTContext &ctx)
       PropertyTrieHistogram(16, /*Start=*/1),
       PropertyTrieRootHistogram(16),
       ConformanceRulesHistogram(16),
-      GeneratingConformancesHistogram(8, /*Start=*/2) {
+      MinimalConformancesHistogram(8, /*Start=*/2) {
   auto debugFlags = StringRef(ctx.LangOpts.DebugRequirementMachine);
   if (!debugFlags.empty())
     Debug = parseDebugFlags(debugFlags);
@@ -699,6 +699,6 @@ RewriteContext::~RewriteContext() {
     llvm::dbgs() << "\n* Conformance rules:\n";
     ConformanceRulesHistogram.dump(llvm::dbgs());
     llvm::dbgs() << "\n* Generating conformance equations:\n";
-    GeneratingConformancesHistogram.dump(llvm::dbgs());
+    MinimalConformancesHistogram.dump(llvm::dbgs());
   }
 }
