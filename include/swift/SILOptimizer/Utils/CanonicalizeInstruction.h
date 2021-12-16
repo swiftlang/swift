@@ -42,11 +42,16 @@ struct CanonicalizeInstruction {
   const char *debugType = defaultDebugType;
   DeadEndBlocks &deadEndBlocks;
   InstModCallbacks callbacks;
+  bool preserveDebugInfo;
 
   CanonicalizeInstruction(const char *passDebugType,
                           DeadEndBlocks &deadEndBlocks)
       : deadEndBlocks(deadEndBlocks),
         callbacks() {
+
+    preserveDebugInfo = getFunction()->getEffectiveOptimizationMode()
+      <= OptimizationMode::NoOptimization;
+
 #ifndef NDEBUG
     if (llvm::DebugFlag && !llvm::isCurrentDebugType(debugType))
       debugType = passDebugType;
@@ -67,6 +72,9 @@ struct CanonicalizeInstruction {
   virtual ~CanonicalizeInstruction();
 
   const SILFunction *getFunction() const { return deadEndBlocks.getFunction(); }
+
+  // TODO: callbacks should come from the current InstructionDeleter.
+  InstModCallbacks &getCallbacks() { return callbacks; }
 
   /// Rewrite this instruction, based on its operands and uses, into a more
   /// canonical representation.
