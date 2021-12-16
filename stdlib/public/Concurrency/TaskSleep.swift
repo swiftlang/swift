@@ -201,6 +201,11 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This function doesn't block the underlying thread.
   public static func sleep(nanoseconds duration: UInt64) async throws {
+    let clock = ContinuousClock()
+    try await Task.sleep(until: clock.now + .nanoseconds(duration), clock: clock)
+  }
+
+  static func sleep(until seconds: Int64, _ nanoseconds: Int64, tolerance: Duration?, clock: swift_clock_id) async throws {
     // Allocate storage for the storage word.
     let wordPtr = UnsafeMutablePointer<Builtin.Word>.allocate(capacity: 1)
 
@@ -242,8 +247,12 @@ extension Task where Success == Never, Failure == Never {
               let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
                 onSleepWake(wordPtr)
               }
-              _enqueueJobGlobalWithDelay(
-                  duration, Builtin.convertTaskToJob(sleepTask))
+              let toleranceSeconds = tolerance?.seconds ?? 0
+              let toleranceNanoseconds = tolerance?.nanoseconds ?? -1
+              _enqueueJobGlobalWithDeadline(
+                  seconds, nanoseconds, 
+                  toleranceSeconds, toleranceNanoseconds,
+                  clock.rawValue, Builtin.convertTaskToJob(sleepTask))
               return
 
             case .activeContinuation, .finished:
@@ -292,5 +301,9 @@ extension Task where Success == Never, Failure == Never {
       // still running.
       throw error
     }
+  }
+
+  public static func sleep<C: Clock>(until deadine: C.Instant, tolerance: C.Instant.Interval? = nil, clock: C) async throws {
+    try await clock.sleep(until: deadine, tolerance: tolerance)
   }
 }

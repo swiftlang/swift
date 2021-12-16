@@ -215,7 +215,11 @@ set(SWIFTLIB_SOURCES
   CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift
+  DoubleWide.swift
+  Duration.swift
+  DurationProtocol.swift
   FloatingPointRandom.swift
+  Instant.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
