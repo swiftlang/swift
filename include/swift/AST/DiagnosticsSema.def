@@ -3185,6 +3185,7 @@ ERROR(nscopying_doesnt_conform,none,
 #define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
 #define SELECT_APPLICATION_TYPE "select{class|class|type}"
 #define SELECT_APPLICATION_TYPES "select{classes|classes|types}"
+#define SELECT_APPLICATION_MAIN_TYPES "select{() -> Void or () throws -> Void|() -> Void, () throws -> Void, () async -> Void, or () async throws -> Void}"
 
 ERROR(attr_ApplicationMain_not_ApplicationDelegate,none,
       "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
@@ -3204,9 +3205,11 @@ NOTE(attr_ApplicationMain_script_here,none,
      ())
 
 ERROR(attr_MainType_without_main,none,
-      "%0 is annotated with @main and must provide a main static function of type () -> Void or () throws -> Void.",
-      (DeclName))
+      "%0 is annotated with @main and must provide a main static function of type %"
+      SELECT_APPLICATION_MAIN_TYPES "1",
+      (DeclName, bool))
 
+#undef SELECT_APPLICATION_MAIN_TYPES
 #undef SELECT_APPLICATION_MAIN
 #undef SELECT_APPLICATION_DELEGATE
 
