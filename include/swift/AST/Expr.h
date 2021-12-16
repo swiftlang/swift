@@ -3429,9 +3429,12 @@ public:
 class VarargExpansionExpr : public Expr {
   Expr *SubExpr;
 
-public:
   VarargExpansionExpr(Expr *subExpr, bool implicit, Type type = Type())
     : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {}
+
+public:
+  static VarargExpansionExpr *createParamExpansion(ASTContext &ctx, Expr *E);
+  static VarargExpansionExpr *createArrayExpansion(ASTContext &ctx, ArrayExpr *AE);
 
   SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
 
@@ -5823,6 +5826,7 @@ public:
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Pack; }
 };
+
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);

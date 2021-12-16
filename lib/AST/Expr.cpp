@@ -1132,11 +1132,6 @@ VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, 
   return new (ctx) VarargExpansionExpr(AE, /*implicit*/ true, AE->getType());
 }
 
-VarargExpansionExpr *VarargExpansionExpr::createTupleExpansion(ASTContext &ctx, TupleExpr *TE) {
-  assert(TE->getType() && "Expansion must have fully-resolved type!");
-  return new (ctx) VarargExpansionExpr(TE, /*implicit*/ true, TE->getType());
-}
-
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   assert(elements.size() & 1 && "even number of elements in sequence");
   size_t bytes = totalSizeToAlloc<Expr *>(elements.size());

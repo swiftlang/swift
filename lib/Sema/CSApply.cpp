@@ -1144,9 +1144,8 @@ namespace {
             paramRef = new (context) InOutExpr(SourceLoc(), paramRef,
                                                outerParamType, /*implicit=*/true);
           } else if (innerParam->isVariadic()) {
-            paramRef = new (context) VarargExpansionExpr(paramRef,
-                                                         /*implicit=*/ true,
-                                                         outerParamType);
+            assert(outerParamType->isEqual(paramRef->getType()));
+            paramRef = VarargExpansionExpr::createParamExpansion(context, paramRef);
           }
           cs.cacheType(paramRef);
 
@@ -1317,9 +1316,8 @@ namespace {
                                     /*implicit=*/true);
           cs.cacheType(paramRef);
         } else if (param->isVariadic()) {
-          paramRef =
-            new (context) VarargExpansionExpr(paramRef, /*implicit*/ true);
-          paramRef->setType(calleeParamType);
+          assert(calleeParamType->isEqual(paramRef->getType()));
+          paramRef = VarargExpansionExpr::createParamExpansion(context, paramRef);
           cs.cacheType(paramRef);
         }
 
@@ -5717,9 +5715,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       cs.cacheType(arrayExpr);
 
       // Wrap the ArrayExpr in a VarargExpansionExpr.
-      auto *varargExpansionExpr = new (ctx)
-          VarargExpansionExpr(arrayExpr,
-                              /*implicit=*/true, arrayExpr->getType());
+      auto *varargExpansionExpr =
+          VarargExpansionExpr::createArrayExpansion(ctx, arrayExpr);
       cs.cacheType(varargExpansionExpr);
 
       newArgs.push_back(Argument(labelLoc, paramLabel, varargExpansionExpr));
