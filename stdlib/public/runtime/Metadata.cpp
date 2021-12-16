@@ -407,7 +407,8 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
             reinterpret_cast<void **>(&dest[i]),
             reinterpret_cast<void *const *>(&src[i]),
             descriptors[i].Flags.getExtraDiscriminator(),
-            !descriptors[i].Flags.isAsync());
+            !descriptors[i].Flags.isAsync(),
+            /*allowNull*/ false); // Don't allow NULL for Obj-C classes
       }
     }
 
@@ -2649,7 +2650,9 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
             reinterpret_cast<void **>(&dest[i]),
             reinterpret_cast<void *const *>(&src[i]),
             descriptors[i].Flags.getExtraDiscriminator(),
-            !descriptors[i].Flags.isAsync());
+            !descriptors[i].Flags.isAsync(),
+            /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
+                                 // might be proven unused and null'ed)
       }
 #else
       memcpy(dest, src, vtable->VTableSize * sizeof(uintptr_t));
@@ -4706,15 +4709,19 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-    swift_ptrauth_copy_code_or_data(dest, src,
-                                    reqt.Flags.getExtraDiscriminator(),
-                                    !reqt.Flags.isAsync());
+    swift_ptrauth_copy_code_or_data(
+        dest, src, reqt.Flags.getExtraDiscriminator(), !reqt.Flags.isAsync(),
+        /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
+                             // might be proven unused and null'ed)
     return;
 
   // FIXME: these should both use ptrauth_key_process_independent_data now.
   case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
   case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
-    swift_ptrauth_copy(dest, src, reqt.Flags.getExtraDiscriminator());
+    swift_ptrauth_copy(
+        dest, src, reqt.Flags.getExtraDiscriminator(),
+        /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
+                             // might be proven unused and null'ed)
     return;
   }
   swift_unreachable("bad witness kind");
