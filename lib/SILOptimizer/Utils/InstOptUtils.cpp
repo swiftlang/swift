@@ -1792,6 +1792,7 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
+// TODO: this currently fails to notify the pass with notifyNewInstruction.
 void swift::salvageDebugInfo(SILInstruction *I) {
   if (!I)
     return;
@@ -1869,6 +1870,38 @@ void swift::salvageDebugInfo(SILInstruction *I) {
             .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
         }
       }
+  }
+}
+
+// TODO: this currently fails to notify the pass with notifyNewInstruction.
+void swift::createDebugFragments(SILValue oldValue, Projection proj,
+                                 SILValue newValue) {
+  if (proj.getKind() != ProjectionKind::Struct)
+    return;
+
+  for (auto *use : getDebugUses(oldValue)) {
+    auto debugVal = dyn_cast<DebugValueInst>(use->getUser());
+    if (!debugVal)
+      continue;
+
+    // Can't create a fragment of a fragment.
+    auto varInfo = debugVal->getVarInfo();
+    if (!varInfo || varInfo->DIExpr.hasFragment())
+      continue;
+
+    SILType baseType = oldValue->getType();
+
+    // Copy VarInfo and add the corresponding fragment DIExpression.
+    SILDebugVariable newVarInfo = *varInfo;
+    newVarInfo.DIExpr.append(
+        SILDebugInfoExpression::createFragment(proj.getVarDecl(baseType)));
+
+    if (!newVarInfo.Type)
+      newVarInfo.Type = baseType;
+
+    // Create a new debug_value
+    SILBuilder(debugVal, debugVal->getDebugScope())
+        .createDebugValue(debugVal->getLoc(), newValue, newVarInfo);
   }
 }
 
