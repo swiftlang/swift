@@ -11630,6 +11630,22 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
   }
+  case ConversionRestrictionKind::ReifyPackToType: {
+    type1 = simplifyType(type1);
+    auto *PET = type1->castTo<PackType>();
+    if (auto *TT = type2->getAs<TupleType>()) {
+      llvm::SmallVector<TupleTypeElt, 8> elts;
+      for (Type elt : PET->getElementTypes()) {
+        elts.push_back(elt);
+      }
+      Type tupleType1 = TupleType::get(elts, getASTContext());
+      return matchTypes(tupleType1, TT, ConstraintKind::Bind, subflags,
+                        locator);
+    } else {
+      return matchTypes(PET->getElementType(0), type2, ConstraintKind::Bind,
+                        subflags, locator);
+    }
+  }
   }
   
   llvm_unreachable("bad conversion restriction");

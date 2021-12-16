@@ -5718,6 +5718,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       newArgs.push_back(Argument(labelLoc, paramLabel, packExpr));
       continue;
     }
+
+    // Handle plain variadic parameters.
     if (param.isVariadic()) {
       assert(!param.isInOut());
 
@@ -6693,6 +6695,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       finishApply(implicitInit, toType, callLocator, callLocator);
       return implicitInit;
+    }
+    case ConversionRestrictionKind::ReifyPackToType: {
+      auto reifyPack =
+          cs.cacheType(new (ctx) ReifyPackExpr(expr, toType));
+      return coerceToType(reifyPack, toType, locator);
     }
     }
   }

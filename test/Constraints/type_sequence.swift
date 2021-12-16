@@ -88,3 +88,23 @@ func call() {
   _ = multipleSequences(xs: "", ys: "")
   _ = multipleSequences(xs: "", 5.0, ys: 5.0, "")
 }
+
+func contextualTyping() {
+  func firsts<@_typeSequence T>(_ seqs: [T]...) -> (T?...) {
+    fatalError()
+  }
+
+  let (_, _): (Int?, String?) = firsts([42], [""]) // OK
+  let (_, _): (String?, String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '(String?, String?)'}}
+  let (_, _): ([Int], String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '([Int], String?)'}}
+  let (_, _, _): (String?, String?, Int) = firsts([42], [""]) // expected-error {{'(Int?, String?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
+
+  func dependent<@_typeSequence T>(_ seqs: Array<T>...) -> (Array<T>.Element?...) {
+    fatalError()
+  }
+
+  let (_, _): (Int?, String?) = dependent([42], [""]) // OK
+  let (_, _): (String?, String?) = dependent([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '(String?, String?)'}}
+  let (_, _): ([Int], String?) = dependent([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '([Int], String?)'}}
+  let (_, _, _): (String?, String?, Int) = dependent([42], [""]) // expected-error {{'(Int?, String?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
+}
