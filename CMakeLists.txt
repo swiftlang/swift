@@ -1123,7 +1123,7 @@ if(SWIFT_INCLUDE_TOOLS)
   # which is used in add_swift_host_tool for the lldb workaround.
   #
   # NOTE: We do not currently support libswift with the Xcode generator.
-  add_subdirectory(libswift)
+  add_subdirectory(SwiftCompilerSources)
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.

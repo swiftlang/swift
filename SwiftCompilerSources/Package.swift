@@ -11,7 +11,7 @@ let package = Package(
     .library(
       name: "Swift",
       type: .static,
-      targets: ["SIL", "Optimizer"]),
+      targets: ["SIL", "Optimizer", "ExperimentalRegex"]),
   ],
   dependencies: [
   ],
@@ -26,8 +26,15 @@ let package = Package(
           "-cross-module-optimization"
         ])]),
     .target(
+      name: "ExperimentalRegex",
+      dependencies: [],
+      swiftSettings: [SwiftSetting.unsafeFlags([
+          "-I", "../include/swift",
+          "-cross-module-optimization"
+        ])]),
+    .target(
       name: "Optimizer",
-      dependencies: ["SIL"],
+      dependencies: ["SIL", "ExperimentalRegex"],
       swiftSettings: [SwiftSetting.unsafeFlags([
           "-I", "../include/swift",
           "-cross-module-optimization"

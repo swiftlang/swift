@@ -7,7 +7,7 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 # A dummy libswift if libswift is disabled
-add_swift_host_library(libswiftStub OBJECT LibSwiftStubs.cpp)
+add_swift_host_library(libswiftStub OBJECT stubs.cpp)
 
 if (NOT LIBSWIFT_BUILD_MODE)
 
@@ -80,5 +80,6 @@ else()
   else()
     message(FATAL_ERROR "Unknown LIBSWIFT_BUILD_MODE '${LIBSWIFT_BUILD_MODE}'")
   endif()
+
 endif()
 
