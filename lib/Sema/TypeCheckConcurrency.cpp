@@ -781,7 +781,7 @@ bool swift::diagnoseNonSendableTypes(
 
 bool swift::diagnoseNonSendableTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
-    ConcurrentReferenceKind refKind) {
+    SendableCheckReason reason) {
   // For functions, check the parameter and result types.
   SubstitutionMap subs = declRef.getSubstitutions();
   if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
@@ -796,7 +796,9 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (auto func = dyn_cast<FuncDecl>(function)) {
       Type resultType = func->getResultInterfaceType().subst(subs);
       if (diagnoseNonSendableTypes(
-              resultType, fromDC, loc, diag::non_sendable_result_type))
+              resultType, fromDC, loc, diag::non_sendable_result_type,
+              (unsigned)reason, func->getDescriptiveKind(), func->getName(),
+              getActorIsolation(func)))
         return true;
     }
 
@@ -826,7 +828,9 @@ bool swift::diagnoseNonSendableTypesInReference(
     // Check the element type of a subscript.
     Type resultType = subscript->getElementInterfaceType().subst(subs);
     if (diagnoseNonSendableTypes(
-            resultType, fromDC, loc, diag::non_sendable_result_type))
+            resultType, fromDC, loc, diag::non_sendable_result_type,
+            (unsigned)reason, subscript->getDescriptiveKind(),
+            subscript->getName(), getActorIsolation(subscript)))
       return true;
 
     return false;
@@ -1973,12 +1977,11 @@ namespace {
       }
 
       if (result == AsyncMarkingResult::FoundAsync) {
-
         // Check for non-sendable types.
         bool problemFound =
             diagnoseNonSendableTypesInReference(
               concDeclRef, getDeclContext(), declLoc,
-              ConcurrentReferenceKind::SynchronousAsAsyncCall);
+              SendableCheckReason::SynchronousAsAsync);
         if (problemFound)
           result = AsyncMarkingResult::NotSendable;
       }
@@ -2115,7 +2118,9 @@ namespace {
       // Check for sendability of the result type.
       if (diagnoseNonSendableTypes(
              fnType->getResult(), getDeclContext(), apply->getLoc(),
-             diag::non_sendable_result_type))
+             diag::non_sendable_call_result_type,
+             apply->isImplicitlyAsync().hasValue(),
+             *unsatisfiedIsolation))
         return true;
 
       return false;
@@ -2141,7 +2146,7 @@ namespace {
       if (isCrossActor) {
         return diagnoseNonSendableTypesInReference(
             valueRef, getDeclContext(), loc,
-            ConcurrentReferenceKind::CrossActor);
+            SendableCheckReason::CrossActor);
       }
 
       // Call is implicitly asynchronous.
@@ -2482,7 +2487,7 @@ namespace {
 
         return diagnoseNonSendableTypesInReference(
             memberRef, getDeclContext(), memberLoc,
-            ConcurrentReferenceKind::CrossActor);
+            SendableCheckReason::CrossActor);
       }
 
       case ActorIsolationRestriction::ActorSelf: {
