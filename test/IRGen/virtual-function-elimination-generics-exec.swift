@@ -36,7 +36,7 @@ let o: MyClass = MyDerivedClass<Int>()
 o.foo()
 // CHECK: MyDerivedClass<T>.foo, T=Int.Type
 
-// NM-NOT: $s4main14MyDerivedClassC3bar1tyx_tF
-// NM:     $s4main14MyDerivedClassC3foo1tyx_tF
-// NM-NOT: $s4main7MyClassC3bar1tyx_tF
-// NM:     $s4main7MyClassC3foo1tyx_tF
+// NM-NOT: $s4main14MyDerivedClassC3baryyF
+// NM:     $s4main14MyDerivedClassC3fooyyF
+// NM-NOT: $s4main7MyClassC3baryyF
+// NM:     $s4main7MyClassC3fooyyF
