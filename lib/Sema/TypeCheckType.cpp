@@ -623,15 +623,41 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto *decl = unboundType->getDecl();
 
   // Make sure we have the right number of generic arguments.
+  //
+  // For generic types without type sequence parameters, we require
+  // the number of declared generic parameters match the number of
+  // arguments.
+  //
+  // For generic types with type sequence parameters, we only require
+  // that the number of arguments is enough to saturate the number of
+  // regular generic parameters. The type sequence parameter will absorb
+  // any excess parameters, or will have a substitution of `Void` if there
+  // is nothing to bind. This Void-binding behavior of type sequences
+  // also explains the offset of one that isn't otherwise present in
+  // the plain generic parameter case.
+  //
+  // struct Foo<Prefix, T..., Suffix> {}
+  // typealias X = Foo<String, Int, Float, Double> // Prefix -> String, Suffix
+  // -> Double, T... -> (Int, Float) typealias X = Foo<String, Int> // Prefix ->
+  // String, Suffix -> Int, T... -> Void typealias Y = Foo<String> // error: Not
+  // enough arguments to bind Suffix.
+  //
   // FIXME: If we have fewer arguments than we need, that might be okay, if
-  // we're allowed to deduce the remaining arguments from context.
+  // we're allowed to deduce the remaining arguments from context. The
+  // expression checker certainly only cares about the case where too many
+  // arguments are given.
   auto genericArgs = generic->getGenericArgs();
   auto genericParams = decl->getGenericParams();
-  if (genericParams->size() != genericArgs.size()) {
+  auto hasTypeSequence = llvm::any_of(
+      *genericParams, [](const auto *GPT) { return GPT->isTypeSequence(); });
+  if ((!hasTypeSequence && genericArgs.size() != genericParams->size()) ||
+      (hasTypeSequence && genericArgs.size() < genericParams->size() - 1)) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      diags.diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
-                     genericParams->size(), genericArgs.size(),
-                     genericArgs.size() < genericParams->size())
+      diags
+          .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
+                    genericParams->size() - (hasTypeSequence ? 1 : 0),
+                    genericArgs.size(),
+                    genericArgs.size() < genericParams->size(), hasTypeSequence)
           .highlight(generic->getAngleBrackets());
       decl->diagnose(diag::kind_declname_declared_here,
                      DescriptiveDeclKind::GenericType, decl->getName());
@@ -728,8 +754,15 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 Type TypeResolution::applyUnboundGenericArguments(
     GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
     ArrayRef<Type> genericArgs) const {
-  assert(genericArgs.size() == decl->getGenericParams()->size() &&
-         "invalid arguments, use applyGenericArguments for diagnostic emitting");
+  const bool hasTypeSequence =
+      llvm::any_of(*decl->getGenericParams(),
+                   [](const auto *GPT) { return GPT->isTypeSequence(); });
+  assert(
+      ((!hasTypeSequence &&
+        genericArgs.size() == decl->getGenericParams()->size()) ||
+       (hasTypeSequence &&
+        genericArgs.size() >= decl->getGenericParams()->size() - 1)) &&
+      "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   auto genericSig = decl->getGenericSignature();
   assert(!genericSig.isNull());
@@ -777,16 +810,62 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // Realize the types of the generic arguments and add them to the
   // substitution map.
-  for (const unsigned i : indices(genericArgs)) {
-    auto origTy = genericSig.getInnermostGenericParams()[i];
-    auto substTy = genericArgs[i];
+  auto innerParams = genericSig.getInnermostGenericParams();
+  for (unsigned i = 0; i < innerParams.size(); ++i) {
+    auto origTy = innerParams[i];
+    auto origGP = origTy->getCanonicalType()->castTo<GenericTypeParamType>();
 
-    // Enter a substitution.
-    subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
-      substTy;
+    if (!origGP->isTypeSequence()) {
+      auto substTy = genericArgs[i];
 
-    skipRequirementsCheck |=
-        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+      // Enter a substitution.
+      subs[origGP] = substTy;
+
+      skipRequirementsCheck |=
+          substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+
+      continue;
+    }
+
+    // Scan backwards to find the bounds of the longest run of
+    // types we can bind to this type sequence parameter.
+    unsigned tail;
+    for (tail = 1; tail <= innerParams.size(); ++tail) {
+      auto tailTy = innerParams[innerParams.size() - tail];
+      auto tailGP = tailTy->getCanonicalType()->castTo<GenericTypeParamType>();
+      if (tailGP->isTypeSequence()) {
+        assert(tailGP->isEqual(origGP) &&
+               "Found multiple type sequence parameters!");
+
+        // Saturate the type sequence. Take care that if the prefix and suffix
+        // have bound all available arguments that we bind the type sequence
+        // parameter to `Void`.
+        const size_t sequenceLength = tail + i <= genericArgs.size()
+                                          ? genericArgs.size() - tail - i + 1
+                                          : 0;
+
+        auto substTy = PackType::get(getASTContext(),
+                                     genericArgs.slice(i, sequenceLength));
+
+        // Enter a substitution.
+        subs[origGP] = substTy;
+
+        skipRequirementsCheck |=
+            substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+
+        break;
+      }
+
+      auto substTy = genericArgs[genericArgs.size() - tail];
+
+      // Enter a substitution.
+      subs[tailGP] = substTy;
+
+      skipRequirementsCheck |=
+          substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+    }
+
+    break;
   }
 
   // Check the generic arguments against the requirements of the declaration's
