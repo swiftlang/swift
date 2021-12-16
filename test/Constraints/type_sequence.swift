@@ -2,7 +2,7 @@
 
 struct TupleStruct<First, @_typeSequence Rest> {
   var first: First
-  var rest: Rest
+  var rest: (Rest...)
 }
 
 func debugPrint<@_typeSequence T>(_ items: T...)
@@ -24,3 +24,4 @@ func min<@_typeSequence T: Comparable>(_ values: T...) -> T? {
 }
 
 func badParameter<T>(_ : @_typeSequence T) {} // expected-error {{attribute does not apply to type}}
+
