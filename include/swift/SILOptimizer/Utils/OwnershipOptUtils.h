@@ -345,23 +345,17 @@ struct LoadOperation {
 
   explicit operator bool() const { return !value.isNull(); }
 
-  SingleValueInstruction *operator*() const {
+  SingleValueInstruction *getLoadInst() const {
     if (value.is<LoadInst *>())
       return value.get<LoadInst *>();
     return value.get<LoadBorrowInst *>();
   }
 
-  const SingleValueInstruction *operator->() const {
-    if (value.is<LoadInst *>())
-      return value.get<LoadInst *>();
-    return value.get<LoadBorrowInst *>();
-  }
+  SingleValueInstruction *operator*() const { return getLoadInst(); }
 
-  SingleValueInstruction *operator->() {
-    if (value.is<LoadInst *>())
-      return value.get<LoadInst *>();
-    return value.get<LoadBorrowInst *>();
-  }
+  const SingleValueInstruction *operator->() const { return getLoadInst(); }
+
+  SingleValueInstruction *operator->() { return getLoadInst(); }
 
   SILValue getOperand() const {
     if (value.is<LoadInst *>())
