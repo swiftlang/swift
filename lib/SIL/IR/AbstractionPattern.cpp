@@ -1649,8 +1649,8 @@ public:
       newGPMapping.insert({gp, newParamTy});
       auto substGPTy = Type(gp).subst(substGPMap)->castTo<GenericTypeParamType>();
       substRequirements.push_back(Requirement(RequirementKind::SameType,
-                                              substGPTy,
-                                              newParamTy));
+                                              newParamTy,
+                                              substGPTy));
       assert(!substReplacementTypes[substGPTy->getIndex()]);
       substReplacementTypes[substGPTy->getIndex()] = substParamTy;
     }
