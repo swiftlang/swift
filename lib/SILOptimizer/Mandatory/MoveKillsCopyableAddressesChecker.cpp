@@ -180,6 +180,14 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SmallBitVector &bv) {
 }
 } // namespace llvm
 
+static SourceLoc getSourceLocFromValue(SILValue value) {
+  if (auto *defInst = value->getDefiningInstruction())
+    return defInst->getLoc().getSourceLoc();
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+    return arg->getDecl()->getLoc();
+  llvm_unreachable("Do not know how to get source loc for value?!");
+}
+
 //===----------------------------------------------------------------------===//
 //                               Use Gathering
 //===----------------------------------------------------------------------===//
@@ -504,14 +512,6 @@ struct MoveKillsCopyableAddressesObjectChecker {
 };
 
 } // namespace
-
-static SourceLoc getSourceLocFromValue(SILValue value) {
-  if (auto *defInst = value->getDefiningInstruction())
-    return defInst->getLoc().getSourceLoc();
-  if (auto *arg = dyn_cast<SILFunctionArgument>(value))
-    return arg->getDecl()->getLoc();
-  llvm_unreachable("Do not know how to get source loc for value?!");
-}
 
 // Returns true if we emitted a diagnostic and handled the single block
 // case. Returns false if we visited all of the uses and seeded the UseState
