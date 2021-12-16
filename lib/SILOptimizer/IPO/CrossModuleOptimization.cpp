@@ -55,11 +55,16 @@ class CrossModuleOptimization {
 
   SILModule &M;
   
+  /// True, if CMO runs by default.
+  /// In this case, serialization decisions are made very conservatively to
+  /// avoid code size increase.
+  bool conservative;
+
   typedef llvm::DenseMap<SILFunction *, bool> FunctionFlags;
 
 public:
-  CrossModuleOptimization(SILModule &M)
-    : M(M) { }
+  CrossModuleOptimization(SILModule &M, bool conservative)
+    : M(M), conservative(conservative) { }
 
   void serializeFunctionsInModule();
 
@@ -255,6 +260,12 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     if (!canUseFromInline(callee))
       return false;
   
+    // In conservative mode we don't want to turn non-public functions into
+    // public functions, because that can increase code size. E.g. if the
+    // function is completely inlined afterwards.
+    if (conservative && callee->getLinkage() != SILLinkage::Public)
+      return false;
+
     return true;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(inst)) {
@@ -272,6 +283,13 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
     return !MI->getMember().isForeign;
+  }
+  if (auto *REAI = dyn_cast<RefElementAddrInst>(inst)) {
+    // In conservative mode, we don't support class field accesse of non-public
+    // properties, because that would require to make the field decl public -
+    // which keeps more metadata alive.
+    return !conservative ||
+           REAI->getField()->getEffectiveAccess() >= AccessLevel::Public;
   }
   return true;
 }
@@ -297,6 +315,10 @@ bool CrossModuleOptimization::canSerializeType(SILType type) {
     [this](Type rawSubType) {
       CanType subType = rawSubType->getCanonicalType();
       if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
+      
+        if (conservative && subNT->getEffectiveAccess() < AccessLevel::Public) {
+          return true;
+        }
       
         // Exclude types which are defined in an @_implementationOnly imported
         // module. Such modules are not transitively available.
@@ -348,13 +370,15 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
   if (SerializeEverything)
     return true;
 
-  // The basic heursitic: serialize all generic functions, because it makes a
-  // huge difference if generic functions can be specialized or not.
-  if (function->getLoweredFunctionType()->isPolymorphic())
-    return true;
+  if (!conservative) {
+    // The basic heursitic: serialize all generic functions, because it makes a
+    // huge difference if generic functions can be specialized or not.
+    if (function->getLoweredFunctionType()->isPolymorphic())
+      return true;
 
-  if (function->getLinkage() == SILLinkage::Shared)
-    return true;
+    if (function->getLinkage() == SILLinkage::Shared)
+      return true;
+  }
 
   // Also serialize "small" non-generic functions.
   int size = 0;
@@ -401,8 +425,27 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     if (!callee->isDefinition() || callee->isAvailableExternally())
       return;
     if (canUseFromInline(callee)) {
-      // Make the function 'public'.
-      makeFunctionUsableFromInline(callee);
+      if (conservative) {
+        // In conservative mode, avoid making non-public functions public,
+        // because that can increase code size.
+        if (callee->getLinkage() == SILLinkage::Private ||
+            callee->getLinkage() == SILLinkage::Hidden) {
+          if (callee->getEffectiveSymbolLinkage() == SILLinkage::Public) {
+            // It's a internal/private class method. There is no harm in making
+            // it public, because it gets public symbol linkage anyway.
+            makeFunctionUsableFromInline(callee);
+          } else {
+            // Treat the function like a 'shared' function, e.g. like a
+            // specialization. This is better for code size than to make it
+            // public, because in conservative mode we are only do this for very
+            // small functions.
+            callee->setLinkage(SILLinkage::Shared);
+          }
+        }
+      } else {
+        // Make the function 'public'.
+        makeFunctionUsableFromInline(callee);
+      }
     }
     serializeFunction(callee, canSerializeFlags);
     assert(callee->isSerialized() == IsSerialized ||
@@ -531,10 +574,9 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
       return;
     if (!M.isWholeModule())
       return;
-    if (!M.getOptions().CrossModuleOptimization)
-      return;
 
-    CrossModuleOptimization CMO(M);
+    CrossModuleOptimization CMO(M,
+      /*conservative*/ !M.getOptions().CrossModuleOptimization);
     CMO.serializeFunctionsInModule();
   }
 };
