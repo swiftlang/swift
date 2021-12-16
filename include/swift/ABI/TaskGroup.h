@@ -42,6 +42,10 @@ public:
 
   /// Checks the cancellation status of the group.
   bool isCancelled();
+
+  // Add a child task to the group. Always called with the status record lock of
+  // the parent task held
+  void addChildTask(AsyncTask *task);
 };
 
 } // end namespace swift
