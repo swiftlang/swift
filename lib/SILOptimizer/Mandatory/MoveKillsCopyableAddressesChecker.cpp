@@ -485,7 +485,6 @@ struct MoveKillsCopyableAddressesObjectChecker {
   SmallSetVector<SILValue, 32> addressesToCheck;
   SILFunction *fn;
   UseState useState;
-  GatherLexicalLifetimeUseVisitor visitor;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> useBlocks;
   llvm::DenseSet<SILBasicBlock *> initBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> destroyBlocks;
@@ -493,7 +492,7 @@ struct MoveKillsCopyableAddressesObjectChecker {
   SmallVector<MarkUnresolvedMoveAddrInst *, 8> markMovesToDataflow;
 
   MoveKillsCopyableAddressesObjectChecker(SILFunction *fn)
-      : fn(fn), useState(), visitor(useState) {}
+      : fn(fn), useState() {}
   bool performSingleBasicBlockAnalysisForAllMarkMoves(SILValue address);
   bool performGlobalDataflow(SILValue address);
 
@@ -880,6 +879,7 @@ bool MoveKillsCopyableAddressesObjectChecker::check() {
     if (!accessPath.isValid())
       continue;
 
+    GatherLexicalLifetimeUseVisitor visitor(useState);
     SWIFT_DEFER { visitor.clear(); };
     visitor.reset(address);
     if (!visitAccessPathUses(visitor, accessPath, fn))
