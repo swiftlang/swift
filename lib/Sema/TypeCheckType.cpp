@@ -3559,12 +3559,31 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     elementOptions = elementOptions.withoutContext(true);
   }
 
-  // Variadic tuples are not permitted.
   bool complained = false;
   if (repr->hasEllipsis()) {
-    diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
-    repr->removeEllipsis();
-    complained = true;
+    if (repr->getNumElements() == 1 && !repr->hasElementNames()) {
+      // This is probably a pack expansion. Try to resolve the pattern type.
+      auto patternTy = resolveType(repr->getElementType(0), elementOptions);
+      if (patternTy->hasError())
+        complained = true;
+
+      // If there's no reference to a variadic generic parameter, complain
+      // - the pack won't actually expand to anything meaningful.
+      if (!patternTy->hasTypeSequence())
+        diagnose(repr->getLoc(), diag::expansion_not_variadic, patternTy)
+          .highlight(repr->getParens());
+
+      return PackExpansionType::get(patternTy);
+    } else {
+      // Variadic tuples are not permitted.
+      //
+      // FIXME: We could probably make this work.
+      // (T, U, V...) is a reasonable pack expansion to support with a kind of
+      // "guaranteed bound" of at least two elements.
+      diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
+      repr->removeEllipsis();
+      complained = true;
+    }
   }
 
   bool hadError = false;
