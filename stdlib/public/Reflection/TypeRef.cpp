@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_ENABLE_REFLECTION
+
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Reflection/TypeRef.h"
@@ -1478,3 +1480,5 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
   // exactly.
   return (OrigTR == SubstTR);
 }
+
+#endif

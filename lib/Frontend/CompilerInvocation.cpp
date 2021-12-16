@@ -843,6 +843,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.DisableSubstSILFunctionTypes =
+      Args.hasArg(OPT_disable_subst_sil_function_types);
+
   if (auto A = Args.getLastArg(OPT_requirement_machine_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
         .Case("off", RequirementMachineMode::Disabled)
