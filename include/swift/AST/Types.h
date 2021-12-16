@@ -6283,21 +6283,22 @@ inline ASTContext &TypeBase::getASTContext() {
 }
 
 inline bool TypeBase::isTypeVariableOrMember() {
-  if (is<TypeVariableType>())
-    return true;
+  Type t(this);
 
-  if (auto depMemTy = getAs<DependentMemberType>())
-    return depMemTy->getBase()->isTypeVariableOrMember();
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
 
-  return false;
+  return t->is<TypeVariableType>();
 }
 
 inline bool TypeBase::isTypeParameter() {
-  if (is<GenericTypeParamType>())
-    return true;
+  Type t(this);
 
-  if (auto depMemTy = getAs<DependentMemberType>())
-    return depMemTy->getBase()->isTypeParameter();
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
+
+  return t->is<GenericTypeParamType>();
+}
 
   return false;
 }
