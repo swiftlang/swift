@@ -106,6 +106,17 @@ public:
     return referenceCount == 1;
   }
 
+  /// This queue is being re-used with new construction arguments.
+  /// Update it appropriately.
+  void updateForNewArguments() {
+    // We intentionally take no arguments so that only calls to
+    // createQueue with no arguments will succeed at calling this no-op
+    // implementation.  Queue types with construction arguments
+    // will need to implement this method to take the appropriate
+    // arguments.  Hopefully this discourages people from forgetting
+    // that queues can be re-used if created in a loop.
+  }
+
   /// An RAII helper class for signalling that the current thread is a
   /// worker thread which has acquired the lock.
   ///
@@ -195,14 +206,18 @@ public:
     ///
     /// The Worker object takes ownership of the queue until it's
     /// published, so you can safely call this even if publishing
-    /// might fail.  Note that the same queue will be returned on
-    /// successive invocations, so take care if the arguments might
-    /// change during the loop.
+    /// might fail.
+    ///
+    /// Note that the same queue will be returned on successive
+    /// invocations.  Queues that accept arguments for construction
+    /// should implement `updateForNewArguments`.
     template <class... Args>
     Impl *createQueue(Args &&...args) {
       assert(!Published);
       if (!CurrentQueue)
         CurrentQueue = asImpl().createNewQueue(std::forward<Args>(args)...);
+      else
+        CurrentQueue->updateForNewArguments(std::forward<Args>(args)...);
       return CurrentQueue;
     }
 
