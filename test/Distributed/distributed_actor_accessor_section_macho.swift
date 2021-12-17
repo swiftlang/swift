@@ -89,43 +89,43 @@ public distributed actor MyOtherActor {
 /// -> `MyActor.simple1`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTEHF" = private constant
 // CHECK-SAME: @"symbolic Si___________pIetMHygzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETFTu" to i64)
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.simple2`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTEHF" = private constant
 // CHECK-SAME: @"symbolic Si_____SS______pIetMHygozo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFTu" to i64)
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.simple3`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTEHF" = private constant
 // CHECK-SAME: @"symbolic SS_____Si______pIetMHggdzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETFTu" to i64)
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.single_case_enum`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTEHF" = private constant
 // CHECK-SAME: @"symbolic __________AA______pIetMHygdzo_ 27distributed_actor_accessors7SimpleEO AA7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTETFTu" to i64)
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.with_indirect_enums`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTEHF" = private constant
 // CHECK-SAME: @"symbolic _____Si_____AA______pIetMHgygozo_ 27distributed_actor_accessors9IndirectEO AA7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTETFTu" to i64)
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyActor.complex`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTEHF" = private constant
 // CHECK-SAME: @"symbolic SaySiG_____SSSg__________AD______pIetMHgggngrzo_ 27distributed_actor_accessors3ObjC AA11LargeStructV AA7MyActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTETFTu" to i64)
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 /// -> `MyOtherActor.empty`
 // CHECK:      @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTEHF" = private constant
 // CHECK-SAME: @"symbolic ___________pIetMHgzo_ 27distributed_actor_accessors12MyOtherActorC s5ErrorP"
-// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETFTu" to i64)
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
 
 // CHECK:      @llvm.used = appending global [{{.*}} x i8*] [
