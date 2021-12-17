@@ -13,6 +13,9 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import StdlibUnittest
 
 // We build this code against a version of 'resil' where
