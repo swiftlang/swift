@@ -201,9 +201,9 @@ bool ShrinkBorrowScope::run() {
 }
 
 bool ShrinkBorrowScope::populateUsers() {
-  SmallVector<Operand *, 16> usePoints;
-  if (!findInnerTransitiveGuaranteedUsesOfBorrowedValue(
-          BorrowedValue(introducer), &usePoints)) {
+  SmallVector<Operand *, 16> uses;
+  if (!findExtendedUsesOfSimpleBorrowedValue(BorrowedValue(introducer),
+                                             &uses)) {
     // If the value produced by begin_borrow escapes, don't shrink the borrow
     // scope.
     return false;
