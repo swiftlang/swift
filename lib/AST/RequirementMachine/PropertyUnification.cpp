@@ -503,6 +503,18 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     auto *proto = conformsTo[i];
     unsigned conformanceRuleID = conformsToRules[i];
 
+    // If we've already processed this pair of rules, record the conformance
+    // and move on.
+    //
+    // This occurs when a pair of rules are inherited from the property map
+    // entry for this key's suffix.
+    auto pair = std::make_pair(concreteRuleID, conformanceRuleID);
+    auto found = ConcreteConformances.find(pair);
+    if (found != ConcreteConformances.end()) {
+      conformances.push_back(found->second);
+      continue;
+    }
+
     // FIXME: Either remove the ModuleDecl entirely from conformance lookup,
     // or pass the correct one down in here.
     auto *module = proto->getParentModule();
@@ -539,19 +551,16 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // opaque result type?
     assert(!conformance.isAbstract());
 
+    // Save this conformance for later.
     auto *concrete = conformance.getConcrete();
+    auto inserted = ConcreteConformances.insert(
+        std::make_pair(pair, concrete));
+    assert(inserted.second);
+    (void) inserted;
 
     // Record the conformance for use by
     // PropertyBag::getConformsToExcludingSuperclassConformances().
     conformances.push_back(concrete);
-
-    // All subsequent logic just records new rewrite rules, and can be
-    // skipped if we've already processed this pair of rules.
-    if (!ConcreteConformanceRules.insert(
-        std::make_pair(concreteRuleID, conformanceRuleID)).second) {
-      // We've already processed this pair of rules.
-      continue;
-    }
 
     auto concreteConformanceSymbol = Symbol::forConcreteConformance(
         concreteType, substitutions, proto, Context);
@@ -627,48 +636,53 @@ void PropertyMap::concretizeTypeWitnessInConformance(
   }
 }
 
-RewriteSystem::ConcreteTypeWitness::ConcreteTypeWitness(
-    Symbol concreteConformance,
-    Symbol assocType,
-    Symbol concreteType)
-  : ConcreteConformance(concreteConformance),
-    AssocType(assocType),
-    ConcreteType(concreteType) {
-  assert(concreteConformance.getKind() == Symbol::Kind::ConcreteConformance);
-  assert(assocType.getKind() == Symbol::Kind::AssociatedType);
-  assert(concreteType.getKind() == Symbol::Kind::ConcreteType);
-  assert(assocType.getProtocols().size() == 1);
-  assert(assocType.getProtocols()[0] == concreteConformance.getProtocol());
+RewriteSystem::TypeWitness::TypeWitness(
+    Term lhs, llvm::PointerUnion<Symbol, Term> rhs)
+  : LHS(lhs), RHS(rhs) {
+  assert(LHS.size() >= 2);
+  assert(getConcreteConformance().getKind() ==
+         Symbol::Kind::ConcreteConformance);
+  assert(getAssocType().getKind() == Symbol::Kind::AssociatedType);
+  if (RHS.is<Symbol>())
+    assert(RHS.get<Symbol>().getKind() == Symbol::Kind::ConcreteType);
+  assert(getAssocType().getProtocols().size() == 1);
+  assert(getAssocType().getProtocols()[0] ==
+         getConcreteConformance().getProtocol());
 }
 
 bool swift::rewriting::operator==(
-    const RewriteSystem::ConcreteTypeWitness &lhs,
-    const RewriteSystem::ConcreteTypeWitness &rhs) {
-  return (lhs.ConcreteConformance == rhs.ConcreteConformance &&
-          lhs.AssocType == rhs.AssocType &&
-          lhs.ConcreteType == rhs.ConcreteType);
+    const RewriteSystem::TypeWitness &lhs,
+    const RewriteSystem::TypeWitness &rhs) {
+  return (lhs.LHS == rhs.LHS &&
+          lhs.RHS == rhs.RHS);
 }
 
-unsigned RewriteSystem::recordConcreteTypeWitness(
-    RewriteSystem::ConcreteTypeWitness witness) {
-  auto key = std::make_pair(witness.ConcreteConformance,
-                            witness.AssocType);
-  unsigned index = ConcreteTypeWitnesses.size();
-  auto inserted = ConcreteTypeWitnessMap.insert(std::make_pair(key, index));
+void RewriteSystem::TypeWitness::dump(llvm::raw_ostream &out) const {
+  out << "Subject type: " << LHS << "\n";
+  if (RHS.is<Symbol>())
+    out << "Concrete type witness: " << RHS.get<Symbol>() << "\n";
+  else
+    out << "Abstract type witness: " << RHS.get<Term>() << "\n";
+}
+
+unsigned RewriteSystem::recordTypeWitness(
+    RewriteSystem::TypeWitness witness) {
+  unsigned index = TypeWitnesses.size();
+  auto inserted = TypeWitnessMap.insert(std::make_pair(witness.LHS, index));
 
   if (!inserted.second) {
     index = inserted.first->second;
   } else {
-    ConcreteTypeWitnesses.push_back(witness);
+    TypeWitnesses.push_back(witness);
   }
 
-  assert(ConcreteTypeWitnesses[index] == witness);
+  assert(TypeWitnesses[index] == witness);
   return index;
 }
 
-const RewriteSystem::ConcreteTypeWitness &
-RewriteSystem::getConcreteTypeWitness(unsigned index) const {
-  return ConcreteTypeWitnesses[index];
+const RewriteSystem::TypeWitness &
+RewriteSystem::getTypeWitness(unsigned index) const {
+  return TypeWitnesses[index];
 }
 
 /// Given the key of a property bag known to have \p concreteType,
@@ -713,8 +727,15 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     //
     // Where S[n] is the nth substitution term.
 
-    // FIXME: Record a rewrite path.
-    return Context.getRelativeTermForType(typeWitness, substitutions);
+    auto result = Context.getRelativeTermForType(typeWitness, substitutions);
+
+    RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
+                                       Term::get(result, Context));
+    unsigned witnessID = System.recordTypeWitness(witness);
+    path.add(RewriteStep::forAbstractTypeWitness(
+        witnessID, /*inverse=*/false));
+
+    return result;
   }
 
   // Otherwise the type witness is concrete, but may contain type
@@ -727,15 +748,15 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
                                       Context, result);
   auto typeWitnessSymbol =
       Symbol::forConcreteType(typeWitnessSchema, result, Context);
-  System.simplifySubstitutions(typeWitnessSymbol);
 
-  auto concreteConformanceSymbol = *(subjectType.end() - 2);
-  auto assocTypeSymbol = *(subjectType.end() - 1);
+  RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
+                                     typeWitnessSymbol);
+  unsigned witnessID = System.recordTypeWitness(witness);
 
-  RewriteSystem::ConcreteTypeWitness witness(concreteConformanceSymbol,
-                                             assocTypeSymbol,
-                                             typeWitnessSymbol);
-  unsigned witnessID = System.recordConcreteTypeWitness(witness);
+  // Simplify the substitution terms in the type witness symbol.
+  RewritePath substPath;
+  System.simplifySubstitutions(typeWitnessSymbol, &substPath);
+  substPath.invert();
 
   // If it is equal to the parent type, introduce a same-type requirement
   // between the two parameters.
@@ -749,12 +770,20 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
       llvm::dbgs() << "^^ Type witness is the same as the concrete type\n";
     }
 
-    // Add a rule T.[concrete: C : P].[P:X] => T.[concrete: C : P].
+    // Add a rule T.[concrete: C : P] => T.[concrete: C : P].[P:X].
     MutableTerm result(key);
-    result.add(concreteConformanceSymbol);
+    result.add(witness.getConcreteConformance());
 
+    // ([concrete: C : P] => [concrete: C : P].[P:X].[concrete: C])
     path.add(RewriteStep::forSameTypeWitness(
         witnessID, /*inverse=*/true));
+
+    // [concrete: C : P].[P:X].([concrete: C] => [concrete: C.X])
+    path.append(substPath);
+
+    // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
+    path.add(RewriteStep::forConcreteTypeWitness(
+        witnessID, /*inverse=*/false));
 
     return result;
   }
@@ -786,10 +815,16 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   //
   // Add a rule:
   //
-  // T.[concrete: C : P].[P:X].[concrete: C.X] => T.[concrete: C : P].[P:X].
+  // T.[concrete: C : P].[P:X].[concrete: C.X'] => T.[concrete: C : P].[P:X].
+  //
+  // Where C.X' is the canonical form of C.X.
   MutableTerm constraintType = subjectType;
   constraintType.add(typeWitnessSymbol);
 
+  // T.[concrete: C : P].[P:X].([concrete: C.X'] => [concrete: C.X])
+  path.append(substPath);
+
+  // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
   path.add(RewriteStep::forConcreteTypeWitness(
       witnessID, /*inverse=*/false));
 
