@@ -1379,10 +1379,14 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
     // may have serialized hand-crafted SIL definitions that are invisible to
     // TBDGen as it is an AST-only traversal.
     if (auto *mod = MSF.dyn_cast<ModuleDecl *>()) {
-      return llvm::none_of(mod->getFiles(), [](const FileUnit *File) -> bool {
+      bool hasSIB = llvm::any_of(mod->getFiles(), [](const FileUnit *File) -> bool {
         auto SASTF = dyn_cast<SerializedASTFile>(File);
         return SASTF && SASTF->isSIB();
       });
+
+      if (hasSIB) {
+        return false;
+      }
     }
 
     // "Default" mode's behavior varies if using a debug compiler.
