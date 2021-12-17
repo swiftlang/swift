@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-emit-sil -parse-stdlib %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
-// RUN: %target-swift-emit-ir -parse-stdlib %s
+// RUN: %target-swift-emit-sil -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
+// RUN: %target-swift-emit-ir -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s
 
 // This test includes some calls to transparent stdlib functions.
 // We pattern match for the absence of access markers in the inlined code.
