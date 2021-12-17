@@ -6,6 +6,8 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// REQUIRES: CPU=x86_64
+
 import _Distributed
 import FakeDistributedActorSystems
 
