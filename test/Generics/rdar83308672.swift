@@ -32,25 +32,25 @@ protocol B {
 // we can drop one requirement but not both.
 
 // CHECK: rdar83308672.(file).G1@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T : B>
+// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T.X == Self.T.Y>
 protocol G1 {
   associatedtype T : A where T.X == T.Y
 }
 
 // CHECK: rdar83308672.(file).G2@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T : B>
+// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T.X == Self.T.Y>
 protocol G2 {
   associatedtype T : A where T : B, T.X == T.Y
 }
 
 // CHECK: rdar83308672.(file).G3@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T : B>
+// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T.X == Self.T.Y>
 protocol G3 {
   associatedtype T : A where T.X == T.Y, T : B
 }
 
 // CHECK: rdar83308672.(file).G4@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T : B>
+// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T.X == Self.T.Y>
 protocol G4 {
   associatedtype T : A where T : B
 }

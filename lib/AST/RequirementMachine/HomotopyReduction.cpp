@@ -335,57 +335,6 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
   return true;
 }
 
-/// Check if a rewrite rule is a candidate for deletion in this pass of the
-/// minimization algorithm.
-bool RewriteSystem::
-isCandidateForDeletion(unsigned ruleID,
-                       const llvm::DenseSet<unsigned> *redundantConformances) const {
-  const auto &rule = getRule(ruleID);
-
-  // We should not find a rule that has already been marked redundant
-  // here; it should have already been replaced with a rewrite path
-  // in all homotopy generators.
-  assert(!rule.isRedundant());
-
-  // Associated type introduction rules are 'permanent'. They're
-  // not worth eliminating since they are re-added every time; it
-  // is better to find other candidates to eliminate in the same
-  // loop instead.
-  if (rule.isPermanent())
-    return false;
-
-  // Other rules involving unresolved name symbols are derived from an
-  // associated type introduction rule together with a conformance rule.
-  // They are eliminated in the first pass.
-  if (rule.getLHS().containsUnresolvedSymbols())
-    return true;
-
-  // Protocol conformance rules are eliminated via a different
-  // algorithm which computes "minimal conformances". This runs between
-  // two passes of homotopy reduction.
-  //
-  // The first pass skips protocol conformance rules.
-  //
-  // The second pass eliminates any protocol conformance rule which is
-  // redundant according to both homotopy reduction and the minimal
-  // conformances algorithm.
-  //
-  // Later on, we verify that any conformance redundant via minimal
-  // conformances was also redundant via homotopy reduction. This
-  // means that the set of minimal conformances is always a superset
-  // (or equal to) of the set of minimal protocol conformance
-  // requirements that homotopy reduction alone would produce.
-  if (rule.isAnyConformanceRule()) {
-    if (!redundantConformances)
-      return false;
-
-    if (!redundantConformances->count(ruleID))
-      return false;
-  }
-
-  return true;
-}
-
 /// Find a rule to delete by looking through all loops for rewrite rules appearing
 /// once in empty context. Returns a redundant rule to delete if one was found,
 /// otherwise returns None.
@@ -401,7 +350,7 @@ isCandidateForDeletion(unsigned ruleID,
 /// \p redundantConformances equal to the set of conformance rules that are
 ///    not minimal conformances.
 Optional<unsigned> RewriteSystem::
-findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
+findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
                  RewritePath &replacementPath) {
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
   for (unsigned loopID : indices(Loops)) {
@@ -423,7 +372,21 @@ findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
 
   for (const auto &pair : redundancyCandidates) {
     unsigned ruleID = pair.second;
-    if (!isCandidateForDeletion(ruleID, redundantConformances))
+    const auto &rule = getRule(ruleID);
+
+    // We should not find a rule that has already been marked redundant
+    // here; it should have already been replaced with a rewrite path
+    // in all homotopy generators.
+    assert(!rule.isRedundant());
+
+    // Associated type introduction rules are 'permanent'. They're
+    // not worth eliminating since they are re-added every time; it
+    // is better to find other candidates to eliminate in the same
+    // loop instead.
+    if (rule.isPermanent())
+      continue;
+
+    if (!isRedundantRuleFn(ruleID))
       continue;
 
     if (!found) {
@@ -431,7 +394,6 @@ findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
       continue;
     }
 
-    const auto &rule = getRule(ruleID);
     const auto &otherRule = getRule(found->second);
 
     // Prefer to delete "less canonical" rules.
@@ -495,10 +457,10 @@ void RewriteSystem::deleteRule(unsigned ruleID,
 }
 
 void RewriteSystem::performHomotopyReduction(
-    const llvm::DenseSet<unsigned> *redundantConformances) {
+    llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
   while (true) {
     RewritePath replacementPath;
-    auto optRuleID = findRuleToDelete(redundantConformances,
+    auto optRuleID = findRuleToDelete(isRedundantRuleFn,
                                       replacementPath);
 
     // If no redundant rules remain which can be eliminated by this pass, stop.
@@ -524,8 +486,24 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   propagateExplicitBits();
 
-  // First pass: Eliminate all redundant rules that are not conformance rules.
-  performHomotopyReduction(/*redundantConformances=*/nullptr);
+  // First pass:
+  // - Eliminate all simplified non-conformance rules.
+  // - Eliminate all rules with unresolved symbols.
+  performHomotopyReduction([&](unsigned ruleID) -> bool {
+    const auto &rule = getRule(ruleID);
+
+    if (rule.isSimplified() &&
+        !rule.isAnyConformanceRule())
+      return true;
+
+    // Other rules involving unresolved name symbols are derived from an
+    // associated type introduction rule together with a conformance rule.
+    // They are eliminated in the first pass.
+    if (rule.getLHS().containsUnresolvedSymbols())
+      return true;
+
+    return false;
+  });
 
   // Now compute a set of minimal conformances.
   //
@@ -537,8 +515,26 @@ void RewriteSystem::minimizeRewriteSystem() {
   llvm::DenseSet<unsigned> redundantConformances;
   computeMinimalConformances(redundantConformances);
 
-  // Second pass: Eliminate all redundant conformance rules.
-  performHomotopyReduction(/*redundantConformances=*/&redundantConformances);
+  // Second pass: Eliminate all non-minimal conformance rules.
+  performHomotopyReduction([&](unsigned ruleID) -> bool {
+    const auto &rule = getRule(ruleID);
+
+    if (rule.isAnyConformanceRule() &&
+        redundantConformances.count(ruleID))
+      return true;
+
+    return false;
+  });
+
+  // Third pass: Eliminate all other redundant non-conformance rules.
+  performHomotopyReduction([&](unsigned ruleID) -> bool {
+    const auto &rule = getRule(ruleID);
+
+    if (!rule.isAnyConformanceRule())
+      return true;
+
+    return false;
+  });
 
   // Check invariants after homotopy reduction.
   verifyRewriteLoops();

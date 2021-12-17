@@ -427,18 +427,14 @@ public:
 
   void propagateExplicitBits();
 
-  bool
-  isCandidateForDeletion(unsigned ruleID,
-                         const llvm::DenseSet<unsigned> *redundantConformances) const;
-
   Optional<unsigned>
-  findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
+  findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
                    RewritePath &replacementPath);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
   void performHomotopyReduction(
-      const llvm::DenseSet<unsigned> *redundantConformances);
+      llvm::function_ref<bool(unsigned)> isRedundantRuleFn);
 
   void computeMinimalConformances(
       llvm::DenseSet<unsigned> &redundantConformances);
