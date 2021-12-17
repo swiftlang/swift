@@ -269,14 +269,12 @@ public distributed actor MyOtherActor {
 
 // CHECK-NEXT: %elt_offset2 = load i8*, i8** %offset
 // CHECK-NEXT: [[OPT_PTR:%.*]] = bitcast i8* %elt_offset2 to %TSSSg*
-// CHECK-NEXT: [[NATIVE_OPT_PTR:%.*]] = bitcast %TSSSg* %22 to { i64, i64 }*
+// CHECK-NEXT: [[NATIVE_OPT_PTR:%.*]] = bitcast %TSSSg* [[OPT_PTR]] to { i64, i64 }*
 // CHECK-NEXT: [[NATIVE_OPT_VAL_0_PTR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[NATIVE_OPT_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[NATIVE_OPT_VAL_0:%.*]] = load i64, i64* [[NATIVE_OPT_VAL_0_PTR]]
 // CHECK-NEXT: [[NATIVE_OPT_VAL_1_PTR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[NATIVE_OPT_PTR]], i32 0, i32 1
-// CHECK-NEXT: [[NATIVE_OPT_VAL_1_OPAQUE:%.*]] = load i64, i64* [[NATIVE_OPT_VAL_1_PTR]]
-// CHECK-NEXT: [[NATIVE_OPT_VAL_1_OBJ:%.*]] = inttoptr i64 [[NATIVE_OPT_VAL_1_OPAQUE]] to %swift.bridge*
-// CHECK: [[NATIVE_OPT_VAL_1:%.*]] = ptrtoint %swift.bridge* [[NATIVE_OPT_VAL_1_OBJ]] to i64
-// CHECK: [[OPT_PTR_INT:%.*]] = ptrtoint %TSSSg* [[OPT_PTR]] to i64
+// CHECK-NEXT: [[NATIVE_OPT_VAL_1:%.*]] = load i64, i64* [[NATIVE_OPT_VAL_1_PTR]]
+// CHECK-NEXT: [[OPT_PTR_INT:%.*]] = ptrtoint %TSSSg* [[OPT_PTR]] to i64
 // CHECK-NEXT: [[NEXT_ELT:%.*]] = add i64 [[OPT_PTR_INT]], 16
 // CHECK-NEXT: [[NEXT_ELT_PTR:%.*]] = inttoptr i64 [[NEXT_ELT]] to i8*
 // CHECK-NEXT: store i8* [[NEXT_ELT_PTR]], i8** %offset

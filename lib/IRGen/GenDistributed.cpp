@@ -64,6 +64,12 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
 
 namespace {
 
+struct AllocationInfo {
+  SILType Type;
+  const TypeInfo &TI;
+  StackAddress Addr;
+};
+
 class DistributedAccessor {
   IRGenModule &IGM;
   IRGenFunction &IGF;
@@ -75,6 +81,9 @@ class DistributedAccessor {
   CanSILFunctionType AccessorType;
   /// The asynchronous context associated with this accessor.
   AsyncContextLayout AsyncLayout;
+
+  /// The list of all arguments that were allocated on the stack.
+  SmallVector<AllocationInfo, 4> AllocatedArguments;
 
 public:
   DistributedAccessor(IRGenFunction &IGF, SILFunction *method,
@@ -203,28 +212,56 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
     // 3. Adjust typed pointer to the alignement of the type.
     auto alignedOffset = typeInfo.roundUpToTypeAlignment(IGF, eltPtr, paramTy);
 
-    // 4. Create an exploded version of the type to pass as an
-    //    argument to distributed method.
-
     if (paramTy.isObject()) {
       auto &nativeSchema = typeInfo.nativeParameterValueSchema(IGM);
-
-      if (nativeSchema.requiresIndirect()) {
-        llvm_unreachable("indirect parameters are not supported");
-      }
-
       // If schema is empty, skip to the next argument.
       if (nativeSchema.empty())
         continue;
+    }
 
-      // 5. Load argument value from the element pointer.
-      cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, alignedOffset, arguments);
-    } else {
-      // If the value is not loadable e.g. generic or resilient
-      // pass its address as an argument.
-      //
-      // TODO: This needs to be copied and destroyed.
+    // 4. Create an exploded version of the type to pass as an
+    //    argument to distributed method.
+
+    switch (param.getConvention()) {
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant: {
+      // The +1 argument is passed indirectly, so we need to copy it into
+      // a temporary.
+
+      auto stackAddr = typeInfo.allocateStack(IGF, paramTy, "arg.temp");
+      auto argPtr = stackAddr.getAddress().getAddress();
+
+      typeInfo.initializeWithCopy(IGF, stackAddr.getAddress(), alignedOffset,
+                                  paramTy, /*isOutlined=*/false);
+      arguments.add(argPtr);
+
+      // Remember to deallocate later.
+      AllocatedArguments.push_back({paramTy, typeInfo, stackAddr});
+      break;
+    }
+
+    case ParameterConvention::Indirect_In_Guaranteed: {
+      // The argument is +0, so we can use the address of the param in
+      // the context directly.
       arguments.add(alignedOffset.getAddress());
+      break;
+    }
+
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
+      llvm_unreachable("indirect parameters are not supported");
+
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Unowned: {
+      cast<LoadableTypeInfo>(typeInfo).loadAsTake(IGF, alignedOffset,
+                                                  arguments);
+      break;
+    }
+
+    case ParameterConvention::Direct_Owned:
+      // Copy the value out at +1.
+      cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, alignedOffset,
+                                                  arguments);
     }
 
     // 6. Move the offset to the beginning of the next element, unless
@@ -334,6 +371,12 @@ void DistributedAccessor::emit() {
     }
 
     emission->end();
+
+    // Deallocate all of the copied arguments.
+    {
+      for (auto &entry : AllocatedArguments)
+        entry.TI.deallocateStack(IGF, entry.Addr, entry.Type);
+    }
 
     Explosion voidResult;
     emitAsyncReturn(IGF, AsyncLayout,
