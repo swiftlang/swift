@@ -175,11 +175,11 @@ func someAsyncFunc() async {
   ////////////
   // effectful properties from outside the actor instance
 
-  // expected-warning@+2 {{cannot use property 'effPropA' with a non-sendable type 'Box' across actors}}
+  // expected-warning@+2 {{non-sendable type 'Box' in asynchronous access to actor-isolated property 'effPropA' cannot cross actor boundary}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = a.effPropA
 
-  // expected-warning@+3 {{cannot use property 'effPropT' with a non-sendable type 'Box' across actors}}
+  // expected-warning@+3 {{non-sendable type 'Box' in implicitly asynchronous access to actor-isolated property 'effPropT' cannot cross actor boundary}}
   // expected-error@+2{{property access can throw, but it is not marked with 'try' and the error is not handled}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = a.effPropT
@@ -189,8 +189,8 @@ func someAsyncFunc() async {
   _ = a.effPropAT
 
   // (mostly) corrected ones
-  _ = await a.effPropA  // expected-warning {{cannot use property 'effPropA' with a non-sendable type 'Box' across actors}}
-  _ = try! await a.effPropT // expected-warning {{cannot use property 'effPropT' with a non-sendable type 'Box' across actors}}
+  _ = await a.effPropA  // expected-warning {{non-sendable type 'Box' in asynchronous access to actor-isolated property 'effPropA' cannot cross actor boundary}}
+  _ = try! await a.effPropT // expected-warning {{non-sendable type 'Box' in implicitly asynchronous access to actor-isolated property 'effPropT' cannot cross actor boundary}}
   _ = try? await a.effPropAT
 
   print("ok!")
@@ -289,28 +289,28 @@ func blender(_ peeler : () -> Void) {
 
 
   await wisk({})
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await wisk(1)
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await (peelBanana)()
   await (((((peelBanana)))))()
   await (((wisk)))((wisk)((wisk)(1)))
-  // expected-warning@-1 3{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1 3{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
 
   blender((peelBanana))
   // expected-error@-1{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
   await wisk(peelBanana)
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
 
   await wisk(wisk)
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await (((wisk)))(((wisk)))
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
 
-  // expected-warning@+1 {{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@+1 {{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await {wisk}()(1)
 
-  // expected-warning@+1 {{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@+1 {{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await (true ? wisk : {n in return})(1)
 }
 
@@ -358,23 +358,23 @@ actor Calculator {
 
 @OrangeActor func doSomething() async {
   let _ = (await bananaAdd(1))(2)
-  // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
-  // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly asynchronous call to actor-isolated instance method 'addCurried' cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly asynchronous call to actor-isolated instance method 'addCurried' cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let plusOne = await calc.addCurried(await calc.add(0, 1))
-  // expected-warning@-1{{cannot call function returning non-sendable type}}
+  // expected-warning@-1{{non-sendable type '(Int) -> Int' returned by implicitly asynchronous call to actor-isolated instance method 'addCurried' cannot cross actor boundary}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = plusOne(2)
 }
