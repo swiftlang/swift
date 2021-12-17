@@ -8,6 +8,8 @@
 
 // REQUIRES: CPU=x86_64
 
+// UNSUPPORTED: OS=windows-msvc
+
 import _Distributed
 import FakeDistributedActorSystems
 

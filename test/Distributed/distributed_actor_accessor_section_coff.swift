@@ -7,6 +7,8 @@
 // REQUIRES: distributed
 
 // REQUIRES: OS=windows-msvc
+// FIXME: Test is temporary disabled (no way to debug)
+// REQUIRES: fix
 
 import _Distributed
 import FakeDistributedActorSystems
