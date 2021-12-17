@@ -1,4 +1,4 @@
-//===--- GeneratingConformances.cpp - Reasoning about conformance rules ---===//
+//===--- MinimalConformances.cpp - Reasoning about conformance rules ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements an algorithm to find a minimal set of "generating
-// conformances", which are rules (V1.[P1] => V1), ..., (Vn.[Pn] => Vn) such
-// that any valid term of the form T.[P] can be written as a product of terms
-// (Vi.[Pi]), where each Vi.[Pi] is a left hand side of a generating
-// conformance.
+// This file implements an algorithm to find a minimal set of conformance
+// rules (V1.[P1] => V1), ..., (Vn.[Pn] => Vn) whose left hand sides
+// _generate_ the set of conformance-valid terms.
+//
+// That is, any valid term of the form T.[P] where T.[P] reduces to T can be
+// written as a product of terms (Vi.[Pi]), where each Vi.[Pi] is a left hand
+// side of a minimal conformance.
 //
 // A "conformance-valid" rewrite system is one where if we can write
 // T == U.V for arbitrary non-empty U and V, then U.[domain(V)] is joinable
@@ -32,25 +34,25 @@
 //
 // Using the rewrite loops that generate the homotopy relation on rewrite paths,
 // decompositions can be found for all "derived" conformance rules, producing
-// a minimal set of generating conformances.
+// a set of minimal conformances.
 //
 // There are two small complications to handle implementation details of
 // Swift generics:
 //
 // 1) Inherited witness tables must be derivable by following other protocol
 //    refinement requirements only, without looking at non-Self associated
-//    types. This is expressed by saying that the generating conformance
+//    types. This is expressed by saying that the minimal conformance
 //    equations for a protocol refinement can only be written in terms of
 //    other protocol refinements; conformance paths involving non-Self
 //    associated types are not considered.
 //
 // 2) The subject type of each conformance requirement must be derivable at
-//    runtime as well, so for each generating conformance, it must be
+//    runtime as well, so for each minimal conformance, it must be
 //    possible to write down a conformance path for the parent type without
-//    using any generating conformance recursively in the parent path of
+//    using any minimal conformance recursively in the parent path of
 //    itself.
 //
-// The generating conformances finds fewer conformance requirements to be
+// The minimal conformances algorithm finds fewer conformance requirements to be
 // redundant than homotopy reduction, which is why homotopy reduction only
 // deletes non-protocol conformance requirements.
 //
@@ -139,6 +141,7 @@ void RewriteLoop::findProtocolConformanceRules(
       case RewriteStep::SuperclassConformance:
       case RewriteStep::ConcreteTypeWitness:
       case RewriteStep::SameTypeWitness:
+      case RewriteStep::AbstractTypeWitness:
         break;
       }
     }
@@ -150,7 +153,7 @@ void RewriteLoop::findProtocolConformanceRules(
 namespace {
 
 /// Utility class to encapsulate some shared state.
-class GeneratingConformances {
+class MinimalConformances {
   const RewriteSystem &System;
 
   RewriteContext &Context;
@@ -204,14 +207,14 @@ class GeneratingConformances {
       llvm::raw_ostream &out,
       const SmallVectorImpl<unsigned> &path) const;
 
-  void dumpGeneratingConformanceEquation(
+  void dumpMinimalConformanceEquation(
       llvm::raw_ostream &out,
       unsigned baseRuleID,
       const std::vector<SmallVector<unsigned, 2>> &paths) const;
 
 public:
-  explicit GeneratingConformances(const RewriteSystem &system,
-                                  llvm::DenseSet<unsigned> &redundantConformances)
+  explicit MinimalConformances(const RewriteSystem &system,
+                               llvm::DenseSet<unsigned> &redundantConformances)
     : System(system),
       Context(system.getRewriteContext()),
       Debug(system.getDebugOptions()),
@@ -221,15 +224,15 @@ public:
 
   void computeCandidateConformancePaths();
 
-  void dumpGeneratingConformanceEquations(llvm::raw_ostream &out) const;
+  void dumpMinimalConformanceEquations(llvm::raw_ostream &out) const;
 
-  void verifyGeneratingConformanceEquations() const;
+  void verifyMinimalConformanceEquations() const;
 
-  void computeGeneratingConformances(bool firstPass);
+  void computeMinimalConformances(bool firstPass);
 
-  void verifyGeneratingConformances() const;
+  void verifyMinimalConformances() const;
 
-  void dumpGeneratingConformances(llvm::raw_ostream &out) const;
+  void dumpMinimalConformances(llvm::raw_ostream &out) const;
 };
 
 } // end namespace
@@ -239,7 +242,7 @@ public:
 ///
 /// The term should be irreducible, except for a protocol symbol at the end.
 void
-GeneratingConformances::decomposeTermIntoConformanceRuleLeftHandSides(
+MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, SmallVectorImpl<unsigned> &result) const {
   assert(term.back().getKind() == Symbol::Kind::Protocol);
 
@@ -284,7 +287,7 @@ GeneratingConformances::decomposeTermIntoConformanceRuleLeftHandSides(
 /// product of left hand sdies of conformance rules. The term U should
 /// be irreducible.
 void
-GeneratingConformances::decomposeTermIntoConformanceRuleLeftHandSides(
+MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, unsigned ruleID,
     SmallVectorImpl<unsigned> &result) const {
   const auto &rule = System.getRule(ruleID);
@@ -298,7 +301,7 @@ GeneratingConformances::decomposeTermIntoConformanceRuleLeftHandSides(
   auto protocol = Symbol::forProtocol(protocols[0], Context);
 
   // A same-type requirement of the form 'Self.Foo == Self' can induce a
-  // conformance rule [P].[P] => [P], and we can end up with a generating
+  // conformance rule [P].[P] => [P], and we can end up with a minimal
   // conformance decomposition of the form
   //
   //   (V.[Q] => V) := [P].(V'.[Q] => V'),
@@ -365,7 +368,7 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
 
 /// Collect conformance rules and parent paths, and record an initial
 /// equation where each conformance is equivalent to itself.
-void GeneratingConformances::collectConformanceRules() {
+void MinimalConformances::collectConformanceRules() {
   // Prepare the initial set of equations.
   for (unsigned ruleID : indices(System.getRules())) {
     const auto &rule = System.getRule(ruleID);
@@ -474,7 +477,7 @@ void GeneratingConformances::collectConformanceRules() {
 ///
 /// That is, we can choose to eliminate <X>.[P], but not <Y>.[P], or vice
 /// versa; but it is never valid to eliminate both.
-void GeneratingConformances::computeCandidateConformancePaths() {
+void MinimalConformances::computeCandidateConformancePaths() {
   for (const auto &loop : System.getLoops()) {
     if (loop.isDeleted())
       continue;
@@ -487,7 +490,7 @@ void GeneratingConformances::computeCandidateConformancePaths() {
     if (result.empty())
       continue;
 
-    if (Debug.contains(DebugFlags::GeneratingConformances)) {
+    if (Debug.contains(DebugFlags::MinimalConformances)) {
       llvm::dbgs() << "Candidate homotopy generator: ";
       loop.dump(llvm::dbgs(), System);
       llvm::dbgs() << "\n";
@@ -503,7 +506,7 @@ void GeneratingConformances::computeCandidateConformancePaths() {
       if (inEmptyContext.empty())
         continue;
 
-      if (Debug.contains(DebugFlags::GeneratingConformances)) {
+      if (Debug.contains(DebugFlags::MinimalConformances)) {
         llvm::dbgs() << "* Protocol " << proto->getName() << ":\n";
         llvm::dbgs() << "** Conformance rules not in context:\n";
         for (unsigned ruleID : inEmptyContext) {
@@ -600,7 +603,7 @@ void GeneratingConformances::computeCandidateConformancePaths() {
 
   for (const auto &pair : ConformancePaths) {
     if (pair.second.size() > 1)
-      Context.GeneratingConformancesHistogram.add(pair.second.size());
+      Context.MinimalConformancesHistogram.add(pair.second.size());
   }
 }
 
@@ -612,7 +615,7 @@ void GeneratingConformances::computeCandidateConformancePaths() {
 /// The \p conformancePaths map sends conformance rules to a list of
 /// disjunctions, where each disjunction is a product of other conformance
 /// rules.
-bool GeneratingConformances::isValidConformancePath(
+bool MinimalConformances::isValidConformancePath(
     llvm::SmallDenseSet<unsigned, 4> &visited,
     const llvm::SmallVectorImpl<unsigned> &path, bool allowConcrete) const {
 
@@ -681,7 +684,7 @@ bool GeneratingConformances::isValidConformancePath(
 /// This helps ensure that the inheritance clause of a protocol is complete
 /// and correct, allowing name lookup to find associated types of inherited
 /// protocols while building the protocol requirement signature.
-bool GeneratingConformances::isValidRefinementPath(
+bool MinimalConformances::isValidRefinementPath(
     const llvm::SmallVectorImpl<unsigned> &path) const {
   for (unsigned ruleID : path) {
     if (!System.getRule(ruleID).isProtocolRefinementRule())
@@ -691,12 +694,12 @@ bool GeneratingConformances::isValidRefinementPath(
   return true;
 }
 
-void GeneratingConformances::dumpGeneratingConformanceEquations(
+void MinimalConformances::dumpMinimalConformanceEquations(
     llvm::raw_ostream &out) const {
   out << "Initial set of equations:\n";
   for (const auto &pair : ConformancePaths) {
     out << "- ";
-    dumpGeneratingConformanceEquation(out, pair.first, pair.second);
+    dumpMinimalConformanceEquation(out, pair.first, pair.second);
     out << "\n";
   }
 
@@ -708,7 +711,7 @@ void GeneratingConformances::dumpGeneratingConformanceEquations(
   }
 }
 
-void GeneratingConformances::dumpConformancePath(
+void MinimalConformances::dumpConformancePath(
     llvm::raw_ostream &out,
     const SmallVectorImpl<unsigned> &path) const {
   if (path.empty()) {
@@ -720,7 +723,7 @@ void GeneratingConformances::dumpConformancePath(
     out << "(" << System.getRule(ruleID).getLHS() << ")";
 }
 
-void GeneratingConformances::dumpGeneratingConformanceEquation(
+void MinimalConformances::dumpMinimalConformanceEquation(
     llvm::raw_ostream &out,
     unsigned baseRuleID,
     const std::vector<SmallVector<unsigned, 2>> &paths) const {
@@ -737,7 +740,7 @@ void GeneratingConformances::dumpGeneratingConformanceEquation(
   }
 }
 
-void GeneratingConformances::verifyGeneratingConformanceEquations() const {
+void MinimalConformances::verifyMinimalConformanceEquations() const {
 #ifndef NDEBUG
   for (const auto &pair : ConformancePaths) {
     const auto &rule = System.getRule(pair.first);
@@ -755,13 +758,13 @@ void GeneratingConformances::verifyGeneratingConformanceEquations() const {
 
       if (proto != otherProto) {
         llvm::errs() << "Invalid equation: ";
-        dumpGeneratingConformanceEquation(llvm::errs(),
-                                          pair.first, pair.second);
+        dumpMinimalConformanceEquation(llvm::errs(),
+                                       pair.first, pair.second);
         llvm::errs() << "\n";
         llvm::errs() << "Mismatched conformance:\n";
         llvm::errs() << "Base rule: " << rule << "\n";
         llvm::errs() << "Final rule: " << otherRule << "\n\n";
-        dumpGeneratingConformanceEquations(llvm::errs());
+        dumpMinimalConformanceEquations(llvm::errs());
         abort();
       }
 
@@ -774,11 +777,11 @@ void GeneratingConformances::verifyGeneratingConformanceEquations() const {
         if ((isLastElement && !rule.isAnyConformanceRule()) ||
             (!isLastElement && !rule.isProtocolConformanceRule())) {
           llvm::errs() << "Equation term is not a conformance rule: ";
-          dumpGeneratingConformanceEquation(llvm::errs(),
-                                            pair.first, pair.second);
+          dumpMinimalConformanceEquation(llvm::errs(),
+                                         pair.first, pair.second);
           llvm::errs() << "\n";
           llvm::errs() << "Term: " << rule << "\n";
-          dumpGeneratingConformanceEquations(llvm::errs());
+          dumpMinimalConformanceEquations(llvm::errs());
           abort();
         }
 
@@ -789,13 +792,13 @@ void GeneratingConformances::verifyGeneratingConformanceEquations() const {
 
       if (baseTerm != otherTerm) {
         llvm::errs() << "Invalid equation: ";
-        dumpGeneratingConformanceEquation(llvm::errs(),
-                                          pair.first, pair.second);
+        dumpMinimalConformanceEquation(llvm::errs(),
+                                       pair.first, pair.second);
         llvm::errs() << "\n";
         llvm::errs() << "Invalid conformance path:\n";
         llvm::errs() << "Expected: " << baseTerm << "\n";
         llvm::errs() << "Got: " << otherTerm << "\n\n";
-        dumpGeneratingConformanceEquations(llvm::errs());
+        dumpMinimalConformanceEquations(llvm::errs());
         abort();
       }
     }
@@ -803,13 +806,12 @@ void GeneratingConformances::verifyGeneratingConformanceEquations() const {
 #endif
 }
 
-/// Find a minimal set of generating conformances by marking all other
+/// Find a set of minimal conformances by marking all non-minimal
 /// conformances redundant.
 ///
 /// In the first pass, we only consider conformance requirements that are
 /// made redundant by concrete conformances.
-void GeneratingConformances::computeGeneratingConformances(
-    bool firstPass) {
+void MinimalConformances::computeMinimalConformances(bool firstPass) {
   for (unsigned ruleID : ConformanceRules) {
     const auto &paths = ConformancePaths[ruleID];
 
@@ -836,9 +838,9 @@ void GeneratingConformances::computeGeneratingConformances(
       if (!derivedViaConcrete)
         continue;
 
-      if (Debug.contains(DebugFlags::GeneratingConformances)) {
+      if (Debug.contains(DebugFlags::MinimalConformances)) {
         llvm::dbgs() << "Derived-via-concrete: ";
-        dumpGeneratingConformanceEquation(llvm::dbgs(), ruleID, paths);
+        dumpMinimalConformanceEquation(llvm::dbgs(), ruleID, paths);
         llvm::dbgs() << "\n";
       }
     } else {
@@ -860,7 +862,7 @@ void GeneratingConformances::computeGeneratingConformances(
 
       if (isValidConformancePath(visited, path,
                                  /*allowConcrete=*/true)) {
-        if (Debug.contains(DebugFlags::GeneratingConformances)) {
+        if (Debug.contains(DebugFlags::MinimalConformances)) {
           llvm::dbgs() << "Redundant rule in ";
           llvm::dbgs() << (firstPass ? "first" : "second");
           llvm::dbgs() << " pass: ";
@@ -876,7 +878,7 @@ void GeneratingConformances::computeGeneratingConformances(
 }
 
 /// Check invariants.
-void GeneratingConformances::verifyGeneratingConformances() const {
+void MinimalConformances::verifyMinimalConformances() const {
 #ifndef NDEBUG
   for (const auto &pair : ConformancePaths) {
     unsigned ruleID = pair.first;
@@ -884,7 +886,7 @@ void GeneratingConformances::verifyGeneratingConformances() const {
 
     if (RedundantConformances.count(ruleID) > 0) {
       // Check that redundant conformances are recoverable via
-      // generating conformances.
+      // minimal conformances.
       llvm::SmallDenseSet<unsigned, 4> visited;
 
       llvm::SmallVector<unsigned, 1> path;
@@ -894,33 +896,26 @@ void GeneratingConformances::verifyGeneratingConformances() const {
                                   /*allowConcrete=*/true)) {
         llvm::errs() << "Redundant conformance is not recoverable:\n";
         llvm::errs() << rule << "\n\n";
-        dumpGeneratingConformanceEquations(llvm::errs());
+        dumpMinimalConformanceEquations(llvm::errs());
         abort();
       }
 
       continue;
     }
 
-    if (rule.isRedundant()) {
-      llvm::errs() << "Generating conformance is redundant: ";
-      llvm::errs() << rule << "\n\n";
-      dumpGeneratingConformanceEquations(llvm::errs());
-      abort();
-    }
-
     if (rule.getLHS().containsUnresolvedSymbols()) {
-      llvm::errs() << "Generating conformance contains unresolved symbols: ";
+      llvm::errs() << "Minimal conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
-      dumpGeneratingConformanceEquations(llvm::errs());
+      dumpMinimalConformanceEquations(llvm::errs());
       abort();
     }
   }
 #endif
 }
 
-void GeneratingConformances::dumpGeneratingConformances(
+void MinimalConformances::dumpMinimalConformances(
     llvm::raw_ostream &out) const {
-  out << "Generating conformances:\n";
+  out << "Minimal conformances:\n";
 
   for (const auto &pair : ConformancePaths) {
     if (RedundantConformances.count(pair.first) > 0)
@@ -930,26 +925,26 @@ void GeneratingConformances::dumpGeneratingConformances(
   }
 }
 
-/// Computes a minimal set of generating conformances, assuming that homotopy
-/// reduction has already eliminated all redundant rewrite rules that are not
+/// Computes minimal conformances, assuming that homotopy reduction has
+/// already eliminated all redundant rewrite rules that are not
 /// conformance rules.
-void RewriteSystem::computeGeneratingConformances(
+void RewriteSystem::computeMinimalConformances(
     llvm::DenseSet<unsigned> &redundantConformances) {
-  GeneratingConformances builder(*this, redundantConformances);
+  MinimalConformances builder(*this, redundantConformances);
 
   builder.collectConformanceRules();
   builder.computeCandidateConformancePaths();
 
-  if (Debug.contains(DebugFlags::GeneratingConformances)) {
-    builder.dumpGeneratingConformanceEquations(llvm::dbgs());
+  if (Debug.contains(DebugFlags::MinimalConformances)) {
+    builder.dumpMinimalConformanceEquations(llvm::dbgs());
   }
 
-  builder.verifyGeneratingConformanceEquations();
-  builder.computeGeneratingConformances(/*firstPass=*/true);
-  builder.computeGeneratingConformances(/*firstPass=*/false);
-  builder.verifyGeneratingConformances();
+  builder.verifyMinimalConformanceEquations();
+  builder.computeMinimalConformances(/*firstPass=*/true);
+  builder.computeMinimalConformances(/*firstPass=*/false);
+  builder.verifyMinimalConformances();
 
-  if (Debug.contains(DebugFlags::GeneratingConformances)) {
-    builder.dumpGeneratingConformances(llvm::dbgs());
+  if (Debug.contains(DebugFlags::MinimalConformances)) {
+    builder.dumpMinimalConformances(llvm::dbgs());
   }
 }

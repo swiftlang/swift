@@ -14,6 +14,7 @@
 #define SWIFT_REWRITESYSTEM_H
 
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/PointerUnion.h"
 
 #include "Debug.h"
 #include "RewriteLoop.h"
@@ -324,28 +325,68 @@ private:
   //////////////////////////////////////////////////////////////////////////////
 
 public:
-  struct ConcreteTypeWitness {
-    Symbol ConcreteConformance;
-    Symbol AssocType;
-    Symbol ConcreteType;
+  /// A type witness has a subject type, stored in LHS, which takes the form:
+  ///
+  /// T.[concrete: C : P].[P:X]
+  ///
+  /// For some concrete type C, protocol P and associated type X.
+  ///
+  /// The type witness of X in the conformance C : P is either a concrete type,
+  /// or an abstract type parameter.
+  ///
+  /// If it is a concrete type, then RHS stores the concrete type symbol.
+  ///
+  /// If it is an abstract type parameter, then RHS stores the type term.
+  ///
+  /// Think of these as rewrite rules which are lazily created, but always
+  /// "there" -- they encode information about concrete conformances, which
+  /// are solved outside of the requirement machine itself.
+  ///
+  /// We don't want to eagerly pull in all concrete conformances and walk
+  /// them recursively introducing rewrite rules.
+  ///
+  /// The RewriteStep::{Concrete,Same,Abstract}TypeWitness rewrite step kinds
+  /// reference TypeWitnesses via their RuleID field.
+  ///
+  /// Type witnesses are recorded lazily in property map construction, in
+  /// PropertyMap::computeConstraintTermForTypeWitness().
+  struct TypeWitness {
+    Term LHS;
+    llvm::PointerUnion<Symbol, Term> RHS;
 
-    ConcreteTypeWitness(Symbol concreteConformance,
-                        Symbol assocType,
-                        Symbol concreteType);
+    TypeWitness(Term lhs, llvm::PointerUnion<Symbol, Term> rhs);
 
-    friend bool operator==(const ConcreteTypeWitness &lhs,
-                           const ConcreteTypeWitness &rhs);
+    friend bool operator==(const TypeWitness &lhs,
+                           const TypeWitness &rhs);
+
+    Symbol getConcreteConformance() const {
+      return *(LHS.end() - 2);
+    }
+
+    Symbol getAssocType() const {
+      return *(LHS.end() - 1);
+    }
+
+    Symbol getConcreteType() const {
+      return RHS.get<Symbol>();
+    }
+
+    Term getAbstractType() const {
+      return RHS.get<Term>();
+    }
+
+    void dump(llvm::raw_ostream &out) const;
   };
 
 private:
   /// Cache for concrete type witnesses. The value in the map is an index
   /// into the vector.
-  llvm::DenseMap<std::pair<Symbol, Symbol>, unsigned> ConcreteTypeWitnessMap;
-  std::vector<ConcreteTypeWitness> ConcreteTypeWitnesses;
+  llvm::DenseMap<Term, unsigned> TypeWitnessMap;
+  std::vector<TypeWitness> TypeWitnesses;
 
 public:
-  unsigned recordConcreteTypeWitness(ConcreteTypeWitness witness);
-  const ConcreteTypeWitness &getConcreteTypeWitness(unsigned index) const;
+  unsigned recordTypeWitness(TypeWitness witness);
+  const TypeWitness &getTypeWitness(unsigned index) const;
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -365,7 +406,7 @@ public:
   /// 2-cells; this is actually represented as a single 2-cell forming a
   /// loop around a base point.
   ///
-  /// This data is used by the homotopy reduction and generating conformances
+  /// This data is used by the homotopy reduction and minimal conformances
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
@@ -386,20 +427,16 @@ public:
 
   void propagateExplicitBits();
 
-  bool
-  isCandidateForDeletion(unsigned ruleID,
-                         const llvm::DenseSet<unsigned> *redundantConformances) const;
-
   Optional<unsigned>
-  findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
+  findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
                    RewritePath &replacementPath);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
   void performHomotopyReduction(
-      const llvm::DenseSet<unsigned> *redundantConformances);
+      llvm::function_ref<bool(unsigned)> isRedundantRuleFn);
 
-  void computeGeneratingConformances(
+  void computeMinimalConformances(
       llvm::DenseSet<unsigned> &redundantConformances);
 
 public:
@@ -420,9 +457,10 @@ private:
   void verifyRewriteLoops() const;
 
   void verifyRedundantConformances(
-      llvm::DenseSet<unsigned> redundantConformances) const;
+      const llvm::DenseSet<unsigned> &redundantConformances) const;
 
-  void verifyMinimizedRules() const;
+  void verifyMinimizedRules(
+      const llvm::DenseSet<unsigned> &redundantConformances) const;
 
 public:
   void dump(llvm::raw_ostream &out) const;
