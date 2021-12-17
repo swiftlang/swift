@@ -915,6 +915,25 @@ public:
   }
 };
 
+class MainTypeAttr final : public DeclAttribute {
+public:
+  MainTypeAttr(bool isImplicit)
+      : DeclAttribute(DAK_MainType, SourceLoc(), SourceLoc(), isImplicit) {}
+
+  MainTypeAttr(SourceLoc AtLoc, SourceLoc NameLoc)
+      : DeclAttribute(DAK_MainType, AtLoc,
+                      SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
+                      /*Implicit=*/false) {}
+
+  MainTypeAttr(SourceLoc NameLoc)
+      : DeclAttribute(DAK_MainType, SourceLoc(), SourceRange(NameLoc, NameLoc),
+                      /*Implicit=*/false) {}
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_MainType;
+  }
+};
+
 class PrivateImportAttr final
 : public DeclAttribute {
   StringRef SourceFile;
