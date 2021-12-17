@@ -53,7 +53,6 @@ class ShrinkBorrowScope {
   llvm::SmallVector<std::pair<SILBasicBlock *, SILInstruction *>>
       barrierInstructions;
 
-  SmallPtrSet<SILBasicBlock *, 8> blocksWithReachedTops;
   SmallPtrSet<SILBasicBlock *, 8> blocksToEndAtTop;
 
   llvm::SmallDenseMap<ApplySite, size_t> transitiveUsesPerApplySite;
@@ -80,12 +79,6 @@ public:
   void findBarriers();
   void rewrite();
   void createEndBorrow(SILInstruction *insertionPoint);
-
-  bool reachedTopOfAllSuccessors(SILBasicBlock *block) {
-    return llvm::all_of(block->getSuccessorBlocks(), [=](auto *successor) {
-      return blocksWithReachedTops.contains(successor);
-    });
-  }
 
   bool isBarrierApply(SILInstruction *instruction) {
     // For now, treat every apply (that doesn't use the borrowed value) as a
@@ -248,6 +241,14 @@ void ShrinkBorrowScope::findBarriers() {
   // visited.
   //
   // TODO: Handle loops.
+  SmallPtrSet<SILBasicBlock *, 8> blocksWithReachedTops;
+  auto reachedTopOfAllSuccessors =
+      [&blocksWithReachedTops](SILBasicBlock *block) -> bool {
+    return llvm::all_of(block->getSuccessorBlocks(), [=](auto *successor) {
+      return blocksWithReachedTops.contains(successor);
+    });
+  };
+
   while (!worklist.empty()) {
     auto *block = worklist.pop_back_val();
     auto *startingInstruction = startingInstructions.lookup(block);
