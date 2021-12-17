@@ -18,8 +18,6 @@
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
-
-SwiftMetatype SILGlobalVariable::registeredMetatype;
     
 SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
                                              IsSerialized_t isSerialized,
@@ -47,8 +45,7 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      IsSerialized_t isSerialized,
                                      StringRef Name, SILType LoweredType,
                                      Optional<SILLocation> Loc, VarDecl *Decl)
-  : SwiftObjectHeader(registeredMetatype),
-    Module(Module),
+  : Module(Module),
     Name(Name),
     LoweredType(LoweredType),
     Location(Loc.getValueOr(SILLocation::invalid())),

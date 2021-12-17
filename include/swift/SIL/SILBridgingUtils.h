@@ -63,11 +63,11 @@ inline SILType getSILType(BridgedType ty) {
 }
 
 inline SILNode *castToSILNode(BridgedNode node) {
-  return static_cast<SILNode *>(node.obj);
+  return reinterpret_cast<SILNode *>(node.obj);
 }
 
 inline SILValue castToSILValue(BridgedValue value) {
-  return static_cast<ValueBase *>(value.obj);
+  return reinterpret_cast<ValueBase *>(value.obj);
 }
 
 inline SILType castToSILType(BridgedType type) {
@@ -75,19 +75,19 @@ inline SILType castToSILType(BridgedType type) {
 }
 
 template <class I = SILInstruction> I *castToInst(BridgedInstruction inst) {
-  return cast<I>(static_cast<SILNode *>(inst.obj)->castToInstruction());
+  return cast<I>(reinterpret_cast<SILNode *>(inst.obj)->castToInstruction());
 }
 
 inline SILBasicBlock *castToBasicBlock(BridgedBasicBlock block) {
-  return static_cast<SILBasicBlock *>(block.obj);
+  return reinterpret_cast<SILBasicBlock *>(block.obj);
 }
 
 inline SILFunction *castToFunction(BridgedFunction function) {
-  return static_cast<SILFunction *>(function.obj);
+  return reinterpret_cast<SILFunction *>(function.obj);
 }
 
 inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
-  return static_cast<SILGlobalVariable *>(global.obj);
+  return reinterpret_cast<SILGlobalVariable *>(global.obj);
 }
 
 ArrayRef<SILValue> getSILValues(BridgedValueArray values,

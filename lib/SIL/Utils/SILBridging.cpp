@@ -28,15 +28,6 @@ SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
 
 }
 
-// Does return null, if libswift is not used, i.e. initializeLibSwift() is
-// never called.
-SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
-  SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];
-  assert((!nodeMetatypesInitialized || metatype) &&
-        "no metatype for bridged SIL node");
-  return metatype;
-}
-
 static_assert(sizeof(BridgedLocation) == sizeof(SILDebugLocation),
               "BridgedLocation has wrong size");
 
@@ -77,71 +68,6 @@ static void setUnimplementedRange(SwiftMetatype metatype,
 /// Called by initializeLibSwift().
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   nodeMetatypesInitialized = true;
-
-  // Handle the important non Node classes.
-  StringRef clName = getStringRef(className);
-  if (clName == "Function")
-    return SILFunction::registerBridgedMetatype(metatype);
-  if (clName == "BasicBlock")
-    return SILBasicBlock::registerBridgedMetatype(metatype);
-  if (clName == "GlobalVariable")
-    return SILGlobalVariable::registerBridgedMetatype(metatype);
-  if (clName == "BlockArgument") {
-    nodeMetatypes[(unsigned)SILNodeKind::SILPhiArgument] = metatype;
-    return;
-  }
-  if (clName == "FunctionArgument") {
-    nodeMetatypes[(unsigned)SILNodeKind::SILFunctionArgument] = metatype;
-    return;
-  }
-
-  // Pre-populate the "unimplemented" ranges of metatypes.
-  // If a specifc class is not implemented yet in libswift, it bridges to an
-  // "unimplemented" class. This ensures that optimizations handle _all_ kind of
-  // instructions gracefully, without the need to define the not-yet-used
-  // classes in libswift.
-#define VALUE_RANGE(ID) SILNodeKind::First_##ID, SILNodeKind::Last_##ID
-  if (clName == "UnimplementedRefCountingInst")
-    return setUnimplementedRange(metatype, VALUE_RANGE(RefCountingInst));
-  if (clName == "UnimplementedSingleValueInst")
-    return setUnimplementedRange(metatype, VALUE_RANGE(SingleValueInstruction));
-  if (clName == "UnimplementedInstruction")
-    return setUnimplementedRange(metatype, VALUE_RANGE(SILInstruction));
-#undef VALUE_RANGE
-
-  if (valueNamesToKind.empty()) {
-#define VALUE(ID, PARENT) \
-    valueNamesToKind[#ID] = SILNodeKind::ID;
-#define BRIDGED_NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-    VALUE(ID, NAME)
-#define ARGUMENT(ID, PARENT) \
-    VALUE(ID, NAME)
-#define BRIDGED_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-    VALUE(ID, NAME)
-#define MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-    VALUE(ID, NAME)
-#include "swift/SIL/SILNodes.def"
-  }
-
-  std::string prefixedName;
-  auto iter = valueNamesToKind.find(clName);
-  if (iter == valueNamesToKind.end()) {
-    // Try again with a "SIL" prefix. For example Argument -> SILArgument.
-    prefixedName = std::string("SIL") + std::string(clName);
-    iter = valueNamesToKind.find(prefixedName);
-    if (iter == valueNamesToKind.end()) {
-      llvm::errs() << "Unknown bridged node class " << clName << '\n';
-      abort();
-    }
-    clName = prefixedName;
-  }
-  SILNodeKind kind = iter->second;
-  SwiftMetatype existingTy = nodeMetatypes[(unsigned)kind];
-  if (existingTy && !unimplementedTypes.count(existingTy)) {
-    llvm::errs() << "Double registration of class " << clName << '\n';
-    abort();
-  }
-  nodeMetatypes[(unsigned)kind] = metatype;
 }
 
 //===----------------------------------------------------------------------===//
@@ -177,14 +103,14 @@ OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function) {
   SILFunction *f = castToFunction(function);
   if (f->empty())
     return {nullptr};
-  return {f->getEntryBlock()};
+  return {nullptr};
 }
 
 OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function) {
   SILFunction *f = castToFunction(function);
   if (f->empty())
     return {nullptr};
-  return {&*f->rbegin()};
+  return {nullptr};
 }
 
 SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function) {
@@ -211,7 +137,7 @@ OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block) {
   auto iter = std::next(b->getIterator());
   if (iter == b->getParent()->end())
     return {nullptr};
-  return {&*iter};
+  return {nullptr};
 }
 
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block) {
@@ -219,11 +145,11 @@ OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block) {
   auto iter = std::next(b->getReverseIterator());
   if (iter == b->getParent()->rend())
     return {nullptr};
-  return {&*iter};
+  return {nullptr};
 }
 
 BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block) {
-  return {castToBasicBlock(block)->getParent()};
+  return {nullptr};
 }
 
 std::string SILBasicBlock_debugDescription(BridgedBasicBlock block) {
@@ -238,14 +164,14 @@ OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block) {
   SILBasicBlock *b = castToBasicBlock(block);
   if (b->empty())
     return {nullptr};
-  return {b->front().asSILNode()};
+  return {nullptr};
 }
 
 OptionalBridgedInstruction SILBasicBlock_lastInst(BridgedBasicBlock block) {
   SILBasicBlock *b = castToBasicBlock(block);
   if (b->empty())
     return {nullptr};
-  return {b->back().asSILNode()};
+  return {nullptr};
 }
 
 SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block) {
@@ -253,11 +179,11 @@ SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block) {
 }
 
 BridgedArgument SILBasicBlock_getArgument(BridgedBasicBlock block, SwiftInt index) {
-  return {castToBasicBlock(block)->getArgument(index)};
+  return {nullptr};
 }
 
 OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block) {
-  return {castToBasicBlock(block)->pred_begin().getSuccessorRef()};
+  return {nullptr};
 }
 
 static SILSuccessor *castToSuccessor(BridgedSuccessor succ) {
@@ -265,15 +191,15 @@ static SILSuccessor *castToSuccessor(BridgedSuccessor succ) {
 }
 
 OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ) {
-  return {castToSuccessor(succ)->getNext()};
+  return {nullptr};
 }
 
 BridgedBasicBlock SILSuccessor_getTargetBlock(BridgedSuccessor succ) {
-  return {castToSuccessor(succ)->getBB()};
+  return {nullptr};
 }
 
 BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ) {
-  return {castToSuccessor(succ)->getContainingInst()};
+  return {nullptr};
 }
 
 //===----------------------------------------------------------------------===//
@@ -281,7 +207,7 @@ BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ) {
 //===----------------------------------------------------------------------===//
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
-  return {static_cast<SILArgument *>(argument.obj)->getParent()};
+  return {nullptr};
 }
 
 //===----------------------------------------------------------------------===//
@@ -304,15 +230,15 @@ static Operand *castToOperand(BridgedOperand operand) {
 }
 
 BridgedValue Operand_getValue(BridgedOperand operand) {
-  return {castToOperand(operand)->get()};
+  return {nullptr};
 }
 
 OptionalBridgedOperand Operand_nextUse(BridgedOperand operand) {
-  return {castToOperand(operand)->getNextUse()};
+  return {nullptr};
 }
 
 BridgedInstruction Operand_getUser(BridgedOperand operand) {
-  return {castToOperand(operand)->getUser()->asSILNode()};
+  return {nullptr};
 }
 
 SwiftInt Operand_isTypeDependent(BridgedOperand operand) {
@@ -320,11 +246,11 @@ SwiftInt Operand_isTypeDependent(BridgedOperand operand) {
 }
 
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value) {
-  return {*castToSILValue(value)->use_begin()};
+  return {nullptr};
 }
 
 BridgedType SILValue_getType(BridgedValue value) {
-  return { castToSILValue(value)->getType().getOpaqueValue() };
+  return {nullptr};
 }
 
 //===----------------------------------------------------------------------===//
@@ -364,7 +290,7 @@ OptionalBridgedInstruction SILInstruction_next(BridgedInstruction inst) {
   auto iter = std::next(i->getIterator());
   if (iter == i->getParent()->end())
     return {nullptr};
-  return {iter->asSILNode()};
+  return {nullptr};
 }
 
 OptionalBridgedInstruction SILInstruction_previous(BridgedInstruction inst) {
@@ -372,19 +298,18 @@ OptionalBridgedInstruction SILInstruction_previous(BridgedInstruction inst) {
   auto iter = std::next(i->getReverseIterator());
   if (iter == i->getParent()->rend())
     return {nullptr};
-  return {iter->asSILNode()};
+  return {nullptr};
 }
 
 BridgedBasicBlock SILInstruction_getParent(BridgedInstruction inst) {
   SILInstruction *i = castToInst(inst);
   assert(!i->isStaticInitializerInst() &&
          "cannot get the parent of a static initializer instruction");
-  return {i->getParent()};
+  return {nullptr};
 }
 
 BridgedArrayRef SILInstruction_getOperands(BridgedInstruction inst) {
-  auto operands = castToInst(inst)->getAllOperands();
-  return {(const unsigned char *)operands.data(), operands.size()};
+  return {nullptr, 0};
 }
 
 void SILInstruction_setOperand(BridgedInstruction inst, SwiftInt index,
@@ -402,7 +327,7 @@ BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst) {
 }
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result) {
-  return {static_cast<MultipleValueInstructionResult *>(result.obj)->getParent()};
+  return {nullptr};
 }
 
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst) {
@@ -410,7 +335,7 @@ SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst) {
 }
 BridgedMultiValueResult
 MultipleValueInstruction_getResult(BridgedInstruction inst, SwiftInt index) {
-  return {castToInst<MultipleValueInstruction>(inst)->getResult(index)};
+  return {nullptr};
 }
 
 BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term) {
@@ -427,7 +352,7 @@ BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi) {
 }
 
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst) {
-  return {castToInst<GlobalAccessInst>(globalInst)->getReferencedGlobal()};
+  return {nullptr};
 }
 
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei) {
@@ -475,7 +400,7 @@ SwiftInt TryApplyInst_numArguments(BridgedInstruction tai) {
 }
 
 BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi) {
-  return {castToInst<BranchInst>(bi)->getDestBB()};
+  return {nullptr};
 }
 
 SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se) {
@@ -502,22 +427,18 @@ BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedValueArray arguments) {
     SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
     SmallVector<SILValue, 16> argValues;
-    return {builder.createBuiltinBinaryFunction(getRegularLocation(loc),
-      getStringRef(name), getSILType(operandType), getSILType(resultType),
-      getSILValues(arguments, argValues))};
+  return {nullptr};
 }
 
 BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
           BridgedLocation loc, BridgedValue condition, BridgedStringRef messge) {
   SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-  return {builder.createCondFail(getRegularLocation(loc),
-    castToSILValue(condition), getStringRef(messge))};
+  return {nullptr};
 }
 
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
           BridgedLocation loc, BridgedType type, SwiftInt value) {
   SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-  return {builder.createIntegerLiteral(getRegularLocation(loc),
-                                       getSILType(type), value)};
+  return {nullptr};
 }
 

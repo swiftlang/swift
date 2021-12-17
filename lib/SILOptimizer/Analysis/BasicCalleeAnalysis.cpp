@@ -344,5 +344,5 @@ BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
                                          callees.incomplete);
   auto iter = cl.begin() + index;
   assert(index >= 0 && iter < cl.end());
-  return {*iter};
+  return {nullptr};
 }
