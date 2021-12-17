@@ -72,8 +72,13 @@ endif()
 # User-configurable options for the standard library.
 #
 
+# New options should be added to stdlib/cmake/modules/StdlibOptions.cmake,
+# so that they are considered in configurations using StandaloneOverlay.cmake
+
 # NOTE: Some of these variables are also initialized in StandaloneOverlay.cmake
 # so that interfaces are emitted when overlays are separately built.
+
+# TODO: migrate this section to StdlibOptions.cmake to reduce duplication
 
 set(SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS "" CACHE STRING
     "Extra flags to pass when compiling swift stdlib files")
@@ -88,10 +93,6 @@ option(SWIFT_STDLIB_STABLE_ABI
 option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
-
-option(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
-       "Support back-deployment of built binaries to older OS versions."
-       TRUE)
 
 option(SWIFT_STDLIB_HAS_DLADDR
        "Build stdlib assuming the runtime environment runtime environment provides dladdr API."
@@ -133,10 +134,6 @@ option(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
        "Build stdlib without a custom implementation of MetadataAllocator, relying on malloc+free instead."
        FALSE)
 
-option(SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS
-       "Build stdlib with fast-path context descriptor lookups based on well-known short manglings."
-       TRUE)
-
 option(SWIFT_STDLIB_HAS_COMMANDLINE
        "Build stdlib with the CommandLine enum and support for argv/argc."
        TRUE)
@@ -164,10 +161,6 @@ option(SWIFT_ENABLE_REFLECTION
   "Build stdlib with support for runtime reflection and mirrors."
   TRUE)
 
-option(SWIFT_STDLIB_BUILD_PRIVATE
-  "Build private part of the Standard Library."
-  TRUE)
-
 if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
 else()
@@ -177,6 +170,10 @@ endif()
 set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
     "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
     "Build the concurrency library to use the given global executor (options: dispatch, singlethreaded, hooked)")
+
+# New options should be added to stdlib/cmake/modules/StdlibOptions.cmake,
+# so that they are considered in configurations using StandaloneOverlay.cmake
+include(StdlibOptions)
 
 #
 # End of user-configurable options.
