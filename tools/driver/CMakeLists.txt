@@ -1,6 +1,6 @@
 # The swift-frontend tool
 
-if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
+if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
 
   # Bootstrapping - level 0
   # For more information on how bootstrapping works, see docs/SwiftInTheCompiler.md
@@ -8,7 +8,7 @@ if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
   add_swift_host_tool(swift-frontend-bootstrapping0
     driver.cpp
     SWIFT_COMPONENT no_component
-    HAS_LIBSWIFT
+    HAS_SWIFT_MODULES
     BOOTSTRAPPING 0
   )
   target_link_libraries(swift-frontend-bootstrapping0
@@ -26,7 +26,7 @@ if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
   add_swift_host_tool(swift-frontend-bootstrapping1
     driver.cpp
     SWIFT_COMPONENT no_component
-    HAS_LIBSWIFT
+    HAS_SWIFT_MODULES
     BOOTSTRAPPING 1
   )
   target_link_libraries(swift-frontend-bootstrapping1
@@ -43,7 +43,7 @@ endif()
 add_swift_host_tool(swift-frontend
   driver.cpp
   SWIFT_COMPONENT compiler
-  HAS_LIBSWIFT
+  HAS_SWIFT_MODULES
 )
 target_link_libraries(swift-frontend
                       PUBLIC

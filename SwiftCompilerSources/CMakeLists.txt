@@ -92,14 +92,14 @@ function(add_swift_compiler_modules_library name)
     set(deployment_version "10.15") # TODO: once #38675 lands, replace this with
 #   set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
     set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
-    if(${LIBSWIFT_BUILD_MODE} STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
+    if(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
       # Let the cross-compiled compile don't pick up the compiled stdlib by providing
       # an (almost) empty resource dir.
       # The compiler will instead pick up the stdlib from the SDK.
       get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
       set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
     endif()
-  elseif(${LIBSWIFT_BUILD_MODE} STREQUAL "CROSSCOMPILE")
+  elseif(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE")
     set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
     get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
     set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../lib/swift")
@@ -160,7 +160,7 @@ endfunction()
 # A dummy library if swift in the compiler is disabled
 add_swift_host_library(swiftCompilerStub OBJECT stubs.cpp)
 
-if (NOT LIBSWIFT_BUILD_MODE)
+if (NOT BOOTSTRAPPING_MODE)
 
   add_library(swiftCompilerModules ALIAS swiftCompilerStub)
 
@@ -171,20 +171,20 @@ else()
 
   add_subdirectory(Sources)
 
-  if(${LIBSWIFT_BUILD_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
+  if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
 
-    if (NOT SWIFT_EXEC_FOR_LIBSWIFT)
+    if (NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
       message(FATAL_ERROR "Need a swift toolchain building swift compiler sources")
     endif()
 
     add_swift_compiler_modules_library(swiftCompilerModules
-      SWIFT_EXEC "${SWIFT_EXEC_FOR_LIBSWIFT}")
+      SWIFT_EXEC "${SWIFT_EXEC_FOR_SWIFT_MODULES}")
 
-  elseif(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
+  elseif(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
 
     set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0)
     set(b1_deps swift-frontend-bootstrapping1 symlink-headers-bootstrapping1)
-    if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
+    if(${BOOTSTRAPPING_MODE} STREQUAL "BOOTSTRAPPING")
       list(APPEND b0_deps swiftCore-bootstrapping0)
       list(APPEND b1_deps swiftCore-bootstrapping1)
       if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -221,7 +221,7 @@ else()
         SWIFT_EXEC $<TARGET_FILE_DIR:swift-frontend-bootstrapping1>/swiftc${CMAKE_EXECUTABLE_SUFFIX}
         DEPENDS ${b1_deps})
 
-    if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+    if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
       file(GLOB module_dirs "${CMAKE_BINARY_DIR}/bootstrapping*/lib/swift/macosx/*.swiftmodule")
       foreach(module_dir ${module_dirs})
         message(WARNING "${module_dir} found from a previous 'bootstrapping' build: removing")
@@ -229,7 +229,7 @@ else()
       endforeach()
     endif()
   else()
-    message(FATAL_ERROR "Unknown LIBSWIFT_BUILD_MODE '${LIBSWIFT_BUILD_MODE}'")
+    message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${BOOTSTRAPPING_MODE}'")
   endif()
 
 endif()

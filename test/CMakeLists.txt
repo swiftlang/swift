@@ -173,9 +173,9 @@ if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
-if (LIBSWIFT_BUILD_MODE)
+if (BOOTSTRAPPING_MODE)
   list(APPEND SWIFT_LIT_ARGS
-       "--param" "libswift_build_mode=${LIBSWIFT_BUILD_MODE}")
+       "--param" "bootstrapping_mode=${BOOTSTRAPPING_MODE}")
 endif()
 
 if (LLVM_USE_SANITIZER STREQUAL "Address")

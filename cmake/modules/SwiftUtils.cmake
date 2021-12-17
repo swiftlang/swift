@@ -96,7 +96,7 @@ endfunction()
 # from the previous bootstrapping stage.
 function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
   set(bs_lib_dir "")
-  if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
+  if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
     set(lib_dir
         "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
     # If building the stdlib with bootstrapping, the compiler has to pick up

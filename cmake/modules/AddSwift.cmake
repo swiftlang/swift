@@ -630,7 +630,7 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(options HAS_LIBSWIFT)
+  set(options HAS_SWIFT_MODULES)
   set(single_parameter_options SWIFT_COMPONENT BOOTSTRAPPING)
   set(multiple_parameter_options LLVM_LINK_COMPONENTS)
 
@@ -696,11 +696,11 @@ function(add_swift_host_tool executable)
     # If we found a swift compiler and are going to use swift code in swift
     # host side tools but link with clang, add the appropriate -L paths so we
     # find all of the necessary swift libraries on Darwin.
-    if (ASHT_HAS_LIBSWIFT AND LIBSWIFT_BUILD_MODE)
+    if (ASHT_HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE)
 
-      if(LIBSWIFT_BUILD_MODE STREQUAL "HOSTTOOLS")
+      if(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
         # Add in the toolchain directory so we can grab compatibility libraries
-        get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_LIBSWIFT} DIRECTORY)
+        get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
         get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
         target_link_directories(${executable} PUBLIC ${TOOLCHAIN_LIB_DIR})
 
@@ -710,7 +710,7 @@ function(add_swift_host_tool executable)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(LIBSWIFT_BUILD_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
+      elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
 
         # Intentinally don't add the lib dir of the cross-compiled compiler, so that
         # the stdlib is not picked up from there, but from the SDK.
@@ -726,7 +726,7 @@ function(add_swift_host_tool executable)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+      elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
         # Add the SDK directory for the host platform.
         target_link_directories(${executable} PRIVATE "${sdk_dir}")
 
@@ -737,7 +737,7 @@ function(add_swift_host_tool executable)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
+      elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
         # At build time link against the built swift libraries from the
         # previous bootstrapping stage.
         get_bootstrapping_swift_lib_dir(bs_lib_dir "${ASHT_BOOTSTRAPPING}")
@@ -751,7 +751,7 @@ function(add_swift_host_tool executable)
         # bootstrapping stage.
         list(APPEND RPATH_LIST "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       else()
-        message(FATAL_ERROR "Unknown LIBSWIFT_BUILD_MODE '${LIBSWIFT_BUILD_MODE}'")
+        message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${BOOTSTRAPPING_MODE}'")
       endif()
 
       # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
@@ -770,18 +770,18 @@ function(add_swift_host_tool executable)
       set_property(TARGET ${executable} APPEND_STRING PROPERTY
                    LINK_FLAGS " -lobjc ")
 
-    endif() # ASHT_HAS_LIBSWIFT AND LIBSWIFT_BUILD_MODE
+    endif() # ASHT_HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE
 
     set_target_properties(${executable} PROPERTIES
       BUILD_WITH_INSTALL_RPATH YES
       INSTALL_RPATH "${RPATH_LIST}")
 
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND ASHT_HAS_LIBSWIFT AND LIBSWIFT_BUILD_MODE)
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND ASHT_HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-    if(${LIBSWIFT_BUILD_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
+    if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
       # At build time and and run time, link against the swift libraries in the
       # installed host toolchain.
-      get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_LIBSWIFT} DIRECTORY)
+      get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
       get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
       set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
@@ -789,7 +789,7 @@ function(add_swift_host_tool executable)
       target_link_libraries(${executable} PRIVATE "swiftCore")
 
       target_link_directories(${executable} PRIVATE ${host_lib_dir})
-      if(LIBSWIFT_BUILD_MODE STREQUAL "HOSTTOOLS")
+      if(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
         set_target_properties(${executable} PROPERTIES
           BUILD_WITH_INSTALL_RPATH YES
           INSTALL_RPATH  "${host_lib_dir}")
@@ -799,7 +799,7 @@ function(add_swift_host_tool executable)
           INSTALL_RPATH  "$ORIGIN/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       endif()
 
-    elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
+    elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       # At build time link against the built swift libraries from the
       # previous bootstrapping stage.
       if (NOT "${ASHT_BOOTSTRAPPING}" STREQUAL "0")
@@ -815,10 +815,10 @@ function(add_swift_host_tool executable)
         BUILD_WITH_INSTALL_RPATH YES
         INSTALL_RPATH  "$ORIGIN/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
-    elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-      message(FATAL_ERROR "LIBSWIFT_BUILD_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
+    elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+      message(FATAL_ERROR "BOOTSTRAPPING_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
     else()
-      message(FATAL_ERROR "Unknown LIBSWIFT_BUILD_MODE '${LIBSWIFT_BUILD_MODE}'")
+      message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${BOOTSTRAPPING_MODE}'")
     endif()
   endif()
 
