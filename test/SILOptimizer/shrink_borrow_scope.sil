@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -408,12 +408,13 @@ exit:
 // CHECK-LABEL: sil [ossa] @hoist_over_struct : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE_C:%[^,]+]] : @owned $C, [[INSTANCE_D:%[^,]+]] : @owned $D):
 // CHECK:         [[LIFETIME_C:%[^,]+]] = begin_borrow [[INSTANCE_C]]
+// CHECK:         [[COPY_C:%[^,]+]] = copy_value [[LIFETIME_C]]
 // CHECK:         [[LIFETIME_D:%[^,]+]] = begin_borrow [[INSTANCE_D]]
 // CHECK:         [[REGISTER_4:%[^,]+]] = struct $CDCase ([[LIFETIME_C]] : $C, [[LIFETIME_D]] : $D)
 // CHECK:         end_borrow [[LIFETIME_C]]
 // CHECK:         end_borrow [[LIFETIME_D]]
 // CHECK:         destroy_value [[INSTANCE_D]]
-// CHECK:         return [[INSTANCE_C]]
+// CHECK:         return [[COPY_C]]
 // CHECK-LABEL: } // end sil function 'hoist_over_struct'
 sil [ossa] @hoist_over_struct : $@convention(thin) (@owned C, @owned D) -> @owned C {
 entry(%instance_c: @owned $C, %instance_d: @owned $D):
