@@ -815,7 +815,9 @@ bool swift::diagnoseNonSendableTypesInReference(
             propertyType, fromDC, loc,
             diag::non_sendable_property_type,
             var->getDescriptiveKind(), var->getName(),
-            var->isLocalCapture()))
+            var->isLocalCapture(),
+            (unsigned)reason,
+            getActorIsolation(var)))
       return true;
   }
 

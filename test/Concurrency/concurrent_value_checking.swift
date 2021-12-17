@@ -50,7 +50,7 @@ extension A1 {
     _ = await self.asynchronous(nil)
 
     // Across to a different actor, so Sendable restriction is enforced.
-    _ = other.localLet // expected-warning{{cannot use property 'localLet' with a non-sendable type 'NotConcurrent' across actors}}
+    _ = other.localLet // expected-warning{{non-sendable type 'NotConcurrent' in asynchronous access to actor-isolated property 'localLet' cannot cross actor boundary}}
     _ = await other.synchronous() // expected-warning{{non-sendable type 'NotConcurrent?' returned by implicitly asynchronous call to actor-isolated instance method 'synchronous()' cannot cross actor boundary}}
     _ = await other.asynchronous(nil) // expected-warning{{non-sendable type 'NotConcurrent?' passed in call to actor-isolated instance method 'asynchronous' cannot cross actor boundary}}
   }
@@ -80,7 +80,7 @@ func globalAsync(_: NotConcurrent?) async {
 }
 
 func globalTest() async {
-  let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
+  let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' in asynchronous access to global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot cross actor boundary}}
   await globalAsync(a) // expected-warning{{non-sendable type 'NotConcurrent?' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
   await globalSync(a)  // expected-warning{{non-sendable type 'NotConcurrent?' passed in call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
 }
@@ -101,7 +101,7 @@ class ClassWithGlobalActorInits { // expected-note 2{{class 'ClassWithGlobalActo
 
 @MainActor
 func globalTestMain(nc: NotConcurrent) async {
-  let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
+  let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' in asynchronous access to global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot cross actor boundary}}
   await globalAsync(a) // expected-warning{{non-sendable type 'NotConcurrent?' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
   await globalSync(a)  // expected-warning{{non-sendable type 'NotConcurrent?' passed in call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
   _ = await ClassWithGlobalActorInits(nc) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
@@ -180,7 +180,7 @@ actor ANI {
 }
 
 func testANI(ani: ANI) async {
-  _ = ani.nc // expected-warning{{cannot use property 'nc' with a non-sendable type 'NC' across actors}}
+  _ = ani.nc // expected-warning{{non-sendable type 'NC' in asynchronous access to nonisolated property 'nc' cannot cross actor boundary}}
 }
 
 // ----------------------------------------------------------------------

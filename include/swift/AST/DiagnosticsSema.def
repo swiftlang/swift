@@ -4593,9 +4593,13 @@ WARNING(non_sendable_call_result_type,none,
         "call to %2 function cannot cross actor boundary",
         (Type, bool, ActorIsolation))
 WARNING(non_sendable_property_type,none,
-        "cannot use %1 %2 with a non-sendable type %0 "
-        "%select{across actors|from concurrently-executed code}3",
-        (Type, DescriptiveDeclKind, DeclName, bool))
+        "non-sendable type %0 in %select{"
+        "%select{asynchronous access to %5 %1 %2|"
+        "implicitly asynchronous access to %5 %1 %2|"
+        "conformance of %5 %1 %2 to non-isolated protocol requirement|"
+        "%5 '@objc' %1 %2}4|captured local %1 %2}3 cannot "
+        "cross %select{actor|task}3 boundary",
+        (Type, DescriptiveDeclKind, DeclName, bool, unsigned, ActorIsolation))
 WARNING(non_sendable_keypath_capture,none,
         "cannot form key path that captures non-sendable type %0",
         (Type))

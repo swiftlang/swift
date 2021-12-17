@@ -175,11 +175,11 @@ func someAsyncFunc() async {
   ////////////
   // effectful properties from outside the actor instance
 
-  // expected-warning@+2 {{cannot use property 'effPropA' with a non-sendable type 'Box' across actors}}
+  // expected-warning@+2 {{non-sendable type 'Box' in asynchronous access to actor-isolated property 'effPropA' cannot cross actor boundary}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = a.effPropA
 
-  // expected-warning@+3 {{cannot use property 'effPropT' with a non-sendable type 'Box' across actors}}
+  // expected-warning@+3 {{non-sendable type 'Box' in implicitly asynchronous access to actor-isolated property 'effPropT' cannot cross actor boundary}}
   // expected-error@+2{{property access can throw, but it is not marked with 'try' and the error is not handled}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = a.effPropT
@@ -189,8 +189,8 @@ func someAsyncFunc() async {
   _ = a.effPropAT
 
   // (mostly) corrected ones
-  _ = await a.effPropA  // expected-warning {{cannot use property 'effPropA' with a non-sendable type 'Box' across actors}}
-  _ = try! await a.effPropT // expected-warning {{cannot use property 'effPropT' with a non-sendable type 'Box' across actors}}
+  _ = await a.effPropA  // expected-warning {{non-sendable type 'Box' in asynchronous access to actor-isolated property 'effPropA' cannot cross actor boundary}}
+  _ = try! await a.effPropT // expected-warning {{non-sendable type 'Box' in implicitly asynchronous access to actor-isolated property 'effPropT' cannot cross actor boundary}}
   _ = try? await a.effPropAT
 
   print("ok!")
