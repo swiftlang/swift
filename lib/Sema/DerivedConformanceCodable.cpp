@@ -54,7 +54,13 @@ static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
 static Identifier getVarNameForCoding(VarDecl *var,
                                       Optional<int> paramIndex = None) {
   auto &C = var->getASTContext();
-  Identifier identifier = var->getName();
+  Identifier identifier;
+  if (auto *PD = dyn_cast<ParamDecl>(var)) {
+    identifier = PD->getArgumentName();
+  } else {
+    identifier = var->getName();
+  }
+
   if (auto originalVar = var->getOriginalWrappedProperty())
     identifier = originalVar->getName();
 
