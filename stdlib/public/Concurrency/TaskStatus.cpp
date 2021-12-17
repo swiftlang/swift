@@ -429,29 +429,6 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 /**************************************************************************/
 
 // ==== Child tasks ------------------------------------------------------------
-SWIFT_CC(swift)
-static ChildTaskStatusRecord*
-swift_task_attachChildImpl(AsyncTask *child) {
-  void *allocation = malloc(sizeof(swift::ChildTaskStatusRecord));
-  auto record = new (allocation) swift::ChildTaskStatusRecord(child);
-  SWIFT_TASK_DEBUG_LOG("attach child task = %p, record = %p, to current task = %p",
-                       child, record, swift_task_getCurrent());
-
-  bool added_record = swift_task_addStatusRecordWithChecks(
-      record, [&](ActiveTaskStatus parentStatus) {
-        swift_task_updateNewChildWithParentAndGroupState(child, parentStatus,
-                                                         NULL);
-        return true;
-      });
-  assert(added_record);
-  return record;
-}
-
-SWIFT_CC(swift)
-static void
-swift_task_detachChildImpl(ChildTaskStatusRecord *record) {
-  swift_task_removeStatusRecord(record);
-}
 
 /* Called in the path of linking a child into a parent/group synchronously with
  * the parent task.

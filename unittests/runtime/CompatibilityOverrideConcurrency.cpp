@@ -231,14 +231,6 @@ TEST_F(CompatibilityOverrideConcurrencyTest, task_hasTaskGroupStatusRecord) {
   swift_task_hasTaskGroupStatusRecord();
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_attachChild) {
-  swift_task_attachChild(nullptr);
-}
-
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_detachChild) {
-  swift_task_detachChild(nullptr);
-}
-
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_cancel) {
   swift_task_cancel(nullptr);
 }
