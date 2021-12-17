@@ -93,9 +93,7 @@ public distributed actor MyOtherActor {
 // CHECK: store i8* %1, i8** %offset, align 8
 // CHECK-NEXT: %elt_offset = load i8*, i8** %offset, align 8
 // CHECK-NEXT: [[ELT_PTR:%.*]] = bitcast i8* %elt_offset to %TSi*
-// CHECK-NEXT: %argval = load %TSi, %TSi* [[ELT_PTR]], align 8
-
-// CHECK: [[NATIVE_VAL_LOC:%.*]] = bitcast %TSi* %argval.coercion.coerced to i64*
+// CHECK-NEXT: [[NATIVE_VAL_LOC:%.*]] = getelementptr inbounds %TSi, %TSi* [[ELT_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[ARG_VAL:%.*]] = load i64, i64* [[NATIVE_VAL_LOC]], align 8
 
 /// Retrieve an async pointer to the distributed thunk for `simple1`
@@ -156,11 +154,11 @@ public distributed actor MyOtherActor {
 
 // CHECK: [[TYPED_RESULT_BUFF:%.*]] = bitcast i8* [[RESULT_BUFF]] to %TSi*
 
-// CHECK: %argval = load %TSS, %TSS* {{.*}}, align 8
-// CHECK: [[NATIVE_STR_PTR:%.*]] = bitcast %TSS* %argval.coercion.coerced to { i64, %swift.bridge* }*
-// CHECK-NEXT: [[NATIVE_STR:%.*]] = load { i64, %swift.bridge* }, { i64, %swift.bridge* }* [[NATIVE_STR_PTR]], align 8
-// CHECK: [[STR_SIZE:%.*]] = extractvalue { i64, %swift.bridge* } [[NATIVE_STR]], 0
-// CHECK-NEXT: [[STR_VAL:%.*]] = extractvalue { i64, %swift.bridge* } [[NATIVE_STR]], 1
+// CHECK: [[ELT_PTR:%.*]] = bitcast i8* %elt_offset to %TSS*
+// CHECK-NEXT: %._guts = getelementptr inbounds %TSS, %TSS* [[ELT_PTR]], i32 0, i32 0
+
+// CHECK: [[STR_SIZE:%.*]] = load i64, i64* %._guts._object._countAndFlagsBits._value
+// CHECK: [[STR_VAL:%.*]] = load %swift.bridge*, %swift.bridge** %._guts._object._object, align 8
 
 /// Load pointer to a distributed thunk for `simple3`
 
@@ -211,23 +209,18 @@ public distributed actor MyOtherActor {
 // CHECK: [[TYPED_RESULT_BUFF:%.*]] = bitcast i8* %2 to %T27distributed_actor_accessors9IndirectEO*
 // CHECK: store i8* %1, i8** %offset, align 8
 // CHECK-NEXT: %elt_offset = load i8*, i8** %offset, align 8
+
 // CHECK-NEXT: [[ENUM_PTR:%.*]] = bitcast i8* %elt_offset to %T27distributed_actor_accessors9IndirectEO*
-// CHECK-NEXT: %argval = load %T27distributed_actor_accessors9IndirectEO, %T27distributed_actor_accessors9IndirectEO* [[ENUM_PTR]], align 8
-// CHECK-NEXT: [[OPAQUE_ENUM_PTR:%.*]] = bitcast %T27distributed_actor_accessors9IndirectEO* %argval.coercion.coerced to i8*
-// CHECK: store %T27distributed_actor_accessors9IndirectEO %argval, %T27distributed_actor_accessors9IndirectEO* %argval.coercion.coerced, align 8
-// CHECK-NEXT: [[COERCED_ENUM_PTR:%.*]] = bitcast %T27distributed_actor_accessors9IndirectEO* %argval.coercion.coerced to i64*
-// CHECK-NEXT: [[NATIVE_ENUM_VAL:%.*]] = load i64, i64* [[COERCED_ENUM_PTR]], align 8
+// CHECK-NEXT: [[NATIVE_ENUM_PTR:%.*]] = bitcast %T27distributed_actor_accessors9IndirectEO* [[ENUM_PTR]] to i64*
+// CHECK-NEXT: [[NATIVE_ENUM_VAL:%.*]] = load i64, i64* [[NATIVE_ENUM_PTR]]
 // CHECK: [[ENUM_PTR_INT:%.*]] = ptrtoint %T27distributed_actor_accessors9IndirectEO* [[ENUM_PTR]] to i64
 // CHECK-NEXT: [[NEXT_ELT_LOC:%.*]] = add i64 [[ENUM_PTR_INT]], 8
 // CHECK-NEXT: [[NEXT_ELT_PTR:%.*]] = inttoptr i64 [[NEXT_ELT_LOC]] to i8*
-// CHECK-NEXT: store i8* [[NEXT_ELT_PTR]], i8** %offset, align 8
-// CHECK-NEXT: %elt_offset1 = load i8*, i8** %offset, align 8
+// CHECK-NEXT: store i8* [[NEXT_ELT_PTR]], i8** %offset
+// CHECK-NEXT: %elt_offset1 = load i8*, i8** %offset
 // CHECK-NEXT: [[INT_PTR:%.*]] = bitcast i8* %elt_offset1 to %TSi*
-// CHECK-NEXT: %argval2 = load %TSi, %TSi* [[INT_PTR]], align 8
-// CHECK-NEXT: [[OPAQUE_INT_PTR:%.*]] = bitcast %TSi* %argval2.coercion.coerced to i8*
-// CHECK: store %TSi %argval2, %TSi* %argval2.coercion.coerced, align 8
-// CHECK-NEXT: [[COERCED_INT_PTR:%.*]] = bitcast %TSi* %argval2.coercion.coerced to i64*
-// CHECK-NEXT: [[NATIVE_INT_VAL:%.*]] = load i64, i64* [[COERCED_INT_PTR]], align 8
+// CHECK-NEXT: %._value = getelementptr inbounds %TSi, %TSi* [[INT_PTR]], i32 0, i32 0
+// CHECK-NEXT: [[NATIVE_INT_VAL:%.*]] = load i64, i64* %._value
 
 /// Call distributed thunk with extracted arguments.
 
@@ -255,10 +248,8 @@ public distributed actor MyOtherActor {
 
 // CHECK: %elt_offset = load i8*, i8** %offset, align 8
 // CHECK-NEXT: [[ARR_PTR:%.*]] = bitcast i8* %elt_offset to %TSa*
-// CHECK-NEXT: %argval = load %TSa, %TSa* [[ARR_PTR]], align 8
-// CHECK: store %TSa %argval, %TSa* %argval.coercion.coerced, align 8
-// CHECK-NEXT: [[PTR_TO_NATIVE_ARR:%.*]] = bitcast %TSa* %argval.coercion.coerced to [[NATIVE_ARR_TYPE:%.*]]
-// CHECK-NEXT: [[NATIVE_ARR_VAL:%.*]] = load {{.*}}, [[NATIVE_ARR_TYPE]] [[PTR_TO_NATIVE_ARR]], align 8
+// CHECK-NEXT: %._buffer = getelementptr inbounds %TSa, %TSa* [[ARR_PTR]], i32 0, i32 0
+// CHECK: [[NATIVE_ARR_VAL:%.*]] = load [[ARR_STORAGE_TYPE:%.*]], [[ARR_STORAGE_TYPE]]* %._buffer._storage
 // CHECK: [[ARR_PTR_INT:%.*]] = ptrtoint %TSa* [[ARR_PTR]] to i64
 // CHECK-NEXT: [[NEXT_ELT:%.*]] = add i64 [[ARR_PTR_INT]], 8
 // CHECK-NEXT: [[OPAQUE_NEXT_ELT:%.*]] = inttoptr i64 [[NEXT_ELT]] to i8*
@@ -269,41 +260,37 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: %elt_offset1 = load i8*, i8** %offset, align 8
 // CHECK-NEXT: [[OBJ_PTR:%.*]] = bitcast i8* %elt_offset1 to %T27distributed_actor_accessors3ObjC**
 // CHECK-NEXT: [[NATIVE_OBJ_VAL:%.*]] = load %T27distributed_actor_accessors3ObjC*, %T27distributed_actor_accessors3ObjC** [[OBJ_PTR]], align 8
-// CHECK-NEXT: [[OBJ_PTR_INT:%.*]] = ptrtoint %T27distributed_actor_accessors3ObjC** [[OBJ_PTR]] to i64
+// CHECK: [[OBJ_PTR_INT:%.*]] = ptrtoint %T27distributed_actor_accessors3ObjC** [[OBJ_PTR]] to i64
 // CHECK-NEXT: [[NEXT_ELT:%.*]] = add i64 [[OBJ_PTR_INT]], 8
 // CHECK-NEXT: [[NEXT_ELT_PTR:%.*]] = inttoptr i64 [[NEXT_ELT]] to i8*
 // CHECK-NEXT: store i8* [[NEXT_ELT_PTR]], i8** %offset, align 8
 
 /// -> String?
 
-// CHECK-NEXT: %elt_offset3 = load i8*, i8** %offset, align 8
-// CHECK-NEXT: [[OPT_PTR:%.*]] = bitcast i8* %elt_offset3 to %TSSSg*
-// CHECK-NEXT: %argval4 = load %TSSSg, %TSSSg* [[OPT_PTR]], align 8
-// CHECK: store %TSSSg %argval4, %TSSSg* %argval4.coercion.coerced, align 8
-// CHECK-NEXT: [[NATIVE_OPT_PTR:%.*]] = bitcast %TSSSg* %argval4.coercion.coerced to { i64, i64 }*
-// CHECK-NEXT: [[NATIVE_OPT_VAL:%.*]] = load { i64, i64 }, { i64, i64 }* [[NATIVE_OPT_PTR]], align 8
-// CHECK:      [[NATIVE_OPT_VAL_0:%.*]] = extractvalue { i64, i64 } [[NATIVE_OPT_VAL]], 0
-// CHECK-NEXT: [[NATIVE_OPT_VAL_1:%.*]] = extractvalue { i64, i64 } [[NATIVE_OPT_VAL]], 1
-// CHECK-NEXT: [[OPT_PTR_INT:%.*]] = ptrtoint %TSSSg* [[OPT_PTR]] to i64
+// CHECK-NEXT: %elt_offset2 = load i8*, i8** %offset
+// CHECK-NEXT: [[OPT_PTR:%.*]] = bitcast i8* %elt_offset2 to %TSSSg*
+// CHECK-NEXT: [[NATIVE_OPT_PTR:%.*]] = bitcast %TSSSg* %22 to { i64, i64 }*
+// CHECK-NEXT: [[NATIVE_OPT_VAL_0_PTR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[NATIVE_OPT_PTR]], i32 0, i32 0
+// CHECK-NEXT: [[NATIVE_OPT_VAL_0:%.*]] = load i64, i64* [[NATIVE_OPT_VAL_0_PTR]]
+// CHECK-NEXT: [[NATIVE_OPT_VAL_1_PTR:%.*]] = getelementptr inbounds { i64, i64 }, { i64, i64 }* [[NATIVE_OPT_PTR]], i32 0, i32 1
+// CHECK-NEXT: [[NATIVE_OPT_VAL_1_OPAQUE:%.*]] = load i64, i64* [[NATIVE_OPT_VAL_1_PTR]]
+// CHECK-NEXT: [[NATIVE_OPT_VAL_1_OBJ:%.*]] = inttoptr i64 [[NATIVE_OPT_VAL_1_OPAQUE]] to %swift.bridge*
+// CHECK: [[NATIVE_OPT_VAL_1:%.*]] = ptrtoint %swift.bridge* [[NATIVE_OPT_VAL_1_OBJ]] to i64
+// CHECK: [[OPT_PTR_INT:%.*]] = ptrtoint %TSSSg* [[OPT_PTR]] to i64
 // CHECK-NEXT: [[NEXT_ELT:%.*]] = add i64 [[OPT_PTR_INT]], 16
 // CHECK-NEXT: [[NEXT_ELT_PTR:%.*]] = inttoptr i64 [[NEXT_ELT]] to i8*
-// CHECK-NEXT: store i8* [[NEXT_ELT_PTR]], i8** %offset, align 8
+// CHECK-NEXT: store i8* [[NEXT_ELT_PTR]], i8** %offset
 
 /// -> LargeStruct (passed indirectly)
 
-// CHECK-NEXT: %elt_offset5 = load i8*, i8** %offset, align 8
-// CHECK-NEXT: [[STRUCT_PTR:%.*]] = bitcast i8* %elt_offset5 to %T27distributed_actor_accessors11LargeStructV*
-// CHECK-NEXT: [[STRUCT_VAL:%.*]] = load %T27distributed_actor_accessors11LargeStructV, %T27distributed_actor_accessors11LargeStructV* [[STRUCT_PTR]], align 8
+// CHECK-NEXT: %elt_offset3 = load i8*, i8** %offset, align 8
+// CHECK-NEXT: [[STRUCT_PTR:%.*]] = bitcast i8* %elt_offset3 to %T27distributed_actor_accessors11LargeStructV*
 
 // CHECK: [[INDIRECT_RESULT_BUFF:%.*]] = bitcast %swift.opaque* [[TYPED_RESULT_BUFF]] to %T27distributed_actor_accessors11LargeStructV*
 
-// CHECK: store %T27distributed_actor_accessors11LargeStructV [[STRUCT_VAL]], %T27distributed_actor_accessors11LargeStructV* %argval6.coercion.coerced, align 8
-// CHECK-NEXT: [[PTR_TO_STRUCT:%.*]] = bitcast %T27distributed_actor_accessors11LargeStructV* %argval6.coercion.coerced to %T27distributed_actor_accessors11LargeStructV**
-// CHECK-NEXT: [[NATIVE_STRUCT_VAL:%.*]] = load %T27distributed_actor_accessors11LargeStructV*, %T27distributed_actor_accessors11LargeStructV** [[PTR_TO_STRUCT]], align 8
-
 /// Now let's make sure that distributed thunk call uses the arguments correctly
 
-// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, %T27distributed_actor_accessors11LargeStructV* [[INDIRECT_RESULT_BUFF]], %swift.context* {{.*}}, {{.*}} [[NATIVE_ARR_VAL]], %T27distributed_actor_accessors3ObjC* [[NATIVE_OBJ_VAL]], i64 [[NATIVE_OPT_VAL_0]], i64 [[NATIVE_OPT_VAL_1]], %T27distributed_actor_accessors11LargeStructV* [[NATIVE_STRUCT_VAL]], %T27distributed_actor_accessors7MyActorC* {{.*}})
+// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, %T27distributed_actor_accessors11LargeStructV* [[INDIRECT_RESULT_BUFF]], %swift.context* {{.*}}, {{.*}} [[NATIVE_ARR_VAL]], %T27distributed_actor_accessors3ObjC* [[NATIVE_OBJ_VAL]], i64 [[NATIVE_OPT_VAL_0]], i64 [[NATIVE_OPT_VAL_1]], %T27distributed_actor_accessors11LargeStructV* [[STRUCT_PTR]], %T27distributed_actor_accessors7MyActorC* {{.*}})
 
 /// RESULT is returned indirectly so there is nothing to pass to `end`
 

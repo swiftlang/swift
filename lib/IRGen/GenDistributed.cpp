@@ -208,7 +208,6 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
 
     if (paramTy.isObject()) {
       auto &nativeSchema = typeInfo.nativeParameterValueSchema(IGM);
-      auto expandedTy = nativeSchema.getExpandedType(IGM);
 
       if (nativeSchema.requiresIndirect()) {
         llvm_unreachable("indirect parameters are not supported");
@@ -219,25 +218,13 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
         continue;
 
       // 5. Load argument value from the element pointer.
-      auto *argValue = IGF.Builder.CreateLoad(alignedOffset, "argval");
-
-      Explosion nonNativeParam;
-      nonNativeParam.add(argValue);
-
-      // Convert SIL type into a native representation.
-      auto nativeParam = nativeSchema.mapIntoNative(
-          IGM, IGF, nonNativeParam, paramTy, /*isOutlined=*/false);
-
-      // If expanded type is a struct we need to explode it to match
-      // expected argument schema.
-      if (auto *ST = dyn_cast<llvm::StructType>(expandedTy)) {
-        IGF.emitAllExtractValues(nativeParam.claimNext(), ST, arguments);
-      } else {
-        arguments.add(nativeParam.claimNext());
-      }
+      cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, alignedOffset, arguments);
     } else {
-      // 5. Load argument value from the element pointer.
-      arguments.add(IGF.Builder.CreateLoad(alignedOffset, "argval"));
+      // If the value is not loadable e.g. generic or resilient
+      // pass its address as an argument.
+      //
+      // TODO: This needs to be copied and destroyed.
+      arguments.add(alignedOffset.getAddress());
     }
 
     // 6. Move the offset to the beginning of the next element, unless
