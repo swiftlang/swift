@@ -289,28 +289,28 @@ func blender(_ peeler : () -> Void) {
 
 
   await wisk({})
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await wisk(1)
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await (peelBanana)()
   await (((((peelBanana)))))()
   await (((wisk)))((wisk)((wisk)(1)))
-  // expected-warning@-1 3{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1 3{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
 
   blender((peelBanana))
   // expected-error@-1{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
   await wisk(peelBanana)
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
 
   await wisk(wisk)
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await (((wisk)))(((wisk)))
-  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@-1{{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
 
-  // expected-warning@+1 {{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@+1 {{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await {wisk}()(1)
 
-  // expected-warning@+1 {{cannot pass argument of non-sendable type 'Any' across actors}}
+  // expected-warning@+1 {{non-sendable type 'Any' passed in call to global actor 'BananaActor'-isolated function cannot cross actor boundary}}
   await (true ? wisk : {n in return})(1)
 }
 

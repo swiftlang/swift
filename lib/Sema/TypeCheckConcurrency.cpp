@@ -788,7 +788,9 @@ bool swift::diagnoseNonSendableTypesInReference(
     for (auto param : *function->getParameters()) {
       Type paramType = param->getInterfaceType().subst(subs);
       if (diagnoseNonSendableTypes(
-              paramType, fromDC, loc, diag::non_sendable_param_type))
+              paramType, fromDC, loc, diag::non_sendable_param_type,
+              (unsigned)reason, function->getDescriptiveKind(),
+              function->getName(), getActorIsolation(function)))
         return true;
     }
 
@@ -821,7 +823,9 @@ bool swift::diagnoseNonSendableTypesInReference(
     for (auto param : *subscript->getIndices()) {
       Type paramType = param->getInterfaceType().subst(subs);
       if (diagnoseNonSendableTypes(
-              paramType, fromDC, loc, diag::non_sendable_param_type))
+              paramType, fromDC, loc, diag::non_sendable_param_type,
+              (unsigned)reason, subscript->getDescriptiveKind(),
+              subscript->getName(), getActorIsolation(subscript)))
         return true;
     }
 
@@ -2107,11 +2111,23 @@ namespace {
       }
 
       // Check for sendability of the parameter types.
-      for (const auto &param : fnType->getParams()) {
-        // FIXME: Dig out the locations of the corresponding arguments.
+      auto params = fnType->getParams();
+      for (unsigned paramIdx : indices(params)) {
+        const auto &param = params[paramIdx];
+
+        // Dig out the location of the argument.
+        SourceLoc argLoc = apply->getLoc();
+        if (auto argList = apply->getArgs()) {
+          auto arg = argList->get(paramIdx);
+          if (arg.getStartLoc().isValid())
+            argLoc = arg.getStartLoc();
+        }
+
         if (diagnoseNonSendableTypes(
-                param.getParameterType(), getDeclContext(), apply->getLoc(),
-                diag::non_sendable_param_type))
+                param.getParameterType(), getDeclContext(), argLoc,
+                diag::non_sendable_call_param_type,
+                apply->isImplicitlyAsync().hasValue(),
+                *unsatisfiedIsolation))
           return true;
       }
 
