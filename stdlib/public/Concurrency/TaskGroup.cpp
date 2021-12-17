@@ -462,11 +462,14 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
   assert(impl == record && "the group IS the task record");
 
   // ok, now that the group actually is initialized: attach it to the task
-  bool notCancelled = swift_task_addStatusRecord(record);
-
-  // If the task has already been cancelled, reflect that immediately in
-  // the group status.
-  if (!notCancelled) impl->statusCancel();
+  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+    // If the task has already been cancelled, reflect that immediately in
+    // the group's status.
+    if (parentStatus.isCancelled()) {
+      impl->statusCancel();
+    }
+    return true;
+  });
 }
 
 // =============================================================================
@@ -493,7 +496,7 @@ void TaskGroupImpl::destroy() {
   SWIFT_TASK_DEBUG_LOG("destroying task group = %p", this);
 
   // First, remove the group from the task and deallocate the record
-  swift_task_removeStatusRecord(getTaskRecord());
+  removeStatusRecord(getTaskRecord());
 
   // No need to drain our queue here, as by the time we call destroy,
   // all tasks inside the group must have been awaited on already.
