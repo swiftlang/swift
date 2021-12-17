@@ -25,17 +25,17 @@ actor A2 {
   }
 
   convenience init(delegatingSync value: NotConcurrent) {
-    self.init(value: value) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+    self.init(value: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to nonisolated initializer 'init(value:)' cannot cross actor boundary}}
   }
 
   convenience init(delegatingAsync value: NotConcurrent) async {
-    await self.init(valueAsync: value) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+    await self.init(valueAsync: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to actor-isolated initializer 'init(valueAsync:)' cannot cross actor boundary}}
   }
 }
 
 func testActorCreation(value: NotConcurrent) async {
-  _ = A2(value: value) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
-  _ = await A2(valueAsync: value) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+  _ = A2(value: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to nonisolated initializer 'init(value:)' cannot cross actor boundary}}
+  _ = await A2(valueAsync: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to actor-isolated initializer 'init(valueAsync:)' cannot cross actor boundary}}
 }
 
 extension A1 {
@@ -52,7 +52,7 @@ extension A1 {
     // Across to a different actor, so Sendable restriction is enforced.
     _ = other.localLet // expected-warning{{cannot use property 'localLet' with a non-sendable type 'NotConcurrent' across actors}}
     _ = await other.synchronous() // expected-warning{{non-sendable type 'NotConcurrent?' returned by implicitly asynchronous call to actor-isolated instance method 'synchronous()' cannot cross actor boundary}}
-    _ = await other.asynchronous(nil) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
+    _ = await other.asynchronous(nil) // expected-warning{{non-sendable type 'NotConcurrent?' passed in call to actor-isolated instance method 'asynchronous' cannot cross actor boundary}}
   }
 }
 
@@ -81,8 +81,8 @@ func globalAsync(_: NotConcurrent?) async {
 
 func globalTest() async {
   let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
-  await globalAsync(a) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
-  await globalSync(a)  // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
+  await globalAsync(a) // expected-warning{{non-sendable type 'NotConcurrent?' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
+  await globalSync(a)  // expected-warning{{non-sendable type 'NotConcurrent?' passed in call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
 }
 
 struct HasSubscript {
@@ -102,9 +102,9 @@ class ClassWithGlobalActorInits { // expected-note 2{{class 'ClassWithGlobalActo
 @MainActor
 func globalTestMain(nc: NotConcurrent) async {
   let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
-  await globalAsync(a) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
-  await globalSync(a)  // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
-  _ = await ClassWithGlobalActorInits(nc) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+  await globalAsync(a) // expected-warning{{non-sendable type 'NotConcurrent?' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
+  await globalSync(a)  // expected-warning{{non-sendable type 'NotConcurrent?' passed in call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
+  _ = await ClassWithGlobalActorInits(nc) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
   // expected-warning@-1{{non-sendable type 'ClassWithGlobalActorInits' returned by call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
   _ = await ClassWithGlobalActorInits() // expected-warning{{non-sendable type 'ClassWithGlobalActorInits' returned by call to global actor 'SomeGlobalActor'-isolated function cannot cross actor boundary}}
 }
@@ -191,8 +191,7 @@ protocol AsyncProto {
 }
 
 extension A1: AsyncProto {
-  // FIXME: Poor diagnostic.
-  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of actor-isolated instance method 'asyncMethod' satisfying non-isolated protocol requirement cannot cross actor boundary}}
 }
 
 protocol MainActorProto {
@@ -201,7 +200,7 @@ protocol MainActorProto {
 
 class SomeClass: MainActorProto {
   @SomeGlobalActor
-  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable type 'NotConcurrent' in parameter of global actor 'SomeGlobalActor'-isolated instance method 'asyncMainMethod' satisfying non-isolated protocol requirement cannot cross actor boundary}}
 }
 
 // ----------------------------------------------------------------------
