@@ -6,27 +6,178 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-# A dummy libswift if libswift is disabled
-add_swift_host_library(libswiftStub OBJECT stubs.cpp)
+
+# Following function are needed as a workaround until it's possible to compile
+# swift code with cmake's builtin swift support.
+
+# Add a swift compiler module
+#
+# Creates a target to compile a swift module.
+# Adds the module name to the global property "swift_compiler_modules".
+#
+function(add_swift_compiler_module module)
+  cmake_parse_arguments(ALSM
+                        ""
+                        ""
+                        "DEPENDS"
+                        ${ARGN})
+  set(raw_sources ${ALSM_UNPARSED_ARGUMENTS})
+  set(sources)
+  foreach(raw_source ${raw_sources})
+    get_filename_component(
+      raw_source "${raw_source}" REALPATH BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    list(APPEND sources "${raw_source}")
+  endforeach()
+
+  set(target_name "SwiftModule${module}")
+
+  # Add a target which depends on the actual compilation target, which
+  # will be created in add_swift_compiler_modules_library.
+  # This target is mainly used to add properties, like the list of source files.
+  add_custom_target(
+      ${target_name}
+      SOURCES ${sources}
+      COMMENT "swift compiler module ${module}")
+
+  set_property(TARGET ${target_name} PROPERTY module_name ${module})
+  set_property(TARGET ${target_name} PROPERTY module_depends ${ALSM_DEPENDS})
+
+  get_property(modules GLOBAL PROPERTY swift_compiler_modules)
+  set_property(GLOBAL PROPERTY swift_compiler_modules ${modules} ${module})
+endfunction()
+ 
+# Add source files to a swift compiler module.
+#
+function(swift_compiler_sources module)
+  cmake_parse_arguments(LSS
+                        ""
+                        ""
+                        ""
+                        ${ARGN})
+  set(sources ${LSS_UNPARSED_ARGUMENTS})
+  list(TRANSFORM sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+
+  set(target_name "SwiftModule${module}")
+  set_property(TARGET "SwiftModule${module}" APPEND PROPERTY SOURCES ${sources})
+endfunction()
+ 
+# Add a library target for the swift compiler modules.
+#
+# Adds targets to compile all swift compiler modules and a target for the
+# library itself.
+#
+function(add_swift_compiler_modules_library name)
+  cmake_parse_arguments(ALS
+                        ""
+                        "BOOTSTRAPPING;SWIFT_EXEC"
+                        "DEPENDS"
+                        ${ARGN})
+
+  set(swift_compile_options
+      "-Xfrontend" "-validate-tbd-against-ir=none"
+      "-Xfrontend" "-enable-cxx-interop"
+      "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+
+  if(CMAKE_BUILD_TYPE STREQUAL Debug)
+    list(APPEND swift_compile_options "-g")
+  else()
+    list(APPEND swift_compile_options "-O" "-cross-module-optimization")
+  endif()
+
+  get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
+
+  set(sdk_option "")
+
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    set(deployment_version "10.15") # TODO: once #38675 lands, replace this with
+#   set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
+    set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    if(${LIBSWIFT_BUILD_MODE} STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
+      # Let the cross-compiled compile don't pick up the compiled stdlib by providing
+      # an (almost) empty resource dir.
+      # The compiler will instead pick up the stdlib from the SDK.
+      get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
+      set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
+    endif()
+  elseif(${LIBSWIFT_BUILD_MODE} STREQUAL "CROSSCOMPILE")
+    set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
+    set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../lib/swift")
+  endif()
+  get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
+      ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
+
+  get_property(modules GLOBAL PROPERTY "swift_compiler_modules")
+  foreach(module ${modules})
+
+    set(module_target "SwiftModule${module}")
+    get_target_property(module ${module_target} "module_name")
+    get_target_property(sources ${module_target} SOURCES)
+    get_target_property(dependencies ${module_target} "module_depends")
+    set(deps, "")
+    if (dependencies)
+      foreach(dep_module ${dependencies})
+        if (DEFINED "${dep_module}_dep_target")
+          list(APPEND deps "${${dep_module}_dep_target}")
+        else()
+          message(FATAL_ERROR "module dependency ${module} -> ${dep_module} not found. Make sure to add modules in dependency order")
+        endif()
+      endforeach()
+    endif()
+
+    set(module_obj_file "${build_dir}/${module}.o")
+    set(module_file "${build_dir}/${module}.swiftmodule")
+    set_property(TARGET ${module_target} PROPERTY "module_file" "${module_file}")
+
+    set(all_obj_files ${all_obj_files} ${module_obj_file})
+
+    # Compile the module into an object file
+    add_custom_command_target(dep_target OUTPUT ${module_obj_file}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      DEPENDS ${sources} ${deps} ${ALS_DEPENDS}
+      COMMAND ${ALS_SWIFT_EXEC} "-c" "-o" ${module_obj_file}
+              ${sdk_option}
+              "-target" ${target}
+              "-module-name" ${module} "-emit-module"
+              "-emit-module-path" "${build_dir}/${module}.swiftmodule"
+              "-parse-as-library" ${sources}
+              "-wmo" ${swift_compile_options}
+              "-I" "${SWIFT_SOURCE_DIR}/include/swift"
+              "-I" "${SWIFT_SOURCE_DIR}/include"
+              "-I" "${build_dir}"
+      COMMENT "Building swift module ${module}")
+
+    set("${module}_dep_target" ${dep_target})
+  endforeach()
+
+  # Create a static library containing all module object files.
+  add_library(${name} STATIC ${all_obj_files})
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+  set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+endfunction()
+
+
+# A dummy library if swift in the compiler is disabled
+add_swift_host_library(swiftCompilerStub OBJECT stubs.cpp)
 
 if (NOT LIBSWIFT_BUILD_MODE)
 
-  add_library(libswift ALIAS libswiftStub)
+  add_library(swiftCompilerModules ALIAS swiftCompilerStub)
 
 else()
   # Note: "Swift" is not added intentinally here, because it would break
   # the bootstrapping build in case no swift toolchain is installed on the host.
-  project(LibSwift LANGUAGES C CXX)
+  project(SwiftInTheCompiler LANGUAGES C CXX)
 
   add_subdirectory(Sources)
 
   if(${LIBSWIFT_BUILD_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
 
     if (NOT SWIFT_EXEC_FOR_LIBSWIFT)
-      message(FATAL_ERROR "Need a swift toolchain for building libswift")
+      message(FATAL_ERROR "Need a swift toolchain building swift compiler sources")
     endif()
 
-    add_libswift("libswift"
+    add_swift_compiler_modules_library(swiftCompilerModules
       SWIFT_EXEC "${SWIFT_EXEC_FOR_LIBSWIFT}")
 
   elseif(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
@@ -59,14 +210,14 @@ else()
 
     # Bootstrapping - stage 1, using the compiler from level 0
 
-    add_libswift(libswift-bootstrapping1
+    add_swift_compiler_modules_library(swiftCompilerModules-bootstrapping1
       SWIFT_EXEC $<TARGET_FILE_DIR:swift-frontend-bootstrapping0>/swiftc${CMAKE_EXECUTABLE_SUFFIX}
       DEPENDS ${b0_deps}
       BOOTSTRAPPING 1)
 
     # The final build, using the compiler from stage 1
 
-    add_libswift(libswift
+    add_swift_compiler_modules_library(swiftCompilerModules
         SWIFT_EXEC $<TARGET_FILE_DIR:swift-frontend-bootstrapping1>/swiftc${CMAKE_EXECUTABLE_SUFFIX}
         DEPENDS ${b1_deps})
 

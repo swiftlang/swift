@@ -10,7 +10,7 @@ target_link_libraries(sil-opt
                         swiftSIL
                         swiftSILGen
                         swiftSILOptimizer
-                        libswift
+                        swiftCompilerModules
                         # Clang libraries included to appease the linker on linux.
                         clangBasic
                         clangCodeGen)

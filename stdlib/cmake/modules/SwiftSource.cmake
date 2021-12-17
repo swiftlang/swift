@@ -737,7 +737,7 @@ function(_compile_swift_files
   if(SWIFTFILE_IS_STDLIB)
     get_bootstrapping_swift_lib_dir(bs_lib_dir "${SWIFTFILE_BOOTSTRAPPING}")
     if(bs_lib_dir)
-      # When building the stdlib with libswift bootstrapping, the compiler needs
+      # When building the stdlib with bootstrapping, the compiler needs
       # to pick up the stdlib from the previous bootstrapping stage, because the
       # stdlib in the current stage is not built yet.
       if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)

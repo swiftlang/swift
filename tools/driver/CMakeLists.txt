@@ -3,7 +3,7 @@
 if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
 
   # Bootstrapping - level 0
-  # For more information on how bootstrapping works, see libswift/README.md.
+  # For more information on how bootstrapping works, see docs/SwiftInTheCompiler.md
 
   add_swift_host_tool(swift-frontend-bootstrapping0
     driver.cpp
@@ -14,7 +14,7 @@ if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
   target_link_libraries(swift-frontend-bootstrapping0
                         PRIVATE
                           swiftDriverTool
-                          libswiftStub)
+                          swiftCompilerStub)
 
   swift_create_post_build_symlink(swift-frontend-bootstrapping0
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
@@ -32,7 +32,7 @@ if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
   target_link_libraries(swift-frontend-bootstrapping1
                         PRIVATE
                           swiftDriverTool
-                          libswift-bootstrapping1)
+                          swiftCompilerModules-bootstrapping1)
 
   swift_create_post_build_symlink(swift-frontend-bootstrapping1
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
@@ -48,7 +48,7 @@ add_swift_host_tool(swift-frontend
 target_link_libraries(swift-frontend
                       PUBLIC
                         swiftDriverTool
-                        libswift)
+                        swiftCompilerModules)
 
 # Create a `swift-driver` executable adjacent to the `swift-frontend` executable
 # to ensure that `swiftc` forwards to the standalone driver when invoked.
