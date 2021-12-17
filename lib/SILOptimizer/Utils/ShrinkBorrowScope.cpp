@@ -208,8 +208,8 @@ bool ShrinkBorrowScope::populateUsers() {
     // scope.
     return false;
   }
-  for (auto *usePoint : usePoints) {
-    auto *user = usePoint->getUser();
+  for (auto *use : uses) {
+    auto *user = use->getUser();
     users.insert(user);
     if (auto apply = ApplySite::isa(user)) {
       ++transitiveUsesPerApplySite[apply];
