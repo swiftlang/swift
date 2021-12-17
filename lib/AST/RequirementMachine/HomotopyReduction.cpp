@@ -543,7 +543,7 @@ void RewriteSystem::minimizeRewriteSystem() {
   // Check invariants after homotopy reduction.
   verifyRewriteLoops();
   verifyRedundantConformances(redundantConformances);
-  verifyMinimizedRules();
+  verifyMinimizedRules(redundantConformances);
 }
 
 /// In a conformance-valid rewrite system, any rule with unresolved symbols on
@@ -656,7 +656,7 @@ void RewriteSystem::verifyRewriteLoops() const {
 /// Assert if homotopy reduction failed to eliminate a redundant conformance,
 /// since this suggests a misunderstanding on my part.
 void RewriteSystem::verifyRedundantConformances(
-    llvm::DenseSet<unsigned> redundantConformances) const {
+    const llvm::DenseSet<unsigned> &redundantConformances) const {
 #ifndef NDEBUG
   for (unsigned ruleID : redundantConformances) {
     const auto &rule = getRule(ruleID);
@@ -680,9 +680,12 @@ void RewriteSystem::verifyRedundantConformances(
 
 // Assert if homotopy reduction failed to eliminate a rewrite rule it was
 // supposed to delete.
-void RewriteSystem::verifyMinimizedRules() const {
+void RewriteSystem::verifyMinimizedRules(
+    const llvm::DenseSet<unsigned> &redundantConformances) const {
 #ifndef NDEBUG
-  for (const auto &rule : Rules) {
+  for (unsigned ruleID : indices(Rules)) {
+    const auto &rule = getRule(ruleID);
+
     // Note that sometimes permanent rules can be simplified, but they can never
     // be redundant.
     if (rule.isPermanent()) {
@@ -703,6 +706,15 @@ void RewriteSystem::verifyMinimizedRules() const {
         !rule.isRedundant() &&
         !rule.isProtocolConformanceRule()) {
       llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+
+    if (rule.isRedundant() &&
+        rule.isAnyConformanceRule() &&
+        !rule.containsUnresolvedSymbols() &&
+        !redundantConformances.count(ruleID)) {
+      llvm::errs() << "Minimal conformance is redundant: " << rule << "\n\n";
       dump(llvm::errs());
       abort();
     }

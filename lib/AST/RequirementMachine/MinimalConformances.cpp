@@ -903,15 +903,8 @@ void MinimalConformances::verifyMinimalConformances() const {
       continue;
     }
 
-    if (rule.isRedundant()) {
-      llvm::errs() << "Generating conformance is redundant: ";
-      llvm::errs() << rule << "\n\n";
-      dumpMinimalConformanceEquations(llvm::errs());
-      abort();
-    }
-
     if (rule.getLHS().containsUnresolvedSymbols()) {
-      llvm::errs() << "Generating conformance contains unresolved symbols: ";
+      llvm::errs() << "Minimal conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
       dumpMinimalConformanceEquations(llvm::errs());
       abort();
@@ -922,7 +915,7 @@ void MinimalConformances::verifyMinimalConformances() const {
 
 void MinimalConformances::dumpMinimalConformances(
     llvm::raw_ostream &out) const {
-  out << "Generating conformances:\n";
+  out << "Minimal conformances:\n";
 
   for (const auto &pair : ConformancePaths) {
     if (RedundantConformances.count(pair.first) > 0)

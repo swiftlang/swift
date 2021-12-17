@@ -461,9 +461,10 @@ private:
   void verifyRewriteLoops() const;
 
   void verifyRedundantConformances(
-      llvm::DenseSet<unsigned> redundantConformances) const;
+      const llvm::DenseSet<unsigned> &redundantConformances) const;
 
-  void verifyMinimizedRules() const;
+  void verifyMinimizedRules(
+      const llvm::DenseSet<unsigned> &redundantConformances) const;
 
 public:
   void dump(llvm::raw_ostream &out) const;
