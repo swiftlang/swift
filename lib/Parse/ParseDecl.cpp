@@ -1943,6 +1943,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
 #include "swift/AST/Attr.def"
 
+  case DAK_MainType:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) MainTypeAttr(AtLoc, Loc));
+    break;
+
   case DAK_Effects: {
     auto kind = parseSingleAttrOption<EffectsKind>
                          (*this, Loc, AttrRange, AttrName, DK)

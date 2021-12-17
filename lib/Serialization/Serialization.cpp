@@ -2590,6 +2590,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_MainType: {
+      auto abbrCode = S.DeclTypeAbbrCodes[MainTypeDeclAttrLayout::Code];
+      MainTypeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                         DA->isImplicit());
+      return;
+    }
+
     case DAK_Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
       auto attr = cast<SpecializeAttr>(DA);

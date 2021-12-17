@@ -4485,6 +4485,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::MainType_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::MainTypeDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) MainTypeAttr(isImplicit);
+        break;
+      }
+
       case decls_block::Specialize_DECL_ATTR: {
         unsigned exported;
         SpecializeAttr::SpecializationKind specializationKind;
