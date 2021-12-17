@@ -257,10 +257,12 @@ static bool withStatusRecordLock(AsyncTask *task,
 /**************************************************************************/
 
 SWIFT_CC(swift)
-static bool swift_task_addStatusRecordImpl(TaskStatusRecord *newRecord) {
-  auto task = swift_task_getCurrent();
+bool swift::addStatusRecord(
+    TaskStatusRecord *newRecord,
+    llvm::function_ref<bool(ActiveTaskStatus status)> shouldAddRecord) {
 
-  // Load the current state.  We can use a relaxed load because we're
+  auto task = swift_task_getCurrent();
+  // Load the current state. We can use a relaxed load because we're
   // synchronous with the task.
   auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
 
@@ -273,53 +275,27 @@ static bool swift_task_addStatusRecordImpl(TaskStatusRecord *newRecord) {
     newRecord->resetParent(oldStatus.getInnermostRecord());
 
     // Set the record as the new innermost record.
-    // We have to use a release on success to make the initialization of
-    // the new record visible to the cancelling thread.
     ActiveTaskStatus newStatus = oldStatus.withInnermostRecord(newRecord);
-    if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
-           /*success*/ std::memory_order_release,
-           /*failure*/ std::memory_order_relaxed))
-      return !oldStatus.isCancelled();
-  }
-}
 
-SWIFT_CC(swift)
-static bool swift_task_tryAddStatusRecordImpl(TaskStatusRecord *newRecord) {
-  auto task = swift_task_getCurrent();
-
-  // Load the current state.  We can use a relaxed load because we're
-  // synchronous with the task.
-  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
-
-  while (true) {
-    // If the old info is already cancelled, do nothing.
-    if (oldStatus.isCancelled())
+    if (shouldAddRecord(newStatus)) {
+      // We have to use a release on success to make the initialization of
+      // the new record visible to the cancelling thread.
+      if (task->_private().Status.compare_exchange_weak(
+              oldStatus, newStatus,
+              /*success*/ std::memory_order_release,
+              /*failure*/ std::memory_order_relaxed)) {
+        return true;
+      } else {
+        // Retry
+      }
+    } else {
       return false;
-
-    // Wait for any active lock to be released.
-    if (oldStatus.isLocked()) {
-      waitForStatusRecordUnlock(task, oldStatus);
-
-      if (oldStatus.isCancelled())
-        return false;
     }
-
-    // Reset the parent of the new record.
-    newRecord->resetParent(oldStatus.getInnermostRecord());
-
-    // Set the record as the new innermost record.
-    // We have to use a release on success to make the initialization of
-    // the new record visible to the cancelling thread.
-    ActiveTaskStatus newStatus = oldStatus.withInnermostRecord(newRecord);
-    if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
-           /*success*/ std::memory_order_release,
-           /*failure*/ std::memory_order_relaxed))
-      return true;
   }
 }
 
 SWIFT_CC(swift)
-static bool swift_task_removeStatusRecordImpl(TaskStatusRecord *record) {
+bool swift::removeStatusRecord(TaskStatusRecord *record) {
   auto task = swift_task_getCurrent();
   SWIFT_TASK_DEBUG_LOG("remove status record = %p, from current task = %p",
                        record, task);
@@ -411,7 +387,14 @@ swift_task_attachChildImpl(AsyncTask *child) {
   auto record = new (allocation) swift::ChildTaskStatusRecord(child);
   SWIFT_TASK_DEBUG_LOG("attach child task = %p, record = %p, to current task = %p",
                        child, record, swift_task_getCurrent());
-  swift_task_addStatusRecord(record);
+
+  bool added_record = swift_task_addStatusRecordWithChecks(
+      record, [&](ActiveTaskStatus parentStatus) {
+        swift_task_updateNewChildWithParentAndGroupState(child, parentStatus,
+                                                         NULL);
+        return true;
+      });
+  assert(added_record);
   return record;
 }
 
@@ -419,6 +402,39 @@ SWIFT_CC(swift)
 static void
 swift_task_detachChildImpl(ChildTaskStatusRecord *record) {
   swift_task_removeStatusRecord(record);
+}
+
+/// Called in the path of linking a child into a parent/group synchronously with
+/// the parent task.
+//
+/// When called to link a child into a parent directly, this does not hold the
+/// parent's task status record lock. When called to link a child into a task
+/// group, this holds the parent's task status record lock.
+SWIFT_CC(swift)
+void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
+                                                  ActiveTaskStatus parentStatus,
+                                                  TaskGroup *group) {
+  // We can take the fast path of just modifying the ActiveTaskStatus in the
+  // child task since we know that it won't have any task status records and
+  // cannot be accessed by anyone else since it hasn't been linked in yet.
+  // Avoids the extra logic in `swift_task_cancel` and `swift_task_escalate`
+  auto oldChildTaskStatus =
+      child->_private().Status.load(std::memory_order_relaxed);
+  assert(oldChildTaskStatus.getInnermostRecord() == NULL);
+
+  auto newChildTaskStatus = oldChildTaskStatus;
+
+  if (parentStatus.isCancelled() || (group && group->isCancelled())) {
+    newChildTaskStatus = newChildTaskStatus.withCancelled();
+  }
+
+  // Propagate max priority of parent to child task's active status and the Job
+  // header
+  JobPriority pri = parentStatus.getStoredPriority();
+  newChildTaskStatus = newChildTaskStatus.withNewPriority(pri);
+  child->Flags.setPriority(pri);
+
+  child->_private().Status.store(newChildTaskStatus, std::memory_order_relaxed);
 }
 
 SWIFT_CC(swift)
@@ -430,11 +446,19 @@ static void swift_taskGroup_attachChildImpl(TaskGroup *group,
   // Acquire the status record lock of parent - we want to synchronize with
   // concurrent cancellation or escalation as we're adding new tasks to the
   // group.
-
   auto parent = swift_task_getCurrent();
-  withStatusRecordLock(parent, LockContext::OnTask,
-                       [&](ActiveTaskStatus &status) {
+  withStatusRecordLock(parent, LockContext::OnTask, [&](ActiveTaskStatus &parentStatus) {
     group->addChildTask(child);
+
+    // After getting parent's status record lock, do some sanity checks to
+    // see if parent task or group has state changes that need to be
+    // propagated to the child.
+    //
+    // This is the same logic that we would do if we were adding a child
+    // task status record - see also asyncLet_addImpl. Since we attach a
+    // child task to a TaskGroupRecord instead, we synchronize on the
+    // parent's task status and then update the child.
+    updateNewChildWithParentAndGroupState(child, parentStatus, group);
   });
 }
 
