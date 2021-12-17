@@ -142,8 +142,15 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
   auto record = impl->getTaskRecord();
   assert(impl == record && "the async-let IS the task record");
 
-  // ok, now that the group actually is initialized: attach it to the task
-  swift_task_addStatusRecord(record);
+  // ok, now that the async let task actually is initialized: attach it to the
+  // current task
+  bool addedRecord = swift_task_addStatusRecordWithChecks(
+      record, [&](ActiveTaskStatus parentStatus) {
+        swift_task_updateNewChildWithParentAndGroupState(task, parentStatus,
+                                                         NULL);
+        return true;
+      });
+  assert(addedRecord);
 }
 
 // =============================================================================

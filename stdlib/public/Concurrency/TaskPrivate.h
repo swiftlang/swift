@@ -438,6 +438,40 @@ inline bool AsyncTask::localValuePop() {
   return _private().Local.popValue(this);
 }
 
+/*************** Methods for Status records manipulation ******************/
+
+/// Remove a status record from a task.  After this call returns,
+/// the record's memory can be freely modified or deallocated.
+///
+/// This must be called synchronously with the task.  The record must
+/// be registered with the task or else this may crash.
+///
+/// The given record need not be the last record added to
+/// the task, but the operation may be less efficient if not.
+///
+/// Returns false if the task has been cancelled.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) bool swift_task_removeStatusRecord(TaskStatusRecord *record);
+
+/// Add a status record to a task. This must be called synchronously with the
+/// task.
+///
+/// This function also takes in a function_ref which is given the task status of
+/// the task we're adding the record to, to determine if the current status of
+/// the task permits adding the status record. This function_ref may be called
+/// multiple times and must be idempotent.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+bool swift_task_addStatusRecordWithChecks(
+    TaskStatusRecord *record,
+    llvm::function_ref<bool(ActiveTaskStatus)> testAddRecord);
+
+/// A helper method for updating a new child task that is created with
+/// information from the parent or the group that it was going to be added to.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_task_updateNewChildWithParentAndGroupState(
+    AsyncTask *child, ActiveTaskStatus parentStatus, TaskGroup *group);
 } // end namespace swift
 
 #endif
