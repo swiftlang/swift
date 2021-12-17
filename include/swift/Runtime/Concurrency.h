@@ -475,18 +475,6 @@ bool swift_taskGroup_hasTaskGroupRecord();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_hasTaskGroupStatusRecord();
 
-/// Attach a child task to its parent task and return the newly created
-/// `ChildTaskStatusRecord`.
-///
-/// The record must be removed with by the parent invoking
-/// `swift_task_detachChild` when the child has completed.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ChildTaskStatusRecord* swift_task_attachChild(AsyncTask *child);
-
-/// Remove a child task from the parent tracking it.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_detachChild(ChildTaskStatusRecord *record);
-
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
 
