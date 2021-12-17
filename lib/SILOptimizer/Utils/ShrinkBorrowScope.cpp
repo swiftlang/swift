@@ -55,7 +55,16 @@ class ShrinkBorrowScope {
   llvm::SmallVector<std::pair<SILBasicBlock *, SILInstruction *>>
       barrierInstructions;
 
-  SmallPtrSet<SILBasicBlock *, 8> blocksToEndAtTop;
+  /// Blocks above which the borrow scope cannot be hoisted.
+  ///
+  /// Consequently, these blocks must begin with end_borrow %borrow.
+  ///
+  /// Note: These blocks aren't barrier blocks.  Rather the borrow scope is
+  ///       barred from being hoisted out of them.  That could happen because
+  ///       one of its predecessors is a barrier block (i.e. has a successor
+  ///       which is live) or because one of its predecessors has a terminator
+  ///       which is itself a deinit barrier.
+  SmallPtrSet<SILBasicBlock *, 8> barredBlocks;
 
   llvm::SmallDenseMap<ApplySite, size_t> transitiveUsesPerApplySite;
 
@@ -268,7 +277,7 @@ void ShrinkBorrowScope::findBarriers() {
       continue;
     }
     for (auto *successor : block->getSuccessorBlocks()) {
-      blocksToEndAtTop.erase(successor);
+      barredBlocks.erase(successor);
     }
 
     // We either have processed all successors of block or else it is a block
@@ -294,7 +303,7 @@ void ShrinkBorrowScope::findBarriers() {
       barrierInstructions.push_back({block, barrier});
     } else {
       deadBlocks.insert(block);
-      blocksToEndAtTop.insert(block);
+      barredBlocks.insert(block);
       for (auto *predecessor : block->getPredecessorBlocks()) {
         worklist.push_back(predecessor);
       }
@@ -316,7 +325,7 @@ void ShrinkBorrowScope::rewrite() {
 
   // Insert the new end_borrow instructions that occur at the beginning of
   // blocks which we couldn't hoist out of.
-  for (auto *block : blocksToEndAtTop) {
+  for (auto *block : barredBlocks) {
     auto *insertionPoint = &*block->begin();
     createEndBorrow(insertionPoint);
   }
