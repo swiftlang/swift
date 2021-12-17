@@ -46,7 +46,7 @@ public protocol SerialExecutor: Executor {
 /// actor.
 @available(SwiftStdlib 5.1, *)
 @frozen
-public struct UnownedSerialExecutor {
+public struct UnownedSerialExecutor: Sendable {
   #if compiler(>=5.5) && $BuiltinExecutor
   @usableFromInline
   internal var executor: Builtin.Executor

@@ -718,6 +718,10 @@ public struct UnsafeCurrentTask {
 }
 
 @available(SwiftStdlib 5.1, *)
+@available(*, unavailable)
+extension UnsafeCurrentTask: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
 extension UnsafeCurrentTask: Hashable {
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)

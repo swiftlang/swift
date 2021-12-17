@@ -383,6 +383,10 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable)
+extension TaskGroup: Sendable { }
+
 // Implementation note:
 // We are unable to just™ abstract over Failure == Error / Never because of the
 // complicated relationship between `group.spawn` which dictates if `group.next`
@@ -638,6 +642,10 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     return _taskGroupIsCancelled(group: _group)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable)
+extension ThrowingTaskGroup: Sendable { }
 
 /// ==== TaskGroup: AsyncSequence ----------------------------------------------
 
