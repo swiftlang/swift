@@ -243,18 +243,20 @@ void ShrinkBorrowScope::findBarriers() {
   // visited.
   //
   // TODO: Handle loops.
-  SmallPtrSet<SILBasicBlock *, 8> blocksWithReachedTops;
-  auto reachedTopOfAllSuccessors =
-      [&blocksWithReachedTops](SILBasicBlock *block) -> bool {
+
+  // Blocks to the top of which the borrow scope has been shrunk.
+  SmallPtrSet<SILBasicBlock *, 8> deadBlocks;
+  auto hasOnlyDeadSuccessors =
+      [&deadBlocks](SILBasicBlock *block) -> bool {
     return llvm::all_of(block->getSuccessorBlocks(), [=](auto *successor) {
-      return blocksWithReachedTops.contains(successor);
+      return deadBlocks.contains(successor);
     });
   };
 
   while (!worklist.empty()) {
     auto *block = worklist.pop_back_val();
     auto *startingInstruction = startingInstructions.lookup(block);
-    if (!startingInstruction && !reachedTopOfAllSuccessors(block)) {
+    if (!startingInstruction && !hasOnlyDeadSuccessors(block)) {
       continue;
     }
     if (!startingInstruction &&
@@ -291,7 +293,7 @@ void ShrinkBorrowScope::findBarriers() {
     if (barrier) {
       barrierInstructions.push_back({block, barrier});
     } else {
-      blocksWithReachedTops.insert(block);
+      deadBlocks.insert(block);
       blocksToEndAtTop.insert(block);
       for (auto *predecessor : block->getPredecessorBlocks()) {
         worklist.push_back(predecessor);
