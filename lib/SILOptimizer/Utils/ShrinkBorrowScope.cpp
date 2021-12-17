@@ -50,6 +50,8 @@ class ShrinkBorrowScope {
   SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts;
 
   SmallPtrSet<SILInstruction *, 16> users;
+
+  /// Deinit barriers that obstruct hoisting end_borrow instructions.
   llvm::SmallVector<std::pair<SILBasicBlock *, SILInstruction *>>
       barrierInstructions;
 
