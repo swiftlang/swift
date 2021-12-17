@@ -118,8 +118,8 @@ struct RewriteStep {
     /// If inverted: the concrete type symbol [concrete: C.X] is introduced.
     ///
     /// The RuleID field is repurposed to store the result of calling
-    /// RewriteSystem::recordConcreteTypeWitness(). This index is then
-    /// passed in to RewriteSystem::getConcreteTypeWitness() when applying
+    /// RewriteSystem::recordTypeWitness(). This index is then passed in
+    /// to RewriteSystem::getTypeWitness() when applying
     /// the step.
     ConcreteTypeWitness,
 
@@ -129,23 +129,34 @@ struct RewriteStep {
     ///
     /// If inverted: the associated type symbol [P:X] is introduced.
     ///
-    /// The RuleID field is repurposed to store the result of calling
-    /// RewriteSystem::recordConcreteTypeWitness(). This index is then
-    /// passed in to RewriteSystem::getConcreteTypeWitness() when applying
+    /// The RuleID field is a TypeWitness ID as above.
     /// the step.
     SameTypeWitness,
+
+    /// If not inverted: replaces the abstract type witness term with the
+    /// subject type term.
+    ///
+    /// If inverted: replaces the subject type term with the abstract type
+    /// term.
+    ///
+    /// The RuleID field is a TypeWitness ID as above.
+    AbstractTypeWitness,
   };
 
   /// The rewrite step kind.
-  StepKind Kind : 3;
+  StepKind Kind : 4;
+
+  /// If false, the step replaces an occurrence of the rule's left hand side
+  /// with the right hand side. If true, vice versa.
+  unsigned Inverse : 1;
 
   /// The size of the left whisker, which is the position within the term where
   /// the rule is being applied. In A.(X => Y).B, this is |A|=1.
-  unsigned StartOffset : 14;
+  unsigned StartOffset : 16;
 
   /// The size of the right whisker, which is the length of the remaining suffix
   /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
-  unsigned EndOffset : 14;
+  unsigned EndOffset : 16;
 
   /// If Kind is ApplyRewriteRule, the index of the rule in the rewrite system.
   ///
@@ -153,11 +164,7 @@ struct RewriteStep {
   /// at the beginning of each concrete substitution.
   ///
   /// If Kind is Concrete, the number of substitutions to push or pop.
-  unsigned RuleID : 15;
-
-  /// If false, the step replaces an occurrence of the rule's left hand side
-  /// with the right hand side. If true, vice versa.
-  unsigned Inverse : 1;
+  unsigned RuleID : 16;
 
   RewriteStep(StepKind kind, unsigned startOffset, unsigned endOffset,
               unsigned ruleID, bool inverse) {
@@ -213,6 +220,11 @@ struct RewriteStep {
                        /*ruleID=*/witnessID, inverse);
   }
 
+  static RewriteStep forAbstractTypeWitness(unsigned witnessID, bool inverse) {
+    return RewriteStep(AbstractTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
+                       /*ruleID=*/witnessID, inverse);
+  }
+
   bool isInContext() const {
     return StartOffset > 0 || EndOffset > 0;
   }
@@ -249,7 +261,7 @@ public:
   }
 
   // Horizontal composition of paths.
-  void append(RewritePath other) {
+  void append(const RewritePath &other) {
     Steps.append(other.begin(), other.end());
   }
 
@@ -293,11 +305,23 @@ public:
   RewritePath Path;
 
 private:
-  bool Deleted;
+  unsigned Deleted : 1;
+
+  /// Cached value for findRulesAppearingOnceInEmptyContext().
+  SmallVector<unsigned, 1> RulesInEmptyContext;
+
+  /// If true, RulesInEmptyContext should be recomputed.
+  unsigned Dirty : 1;
 
 public:
   RewriteLoop(MutableTerm basepoint, RewritePath path)
-    : Basepoint(basepoint), Path(path), Deleted(false) {}
+    : Basepoint(basepoint), Path(path) {
+    Deleted = 0;
+
+    // Initially, the RulesInEmptyContext vector is not valid because
+    // it has not been computed yet.
+    Dirty = 1;
+  }
 
   bool isDeleted() const {
     return Deleted;
@@ -305,12 +329,17 @@ public:
 
   void markDeleted() {
     assert(!Deleted);
-    Deleted = true;
+    Deleted = 1;
+  }
+
+  /// This must be called after changing 'Path'.
+  void markDirty() {
+    Dirty = 1;
   }
 
   bool isInContext(const RewriteSystem &system) const;
 
-  llvm::SmallVector<unsigned, 1>
+  ArrayRef<unsigned>
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
 
   void findProtocolConformanceRules(
@@ -384,6 +413,9 @@ struct RewritePathEvaluator {
 
   void applySameTypeWitness(const RewriteStep &step,
                             const RewriteSystem &system);
+
+  void applyAbstractTypeWitness(const RewriteStep &step,
+                                const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
 };

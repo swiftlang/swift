@@ -131,7 +131,7 @@ public:
   Histogram PropertyTrieHistogram;
   Histogram PropertyTrieRootHistogram;
   Histogram ConformanceRulesHistogram;
-  Histogram GeneratingConformancesHistogram;
+  Histogram MinimalConformancesHistogram;
 
   explicit RewriteContext(ASTContext &ctx);
 
