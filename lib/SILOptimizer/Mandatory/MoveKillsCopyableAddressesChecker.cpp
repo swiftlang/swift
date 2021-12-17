@@ -196,14 +196,15 @@ namespace {
 
 struct UseState {
   SILValue address;
-  SmallVector<MarkUnresolvedMoveAddrInst *, 8> markMoves;
-  SmallPtrSet<SILInstruction *, 8> seenMarkMoves;
-  SmallSetVector<SILInstruction *, 8> inits;
-  SmallSetVector<SILInstruction *, 8> livenessUses;
-  SmallBlotSetVector<DestroyAddrInst *, 8> destroys;
-  llvm::SmallDenseMap<SILInstruction *, unsigned, 8> destroyToIndexMap;
-  SmallBlotSetVector<SILInstruction *, 8> reinits;
-  llvm::SmallDenseMap<SILInstruction *, unsigned, 8> reinitToIndexMap;
+  SmallVector<MarkUnresolvedMoveAddrInst *, 1> markMoves;
+  SmallPtrSet<SILInstruction *, 1> seenMarkMoves;
+  SmallSetVector<SILInstruction *, 2> inits;
+  SmallSetVector<SILInstruction *, 4> livenessUses;
+  SmallBlotSetVector<DestroyAddrInst *, 4> destroys;
+  llvm::SmallDenseMap<SILInstruction *, unsigned, 4> destroyToIndexMap;
+  SmallBlotSetVector<SILInstruction *, 4> reinits;
+  llvm::SmallDenseMap<SILInstruction *, unsigned, 4> reinitToIndexMap;
+  SmallBlotSetVector<Operand *, 2> partialApplyOperands;
 
   void insertMarkUnresolvedMoveAddr(MarkUnresolvedMoveAddrInst *inst) {
     if (!seenMarkMoves.insert(inst).second)
