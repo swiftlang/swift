@@ -40,9 +40,9 @@ protocol AsyncProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A3: AsyncProtocolWithNotSendable {
-  func f() async -> NotSendable { NotSendable() } // expected-warning{{cannot call function returning non-sendable type 'NotSendable' across actors}}
+  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' returned by actor-isolated instance method 'f()' satisfying non-isolated protocol requirement cannot cross actor boundary}}
 
-  var prop: NotSendable { // expected-warning{{cannot use property 'prop' with a non-sendable type 'NotSendable' across actors}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to non-isolated protocol requirement cannot cross actor boundary}}
     get async {
       NotSendable()
     }
@@ -53,9 +53,9 @@ actor A3: AsyncProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A4: AsyncProtocolWithNotSendable {
-  func f() -> NotSendable { NotSendable() } // expected-warning{{cannot call function returning non-sendable type 'NotSendable' across actors}}
+  func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' returned by actor-isolated instance method 'f()' satisfying non-isolated protocol requirement cannot cross actor boundary}}
 
-  var prop: NotSendable { // expected-warning{{cannot use property 'prop' with a non-sendable type 'NotSendable' across actors}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to non-isolated protocol requirement cannot cross actor boundary}}
     get {
       NotSendable()
     }
@@ -98,9 +98,9 @@ protocol AsyncThrowingProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A7: AsyncThrowingProtocolWithNotSendable {
-  func f() async -> NotSendable { NotSendable() } // expected-warning{{cannot call function returning non-sendable type 'NotSendable' across actors}}
+  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' returned by actor-isolated instance method 'f()' satisfying non-isolated protocol requirement cannot cross actor boundary}}
 
-  var prop: NotSendable { // expected-warning{{cannot use property 'prop' with a non-sendable type 'NotSendable' across actors}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to non-isolated protocol requirement cannot cross actor boundary}}
     get async {
       NotSendable()
     }
@@ -111,9 +111,9 @@ actor A7: AsyncThrowingProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A8: AsyncThrowingProtocolWithNotSendable {
-  func f() -> NotSendable { NotSendable() } // expected-warning{{cannot call function returning non-sendable type 'NotSendable' across actors}}
+  func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' returned by actor-isolated instance method 'f()' satisfying non-isolated protocol requirement cannot cross actor boundary}}
 
-  var prop: NotSendable { // expected-warning{{cannot use property 'prop' with a non-sendable type 'NotSendable' across actors}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to non-isolated protocol requirement cannot cross actor boundary}}
     get {
       NotSendable()
     }
