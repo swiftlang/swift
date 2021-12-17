@@ -47,6 +47,8 @@ class ShrinkBorrowScope {
 
   InstructionDeleter &deleter;
 
+  SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts;
+
   SmallPtrSet<SILInstruction *, 16> users;
   llvm::SmallVector<std::pair<SILBasicBlock *, SILInstruction *>>
       barrierInstructions;
@@ -66,8 +68,10 @@ class ShrinkBorrowScope {
   llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *> startingInstructions;
 
 public:
-  ShrinkBorrowScope(BeginBorrowInst *bbi, InstructionDeleter &deleter)
-      : introducer(bbi), deleter(deleter) {}
+  ShrinkBorrowScope(BeginBorrowInst *bbi, InstructionDeleter &deleter,
+                    SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts)
+      : introducer(bbi), deleter(deleter),
+        modifiedCopyValueInsts(modifiedCopyValueInsts) {}
 
   bool run();
 
@@ -156,6 +160,7 @@ public:
           auto borrowee = introducer->getOperand();
           if (auto *cvi = dyn_cast<CopyValueInst>(argument)) {
             cvi->setOperand(borrowee);
+            modifiedCopyValueInsts.push_back(cvi);
           } else {
             apply.setArgument(index, borrowee);
           }
@@ -172,6 +177,7 @@ public:
         if (canReplaceValueWithBorrowedValue(cvi->getOperand())) {
           auto borrowee = introducer->getOperand();
           cvi->setOperand(borrowee);
+          modifiedCopyValueInsts.push_back(cvi);
           return true;
         }
       }
@@ -318,8 +324,9 @@ void ShrinkBorrowScope::createEndBorrow(SILInstruction *insertionPoint) {
       introducer);
 }
 
-bool swift::shrinkBorrowScope(BeginBorrowInst *bbi,
-                              InstructionDeleter &deleter) {
-  ShrinkBorrowScope borrowShrinker(bbi, deleter);
+bool swift::shrinkBorrowScope(
+    BeginBorrowInst *bbi, InstructionDeleter &deleter,
+    SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts) {
+  ShrinkBorrowScope borrowShrinker(bbi, deleter, modifiedCopyValueInsts);
   return borrowShrinker.run();
 }
