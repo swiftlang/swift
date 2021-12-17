@@ -215,8 +215,10 @@ def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Run SIL copy propagation with lexical lifetimes to shorten object "
            "lifetimes while preserving variable lifetimes.">;
-def disable_copy_propagation : Flag<["-"], "disable-copy-propagation">,
-  HelpText<"Don't run SIL copy propagation to preserve object lifetime.">;
+def copy_propagation_state_EQ :
+  Joined<["-"], "enable-copy-propagation=">,
+  HelpText<"Whether to enable copy propagation">,
+  MetaVarName<"true|requested-passes-only|false">;
 
 def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-sendable">,
     HelpText<"Enable inference of Sendable conformances for public structs and enums">;

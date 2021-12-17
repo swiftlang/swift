@@ -65,6 +65,8 @@ class Swift(product.Product):
         # Add freestanding related flags.
         self.cmake_options.extend(self._freestanding_is_darwin)
 
+        self.cmake_options.extend(self._build_swift_private_stdlib)
+
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -186,6 +188,11 @@ updated without updating swift.py?")
     def _freestanding_is_darwin(self):
         return [('SWIFT_FREESTANDING_IS_DARWIN:BOOL',
                  self.args.swift_freestanding_is_darwin)]
+
+    @property
+    def _build_swift_private_stdlib(self):
+        return [('SWIFT_STDLIB_BUILD_PRIVATE:BOOL',
+                 self.args.build_swift_private_stdlib)]
 
     @classmethod
     def get_dependencies(cls):
