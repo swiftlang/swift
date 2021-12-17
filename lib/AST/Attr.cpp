@@ -895,6 +895,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     return true;
 
+  case DAK_MainType: {
+    // Don't print into SIL. Necessary bits have already been generated.
+    if (Options.PrintForSIL)
+      return false;
+    Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
+    return true;
+  }
+
   case DAK_SetterAccess:
     Printer.printKeyword(getAttrName(), Options, "(set)");
     return true;
@@ -1241,6 +1249,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
+  case DAK_MainType:
+    return "main";
   case DAK_DynamicReplacement:
     return "_dynamicReplacement";
   case DAK_TypeEraser:
