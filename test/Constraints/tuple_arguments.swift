@@ -1768,3 +1768,12 @@ func noescapeSplat() {
   }
 }
 
+func variadicSplat() {
+  func takesFnWithVarg(fn: (Int, Int...) -> Void) {}
+  takesFnWithVarg { x in // expected-error {{contextual closure type '(Int, Int...) -> Void' expects 2 arguments, but 1 was used in closure body}}
+    _ = x.1.count
+  }
+  takesFnWithVarg { x, y in
+    _ = y.count
+  }
+}

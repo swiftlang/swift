@@ -51,7 +51,7 @@ sil [ossa] @take_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct)
 
 sil [noinline] [ossa] @blackhole : $@convention(thin) <T> (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T, let, name "t", argno 1
+  debug_value %0 : $*T, let, name "t", argno 1, expr op_deref
   %2 = tuple ()
   return %2 : $()
 }
@@ -562,16 +562,16 @@ bb3:
   return %res : $()
 }
 
-// CHECK-LABEL: sil [ossa] @mem2reg_debug_value_addr :
+// CHECK-LABEL: sil [ossa] @mem2reg_debug_value :
 // CHECK-NOT: alloc_stack
-// CHECK-NOT: debug_value_addr
+// CHECK-NOT: debug_value {{.*}} expr op_deref
 // CHECK: debug_value %0
-// CHECK-LABEL: } // end sil function 'mem2reg_debug_value_addr'
-sil [ossa] @mem2reg_debug_value_addr : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK-LABEL: } // end sil function 'mem2reg_debug_value'
+sil [ossa] @mem2reg_debug_value : $@convention(thin) (@owned Klass) -> @owned Klass {
 bb0(%0 : @owned $Klass):
   %1 = alloc_stack $Klass
   store %0 to [init] %1 : $*Klass
-  debug_value_addr %1 : $*Klass
+  debug_value %1 : $*Klass, expr op_deref
   %2 = load [take] %1 : $*Klass
   dealloc_stack %1 : $*Klass
   return %2 : $Klass
@@ -682,8 +682,8 @@ bb0:
   %0 = alloc_stack $Klass
   %local = alloc_ref $Klass
   store %local to [init] %0 : $*Klass
-  // CHECK-NOT: debug_value_addr
-  debug_value_addr %0 : $*Klass
+  // CHECK-NOT: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*Klass, expr op_deref
   destroy_addr %0 : $*Klass
   // CHECK-NOT: dealloc_stack
   dealloc_stack %0 : $*Klass
@@ -717,7 +717,7 @@ bb0(%0 : @owned $Klass):
   debug_value %0 : $Klass
   %2 = alloc_stack $Klass
   store %0 to [init] %2 : $*Klass
-  debug_value_addr %2 : $*Klass
+  debug_value %2 : $*Klass, expr op_deref
   %5 = load [take] %2 : $*Klass
   destroy_value %5 : $Klass
   dealloc_stack %2 : $*Klass

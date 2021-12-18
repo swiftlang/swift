@@ -32,7 +32,6 @@
 #include <errno.h>
 #endif
 #include <sys/resource.h>
-#include <unistd.h>
 #endif
 #include <climits>
 #include <clocale>
@@ -42,7 +41,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#if defined(__CYGWIN__) || defined(__HAIKU__)
 #include <sstream>
+#endif
 #if defined(__OpenBSD__) || defined(__ANDROID__) || defined(__linux__) || defined(__wasi__) || defined(_WIN32)
 #include <locale.h>
 #if defined(_WIN32)
@@ -56,6 +57,10 @@
 
 #if defined(__ANDROID__)
 #include <android/api-level.h>
+#endif
+
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
+#include <pthread_np.h>
 #endif
 
 #include "swift/Runtime/Debug.h"
@@ -202,6 +207,8 @@ uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 }
 #endif
 
+#if SWIFT_STDLIB_HAS_STDIN
+
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
 /// line.  Can be NULL if no characters were read. This buffer should be
 /// freed by the caller.
@@ -265,18 +272,24 @@ swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #endif
 }
 
-#if defined(__CYGWIN__) || defined(_WIN32)
-  #define strcasecmp _stricmp
-#endif
+#endif  // SWIFT_STDLIB_HAS_STDIN
 
 static bool swift_stringIsSignalingNaN(const char *nptr) {
   if (nptr[0] == '+' || nptr[0] == '-') {
     ++nptr;
   }
 
-  return strcasecmp(nptr, "snan") == 0;
+  if ((nptr[0] == 's' || nptr[0] == 'S') &&
+      (nptr[1] == 'n' || nptr[1] == 'N') &&
+      (nptr[2] == 'a' || nptr[2] == 'A') &&
+      (nptr[3] == 'n' || nptr[3] == 'N') && (nptr[4] == '\0')) {
+    return true;
+  }
+
+  return false;
 }
 
+#if defined(__CYGWIN__) || defined(__HAIKU__)
 // This implementation should only be used on platforms without the
 // relevant strto* functions, such as Cygwin or Haiku.
 // Note that using this currently causes test failures.
@@ -297,6 +310,7 @@ T _swift_strto(const char *nptr, char **endptr) {
 
   return ParsedValue;
 }
+#endif
 
 #if defined(__OpenBSD__) || defined(_WIN32) || defined(__CYGWIN__) || defined(__HAIKU__)
 #define NEED_SWIFT_STRTOD_L
@@ -446,5 +460,115 @@ size_t _swift_stdlib_getHardwareConcurrency() {
   return 1;
 #else
   return std::thread::hardware_concurrency();
+#endif
+}
+
+__swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
+                                                __swift_size_t alignment) {
+  // This function is not currently implemented. Future releases of Swift can
+  // implement heuristics in this function to allow for larger stack allocations
+  // if conditions are suitable. These heuristics need to be significantly
+  // cheaper than simply calling malloc().
+  //
+  // A possible implementation is provided below (#iffed out), but has not yet
+  // been measured for its performance characteristics. In particular, if the
+  // platform-specific functions we need to use end up calling malloc(), it's
+  // pointless to use them.
+  return false;
+
+#if 0
+  uintptr_t stackBegin = 0;
+  uintptr_t stackEnd = 0;
+  if (!_swift_stdlib_getCurrentStackBounds(&stackBegin, &stackEnd)) {
+    return false;
+  }
+
+  // Locate a value on the stack. The start of this function's stack frame is a
+  // good approximation.
+  uintptr_t stackAddress = (uintptr_t)__builtin_frame_address(0);
+  if (stackAddress < stackBegin || stackAddress >= stackEnd) {
+    // The stack range we got from the OS doesn't contain the stack address we
+    // just got. That may indicate that the current thread's stack has been
+    // moved (e.g. with sigaltstack().)
+    return false;
+  }
+
+  // How much space remains on the stack after that stack value right there?
+  uintptr_t stackRemaining = stackAddress - stackBegin;
+
+  // Make sure we leave some room at the end of the stack for other variables,
+  // allocations, etc. For a 1MB stack, we'll leave the last 64KB alone.
+  uintptr_t stackSafetyMargin = (stackEnd - stackBegin) >> 4;
+  if (stackRemaining < stackSafetyMargin) {
+    return false;
+  }
+
+  return stackRemaining >= byteCount;
+#endif
+}
+
+__swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
+                                                 __swift_uintptr_t *outEnd) {
+#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  // This platform does not support threads, so the API we'd call to get stack
+  // bounds (i.e. libpthread) is not going to be usable.
+  return false;
+  
+#elif defined(__APPLE__)
+  pthread_t thread = pthread_self();
+  // On Apple platforms, the stack grows down, so that the end of the stack
+  // comes before the beginning on the number line, and an address on the stack
+  // will be LESS than the start of the stack and GREATER than the end.
+  void *end = pthread_get_stackaddr_np(thread);
+  if (!end) {
+    return false;
+  }
+  *outEnd = (uintptr_t)end;
+  *outBegin = *outEnd - pthread_get_stacksize_np(thread);
+  return true;
+
+#elif defined(_WIN32) && (_WIN32_WINNT >= 0x0602)
+  ULONG_PTR lowLimit = 0;
+  ULONG_PTR highLimit = 0;
+  GetCurrentThreadStackLimits(&lowLimit, &highLimit);
+  *outBegin = lowLimit;
+  *outEnd = highLimit;
+  return true;
+
+#elif defined(__OpenBSD__)
+  stack_t sinfo;
+  if (pthread_stackseg_np(pthread_self(), &sinfo) != 0) {
+    return false;
+  }
+
+  *outBegin = (uintptr_t)sinfo.ss_sp - sinfo.ss_size;
+  *outEnd = (uintptr_t)sinfo.ss_sp;
+  return true;
+#elif defined(__FreeBSD__) || defined(__ANDROID__) || defined(__linux__)
+  pthread_attr_t attr;
+
+#if defined(__FreeBSD__)
+  if (0 != pthread_attr_init(&attr) || 0 != pthread_attr_get_np(pthread_self(), &attr)) {
+    return false;
+  }
+#else
+  if (0 != pthread_getattr_np(pthread_self(), &attr)) {
+    return false;
+  }
+#endif
+
+  void *begin = nullptr;
+  size_t size = 0;
+  bool success = (0 == pthread_attr_getstack(&attr, &begin, &size));
+
+  *outBegin = (uintptr_t)begin;
+  *outEnd = *outBegin + size;
+
+  pthread_attr_destroy(&attr);
+  return success;
+
+#else
+  // FIXME: implement on this platform
+  return false;
 #endif
 }

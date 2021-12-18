@@ -30,7 +30,7 @@ sil [ossa] @callee : $@convention(method) <RealType where RealType : FloatingPoi
 
 sil [ossa] @test : $@convention(method) <RealType where RealType : FloatingPoint> (@in_guaranteed Complex<RealType>, Bool, @thin Complex<RealType>.Type) -> @out Complex<RealType> {
 bb0(%0 : $*Complex<RealType>, %1 : $*Complex<RealType>, %2 : $Bool, %3 : $@thin Complex<RealType>.Type):
-  debug_value_addr %1 : $*Complex<RealType>, let, name "z", argno 1
+  debug_value %1 : $*Complex<RealType>, let, name "z", argno 1, expr op_deref
   debug_value %2 : $Bool, let, name "b", argno 2
   debug_value %3 : $@thin Complex<RealType>.Type, let, name "self", argno 3
   %7 = alloc_stack $RealType, let, name "θ"

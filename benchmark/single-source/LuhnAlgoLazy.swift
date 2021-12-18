@@ -5,18 +5,20 @@
 
 import TestsUtils
 
-public let LuhnAlgoLazy = BenchmarkInfo(
-  name: "LuhnAlgoLazy",
-  runFunction: run_LuhnAlgoLazy,
-  tags: [.algorithm]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "LuhnAlgoLazy",
+    runFunction: run_LuhnAlgoLazy,
+    tags: [.algorithm]
+  ),
+]
 
 @inline(never)
-public func run_LuhnAlgoLazy(_ N: Int) {
+public func run_LuhnAlgoLazy(_ n: Int) {
     let resultRef = true
     var result = false
 
-    for _ in 1...100*N {
+    for _ in 1...100*n {
         result = lazychecksum(ccnum)
 
         if result != resultRef {
@@ -24,7 +26,7 @@ public func run_LuhnAlgoLazy(_ N: Int) {
         }
     }
 
-    CheckResults(result == resultRef)
+    check(result == resultRef)
 }
 
 // Another version of the Luhn algorithm, similar to the one found here:

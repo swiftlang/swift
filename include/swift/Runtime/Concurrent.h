@@ -63,7 +63,7 @@ template <class ElemTy> struct ConcurrentList {
 
   /// Remove all of the links in the chain. This method leaves
   /// the list at a usable state and new links can be added.
-  /// Notice that this operation is non-concurrent because
+  /// Notice that this operation is non-sendable because
   /// we have no way of ensuring that no one is currently
   /// traversing the list.
   void clear() {
@@ -639,7 +639,7 @@ private:
   /// Otherwise, just return the passed-in size, which is always valid even if
   /// not necessarily optimal.
   static size_t goodSize(size_t size) {
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(__APPLE__) && defined(__MACH__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
     return malloc_good_size(size);
 #else
     return size;

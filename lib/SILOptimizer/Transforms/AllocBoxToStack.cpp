@@ -65,7 +65,7 @@ static bool useCaptured(Operand *UI) {
   auto *User = UI->getUser();
 
   // These instructions do not cause the address to escape.
-  if (isa<DebugValueInst>(User) || isa<DebugValueAddrInst>(User)
+  if (isa<DebugValueInst>(User)
       || isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User)
       || isa<DestroyValueInst>(User))
     return false;
@@ -533,11 +533,13 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   SILBuilderWithScope Builder(ABI);
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
+  auto &mod = ABI->getFunction()->getModule();
+  bool isLexical = mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
   auto *ASI = Builder.createAllocStack(
       ABI->getLoc(),
       getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
                          ABI->getBoxType(), ABI->getModule().Types, 0),
-      ABI->getVarInfo(), ABI->hasDynamicLifetime());
+      ABI->getVarInfo(), ABI->hasDynamicLifetime(), isLexical);
 
   // Transfer a mark_uninitialized if we have one.
   SILValue StackBox = ASI;

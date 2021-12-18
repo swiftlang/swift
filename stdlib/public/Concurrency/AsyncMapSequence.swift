@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that maps the given closure over the
   /// asynchronous sequence’s elements.
@@ -53,8 +53,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence that maps the given closure over the asynchronous
 /// sequence’s elements.
-@available(SwiftStdlib 5.5, *)
-@frozen
+@available(SwiftStdlib 5.1, *)
 public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
@@ -62,7 +61,7 @@ public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let transform: (Base.Element) async -> Transformed
 
-  @inlinable
+  @usableFromInline
   init(
     _ base: Base, 
     transform: @escaping (Base.Element) async -> Transformed
@@ -72,7 +71,7 @@ public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncMapSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///
@@ -83,7 +82,6 @@ extension AsyncMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the map sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -91,7 +89,7 @@ extension AsyncMapSequence: AsyncSequence {
     @usableFromInline
     let transform: (Base.Element) async -> Transformed
 
-    @inlinable
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
       transform: @escaping (Base.Element) async -> Transformed

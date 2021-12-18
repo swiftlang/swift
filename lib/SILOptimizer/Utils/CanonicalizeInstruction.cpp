@@ -33,12 +33,7 @@
 
 using namespace swift;
 
-// STATISTIC uses the default DEBUG_TYPE.
-#define DEBUG_TYPE CanonicalizeInstruction::defaultDebugType
-STATISTIC(NumSimplified, "Number of instructions simplified");
-
 // Tracing within the implementation can also be activiated by the pass.
-#undef DEBUG_TYPE
 #define DEBUG_TYPE pass.debugType
 
 // Vtable anchor.
@@ -449,6 +444,11 @@ eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
 static SILBasicBlock::iterator
 eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   auto next = std::next(bbi->getIterator());
+
+  // Never eliminate lexical borrow scopes.  They must be kept to ensure that
+  // value lifetimes aren't observably shortened.
+  if (bbi->isLexical())
+    return next;
 
   // We know that our borrow is completely within the lifetime of its base value
   // if the borrow is never reborrowed. We check for reborrows and do not

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine=verify -debug-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -requirement-machine=verify -dump-requirement-machine 2>&1 | %FileCheck %s
 
 struct Foo<A, B> {}
 
@@ -29,10 +29,10 @@ struct MergeTest<G : P1a & P2a> {
 
 // CHECK-LABEL: Adding generic signature <τ_0_0 where τ_0_0 : P1a, τ_0_0 : P2a> {
 // CHECK-LABEL: Rewrite system: {
-// CHECK: - τ_0_0.[P2a:T] => τ_0_0.[P1a&P2a:T]
 // CHECK: - τ_0_0.[P1a:T] => τ_0_0.[P1a&P2a:T]
-// CHECK: - [P1a&P2a:T].[P2:X] => [P1a&P2a:T].[P1&P2:X]
+// CHECK: - τ_0_0.[P2a:T] => τ_0_0.[P1a&P2a:T]
 // CHECK: - [P1a&P2a:T].[P1:X] => [P1a&P2a:T].[P1&P2:X]
+// CHECK: - [P1a&P2a:T].[P2:X] => [P1a&P2a:T].[P1&P2:X]
 // CHECK: - τ_0_0.[P1a&P2a:T].[P2:Y2] => τ_0_0.[P1a&P2a:T].[P1:Y1]
 // CHECK: - τ_0_0.[P1a&P2a:T].[P2:Z2] => τ_0_0.[P1a&P2a:T].[P1:Z1]
 // CHECK: }

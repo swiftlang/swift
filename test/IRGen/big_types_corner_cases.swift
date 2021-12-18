@@ -168,7 +168,7 @@ class SuperSub : SuperBase {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgvg"(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret({{.*}}) %0, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}}) %1)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK: [[LOAD:%.*]] = load %swift.refcounted*, %swift.refcounted** %.callInternalLet.data
-// CHECK: call swiftcc void %7(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret({{.*}}) [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
+// CHECK: call swiftcc void %{{[0-9]+}}(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret({{.*}}) [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
 // CHECK: ret void
 public struct MUseStruct {
   var x = BigStruct()

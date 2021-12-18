@@ -67,30 +67,81 @@ func is_doc14() {}
 /// IS_DOC_END
 func is_doc15() {}
 
-/// is_doc16 IS_DOC_START
-/** Aaa bbb ccc. */
-/// IS_DOC_END
-func is_doc16() {}
+/// IS_DOC_NOT_ATTACHED
+/// Should not return with the comments for the function below it or prevent
+/// its actual comment from being returned.
 
-/** Aaa is_doc17 IS_DOC_START *//** bbb */
-/// IS_DOC_END
-func is_doc17() {}
+/// IS_DOC_START priorCommentOneLineGap Aaa.
+///
+/// Bbb. IS_DOC_END
+func priorCommentOneLineGap() {}
 
 /// IS_DOC_NOT_ATTACHED
-// NOT_DOC
-/// is_doc18 IS_DOC_START IS_DOC_END
-func is_doc18() {}
+/// Same as above but with a two line gap this time.
 
-// Aaa.  NOT_DOC
-/// is_doc19 IS_DOC_START
-/** Aaa
- *
- * Bbb */
-/// Ccc
-/** Ddd
- *  Eee  IS_DOC_END
+
+/// IS_DOC_START priorCommentTwoLineGap Aaa.
+///
+/// Bbb. IS_DOC_END
+func priorCommentTwoLineGap() {}
+
+/// IS_DOC_NOT_ATTACHED
+/// Make sure a gyb comment doesn't cause the previous comment to stay
+/// attached.
+// ###line 9001
+
+/// IS_DOC_START priorCommentGyb Aaa.
+///
+/// Bbb. IS_DOC_END
+func priorCommentGyb() {}
+
+/**
+  IS_DOC_START priorBlockMultiLineComment Aaa.
  */
-func is_doc19() {}
+/**
+  Bbb. IS_DOC_END
+ */
+func priorBlockMultiLineComment() {}
+
+/** IS_DOC_START priorBlockSingleLineComment Aaa. */
+/**
+  Bbb. IS_DOC_END
+ */
+func priorBlockSingleLineComment() {}
+
+/** IS_DOC_START priorBlockMixedComment Aaa. */
+/// Bbb.
+/// Multiline. IS_DOC_END
+func priorBlockMixedComment() {}
+
+/// IS_DOC_START priorLineMixedComment Aaa.
+/// Multiline.
+/**  Bbb. IS_DOC_END */
+func priorLineMixedComment() {}
+
+/// IS_DOC_START priorSingleLineMixedComment Aaa.
+/**
+  Bbb. IS_DOC_END
+ */
+func priorSingleLineMixedComment() {}
+
+/**
+  IS_DOC_START priorBlockMultiLineMixedComment Aaa.
+ */
+/// Bbb. IS_DOC_END
+func priorBlockMultiLineMixedComment() {}
+
+// Aaa. NOT_DOC
+/// allTheThings IS_DOC_NOT_ATTACHED
+/** Bbb IS_DOC_NOT_ATTACHED
+ *
+ * Ccc. */
+// Ddd. NOT_DOC
+/// IS_DOC_START Eee
+/**
+ * Fff. IS_DOC_END
+ */
+func allTheThings() {}
 
 // RUN: %target-swift-ide-test -print-comments -source-filename %s > %t.txt
 // RUN: %FileCheck %s -check-prefix=WRONG < %t.txt
@@ -121,8 +172,13 @@ func is_doc19() {}
 // CHECK-NEXT: comment_merge.swift:59:6: Func/not_doc13 RawComment=none
 // CHECK-NEXT: comment_merge.swift:63:6: Func/is_doc14 RawComment=[/// is_doc14 IS_DOC_START\n/// IS_DOC_END\n]
 // CHECK-NEXT: comment_merge.swift:68:6: Func/is_doc15 RawComment=[/// is_doc15 IS_DOC_START\n/// Aaa bbb ccc.\n/// IS_DOC_END\n]
-// CHECK-NEXT: comment_merge.swift:73:6: Func/is_doc16 RawComment=[/// is_doc16 IS_DOC_START\n/** Aaa bbb ccc. *//// IS_DOC_END\n]
-// CHECK-NEXT: comment_merge.swift:77:6: Func/is_doc17 RawComment=[/** Aaa is_doc17 IS_DOC_START *//** bbb *//// IS_DOC_END\n]
-// CHECK-NEXT: comment_merge.swift:82:6: Func/is_doc18 RawComment=[/// is_doc18 IS_DOC_START IS_DOC_END\n]
-// CHECK-NEXT: comment_merge.swift:93:6: Func/is_doc19 RawComment=[/// is_doc19 IS_DOC_START\n/** Aaa\n *\n * Bbb *//// Ccc\n/** Ddd\n *  Eee  IS_DOC_END\n */]
-
+// CHECK-NEXT: comment_merge.swift:77:6: Func/priorCommentOneLineGap RawComment=[/// IS_DOC_START priorCommentOneLineGap Aaa.\n///\n/// Bbb. IS_DOC_END\n]
+// CHECK-NEXT: comment_merge.swift:86:6: Func/priorCommentTwoLineGap RawComment=[/// IS_DOC_START priorCommentTwoLineGap Aaa.\n///\n/// Bbb. IS_DOC_END\n]
+// CHECK-NEXT: comment_merge.swift:96:6: Func/priorCommentGyb RawComment=[/// IS_DOC_START priorCommentGyb Aaa.\n///\n/// Bbb. IS_DOC_END\n]
+// CHECK-NEXT: comment_merge.swift:104:6: Func/priorBlockMultiLineComment RawComment=[/**\n  IS_DOC_START priorBlockMultiLineComment Aaa.\n *//**\n  Bbb. IS_DOC_END\n */]
+// CHECK-NEXT: comment_merge.swift:110:6: Func/priorBlockSingleLineComment RawComment=[/** IS_DOC_START priorBlockSingleLineComment Aaa. *//**\n  Bbb. IS_DOC_END\n */]
+// CHECK-NEXT: comment_merge.swift:115:6: Func/priorBlockMixedComment RawComment=[/** IS_DOC_START priorBlockMixedComment Aaa. *//// Bbb.\n/// Multiline. IS_DOC_END\n]
+// CHECK-NEXT: comment_merge.swift:120:6: Func/priorLineMixedComment RawComment=[/// IS_DOC_START priorLineMixedComment Aaa.\n/// Multiline.\n/**  Bbb. IS_DOC_END */]
+// CHECK-NEXT: comment_merge.swift:126:6: Func/priorSingleLineMixedComment RawComment=[/// IS_DOC_START priorSingleLineMixedComment Aaa.\n/**\n  Bbb. IS_DOC_END\n */]
+// CHECK-NEXT: comment_merge.swift:132:6: Func/priorBlockMultiLineMixedComment RawComment=[/**\n  IS_DOC_START priorBlockMultiLineMixedComment Aaa.\n *//// Bbb. IS_DOC_END\n]
+// CHECK-NEXT: comment_merge.swift:144:6: Func/allTheThings RawComment=[/// IS_DOC_START Eee\n/**\n * Fff. IS_DOC_END\n */]

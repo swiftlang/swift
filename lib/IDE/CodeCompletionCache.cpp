@@ -102,7 +102,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 1;
+static constexpr uint32_t onDiskCompletionCacheVersion = 3; // Removed "source file path".
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -209,7 +209,6 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto numBytesToErase = static_cast<unsigned>(*cursor++);
     auto chunkIndex = read32le(cursor);
     auto moduleIndex = read32le(cursor);
-    auto sourceFilePathIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
     auto diagMessageIndex = read32le(cursor);
 
@@ -219,34 +218,23 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       assocUSRs.push_back(getString(read32le(cursor)));
     }
 
-    auto declKeywordCount = read32le(cursor);
-    SmallVector<std::pair<StringRef, StringRef>, 4> declKeywords;
-    for (unsigned i = 0; i < declKeywordCount; ++i) {
-      auto first = getString(read32le(cursor));
-      auto second = getString(read32le(cursor));
-      declKeywords.push_back(std::make_pair(first, second));
-    }
-
     CodeCompletionString *string = getCompletionString(chunkIndex);
     auto moduleName = getString(moduleIndex);
-    auto sourceFilePath = getString(sourceFilePathIndex);
     auto briefDocComment = getString(briefDocIndex);
     auto diagMessage = getString(diagMessageIndex);
 
     CodeCompletionResult *result = nullptr;
-    if (kind == CodeCompletionResult::Declaration) {
+    if (kind == CodeCompletionResult::ResultKind::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
-          context, CodeCompletionFlair(), numBytesToErase, string,
-          declKind, isSystem, moduleName, sourceFilePath, notRecommended,
-          diagSeverity, diagMessage, briefDocComment,
+          context, CodeCompletionFlair(), numBytesToErase, string, declKind,
+          isSystem, moduleName, notRecommended, diagSeverity, diagMessage,
+          briefDocComment,
           copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
-          copyArray(*V.Sink.Allocator, ArrayRef<std::pair<StringRef, StringRef>>(declKeywords)),
-          CodeCompletionResult::Unknown, opKind);
+          CodeCompletionResult::ExpectedTypeRelation::Unknown, opKind);
     } else {
-      result = new (*V.Sink.Allocator)
-          CodeCompletionResult(kind, context,  CodeCompletionFlair(),
-                               numBytesToErase, string,
-                               CodeCompletionResult::NotApplicable, opKind);
+      result = new (*V.Sink.Allocator) CodeCompletionResult(
+          kind, context, CodeCompletionFlair(), numBytesToErase, string,
+          CodeCompletionResult::ExpectedTypeRelation::NotApplicable, opKind);
     }
 
     V.Sink.Results.push_back(result);
@@ -304,7 +292,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
     OSSLE.write(K.ResultsHaveLeadingDot);
     OSSLE.write(K.ForTestableLookup);
     OSSLE.write(K.ForPrivateImportLookup);
-    OSSLE.write(K.CodeCompleteInitsInPostfixExpr);
+    OSSLE.write(K.AddInitsInToplevel);
     OSSLE.write(K.Annotated);
     LE.write(static_cast<uint32_t>(OSS.tell()));   // Size of debug info
     out.write(OSS.str().data(), OSS.str().size()); // Debug info blob
@@ -362,7 +350,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
 
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));
-      if (R->getKind() == CodeCompletionResult::Declaration)
+      if (R->getKind() == CodeCompletionResult::ResultKind::Declaration)
         LE.write(static_cast<uint8_t>(R->getAssociatedDeclKind()));
       else
         LE.write(static_cast<uint8_t>(~0u));
@@ -378,20 +366,12 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
       LE.write(addString(R->getModuleName()));      // index into strings
-      LE.write(addString(R->getSourceFilePath()));  // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
       LE.write(addString(R->getDiagnosticMessage())); // index into strings
 
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {
         LE.write(addString(R->getAssociatedUSRs()[i]));
-      }
-
-      auto AllKeywords = R->getDeclKeywords();
-      LE.write(static_cast<uint32_t>(AllKeywords.size()));
-      for (unsigned i = 0; i < AllKeywords.size(); ++i) {
-        LE.write(addString(AllKeywords[i].first));
-        LE.write(addString(AllKeywords[i].second));
       }
     }
   }
@@ -423,7 +403,7 @@ static std::string getName(StringRef cacheDirectory,
   OSS << (K.ResultsHaveLeadingDot ? "-dot" : "")
       << (K.ForTestableLookup ? "-testable" : "")
       << (K.ForPrivateImportLookup ? "-private" : "")
-      << (K.CodeCompleteInitsInPostfixExpr ? "-inits" : "")
+      << (K.AddInitsInToplevel ? "-inits" : "")
       << (K.Annotated ? "-annotated" : "");
 
   // name[-access-path-components]

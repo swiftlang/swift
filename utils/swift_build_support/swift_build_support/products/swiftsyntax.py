@@ -94,17 +94,10 @@ class SwiftSyntax(product.Product):
         return self.args.install_swiftsyntax
 
     def install(self, target_name):
-        install_prefix = self.args.install_destdir + self.args.install_prefix
-
-        dylib_dir = os.path.join(install_prefix, 'lib')
-
-        additional_params = [
-            '--dylib-dir', dylib_dir,
-            '--install'
-        ]
-
-        self.run_swiftsyntax_build_script(target=target_name,
-                                          additional_params=additional_params)
+        # SwiftSyntax doesn't produce any products thate should be installed 
+        # into the toolchein. All tools using it link against SwiftSyntax 
+        # statically.
+        pass
 
     @classmethod
     def get_dependencies(cls):

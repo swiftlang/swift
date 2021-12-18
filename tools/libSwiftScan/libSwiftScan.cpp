@@ -23,7 +23,7 @@
 
 using namespace swift::dependencies;
 
-DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t);
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t)
 
 //=== Private Cleanup Functions -------------------------------------------===//
 
@@ -74,6 +74,7 @@ void swiftscan_dependency_info_details_dispose(
     swiftscan_string_dispose(details_impl->clang_details.module_map_path);
     swiftscan_string_dispose(details_impl->clang_details.context_hash);
     swiftscan_string_set_dispose(details_impl->clang_details.command_line);
+    swiftscan_string_set_dispose(details_impl->clang_details.captured_pcm_args);
     break;
   }
   delete details_impl;
@@ -346,6 +347,11 @@ swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details) {
   return details->clang_details.command_line;
 }
 
+swiftscan_string_set_t *
+swiftscan_clang_detail_get_captured_pcm_args(swiftscan_module_details_t details) {
+  return details->clang_details.captured_pcm_args;
+}
+
 //=== Batch Scan Input Functions ------------------------------------------===//
 
 swiftscan_batch_scan_input_t *swiftscan_batch_scan_input_create() {
@@ -438,7 +444,8 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation) {
 void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
   for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
     swiftscan_string_dispose(set->strings[SI]);
-  delete[] set->strings;
+  if (set->count > 0)
+    delete[] set->strings;
   delete set;
 }
 
@@ -494,6 +501,19 @@ static void addFrontendFlagOption(llvm::opt::OptTable &table,
   }
 }
 
+swiftscan_string_ref_t
+swiftscan_compiler_target_info_query(swiftscan_scan_invocation_t invocation) {
+  int argc = invocation->argv->count;
+  std::vector<const char *> Compilation;
+  for (int i = 0; i < argc; ++i)
+    Compilation.push_back(get_C_string(invocation->argv->strings[i]));
+
+  auto TargetInfo = getTargetInfo(Compilation);
+  if (TargetInfo.getError())
+    return create_null();
+  return TargetInfo.get();
+}
+
 swiftscan_string_set_t *
 swiftscan_compiler_supported_arguments_query() {
   std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
@@ -508,8 +528,10 @@ swiftscan_compiler_supported_arguments_query() {
 
 swiftscan_string_set_t *
 swiftscan_compiler_supported_features_query() {
-  // TODO: We are yet to figure out how "Features" will be organized.
-  return nullptr;
+  std::vector<std::string> allFeatures;
+  allFeatures.emplace_back("library-level");
+  allFeatures.emplace_back("emit-abi-descriptor");
+  return create_set(allFeatures);
 }
 
 int invoke_swift_compiler(int argc, const char **argv) {

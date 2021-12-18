@@ -5,17 +5,17 @@
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_cancel_then_add() async {
   // CHECK: test_taskGroup_cancel_then_add
   print("\(#function)")
@@ -55,7 +55,7 @@ func test_taskGroup_cancel_then_add() async {
 
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_then_add()

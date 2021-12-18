@@ -33,6 +33,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
@@ -198,8 +199,10 @@ public:
 
 namespace path = llvm::sys::path;
 
-static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf) {
-  auto VI = serialization::validateSerializedAST(buf.getBuffer());
+static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf,
+                                    bool requiresOSSAModules) {
+  auto VI = serialization::validateSerializedAST(buf.getBuffer(),
+                                                 requiresOSSAModules);
   return VI.status == serialization::Status::Valid;
 }
 
@@ -497,7 +500,8 @@ class ModuleInterfaceLoaderImpl {
 
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
     auto validationInfo = serialization::validateSerializedAST(
-        buf.getBuffer(), /*ExtendedValidationInfo=*/nullptr, &allDeps);
+        buf.getBuffer(), requiresOSSAModules,
+        /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
     if (validationInfo.status != serialization::Status::Valid) {
       rebuildInfo.setSerializationStatus(path, validationInfo.status);
@@ -538,7 +542,7 @@ class ModuleInterfaceLoaderImpl {
 
     // First, make sure the underlying module path exists and is valid.
     auto modBuf = fs.getBufferForFile(fwd.underlyingModulePath);
-    if (!modBuf || !serializedASTLooksValid(*modBuf.get()))
+    if (!modBuf || !serializedASTLooksValid(*modBuf.get(), requiresOSSAModules))
       return false;
 
     // Next, check the dependencies in the forwarding file.
@@ -646,12 +650,6 @@ class ModuleInterfaceLoaderImpl {
   }
 
   std::pair<std::string, std::string> getCompiledModuleCandidates() {
-    // If we require ossa modules, then we /always/ rebuild the module interface
-    // regardless of the module loading mode.
-    if (requiresOSSAModules) {
-      return {};
-    }
-
     std::pair<std::string, std::string> result;
     // Keep track of whether we should attempt to load a .swiftmodule adjacent
     // to the .swiftinterface.
@@ -1007,7 +1005,7 @@ class ModuleInterfaceLoaderImpl {
       ModuleInterfaceBuilder builder(
         ctx.SourceMgr, diagsToUse,
         astDelegate, interfacePath, moduleName, cacheDir,
-        prebuiltCacheDir, backupInterfaceDir,
+        prebuiltCacheDir, backupInterfaceDir, StringRef(),
         Opts.disableInterfaceLock, diagnosticLoc,
         dependencyTracker);
       // If we found an out-of-date .swiftmodule, we still want to add it as
@@ -1039,7 +1037,7 @@ class ModuleInterfaceLoaderImpl {
       // the genericSubInvocation we'll need to use to compute the cache paths.
       ModuleInterfaceBuilder fallbackBuilder(
         ctx.SourceMgr, &ctx.Diags, astDelegate, backupPath, moduleName, cacheDir,
-        prebuiltCacheDir, backupInterfaceDir,
+        prebuiltCacheDir, backupInterfaceDir, StringRef(),
         Opts.disableInterfaceLock, diagnosticLoc,
         dependencyTracker);
       if (rebuildInfo.sawOutOfDateModule(modulePath))
@@ -1083,7 +1081,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-  bool IsFramework) {
+  bool skipBuildingInterface, bool IsFramework) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
@@ -1109,6 +1107,16 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   // If present, use the private interface instead of the public one.
   if (fs.exists(PrivateInPath)) {
     InPath = PrivateInPath;
+  }
+
+  // If we've been told to skip building interfaces, we are done here and do
+  // not need to have the module actually built. For example, if we are
+  // currently answering a `canImport` query, it is enough to have found
+  // the interface.
+  if (skipBuildingInterface) {
+    if (ModuleInterfacePath)
+      *ModuleInterfacePath = InPath;
+    return std::error_code();
   }
 
   // Create an instance of the Impl to do the heavy lifting.
@@ -1208,7 +1216,8 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     const ClangImporterOptions &ClangOpts, StringRef CacheDir,
     StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
     StringRef ModuleName, StringRef InPath,
-    StringRef OutPath, bool SerializeDependencyHashes,
+    StringRef OutPath, StringRef ABIOutputPath,
+    bool SerializeDependencyHashes,
     bool TrackSystemDependencies, ModuleInterfaceLoaderOptions LoaderOpts,
     RequireOSSAModules_t RequireOSSAModules) {
   InterfaceSubContextDelegateImpl astDelegate(
@@ -1218,7 +1227,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       SerializeDependencyHashes, TrackSystemDependencies, RequireOSSAModules);
   ModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
                                  ModuleName, CacheDir, PrebuiltCacheDir,
-                                 BackupInterfaceDir,
+                                 BackupInterfaceDir, ABIOutputPath,
                                  LoaderOpts.disableInterfaceLock);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
@@ -1236,7 +1245,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
   assert(!backInPath.empty());
   ModuleInterfaceBuilder backupBuilder(SourceMgr, &Diags, astDelegate, backInPath,
                                        ModuleName, CacheDir, PrebuiltCacheDir,
-                                       BackupInterfaceDir,
+                                       BackupInterfaceDir, ABIOutputPath,
                                        LoaderOpts.disableInterfaceLock);
   // Ensure we can rebuild module after user changed the original interface file.
   backupBuilder.addExtraDependency(InPath);
@@ -1488,7 +1497,9 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (LoaderOpts.remarkOnRebuildFromInterface) {
     GenericArgs.push_back("-Rmodule-interface-rebuild");
   }
-
+  // This flag only matters when we are verifying an textual interface.
+  frontendOpts.DowngradeInterfaceVerificationError =
+    LoaderOpts.downgradeInterfaceVerificationError;
   // Note that we don't assume cachePath is the same as the Clang
   // module cache path at this point.
   if (buildModuleCacheDirIfAbsent && !moduleCachePath.empty())
@@ -1563,7 +1574,7 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath) {
       // ensure that we compile all swift interface files with the option set.
       unsigned(genericSubInvocation.getSILOptions().EnableOSSAModules));
 
-  return llvm::APInt(64, H).toString(36, /*Signed=*/false);
+  return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }
 
 std::error_code
@@ -1593,6 +1604,10 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   // arguments in the textual interface file. So copy to use a new compiler
   // invocation.
   CompilerInvocation subInvocation = genericSubInvocation;
+
+  // Save the target triple from the original context.
+  llvm::Triple originalTargetTriple(subInvocation.getLangOptions().Target);
+
   std::vector<StringRef> BuildArgs(GenericArgs.begin(), GenericArgs.end());
   assert(BuildArgs.size() == GenericArgs.size());
   // Configure inputs
@@ -1642,6 +1657,22 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   if (subInvocation.parseArgs(SubArgs, *Diags)) {
     return std::make_error_code(std::errc::not_supported);
   }
+
+  // If the target triple parsed from the Swift interface file differs
+  // only in subarchitecture from the original target triple, then
+  // we have loaded a Swift interface from a different-but-compatible
+  // architecture slice. Use the original subarchitecture.
+  llvm::Triple parsedTargetTriple(subInvocation.getTargetTriple());
+  if (parsedTargetTriple.getSubArch() != originalTargetTriple.getSubArch() &&
+      parsedTargetTriple.getArch() == originalTargetTriple.getArch() &&
+      parsedTargetTriple.getVendor() == originalTargetTriple.getVendor() &&
+      parsedTargetTriple.getOS() == originalTargetTriple.getOS() &&
+      parsedTargetTriple.getEnvironment()
+        == originalTargetTriple.getEnvironment()) {
+    parsedTargetTriple.setArchName(originalTargetTriple.getArchName());
+    subInvocation.setTargetTriple(parsedTargetTriple.str());
+  }
+
   CompilerInstance subInstance;
   SubCompilerInstanceInfo info;
   info.Instance = &subInstance;
@@ -1654,6 +1685,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   if (subInstance.setup(subInvocation)) {
     return std::make_error_code(std::errc::not_supported);
   }
+
   info.BuildArguments = BuildArgs;
   info.Hash = CacheHash;
   auto target = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(), "-target") - 1);
@@ -1710,8 +1742,14 @@ bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-           bool &IsFramework, bool &IsSystemModule) {
-  StringRef moduleName = ModuleID.Item.str();
+           bool skipBuildingInterface, bool &IsFramework, bool &IsSystemModule) {
+  // Find a module with an actual, physical name on disk, in case
+  // -module-alias is used (otherwise same).
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend, and an
+  // input file has 'import Foo', a module called Bar (real name) should be searched.
+  StringRef moduleName = Ctx.getRealModuleName(ModuleID.Item).str();
+
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no explicit module path is given matches the name, return with an
   // error code.
@@ -1782,14 +1820,19 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-  bool IsFramework) {
+  bool skipBuildingInterface, bool IsFramework) {
   llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
 }
 
 bool ExplicitSwiftModuleLoader::canImportModule(
     ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
-  StringRef moduleName = mID.Item.str();
+  // Look up the module with the real name (physical name on disk);
+  // in case `-module-alias` is used, the name appearing in source files
+  // and the real module name are different. For example, '-module-alias Foo=Bar'
+  // maps Foo appearing in source files, e.g. 'import Foo', to the real module
+  // name Bar (on-disk name), which should be searched for loading.
+  StringRef moduleName = Ctx.getRealModuleName(mID.Item).str();
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no provided explicit module matches the name, then it cannot be imported.
   if (it == Impl.ExplicitModuleMap.end()) {

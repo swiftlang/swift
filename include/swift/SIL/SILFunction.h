@@ -60,6 +60,12 @@ enum IsExactSelfClass_t {
   IsExactSelfClass,
 };
 
+enum class PerformanceConstraints : uint8_t {
+  None = 0,
+  NoAllocation = 1,
+  NoLocks = 2,
+};
+
 class SILSpecializeAttr final {
   friend SILFunction;
 public:
@@ -72,7 +78,8 @@ public:
                                    GenericSignature specializedSignature,
                                    bool exported, SpecializationKind kind,
                                    SILFunction *target, Identifier spiGroup,
-                                   const ModuleDecl *spiModule);
+                                   const ModuleDecl *spiModule,
+                                   AvailabilityContext availability);
 
   bool isExported() const {
     return exported;
@@ -110,6 +117,10 @@ public:
     return spiModule;
   }
 
+  AvailabilityContext getAvailability() const {
+    return availability;
+  }
+
   void print(llvm::raw_ostream &OS) const;
 
 private:
@@ -117,13 +128,15 @@ private:
   bool exported;
   GenericSignature specializedSignature;
   Identifier spiGroup;
+  AvailabilityContext availability;
   const ModuleDecl *spiModule = nullptr;
   SILFunction *F = nullptr;
   SILFunction *targetFunction = nullptr;
 
   SILSpecializeAttr(bool exported, SpecializationKind kind,
                     GenericSignature specializedSignature, SILFunction *target,
-                    Identifier spiGroup, const ModuleDecl *spiModule);
+                    Identifier spiGroup, const ModuleDecl *spiModule,
+                    AvailabilityContext availability);
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
@@ -224,6 +237,8 @@ private:
   AvailabilityContext Availability;
 
   Purpose specialPurpose = Purpose::None;
+
+  PerformanceConstraints perfConstraints = PerformanceConstraints::None;
 
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
@@ -804,6 +819,12 @@ public:
 
   void setOptimizationMode(OptimizationMode mode) {
     OptMode = unsigned(mode);
+  }
+
+  PerformanceConstraints getPerfConstraints() const { return perfConstraints; }
+
+  void setPerfConstraints(PerformanceConstraints perfConstr) {
+    perfConstraints = perfConstr;
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),

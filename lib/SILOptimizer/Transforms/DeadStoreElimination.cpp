@@ -400,9 +400,10 @@ private:
   /// Process instructions. Extract locations from SIL StoreInst.
   void processStoreInst(SILInstruction *Inst, DSEKind Kind);
 
-  /// Process instructions. Extract locations from SIL DebugValueAddrInst.
-  /// DebugValueAddrInst maybe promoted to DebugValue, when this is done,
-  /// DebugValueAddrInst is effectively a read on the location.
+  /// Process instructions. Extract locations from SIL DebugValueInst.
+  /// DebugValueInst w/ address value maybe promoted to DebugValueInst w/
+  /// scalar value when this is done,
+  /// DebugValueInst is effectively a read on the location.
   void processDebugValueAddrInst(SILInstruction *I, DSEKind Kind);
   void processDebugValueAddrInstForGenKillSet(SILInstruction *I);
   void processDebugValueAddrInstForDSE(SILInstruction *I);
@@ -1045,7 +1046,7 @@ void DSEContext::processStoreInst(SILInstruction *I, DSEKind Kind) {
 
 void DSEContext::processDebugValueAddrInstForGenKillSet(SILInstruction *I) {
   BlockState *S = getBlockState(I);
-  SILValue Mem = cast<DebugValueAddrInst>(I)->getOperand();
+  SILValue Mem = cast<DebugValueInst>(I)->getOperand();
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->BBMaxStoreSet.test(i))
       continue;
@@ -1058,7 +1059,7 @@ void DSEContext::processDebugValueAddrInstForGenKillSet(SILInstruction *I) {
 
 void DSEContext::processDebugValueAddrInstForDSE(SILInstruction *I) {
   BlockState *S = getBlockState(I);
-  SILValue Mem = cast<DebugValueAddrInst>(I)->getOperand();
+  SILValue Mem = cast<DebugValueInst>(I)->getOperand();
   for (unsigned i = 0; i < S->LocationNum; ++i) {
     if (!S->isTrackingLocation(S->BBWriteSetMid, i))
       continue;
@@ -1140,11 +1141,11 @@ void DSEContext::processInstruction(SILInstruction *I, DSEKind Kind) {
     processLoadInst(I, Kind);
   } else if (isa<StoreInst>(I)) {
     processStoreInst(I, Kind);
-  } else if (isa<DebugValueAddrInst>(I)) {
+  } else if (DebugValueInst::hasAddrVal(I)) {
     processDebugValueAddrInst(I, Kind);
   } else if (I->mayReadFromMemory()) {
     processUnknownReadInst(I, Kind);
-  }  
+  }
 
   // Check whether this instruction will invalidate any other locations.
   for (auto result : I->getResults())
@@ -1181,14 +1182,17 @@ void DSEContext::runIterativeDSE() {
 }
 
 bool DSEContext::run() {
-  std::pair<int, int> LSCount = std::make_pair(0, 0);
+  int numLoads = 0, numStores = 0;
+  bool immutableLoadsFound = false;
   // Walk over the function and find all the locations accessed by
   // this function.
   LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex,
-                                   BaseToLocIndex, TE, LSCount);
+                                   BaseToLocIndex, TE,
+                                   /*stopAtImmutable*/ false,
+                                   numLoads, numStores, immutableLoadsFound);
 
   // Check how to optimize this function.
-  ProcessKind Kind = getProcessFunctionKind(LSCount.second);
+  ProcessKind Kind = getProcessFunctionKind(numStores);
   
   // We do not optimize this function at all.
   if (Kind == ProcessKind::ProcessNone)

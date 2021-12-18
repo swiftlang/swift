@@ -176,7 +176,12 @@ void Mangler::verify(StringRef nameStr) {
     llvm::errs() << "Can't demangle: " << nameStr << '\n';
     abort();
   }
-  std::string Remangled = mangleNode(Root);
+  auto mangling = mangleNode(Root);
+  if (!mangling.isSuccess()) {
+    llvm::errs() << "Can't remangle: " << nameStr << '\n';
+    abort();
+  }
+  std::string Remangled = mangling.result();
   if (Remangled == nameStr)
     return;
 

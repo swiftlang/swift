@@ -65,6 +65,26 @@ SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
 
 SILGenModule::~SILGenModule() {
   assert(!TopLevelSGF && "active source file lowering!?");
+
+  // Update the linkage of external private functions to public_external,
+  // because there is no private_external linkage. External private functions
+  // can occur in the following cases:
+  //
+  // * private class methods which are referenced from the vtable of a derived
+  //   class  in a different file/module. Such private methods are always
+  //   generated with public linkage in the other file/module.
+  //
+  // * in lldb: lldb can access private declarations in other files/modules
+  //
+  // * private functions with a @_silgen_name attribute but without a body
+  //
+  // * when compiling with -disable-access-control
+  //
+  for (SILFunction &f : M.getFunctionList()) {
+    if (f.getLinkage() == SILLinkage::Private && f.isExternalDeclaration())
+      f.setLinkage(SILLinkage::PublicExternal);
+  }
+
   M.verify();
 }
 
@@ -338,24 +358,15 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   return SwiftModule->lookupConformance(type, proto);
 }
 
-static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
-                                            Optional<FuncDecl*> &cache,
-                                            StringRef name) {
+static FuncDecl *lookupIntrinsic(ModuleDecl &module,
+                                 Optional<FuncDecl *> &cache, Identifier name) {
   if (cache)
     return *cache;
-  
-  auto *module = C.getLoadedModule(C.Id_Concurrency);
-  if (!module) {
-    cache = nullptr;
-    return nullptr;
-  }
-  
-  SmallVector<ValueDecl *, 1> decls;
-  module->lookupQualified(module,
-                     DeclNameRef(C.getIdentifier(name)),
-                     NL_QualifiedDefault | NL_IncludeUsableFromInline,
-                     decls);
 
+  SmallVector<ValueDecl *, 1> decls;
+  module.lookupQualified(&module, DeclNameRef(name),
+                         NL_QualifiedDefault | NL_IncludeUsableFromInline,
+                         decls);
   if (decls.size() != 1) {
     cache = nullptr;
     return nullptr;
@@ -363,6 +374,18 @@ static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
   auto func = dyn_cast<FuncDecl>(decls[0]);
   cache = func;
   return func;
+}
+
+static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
+                                            Optional<FuncDecl *> &cache,
+                                            StringRef name) {
+  auto *module = C.getLoadedModule(C.Id_Concurrency);
+  if (!module) {
+    cache = nullptr;
+    return nullptr;
+  }
+
+  return lookupIntrinsic(*module, cache, C.getIdentifier(name));
 }
 
 FuncDecl *
@@ -437,6 +460,37 @@ SILGenModule::getCheckExpectedExecutor() {
                                     "_checkExpectedExecutor");
 }
 
+FuncDecl *SILGenModule::getAsyncMainDrainQueue() {
+  return lookupConcurrencyIntrinsic(getASTContext(), AsyncMainDrainQueue,
+                                    "_asyncMainDrainQueue");
+}
+
+FuncDecl *SILGenModule::getGetMainExecutor() {
+  return lookupConcurrencyIntrinsic(getASTContext(), GetMainExecutor,
+                                    "_getMainExecutor");
+}
+
+FuncDecl *SILGenModule::getSwiftJobRun() {
+  return lookupConcurrencyIntrinsic(getASTContext(), SwiftJobRun,
+                                    "_swiftJobRun");
+}
+
+FuncDecl *SILGenModule::getExit() {
+  if (ExitFunc)
+    return *ExitFunc;
+
+  ASTContext &C = getASTContext();
+  ModuleDecl *concurrencyShims =
+      C.getModuleByIdentifier(C.getIdentifier("_SwiftConcurrencyShims"));
+
+  if (!concurrencyShims) {
+    ExitFunc = nullptr;
+    return nullptr;
+  }
+
+  return lookupIntrinsic(*concurrencyShims, ExitFunc, C.getIdentifier("exit"));
+}
+
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   if (NSErrorConformanceToError)
     return *NSErrorConformanceToError;
@@ -496,8 +550,12 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   auto fn = M.lookUpFunction(functionName);
   if (fn) return fn;
 
-  auto rootType = CanGenericTypeParamType::get(0, 0, getASTContext());
-  auto valueType = CanGenericTypeParamType::get(0, 1, getASTContext());
+  auto rootType =
+      CanGenericTypeParamType::get(/*type sequence*/ false,
+                                   /*depth*/ 0, /*index*/ 0, getASTContext());
+  auto valueType =
+      CanGenericTypeParamType::get(/*type sequence*/ false,
+                                   /*depth*/ 0, /*index*/ 1, getASTContext());
 
   // Build the generic signature <A, B>.
   auto sig = GenericSignature::get({rootType, valueType}, {});
@@ -1036,6 +1094,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     postEmitFunction(constant, f);
     return;
   }
+  case SILDeclRef::Kind::AsyncEntryPoint:
   case SILDeclRef::Kind::EntryPoint: {
     f->setBare(IsBare);
 
@@ -1046,7 +1105,27 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     auto *decl = constant.getDecl();
     auto *dc = decl->getDeclContext();
     PrettyStackTraceSILFunction X("silgen emitArtificialTopLevel", f);
-    SILGenFunction(*this, *f, dc).emitArtificialTopLevel(decl);
+    // In all cases, a constant.kind == EntryPoint indicates the main entrypoint
+    // to the program, @main.
+    // In the synchronous case, the decl is not async, so emitArtificialTopLevel
+    // emits the error unwrapping and call to MainType.$main() into @main.
+    //
+    // In the async case, emitAsyncMainThreadStart is responsible for generating
+    // the contents of @main. This wraps @async_main in a task, passes that task
+    // to swift_job_run to execute the first thunk, and starts the runloop to
+    // run any additional continuations. The kind is EntryPoint, and the decl is
+    // async.
+    // When the kind is 'AsyncMain', we are generating @async_main. In this
+    // case, emitArtificialTopLevel emits the code for calling MaintType.$main,
+    // unwrapping errors, and calling exit(0) into @async_main to run the
+    // user-specified main function.
+    if (constant.kind == SILDeclRef::Kind::EntryPoint && isa<FuncDecl>(decl) &&
+        static_cast<FuncDecl *>(decl)->hasAsync()) {
+      SILDeclRef mainEntryPoint = SILDeclRef::getAsyncMainDeclEntryPoint(decl);
+      SILGenFunction(*this, *f, dc).emitAsyncMainThreadStart(mainEntryPoint);
+    } else {
+      SILGenFunction(*this, *f, dc).emitArtificialTopLevel(decl);
+    }
     postEmitFunction(constant, f);
     return;
   }
@@ -1069,6 +1148,7 @@ static void emitOrDelayFunction(SILGenModule &SGM,
   auto linkage = constant.getLinkage(ForDefinition);
   bool mayDelay = !forceEmission &&
              (constant.isImplicit() &&
+              !constant.isDynamicallyReplaceable() &&
               !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule()));
 
   // Avoid emitting a delayable definition if it hasn't already been referenced.
@@ -1299,8 +1379,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   if (AFD->isDistributed()) {
     auto thunk = SILDeclRef(AFD).asDistributed();
-    if (!hasFunction(thunk))
-      emitDistributedThunk(thunk);
+    emitDistributedThunk(thunk);
   }
 }
 
@@ -1885,7 +1964,7 @@ public:
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel, sf);
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getName();
       auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
-      sgm.TopLevelSGF->prepareEpilog(false, true, moduleCleanupLoc);
+      sgm.TopLevelSGF->prepareEpilog(None, true, moduleCleanupLoc);
 
       // Create the argc and argv arguments.
       auto prologueLoc = RegularLocation::getModuleLocation();
@@ -2030,10 +2109,15 @@ public:
 
     // If the source file contains an artificial main, emit the implicit
     // top-level code.
-    if (auto *mainDecl = sf->getMainDecl())
+    if (auto *mainDecl = sf->getMainDecl()) {
+      if (isa<FuncDecl>(mainDecl) &&
+          static_cast<FuncDecl *>(mainDecl)->hasAsync())
+        emitSILFunctionDefinition(
+            SILDeclRef::getAsyncMainDeclEntryPoint(mainDecl));
       emitSILFunctionDefinition(SILDeclRef::getMainDeclEntryPoint(mainDecl));
+    }
   }
-  
+
   void emitSILFunctionDefinition(SILDeclRef ref) {
     SGM.emitFunctionDefinition(ref, SGM.getFunction(ref, ForDefinition));
   }
@@ -2068,6 +2152,9 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
   if (desc.getSourceFileToParse()) {
     return llvm::cantFail(evaluator(ParseSILModuleRequest{desc}));
   }
+
+  // For leak detection.
+  SILInstruction::resetInstructionCounts();
 
   auto silMod = SILModule::createEmptyModule(desc.context, desc.conv,
                                              desc.opts);
@@ -2123,50 +2210,4 @@ swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
                           const SILOptions &options) {
   auto desc = ASTLoweringDescriptor::forFile(sf, tc, options);
   return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
-}
-
-static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
-                                               Decl *d) {
-  auto *vd = cast<AbstractFunctionDecl>(d);
-  for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
-    auto *SA = cast<SpecializeAttr>(A);
-    // Filter _spi.
-    auto spiGroups = SA->getSPIGroups();
-    auto hasSPIGroup = !spiGroups.empty();
-    if (hasSPIGroup) {
-      if (vd->getModuleContext() != M.getSwiftModule() &&
-          !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
-        continue;
-      }
-    }
-    if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
-      auto target = SILDeclRef(targetFunctionDecl);
-      auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
-      auto kind = SA->getSpecializationKind() ==
-                          SpecializeAttr::SpecializationKind::Full
-                      ? SILSpecializeAttr::SpecializationKind::Full
-                      : SILSpecializeAttr::SpecializationKind::Partial;
-      Identifier spiGroupIdent;
-      if (hasSPIGroup) {
-        spiGroupIdent = spiGroups[0];
-      }
-      targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-          spiGroupIdent, vd->getModuleContext()));
-    }
-  }
-}
-
-void SILGenModule::visitImportDecl(ImportDecl *import) {
-  auto *module = import->getModule();
-  if (module->isNonSwiftModule())
-    return;
-
-  SmallVector<Decl*, 16> prespecializations;
-  module->getExportedPrespecializations(prespecializations);
-  for (auto *p : prespecializations) {
-    if (auto *vd = dyn_cast<AbstractFunctionDecl>(p)) {
-      transferSpecializeAttributeTargets(*this, M, vd);
-    }
-  }
 }

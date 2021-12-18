@@ -1895,7 +1895,8 @@ extension BinaryFloatingPoint {
     switch (Source.exponentBitCount, Source.significandBitCount) {
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
     case (5, 10):
-      guard #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+      guard #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) //SwiftStdlib 5.3
+      else {
         // Convert signaling NaN to quiet NaN by multiplying by 1.
         self = Self._convert(from: value).value * 1
         break

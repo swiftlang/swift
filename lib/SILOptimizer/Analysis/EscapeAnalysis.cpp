@@ -202,21 +202,22 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
+    return cast<SingleValueInstruction>(value)->getOperand(0);
+
   case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UncheckedAddrCastInst:
     // DO NOT use LOADABLE_REF_STORAGE because unchecked references don't have
     // retain/release instructions that trigger the 'default' case.
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   case ValueKind::RefTo##Name##Inst:                                           \
   case ValueKind::Name##ToRefInst:
 #include "swift/AST/ReferenceStorage.def"
-    return cast<SingleValueInstruction>(value)->getOperand(0);
-
-  case ValueKind::UncheckedAddrCastInst: {
-    auto *uac = cast<UncheckedAddrCastInst>(value);
-    SILValue op = uac->getOperand();
+  {
+    auto *svi = cast<SingleValueInstruction>(value);
+    SILValue op = svi->getOperand(0);
     SILType srcTy = op->getType().getObjectType();
     SILType destTy = value->getType().getObjectType();
-    SILFunction *f = uac->getFunction();
+    SILFunction *f = svi->getFunction();
     // If the source and destination of the cast don't agree on being a pointer,
     // we bail. Otherwise we would miss important edges in the connection graph:
     // e.g. loads of non-pointers are ignored, while it could be an escape of
@@ -249,6 +250,14 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
       pointerOperand = opV;
     }
     return pointerOperand;
+  }
+  case ValueKind::MultipleValueInstructionResult: {
+    if (auto *dt = dyn_cast<DestructureTupleInst>(value)) {
+      if (canOptimizeArrayUninitializedResult(dt))
+        return SILValue();
+      return dt->getOperand();
+    }
+    return SILValue();
   }
   default:
     return SILValue();
@@ -1939,6 +1948,11 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
         continue;
       }
     }
+    if (auto *dt = dyn_cast<DestructureTupleInst>(use->getUser())) {
+      call.arrayStruct = dt->getResult(0);
+      call.arrayElementPtr = dt->getResult(1);
+      continue;
+    }
     // If there are any other uses, such as a release_value, erase the previous
     // call info and bail out.
     call.arrayStruct = nullptr;
@@ -1957,8 +1971,9 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
 }
 
 bool EscapeAnalysis::canOptimizeArrayUninitializedResult(
-    TupleExtractInst *tei) {
-  ApplyInst *ai = dyn_cast<ApplyInst>(tei->getOperand());
+    SILInstruction *extract) {
+  assert(isa<TupleExtractInst>(extract) || isa<DestructureTupleInst>(extract));
+  ApplyInst *ai = dyn_cast<ApplyInst>(extract->getOperand(0));
   if (!ai)
     return false;
 
@@ -2097,12 +2112,13 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     }
   }
 
-  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) {
+  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I) ||
+      isa<DestroyValueInst>(I)) {
     // Treat the release instruction as if it is the invocation
     // of a deinit function.
     if (RecursionDepth < MaxRecursionDepth) {
       // Check if the destructor is known.
-      auto OpV = cast<RefCountingInst>(I)->getOperand(0);
+      auto OpV = I->getOperand(0);
       if (buildConnectionGraphForDestructor(OpV, I, FInfo, BottomUpOrder,
                                             RecursionDepth))
         return;
@@ -2143,7 +2159,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::CondBranchInst:
     case SILInstructionKind::SwitchEnumInst:
     case SILInstructionKind::DebugValueInst:
-    case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::ValueMetatypeInst:
     case SILInstructionKind::InitExistentialMetatypeInst:
     case SILInstructionKind::OpenExistentialMetatypeInst:
@@ -2158,10 +2173,21 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return isPointer(result);
       }));
       return;
-
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::CopyValueInst: {
+      auto svi = cast<SingleValueInstruction>(I);
+      CGNode *resultNode = ConGraph->getNode(svi);
+      if (CGNode *opNode = ConGraph->getNode(svi->getOperand(0))) {
+        ConGraph->defer(resultNode, opNode);
+        return;
+      }
+      ConGraph->setEscapesGlobal(svi);
+      return;
+    }
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     case SILInstructionKind::Name##ReleaseInst:
 #include "swift/AST/ReferenceStorage.def"
+    case SILInstructionKind::DestroyValueInst:
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::ReleaseValueInst: {
       // A release instruction may deallocate the pointer operand. This may
@@ -2351,9 +2377,15 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       // This is a tuple_extract which extracts the second result of an
       // array.uninitialized call (otherwise getPointerBase should have already
       // looked through it).
-      auto *TEI = cast<TupleExtractInst>(I);
-      assert(canOptimizeArrayUninitializedResult(TEI)
+      assert(canOptimizeArrayUninitializedResult(I)
              && "tuple_extract should be handled as projection");
+      return;
+    }
+    case SILInstructionKind::DestructureTupleInst: {
+      if (canOptimizeArrayUninitializedResult(I)) {
+        return;
+      }
+      setAllEscaping(I, ConGraph);
       return;
     }
     case SILInstructionKind::UncheckedRefCastAddrInst: {

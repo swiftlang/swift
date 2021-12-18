@@ -840,21 +840,17 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
 
     SyntaxParsingContext YieldsCtxt(SyntaxContext, SyntaxKind::YieldList);
 
-    SmallVector<Identifier, 4> yieldLabels;
-    SmallVector<SourceLoc, 4> yieldLabelLocs;
-    SmallVector<TrailingClosure, 2> trailingClosures;
-
-    status = parseExprList(tok::l_paren, tok::r_paren,
-                           /*postfix (allow trailing closure)*/ false,
-                           /*expr basic (irrelevant)*/ true,
-                           lpLoc,
-                           yields, yieldLabels, yieldLabelLocs,
-                           rpLoc,
-                           trailingClosures,
-                           SyntaxKind::ExprList);
-    assert(trailingClosures.empty());
-    assert(yieldLabels.empty());
-    assert(yieldLabelLocs.empty());
+    SmallVector<ExprListElt, 4> yieldElts;
+    status = parseExprList(tok::l_paren, tok::r_paren, /*isArgumentList*/ false,
+                           lpLoc, yieldElts, rpLoc, SyntaxKind::ExprList);
+    for (auto &elt : yieldElts) {
+      // We don't accept labels in a list of yields.
+      if (elt.LabelLoc.isValid()) {
+        diagnose(elt.LabelLoc, diag::unexpected_label_yield)
+          .fixItRemoveChars(elt.LabelLoc, elt.E->getStartLoc());
+      }
+      yields.push_back(elt.E);
+    }
   } else {
     SourceLoc beginLoc = Tok.getLoc();
 
@@ -1283,10 +1279,6 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   }
 
   StructureMarkerRAII ParsingAvailabilitySpecList(*this, Tok);
-
-  if (ParsingAvailabilitySpecList.isFailed()) {
-    return makeParserError();
-  }
 
   SourceLoc LParenLoc = consumeToken(tok::l_paren);
 

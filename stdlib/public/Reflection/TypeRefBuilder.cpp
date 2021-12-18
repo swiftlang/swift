@@ -96,9 +96,12 @@ TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
       // Symbolic references cannot be mangled, return a failure.
       return {};
     default:
-      auto result = mangleNode(node);
+      auto mangling = mangleNode(node);
       clearNodeFactory();
-      return result;
+      if (!mangling.isSuccess()) {
+        return {};
+      }
+      return mangling.result();
     }
   }
 

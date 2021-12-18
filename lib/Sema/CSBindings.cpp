@@ -548,7 +548,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
   if (!TypeVar->getImpl().isClosureParameterType()) {
     auto type = binding.BindingType;
 
-    if (type->isCGFloatType() &&
+    if (type->isCGFloat() &&
         llvm::any_of(Bindings, [](const PotentialBinding &binding) {
           return binding.BindingType->isDouble();
         }))
@@ -557,7 +557,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
     if (type->isDouble()) {
       auto inferredCGFloat =
           llvm::find_if(Bindings, [](const PotentialBinding &binding) {
-            return binding.BindingType->isCGFloatType();
+            return binding.BindingType->isCGFloat();
           });
 
       if (inferredCGFloat != Bindings.end()) {
@@ -981,7 +981,48 @@ bool BindingSet::isViable(PotentialBinding &binding) {
 }
 
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
-  if (isHole() || isDelayed())
+  if (isHole())
+    return false;
+
+  if (llvm::any_of(Bindings, [&](const PotentialBinding &binding) {
+        if (binding.Kind == AllowedBindingKind::Supertypes)
+          return false;
+
+        auto type = binding.BindingType;
+
+        if (CS.shouldAttemptFixes())
+          return false;
+
+        if (type->isAnyHashable() || type->isDouble() || type->isCGFloat())
+          return false;
+
+        {
+          PointerTypeKind pointerKind;
+          if (type->getAnyPointerElementType(pointerKind)) {
+            switch (pointerKind) {
+            case PTK_UnsafeRawPointer:
+            case PTK_UnsafeMutableRawPointer:
+              return false;
+
+            default:
+              break;
+            }
+          }
+        }
+
+        return type->is<StructType>() || type->is<EnumType>() ||
+               type->is<BuiltinType>();
+      })) {
+    // Result type of subscript could be l-value so we can't bind it early.
+    if (!TypeVar->getImpl().isSubscriptResultType() &&
+        llvm::none_of(Info.DelayedBy, [](const Constraint *constraint) {
+          return constraint->getKind() == ConstraintKind::Disjunction ||
+                 constraint->getKind() == ConstraintKind::ValueMember;
+        }))
+      return true;
+  }
+
+  if (isDelayed())
     return false;
 
   // If this bindings are for a closure and there are no holes,
@@ -1336,8 +1377,9 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::KeyPath:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
+  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::Conjunction:
+  case ConstraintKind::BindTupleOfFunctionParams:
     // Constraints from which we can't do anything.
     break;
 
@@ -1709,7 +1751,8 @@ bool TypeVarBindingProducer::computeNext() {
     if (NumTries == 0 && binding.hasDefaultedLiteralProtocol()) {
       auto knownKind =
           *(binding.getDefaultedLiteralProtocol()->getKnownProtocolKind());
-      for (auto altType : CS.getAlternativeLiteralTypes(knownKind)) {
+      SmallVector<Type, 2> scratch;
+      for (auto altType : CS.getAlternativeLiteralTypes(knownKind, scratch)) {
         addNewBinding(binding.withSameSource(altType, BindingKind::Subtypes));
       }
     }
@@ -1767,9 +1810,10 @@ bool TypeVarBindingProducer::computeNext() {
       // always preserved.
       auto *BGT = type->castTo<BoundGenericType>();
       auto dstLocator = TypeVar->getImpl().getLocator();
-      auto newType = CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
-                                               dstLocator)
-                         ->reconstituteSugar(/*recursive=*/false);
+      auto newType =
+          CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
+                                    dstLocator, /*isTypeResolution=*/false)
+              ->reconstituteSugar(/*recursive=*/false);
       addNewBinding(binding.withType(newType));
     }
 
@@ -1871,8 +1915,9 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // If the whole body is being ignored due to a pre-check failure,
     // let's not record a fix about result type since there is
     // just not enough context to infer it without a body.
-    if (cs.hasFixFor(cs.getConstraintLocator(closure),
-                     FixKind::IgnoreInvalidResultBuilderBody))
+    auto *closureLoc = cs.getConstraintLocator(closure);
+    if (cs.hasFixFor(closureLoc, FixKind::IgnoreInvalidResultBuilderBody) ||
+        cs.hasFixFor(closureLoc, FixKind::IgnoreResultBuilderWithReturnStmts))
       return None;
 
     ConstraintFix *fix = SpecifyClosureReturnType::create(cs, dstLocator);
@@ -1904,6 +1949,11 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     return std::make_pair(fix, defaultImpact);
   }
 
+  if (srcLocator->isLastElement<LocatorPathElt::PlaceholderType>()) {
+    ConstraintFix *fix = SpecifyTypeForPlaceholder::create(cs, srcLocator);
+    return std::make_pair(fix, defaultImpact);
+  }
+
   if (dstLocator->directlyAt<NilLiteralExpr>()) {
     // This is a dramatic event, it means that there is absolutely
     // no contextual information to resolve type of `nil`.
@@ -1922,6 +1972,24 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   if (Binding.hasDefaultedLiteralProtocol()) {
     type = cs.replaceInferableTypesWithTypeVars(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
+  }
+
+  // If type variable has been marked as a possible hole due to
+  // e.g. reference to a missing member. Let's propagate that
+  // information to the object type of the optional type it's
+  // about to be bound to.
+  //
+  // In some situations like pattern bindings e.g. `if let x = base?.member`
+  // - if `member` doesn't exist, `x` cannot be determined either, which
+  // leaves `OptionalEvaluationExpr` representing outer type of `base?.member`
+  // without any contextual information, so even though `x` would get
+  // bound to result type of the chain, underlying type variable wouldn't
+  // be resolved, so we need to propagate holes up the conversion chain.
+  if (TypeVar->getImpl().canBindToHole()) {
+    if (auto objectTy = type->getOptionalObjectType()) {
+      if (auto *typeVar = objectTy->getAs<TypeVariableType>())
+        cs.recordPotentialHole(typeVar);
+    }
   }
 
   ConstraintSystem::TypeMatchOptions options;
@@ -1959,7 +2027,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    cs.DefaultedConstraints.push_back(srcLocator);
+    cs.DefaultedConstraints.insert(srcLocator);
 
     if (type->isPlaceholder() && reportHole())
       return true;

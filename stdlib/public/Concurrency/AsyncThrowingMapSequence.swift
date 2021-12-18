@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that maps the given error-throwing
   /// closure over the asynchronous sequence’s elements.
@@ -66,8 +66,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence that maps the given error-throwing closure over the
 /// asynchronous sequence’s elements.
-@available(SwiftStdlib 5.5, *)
-@frozen
+@available(SwiftStdlib 5.1, *)
 public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
@@ -75,7 +74,7 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let transform: (Base.Element) async throws -> Transformed
 
-  @inlinable
+  @usableFromInline
   init(
     _ base: Base, 
     transform: @escaping (Base.Element) async throws -> Transformed
@@ -85,7 +84,7 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingMapSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///
@@ -96,7 +95,6 @@ extension AsyncThrowingMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the map sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -107,7 +105,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
-    @inlinable
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
       transform: @escaping (Base.Element) async throws -> Transformed

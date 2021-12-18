@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,7 +20,7 @@ import TestsUtils
 
 let t: [BenchmarkCategory] = [.validation, .api]
 
-public let SequenceAlgos = [
+public let benchmarks = [
   BenchmarkInfo(name: "SequenceAlgosList", runFunction: { for _ in 0..<$0 {
       benchmarkSequenceAlgos(s: l, n: n)
       benchmarkEquatableSequenceAlgos(s: l, n: n)
@@ -69,11 +69,11 @@ extension List: Equatable where Element: Equatable {
 }
 
 func benchmarkSequenceAlgos<S: Sequence>(s: S, n: Int) where S.Element == Int {
-  CheckResults(s.reduce(0, &+) == (n*(n-1))/2)
+  check(s.reduce(0, &+) == (n*(n-1))/2)
   let mn = s.min()
   let mx = s.max()
-  CheckResults(mn == 0 && mx == n-1)
-  CheckResults(s.starts(with: s))
+  check(mn == 0 && mx == n-1)
+  check(s.starts(with: s))
 }
 
 let n = 1_000
@@ -86,8 +86,8 @@ let s = sequence(first: 0, next: { $0 < n&-1 ? $0&+1 : nil})
 
 func benchmarkEquatableSequenceAlgos<S: Sequence>(s: S, n: Int)
   where S.Element == Int, S: Equatable {
-  CheckResults(repeatElement(s, count: 1).contains(s))
-  CheckResults(!repeatElement(s, count: 1).contains { $0 != s })
+  check(repeatElement(s, count: 1).contains(s))
+  check(!repeatElement(s, count: 1).contains { $0 != s })
 }
 
 enum List<Element> {

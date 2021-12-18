@@ -51,7 +51,6 @@
 
 #if defined(__GLIBCXX__) && __GLIBCXX__ < 20160726
 #include <stddef.h>
-namespace std { using ::max_align_t; }
 #endif
 
 using namespace swift;
@@ -229,7 +228,10 @@ swift::swift_getMangledTypeName(const Metadata *type) {
     if (demangling == nullptr) {
       return TypeNamePair{NULL, 0};
     }
-    auto name = Demangle::mangleNode(demangling);
+    auto mangling = Demangle::mangleNode(demangling);
+    if (!mangling.isSuccess())
+      return TypeNamePair{NULL, 0};
+    std::string name = mangling.result();
 
     // Copy it to memory we can reference forever.
     auto size = name.size();

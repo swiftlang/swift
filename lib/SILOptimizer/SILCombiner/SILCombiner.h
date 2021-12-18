@@ -158,7 +158,8 @@ public:
             [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
         deBlocks(&B.getFunction()),
         ownershipFixupContext(getInstModCallbacks(), deBlocks),
-        libswiftPassInvocation(parentTransform->getPassManager(), this) {}
+        libswiftPassInvocation(parentTransform->getPassManager(),
+                               parentTransform->getFunction(), this) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -278,7 +279,7 @@ public:
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
-  SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
+  SILInstruction *legacyVisitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitCopyValueInst(CopyValueInst *cvi);
   SILInstruction *visitDestroyValueInst(DestroyValueInst *dvi);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -308,7 +309,7 @@ public:
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
   SILInstruction *
   visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
-  SILInstruction *visitStrongReleaseInst(StrongReleaseInst *SRI);
+  SILInstruction *legacyVisitStrongReleaseInst(StrongReleaseInst *SRI);
   SILInstruction *visitCondBranchInst(CondBranchInst *CBI);
   SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
@@ -344,7 +345,6 @@ public:
 #include "swift/SILOptimizer/PassManager/Passes.def"
 
   /// Instruction visitor helpers.
-  SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
 
   // Optimize the "isConcrete" builtin.
   SILInstruction *optimizeBuiltinIsConcrete(BuiltinInst *I);
@@ -383,7 +383,7 @@ public:
 
   /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
   /// introduced during SILCombine for an owned value.
-  void canonicalizeOSSALifetimes();
+  void canonicalizeOSSALifetimes(SILInstruction *currentInst);
 
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
@@ -405,6 +405,8 @@ public:
   SILInstruction *tryFoldComposedUnaryForwardingInstChain(
       SingleValueInstruction *user, SingleValueInstruction *value,
       function_ref<SILValue()> newValueGenerator);
+
+  SILInstruction *optimizeAlignment(PointerToAddressInst *ptrAdrInst);
 
   InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
 

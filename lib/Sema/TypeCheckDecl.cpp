@@ -32,7 +32,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/OperatorNameLookup.h"
@@ -41,7 +40,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeWalker.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -61,12 +59,6 @@
 
 using namespace swift;
 
-#define DEBUG_TYPE "Serialization"
-
-STATISTIC(NumLazyRequirementSignaturesLoaded,
-          "# of lazily-deserialized requirement signatures loaded");
-
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "TypeCheckDecl"
 
 namespace {
@@ -482,14 +474,16 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       if (!apply)
         return { true, E };
 
+      auto *argList = apply->getArgs();
       auto Callee = apply->getSemanticFn();
       
       Expr *arg;
 
       if (isa<OtherConstructorDeclRefExpr>(Callee)) {
-        arg = apply->getArg();
+        arg = argList->getUnaryExpr();
+        assert(arg);
       } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
-        arg = CRE->getArg();
+        arg = CRE->getBase();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
         if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
           return { true, E };
@@ -666,34 +660,6 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
   // Check whether any of the inherited protocols fail to conform to themselves.
   for (auto proto : decl->getInheritedProtocols()) {
     if (!proto->existentialConformsToSelf())
-      return false;
-  }
-
-  return true;
-}
-
-bool
-ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
-                                          ProtocolDecl *decl) const {
-  // ObjC protocols can always be existential.
-  if (decl->isObjC())
-    return true;
-
-  for (auto member : decl->getMembers()) {
-    // Existential types cannot be used if the protocol has an associated type.
-    if (isa<AssociatedTypeDecl>(member))
-      return false;
-
-    // For value members, look at their type signatures.
-    if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      if (!decl->isAvailableInExistential(valueMember))
-        return false;
-    }
-  }
-
-  // Check whether all of the inherited protocols support existential types.
-  for (auto proto : decl->getInheritedProtocols()) {
-    if (!proto->existentialTypeSupported())
       return false;
   }
 
@@ -893,54 +859,6 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   }
 
   return false;
-}
-
-ArrayRef<Requirement>
-RequirementSignatureRequest::evaluate(Evaluator &evaluator,
-                                      ProtocolDecl *proto) const {
-  ASTContext &ctx = proto->getASTContext();
-
-  // First check if we have a deserializable requirement signature.
-  if (proto->hasLazyRequirementSignature()) {
-    ++NumLazyRequirementSignaturesLoaded;
-    // FIXME: (transitional) increment the redundant "always-on" counter.
-    if (ctx.Stats)
-      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
-
-    auto contextData = static_cast<LazyProtocolData *>(
-        ctx.getOrCreateLazyContextData(proto, nullptr));
-
-    SmallVector<Requirement, 8> requirements;
-    contextData->loader->loadRequirementSignature(
-        proto, contextData->requirementSignatureData, requirements);
-    if (requirements.empty())
-      return None;
-    return ctx.AllocateCopy(requirements);
-  }
-
-  GenericSignatureBuilder builder(proto->getASTContext());
-
-  // Add all of the generic parameters.
-  for (auto gp : *proto->getGenericParams())
-    builder.addGenericParameter(gp);
-
-  // Add the conformance of 'self' to the protocol.
-  auto selfType =
-    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-  auto requirement =
-    Requirement(RequirementKind::Conformance, selfType,
-                proto->getDeclaredInterfaceType());
-
-  builder.addRequirement(
-          requirement,
-          GenericSignatureBuilder::RequirementSource::forRequirementSignature(
-                                                      builder, selfType, proto),
-          nullptr);
-
-  auto reqSignature = std::move(builder).computeGenericSignature(
-                        /*allowConcreteGenericParams=*/false,
-                        /*requirementSignatureSelfProto=*/proto);
-  return reqSignature.getRequirements();
 }
 
 Type
@@ -1935,7 +1853,7 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   auto selfNominal = DC->getSelfNominalTypeDecl();
 
   // Check the parameters for a reference to 'Self'.
-  bool isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
+  bool isProtocol = isa_and_nonnull<ProtocolDecl>(selfNominal);
   for (auto param : *decl->getParameters()) {
     // Look through a metatype reference, if there is one.
     auto paramType = param->getInterfaceType()->getMetatypeInstanceType();
@@ -2015,6 +1933,13 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     resultTyRepr = cast<SubscriptDecl>(decl)->getElementTypeRepr();
   }
 
+  if (!resultTyRepr && decl->getClangDecl() &&
+      isa<clang::FunctionDecl>(decl->getClangDecl())) {
+    auto clangFn = cast<clang::FunctionDecl>(decl->getClangDecl());
+    return ctx.getClangModuleLoader()->importFunctionReturnType(
+        clangFn, decl->getDeclContext());
+  }
+
   // Nothing to do if there's no result type.
   if (resultTyRepr == nullptr)
     return TupleType::getEmpty(ctx);
@@ -2030,8 +1955,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   const auto options =
       TypeResolutionOptions(TypeResolverContext::FunctionResult);
   auto *const dc = decl->getInnermostDeclContext();
-  return TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
+  return TypeResolution::forInterface(dc, options,
+                                      /*unboundTyOpener*/ nullptr,
+                                      PlaceholderType::get)
       .resolveType(resultTyRepr);
 }
 
@@ -2115,7 +2041,6 @@ static Type validateParameterType(ParamDecl *decl) {
 
   TypeResolutionOptions options(None);
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
-  HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
@@ -2126,7 +2051,6 @@ static Type validateParameterType(ParamDecl *decl) {
     };
     // FIXME: Don't let placeholder types escape type resolution.
     // For now, just return the placeholder type.
-    placeholderHandler = PlaceholderType::get;
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
@@ -2149,7 +2073,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   placeholderHandler);
+                                   PlaceholderType::get);
   auto Ty = resolution.resolveType(decl->getTypeRepr());
 
   if (Ty->hasError()) {
@@ -2635,6 +2559,11 @@ static ArrayRef<Decl *> evaluateMembersRequest(
         (void) var->getPropertyWrapperAuxiliaryVariables();
         (void) var->getPropertyWrapperInitializerInfo();
       }
+    }
+
+    // For a distributed function, add the remote function.
+    if (auto *func = dyn_cast<FuncDecl>(member)) {
+      (void) func->getDistributedActorRemoteFuncDecl();
     }
   }
 

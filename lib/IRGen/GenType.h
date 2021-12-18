@@ -34,7 +34,6 @@ namespace llvm {
 }
 
 namespace swift {
-  class GenericSignatureBuilder;
   class ArchetypeType;
   class CanType;
   class ClassDecl;
@@ -277,8 +276,6 @@ public:
   {}
   
   ~GenericContextScope() {
-    if (!newSig)
-      return;
     assert(TC.CurGenericSignature == newSig);
     TC.setGenericContext(oldSig);
   }

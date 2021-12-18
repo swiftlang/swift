@@ -384,3 +384,116 @@ func testUnqualified1(x: QuxEnum) {
   // UNRESOLVED_3: End completions
 
 }
+
+struct SomeStruct: Equatable {
+  let structMember: String
+}
+
+enum OtherEnum {
+  case otherEnumCase
+
+  static var otherStaticMember: OtherEnum { fatalError() }
+}
+
+enum PlainEnum {
+  case caseWithAssociatedType(SomeStruct)
+
+  static var staticMember: PlainEnum { fatalError() }
+}
+
+func completeEquatableEnum(x: PlainEnum) {
+  switch x {
+  case .#^PATTERN_MATCH_PLAIN_ENUM^#
+// We shouldn't suggest staticMember here because PlainEnum isn't equatable and thus doesn't have a ~= operator defined between instances
+// PATTERN_MATCH_PLAIN_ENUM:     Begin completions, 1 items
+// PATTERN_MATCH_PLAIN_ENUM-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: caseWithAssociatedType({#SomeStruct#})[#PlainEnum#];
+// PATTERN_MATCH_PLAIN_ENUM:     End completions
+  }
+}
+
+enum EnumWithCustomPatternMatchingOperator {
+  case caseWithAssociatedType(SomeStruct)
+
+  static var staticMember: EnumWithCustomPatternMatchingOperator { fatalError() }
+}
+
+func ~=(pattern: OtherEnum, value: EnumWithCustomPatternMatchingOperator) -> Bool {
+ return true
+}
+
+func completeEnumWithCustomPatternMatchingOperator(x: EnumWithCustomPatternMatchingOperator) {
+  switch x {
+  case .#^PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING^#
+// We should be suggesting static members of `OtherEnum`, because we can match it to `EnumWithCustomPatternMatchingOperator` using the custom pattern match operator. 
+// We should also suggest enum cases from `EnumWithCustomPatternMatchingOperator` whose pattern matching doesn't go through any `~=` operator.
+// We shouldn't suggest `staticMember` because `EnumWithCustomPatternMatchingOperator` doesn`t have `~=` defined between two of its instances.
+// PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING:     Begin completions, 4 items
+// PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: otherEnumCase[#OtherEnum#];
+// PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: otherStaticMember[#OtherEnum#];
+// PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): OtherEnum#})[#(into: inout Hasher) -> Void#];
+// PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: caseWithAssociatedType({#SomeStruct#})[#EnumWithCustomPatternMatchingOperator#];
+// PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING:     End completions
+  }
+}
+
+func completeEnumAssociatedTypeWithCustomPatternMatchingOperator(x: EnumWithCustomPatternMatchingOperator) {
+  switch x {
+  case .caseWithAssociatedType(.#^COMPLETE_ASSOCIATED_TYPE_WITH_CUSTOM_PATTERN_MATCHING^#)
+// COMPLETE_ASSOCIATED_TYPE_WITH_CUSTOM_PATTERN_MATCHING:     Begin completions, 1 items
+// COMPLETE_ASSOCIATED_TYPE_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#structMember: String#})[#SomeStruct#];
+// COMPLETE_ASSOCIATED_TYPE_WITH_CUSTOM_PATTERN_MATCHING:     End completions
+  }
+}
+
+enum EquatableEnum: Equatable {
+  case caseWithAssociatedType(SomeStruct)
+
+  static var staticMember: EnumWithCustomPatternMatchingOperator { fatalError() }
+}
+
+func completeEquatableEnum(x: EquatableEnum) {
+  switch x {
+  case .#^PATTERN_MATCH_EQUATABLE_ENUM^#
+// Suggest all static members of `EquatableEnum` because we can pattern match through the `~=` operator between two equatable types defined in the stdlib.
+// PATTERN_MATCH_EQUATABLE_ENUM:     Begin completions, 2 items
+// PATTERN_MATCH_EQUATABLE_ENUM-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: caseWithAssociatedType({#SomeStruct#})[#EquatableEnum#];
+// PATTERN_MATCH_EQUATABLE_ENUM-DAG: Decl[StaticVar]/CurrNominal:        staticMember[#EnumWithCustomPatternMatchingOperator#];
+// PATTERN_MATCH_EQUATABLE_ENUM:     End completions
+  }
+}
+
+enum EquatableEnumWithCustomPatternMatchingOperator: Equatable {
+  case caseWithAssociatedType(SomeStruct)
+
+  static var staticMember: EnumWithCustomPatternMatchingOperator { fatalError() }
+}
+
+func ~=(pattern: OtherEnum, value: EquatableEnumWithCustomPatternMatchingOperator) -> Bool {
+ return true
+}
+
+func completeEnumWithCustomPatternMatchingOperator(x: EquatableEnumWithCustomPatternMatchingOperator) {
+  switch x {
+  case .#^PATTERN_MATCH_EQUATABLE_ENUM_WITH_CUSTOM_PATTERN_MATCHING^#
+// Same as PATTERN_MATCH_ENUM_WITH_CUSTOM_PATTERN_MATCHING but also suggest static members on `EquatableEnumWithCustomPatternMatchingOperator` because its `Equatable`
+// PATTERN_MATCH_EQUATABLE_ENUM_WITH_CUSTOM_PATTERN_MATCHING:     Begin completions, 5 items
+// PATTERN_MATCH_EQUATABLE_ENUM_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: otherEnumCase[#OtherEnum#];
+// PATTERN_MATCH_EQUATABLE_ENUM_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: otherStaticMember[#OtherEnum#];
+// PATTERN_MATCH_EQUATABLE_ENUM_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): OtherEnum#})[#(into: inout Hasher) -> Void#];
+// PATTERN_MATCH_EQUATABLE_ENUM_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: caseWithAssociatedType({#SomeStruct#})[#EquatableEnumWithCustomPatternMatchingOperator#];
+// PATTERN_MATCH_EQUATABLE_ENUM_WITH_CUSTOM_PATTERN_MATCHING-DAG: Decl[StaticVar]/CurrNominal:        staticMember[#EnumWithCustomPatternMatchingOperator#];
+// PATTERN_MATCH_EQUATABLE_ENUM_WITH_CUSTOM_PATTERN_MATCHING:     End completions
+  }
+}
+
+enum WithNestedEnum {
+  case bar(PlainEnum)
+}
+
+func completeInNestedPatternMatching(x: WithNestedEnum) {
+  switch x {
+  case .bar(.#^NESTED_ENUM_PATTERN_MATCHING^#)
+}
+// NESTED_ENUM_PATTERN_MATCHING:     Begin completions, 1 items
+// NESTED_ENUM_PATTERN_MATCHING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: caseWithAssociatedType({#SomeStruct#})[#PlainEnum#];
+// NESTED_ENUM_PATTERN_MATCHING:     End completions

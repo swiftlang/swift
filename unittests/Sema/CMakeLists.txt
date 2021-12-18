@@ -3,7 +3,9 @@ add_swift_unittest(swiftSemaTests
   SemaFixture.cpp
   BindingInferenceTests.cpp
   ConstraintSimplificationTests.cpp
-  UnresolvedMemberLookupTests.cpp)
+  UnresolvedMemberLookupTests.cpp
+  PlaceholderTypeInferenceTests.cpp
+  SolutionFilteringTests.cpp)
 
 target_link_libraries(swiftSemaTests
   PRIVATE

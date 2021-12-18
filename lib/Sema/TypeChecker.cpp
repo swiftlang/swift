@@ -369,22 +369,21 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
-  const auto resolution = TypeResolution::forContextual(
-      DC, GenericEnv, options,
-      [](auto unboundTy) {
-        // FIXME: Don't let unbound generic types escape type resolution.
-        // For now, just return the unbound generic type.
-        return unboundTy;
-      },
-      // FIXME: Don't let placeholder types escape type resolution.
-      // For now, just return the placeholder type.
-      PlaceholderType::get);
-
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
-  return resolution.resolveType(TyR, GenericParams);
+  return TypeResolution::forInterface(
+             DC, GenericEnv, options,
+             [](auto unboundTy) {
+               // FIXME: Don't let unbound generic types escape type resolution.
+               // For now, just return the unbound generic type.
+               return unboundTy;
+             },
+             // FIXME: Don't let placeholder types escape type resolution.
+             // For now, just return the placeholder type.
+             PlaceholderType::get)
+      .resolveType(TyR, GenericParams);
 }
 
 namespace {
@@ -408,7 +407,7 @@ namespace {
       return true;
     }
   };
-};
+}
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericEnvironment *
@@ -435,10 +434,14 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->walk(walker);
   }
 
-  return TypeChecker::checkGenericSignature(nestedList.back(), DC,
-                                         /*parentSig=*/nullptr,
-                                         /*allowConcreteGenericParams=*/true)
-    .getGenericEnvironment();
+  auto request = InferredGenericSignatureRequest{
+      DC->getParentModule(), /*parentSig=*/nullptr,
+      nestedList.back(), WhereClauseOwner(),
+      {}, {}, /*allowConcreteGenericParams=*/true};
+  auto sig = evaluateOrDefault(DC->getASTContext().evaluator, request,
+                               GenericSignatureWithError()).getPointer();
+
+  return sig.getGenericEnvironment();
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
@@ -489,4 +492,137 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
+}
+
+bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
+                                   DeclContext *dc,
+                                   Optional<TypeResolutionStage> stage) {
+  if (stage)
+    type = dc->mapTypeIntoContext(type);
+  auto tanSpace = type->getAutoDiffTangentSpace(
+      LookUpConformanceInModule(dc->getParentModule()));
+  if (!tanSpace)
+    return false;
+  // If no `Self == Self.TangentVector` requirement, return true.
+  if (!tangentVectorEqualsSelf)
+    return true;
+  // Otherwise, return true if `Self == Self.TangentVector`.
+  return type->getCanonicalType() == tanSpace->getCanonicalType();
+}
+
+bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
+                                              Optional<FunctionTypeRepr *>repr,
+                                              DeclContext *dc,
+                                              Optional<TypeResolutionStage> stage) {
+  // If the type has a placeholder, don't try to diagnose anything now since
+  // we'll produce a better diagnostic when (if) the expression successfully
+  // typechecks.
+  if (fnTy->hasPlaceholder())
+    return false;
+
+  // If the type is a block or C function pointer, it must be representable in
+  // ObjC.
+  auto representation = fnTy->getRepresentation();
+  auto extInfo = fnTy->getExtInfo();
+  auto &ctx = dc->getASTContext();
+
+  bool hadAnyError = false;
+
+  switch (representation) {
+  case AnyFunctionType::Representation::Block:
+  case AnyFunctionType::Representation::CFunctionPointer:
+    if (!fnTy->isRepresentableIn(ForeignLanguage::ObjectiveC, dc)) {
+      StringRef strName =
+        (representation == AnyFunctionType::Representation::Block)
+        ? "block"
+        : "c";
+      auto extInfo2 =
+        extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
+      auto simpleFnTy = FunctionType::get(fnTy->getParams(), fnTy->getResult(),
+                                          extInfo2);
+      ctx.Diags.diagnose(loc, diag::objc_convention_invalid,
+                         simpleFnTy, strName);
+      hadAnyError = true;
+    }
+    break;
+
+  case AnyFunctionType::Representation::Thin:
+  case AnyFunctionType::Representation::Swift:
+    break;
+  }
+
+  // `@differentiable` function types must return a differentiable type and have
+  // differentiable (or `@noDerivative`) parameters.
+  if (extInfo.isDifferentiable() &&
+      stage != TypeResolutionStage::Structural) {
+    auto result = fnTy->getResult();
+    auto params = fnTy->getParams();
+    auto diffKind = extInfo.getDifferentiabilityKind();
+    bool isLinear = diffKind == DifferentiabilityKind::Linear;
+
+    // Check the params.
+
+    // Emit `@noDerivative` fixit only if there is at least one valid
+    // differentiability parameter. Otherwise, adding `@noDerivative` produces
+    // an ill-formed function type.
+    auto hasValidDifferentiabilityParam =
+    llvm::find_if(params, [&](AnyFunctionType::Param param) {
+      if (param.isNoDerivative())
+        return false;
+      return TypeChecker::isDifferentiable(param.getPlainType(),
+                                           /*tangentVectorEqualsSelf*/ isLinear,
+                                           dc, stage);
+    }) != params.end();
+    bool alreadyDiagnosedOneParam = false;
+    for (unsigned i = 0, end = fnTy->getNumParams(); i != end; ++i) {
+      auto param = params[i];
+      if (param.isNoDerivative())
+        continue;
+      auto paramType = param.getPlainType();
+      if (TypeChecker::isDifferentiable(paramType, isLinear, dc, stage))
+        continue;
+      auto diagLoc =
+          repr ? (*repr)->getArgsTypeRepr()->getElement(i).Type->getLoc() : loc;
+      auto paramTypeString = paramType->getString();
+      auto diagnostic = ctx.Diags.diagnose(
+          diagLoc, diag::differentiable_function_type_invalid_parameter,
+          paramTypeString, isLinear, hasValidDifferentiabilityParam);
+      alreadyDiagnosedOneParam = true;
+      hadAnyError = true;
+      if (hasValidDifferentiabilityParam)
+        diagnostic.fixItInsert(diagLoc, "@noDerivative ");
+    }
+    // Reject the case where all parameters have '@noDerivative'.
+    if (!alreadyDiagnosedOneParam && !hasValidDifferentiabilityParam) {
+      auto diagLoc = repr ? (*repr)->getArgsTypeRepr()->getLoc() : loc;
+      auto diag = ctx.Diags.diagnose(
+          diagLoc,
+          diag::differentiable_function_type_no_differentiability_parameters,
+          isLinear);
+      hadAnyError = true;
+
+      if (repr) {
+          diag.highlight((*repr)->getSourceRange());
+      }
+    }
+
+    // Check the result
+    bool differentiable = isDifferentiable(result,
+                                           /*tangentVectorEqualsSelf*/ isLinear,
+                                           dc, stage);
+    if (!differentiable) {
+      auto diagLoc = repr ? (*repr)->getResultTypeRepr()->getLoc() : loc;
+      auto resultStr = fnTy->getResult()->getString();
+      auto diag = ctx.Diags.diagnose(
+          diagLoc, diag::differentiable_function_type_invalid_result, resultStr,
+          isLinear);
+      hadAnyError = true;
+
+      if (repr) {
+          diag.highlight((*repr)->getResultTypeRepr()->getSourceRange());
+      }
+    }
+  }
+
+  return hadAnyError;
 }

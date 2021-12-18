@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file contains utilities to work with debug-info related instructions:
-// debug_value and debug_value_addr.
+// debug_value, alloc_stack, and alloc_box.
 //
 // SIL optimizations should deal with debug-info related instructions when
 // looking at the uses of a value.
@@ -174,6 +174,18 @@ inline SILInstruction *getSingleNonDebugUser(SILValue V) {
   return I->getUser();
 }
 
+/// If \p value has a single debug user, return the operand associated with that
+/// use. Otherwise, returns nullptr.
+inline Operand *getSingleDebugUse(SILValue value) {
+  auto range = getDebugUses(value);
+  auto ii = range.begin(), ie = range.end();
+  if (ii == ie)
+    return nullptr;
+  if (std::next(ii) != ie)
+    return nullptr;
+  return *ii;
+}
+
 /// Erases the instruction \p I from it's parent block and deletes it, including
 /// all debug instructions which use \p I.
 /// Precondition: The instruction may only have debug instructions as uses.
@@ -228,7 +240,6 @@ struct DebugVarCarryingInst {
   enum class Kind {
     Invalid = 0,
     DebugValue,
-    DebugValueAddr,
     AllocStack,
     AllocBox,
   };
@@ -239,8 +250,6 @@ struct DebugVarCarryingInst {
   DebugVarCarryingInst() : kind(Kind::Invalid), inst(nullptr) {}
   DebugVarCarryingInst(DebugValueInst *dvi)
       : kind(Kind::DebugValue), inst(dvi) {}
-  DebugVarCarryingInst(DebugValueAddrInst *dvai)
-      : kind(Kind::DebugValueAddr), inst(dvai) {}
   DebugVarCarryingInst(AllocStackInst *asi)
       : kind(Kind::AllocStack), inst(asi) {}
   DebugVarCarryingInst(AllocBoxInst *abi) : kind(Kind::AllocBox), inst(abi) {}
@@ -251,9 +260,6 @@ struct DebugVarCarryingInst {
       return;
     case SILInstructionKind::DebugValueInst:
       kind = Kind::DebugValue;
-      break;
-    case SILInstructionKind::DebugValueAddrInst:
-      kind = Kind::DebugValueAddr;
       break;
     case SILInstructionKind::AllocStackInst:
       kind = Kind::AllocStack;
@@ -283,8 +289,6 @@ struct DebugVarCarryingInst {
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
       return cast<DebugValueInst>(inst)->getDecl();
-    case Kind::DebugValueAddr:
-      return cast<DebugValueAddrInst>(inst)->getDecl();
     case Kind::AllocStack:
       return cast<AllocStackInst>(inst)->getDecl();
     case Kind::AllocBox:
@@ -299,8 +303,6 @@ struct DebugVarCarryingInst {
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
       return cast<DebugValueInst>(inst)->getVarInfo();
-    case Kind::DebugValueAddr:
-      return cast<DebugValueAddrInst>(inst)->getVarInfo();
     case Kind::AllocStack:
       return cast<AllocStackInst>(inst)->getVarInfo();
     case Kind::AllocBox:
@@ -316,9 +318,6 @@ struct DebugVarCarryingInst {
     case Kind::DebugValue:
       cast<DebugValueInst>(inst)->setDebugVarScope(NewDS);
       break;
-    case Kind::DebugValueAddr:
-      cast<DebugValueAddrInst>(inst)->setDebugVarScope(NewDS);
-      break;
     case Kind::AllocStack:
       cast<AllocStackInst>(inst)->setDebugVarScope(NewDS);
       break;
@@ -327,6 +326,34 @@ struct DebugVarCarryingInst {
     }
   }
 };
+
+/// Attempt to discover a StringRef varName for the value \p value. If we fail,
+/// we return the name "unknown".
+inline StringRef getDebugVarName(SILValue value) {
+  if (auto *asi = dyn_cast<AllocStackInst>(value)) {
+    DebugVarCarryingInst debugVar(asi);
+    if (auto varInfo = debugVar.getVarInfo()) {
+      return varInfo->Name;
+    } else {
+      if (auto *decl = debugVar.getDecl()) {
+        return decl->getBaseName().userFacingName();
+      }
+    }
+  }
+
+  StringRef varName = "unknown";
+  if (auto *use = getSingleDebugUse(value)) {
+    DebugVarCarryingInst debugVar(use->getUser());
+    if (auto varInfo = debugVar.getVarInfo()) {
+      varName = varInfo->Name;
+    } else {
+      if (auto *decl = debugVar.getDecl()) {
+        varName = decl->getBaseName().userFacingName();
+      }
+    }
+  }
+  return varName;
+}
 
 } // end namespace swift
 

@@ -70,7 +70,7 @@ sil @unknown : $@convention(thin) () -> ()
 // CHECK: } // end sil function 'simple_hoist'
 sil @simple_hoist : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
-  debug_value_addr %0 : $*MyArray<MyStruct>
+  debug_value %0 : $*MyArray<MyStruct>, expr op_deref
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1
 
@@ -224,7 +224,7 @@ bb2:
 // CHECK: bb3:
 sil @dont_hoist_if_executed_conditionally : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> MyArray<MyStruct> {
 bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
-  debug_value_addr %0 : $*MyArray<MyStruct>
+  debug_value %0 : $*MyArray<MyStruct>, expr op_deref
   %2 = load %0 : $*MyArray<MyStruct>
   br bb1(%2 : $MyArray<MyStruct>)
 

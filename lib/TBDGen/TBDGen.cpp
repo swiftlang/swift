@@ -47,10 +47,10 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/YAMLParser.h"
-#include "llvm/TextAPI/MachO/InterfaceFile.h"
-#include "llvm/TextAPI/MachO/Symbol.h"
-#include "llvm/TextAPI/MachO/TextAPIReader.h"
-#include "llvm/TextAPI/MachO/TextAPIWriter.h"
+#include "llvm/TextAPI/InterfaceFile.h"
+#include "llvm/TextAPI/Symbol.h"
+#include "llvm/TextAPI/TextAPIReader.h"
+#include "llvm/TextAPI/TextAPIWriter.h"
 
 #include "APIGen.h"
 #include "TBDGenVisitor.h"
@@ -68,7 +68,7 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 
 TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
                              APIRecorder &recorder)
-    : TBDGenVisitor(desc.getTarget(), desc.getDataLayout(),
+    : TBDGenVisitor(desc.getTarget(), desc.getDataLayoutString(),
                     desc.getParentModule(), desc.getOptions(), recorder) {}
 
 void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
@@ -390,7 +390,9 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
   if (kind == SymbolKind::ObjectiveCClass) {
     mangled = name;
   } else {
-    llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
+    if (!DataLayout)
+      DataLayout = llvm::DataLayout(DataLayoutDescription);
+    llvm::Mangler::getNameWithPrefix(mangled, name, *DataLayout);
   }
 
   addSymbolInternal(mangled, kind, source);
@@ -411,15 +413,14 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef));
 }
 
-void TBDGenVisitor::addAsyncFunctionPointerSymbol(AbstractFunctionDecl *AFD) {
-  auto declRef = SILDeclRef(AFD);
+void TBDGenVisitor::addAsyncFunctionPointerSymbol(SILDeclRef declRef) {
   auto silLinkage = effectiveLinkageForClassMember(
     declRef.getLinkage(ForDefinition),
     declRef.getSubclassScope());
   if (Opts.PublicSymbolsOnly && silLinkage != SILLinkage::Public)
     return;
 
-  auto entity = LinkEntity::forAsyncFunctionPointer(AFD);
+  auto entity = LinkEntity::forAsyncFunctionPointer(declRef);
   auto linkage =
       LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
   addSymbol(linkage.getName(), SymbolSource::forSILDeclRef(declRef));
@@ -719,6 +720,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   if (AFD->isDistributed()) {
     addSymbol(SILDeclRef(AFD).asDistributed());
+    addAsyncFunctionPointerSymbol(SILDeclRef(AFD).asDistributed());
   }
 
   // Add derivative function symbols.
@@ -742,7 +744,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   visitDefaultArguments(AFD, AFD->getParameters());
 
   if (AFD->hasAsync()) {
-    addAsyncFunctionPointerSymbol(AFD);
+    addAsyncFunctionPointerSymbol(SILDeclRef(AFD));
   }
 }
 
@@ -935,7 +937,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     void addMethod(SILDeclRef method) {
       assert(method.getDecl()->getDeclContext() == CD);
 
-      if (CD->hasResilientMetadata()) {
+      if (TBD.Opts.VirtualFunctionElimination || CD->hasResilientMetadata()) {
         if (FirstTime) {
           FirstTime = false;
 
@@ -989,6 +991,10 @@ void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
     // default ValueDecl handling gives the allocating one, so we have to
     // manually include the non-allocating one.
     addSymbol(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+    if (CD->hasAsync()) {
+      addAsyncFunctionPointerSymbol(
+          SILDeclRef(CD, SILDeclRef::Kind::Initializer));
+    }
     if (auto parentClass = CD->getParent()->getSelfClassDecl()) {
       if (parentClass->isObjC() || CD->isObjC())
         recorder.addObjCMethod(parentClass, SILDeclRef(CD));
@@ -1073,7 +1079,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
           : TBD(TBD), PD(PD), Resilient(PD->getParentModule()->isResilient()) {}
 
       void addMethod(SILDeclRef declRef) {
-        if (Resilient) {
+        if (Resilient || TBD.Opts.WitnessMethodElimination) {
           TBD.addDispatchThunk(declRef);
           TBD.addMethodDescriptor(declRef);
         }
@@ -1197,10 +1203,8 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
     visitFile(singleFile);
 
     // Visit synthesized file, if it exists.
-    if (auto *SF = dyn_cast<SourceFile>(singleFile)) {
-      if (auto *synthesizedFile = SF->getSynthesizedFile())
-        visitFile(synthesizedFile);
-    }
+    if (auto *synthesizedFile = singleFile->getSynthesizedFile())
+      visitFile(synthesizedFile);
     return;
   }
 
@@ -1359,15 +1363,24 @@ public:
       return;
 
     apigen::APIAvailability availability;
+    auto access = apigen::APIAccess::Public;
     if (source.kind == SymbolSource::Kind::SIL) {
       auto ref = source.getSILDeclRef();
-      if (ref.hasDecl())
+      if (ref.hasDecl()) {
         availability = getAvailability(ref.getDecl());
+        if (ref.getDecl()->isSPI())
+          access = apigen::APIAccess::Private;
+      }
+    } else if (source.kind == SymbolSource::Kind::IR) {
+      auto ref = source.getIRLinkEntity();
+      if (ref.hasDecl()) {
+        if (ref.getDecl()->isSPI())
+          access = apigen::APIAccess::Private;
+      }
     }
 
     api.addSymbol(symbol, moduleLoc, apigen::APILinkage::Exported,
-                  apigen::APIFlags::None, apigen::APIAccess::Public,
-                  availability);
+                  apigen::APIFlags::None, access, availability);
   }
 
   void addObjCInterface(const ClassDecl *decl) override {
@@ -1380,15 +1393,19 @@ public:
     StringRef name = getSelectorName(method, buffer);
     apigen::APIAvailability availability;
     bool isInstanceMethod = true;
-    if (auto *decl = method.getDecl()) {
-      availability = getAvailability(decl);
-      if (decl->getDescriptiveKind() == DescriptiveDeclKind::ClassMethod)
+    auto access = apigen::APIAccess::Public;
+    if (method.hasDecl()) {
+      availability = getAvailability(method.getDecl());
+      if (method.getDecl()->getDescriptiveKind() ==
+          DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
+      if (method.getDecl()->isSPI())
+        access = apigen::APIAccess::Private;
     }
 
     auto *clsRecord = addOrGetObjCInterface(cls);
-    api.addObjCMethod(clsRecord, name, moduleLoc, apigen::APIAccess::Public,
-                      isInstanceMethod, false, availability);
+    api.addObjCMethod(clsRecord, name, moduleLoc, access, isInstanceMethod,
+                      false, availability);
   }
 
 private:
@@ -1436,11 +1453,12 @@ private:
     if (auto *super = decl->getSuperclassDecl())
       superCls = super->getObjCRuntimeName(buffer);
     apigen::APIAvailability availability = getAvailability(decl);
-    apigen::APIAccess access = decl->getFormalAccess() == AccessLevel::Public
-                                   ? apigen::APIAccess::Public
-                                   : apigen::APIAccess::Private;
-    apigen::APILinkage linkage = decl->isObjC() ? apigen::APILinkage::Exported
-                                                : apigen::APILinkage::Internal;
+    apigen::APIAccess access =
+        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+    apigen::APILinkage linkage =
+        decl->getFormalAccess() == AccessLevel::Public && decl->isObjC()
+            ? apigen::APILinkage::Exported
+            : apigen::APILinkage::Internal;
     auto cls = api.addObjCClass(name, linkage, moduleLoc, access, availability,
                                 superCls);
     classMap.try_emplace(decl, cls);

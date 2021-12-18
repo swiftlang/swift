@@ -305,7 +305,8 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
     auto PType = param.getArgumentType(M, FTy, F->getTypeExpansionContext());
     assert(PType.isExistentialType());
     /// Generate new generic parameter.
-    auto *NewGenericParam = GenericTypeParamType::get(Depth, GPIdx++, Ctx);
+    auto *NewGenericParam =
+        GenericTypeParamType::get(/*type sequence*/ false, Depth, GPIdx++, Ctx);
     genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
                                PType);
@@ -335,12 +336,9 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   convertExistentialArgTypesToGenericArgTypes(GenericParams, Requirements);
 
   /// Compute the updated generic signature.
-  NewGenericSig = evaluateOrDefault(
-      Ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        OrigGenericSig.getPointer(), std::move(GenericParams),
-        std::move(Requirements)},
-      GenericSignature());
+  NewGenericSig = buildGenericSignature(Ctx, OrigGenericSig,
+                                        std::move(GenericParams),
+                                        std::move(Requirements));
 
   /// Create a lambda for GenericParams.
   auto getCanonicalType = [&](Type t) -> CanType {

@@ -230,10 +230,8 @@ diagnoseSubstitutionMapAvailability(SourceLoc loc,
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
-bool diagnoseDeclAvailability(const ValueDecl *D,
-                              SourceRange R,
-                              const ApplyExpr *call,
-                              const ExportContext &where,
+bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
+                              const Expr *call, const ExportContext &where,
                               DeclAvailabilityFlags flags = None);
 
 void diagnoseUnavailableOverride(ValueDecl *override,
@@ -242,10 +240,9 @@ void diagnoseUnavailableOverride(ValueDecl *override,
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
-bool diagnoseExplicitUnavailability(const ValueDecl *D,
-                                    SourceRange R,
+bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                     const ExportContext &Where,
-                                    const ApplyExpr *call,
+                                    const Expr *call,
                                     DeclAvailabilityFlags Flags = None);
 
 /// Emit a diagnostic for references to declarations that have been
@@ -267,6 +264,10 @@ bool diagnoseExplicitUnavailability(
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
+
+/// Check if \p D needs to be checked for correct availability depending on the
+/// flag -check-api-availability-only.
+bool shouldCheckAvailability(const Decl *D);
 
 } // namespace swift
 

@@ -269,7 +269,9 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   // synthesized extention itself rather than a member, into its extended
   // nominal (the extension's own requirements shouldn't be considered in the
   // substitution).
+  unsigned TypeContextDepth = 0;
   SubstitutionMap SubMap;
+  ModuleDecl *M = nullptr;
   Type BaseType;
   if (SynthesizedTarget) {
     BaseType = SynthesizedTarget.getBaseNominal()->getDeclaredInterfaceType();
@@ -279,13 +281,29 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
         DC = cast<ExtensionDecl>(D)->getExtendedNominal();
       else
         DC = D->getInnermostDeclContext()->getInnermostTypeContext();
-      auto *M = DC->getParentModule();
+      M = DC->getParentModule();
       SubMap = BaseType->getContextSubstitutionMap(M, DC);
+      if (!SubMap.empty()) {
+        TypeContextDepth = SubMap.getGenericSignature()
+            .getGenericParams().back()->getDepth() + 1;
+      }
     }
   }
 
   auto SubstTypes = [&](Type Ty) {
-    return Ty.subst(SubMap, SubstFlags::DesugarMemberTypes);
+    if (SubMap.empty())
+      return Ty;
+
+    return Ty.subst(
+      [&](SubstitutableType *type) -> Type {
+        if (cast<GenericTypeParamType>(type)->getDepth() < TypeContextDepth)
+          return Type(type).subst(SubMap);
+        return type;
+      },
+      [&](CanType depType, Type substType, ProtocolDecl *proto) {
+        return M->lookupConformance(substType, proto);
+      },
+      SubstFlags::DesugarMemberTypes);
   };
 
   // FIXME: Not right for extensions of nested generic types
@@ -1125,7 +1143,7 @@ public:
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
-    if (Data.isImplicit)
+    if (Data.isImplicit || !Range.isValid())
       return true;
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
@@ -1264,7 +1282,7 @@ RequestRefactoringEditConsumer(CategorizedEditsReceiver Receiver) :
   Impl(*new Implementation(Receiver)) {}
 
 RequestRefactoringEditConsumer::
-~RequestRefactoringEditConsumer() { delete &Impl; };
+~RequestRefactoringEditConsumer() { delete &Impl; }
 
 void RequestRefactoringEditConsumer::
 accept(SourceManager &SM, RegionType RegionType,
@@ -1389,7 +1407,8 @@ void SwiftLangSupport::findRenameRanges(
 
 void SwiftLangSupport::findLocalRenameRanges(
     StringRef Filename, unsigned Line, unsigned Column, unsigned Length,
-    ArrayRef<const char *> Args, CategorizedRenameRangesReceiver Receiver) {
+    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    CategorizedRenameRangesReceiver Receiver) {
   std::string Error;
   SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, Filename, Error);
   if (!Invok) {
@@ -1429,6 +1448,7 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
   getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
+                                   CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
 

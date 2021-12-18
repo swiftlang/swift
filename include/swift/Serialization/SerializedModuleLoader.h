@@ -77,7 +77,7 @@ protected:
                           std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                          bool &isFramework, bool &isSystemModule);
+                          bool skipBuildingInterface, bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -98,7 +98,7 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool IsFramework) = 0;
+      bool skipBuildingInterface, bool IsFramework) = 0;
 
   std::error_code
   openModuleFile(
@@ -161,6 +161,8 @@ public:
           std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
           bool isFramework);
 
+  bool isRequiredOSSAModules() const;
+
   /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
@@ -220,7 +222,7 @@ class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool IsFramework) override;
+      bool skipBuildingInterface, bool IsFramework) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
@@ -261,9 +263,11 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
   MemoryBufferSerializedModuleLoader(ASTContext &ctx,
                                      DependencyTracker *tracker,
                                      ModuleLoadingMode loadMode,
-                                     bool IgnoreSwiftSourceInfo)
+                                     bool IgnoreSwiftSourceInfo,
+                                     bool BypassResilience)
       : SerializedModuleLoaderBase(ctx, tracker, loadMode,
-                                   IgnoreSwiftSourceInfo) {}
+                                   IgnoreSwiftSourceInfo),
+        BypassResilience(BypassResilience) {}
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID,
@@ -272,13 +276,14 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool IsFramework) override;
+      bool skipBuildingInterface, bool IsFramework) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
       StringRef moduleName,
       const SerializedModuleBaseName &BaseName) override;
 
+  bool BypassResilience;
 public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
@@ -308,10 +313,10 @@ public:
   static std::unique_ptr<MemoryBufferSerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
          ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
-         bool IgnoreSwiftSourceInfo = false) {
+         bool IgnoreSwiftSourceInfo = false, bool BypassResilience = false) {
     return std::unique_ptr<MemoryBufferSerializedModuleLoader>{
-        new MemoryBufferSerializedModuleLoader(ctx, tracker, loadMode,
-                                               IgnoreSwiftSourceInfo)};
+        new MemoryBufferSerializedModuleLoader(
+            ctx, tracker, loadMode, IgnoreSwiftSourceInfo, BypassResilience)};
   }
 };
 
@@ -459,6 +464,9 @@ public:
 
   virtual void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)>) const override;
+
+  virtual void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const override;
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;

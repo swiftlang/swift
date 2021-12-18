@@ -164,8 +164,6 @@ void IRGenThunk::prepareArguments() {
 
   // Chop off the async context parameters.
   if (isAsync) {
-    // FIXME: Once we remove async task and executor this should be one not
-    // three.
     unsigned numAsyncContextParams =
         (unsigned)AsyncFunctionArgumentIndex::Context + 1;
     (void)original.claim(numAsyncContextParams);
@@ -344,9 +342,34 @@ void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
 
 llvm::Constant *
 IRGenModule::getAddrOfAsyncFunctionPointer(LinkEntity entity) {
-  return getAddrOfLLVMVariable(
-    LinkEntity::forAsyncFunctionPointer(entity),
-    NotForDefinition, DebugTypeInfo());
+  llvm::Constant *Pointer =
+      getAddrOfLLVMVariable(LinkEntity::forAsyncFunctionPointer(entity),
+                            NotForDefinition, DebugTypeInfo());
+  if (!getOptions().IndirectAsyncFunctionPointer)
+    return Pointer;
+
+  // When the symbol does not have DLL Import storage, we must directly address
+  // it. Otherwise, we will form an invalid reference.
+  if (!Pointer->isDLLImportDependent())
+    return Pointer;
+
+  llvm::Constant *PointerPointer =
+      getOrCreateGOTEquivalent(Pointer,
+                               LinkEntity::forAsyncFunctionPointer(entity));
+  llvm::Constant *PointerPointerConstant =
+      llvm::ConstantExpr::getPtrToInt(PointerPointer, IntPtrTy);
+  llvm::Constant *Marker =
+      llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
+                                                      1));
+  // TODO(compnerd) ensure that the pointer alignment guarantees that bit-0 is
+  // cleared. We cannot use an `getOr` here as it does not form a relocatable
+  // expression.
+  llvm::Constant *Address =
+      llvm::ConstantExpr::getAdd(PointerPointerConstant, Marker);
+
+  IndirectAsyncFunctionPointers[entity] = Address;
+  return llvm::ConstantExpr::getIntToPtr(Address,
+                                         AsyncFunctionPointerTy->getPointerTo());
 }
 
 llvm::Constant *
@@ -370,6 +393,15 @@ IRGenModule::getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp) {
   for (auto &entry : GlobalVars) {
     if (entry.getSecond() == afp) {
       auto entity = entry.getFirst();
+      return entity.getSILFunction();
+    }
+  }
+  for (auto &entry : IndirectAsyncFunctionPointers) {
+    if (entry.getSecond() == afp) {
+      auto entity = entry.getFirst();
+      assert(getOptions().IndirectAsyncFunctionPointer &&
+             "indirect async function found for non-indirect async function"
+             " target?");
       return entity.getSILFunction();
     }
   }

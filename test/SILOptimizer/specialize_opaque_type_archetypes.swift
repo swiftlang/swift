@@ -121,7 +121,7 @@ public func useExternal() {
 
 // CHECK-LABEL: sil @$s1A20useExternalResilientyyF
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
-// CHECK:  [[FUN:%.*]] = function_ref @$s9External217externalResilientQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External217externalResilientQryF : $@convention(thin) @substituted {{.*}} for <@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) __>
 // CHECK:  apply [[FUN]]([[RES]])
 // CHECK:  witness_method
 // CHECK:  return
@@ -270,7 +270,7 @@ extension P3 {
 
 // CHECK-LABEL: sil @$s1A21useExternalResilient2yyF : $@convention(thin) () -> ()
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
-// CHECK:   [[FUN:%.*]] = function_ref @$s9External226inlinableExternalResilientQryF : $@convention(thin) () -> @out Int64
+// CHECK:   [[FUN:%.*]] = function_ref @$s9External226inlinableExternalResilientQryF : $@convention(thin) @substituted {{.*}} for <Int64>
 // CHECK:   apply [[FUN]]([[RES]])
 // CHECK:   return
 public func useExternalResilient2() {
@@ -281,7 +281,7 @@ public func useExternalResilient2() {
 // In this case we should only 'peel' one layer of opaque archetypes.
 // CHECK-LABEL: sil @$s1A21useExternalResilient3yyF
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
-// CHECK:  [[FUN:%.*]] = function_ref @$s9External3031inlinableExternalResilientCallsD0QryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External3031inlinableExternalResilientCallsD0QryF : $@convention(thin) @substituted {{.*}} for <@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) __>
 // CHECK:  apply [[FUN]]([[RES]])
 public func useExternalResilient3() {
   let e = inlinableExternalResilientCallsResilient()
@@ -291,7 +291,7 @@ public func useExternalResilient3() {
 // Check that we can look throught two layers of inlinable resilient functions.
 // CHECK-LABEL: sil @$s1A21useExternalResilient4yyF
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
-// CHECK:   [[FUN:%.*]] = function_ref @$s9External3040inlinableExternalResilientCallsInlinablecD0QryF : $@convention(thin) () -> @out Int64
+// CHECK:   [[FUN:%.*]] = function_ref @$s9External3040inlinableExternalResilientCallsInlinablecD0QryF : $@convention(thin) @substituted {{.*}} for <Int64>
 // CHECK:   apply [[FUN]]([[RES]])
 public func useExternalResilient4() {
   let e = inlinableExternalResilientCallsInlinableExternalResilient()
@@ -435,10 +435,10 @@ func createTrivial<T>(_ t: T) -> Trivial<T> {
 }
 
 // CHECK: sil @$s1A11testTrivialyyF : $@convention(thin) () -> ()
-// CHECK:   %0 = integer_literal $Builtin.Int64, 1
-// CHECK:   %1 = struct $Int64 (%0 : $Builtin.Int64)
-// CHECK:   %2 = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
-// CHECK:   %3 = apply %2(%1)
+// CHECK:   %[[LITERAL:.+]] = integer_literal $Builtin.Int64, 1
+// CHECK:   %[[STRUCT:.+]] = struct $Int64 (%[[LITERAL]] : $Builtin.Int64)
+// CHECK:   %[[FUNC:.+]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
+// CHECK:   apply %[[FUNC]](%[[STRUCT]])
 public func testTrivial() {
    let s = bar(10)
    let t = createTrivial(s)

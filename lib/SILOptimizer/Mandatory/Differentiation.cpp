@@ -616,7 +616,7 @@ emitDerivativeFunctionReference(
       context.emitNondifferentiabilityError(
           original, invoker, diag::autodiff_private_derivative_from_fragile,
           fragileKind,
-          llvm::isa_and_nonnull<AbstractClosureExpr>(
+          isa_and_nonnull<AbstractClosureExpr>(
               originalFRI->getLoc().getAsASTNode<Expr>()));
       return None;
     }

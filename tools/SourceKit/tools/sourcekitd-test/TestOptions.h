@@ -67,6 +67,7 @@ enum class SourceKitRequest {
   CollectVariableType,
   GlobalConfiguration,
   DependencyUpdated,
+  Diagnostics,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
@@ -103,6 +104,13 @@ struct TestOptions {
   std::string ObjCName;
   std::string ObjCSelector;
   std::string Name;
+  /// An ID that can be used to cancel this request.
+  std::string RequestId;
+  /// If not empty, all requests with this ID should be cancelled.
+  std::string CancelRequest;
+  /// If set, simulate that the request takes x ms longer than it actually
+  /// does. The request can be cancelled while waiting this duration.
+  llvm::Optional<uint64_t> SimulateLongRequest;
   bool CheckInterfaceIsASCII = false;
   bool UsedSema = false;
   bool PrintRequest = true;

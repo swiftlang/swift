@@ -683,7 +683,7 @@ function (swift_benchmark_compile_archopts)
           ${objcfile}
           "-o" "${OUTPUT_EXEC}"
         COMMAND
-        "codesign" "-f" "-s" "-" "${OUTPUT_EXEC}")
+        "${srcdir}/../utils/swift-darwin-postprocess.py" "${OUTPUT_EXEC}")
   else()
     # TODO: rpath.
     add_custom_command(
@@ -708,7 +708,10 @@ function(swift_benchmark_compile)
   cmake_parse_arguments(SWIFT_BENCHMARK_COMPILE "" "PLATFORM" "" ${ARGN})
 
   if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE)
-    set(stdlib_dependencies "swift-frontend")
+    set(stdlib_dependencies "swift-frontend" "swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+      list(APPEND stdlib_dependencies "swiftDarwin-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    endif()
     foreach(stdlib_dependency ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})
       string(FIND "${stdlib_dependency}" "Unittest" find_output)
       if("${find_output}" STREQUAL "-1")

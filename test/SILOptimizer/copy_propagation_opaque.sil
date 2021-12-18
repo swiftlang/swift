@@ -139,7 +139,7 @@ bb3(%11 : @owned $T):
 //
 // The non-consuming use now uses the original value.
 // CHECK-DEBUG-NEXT:   debug_value %0 : $T
-// CHECK-NEXT:   debug_value_addr %1 : $*T
+// CHECK-NEXT:   debug_value %1 : $*T, expr op_deref
 //
 // The original destroy is deleted with optimizations enabled.
 // CHECK-DEBUG-NEXT: destroy_value %0 : $T
@@ -152,7 +152,7 @@ bb0(%arg : @owned $T, %addr : $*T):
   debug_value %copy : $T
   store %copy to [assign] %addr : $*T
   debug_value %arg : $T
-  debug_value_addr %addr : $*T
+  debug_value %addr : $*T, expr op_deref
   destroy_value %arg : $T
   %v = tuple ()
   return %v : $()

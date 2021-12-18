@@ -23,6 +23,7 @@
 
 namespace swift {
   class BuiltinInfo;
+  class BuiltinInst;
   class Identifier;
   class SILType;
 
@@ -32,10 +33,8 @@ namespace irgen {
 
   /// Emit a call to a builtin function.
   void emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &builtin,
-                       Identifier fnId, SILType resultType,
-                       ArrayRef<SILType> argTypes,
-                       Explosion &args, Explosion &result,
-                       SubstitutionMap substitutions);
+                       BuiltinInst *Inst, ArrayRef<SILType> argTypes,
+                       Explosion &args, Explosion &result);
 
 } // end namespace irgen
 } // end namespace swift

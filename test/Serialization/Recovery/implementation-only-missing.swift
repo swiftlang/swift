@@ -43,6 +43,8 @@ public protocol HiddenProtocol {
   associatedtype Value
 }
 
+public protocol HiddenProtocol2 {}
+
 public protocol HiddenProtocolWithOverride {
   func hiddenOverride()
 }
@@ -97,6 +99,15 @@ public struct PublicStructConformsToHiddenProtocol: RefinesHiddenProtocol {
 public class SomeClass {
     func funcUsingIoiType(_ a: HiddenClass) {}
 }
+
+// Check that we recover from a reference to an implementation-only
+// imported type in a protocol composition. rdar://78631465
+protocol CompositionMemberInheriting : HiddenProtocol2 {}
+protocol CompositionMemberSimple {}
+protocol InheritingFromComposition : CompositionMemberInheriting & CompositionMemberSimple {}
+struct StructInheritingFromComposition : CompositionMemberInheriting & CompositionMemberSimple {}
+class ClassInheritingFromComposition : CompositionMemberInheriting & CompositionMemberSimple {}
+protocol InheritingFromCompositionDirect : CompositionMemberSimple & HiddenProtocol2 {}
 
 #elseif CLIENT_APP
 

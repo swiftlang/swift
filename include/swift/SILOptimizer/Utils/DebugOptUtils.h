@@ -44,8 +44,7 @@ inline void deleteAllDebugUses(SILInstruction *inst,
 }
 
 /// Transfer debug info associated with (the result of) \p I to a
-/// new `debug_value` or `debug_value_addr` instruction before \p I is
-/// deleted.
+/// new `debug_value` instruction before \p I is deleted.
 void salvageDebugInfo(SILInstruction *I);
 
 /// Erases the instruction \p I from it's parent block and deletes it, including

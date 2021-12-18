@@ -24,7 +24,6 @@
 #include "swift/Runtime/HeapObject.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
-#include "AsyncCall.h"
 #include "Debug.h"
 
 #if !defined(_WIN32)
@@ -176,13 +175,10 @@ void swift::swift_asyncLet_begin(AsyncLet *alet,
                                  void *closureEntryPoint,
                                  HeapObject *closureContext,
                                  void *resultBuffer) {
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] creating async let buffer of type %s at %p\n",
-          _swift_get_thread_id(),
-          swift_getTypeName(futureResultType, true).data,
-          resultBuffer);
-#endif
-  
+  SWIFT_TASK_DEBUG_LOG("creating async let buffer of type %s at %p",
+                       swift_getTypeName(futureResultType, true).data,
+                       resultBuffer);
+
   auto flags = TaskCreateFlags();
   flags.setEnqueueJob(true);
 
@@ -245,8 +241,12 @@ static void swift_asyncLet_getImpl(SWIFT_ASYNC_CONTEXT AsyncContext *callerConte
 }
 
 struct AsyncLetContinuationContext: AsyncContext {
-  AsyncLet *alet;  
+  AsyncLet *alet;
+  OpaqueValue *resultBuffer;
 };
+
+static_assert(sizeof(AsyncLetContinuationContext) <= sizeof(TaskFutureWaitAsyncContext),
+              "compiler provides the same amount of context space to each");
 
 SWIFT_CC(swiftasync)
 static void _asyncLet_get_throwing_continuation(
@@ -317,10 +317,7 @@ static void swift_asyncLet_endImpl(AsyncLet *alet) {
   AsyncTask *parent = swift_task_getCurrent();
   assert(parent && "async-let must have a parent task");
 
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] async let end of task %p, parent: %p\n",
-          _swift_get_thread_id(), task, parent);
-#endif
+  SWIFT_TASK_DEBUG_LOG("async let end of task %p, parent: %p", task, parent);
   _swift_task_dealloc_specific(parent, task);
 }
 
@@ -345,10 +342,8 @@ static void asyncLet_finish_after_task_completion(SWIFT_ASYNC_CONTEXT AsyncConte
   // and finally, release the task and destroy the async-let
   assert(swift_task_getCurrent() && "async-let must have a parent task");
 
-#if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] async let end of task %p, parent: %p\n",
-          _swift_get_thread_id(), task, swift_task_getCurrent());
-#endif
+  SWIFT_TASK_DEBUG_LOG("async let end of task %p, parent: %p", task,
+                       swift_task_getCurrent());
   // Destruct the task.
   task->~AsyncTask();
   // Deallocate it out of the parent, if it was allocated there.
@@ -369,8 +364,7 @@ static void _asyncLet_finish_continuation(
   auto continuationContext
     = reinterpret_cast<AsyncLetContinuationContext*>(callContext);
   auto alet = continuationContext->alet;
-  auto resultBuffer = asImpl(alet)->getFutureContext()
-                                  ->successResultPointer;
+  auto resultBuffer = continuationContext->resultBuffer;
   
   // Destroy the error, or the result that was stored to the buffer.
   if (error) {
@@ -415,6 +409,7 @@ static void swift_asyncLet_finishImpl(SWIFT_ASYNC_CONTEXT AsyncContext *callerCo
   aletContext->Parent = callerContext;
   aletContext->ResumeParent = resumeFunction;
   aletContext->alet = alet;
+  aletContext->resultBuffer = reinterpret_cast<OpaqueValue*>(resultBuffer);
   auto futureContext = asImpl(alet)->getFutureContext();
   
   // TODO: It would be nice if we could await the future without having to

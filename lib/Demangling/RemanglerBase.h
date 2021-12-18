@@ -28,6 +28,13 @@ namespace swift {
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
 
+#define RETURN_IF_ERROR(x)                                                     \
+  do {                                                                         \
+    ManglingError err = (x);                                                   \
+    if (!err.isSuccess())                                                      \
+      return err;                                                              \
+  } while (0)
+
 // An entry in the remangler's substitution map.
 class SubstitutionEntry {
   Node *TheNode = nullptr;

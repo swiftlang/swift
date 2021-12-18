@@ -44,7 +44,7 @@ static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
 bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
                      const TBDGenOptions &Opts) {
   std::error_code EC;
-  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::OF_None);
   if (EC) {
     M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
                                       OutputFilename, EC.message());
@@ -76,6 +76,7 @@ static bool validateSymbols(DiagnosticEngine &diags,
     // symbol table, so make sure to mangle IRGen names before comparing them
     // with what TBDGen created.
     auto unmangledName = nameValue.getKey();
+
     SmallString<128> name;
     llvm::Mangler::getNameWithPrefix(name, unmangledName,
                                      IRModule.getDataLayout());

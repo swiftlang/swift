@@ -325,7 +325,10 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
     node = node->getChild(0);
   }
   if (Demangle::isSpecialized(node)) {
-    node = Demangle::getUnspecialized(node, demangler);
+    auto unspec = Demangle::getUnspecialized(node, demangler);
+    if (!unspec.isSuccess())
+      return nullptr;
+    node = unspec.result();
   }
 
   return _findContextDescriptor(node, demangler);
@@ -426,7 +429,9 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
     result.ImportInfo->collect</*asserting*/true>(component);
   }
 
+#ifndef NDEBUG
   assert(stage != AfterName && "no components?");
+#endif
 
   // Record the full identity.
   result.FullIdentity =
@@ -675,7 +680,7 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 
 // FIXME: When the _Concurrency library gets merged into the Standard Library,
 // we will be able to reference those symbols directly as well.
-#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)
+#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)
 
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
@@ -696,6 +701,7 @@ _findContextDescriptor(Demangle::NodePointer node,
       (const ContextDescriptor *)symbolicNode->getIndex());
   }
 
+#if SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS
   // Fast-path lookup for standard library type references with short manglings.
   if (symbolicNode->getNumChildren() >= 2
       && symbolicNode->getChild(0)->getKind() == Node::Kind::Module
@@ -709,13 +715,14 @@ _findContextDescriptor(Demangle::NodePointer node,
     }
   // FIXME: When the _Concurrency library gets merged into the Standard Library,
   // we will be able to reference those symbols directly as well.
-#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)
+#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif
 
 #include "swift/Demangling/StandardTypesMangling.def"
   }
+#endif
   
   const ContextDescriptor *foundContext = nullptr;
   auto &T = TypeMetadataRecords.get();
@@ -724,8 +731,14 @@ _findContextDescriptor(Demangle::NodePointer node,
   if (symbolicNode->getKind() == Node::Kind::DependentGenericParamType)
     return nullptr;
 
-  StringRef mangledName =
+  auto mangling =
     Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+
+  if (!mangling.isSuccess())
+    return nullptr;
+
+  StringRef mangledName = mangling.result();
+
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -880,8 +893,13 @@ _findProtocolDescriptor(NodePointer node,
     return cast<ProtocolDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
 
-  mangledName =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem).str();
+  auto mangling =
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+
+  if (!mangling.isSuccess())
+    return nullptr;
+
+  mangledName = mangling.result().str();
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -1020,7 +1038,7 @@ _gatherGenericParameters(const ContextDescriptor *context,
 
       str += "_gatherGenericParameters: context: ";
 
-#if !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+#if SWIFT_STDLIB_HAS_DLADDR
       SymbolInfo contextInfo;
       if (lookupSymbol(context, &contextInfo)) {
         str += contextInfo.symbolName.get();
@@ -1348,9 +1366,12 @@ public:
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
     // is used for Objective-C entities.
-    const char *objcMangledName = mangleNodeAsObjcCString(node, demangler);
-    if (auto protocol = objc_getProtocol(objcMangledName))
-      return ProtocolDescriptorRef::forObjC(protocol);
+    auto mangling = mangleNodeAsObjcCString(node, demangler);
+    if (mangling.isSuccess()) {
+      const char *objcMangledName = mangling.result();
+      if (auto protocol = objc_getProtocol(objcMangledName))
+        return ProtocolDescriptorRef::forObjC(protocol);
+    }
 #endif
 
     return ProtocolDescriptorRef();
@@ -1446,6 +1467,12 @@ public:
   TypeLookupErrorOr<BuiltType> createExistentialMetatypeType(
       BuiltType instance,
       llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = None) const {
+    if (instance->getKind() != MetadataKind::Existential
+        && instance->getKind() != MetadataKind::ExistentialMetatype) {
+      return TYPE_LOOKUP_ERROR_FMT("Tried to build an existential metatype from "
+                                   "a type that was neither an existential nor "
+                                   "an existential metatype");
+    }
     return swift_getExistentialMetatypeMetadata(instance);
   }
 

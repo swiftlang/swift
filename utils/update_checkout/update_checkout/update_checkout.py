@@ -8,8 +8,6 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-from __future__ import print_function
-
 import argparse
 import json
 import os
@@ -72,7 +70,7 @@ def check_parallel_results(results, op):
             print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             fail_count += 1
             if r.stderr:
-                print(r.stderr)
+                print(r.stderr.decode('utf-8'))
     return fail_count
 
 

@@ -212,6 +212,9 @@ enum class MatchKind : uint8_t {
   /// The witness matched the requirement exactly.
   ExactMatch,
 
+  /// The witness has fewer effects than the requirement, which is okay.
+  FewerEffects,
+
   /// There is a difference in optionality.
   OptionalityConflict,
 
@@ -279,6 +282,9 @@ enum class MatchKind : uint8_t {
   /// The witness did not match because it is an enum case with
   /// associated values.
   EnumCaseWithAssociatedValues,
+
+  /// The witness did not match due to _const/non-_const differences.
+  CompileTimeConstConflict,
 };
 
 /// Describes the kind of optional adjustment performed when
@@ -435,11 +441,13 @@ struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    Type witnessType,
                    Optional<RequirementEnvironment> env = None,
-                   ArrayRef<OptionalAdjustment> optionalAdjustments = {})
+                   ArrayRef<OptionalAdjustment> optionalAdjustments = {},
+                   GenericSignature derivativeGenSig = GenericSignature())
     : Witness(witness), Kind(kind), WitnessType(witnessType),
       ReqEnv(std::move(env)),
       OptionalAdjustments(optionalAdjustments.begin(),
-                          optionalAdjustments.end())
+                          optionalAdjustments.end()),
+      DerivativeGenSig(derivativeGenSig)
   {
     assert(hasWitnessType() == !witnessType.isNull() &&
            "Should (or should not) have witness type");
@@ -447,11 +455,13 @@ struct RequirementMatch {
 
   RequirementMatch(ValueDecl *witness, MatchKind kind, Requirement requirement,
                    Optional<RequirementEnvironment> env = None,
-                   ArrayRef<OptionalAdjustment> optionalAdjustments = {})
+                   ArrayRef<OptionalAdjustment> optionalAdjustments = {},
+                   GenericSignature derivativeGenSig = GenericSignature())
       : Witness(witness), Kind(kind), WitnessType(requirement.getFirstType()),
         MissingRequirement(requirement), ReqEnv(std::move(env)),
         OptionalAdjustments(optionalAdjustments.begin(),
-                            optionalAdjustments.end()) {
+                            optionalAdjustments.end()),
+        DerivativeGenSig(derivativeGenSig) {
     assert(hasWitnessType() && hasRequirement() &&
            "Should have witness type and requirement");
   }
@@ -481,10 +491,51 @@ struct RequirementMatch {
   /// environment.
   SubstitutionMap WitnessSubstitutions;
 
-  /// Determine whether this match is viable.
+  /// The matched derivative generic signature.
+  GenericSignature DerivativeGenSig;
+
+  /// Determine whether this match is well-formed, meaning that it is any
+  /// difference determined by requirement matching is acceptable.
+  bool isWellFormed() const {
+    switch(Kind) {
+    case MatchKind::ExactMatch:
+    case MatchKind::FewerEffects:
+      return true;
+
+    case MatchKind::OptionalityConflict:
+    case MatchKind::RenamedMatch:
+    case MatchKind::WitnessInvalid:
+    case MatchKind::Circularity:
+    case MatchKind::KindConflict:
+    case MatchKind::TypeConflict:
+    case MatchKind::MissingRequirement:
+    case MatchKind::StaticNonStaticConflict:
+    case MatchKind::CompileTimeConstConflict:
+    case MatchKind::SettableConflict:
+    case MatchKind::PrefixNonPrefixConflict:
+    case MatchKind::PostfixNonPostfixConflict:
+    case MatchKind::MutatingConflict:
+    case MatchKind::NonMutatingConflict:
+    case MatchKind::ConsumingConflict:
+    case MatchKind::RethrowsConflict:
+    case MatchKind::RethrowsByConformanceConflict:
+    case MatchKind::AsyncConflict:
+    case MatchKind::ThrowsConflict:
+    case MatchKind::NonObjC:
+    case MatchKind::MissingDifferentiableAttr:
+    case MatchKind::EnumCaseWithAssociatedValues:
+      return false;
+    }
+
+    llvm_unreachable("Unhandled MatchKind in switch.");
+  }
+
+  /// Determine whether this match is viable, meaning that we could generate
+  /// a witness for it, even though there might be semantic errors.
   bool isViable() const {
     switch(Kind) {
     case MatchKind::ExactMatch:
+    case MatchKind::FewerEffects:
     case MatchKind::OptionalityConflict:
     case MatchKind::RenamedMatch:
       return true;
@@ -495,6 +546,7 @@ struct RequirementMatch {
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
+    case MatchKind::CompileTimeConstConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
     case MatchKind::PostfixNonPostfixConflict:
@@ -518,6 +570,7 @@ struct RequirementMatch {
   bool hasWitnessType() const {
     switch(Kind) {
     case MatchKind::ExactMatch:
+    case MatchKind::FewerEffects:
     case MatchKind::RenamedMatch:
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
@@ -528,6 +581,7 @@ struct RequirementMatch {
     case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::StaticNonStaticConflict:
+    case MatchKind::CompileTimeConstConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
     case MatchKind::PostfixNonPostfixConflict:

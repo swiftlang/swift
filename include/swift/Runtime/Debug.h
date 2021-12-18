@@ -85,15 +85,18 @@ static inline void crash(const char *message) {
 // swift::fatalError() halts with a crash log message, 
 // but makes no attempt to preserve register state.
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+SWIFT_FORMAT(2, 3)
 extern void
 fatalError(uint32_t flags, const char *format, ...);
 
 /// swift::warning() emits a warning from the runtime.
 extern void
+SWIFT_VFORMAT(2)
 warningv(uint32_t flags, const char *format, va_list args);
 
 /// swift::warning() emits a warning from the runtime.
 extern void
+SWIFT_FORMAT(2, 3)
 warning(uint32_t flags, const char *format, ...);
 
 // swift_dynamicCastFailure halts using fatalError()

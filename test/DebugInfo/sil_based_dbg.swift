@@ -15,3 +15,25 @@ public func testit() {
   print("Hello")
 }
 
+// We need to remove the debug scope within alloc_stack's auxiliary debug var info
+// in sil-based-dbg mode.
+// To create something like `alloc_stack ..., (name "foo", loc ..., scope 0)...`
+// as our testing input, we're only running SROA over the input swift code.
+// RUN: %target-swift-frontend %s -disable-debugger-shadow-copies -emit-sil -g -o %t/stage1.sil
+// RUN: %target-sil-opt -sil-print-debuginfo -access-marker-elim -sroa %t/stage1.sil -o %t/stage2.sil
+// The verification shouldn't fail
+// RUN: %target-swift-frontend %t/stage2.sil -sil-verify-all -sil-based-debuginfo -g -emit-sil -o %t/out.sil
+// RUN: %FileCheck %s --check-prefix=CHECK_DBG_SCOPE < %t/out.sil
+struct TheStruct {
+    var the_member : Int
+}
+// CHECK_DBG_SCOPE-LABEL: sil {{.*}}test_debug_scope
+public func test_debug_scope(val : Int) -> Int {
+    // CHECK_DBG_SCOPE: alloc_stack $Builtin.Int{{[0-9]+}}, var, (name "the_struct",
+    // CHECK_DBG_SCOPE-SAME:                                      loc
+    // The auxiliary debug scope should be removed
+    // CHECK_DBG_SCOPE-NOT:                                       scope {{[0-9]+}})
+    var the_struct = TheStruct(the_member: 0)
+    the_struct.the_member = val + 13
+    return the_struct.the_member
+}

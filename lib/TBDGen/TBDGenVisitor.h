@@ -29,7 +29,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/TextAPI/MachO/InterfaceFile.h"
+#include "llvm/TextAPI/InterfaceFile.h"
 
 using namespace swift::irgen;
 using StringSet = llvm::StringSet<>;
@@ -92,7 +92,9 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   llvm::StringSet<> DuplicateSymbolChecker;
 #endif
 
-  const llvm::DataLayout &DataLayout;
+  Optional<llvm::DataLayout> DataLayout = None;
+  const StringRef DataLayoutDescription;
+
   UniversalLinkageInfo UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
@@ -121,7 +123,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
                  SymbolKind kind = SymbolKind::GlobalSymbol);
 
   void addSymbol(SILDeclRef declRef);
-  void addAsyncFunctionPointerSymbol(AbstractFunctionDecl *AFD);
+  void addAsyncFunctionPointerSymbol(SILDeclRef declRef);
 
   void addSymbol(LinkEntity entity);
 
@@ -167,10 +169,10 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
                                   const AutoDiffConfig &config);
 
 public:
-  TBDGenVisitor(const llvm::Triple &target, const llvm::DataLayout &dataLayout,
+  TBDGenVisitor(const llvm::Triple &target, const StringRef dataLayoutString,
                 ModuleDecl *swiftModule, const TBDGenOptions &opts,
                 APIRecorder &recorder)
-      : DataLayout(dataLayout),
+      : DataLayoutDescription(dataLayoutString),
         UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false),
         SwiftModule(swiftModule), Opts(opts), recorder(recorder),
         previousInstallNameMap(parsePreviousModuleInstallNameMap()) {}

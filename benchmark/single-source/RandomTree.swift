@@ -19,7 +19,7 @@ var rng = SplitMix64(seed: 0)
 let count = 400
 let input = (0 ..< count).shuffled(using: &rng)
 
-public let RandomTree = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "RandomTree.insert.ADT",
     runFunction: run_ADT_insert,

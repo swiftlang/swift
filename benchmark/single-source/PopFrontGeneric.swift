@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,11 +12,12 @@
 
 import TestsUtils
 
-public let PopFrontArrayGeneric = BenchmarkInfo(
-  name: "PopFrontArrayGeneric",
-  runFunction: run_PopFrontArrayGeneric,
-  tags: [.validation, .api, .Array],
-  legacyFactor: 20)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "PopFrontArrayGeneric",
+    runFunction: run_PopFrontArrayGeneric,
+    tags: [.validation, .api, .Array],
+    legacyFactor: 20)
 
 let arrayCount = 1024
 
@@ -47,16 +48,16 @@ func myArrayReplace<
 }
 
 @inline(never)
-public func run_PopFrontArrayGeneric(_ N: Int) {
+public func run_PopFrontArrayGeneric(_ n: Int) {
   let orig = Array(repeating: 1, count: arrayCount)
   var a = [Int]()
-  for _ in 1...N {
+  for _ in 1...n {
       var result = 0
       a.append(contentsOf: orig)
       while a.count != 0 {
         result += a[0]
         myArrayReplace(&a, 0..<1, EmptyCollection())
       }
-      CheckResults(result == arrayCount)
+      check(result == arrayCount)
   }
 }

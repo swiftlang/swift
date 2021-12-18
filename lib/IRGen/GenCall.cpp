@@ -1092,16 +1092,19 @@ namespace {
         llvm_unreachable("OpenCL type in ABI lowering");
 
       // We should never see ARM SVE types at all.
-#define SVE_TYPE(Name, Id, ...) \
-      case clang::BuiltinType::Id:
+#define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
         llvm_unreachable("ARM SVE type in ABI lowering");
 
       // We should never see PPC MMA types at all.
-#define PPC_VECTOR_TYPE(Name, Id, Size) \
-      case clang::BuiltinType::Id:
+#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/PPCTypes.def"
         llvm_unreachable("PPC MMA type in ABI lowering");
+
+      // We should never see RISC-V V types at all.
+#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/RISCVVTypes.def"
+        llvm_unreachable("RISC-V V type in ABI lowering");
 
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
@@ -1983,6 +1986,46 @@ void IRGenFunction::emitAllExtractValues(llvm::Value *value,
     out.add(Builder.CreateExtractValue(value, i));
 }
 
+namespace {
+// TODO(compnerd) analyze if this should be out-lined via a runtime call rather
+// than be open-coded.  This needs to account for the fact that we are able to
+// statically optimize this often times due to CVP changing the select to a
+// `select i1 true, ...`.
+llvm::Value *emitIndirectAsyncFunctionPointer(IRGenFunction &IGF,
+                                              llvm::Value *pointer) {
+  llvm::IntegerType *IntPtrTy = IGF.IGM.IntPtrTy;
+  llvm::Type *AsyncFunctionPointerPtrTy = IGF.IGM.AsyncFunctionPointerPtrTy;
+  llvm::Constant *Zero =
+      llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
+                                                      0));
+  llvm::Constant *One =
+      llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
+                                                      1));
+  llvm::Constant *NegativeOne =
+      llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),
+                                                      -2));
+  swift::irgen::Alignment PointerAlignment = IGF.IGM.getPointerAlignment();
+
+  llvm::Value *PtrToInt = IGF.Builder.CreatePtrToInt(pointer, IntPtrTy);
+  llvm::Value *And = IGF.Builder.CreateAnd(PtrToInt, One);
+  llvm::Value *ICmp = IGF.Builder.CreateICmpEQ(And, Zero);
+
+  llvm::Value *BitCast =
+      IGF.Builder.CreateBitCast(pointer, AsyncFunctionPointerPtrTy);
+
+  llvm::Value *UntaggedPointer = IGF.Builder.CreateAnd(PtrToInt, NegativeOne);
+  llvm::Value *IntToPtr =
+      IGF.Builder.CreateIntToPtr(UntaggedPointer,
+                                 AsyncFunctionPointerPtrTy->getPointerTo());
+  llvm::Value *Load = IGF.Builder.CreateLoad(IntToPtr, PointerAlignment);
+
+  // (select (icmp eq, (and (ptrtoint %AsyncFunctionPointer), 1), 0),
+  //         (%AsyncFunctionPointer),
+  //         (inttoptr (and (ptrtoint %AsyncFunctionPointer), -2)))
+  return IGF.Builder.CreateSelect(ICmp, BitCast, Load);
+}
+}
+
 std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
     FunctionPointer functionPointer, llvm::Value *thickContext,
@@ -2004,9 +2047,11 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
       if (auto authInfo = functionPointer.getAuthInfo()) {
         ptr = emitPointerAuthAuth(IGF, ptr, authInfo);
       }
-      auto *afpPtr =
-          IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
-      afpPtrValue = afpPtr;
+      afpPtrValue =
+          (IGF.IGM.getOptions().IndirectAsyncFunctionPointer)
+              ? emitIndirectAsyncFunctionPointer(IGF, ptr)
+              : IGF.Builder.CreateBitCast(ptr,
+                                          IGF.IGM.AsyncFunctionPointerPtrTy);
     }
     return *afpPtrValue;
   };
@@ -2017,7 +2062,9 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     } else if (auto *function = functionPointer.getRawAsyncFunction()) {
       fn = function;
     } else {
-      llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(getAFPPtr(), 0);
+      llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(
+          getAFPPtr()->getType()->getScalarType()->getPointerElementType(),
+          getAFPPtr(), 0);
       fn = IGF.emitLoadOfRelativePointer(
           Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
           /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
@@ -2034,7 +2081,9 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
                                     initialContextSize.getValue());
     } else {
       assert(!functionPointer.useStaticContextSize());
-      auto *sizePtr = IGF.Builder.CreateStructGEP(getAFPPtr(), 1);
+      auto *sizePtr = IGF.Builder.CreateStructGEP(
+          getAFPPtr()->getType()->getScalarType()->getPointerElementType(),
+          getAFPPtr(), 1);
       size = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
     }
   }
@@ -4824,10 +4873,14 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
     auto *fnPtr = Value;
     if (auto authInfo = AuthInfo) {
       fnPtr = emitPointerAuthAuth(IGF, fnPtr, authInfo);
+      if (IGF.IGM.getOptions().IndirectAsyncFunctionPointer)
+        fnPtr = emitIndirectAsyncFunctionPointer(IGF, fnPtr);
     }
     auto *descriptorPtr =
         IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.AsyncFunctionPointerPtrTy);
-    auto *addrPtr = IGF.Builder.CreateStructGEP(descriptorPtr, 0);
+    auto *addrPtr = IGF.Builder.CreateStructGEP(
+        descriptorPtr->getType()->getScalarType()->getPointerElementType(),
+        descriptorPtr, 0);
     auto *result = IGF.emitLoadOfRelativePointer(
         Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
         /*expectedType*/ getFunctionType()->getPointerTo());

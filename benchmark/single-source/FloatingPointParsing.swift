@@ -15,7 +15,7 @@
 
 import TestsUtils
 
-public let FloatingPointParsing = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "ParseFloat.Float.Exp",
     runFunction: run_ParseFloatExp,
@@ -221,8 +221,8 @@ let float80UniformWorkload = [
 ]
 
 @inline(__always)
-public func parseFloatWorkload<T : LosslessStringConvertible>(_ N: Int, workload: [String], type: T.Type) {
-  for _ in 0..<N {
+public func parseFloatWorkload<T : LosslessStringConvertible>(_ n: Int, workload: [String], type: T.Type) {
+  for _ in 0..<n {
     for element in workload {
       let f = T(element)
       blackHole(f)
@@ -231,43 +231,43 @@ public func parseFloatWorkload<T : LosslessStringConvertible>(_ N: Int, workload
 }
 
 @inline(never)
-public func run_ParseFloatExp(_ N: Int) {
-  parseFloatWorkload(N, workload: floatExpWorkload, type: Float.self)
+public func run_ParseFloatExp(_ n: Int) {
+  parseFloatWorkload(n, workload: floatExpWorkload, type: Float.self)
 }
 
 @inline(never)
-public func run_ParseDoubleExp(_ N: Int) {
-  parseFloatWorkload(N, workload: doubleExpWorkload, type: Double.self)
+public func run_ParseDoubleExp(_ n: Int) {
+  parseFloatWorkload(n, workload: doubleExpWorkload, type: Double.self)
 }
 
 @inline(never)
-public func run_ParseFloat80Exp(_ N: Int) {
+public func run_ParseFloat80Exp(_ n: Int) {
 #if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
-  parseFloatWorkload(N, workload: float80ExpWorkload, type: Float80.self)
+  parseFloatWorkload(n, workload: float80ExpWorkload, type: Float80.self)
 #endif // x86
 #endif // Darwin/Linux
 }
 
 @inline(never)
-public func run_ParseFloatUniform(_ N: Int) {
-  parseFloatWorkload(N, workload: floatUniformWorkload, type: Float.self)
+public func run_ParseFloatUniform(_ n: Int) {
+  parseFloatWorkload(n, workload: floatUniformWorkload, type: Float.self)
 }
 
 @inline(never)
-public func run_ParseDoubleUniform(_ N: Int) {
-  parseFloatWorkload(N, workload: doubleUniformWorkload, type: Double.self)
+public func run_ParseDoubleUniform(_ n: Int) {
+  parseFloatWorkload(n, workload: doubleUniformWorkload, type: Double.self)
 }
 
 @inline(never)
-public func run_ParseFloat80Uniform(_ N: Int) {
+public func run_ParseFloat80Uniform(_ n: Int) {
 #if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
-  parseFloatWorkload(N, workload: float80UniformWorkload, type: Float80.self)
+  parseFloatWorkload(n, workload: float80UniformWorkload, type: Float80.self)
 #endif // x86
 #endif // Darwin/Linux
 }

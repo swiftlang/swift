@@ -72,6 +72,13 @@ void swift_dumpTrackedAccesses();
 
 #endif
 
+// When building the concurrency library for back deployment, we rename these
+// symbols unformly so they don't conflict with the real concurrency library.
+#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
+#  define swift_task_enterThreadLocalContext swift_task_enterThreadLocalContextBackDeploy
+#  define swift_task_exitThreadLocalContext swift_task_exitThreadLocalContextBackDeploy
+#endif
+
 /// Called when a task inits, resumes and returns control to caller synchronous
 /// code to update any exclusivity specific state associated with the task.
 ///

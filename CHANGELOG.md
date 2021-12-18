@@ -5,6 +5,66 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 Swift 5.6
 ---------
+
+* References to `Self` or so-called "`Self` requirements" in the type signatures
+  of protocol members are now correctly detected in the parent of a nested type.
+  As a result, protocol members that fall under this overlooked case are no longer
+  available on values of protocol type:
+
+  ```swift
+  struct Outer<T> {
+    struct Inner {}
+  }
+
+  protocol P {}
+  extension P {
+    func method(arg: Outer<Self>.Inner) {}
+  }
+
+  func test(p: P) {
+    // error: 'method' has a 'Self' requirement and cannot be used on a value of
+    // protocol type (use a generic constraint instead).
+    _ = p.method
+  }
+  ``` 
+
+* [SE-0324][]:
+
+  Relax diagnostics for pointer arguments to C functions. The Swift
+  compiler now accepts limited pointer type mismatches when directly
+  calling functions imported from C as long as the C language allows
+  those pointer types to alias. Consequently, any Swift
+  `Unsafe[Mutable]Pointer<T>` or `Unsafe[Mutable]RawPointer` may be
+  passed to C function arguments declared as `[signed|unsigned] char
+  *`. Swift `Unsafe[Mutable]Pointer<T>` can also be passed to C
+  function arguments with an integer type that differs from `T` only
+  in its signedness.
+
+  For example, after importing a C function declaration:
+  ```c
+  long long decode_int64(const char *ptr_to_int64);
+  ```
+  Swift can now directly pass a raw pointer as the function argument:
+  ```swift
+  func decodeAsInt64(data: Data) -> Int64 {
+      data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+          decode_int64(bytes.baseAddress!)
+      }
+  }
+  ```
+
+* [SE-0315][]:
+
+  Type expressions and annotations can now include "type placeholders" which
+  directs the compiler to fill in that portion of the type according to the usual
+  type inference rules. Type placeholders are spelled as an underscore ("`_`") in
+  a type name. For instance:
+  
+  ```swift
+  // This is OK--the compiler can infer the key type as `Int`.
+  let dict: [_: String] = [0: "zero", 1: "one", 2: "two"]
+  ```
+
 * [SE-0290][]:
 
   It is now possible to write inverted availability conditions by using the new `#unavailable` keyword:
@@ -21,6 +81,23 @@ Swift 5.6
 
 Swift 5.5
 ---------
+
+### 2021-09-20 (Xcode 13.0)
+
+* [SE-0323][]:
+
+  The main function is executed with `MainActor` isolation applied, so functions
+  and variables with `MainActor` isolation may be called and modified
+  synchronously from the main function. If the main function is annotated with a
+  global actor explicitly, it must be the main actor or an error is emitted. If
+  no global actor annotation is present, the main function is implicitly run on
+  the main actor.
+
+  The main function is executed synchronously up to the first suspension point.
+  Any tasks enqueued by initializers in Objective-C or C++ will run after the
+  main function runs to the first suspension point. At the suspension point, the
+  main function suspends and the tasks are executed according to the Swift
+  concurrency mechanisms.
 
 * [SE-0313][]:
 
@@ -57,7 +134,8 @@ Swift 5.5
     // previously interpreted as a return type of Box<T>, ignoring the <Int> part;
     // now we diagnose an error with a fix-it suggesting replacing `Self` with `Box`
     static func makeBox() -> Self<Int> {...}
-  }```
+  }
+  ```
 
 * [SR-14878][]:
 
@@ -8679,7 +8757,10 @@ Swift 1.0
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 [SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
+[SE-0315]: <https://github.com/apple/swift-evolution/blob/main/proposals/0315-placeholder-types.md>
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
+[SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
+[SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

@@ -4,7 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// UNSUPPORTED: use_os_stdlib
+// rdar://82123254
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 import StdlibUnittest
@@ -18,7 +20,7 @@ import StdlibUnittest
 
 var asyncTests = TestSuite("Async")
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor MyActor {
   func synchronous() { }
 
@@ -30,7 +32,7 @@ actor MyActor {
   }
 }
 
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 5.1, *) {
   let actor = MyActor()
 
   asyncTests.test("Detach") {

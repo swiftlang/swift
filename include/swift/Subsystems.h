@@ -52,6 +52,7 @@ namespace swift {
   class GenericParamList;
   class IRGenOptions;
   class LangOptions;
+  class SILOptions;
   class ModuleDecl;
   /// A opaque syntax node created by a \c SyntaxParseAction, whose contents
   /// must be interpreted by the \c SyntaxParseAction which created it.
@@ -83,6 +84,10 @@ namespace swift {
 
   namespace fine_grained_dependencies {
     class SourceFileDepGraph;
+  }
+
+  namespace symbolgraphgen {
+    struct SymbolGraphOptions;
   }
 
   /// @{
@@ -152,7 +157,7 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
-  /// Resolve the given \c TypeRepr to a contextual type.
+  /// Resolve the given \c TypeRepr to an interface type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
   /// code completion).
@@ -186,6 +191,7 @@ namespace swift {
   /// Serializes a module or single source file to the given output file.
   void
   serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
+            const symbolgraphgen::SymbolGraphOptions &symbolGraphOptions,
             const SILModule *M = nullptr,
             const fine_grained_dependencies::SourceFileDepGraph *DG = nullptr);
 
@@ -283,7 +289,7 @@ namespace swift {
   public:
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, const TypeCheckerOptions &TyOpts,
-               StringRef ModuleName,
+               const SILOptions &SILOpts, StringRef ModuleName,
                std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
@@ -362,6 +368,12 @@ namespace swift {
   /// The ASTContext will automatically call these upon construction.
   /// Calling registerIDERequestFunctions will invoke this function as well.
   void registerIDETypeCheckRequestFunctions(Evaluator &evaluator);
+
+  /// Register clang importer request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and import any Clang APIs should call this function
+  /// after forming the ASTContext.
+  void registerClangImporterRequestFunctions(Evaluator &evaluator);
 
   /// Register SILOptimizer passes necessary for IRGen.
   void registerIRGenSILTransforms(ASTContext &ctx);

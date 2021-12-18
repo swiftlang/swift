@@ -15,9 +15,11 @@
 
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringMap.h"
 
 #include <string>
 #include <vector>
@@ -47,6 +49,9 @@ public:
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
+
+  /// The map of aliases and underlying names of imported or referenced modules.
+  llvm::StringMap<StringRef> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
   std::string ModuleName;
@@ -177,6 +182,11 @@ public:
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.
   Optional<bool> SerializeOptionsForDebugging;
+
+  /// When true the debug prefix map entries will be applied to debugging
+  /// options before serialization. These can be reconstructed at debug time by
+  /// applying the inverse map in SearchPathOptions.SearchPathRemapper.
+  bool DebugPrefixSerializedDebuggingOptions = false;
 
   /// When true, check if all required SwiftOnoneSupport symbols are present in
   /// the module.
@@ -324,8 +334,18 @@ public:
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
 
+  /// Downgrade all errors emitted in the module interface verification phase
+  /// to warnings.
+  /// TODO: remove this after we fix all project-side warnings in the interface.
+  bool DowngradeInterfaceVerificationError = false;
+
   /// True if the "-static" option is set.
   bool Static = false;
+
+  /// True if building with -experimental-hermetic-seal-at-link. Turns on
+  /// dead-stripping optimizations assuming that all users of library code
+  /// are present at LTO time.
+  bool HermeticSealAtLink = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
@@ -418,6 +438,10 @@ public:
   /// Whether to include symbols with SPI information in the symbol graph.
   bool IncludeSPISymbolsInSymbolGraph = false;
 
+  /// This is used to obfuscate the serialized search paths so we don't have
+  /// to encode the actual paths into the .swiftmodule file.
+  PathObfuscator serializedPathObfuscator;
+
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
@@ -427,6 +451,8 @@ private:
   static bool canActionEmitModuleDoc(ActionType);
   static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
+  static bool canActionEmitABIDescriptor(ActionType);
+  static bool canActionEmitModuleSemanticInfo(ActionType);
 
 public:
   static bool doesActionGenerateSIL(ActionType);

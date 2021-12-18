@@ -20,6 +20,7 @@
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -119,6 +120,10 @@ public:
   bool isStandardComparisonOperator() const {
     return is("==") || is("!=") || is("===") || is("!==") || is("<") ||
            is(">") || is("<=") || is(">=");
+  }
+
+  bool isNilCoalescingOperator() const {
+    return is("??");
   }
 
   /// isOperatorStartCodePoint - Return true if the specified code point is a

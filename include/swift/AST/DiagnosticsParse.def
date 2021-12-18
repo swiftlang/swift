@@ -107,6 +107,10 @@ ERROR(lex_unprintable_ascii_character,none,
       "unprintable ASCII character found in source file", ())
 ERROR(lex_invalid_utf8,none,
       "invalid UTF-8 found in source file", ())
+
+NOTE(lex_experimental_regex_strawperson,none,
+     "'%0'", (StringRef))
+
 ERROR(lex_single_quote_string,none,
       "single-quoted string literal found, use '\"'", ())
 ERROR(lex_invalid_curly_quote,none,
@@ -302,6 +306,9 @@ ERROR(getset_cannot_be_implied,none,
 // Import
 ERROR(decl_expected_module_name,none,
       "expected module name in import declaration", ())
+ERROR(expected_module_alias,none,
+      "cannot refer to module as %0 because it has been aliased; use %1 "
+      "instead", (Identifier, Identifier))
 
 // Extension
 ERROR(expected_lbrace_extension,PointsToFirstBadToken,
@@ -488,6 +495,7 @@ ERROR(referenced_value_no_accessor,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
 ERROR(expected_sil_value_ownership_kind,none,
       "expected value ownership kind in SIL code", ())
+ERROR(unrecognized_sil_qualifier,none, "unrecognized SIL qualifier", ())
 ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
       "SILFunction and SILArgument have mismatching ValueOwnershipKinds. "
       "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
@@ -499,6 +507,12 @@ ERROR(expected_sil_tuple_index,none,
 ERROR(invalid_index_subset,none,
       "invalid index subset; expected '[SU]+' where 'S' represents set indices "
       "and 'U' represents unset indices", ())
+ERROR(sil_invalid_attribute_for_instruction,none,
+      "The attribute '%0' is invalid for the instruction '%1'.", 
+      (StringRef, StringRef))
+ERROR(sil_invalid_attribute_for_expected,none,
+      "Invalid attribute '%0' (expected '%1').", 
+      (StringRef, StringRef))
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -521,6 +535,8 @@ ERROR(sil_invalid_column_in_sil_location,none,
       "column number must be a positive integer", ())
 ERROR(sil_invalid_scope_slot,none,
       "scope number must be a positive integer ", ())
+ERROR(sil_invalid_constant,none,
+      "constant operand must be an integer literal ", ())
 ERROR(sil_scope_undeclared,none,
       "scope number %0 needs to be declared before first use", (unsigned))
 ERROR(sil_scope_redefined,none,
@@ -621,6 +637,8 @@ ERROR(sil_keypath_index_operand_type_conflict,none,
 ERROR(sil_keypath_no_use_of_operand_in_pattern,none,
       "operand %0 is not referenced by any component in the pattern",
       (unsigned))
+ERROR(sil_movevalue_invalid_optional_attribute,none,
+      "Optional attribute '[%0]' can not be applied to move_value", (StringRef))
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -1023,6 +1041,8 @@ ERROR(expected_await_not_async,none,
 // Yield Statment
 ERROR(expected_expr_yield,PointsToFirstBadToken,
       "expected expression in 'yield' statement", ())
+ERROR(unexpected_label_yield,none,
+      "unexpected label in 'yield' statement", ())
 
 // Defer Statement
 ERROR(expected_lbrace_after_defer,PointsToFirstBadToken,
@@ -1340,10 +1360,6 @@ ERROR(expr_selector_expected_property_expr,PointsToFirstBadToken,
 ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#selector' expression", ())
 
-// Type-of expressions.
-ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
-      "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
-
 // '#assert'
 ERROR(pound_assert_disabled,PointsToFirstBadToken,
       "#assert is an experimental feature that is currently disabled", ())
@@ -1393,6 +1409,9 @@ ERROR(attr_expected_lparen,none,
 
 ERROR(attr_expected_rparen,none,
 "expected ')' in '%0' %select{attribute|modifier}1", (StringRef, bool))
+
+ERROR(attr_expected_semi,none,
+"expected ';' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
 ERROR(attr_expected_comma,none,
 "expected ',' in '%0' %select{attribute|modifier}1", (StringRef, bool))
@@ -1594,10 +1613,6 @@ ERROR(opened_attribute_id_value,none,
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
 
-// effects
-ERROR(effects_attribute_expect_option,none,
-      "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
-
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
       "expected 'safe' or 'unsafe'", ())
@@ -1704,6 +1719,10 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       "parameters as original function generic signature '%1'",
       (StringRef, StringRef))
 
+WARNING(warn_attr_unsafe_removed,none,
+        "'%0' attribute has been removed in favor of @_predatesConcurrency",
+        (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1743,6 +1762,9 @@ ERROR(unsupported_conditional_compilation_unary_expression,none,
 ERROR(unsupported_platform_condition_expression,none,
       "unexpected platform condition "
       "(expected 'os', 'arch', or 'swift')",
+      ())
+ERROR(platform_condition_expected_argument,none,
+      "expected argument to platform condition",
       ())
 ERROR(platform_condition_expected_one_argument,none,
       "expected only one argument to platform condition",
@@ -1837,6 +1859,11 @@ ERROR(availability_query_repeated_platform, none,
 ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
       "concurrency is enabled",
+      (StringRef, bool))
+
+ERROR(attr_requires_distributed, none,
+      "'%0' %select{attribute|modifier}1 is only valid when experimental "
+      "distributed support is enabled",
       (StringRef, bool))
 
 //------------------------------------------------------------------------------

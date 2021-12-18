@@ -34,8 +34,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
@@ -1023,7 +1025,7 @@ void LazyConformanceLoader::anchor() {}
 
 /// Lookup table used to store members of a nominal type (and its extensions)
 /// for fast retrieval.
-class swift::MemberLookupTable {
+class swift::MemberLookupTable : public ASTAllocated<swift::MemberLookupTable> {
   /// The last extension that was included within the member lookup table's
   /// results.
   ExtensionDecl *LastExtensionIncluded = nullptr;
@@ -1107,17 +1109,6 @@ public:
   SWIFT_DEBUG_DUMP {
     dump(llvm::errs());
   }
-
-  // Only allow allocation of member lookup tables using the allocator in
-  // ASTContext or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(MemberLookupTable)) {
-    return C.Allocate(Bytes, Alignment);
-  }
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
 };
 
 namespace {
@@ -1136,20 +1127,9 @@ namespace {
 /// table for lookup based on Objective-C selector.
 class ClassDecl::ObjCMethodLookupTable
         : public llvm::DenseMap<std::pair<ObjCSelector, char>,
-                                StoredObjCMethods>
-{
-public:
-  // Only allow allocation of member lookup tables using the allocator in
-  // ASTContext or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(MemberLookupTable)) {
-    return C.Allocate(Bytes, Alignment);
-  }
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
-};
+                                StoredObjCMethods>,
+          public ASTAllocated<ClassDecl::ObjCMethodLookupTable>
+{};
 
 MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
   // Register a cleanup with the ASTContext to call the lookup table
@@ -1240,6 +1220,12 @@ void ExtensionDecl::addedMember(Decl *member) {
     if (nominal)
       nominal->addedMember(member);
   }
+}
+
+void NominalTypeDecl::addMemberToLookupTable(Decl *member) {
+  prepareLookupTable();
+
+  LookupTable->addMember(member);
 }
 
 // For lack of anywhere more sensible to put it, here's a diagram of the pieces
@@ -1354,7 +1340,9 @@ void NominalTypeDecl::prepareLookupTable() {
   } else {
     LookupTable->addMembers(getMembers());
   }
+}
 
+void NominalTypeDecl::addLoadedExtensions() {
   for (auto e : getExtensions()) {
     // If we can lazy-load this extension, only take the members we've loaded
     // so far.
@@ -1446,10 +1434,10 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   decl->prepareLookupTable();
 
-  // If we're allowed to load extensions, call prepareExtensions to ensure we
+  // If we're allowed to load extensions, call addLoadedExtensions to ensure we
   // properly invalidate the lazily-complete cache for any extensions brought in
   // by modules loaded after-the-fact. This can happen with the LLDB REPL.
-  decl->prepareExtensions();
+  decl->addLoadedExtensions();
 
   auto &Table = *decl->LookupTable;
   if (!useNamedLazyMemberLoading) {
@@ -1462,15 +1450,51 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
     Table.updateLookupTable(decl);
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
-    // The lookup table believes it doesn't have a complete accounting of this
-    // name - either because we're never seen it before, or another extension
-    // was registered since the last time we searched. Ask the loaders to give
-    // us a hand.
     DeclBaseName baseName(name.getBaseName());
-    populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
-    populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
 
-    Table.markLazilyComplete(baseName);
+    if (isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl())) {
+      auto allFound = evaluateOrDefault(
+          ctx.evaluator, CXXNamespaceMemberLookup({cast<EnumDecl>(decl), name}),
+          {});
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+
+      // Bypass the regular member lookup table if we find something in
+      // the original C++ namespace. We don't want to store the C++ decl in the
+      // lookup table as the decl can be referenced  from multiple namespace
+      // declarations due to inline namespaces. We still merge in the other
+      // entries found in the lookup table, to support finding members in
+      // namespace extensions.
+      if (!allFound.empty()) {
+        auto known = Table.find(name);
+        if (known != Table.end()) {
+          auto swiftLookupResult = maybeFilterOutAttrImplements(
+              known->second, name, includeAttrImplements);
+          for (auto foundSwiftDecl : swiftLookupResult) {
+            allFound.push_back(foundSwiftDecl);
+          }
+        }
+        return allFound;
+      }
+    } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
+      auto allFound = evaluateOrDefault(
+          ctx.evaluator,
+          ClangRecordMemberLookup({cast<StructDecl>(decl), name}), {});
+      // Add all the members we found, later we'll combine these with the
+      // existing members.
+      for (auto found : allFound)
+        Table.addMember(found);
+
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+    } else {
+      // The lookup table believes it doesn't have a complete accounting of this
+      // name - either because we're never seen it before, or another extension
+      // was registered since the last time we searched. Ask the loaders to give
+      // us a hand.
+      populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+    }
+
+    Table.markLazilyComplete(name.getBaseName());
   }
 
   // Look for a declaration with this name.
@@ -1694,6 +1718,35 @@ static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
   }
 }
 
+static void installDistributedRemoteFunctionsIfNeeded(NominalTypeDecl *target,
+                                                      DeclNameRef member) {
+  auto &Context = target->getASTContext();
+  auto baseName = member.getBaseName();
+
+  if (member.isSimpleName() || baseName.isSpecial())
+    return;
+
+  // We only need to install _remote functions.
+  if (!baseName.getIdentifier().str().startswith("_remote_"))
+    return;
+
+  // _remote_-prefixed functions can be generated by distributed funcs.
+  auto prefixLen = strlen("_remote_");
+  auto originalFuncName =
+      Context.getIdentifier(
+          baseName.getIdentifier().str().substr(prefixLen));
+
+  for (auto member : target->lookupDirect(originalFuncName)) {
+    auto func = dyn_cast<FuncDecl>(member);
+    if (!func) continue;
+
+    auto sourceFile = func->getDeclContext()->getParentSourceFile();
+    if (sourceFile && sourceFile->Kind != SourceFileKind::Interface) {
+      (void)func->getDistributedActorRemoteFuncDecl();
+    }
+  }
+}
+
 bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
                                   DeclNameRef member,
                                   NLOptions options,
@@ -1746,6 +1799,9 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
 
     // Make sure we've resolved property wrappers, if we need them.
     installPropertyWrapperMembersIfNeeded(current, member);
+
+    // Make sure we've resolved synthesized _remote funcs for distributed actors.
+    installDistributedRemoteFunctionsIfNeeded(current, member);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
@@ -2095,10 +2151,21 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
   auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, options);
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{descriptor}, {});
+
+  unsigned nominalTypeDeclCount = 0;
   for (const auto &result : lookup.allResults()) {
     auto typeDecl = cast<TypeDecl>(result.getValueDecl());
+
+    if (isa<NominalTypeDecl>(typeDecl))
+      nominalTypeDeclCount++;
+
     results.push_back(typeDecl);
   }
+
+  // If we saw multiple nominal type declarations with the same name,
+  // the result of the lookup is definitely ambiguous.
+  if (nominalTypeDeclCount > 1)
+    results.clear();
 
   return results;
 }
@@ -2241,6 +2308,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
   case TypeReprKind::Isolated:
+  case TypeReprKind::CompileTimeConst:
   case TypeReprKind::Metatype:
   case TypeReprKind::Owned:
   case TypeReprKind::Protocol:
@@ -2516,8 +2584,9 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // The generic parameter 'Self'.
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
-    auto selfDecl = new (ctx) GenericTypeParamDecl(
-        proto, selfId, SourceLoc(), /*depth=*/0, /*index=*/0);
+    auto selfDecl = new (ctx)
+        GenericTypeParamDecl(proto, selfId, SourceLoc(),
+                             /*type sequence=*/false, /*depth=*/0, /*index=*/0);
     auto protoType = proto->getDeclaredInterfaceType();
     InheritedEntry selfInherited[1] = {
       InheritedEntry(TypeLoc::withoutLoc(protoType)) };
@@ -2596,54 +2665,6 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
       }
     }
   }
-
-  // If we have more than one attribute declaration, we have an ambiguity.
-  // So, emit an ambiguity diagnostic.
-  if (auto typeRepr = attr->getTypeRepr()) {
-    if (nominals.size() > 1) {
-      SmallVector<NominalTypeDecl *, 4> ambiguousCandidates;
-      // Filter out declarations that cannot be attributes.
-      for (auto decl : nominals) {
-        if (isa<ProtocolDecl>(decl)) {
-          continue;
-        }
-        ambiguousCandidates.push_back(decl);
-      }
-      if (ambiguousCandidates.size() > 1) {
-        auto attrName = nominals.front()->getName();
-        ctx.Diags.diagnose(typeRepr->getLoc(),
-                           diag::ambiguous_custom_attribute_ref, attrName);
-        for (auto candidate : ambiguousCandidates) {
-          ctx.Diags.diagnose(candidate->getLoc(),
-                             diag::found_attribute_candidate);
-          // If the candidate is a top-level attribute, let's suggest
-          // adding module name to resolve the ambiguity.
-          if (candidate->getDeclContext()->isModuleScopeContext()) {
-            auto moduleName = candidate->getParentModule()->getName();
-            ctx.Diags
-                .diagnose(typeRepr->getLoc(),
-                          diag::ambiguous_custom_attribute_ref_fix,
-                          moduleName.str(), attrName, moduleName)
-                .fixItInsert(typeRepr->getLoc(), moduleName.str().str() + ".");
-          }
-        }
-        return nullptr;
-      }
-    }
-  }
-
-  // There is no nominal type with this name, so complain about this being
-  // an unknown attribute.
-  std::string typeName;
-  if (auto typeRepr = attr->getTypeRepr()) {
-    llvm::raw_string_ostream out(typeName);
-    typeRepr->print(out);
-  } else {
-    typeName = attr->getType().getString();
-  }
-
-  ctx.Diags.diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
-  attr->setInvalid();
 
   return nullptr;
 }

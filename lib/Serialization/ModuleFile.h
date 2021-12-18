@@ -344,9 +344,12 @@ public:
     fatal(expected.takeError());
   }
 
+  /// Report an unexpected format error that could happen only from a memory-level
+  /// inconsistency. Please prefer passing an error to `fatal(llvm::Error error)` when possible.
   [[noreturn]] void fatal() const {
     fatal(llvm::make_error<llvm::StringError>(
-        "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
+        "Memory corruption or serialization format inconsistency.",
+        llvm::inconvertibleErrorCode()));
   }
 
   /// Outputs information useful for diagnostics to \p out
@@ -471,6 +474,11 @@ public:
     return Core->Bits.IsStaticLibrary;
   }
 
+  /// Whether this module was built with -experimental-hermetic-seal-at-link.
+  bool hasHermeticSealAtLink() const {
+    return Core->Bits.HasHermeticSealAtLink;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
@@ -500,6 +508,9 @@ public:
   /// \c true if this module has information from a corresponding
   /// .swiftsourceinfo file (ie. the file exists and has been read).
   bool hasSourceInfo() const { return Core->hasSourceInfo(); }
+
+  /// \c true if this module was built with complete checking for concurrency.
+  bool isConcurrencyChecked() const { return Core->isConcurrencyChecked(); }
 
   /// Associates this module file with the AST node representing it.
   ///
@@ -732,7 +743,8 @@ public:
   Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
-
+  void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const;
 
   // MARK: Deserialization interface
 

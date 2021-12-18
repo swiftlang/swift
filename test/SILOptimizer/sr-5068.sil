@@ -100,7 +100,7 @@ bb3:                                              // Preds: bb1
   %70 = alloc_stack $ReadonlyExternalFramework                // users: %106, %99, %73, %107, %71
   copy_addr %0 to [initialization] %70 : $*ReadonlyExternalFramework // id: %71
   destroy_addr %0 : $*ReadonlyExternalFramework               // id: %72
-  debug_value_addr %70 : $*ReadonlyExternalFramework, let, name "ExternalFramework", argno 1 // id: %73
+  debug_value %70 : $*ReadonlyExternalFramework, let, name "ExternalFramework", argno 1, expr op_deref // id: %73
   %75 = integer_literal $Builtin.Word, 1          // user: %78
   %76 = integer_literal $Builtin.Int64, 1         // user: %77
   %77 = struct $Int (%76 : $Builtin.Int64)        // user: %81

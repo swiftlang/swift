@@ -287,6 +287,15 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
   return false;
 }
 
+void ToolChain::addLinkedLibArgs(const llvm::opt::ArgList &Args,
+                                 llvm::opt::ArgStringList &FrontendArgs) {
+  Args.getLastArg(options::OPT_l);
+  for (auto Arg : Args.getAllArgValues(options::OPT_l)) {
+    const std::string lArg("-l" + Arg);
+    FrontendArgs.push_back(Args.MakeArgString(Twine(lArg)));
+  }
+}
+
 /// Construct a \c BatchJob by merging the constituent \p jobs' CommandOutput,
 /// input \c Job and \c Action members. Call through to \c constructInvocation
 /// on \p BatchJob, to build the \c InvocationInfo.

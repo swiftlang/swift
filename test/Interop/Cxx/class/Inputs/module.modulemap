@@ -53,6 +53,11 @@ module MutableMembers {
   requires cplusplus
 }
 
+module MutabilityAnnotations {
+  header "mutability-annotations.h"
+  requires cplusplus
+}
+
 module ProtocolConformance {
   header "protocol-conformance.h"
   requires cplusplus

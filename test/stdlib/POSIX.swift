@@ -1,8 +1,10 @@
 // RUN: %target-run-simple-swift %t
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: OS=wasi
 
 import StdlibUnittest
+import SwiftPrivateLibcExtras
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)

@@ -193,6 +193,7 @@ def _apply_default_arguments(args):
         args.test_swiftformat = False
         args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
+        args.test_swiftdocc = False
 
     # --test implies --test-early-swift-driver
     # (unless explicitly skipped with `--skip-test-early-swift-driver`)
@@ -518,7 +519,7 @@ def create_argument_parser():
            default=defaults.DSYMUTIL_JOBS,
            metavar='COUNT',
            help='the maximum number of parallel dsymutil jobs to use when '
-                'extracting symbols. Tweak with caution, since dsymutil'
+                'extracting symbols. Tweak with caution, since dsymutil '
                 'is memory intensive.')
 
     option('--disable-guaranteed-normal-arguments', store_true,
@@ -542,6 +543,10 @@ def create_argument_parser():
     option('--llvm-install-components', store,
            default=defaults.llvm_install_components(),
            help='A semi-colon split list of llvm components to install')
+
+    option('--libswift', store('libswift_mode'),
+           choices=['off', 'hosttools', 'bootstrapping', 'bootstrapping-with-hostlibs'],
+           help='The libswift build mode. For details see libswift/README.md')
 
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
@@ -596,6 +601,13 @@ def create_argument_parser():
     option(['-b', '--llbuild'], toggle_true('build_llbuild'),
            help='build llbuild')
 
+    option(['--back-deploy-concurrency'], toggle_true('build_backdeployconcurrency'),
+           help='build back-deployment support for concurrency')
+
+    option(['--install-back-deploy-concurrency'],
+           toggle_true('install_backdeployconcurrency'),
+           help='install back-deployment support libraries for concurrency')
+
     option(['--libcxx'], toggle_true('build_libcxx'),
            help='build libcxx')
 
@@ -619,6 +631,8 @@ def create_argument_parser():
 
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
+    option(['--swiftdocc'], toggle_true('build_swiftdocc'),
+           help='build Swift DocC')
 
     option(['--skip-early-swift-driver'], toggle_false('build_early_swift_driver'),
            help='skip building the early swift-driver')
@@ -647,6 +661,8 @@ def create_argument_parser():
            help='install new Swift driver')
     option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
            help='install SwiftEvolve')
+    option(['--install-swiftdocc'], toggle_true('install_swiftdocc'),
+           help='install Swift DocC')
     option(['--toolchain-benchmarks'],
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
@@ -690,6 +706,9 @@ def create_argument_parser():
 
     option(['-c', '--clean'], store_true,
            help='do a clean build')
+
+    option(['--clean-install-destdir'], store_true,
+           help='Clean the install destroot before building.')
 
     option('--export-compile-commands', toggle_true,
            help='generate compilation databases in addition to building')
@@ -956,6 +975,9 @@ def create_argument_parser():
     option('--build-swift-stdlib-unittest-extra', toggle_true,
            help='Build optional StdlibUnittest components')
 
+    option('--build-swift-stdlib-static-print', toggle_true,
+           help='Build constant_vprintf support')
+
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')
 
@@ -1059,6 +1081,12 @@ def create_argument_parser():
            toggle_false('test_android_host'),
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
+    option('--skip-clean-libdispatch', toggle_false('clean_libdispatch'),
+           help='skip cleaning up libdispatch')
+    option('--skip-clean-foundation', toggle_false('clean_foundation'),
+           help='skip cleaning up foundation')
+    option('--skip-clean-xctest', toggle_false('clean_xctest'),
+           help='skip cleaning up xctest')
     option('--skip-clean-llbuild', toggle_false('clean_llbuild'),
            help='skip cleaning up llbuild')
     option('--clean-early-swift-driver', toggle_true('clean_early_swift_driver'),
@@ -1097,6 +1125,8 @@ def create_argument_parser():
     option('--skip-test-swift-inspect',
            toggle_false('test_swift_inspect'),
            help='skip testing swift_inspect')
+    option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
+           help='skip testing swift-docc')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
@@ -1132,15 +1162,6 @@ def create_argument_parser():
            help='The Android API level to target when building for Android. '
                 'Currently only 21 or above is supported')
 
-    option('--android-ndk-gcc-version', store,
-           choices=['4.8', '4.9'],
-           default='4.9',
-           help='The GCC version to use when building for Android. Currently '
-                'only 4.9 is supported. %(default)s is also the default '
-                'value. This option may be used when experimenting with '
-                'versions of the Android NDK not officially supported by '
-                'Swift')
-
     option('--android-icu-uc', store_path,
            help='Path to libicuuc.so')
     option('--android-icu-uc-include', store_path,
@@ -1170,8 +1191,7 @@ def create_argument_parser():
 
     option('--enable-experimental-differentiable-programming', toggle_true,
            default=True,
-           help='Enable experimental Swift differentiable programming language'
-                ' features.')
+           help='Enable experimental Swift differentiable programming.')
 
     option('--enable-experimental-concurrency', toggle_true,
            default=True,
@@ -1180,6 +1200,10 @@ def create_argument_parser():
     option('--enable-experimental-distributed', toggle_true,
            default=True,
            help='Enable experimental Swift distributed actors.')
+
+    option('--enable-experimental-string-processing', toggle_true,
+           default=True,
+           help='Enable experimental Swift string processing.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

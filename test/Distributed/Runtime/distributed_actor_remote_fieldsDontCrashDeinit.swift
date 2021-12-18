@@ -8,17 +8,17 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: rdar78290608
-
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 distributed actor SomeSpecificDistributedActor {
+  typealias Transport = FakeTransport
+
   let name: String
   let surname: String
   let age: Int
 
-  init(name: String, transport: ActorTransport) {
+  init(name: String, transport: FakeTransport) {
     self.name = name
     self.surname = "Surname"
     self.age = 42
@@ -35,17 +35,17 @@ distributed actor SomeSpecificDistributedActor {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct FakeActorID: ActorIdentity {
   let id: UInt64
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 enum FakeTransportError: ActorTransportError {
   case unsupportedActorIdentity(AnyActorIdentity)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address : String) {
@@ -53,16 +53,16 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct FakeTransport: ActorTransport {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
   }
 
   func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
-  throws -> ActorResolved<Act>
+  throws -> Act?
       where Act: DistributedActor {
-    .makeProxy
+    return nil
   }
 
   func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
@@ -81,9 +81,12 @@ struct FakeTransport: ActorTransport {
   }
 }
 
+@available(SwiftStdlib 5.6, *)
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
   let transport = FakeTransport()
@@ -98,7 +101,7 @@ func test_remote() async {
   print("done") // CHECK: done
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     await test_remote()

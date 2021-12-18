@@ -1381,7 +1381,7 @@ class infer_instanceVar1 {
   var var_CFunctionPointer_1: @convention(c) () -> ()
   // CHECK-LABEL: @objc var var_CFunctionPointer_invalid_1: Int
   var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{@convention attribute only applies to function types}}
-  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: @convention(c) (PlainStruct) -> Int
+  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: <<error type>>
   var var_CFunctionPointer_invalid_2: @convention(c) (PlainStruct) -> Int // expected-error {{'(PlainStruct) -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
   
   // <rdar://problem/20918869> Confusing diagnostic for @convention(c) throws
@@ -1868,7 +1868,7 @@ class HasIBOutlet {
 // CHECK-LABEL: {{^}}class HasIBAction {
 class HasIBAction {
   @IBAction func goodAction(_ sender: AnyObject?) { }
-  // CHECK: {{^}}  @objc @IBAction func goodAction(_ sender: AnyObject?) {
+  // CHECK: {{^}}  @objc @IBAction @MainActor func goodAction(_ sender: AnyObject?) {
 
   @IBAction func badAction(_ sender: PlainStruct?) { }
   // expected-error@-1{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}

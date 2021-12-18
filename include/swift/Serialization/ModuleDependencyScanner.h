@@ -55,7 +55,7 @@ namespace swift {
           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-          bool IsFramework) override;
+          bool skipBuildingInterface, bool IsFramework) override;
 
       virtual void collectVisibleTopLevelModuleNames(
           SmallVectorImpl<Identifier> &names) const override {
@@ -117,7 +117,7 @@ namespace swift {
           std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                                                 bool IsFramework) override;
+          bool skipBuildingInterface, bool IsFramework) override;
 
       static bool classof(const ModuleDependencyScanner *MDS) {
         return MDS->getKind() == MDS_placeholder;

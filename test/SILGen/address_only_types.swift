@@ -16,7 +16,7 @@ protocol Unloadable {
 // CHECK-LABEL: sil hidden [ossa] @$s18address_only_types0a1_B9_argument{{[_0-9a-zA-Z]*}}F
 func address_only_argument(_ x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : $*Unloadable):
-  // CHECK: debug_value_addr [[XARG]]
+  // CHECK: debug_value [[XARG]] {{.*}} expr op_deref
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
 }
@@ -31,7 +31,7 @@ func address_only_ignored_argument(_: Unloadable) {
 // CHECK-LABEL: sil hidden [ossa] @$s18address_only_types0a1_B7_return{{[_0-9a-zA-Z]*}}F
 func address_only_return(_ x: Unloadable, y: Int) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable, [[XARG:%[0-9]+]] : $*Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64):
-  // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
+  // CHECK-NEXT: debug_value [[XARG]] : $*Unloadable, let, name "x", {{.*}} expr op_deref
   // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
   // CHECK-NEXT: copy_addr [[XARG]] to [initialization] [[RET]]
   // CHECK-NEXT: [[VOID:%[0-9]+]] = tuple ()
@@ -115,7 +115,7 @@ func address_only_call_1_ignore_return() {
 // CHECK-LABEL: sil hidden [ossa] @$s18address_only_types0a1_B7_call_2{{[_0-9a-zA-Z]*}}F
 func address_only_call_2(_ x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : $*Unloadable):
-  // CHECK: debug_value_addr [[XARG]] : $*Unloadable
+  // CHECK: debug_value [[XARG]] : $*Unloadable, {{.*}} expr op_deref
   some_address_only_function_2(x)
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @$s18address_only_types05some_a1_B11_function_2{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]([[XARG]])
@@ -197,7 +197,7 @@ func address_only_assignment_from_temp_to_property() {
 // CHECK-LABEL: sil hidden [ossa] @$s18address_only_types0a1_B31_assignment_from_lv_to_property{{[_0-9a-zA-Z]*}}F
 func address_only_assignment_from_lv_to_property(_ v: Unloadable) {
   // CHECK: bb0([[VARG:%[0-9]+]] : $*Unloadable):
-  // CHECK: debug_value_addr [[VARG]] : $*Unloadable
+  // CHECK: debug_value [[VARG]] : $*Unloadable, {{.*}} expr op_deref
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: copy_addr [[VARG]] to [initialization] [[TEMP]]
   // CHECK: [[SETTER:%[0-9]+]] = function_ref @$s18address_only_types11global_propAA10Unloadable_pvs

@@ -70,7 +70,7 @@ class PriorityQueue {
     while (ind != 0) {
       let p = getParentIndex(ind)
       if heap[p].cost > c {
-        Swap(p, with: ind)
+        swap(p, with: ind)
         ind = p
       } else {
         break
@@ -83,7 +83,7 @@ class PriorityQueue {
     if (heap.isEmpty) {
       return nil
     }
-    Swap(0, with:heap.count-1)
+    swap(0, with:heap.count-1)
     let r = heap.removeLast()
     graphIndexToHeapIndexMap[r.to] = nil
     bubbleDown(0)
@@ -111,21 +111,21 @@ class PriorityQueue {
       if (heap[ind].cost <= heap[min].cost) {
         break
       }
-      Swap(ind, with: min)
+      swap(ind, with: min)
       ind = min
     }
   }
 
   // Swaps elements I and J in the heap and correspondingly updates
   // graphIndexToHeapIndexMap.
-  func Swap(_ i: Int, with j : Int) {
+  func swap(_ i: Int, with j : Int) {
     if (i == j) {
       return
     }
     (heap[i], heap[j]) = (heap[j], heap[i])
-    let (I, J) = (heap[i].to, heap[j].to)
-    (graphIndexToHeapIndexMap[I], graphIndexToHeapIndexMap[J]) =
-    (graphIndexToHeapIndexMap[J], graphIndexToHeapIndexMap[I])
+    let (i2, j2) = (heap[i].to, heap[j].to)
+    (graphIndexToHeapIndexMap[i2], graphIndexToHeapIndexMap[j2]) =
+    (graphIndexToHeapIndexMap[j2], graphIndexToHeapIndexMap[i2])
   }
 
   // Dumps the heap.
@@ -182,7 +182,7 @@ extension Edge : Hashable {
   }
 }
 
-func Prims(_ graph : Array<GraphNode>, _ fun : (Int, Int) -> Double) -> Array<Int?> {
+func prims(_ graph : Array<GraphNode>, _ fun : (Int, Int) -> Double) -> Array<Int?> {
   var treeEdges = Array<Int?>(repeating:nil, count:graph.count)
 
   let queue = PriorityQueue(Num:graph.count)

@@ -432,6 +432,7 @@ class AbstractionPattern {
     const clang::ObjCMethodDecl *ObjCMethod;
     const clang::CXXMethodDecl *CXXMethod;
     const AbstractionPattern *OrigTupleElements;
+    const void *RawTypePtr;
   };
   CanGenericSignature GenericSig;
 
@@ -529,7 +530,7 @@ class AbstractionPattern {
     OrigType = origType;
     GenericSig = CanGenericSignature();
     if (OrigType->hasTypeParameter()) {
-      assert(OrigType == signature->getCanonicalTypeInContext(origType));
+      assert(OrigType == signature.getCanonicalTypeInContext(origType));
       GenericSig = signature;
     }
   }
@@ -1274,7 +1275,7 @@ public:
   /// pattern?
   bool matchesTuple(CanTupleType substType);
 
-  bool isTuple() {
+  bool isTuple() const {
     switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("querying invalid abstraction pattern!");
@@ -1386,8 +1387,59 @@ public:
       Lowering::TypeConverter &TC
   ) const;
   
+  /// How values are passed or returned according to this abstraction pattern.
+  enum CallingConventionKind {
+    // Value is passed or returned directly as a unit.
+    Direct,
+    // Value is passed or returned indirectly through memory.
+    Indirect,
+    // Value is a tuple that is destructured, and each element is considered
+    // independently.
+    Destructured,
+  };
+  
+  /// If this abstraction pattern appears in function return position, how is
+  /// the corresponding value returned?
+  CallingConventionKind getResultConvention(TypeConverter &TC) const;
+  
+  /// If this abstraction pattern appears in function parameter position, how
+  /// is the corresponding value passed?
+  CallingConventionKind getParameterConvention(TypeConverter &TC) const;
+  
+  /// Generate the abstraction pattern for lowering the substituted SIL
+  /// function type for a function type matching this abstraction pattern.
+  ///
+  /// This abstraction pattern must be a function abstraction pattern, matching
+  /// \c substType .
+  ///
+  /// Where the abstraction pattern involves substitutable types, in order
+  /// to minimize function conversions, we extract those positions out into
+  /// fresh generic arguments, with the minimum set of constraints necessary
+  /// to maintain the calling convention (such as passed-directly or
+  /// passed-indirectly) as well as satisfy requirements of where the generic
+  /// argument structurally appears in the type.
+  /// The goal is for similar-shaped generic function types to remain
+  /// canonically equivalent, like `(T, U) -> ()`, `(T, T) -> ()`,
+  /// `(U, T) -> ()` or `(T, T.A) -> ()` when given substitutions that produce
+  /// the same function types.
+  ///
+  /// Returns a new AbstractionPattern to use for type lowering, as well as
+  /// the SubstitutionMap used to map `substType` into the new abstraction
+  /// pattern's generic environment, and the coroutine yield type mapped into
+  /// the generic environment of the new abstraction pattern.
+  std::tuple<AbstractionPattern, SubstitutionMap, AbstractionPattern>
+  getSubstFunctionTypePattern(CanAnyFunctionType substType,
+                              TypeConverter &TC,
+                              AbstractionPattern coroutineYieldOrigType,
+                              CanType coroutineYieldSubstType) const;
+  
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;
+  
+  bool operator==(const AbstractionPattern &other) const;
+  bool operator!=(const AbstractionPattern &other) const {
+    return !(*this == other);
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &out,

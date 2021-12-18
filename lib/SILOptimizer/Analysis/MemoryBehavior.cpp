@@ -364,7 +364,6 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
       return true;
 
     switch (user->getKind()) {
-      case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::FixLifetimeInst:
       case SILInstructionKind::LoadInst:
       case SILInstructionKind::StoreInst:
@@ -374,6 +373,10 @@ static bool hasEscapingUses(SILValue address, int &numChecks) {
       case SILInstructionKind::EndAccessInst:
         // Those instructions have no result and cannot escape the address.
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (DebugValueInst::hasAddrVal(user))
+          break;
+        return true;
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
       case SILInstructionKind::BeginApplyInst:
@@ -562,6 +565,17 @@ static SILValue getBeginScopeInst(SILValue V) {
   }
   if (BorrowedValue borrowedObj = getSingleBorrowIntroducingValue(object)) {
     return borrowedObj.value;
+  }
+  if (!object->getFunction()->hasOwnership()) {
+    // In non-OSSA, do a quick check if the object is a guaranteed function
+    // argument.
+    // Note that in OSSA, getSingleBorrowIntroducingValue will detect a
+    // guaranteed argument.
+    SILValue root = findOwnershipReferenceAggregate(object);
+    if (auto *funcArg = dyn_cast<SILFunctionArgument>(root)) {
+      if (funcArg->getArgumentConvention().isGuaranteedConvention())
+        return funcArg;
+    }
   }
   return SILValue();
 }

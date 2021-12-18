@@ -2,8 +2,8 @@ target_sources(swiftSILOptimizer PRIVATE
   AADumper.cpp
   AccessSummaryDumper.cpp
   AccessPathVerification.cpp
-  AccessedStorageAnalysisDumper.cpp
-  AccessedStorageDumper.cpp
+  AccessStorageAnalysisDumper.cpp
+  AccessStorageDumper.cpp
   BasicCalleePrinter.cpp
   BasicInstructionPropertyDumper.cpp
   BugReducerTester.cpp
@@ -25,6 +25,7 @@ target_sources(swiftSILOptimizer PRIVATE
   LoopInfoPrinter.cpp
   LoopRegionPrinter.cpp
   MemBehaviorDumper.cpp
+  ModulePrinter.cpp
   RCIdentityDumper.cpp
   SerializeSILPass.cpp
   SILDebugInfoGenerator.cpp

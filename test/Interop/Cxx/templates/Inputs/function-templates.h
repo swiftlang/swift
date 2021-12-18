@@ -61,6 +61,8 @@ template <class T> void constLvalueReference(const T &) {}
 
 template <class T> void forwardingReference(T &&) {}
 
+template <class T> void PointerTemplateParameter(T*){}
+
 namespace Orbiters {
 
 template<class T>

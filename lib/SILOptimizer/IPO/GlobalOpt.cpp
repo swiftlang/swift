@@ -26,7 +26,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "llvm/ADT/MapVector.h"
@@ -313,6 +313,10 @@ bool SILGlobalOpt::isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG,
                                                    SILFunction *globalAddrF) {
   if (SILG->isLet())
     return true;
+
+  // Don't replace loads from `var` globals when compiled with -Onone.
+  if (Module->getOptions().OptMode == OptimizationMode::NoOptimization)
+    return false;
 
   // If we should skip this, it is probably because there are multiple stores.
   // Return false if there are multiple stores or no stores.
@@ -768,10 +772,6 @@ bool SILGlobalOpt::run() {
   do {
     changed = false;
     for (auto &InitCalls : GlobalInitCallMap) {
-      // Don't optimize functions that are marked with the opt.never attribute.
-      if (!InitCalls.first->shouldOptimize())
-        continue;
-
       // Try to create a static initializer for the global and replace all uses
       // of the global by this constant value.
       changed |= optimizeInitializer(InitCalls.first, InitCalls.second);
@@ -787,6 +787,10 @@ bool SILGlobalOpt::run() {
 
     optimizeGlobalAccess(Init.first, Init.second);
   }
+
+  /// Don't perform the remaining optimizations when compiled with -Onone.
+  if (Module->getOptions().OptMode == OptimizationMode::NoOptimization)
+    return HasChanged;
 
   SmallVector<SILGlobalVariable *, 8> addrGlobals;
   for (auto &addrPair : GlobalAddrMap) {

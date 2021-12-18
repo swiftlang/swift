@@ -56,6 +56,7 @@ TYPE_ATTR(noDerivative)
 TYPE_ATTR(async)
 TYPE_ATTR(Sendable)
 TYPE_ATTR(unchecked)
+TYPE_ATTR(_typeSequence)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -426,7 +427,12 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   NotSerialized |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   70)
-// NOTE: 71 is unused
+DECL_ATTR(_typeSequence, TypeSequence,
+  OnGenericTypeParam |
+  UserInaccessible |
+  NotSerialized |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  71)
 // NOTE: 72 is unused
 DECL_ATTR(_optimize, Optimize,
   OnAbstractFunction | OnSubscript | OnVar |
@@ -599,7 +605,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
   106)
 
 SIMPLE_DECL_ATTR(Sendable, Sendable,
-  OnFunc | OnConstructor | OnAccessor |
+  OnFunc | OnConstructor | OnAccessor | OnAnyClangDecl |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   107)
@@ -629,15 +635,8 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   APIBreakingToAdd | APIStableToRemove,
   112)
 
-CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeSendable, UnsafeSendable,
-  OnParam | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  113)
-
-CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeMainActor, UnsafeMainActor,
-  OnParam | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
-  114)
+// 113 was experimental _unsafeSendable and is now unused
+// 114 was experimental _unsafeMainActor and is now unused
 
 SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
   OnParam | UserInaccessible |
@@ -658,17 +657,47 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   APIBreakingToAdd | APIBreakingToRemove,
   118)
 
-SIMPLE_DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
-  OnFunc | OnVar |
-  DistributedOnly | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove |
-  APIBreakingToAdd | APIBreakingToRemove,
-  119)
+// 119 is unused
 
 SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
   OnFunc | UserInaccessible | NotSerialized | OnNominalType |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   120)
+
+DECL_ATTR(_nonSendable, NonSendable,
+  OnNominalType |
+  UserInaccessible | AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove |
+  APIStableToAdd | APIBreakingToRemove,
+  121)
+
+SIMPLE_DECL_ATTR(_noImplicitCopy, NoImplicitCopy,
+  UserInaccessible |
+  ABIStableToAdd | ABIBreakingToRemove |
+  APIStableToAdd | APIBreakingToRemove |
+  OnParam | OnVar,
+  122)
+
+SIMPLE_DECL_ATTR(_noLocks, NoLocks,
+  OnAbstractFunction | OnSubscript | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  123)
+
+SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
+  OnAbstractFunction | OnSubscript | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  124)
+
+SIMPLE_DECL_ATTR(_predatesConcurrency, PredatesConcurrency,
+  OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript |
+  OnEnumElement | UserInaccessible |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  125)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
+  DeclModifier | OnParam | OnVar |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  126)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.

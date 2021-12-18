@@ -333,16 +333,21 @@ void DestroyHoisting::getUsedLocationsOfOperands(Bits &bits, SILInstruction *I) 
   }
 }
 
-// Set all bits of locations which instruction \p I is using. It's including
-// parent and sub-locations (see comment in getUsedLocationsOfAddr).
+// NOTE: All instructions handled in
+// MemoryLocations::analyzeLocationUsesRecursively should also be handled
+// explicitly here.
+// Set all bits of locations which instruction \p I is using.
+// It's including parent and sub-locations (see comment in
+// getUsedLocationsOfAddr).
 void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
   switch (I->getKind()) {
-    case SILInstructionKind::EndBorrowInst:
-      if (auto *LBI = dyn_cast<LoadBorrowInst>(
-                                        cast<EndBorrowInst>(I)->getOperand())) {
+    case SILInstructionKind::EndBorrowInst: {
+      auto op = cast<EndBorrowInst>(I)->getOperand();
+      if (auto *LBI = dyn_cast<LoadBorrowInst>(op)) {
         getUsedLocationsOfAddr(bits, LBI->getOperand());
       }
       break;
+    }
     case SILInstructionKind::EndApplyInst:
       // Operands passed to begin_apply are alive throughout an end_apply ...
       getUsedLocationsOfOperands(bits, cast<EndApplyInst>(I)->getBeginApply());
@@ -351,6 +356,19 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
       // ... or abort_apply.
       getUsedLocationsOfOperands(bits, cast<AbortApplyInst>(I)->getBeginApply());
       break;
+    case SILInstructionKind::EndAccessInst:
+      getUsedLocationsOfOperands(bits,
+                                 cast<EndAccessInst>(I)->getBeginAccess());
+      break;
+    // These instructions do not access the memory location for read/write
+    case SILInstructionKind::StructElementAddrInst:
+    case SILInstructionKind::TupleElementAddrInst:
+    case SILInstructionKind::WitnessMethodInst:
+    case SILInstructionKind::OpenExistentialAddrInst:
+      break;
+    case SILInstructionKind::InitExistentialAddrInst:
+    case SILInstructionKind::InitEnumDataAddrInst:
+    case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     case SILInstructionKind::SelectEnumAddrInst:
     case SILInstructionKind::ExistentialMetatypeInst:
     case SILInstructionKind::ValueMetatypeInst:
@@ -368,11 +386,12 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::YieldInst:
+    case SILInstructionKind::SwitchEnumAddrInst:
       getUsedLocationsOfOperands(bits, I);
       break;
-    case SILInstructionKind::DebugValueAddrInst:
+    case SILInstructionKind::DebugValueInst:
     case SILInstructionKind::DestroyAddrInst:
-      // destroy_addr and debug_value_addr are handled specially.
+      // destroy_addr and debug_value are handled specially.
       break;
     default:
       break;
@@ -427,7 +446,7 @@ void DestroyHoisting::moveDestroys(BitDataflow &dataFlow) {
                          return activeDestroys == dataFlow[P].exitSet;
                        }));
 
-    // Delete all destroy_addr and debug_value_addr which are scheduled for
+    // Delete all destroy_addr and debug_value which are scheduled for
     // removal.
     processRemoveList(toRemove);
   }
@@ -462,15 +481,15 @@ void DestroyHoisting::moveDestroysInBlock(
     if (destroyedLoc >= 0) {
       activeDestroys.set(destroyedLoc);
       toRemove.push_back(&I);
-    } else if (auto *DVA = dyn_cast<DebugValueAddrInst>(&I)) {
-      // debug_value_addr does not count as real use of a location. If we are
-      // moving a destroy_addr above a debug_value_addr, just delete that
-      // debug_value_addr.
-      auto *dvaLoc = locations.getLocation(DVA->getOperand());
+    } else if (auto *DV = DebugValueInst::hasAddrVal(&I)) {
+      // debug_value w/ address value does not count as real use of a location.
+      // If we are moving a destroy_addr above a debug_value, just delete that
+      // debug_value.
+      auto *dvaLoc = locations.getLocation(DV->getOperand());
       if (dvaLoc && locationOverlaps(dvaLoc, activeDestroys))
-        toRemove.push_back(DVA);
+        toRemove.push_back(DV);
     } else if (I.mayHaveSideEffects()) {
-      // Delete all destroy_addr and debug_value_addr which are scheduled for
+      // Delete all destroy_addr and debug_value which are scheduled for
       // removal.
       processRemoveList(toRemove);
     }
@@ -486,7 +505,7 @@ void DestroyHoisting::insertDestroys(Bits &toInsert, Bits &activeDestroys,
   if (toInsert.none())
     return;
 
-  // The removeList contains destroy_addr (and debug_value_addr) instructions
+  // The removeList contains destroy_addr (and debug_value) instructions
   // which we want to delete, but we didn't see any side-effect instructions
   // since then. There is no value in moving a destroy_addr over side-effect-
   // free instructions (it could even trigger creating redundant address
@@ -503,10 +522,10 @@ void DestroyHoisting::insertDestroys(Bits &toInsert, Bits &activeDestroys,
         activeDestroys.reset(destroyedLoc);
         return true;
       }
-      if (auto *DVA = dyn_cast<DebugValueAddrInst>(I)) {
-        // Also keep debug_value_addr instructions, located before a
+      if (auto *DV = DebugValueInst::hasAddrVal(I)) {
+        // Also keep debug_value instructions, located before a
         // destroy_addr which we won't move.
-        auto *dvaLoc = locations.getLocation(DVA->getOperand());
+        auto *dvaLoc = locations.getLocation(DV->getOperand());
         if (dvaLoc && dvaLoc->selfAndParents.anyCommon(keepDestroyedLocs))
           return true;
       }
@@ -765,18 +784,11 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "*** DestroyHoisting on function: "
                             << F->getName() << " ***\n");
 
-    bool EdgeChanged = splitAllCriticalEdges(*F, nullptr, nullptr);
-
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
 
     DestroyHoisting CM(F, DA);
     bool InstChanged = CM.hoistDestroys();
 
-    if (EdgeChanged) {
-      // We split critical edges.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-      return;
-    }
     if (InstChanged) {
       // We moved instructions.
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

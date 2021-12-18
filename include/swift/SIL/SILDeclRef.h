@@ -156,8 +156,11 @@ struct SILDeclRef {
     /// The main entry-point function. This may reference a SourceFile for a
     /// top-level main, or a decl for e.g an @main decl.
     EntryPoint,
+
+    /// The asynchronous main entry-point function.
+    AsyncEntryPoint,
   };
-  
+
   /// The AST node represented by this SILDeclRef.
   Loc loc;
   /// The Kind of this SILDeclRef.
@@ -230,6 +233,9 @@ struct SILDeclRef {
 
   /// Produces a SILDeclRef for a synthetic main entry-point such as @main.
   static SILDeclRef getMainDeclEntryPoint(ValueDecl *decl);
+
+  /// Produces a SILDeclRef for the synthesized async main entry-point
+  static SILDeclRef getAsyncMainDeclEntryPoint(ValueDecl *decl);
 
   /// Produces a SILDeclRef for the entry-point of a main FileUnit.
   static SILDeclRef getMainFileEntryPoint(FileUnit *file);

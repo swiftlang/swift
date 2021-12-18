@@ -309,26 +309,29 @@ llvm::PointerType *IRGenModule::getEnumValueWitnessTablePtrTy() {
                                            "swift.enum_vwtable", true);
 }
 
-/// Load a specific witness from a known table.  The result is
-/// always an i8*.
-llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
-                                                     llvm::Value *table,
-                                                     WitnessIndex index,
-                                                     llvm::Value **slotPtr) {
+Address irgen::slotForLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                          llvm::Value *table,
+                                          WitnessIndex index) {
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
   // GEP to the appropriate index, avoiding spurious IR in the trivial case.
   llvm::Value *slot = table;
   if (index.getValue() != 0)
     slot = IGF.Builder.CreateConstInBoundsGEP1_32(
-       table->getType()->getPointerElementType(), table, index.getValue());
+        table->getType()->getPointerElementType(), table, index.getValue());
 
-  if (slotPtr) *slotPtr = slot;
+  return Address(slot, IGF.IGM.getPointerAlignment());
+}
 
-  auto witness =
-    IGF.Builder.CreateLoad(Address(slot, IGF.IGM.getPointerAlignment()));
-  IGF.setInvariantLoad(witness);
-  return witness;
+/// Load a specific witness from a known table.  The result is
+/// always an i8*.
+llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                     llvm::Value *table,
+                                                     WitnessIndex index,
+                                                     llvm::Value **slotPtr) {
+  auto slot = slotForLoadOfOpaqueWitness(IGF, table, index);
+  if (slotPtr) *slotPtr = slot.getAddress();
+  return IGF.emitInvariantLoad(slot);
 }
 
 /// Load a specific witness from a known table.  The result is
@@ -340,7 +343,8 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
   // GEP to the appropriate index.
-  llvm::Value *slot = IGF.Builder.CreateInBoundsGEP(table, index);
+  llvm::Value *slot = IGF.Builder.CreateInBoundsGEP(
+      table->getType()->getScalarType()->getPointerElementType(), table, index);
 
   if (slotPtr) *slotPtr = slot;
 
@@ -529,15 +533,16 @@ irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
 StackAddress IRGenFunction::emitDynamicAlloca(SILType T,
                                               const llvm::Twine &name) {
   llvm::Value *size = emitLoadOfSize(*this, T);
-  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), name);
+  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), true, name);
 }
 
 StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
                                               llvm::Value *arraySize,
                                               Alignment align,
+                                              bool allowTaskAlloc,
                                               const llvm::Twine &name) {
   // Async functions call task alloc.
-  if (isAsync()) {
+  if (allowTaskAlloc && isAsync()) {
     llvm::Value *byteCount;
     auto eltSize = IGM.DataLayout.getTypeAllocSize(eltTy);
     if (eltSize == 1) {
@@ -552,6 +557,8 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     return {address, address.getAddress()};
   // In coroutines, call llvm.coro.alloca.alloc.
   } else if (isCoroutine()) {
+    // NOTE: llvm does not support dynamic allocas in coroutines.
+
     // Compute the number of bytes to allocate.
     llvm::Value *byteCount;
     auto eltSize = IGM.DataLayout.getTypeAllocSize(eltTy);
@@ -602,9 +609,10 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 
 /// Deallocate dynamic alloca's memory if requested by restoring the stack
 /// location before the dynamic alloca's call.
-void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
+void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
+                                                bool allowTaskDealloc) {
   // Async function use taskDealloc.
-  if (isAsync() && address.getAddress().isValid()) {
+  if (allowTaskDealloc && isAsync() && address.getAddress().isValid()) {
     emitTaskDealloc(Address(address.getExtraInfo(), address.getAlignment()));
     return;
   }
@@ -613,6 +621,8 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
   // for a partial_apply [stack] that did not need a context object on the
   // stack.
   else if (isCoroutine() && address.getAddress().isValid()) {
+    // NOTE: llvm does not support dynamic allocas in coroutines.
+
     auto allocToken = address.getExtraInfo();
     assert(allocToken && "dynamic alloca in coroutine without alloc token?");
     auto freeFn = llvm::Intrinsic::getDeclaration(
@@ -1249,79 +1259,6 @@ Address irgen::emitProjectValueInBuffer(IRGenFunction &IGF, SILType type,
 
   auto addressOfValue = Builder.CreateBitCast(call, storagePtrTy);
   return Address(addressOfValue, Alignment(1));
-}
-
-static llvm::Constant *getDeallocateValueInBufferFunction(IRGenModule &IGM) {
-
-  llvm::Type *argTys[] = {IGM.TypeMetadataPtrTy, IGM.OpaquePtrTy};
-
-  llvm::SmallString<40> fnName("__swift_deallocate_value_buffer");
-
-  return IGM.getOrCreateHelperFunction(
-      fnName, IGM.VoidTy, argTys,
-      [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        auto *metadata = &*(it++);
-        auto buffer = Address(&*(it++), Alignment(1));
-        auto &Builder = IGF.Builder;
-
-        // Dynamically check whether this type is inline or needs an allocation.
-        llvm::Value *isInline, *flags;
-        std::tie(isInline, flags) = emitLoadOfIsInline(IGF, metadata);
-        auto *outlineBB = IGF.createBasicBlock("outline.deallocateValueInBuffer");
-        auto *doneBB = IGF.createBasicBlock("done");
-
-        Builder.CreateCondBr(isInline, doneBB, outlineBB);
-
-        Builder.emitBlock(outlineBB);
-        {
-          auto *size = emitLoadOfSize(IGF, metadata);
-          auto *alignMask = emitAlignMaskFromFlags(IGF, flags);
-          auto *ptr = Builder.CreateLoad(Address(
-              Builder.CreateBitCast(buffer.getAddress(), IGM.Int8PtrPtrTy),
-              buffer.getAlignment()));
-          IGF.emitDeallocRawCall(ptr, size, alignMask);
-          Builder.CreateBr(doneBB);
-        }
-
-        Builder.emitBlock(doneBB);
-        Builder.CreateRetVoid();
-      },
-      true /*noinline*/);
-}
-
-void irgen::emitDeallocateValueInBuffer(IRGenFunction &IGF,
-                                 SILType type,
-                                 Address buffer) {
-  // Handle FixedSize types.
-  auto &IGM = IGF.IGM;
-  auto &Builder = IGF.Builder;
-  if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&IGF.getTypeInfo(type))) {
-    auto packing = fixedTI->getFixedPacking(IGM);
-
-    // Inline representation.
-    if (packing == FixedPacking::OffsetZero)
-      return;
-
-    // Outline representation.
-    assert(packing == FixedPacking::Allocate && "Expect non dynamic packing");
-    auto size = fixedTI->getStaticSize(IGM);
-    auto alignMask = fixedTI->getStaticAlignmentMask(IGM);
-    auto *ptr = Builder.CreateLoad(Address(
-        Builder.CreateBitCast(buffer.getAddress(), IGM.Int8PtrPtrTy),
-        buffer.getAlignment()));
-    IGF.emitDeallocRawCall(ptr, size, alignMask);
-    return;
-  }
-
-  // Dynamic packing.
-  auto *projectFun = getDeallocateValueInBufferFunction(IGF.IGM);
-  auto *metadata = IGF.emitTypeMetadataRefForLayout(type);
-  auto *call = Builder.CreateCall(
-      projectFun,
-      {metadata, Builder.CreateBitCast(buffer.getAddress(), IGM.OpaquePtrTy)});
-  call->setCallingConv(IGF.IGM.DefaultCC);
-  call->setDoesNotThrow();
 }
 
 llvm::Value *

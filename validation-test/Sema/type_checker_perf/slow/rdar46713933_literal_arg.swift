@@ -7,6 +7,6 @@ func wrap<T: ExpressibleByFloatLiteral>(_ key: String, _ value: T) -> T { return
 func wrap<T: ExpressibleByStringLiteral>(_ key: String, _ value: T) -> T { return value }
 
 func wrapped() -> Int {
-  return wrap("1", 1) + wrap("1", 1) + wrap("1", 1) + wrap("1", 1)
+  return wrap("1", 1) + wrap("1", 1) + wrap("1", 1) + wrap("1", 1) + wrap("1", 1) + wrap("1", 1)
   // expected-error@-1 {{the compiler is unable to type-check this expression in reasonable time}}
 }

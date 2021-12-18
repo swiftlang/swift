@@ -17,4 +17,8 @@ public struct Type {
   
   public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
   public var isObject: Bool { !isAddress }
+  
+  public func isTrivial(in function: Function) -> Bool {
+    return SILType_isTrivial(bridged, function.bridged) != 0
+  }
 }

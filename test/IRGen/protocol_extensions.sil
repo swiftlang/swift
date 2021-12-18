@@ -16,7 +16,7 @@ extension P1 {
 // CHECK-LABEL: define hidden swiftcc void @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_
 sil hidden @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@convention(method) <Self where Self : P1> (@in Self) -> () {
 bb0(%0 : $*Self):
-  debug_value_addr %0 : $*Self, let, name "self" // id: %1
+  debug_value %0 : $*Self, let, name "self", expr op_deref // id: %1
   %2 = witness_method $Self, #P1.reqP1a : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> () // user: %3
   %3 = apply %2<Self>(%0) : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Self                        // id: %4
@@ -27,7 +27,7 @@ bb0(%0 : $*Self):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_
 sil @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_ : $@convention(method) <Self where Self : P1> (@in Self) -> () {
 bb0(%0 : $*Self):
-  debug_value_addr %0 : $*Self, let, name "self" // id: %1
+  debug_value %0 : $*Self, let, name "self", expr op_deref // id: %1
   // function_ref protocol_extensions.P1.extP1a <A : protocol_extensions.P1>(protocol_extensions.P1.Self)() -> ()
   %2 = function_ref @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in τ_0_0) -> () // user: %5
   %3 = alloc_stack $Self                          // users: %4, %5, %6

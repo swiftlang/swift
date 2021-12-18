@@ -133,6 +133,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is an "inherited" type.
   Inherited,
+
+  /// Whether this is a custom attribute.
+  CustomAttr
 };
 
 /// Options that determine how type resolution should work.
@@ -215,6 +218,7 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::Inherited:
+    case Context::CustomAttr:
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -299,9 +303,6 @@ private:
   /// The generic environment used to map to archetypes.
   GenericEnvironment *genericEnv;
 
-  /// The generic signature to use for type resolution.
-  GenericSignature genericSig;
-
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
                  TypeResolutionOptions options,
                  OpenUnboundGenericTypeFn unboundTyOpener,
@@ -310,10 +311,6 @@ private:
         unboundTyOpener(unboundTyOpener),
         placeholderHandler(placeholderHandler),
         genericEnv(nullptr) {}
-
-  /// Retrieves the generic signature for the context, or NULL if there is
-  /// no generic signature to resolve types.
-  GenericSignature getGenericSignature() const;
 
 public:
   /// Form a type resolution for the structure of a type, which does not
@@ -331,22 +328,29 @@ public:
                OpenUnboundGenericTypeFn unboundTyOpener,
                HandlePlaceholderTypeReprFn placeholderHandler);
 
-  /// Form a type resolution for a contextual type, which is a complete
-  /// description of the type using the archetypes of the given declaration
-  /// context.
+  /// Form a type resolution for an interface type, which is a complete
+  /// description of the type using generic parameters.
   static TypeResolution
-  forContextual(DeclContext *dc, TypeResolutionOptions opts,
-                OpenUnboundGenericTypeFn unboundTyOpener,
-                HandlePlaceholderTypeReprFn placeholderHandler);
+  forInterface(DeclContext *dc, GenericEnvironment *genericEnv,
+               TypeResolutionOptions opts,
+               OpenUnboundGenericTypeFn unboundTyOpener,
+               HandlePlaceholderTypeReprFn placeholderHandler);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given generic
   /// environment.
-  static TypeResolution
-  forContextual(DeclContext *dc, GenericEnvironment *genericEnv,
-                TypeResolutionOptions opts,
-                OpenUnboundGenericTypeFn unboundTyOpener,
-                HandlePlaceholderTypeReprFn placeholderHandler);
+  static Type
+  resolveContextualType(TypeRepr *TyR, DeclContext *dc,
+                        TypeResolutionOptions opts,
+                        OpenUnboundGenericTypeFn unboundTyOpener,
+                        HandlePlaceholderTypeReprFn placeholderHandler,
+                        GenericParamList *silParams = nullptr);
+
+  static Type resolveContextualType(
+      TypeRepr *TyR, DeclContext *dc, GenericEnvironment *genericEnv,
+      TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
+      HandlePlaceholderTypeReprFn placeholderHandler,
+      GenericParamList *silParams = nullptr);
 
 public:
   TypeResolution withOptions(TypeResolutionOptions opts) const;
@@ -372,6 +376,10 @@ public:
     return placeholderHandler;
   }
 
+  /// Retrieves the generic signature for the context, or NULL if there is
+  /// no generic signature to resolve types.
+  GenericSignature getGenericSignature() const;
+
   /// Resolves a TypeRepr to a type.
   ///
   /// Performs name lookup, checking of generic arguments, and so on in order
@@ -383,12 +391,6 @@ public:
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR,
                    GenericParamList *silParams=nullptr) const;
-
-  /// Whether this type resolution uses archetypes (vs. generic parameters).
-  bool usesArchetypes() const;
-
-  /// Map the given type (that involves generic parameters)
-  Type mapTypeIntoContext(Type type) const;
 
   /// Resolve a reference to a member type of the given (dependent) base and
   /// name.

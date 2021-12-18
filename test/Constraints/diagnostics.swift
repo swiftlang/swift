@@ -573,7 +573,7 @@ func r22263468(_ a : String?) {
   // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
   // re-think the way errors in tuple elements are detected because it's currently impossible to detect
   // exactly what went wrong here and aggregate fixes for different elements at the same time.
-  _ = MyTuple(42, a) // expected-error {{tuple type '(Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
+  _ = MyTuple(42, a) // expected-error {{tuple type '(_const Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
 }
 
 // rdar://71829040 - "ambiguous without more context" error for tuple type mismatch.
@@ -1137,7 +1137,7 @@ func badTypes() {
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
+  // expected-error@-1 {{type of expression is ambiguous without more context}}
 }
 
 do {
@@ -1219,14 +1219,14 @@ func voidFuncWithEffects1() throws {
   // expected-note@-2 {{did you mean to add a return type?}}{{35-35= -> <#Return Type#>}}
 }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+@available(SwiftStdlib 5.5, *)
 func voidFuncWithEffects2() async throws {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
 }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+@available(SwiftStdlib 5.5, *)
 // expected-error@+1 {{'async' must precede 'throws'}}
 func voidFuncWithEffects3() throws async {
   return 1
@@ -1234,7 +1234,7 @@ func voidFuncWithEffects3() throws async {
   // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
 }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+@available(SwiftStdlib 5.5, *)
 func voidFuncWithEffects4() async {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
@@ -1247,7 +1247,7 @@ func voidFuncWithEffects5(_ closure: () throws -> Void) rethrows {
   // expected-note@-2 {{did you mean to add a return type?}}{{65-65= -> <#Return Type#>}}
 }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+@available(SwiftStdlib 5.5, *)
 func voidGenericFuncWithEffects<T>(arg: T) async where T: CustomStringConvertible {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}

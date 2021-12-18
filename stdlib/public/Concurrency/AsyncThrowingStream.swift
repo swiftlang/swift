@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncThrowingStream<Element, Failure: Error> {
   public struct Continuation: Sendable {
     /// Indication of the type of termination informed to
@@ -108,7 +108,21 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     }
   }
 
-  let produce: () async throws -> Element?
+  final class _Context {
+    let storage: _Storage?
+    let produce: () async throws -> Element?
+
+    init(storage: _Storage? = nil, produce: @escaping () async throws -> Element?) {
+      self.storage = storage
+      self.produce = produce
+    }
+
+    deinit {
+      storage?.cancel()
+    }
+  }
+
+  let context: _Context
 
   /// Construct a AsyncThrowingStream buffering given an Element type.
   ///
@@ -132,18 +146,30 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     _ build: (Continuation) -> Void
   ) where Failure == Error {
     let storage: _Storage = .create(limit: limit)
-    self.init(unfolding: storage.next)
+    context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
   
   public init(
     unfolding produce: @escaping () async throws -> Element?
   ) where Failure == Error {
-    self.produce = produce
+    let storage: _AsyncStreamCriticalStorage<Optional<() async throws -> Element?>>
+      = .create(produce)
+    context = _Context {
+      return try await withTaskCancellationHandler {
+        guard let result = try await storage.value?() else {
+          storage.value = nil
+          return nil
+        }
+        return result
+      } onCancel: {
+        storage.value = nil
+      }
+    }
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream: AsyncSequence {
   /// The asynchronous iterator for iterating a AsyncThrowingStream.
   ///
@@ -152,20 +178,20 @@ extension AsyncThrowingStream: AsyncSequence {
   /// concurrently and contends with another call to next is a programmer error
   /// and will fatalError.
   public struct Iterator: AsyncIteratorProtocol {
-    let produce: () async throws -> Element?
+    let context: _Context
 
     public mutating func next() async throws -> Element? {
-      return try await produce()
+      return try await context.produce()
     }
   }
 
   /// Construct an iterator.
   public func makeAsyncIterator() -> Iterator {
-    return Iterator(produce: produce)
+    return Iterator(context: context)
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
   /// normally from its suspension point or buffer the value if no awaiting

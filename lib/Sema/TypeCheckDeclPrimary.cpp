@@ -18,19 +18,19 @@
 
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
-#include "TypeChecker.h"
+#include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
-#include "TypeCheckAvailability.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
-#include "MiscDiagnostics.h"
-#include "swift/AST/AccessNotes.h"
-#include "swift/AST/AccessScope.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AccessNotes.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -42,15 +42,15 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
-#include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
@@ -400,14 +400,14 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
     return;
   
   // Make sure it is calling the rawValue constructor
-  if (ctor->getNumArguments() != 1)
+  auto *args = ctor->getArgs();
+  if (!args->isUnary())
     return;
-  if (ctor->getArgumentLabels().front() != VD->getASTContext().Id_rawValue)
+  if (args->getLabel(0) != VD->getASTContext().Id_rawValue)
     return;
   
   // Make sure the rawValue parameter is a '0' integer literal
-  auto *args = cast<TupleExpr>(ctor->getArg());
-  auto intArg = dyn_cast<IntegerLiteralExpr>(args->getElement(0));
+  auto intArg = dyn_cast<IntegerLiteralExpr>(args->getExpr(0));
   if (!intArg)
     return;
   if (intArg->getValue() != 0)
@@ -967,11 +967,65 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
   }
 }
 
+void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,
+                                                  Type inferredType) {
+  assert(writtenType && inferredType &&
+         "Must provide both written and inferred types");
+  assert(writtenType->hasPlaceholder() && "Written type has no placeholder?");
+
+  class PlaceholderNotator
+      : public CanTypeDifferenceVisitor<PlaceholderNotator> {
+  public:
+    bool visitDifferentComponentTypes(CanType t1, CanType t2) {
+      // Never replace anything the user wrote with an error type.
+      if (t2->hasError() || t2->hasUnresolvedType()) {
+        return false;
+      }
+
+      auto *placeholder = t1->getAs<PlaceholderType>();
+      if (!placeholder) {
+        return false;
+      }
+
+      if (auto *origRepr =
+              placeholder->getOriginator().dyn_cast<PlaceholderTypeRepr *>()) {
+        t1->getASTContext()
+            .Diags
+            .diagnose(origRepr->getLoc(),
+                      diag::replace_placeholder_with_inferred_type, t2)
+            .fixItReplace(origRepr->getSourceRange(), t2.getString());
+      }
+      return false;
+    }
+
+    bool check(Type t1, Type t2) {
+      return !visit(t1->getCanonicalType(), t2->getCanonicalType());
+    };
+  };
+
+  PlaceholderNotator().check(writtenType, inferredType);
+}
+
 /// Check the default arguments that occur within this pattern.
 static void checkDefaultArguments(ParameterList *params) {
   // Force the default values in case they produce diagnostics.
-  for (auto *param : *params)
-    (void)param->getTypeCheckedDefaultExpr();
+  for (auto *param : *params) {
+    auto ifacety = param->getInterfaceType();
+    auto *expr = param->getTypeCheckedDefaultExpr();
+    if (!ifacety->hasPlaceholder()) {
+      continue;
+    }
+
+    // Placeholder types are banned for all parameter decls. We try to use the
+    // freshly-checked default expression's contextual type to suggest a
+    // reasonable type to insert.
+    param->diagnose(diag::placeholder_type_not_allowed_in_parameter)
+        .highlight(param->getSourceRange());
+    if (expr && !expr->getType()->hasError()) {
+      TypeChecker::notePlaceholderReplacementTypes(
+          ifacety, expr->getType()->mapTypeOutOfContext());
+    }
+  }
 }
 
 Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
@@ -1410,28 +1464,6 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
-void TypeChecker::checkResultType(Type resultType,
-                                  DeclContext *owner) {
-//  // Only distributed functions have special requirements on return types.
-//  if (!owner->isDistributed())
-//    return;
-//
-//  auto conformanceDC = owner->getConformanceContext();
-//
-//  // Result type of distributed functions must be Codable.
-//  auto target =
-//      conformanceDC->mapTypeIntoContext(it->second->getValueInterfaceType());
-//  if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
-//      .isInvalid()) {
-//    TypeLoc typeLoc = {
-//        it->second->getTypeReprOrParentPatternTypeRepr(),
-//        it->second->getType(),
-//    };
-//    it->second->diagnose(diag::codable_non_conforming_property_here,
-//                         derived.getProtocolType(), typeLoc);
-//    propertiesAreValid = false;
-}
-
 void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
   SmallVector<VarDecl *, 2> boundVars;
   pattern->collectVariables(boundVars);
@@ -1659,8 +1691,6 @@ public:
 
     DeclVisitor<DeclChecker>::visit(decl);
 
-    TypeChecker::checkUnsupportedProtocolType(decl);
-
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = getASTContext();
       TypeChecker::checkForForbiddenPrefix(Context, VD->getBaseName());
@@ -1733,12 +1763,19 @@ public:
 
         auto &diags = ID->getASTContext().Diags;
         InFlightDiagnostic inFlight =
-            diags.diagnose(ID, diag::warn_public_import_of_private_module,
+            diags.diagnose(ID, diag::error_public_import_of_private_module,
                            target->getName(), importer->getName());
         if (ID->getAttrs().isEmpty()) {
            inFlight.fixItInsert(ID->getStartLoc(),
                               "@_implementationOnly ");
         }
+
+        static bool treatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
+#ifndef NDEBUG
+        treatAsError = true;
+#endif
+        if (!treatAsError)
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
     }
   }
@@ -1904,8 +1941,11 @@ public:
 
     auto &Ctx = getASTContext();
     for (auto i : range(PBD->getNumPatternEntries())) {
-      const auto *entry = evaluateOrDefault(
-          Ctx.evaluator, PatternBindingEntryRequest{PBD, i}, nullptr);
+      const auto *entry =
+          PBD->isFullyValidated(i)
+              ? &PBD->getPatternList()[i]
+              : evaluateOrDefault(Ctx.evaluator,
+                                  PatternBindingEntryRequest{PBD, i}, nullptr);
       assert(entry && "No pattern binding entry?");
 
       const auto *Pat = PBD->getPattern(i);
@@ -2231,7 +2271,7 @@ public:
       visit(member);
 
     checkInheritanceClause(ED);
-
+    diagnoseMissingExplicitSendable(ED);
     checkAccessControl(ED);
 
     TypeChecker::checkPatternBindingCaptures(ED);
@@ -2281,6 +2321,7 @@ public:
     TypeChecker::checkPatternBindingCaptures(SD);
 
     checkInheritanceClause(SD);
+    diagnoseMissingExplicitSendable(SD);
 
     checkAccessControl(SD);
 
@@ -2532,6 +2573,7 @@ public:
     }
 
     checkInheritanceClause(CD);
+    diagnoseMissingExplicitSendable(CD);
 
     checkAccessControl(CD);
 
@@ -2694,7 +2736,6 @@ public:
       checkAccessControl(FD);
 
       TypeChecker::checkParameterList(FD->getParameters(), FD);
-      TypeChecker::checkResultType(FD->getResultInterfaceType(), FD);
     }
 
     TypeChecker::checkDeclAttributes(FD);
@@ -2777,7 +2818,7 @@ public:
     if (FD->getDeclContext()->isTypeContext()) {
       if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
         auto selfNominal = FD->getDeclContext()->getSelfNominalTypeDecl();
-        auto isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
+        auto isProtocol = isa_and_nonnull<ProtocolDecl>(selfNominal);
         // We did not find 'Self'. Complain.
         FD->diagnose(diag::operator_in_unrelated_type,
                      FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
@@ -2940,6 +2981,9 @@ public:
     checkAccessControl(ED);
 
     checkExplicitAvailability(ED);
+
+    if (nominal->isDistributedActor())
+      TypeChecker::checkDistributedActor(dyn_cast<ClassDecl>(nominal));
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

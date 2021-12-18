@@ -163,15 +163,14 @@ extension Dependent : Associate {
   public typealias X = (T, T)
 }
 
-// CHECK-LABEL: @"\01l_protocols"
-// CHECK-SAME: @"$s28protocol_conformance_records8RuncibleMp"
-// CHECK-SAME: @"$s28protocol_conformance_records5SpoonMp"
+// CHECK-LABEL: @"$s28protocol_conformance_records9AssociateHr" = private constant
+// CHECK-LABEL: @"$s28protocol_conformance_records8RuncibleHr" = private constant
+// CHECK-LABEL: @"$s28protocol_conformance_records5SpoonHr" = private constant
 
-// CHECK-LABEL: @"\01l_protocol_conformances" = private constant
-// CHECK-SAME: @"$s28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc"
-// CHECK-SAME: @"$s28protocol_conformance_records15NativeClassTypeCAA8RuncibleAAMc"
-// CHECK-SAME: @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAMc"
-// CHECK-SAME: @"$s16resilient_struct4SizeV28protocol_conformance_records8RuncibleADMc"
-// CHECK-SAME: @"$s28protocol_conformance_records8ConcreteVAA20AssociateConformanceAAMc"
-// CHECK-SAME: @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlMc"
-// CHECK-SAME: @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc"
+// CHECK-LABEL: @"$s28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAHc" = private constant
+// CHECK-LABEL: @"$s28protocol_conformance_records15NativeClassTypeCAA8RuncibleAAHc" = private constant
+// CHECK-LABEL: @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAHc" = private constant
+// CHECK-LABEL: @"$s16resilient_struct4SizeV28protocol_conformance_records8RuncibleADHc" = private constant
+// CHECK-LABEL: @"$s28protocol_conformance_records8ConcreteVAA20AssociateConformanceAAHc" = private constant
+// CHECK-LABEL: @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlHc" = private constant
+// CHECK-LABEL: @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsHc" = private constant

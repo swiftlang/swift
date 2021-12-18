@@ -31,6 +31,7 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -127,6 +128,9 @@ namespace swift {
     /// The target variant SDK version, if known.
     Optional<llvm::VersionTuple> VariantSDKVersion;
 
+    /// The SDK canonical name, if known.
+    std::string SDKName;
+
     /// The alternate name to use for the entry point instead of main.
     std::string entryPointFunctionName = "main";
 
@@ -140,14 +144,23 @@ namespace swift {
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
 
+    /// Enable experimental string processing
+    bool EnableExperimentalStringProcessing = false;
+
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
+
+    /// Only check the availability of the API, ignore function bodies.
+    bool CheckAPIAvailabilityOnly = false;
 
     /// Should conformance availability violations be diagnosed as errors?
     bool EnableConformanceAvailabilityErrors = false;
 
     /// Should potential unavailability on enum cases be downgraded to a warning?
     bool WarnOnPotentiallyUnavailableEnumCase = false;
+
+    /// Should the editor placeholder error be downgraded to a warning?
+    bool WarnOnEditorPlaceholder = false;
 
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
@@ -168,6 +181,9 @@ namespace swift {
 
     // Availability macros definitions to be expanded at parsing.
     SmallVector<std::string, 4> AvailabilityMacros;
+
+    /// Require public declarations to declare that they are Sendable (or not).
+    bool RequireExplicitSendable = false;
 
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
@@ -223,14 +239,6 @@ namespace swift {
 
     /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
-
-    /// Whether to include initializers when code-completing a postfix
-    /// expression.
-    bool CodeCompleteInitsInPostfixExpr = false;
-
-    /// Whether to use heuristics to decide whether to show call-pattern
-    /// completions.
-    bool CodeCompleteCallPatternHeuristics = false;
 
     ///
     /// Flags for use by tests
@@ -302,10 +310,6 @@ namespace swift {
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;
 
-    /// Enable experimental support for structural opaque result types, e.g.
-    /// `func f() -> (some P)?`.
-    bool EnableExperimentalStructuralOpaqueTypes = false;
-
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
@@ -314,6 +318,9 @@ namespace swift {
 
     /// Enable experimental 'distributed' actors and functions.
     bool EnableExperimentalDistributed = false;
+
+    /// Enable experimental 'move only' features.
+    bool EnableExperimentalMoveOnly = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
@@ -332,14 +339,6 @@ namespace swift {
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
     bool EnableNewOperatorLookup = false;
-
-    /// Whether to enable the "fuzzy" forward-scanning behavior for trailing
-    /// closure matching, which skips over defaulted closure parameters
-    /// to match later (non-defaulted) closure parameters
-    ///
-    /// This is a backward-compatibility hack for unlabeled trailing closures,
-    /// to be disabled in Swift 6+.
-    bool EnableFuzzyForwardScanTrailingClosureMatching = true;
 
     /// Use Clang function types for computing canonical types.
     /// If this option is false, the clang function types will still be computed
@@ -436,6 +435,11 @@ namespace swift {
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
 
+    /// Enable experimental 'hermetic seal at link' feature. Turns on
+    /// dead-stripping optimizations assuming that all users of library code
+    /// are present at LTO time.
+    bool HermeticSealAtLink = false;
+
     /// Allow deserializing implementation only dependencies. This should only
     /// be set true by lldb and other tooling, so that deserilization
     /// recovery issues won't bring down the debugger.
@@ -462,21 +466,39 @@ namespace swift {
 
     /// Whether the new experimental generics implementation is enabled.
     RequirementMachineMode EnableRequirementMachine =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Enabled;
 
-    /// Enables debugging output from the requirement machine.
-    bool DebugRequirementMachine = false;
+    /// Enables dumping rewrite systems from the requirement machine.
+    bool DumpRequirementMachine = false;
 
     /// Enables statistics output from the requirement machine.
     bool AnalyzeRequirementMachine = false;
 
-    /// Maximum iteration count for requirement machine confluent completion
-    /// algorithm.
-    unsigned RequirementMachineStepLimit = 2000;
+    /// Enables fine-grained debug output from the requirement machine.
+    std::string DebugRequirementMachine;
 
-    /// Maximum term length for requirement machine confluent completion
+    /// Maximum iteration count for requirement machine Knuth-Bendix completion
+    /// algorithm.
+    unsigned RequirementMachineStepLimit = 4000;
+
+    /// Maximum term length for requirement machine Knuth-Bendix completion
     /// algorithm.
     unsigned RequirementMachineDepthLimit = 10;
+
+    /// Enable the new experimental protocol requirement signature minimization
+    /// algorithm.
+    RequirementMachineMode RequirementMachineProtocolSignatures =
+        RequirementMachineMode::Disabled;
+
+    /// Enable the new experimental generic signature minimization algorithm
+    /// for abstract generic signatures.
+    RequirementMachineMode RequirementMachineAbstractSignatures =
+        RequirementMachineMode::Disabled;
+
+    /// Enable the new experimental generic signature minimization algorithm
+    /// for user-written generic signatures.
+    RequirementMachineMode RequirementMachineInferredSignatures =
+        RequirementMachineMode::Disabled;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -591,6 +613,12 @@ namespace swift {
     /// than this many seconds.
     unsigned ExpressionTimeoutThreshold = 600;
 
+    /// If the shared pointer is not a \c nullptr and the pointee is \c true,
+    /// typechecking should be aborted at the next possible opportunity.
+    /// This is used by SourceKit to cancel requests for which the result is no
+    /// longer of interest.
+    std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
+
     /// If non-zero, abort the switch statement exhaustiveness checker if
     /// the Space::minus function is called more than this many times.
     ///
@@ -659,6 +687,10 @@ namespace swift {
     /// parameters of closures.
     bool EnableOneWayClosureParameters = false;
 
+    /// Enable experimental support for type inference through multi-statement
+    /// closures.
+    bool EnableMultiStatementClosureInference = false;
+
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
   };
@@ -666,6 +698,10 @@ namespace swift {
   /// Options for controlling the behavior of the Clang importer.
   class ClangImporterOptions final {
   public:
+    /// The path to the Clang compiler executable.
+    /// Used to detect the default include paths.
+    std::string clangPath = "clang";
+
     /// The module cache path which the Clang importer should use.
     std::string ModuleCachePath;
 
@@ -732,6 +768,9 @@ namespace swift {
     /// When set, don't look for or load overlays.
     bool DisableOverlayModules = false;
 
+    /// When set, import SPI_AVAILABLE symbols with Swift SPI attribtues.
+    bool EnableClangSPI = false;
+
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;
 
@@ -759,8 +798,12 @@ namespace swift {
                           DetailedPreprocessingRecord,
                           ImportForwardDeclarations,
                           DisableSwiftBridgeAttr,
-                          DisableOverlayModules);
+                          DisableOverlayModules,
+                          EnableClangSPI);
     }
+
+    std::vector<std::string> getRemappedExtraArgs(
+        std::function<std::string(StringRef)> pathRemapCallback) const;
   };
 
 } // end namespace swift

@@ -218,6 +218,95 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *uci) {
   return nullptr;
 }
 
+// Optimize Builtin.assumeAlignment -> pointer_to_address
+//
+// Case #1. Literal zero = natural alignment
+//    %1 = integer_literal $Builtin.Int64, 0
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*Int
+//
+//    Erases the `pointer_to_address` `[align=]` attribute:
+//
+// Case #2. Literal nonzero = forced alignment.
+//
+//    %1 = integer_literal $Builtin.Int64, 16
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*Int
+//
+//    Promotes the `pointer_to_address` `[align=]` attribute to a higher value.
+//
+// Case #3. Folded dynamic alignment
+//
+//    %1 = builtin "alignof"<T>(%0 : $@thin T.Type) : $Builtin.Word
+//    %2 = builtin "assumeAlignment"
+//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
+//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*T
+//
+//    Erases the `pointer_to_address` `[align=]` attribute.
+SILInstruction *
+SILCombiner::optimizeAlignment(PointerToAddressInst *ptrAdrInst) {
+  if (!ptrAdrInst->alignment())
+    return nullptr;
+
+  llvm::Align oldAlign = ptrAdrInst->alignment().valueOrOne();
+
+  // TODO: stripCasts(ptrAdrInst->getOperand()) can be used to find the Builtin,
+  // but then the Builtin could not be trivially removed. Ideally,
+  // Builtin.assume will be the immediate operand so it can be removed in the
+  // common case.
+  BuiltinInst *assumeAlign = dyn_cast<BuiltinInst>(ptrAdrInst->getOperand());
+  if (!assumeAlign
+      || assumeAlign->getBuiltinKind() != BuiltinValueKind::AssumeAlignment) {
+    return nullptr;
+  }
+  SILValue ptrSrc = assumeAlign->getArguments()[0];
+  SILValue alignOper = assumeAlign->getArguments()[1];
+
+  if (auto *integerInst = dyn_cast<IntegerLiteralInst>(alignOper)) {
+    llvm::MaybeAlign newAlign(integerInst->getValue().getLimitedValue());
+    if (newAlign && newAlign.valueOrOne() <= oldAlign)
+      return nullptr;
+
+    // Case #1: the pointer is assumed naturally aligned
+    //
+    // Or Case #2: the pointer is assumed to have non-zero alignment greater
+    // than it current alignment.
+    //
+    // In either case, rewrite the address alignment with the assumed alignment,
+    // and bypass the Builtin.assumeAlign.
+    return Builder.createPointerToAddress(
+        ptrAdrInst->getLoc(), ptrSrc, ptrAdrInst->getType(),
+        ptrAdrInst->isStrict(), ptrAdrInst->isInvariant(), newAlign);
+  }
+  // Handle possible 32-bit sign-extension.
+  SILValue extendedAlignment;
+  if (match(alignOper,
+            m_ApplyInst(BuiltinValueKind::SExtOrBitCast,
+                        m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
+                                    m_SILValue(extendedAlignment))))) {
+    alignOper = extendedAlignment;
+  }
+  MetatypeInst *metatype;
+  if (match(alignOper,
+            m_ApplyInst(BuiltinValueKind::Alignof, m_MetatypeInst(metatype)))) {
+    SILType instanceType = ptrAdrInst->getFunction()->getLoweredType(
+        metatype->getType().castTo<MetatypeType>().getInstanceType());
+
+    if (instanceType.getAddressType() != ptrAdrInst->getType())
+      return nullptr;
+
+    // Case #3: the alignOf type matches the address type. Convert to a
+    // naturally aligned pointer by erasing alignment and bypassing the
+    // Builtin.assumeAlign.
+    return Builder.createPointerToAddress(
+        ptrAdrInst->getLoc(), ptrSrc, ptrAdrInst->getType(),
+        ptrAdrInst->isStrict(), ptrAdrInst->isInvariant());
+  }
+  return nullptr;
+}
+
 SILInstruction *
 SILCombiner::
 visitPointerToAddressInst(PointerToAddressInst *PTAI) {
@@ -237,13 +326,17 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
     // handle issues around interior pointers and expanding borrow scopes.
     if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand())) {
       if (!hasOwnership()) {
-        return Builder.createUncheckedAddrCast(PTAI->getLoc(), ATPI->getOperand(),
+        return Builder.createUncheckedAddrCast(PTAI->getLoc(),
+                                               ATPI->getOperand(),
                                                PTAI->getType());
       }
 
-      OwnershipRAUWHelper helper(ownershipFixupContext, PTAI, ATPI->getOperand());
+      OwnershipRAUWHelper helper(ownershipFixupContext, PTAI,
+                                 ATPI->getOperand());
       if (helper) {
-        auto *newInst = Builder.createUncheckedAddrCast(PTAI->getLoc(), ATPI->getOperand(),
+        auto replacement = helper.prepareReplacement();
+        auto *newInst = Builder.createUncheckedAddrCast(PTAI->getLoc(),
+                                                        replacement,
                                                         PTAI->getType());
         helper.perform(newInst);
         return nullptr;
@@ -370,7 +463,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
     }
   }
 
-  return nullptr;
+  return optimizeAlignment(PTAI);
 }
 
 SILInstruction *
@@ -726,8 +819,9 @@ SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
         // Since we are using std::next, we use getAutogeneratedLocation to
         // avoid any issues if our next insertion point is a terminator.
         auto loc = RegularLocation::getAutoGeneratedLocation();
+        auto replacement = helper.prepareReplacement();
         auto *newInst = localBuilder.createUncheckedRefCast(
-            loc, originalRef, rawToRef->getType());
+            loc, replacement, rawToRef->getType());
         // If we have an operand with ownership, we need to change our
         // unchecked_ref_cast to produce an unowned value. This is because
         // otherwise, our unchecked_ref_cast will consume the underlying owned
@@ -800,8 +894,9 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
 
     OwnershipRAUWHelper helper(ownershipFixupContext, UBCI, Oper);
     if (helper) {
+      auto replacement = helper.prepareReplacement();
       auto *transformedOper = Builder.createUncheckedBitwiseCast(
-          UBCI->getLoc(), Oper, UBCI->getType());
+          UBCI->getLoc(), replacement, UBCI->getType());
       helper.perform(transformedOper);
       return nullptr;
     }
@@ -817,31 +912,21 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
                            Builder.getModule()))
     return nullptr;
 
-  if (!Builder.hasOwnership()) {
-    return Builder.createUncheckedRefCast(UBCI->getLoc(), UBCI->getOperand(),
-                                          UBCI->getType());
+  // Normally, OwnershipRAUWHelper needs to be called to handle ownership of
+  // UBCI->getOperand(). However, we know that UBCI->getOperand() is already
+  // available at the point of the cast, and by forcing the cast to be Unowned,
+  // we ensure that no ownership adjustment is needed. So we can skip
+  // prepareReplacement completely and just drop in the replacement. That avoids
+  // an extra copy in the case that UBCI->getOperand() is Owned.
+  auto *refCast = Builder.createUncheckedRefCast(
+      UBCI->getLoc(), UBCI->getOperand(), UBCI->getType());
+  if (Builder.hasOwnership()) {
+    // A bitwise cast is always unowned, so we can safely force the reference
+    // cast to forward as unowned and no ownership adjustment is needed.
+    assert(UBCI->getOwnershipKind() == OwnershipKind::Unowned);
+    refCast->setForwardingOwnershipKind(OwnershipKind::Unowned);
   }
-
-  {
-    OwnershipRAUWHelper helper(ownershipFixupContext, UBCI, UBCI->getOperand());
-    if (helper) {
-      auto *newInst = Builder.createUncheckedRefCast(UBCI->getLoc(), UBCI->getOperand(),
-                                                     UBCI->getType());
-      // If we have an operand with owned ownership, we change our
-      // unchecked_ref_cast to explicitly pass the owned operand as an unowned
-      // value. This is because otherwise, we would consume the owned value
-      // creating breaking OSSA. In contrast, if we have a guaranteed value, we
-      // are going to be replacing an UnownedInstantaneousUse with an
-      // InstantaneousUse which is always safe for a guaranteed value.
-      if (newInst->getForwardingOwnershipKind() == OwnershipKind::Owned) {
-        newInst->setForwardingOwnershipKind(OwnershipKind::Unowned);
-      }
-      helper.perform(newInst);
-      return nullptr;
-    }
-  }
-
-  return nullptr;
+  return refCast;
 }
 
 SILInstruction *
@@ -1064,10 +1149,11 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
         continue;
       }
 
-      OwnershipRAUWHelper helper(ownershipFixupContext, pa,
-                                 cfi->getConverted());
-      if (!helper)
+      OwnershipRAUWHelper checkRAUW(ownershipFixupContext, pa,
+                                    cfi->getConverted());
+      if (!checkRAUW)
         continue;
+
       SmallVector<SILValue, 4> args(pa->getArguments().begin(),
                                     pa->getArguments().end());
       auto newValue = makeCopiedValueAvailable(cfi->getConverted(),
@@ -1085,7 +1171,12 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       // We need to end the lifetime of the convert_function/partial_apply since
       // the helper assumes that ossa is correct upon input.
       localBuilder.emitDestroyValueOperation(pa->getLoc(), newConvert);
-      helper.perform(newConvert);
+      // 'newConvert' may have different ownership than then 'cfi'. newConvert
+      // is always owned, while 'cfi' may have been guaranteed. OSSA-RAUW
+      // validity depends on the ownership kind. Reinstantiate
+      // OwnershipRAUWHelper to verify that it is still valid
+      // (a very fast check in this case).
+      OwnershipRAUWHelper(ownershipFixupContext, pa, newConvert).perform();
     }
   }
 

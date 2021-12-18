@@ -5,14 +5,14 @@
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
 let seconds: UInt64 = 1_000_000_000
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_detach_cancel_while_child_running() async {
   let task: Task<Bool, Error> = Task.detached {
     async let childCancelled: Bool = { () -> Bool in
@@ -36,7 +36,7 @@ func test_detach_cancel_while_child_running() async {
   print("was cancelled: \(got)") // CHECK: was cancelled: true
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_cancel_while_withTaskCancellationHandler_inflight() async {
   let task: Task<Bool, Error> = Task.detached {
     await withTaskCancellationHandler {
@@ -63,7 +63,7 @@ func test_cancel_while_withTaskCancellationHandler_inflight() async {
   print("was cancelled: \(got)") // CHECK: was cancelled: true
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_cancel_while_withTaskCancellationHandler_onlyOnce() async {
   let task: Task<Bool, Error> = Task.detached {
     await withTaskCancellationHandler {
@@ -91,7 +91,7 @@ func test_cancel_while_withTaskCancellationHandler_onlyOnce() async {
   print("was cancelled: \(got)") // CHECK: was cancelled: true
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_detach_cancel_while_child_running()

@@ -14,6 +14,7 @@
 #include "llvm/Support/Path.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 
 #include "SymbolGraphASTWalker.h"
@@ -56,7 +57,7 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
                                          const SymbolGraphOptions &Options) {
   SymbolGraphASTWalker Walker(*M, Options);
   SmallVector<Decl *, 64> ModuleDecls;
-  M->getDisplayDecls(ModuleDecls);
+  swift::getTopLevelDeclsForDisplay(M, ModuleDecls);
 
   if (Options.PrintMessages)
     llvm::errs() << ModuleDecls.size()

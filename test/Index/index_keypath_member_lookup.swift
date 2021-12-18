@@ -158,3 +158,11 @@ extension Foo {
     // CHECK: [[@LINE-1]]:5 | instance-property/Swift | prop | [[PROP_USR]] | Ref,Read,RelCont | rel: 1
   }
 }
+
+// Also make sure we don't crash for multiple overloads.
+@dynamicMemberLookup
+protocol P {}
+extension P {
+  subscript<T>(dynamicMember keyPath: KeyPath<Bar, T>) -> Int { 0 }
+  subscript<T>(dynamicMember keyPath: KeyPath<P, T>) -> Int { 0 }
+}

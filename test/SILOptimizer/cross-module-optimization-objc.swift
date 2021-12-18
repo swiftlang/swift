@@ -1,7 +1,7 @@
 // First test: functional correctness
 
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -I%t %S/Inputs/cross-module-objc.swift -c -o %t/test.o
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -I%t %S/Inputs/cross-module/cross-module-objc.swift -c -o %t/test.o
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -c -o %t/main.o
 // RUN: %target-swiftc_driver %t/main.o %t/test.o -o %t/a.out
 // RUN: %target-codesign %t/a.out

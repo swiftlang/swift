@@ -91,7 +91,7 @@ protocol AsExistentialB {
 }
 
 protocol AsExistentialAssocTypeA {
-  var delegate : AsExistentialAssocTypeB? { get } // expected-error {{protocol 'AsExistentialAssocTypeB' can only be used as a generic constraint because it has Self or associated type requirements}}
+  var delegate : AsExistentialAssocTypeB? { get }
 }
 protocol AsExistentialAssocTypeB {
   func aMethod(_ object : AsExistentialAssocTypeA)
@@ -103,7 +103,7 @@ protocol AsExistentialAssocTypeAgainA {
   associatedtype Bar
 }
 protocol AsExistentialAssocTypeAgainB {
-  func aMethod(_ object : AsExistentialAssocTypeAgainA) // expected-error {{protocol 'AsExistentialAssocTypeAgainA' can only be used as a generic constraint because it has Self or associated type requirements}}
+  func aMethod(_ object : AsExistentialAssocTypeAgainA)
 }
 
 // SR-547
@@ -124,5 +124,3 @@ protocol B {
     
     func observeChangeOfProperty(_ property: BC, observable: BA)
 }
-
-

@@ -21,6 +21,17 @@ func simpleErr(arg: String) async throws -> String { }
 func simpleRes(arg: String, _ completion: @escaping (Result<String, Error>) -> Void) { }
 func simpleRes(arg: String) async throws -> String { }
 
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ALREADY-ASYNC %s
+func alreadyAsync() async {
+  simple {
+    print($0)
+  }
+}
+// ALREADY-ASYNC: func alreadyAsync() async {
+// ALREADY-ASYNC-NEXT: let val0 = await simple()
+// ALREADY-ASYNC-NEXT: print(val0)
+// ALREADY-ASYNC-NEXT: }
+
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NESTED %s
 func nested() {
   simple {
@@ -215,7 +226,6 @@ func callNonAsyncInAsyncComment(_ completion: @escaping (String) -> Void) {
 // CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // i
 // CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     }
 // CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     // j
-// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     {{ }}
 // CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     // k
 // CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   }
 // CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT: }
@@ -269,7 +279,7 @@ func voidResultCompletion(completion: @escaping (Result<Void, Error>) -> Void) {
 // VOID-RESULT-HANDLER-NEXT: }
 
 // rdar://77789360 Make sure we don't print a double return statement.
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING %s
 func testReturnHandling(_ completion: @escaping (String?, Error?) -> Void) {
   return completion("", nil)
 }
@@ -279,6 +289,8 @@ func testReturnHandling(_ completion: @escaping (String?, Error?) -> Void) {
 
 // rdar://77789360 Make sure we don't print a double return statement and don't
 // completely drop completion(a).
+// Note we cannot use refactor-check-compiles here, as the placeholders mean we
+// don't form valid AST.
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING2 %s
 func testReturnHandling2(completion: @escaping (String) -> ()) {
   simpleErr(arg: "") { x, err in
@@ -622,3 +634,46 @@ func twoCompletionHandlerCalls(completion: @escaping (String?, Error?) -> Void) 
 // TWO-COMPLETION-HANDLER-CALLS-NEXT:   return res
 // TWO-COMPLETION-HANDLER-CALLS-NEXT:   return res
 // TWO-COMPLETION-HANDLER-CALLS-NEXT: }
+
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NESTED-IGNORED %s
+func nestedIgnored() throws {
+  simple { _ in
+    print("done")
+    simple { _ in
+      print("done")
+    }
+  }
+}
+// NESTED-IGNORED:      func nestedIgnored() async throws {
+// NESTED-IGNORED-NEXT:   let _ = await simple()
+// NESTED-IGNORED-NEXT:   print("done")
+// NESTED-IGNORED-NEXT:   let _ = await simple()
+// NESTED-IGNORED-NEXT:   print("done")
+// NESTED-IGNORED-NEXT: }
+
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=IGNORED-ERR %s
+func nestedIgnoredErr() throws {
+  simpleErr(arg: "") { str, _ in
+    if str == nil {
+      print("error")
+    }
+
+    simpleErr(arg: "") { str, _ in
+      if str == nil {
+        print("error")
+      }
+    }
+  }
+}
+// IGNORED-ERR:      func nestedIgnoredErr() async throws {
+// IGNORED-ERR-NEXT:   do {
+// IGNORED-ERR-NEXT:     let str = try await simpleErr(arg: "")
+// IGNORED-ERR-NEXT:     do {
+// IGNORED-ERR-NEXT:       let str1 = try await simpleErr(arg: "")
+// IGNORED-ERR-NEXT:     } catch {
+// IGNORED-ERR-NEXT:       print("error")
+// IGNORED-ERR-NEXT:     }
+// IGNORED-ERR-NEXT:   } catch {
+// IGNORED-ERR-NEXT:     print("error")
+// IGNORED-ERR-NEXT:   }
+// IGNORED-ERR-NEXT: }

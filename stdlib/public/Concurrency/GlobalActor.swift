@@ -22,7 +22,7 @@ import Swift
 /// such a declaration from another actor (or from nonisolated code),
 /// synchronization is performed through the \c shared actor instance to ensure
 /// mutually-exclusive access to the declaration.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol GlobalActor {
   /// The type of the shared actor instance that will be used to provide
   /// mutually-exclusive access to declarations annotated with the given global
@@ -43,7 +43,7 @@ public protocol GlobalActor {
   static var sharedUnownedExecutor: UnownedSerialExecutor { get }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension GlobalActor {
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
     shared.unownedExecutor

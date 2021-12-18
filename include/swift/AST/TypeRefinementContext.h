@@ -46,7 +46,7 @@ namespace swift {
 /// These refinement contexts form a lexical tree parallel to the AST but much
 /// more sparse: we only introduce refinement contexts when there is something
 /// to refine.
-class TypeRefinementContext {
+class TypeRefinementContext : public ASTAllocated<TypeRefinementContext> {
 
 public:
   /// Describes the reason a type refinement context was introduced.
@@ -276,11 +276,6 @@ public:
   void print(raw_ostream &OS, SourceManager &SrcMgr, unsigned Indent = 0) const;
   
   static StringRef getReasonName(Reason R);
-  
-  // Only allow allocation of TypeRefinementContext using the allocator in
-  // ASTContext.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(TypeRefinementContext));
 };
 
 } // end namespace swift

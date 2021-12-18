@@ -183,7 +183,7 @@ public:
   }
 
 private:
-  static const unsigned MaxDepth = 1024;
+  static const unsigned MaxDepth = 768;
 
   /// Called when the node tree in valid.
   ///
@@ -439,6 +439,7 @@ private:
     case Node::Kind::NativePinningAddressor:
     case Node::Kind::NativePinningMutableAddressor:
     case Node::Kind::NominalTypeDescriptor:
+    case Node::Kind::NominalTypeDescriptorRecord:
     case Node::Kind::NonObjCAttribute:
     case Node::Kind::Number:
     case Node::Kind::ObjCAsyncCompletionHandlerImpl:
@@ -447,6 +448,7 @@ private:
     case Node::Kind::ObjCMetadataUpdateFunction:
     case Node::Kind::ObjCResilientClassStub:
     case Node::Kind::OpaqueTypeDescriptor:
+    case Node::Kind::OpaqueTypeDescriptorRecord:
     case Node::Kind::OpaqueTypeDescriptorAccessor:
     case Node::Kind::OpaqueTypeDescriptorAccessorImpl:
     case Node::Kind::OpaqueTypeDescriptorAccessorKey:
@@ -463,8 +465,10 @@ private:
     case Node::Kind::PropertyDescriptor:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
+    case Node::Kind::ProtocolConformanceDescriptorRecord:
     case Node::Kind::MetadataInstantiationCache:
     case Node::Kind::ProtocolDescriptor:
+    case Node::Kind::ProtocolDescriptorRecord:
     case Node::Kind::ProtocolRequirementsBaseDescriptor:
     case Node::Kind::ProtocolSelfConformanceDescriptor:
     case Node::Kind::ProtocolSelfConformanceWitness:
@@ -554,6 +558,7 @@ private:
     case Node::Kind::ProtocolConformanceRefInTypeModule:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
+    case Node::Kind::DistributedThunk:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -775,7 +780,7 @@ private:
 
   void printFunctionType(NodePointer LabelList, NodePointer node,
                          unsigned depth) {
-    if (node->getNumChildren() < 2 || node->getNumChildren() > 6) {
+    if (node->getNumChildren() < 2) {
       setInvalid();
       return;
     }
@@ -814,9 +819,14 @@ private:
       assert(false && "Unhandled function type in printFunctionType!");
     }
 
+    unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
     bool isSendable = false, isAsync = false, isThrows = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
+      // handled earlier
+      ++startIndex;
+    }
     if (node->getChild(startIndex)->getKind() ==
           Node::Kind::GlobalActorFunctionType) {
       print(node->getChild(startIndex), depth + 1);
@@ -826,10 +836,6 @@ private:
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
-      ++startIndex;
-    }
-    if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
-      // handled earlier
       ++startIndex;
     }
     if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
@@ -866,7 +872,7 @@ private:
     if (isSendable)
       Printer << "@Sendable ";
 
-    printFunctionParameters(LabelList, node->getChild(startIndex), depth,
+    printFunctionParameters(LabelList, node->getChild(argIndex), depth,
                             Options.ShowFunctionArgumentTypes);
 
     if (!Options.ShowFunctionArgumentTypes)
@@ -878,7 +884,7 @@ private:
     if (isThrows)
       Printer << " throws";
 
-    print(node->getChild(startIndex + 1), depth + 1);
+    print(node->getChild(argIndex + 1), depth + 1);
   }
 
   void printImplFunctionType(NodePointer fn, unsigned depth) {
@@ -1149,6 +1155,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
                                bool asPrefixContext) {
   if (depth > NodePrinter::MaxDepth) {
     Printer << "<<too complex>>";
+    return nullptr;
+  }
+
+  if (!Node) {
+    Printer << "<null node pointer>";
     return nullptr;
   }
 
@@ -1981,6 +1992,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "opaque type symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
     return nullptr;
+  case Node::Kind::DistributedThunk:
+    if (!Options.ShortenThunk) {
+      Printer << "distributed thunk for ";
+    }
+    return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable key for ";
@@ -2016,8 +2032,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "protocol conformance descriptor for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::ProtocolConformanceDescriptorRecord:
+    Printer << "protocol conformance descriptor runtime record for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::ProtocolDescriptor:
     Printer << "protocol descriptor for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::ProtocolDescriptorRecord:
+    Printer << "protocol descriptor runtime record for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::ProtocolRequirementsBaseDescriptor:
@@ -2122,8 +2146,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "nominal type descriptor for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::NominalTypeDescriptorRecord:
+    Printer << "nominal type descriptor runtime record for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::OpaqueTypeDescriptor:
     Printer << "opaque type descriptor for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::OpaqueTypeDescriptorRecord:
+    Printer << "opaque type descriptor runtime record for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OpaqueTypeDescriptorAccessor:
@@ -3015,7 +3047,7 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
     PostfixContext = nullptr;
   }
   return PostfixContext;
-};
+}
 
 void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
                                   NodePointer genericFunctionTypeList,

@@ -16,7 +16,7 @@ toolchain as a one-off, there are a couple of differences:
   - [Troubleshooting cloning issues](#troubleshooting-cloning-issues)
 - [Installing dependencies](#installing-dependencies)
   - [macOS](#macOS)
-  - [Ubuntu Linux](#ubuntu-linux)
+  - [Linux](#linux)
 - [Building the project for the first time](#building-the-project-for-the-first-time)
   - [Spot check dependencies](#spot-check-dependencies)
   - [The roles of different tools](#the-roles-of-different-tools)
@@ -130,7 +130,7 @@ Double-check that running `pwd` prints a path ending with `swift`.
 
 ⚠️ Since version 0.2.14, `sccache` no longer caches compile commands issued by `build-script` because of [sccache PR 898](https://github.com/mozilla/sccache/pull/898), since `build-script` adds the `-arch x86_64` argument twice. The instructions below may install `sccache` 0.2.14 or newer. You may want to instead download and install an older release from their [Releases page](https://github.com/mozilla/sccache/releases) until this issue is resolved.
 
-1. Install [Xcode 12.3][Xcode] or newer:
+1. Install [Xcode 13 beta 4][Xcode] or newer:
    The required version of Xcode changes frequently and is often a beta release.
    Check this document or the host information on <https://ci.swift.org> for the
    current required version.

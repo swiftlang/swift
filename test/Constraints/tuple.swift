@@ -337,3 +337,30 @@ var optionalTuple3: (UInt64, Int)? = (bignum, 1) // expected-error {{cannot conv
 optionalTuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
 // Optional to Optional
 optionalTuple = optionalTuple2 // expected-error {{cannot assign value of type '(Int64, Int)?' to type '(Int, Int)?'}}
+
+func testTupleLabelMismatchFuncConversion(fn1: @escaping ((x: Int, y: Int)) -> Void,
+                                          fn2: @escaping () -> (x: Int, Int)) {
+  // Warn on mismatches
+  let _: ((a: Int, b: Int)) -> Void = fn1 // expected-warning {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
+  let _: ((x: Int, b: Int)) -> Void = fn1 // expected-warning {{tuple conversion from '(x: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
+
+  let _: () -> (y: Int, Int) = fn2 // expected-warning {{tuple conversion from '(x: Int, Int)' to '(y: Int, Int)' mismatches labels}}
+  let _: () -> (y: Int, k: Int) = fn2 // expected-warning {{tuple conversion from '(x: Int, Int)' to '(y: Int, k: Int)' mismatches labels}}
+
+  // Attempting to shuffle has always been illegal here
+  let _: () -> (y: Int, x: Int) = fn2 // expected-error {{cannot convert value of type '() -> (x: Int, Int)' to specified type '() -> (y: Int, x: Int)'}}
+
+  // Losing labels is okay though.
+  let _: () -> (Int, Int) = fn2
+
+  // Gaining labels also okay.
+  let _: ((x: Int, Int)) -> Void = fn1
+  let _: () -> (x: Int, y: Int) = fn2
+  let _: () -> (Int, y: Int) = fn2
+}
+
+func testTupleLabelMismatchKeyPath() {
+  // Very Cursed.
+  let _: KeyPath<(x: Int, y: Int), Int> = \(a: Int, b: Int).x
+  // expected-warning@-1 {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
+}

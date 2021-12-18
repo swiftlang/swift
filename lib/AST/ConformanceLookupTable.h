@@ -39,7 +39,7 @@ class ModuleDecl;
 /// This table is a lower-level detail that clients should generally not
 /// access directly. Rather, one should use the protocol- and
 /// conformance-centric entry points in \c NominalTypeDecl and \c DeclContext.
-class ConformanceLookupTable {
+class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   /// Describes the stage at which a particular nominal type or
   /// extension's conformances has been processed.
   enum class ConformanceStage : uint8_t {
@@ -199,7 +199,7 @@ class ConformanceLookupTable {
   };
 
   /// An entry in the conformance table.
-  struct ConformanceEntry {
+  struct ConformanceEntry : public ASTAllocated<ConformanceEntry> {
     /// The source location within the current context where the
     /// protocol conformance was specified.
     SourceLoc Loc;
@@ -299,11 +299,6 @@ class ConformanceLookupTable {
 
       return Loc;
     }
-
-    // Only allow allocation of conformance entries using the
-    // allocator in ASTContext.
-    void *operator new(size_t Bytes, ASTContext &C,
-                       unsigned Alignment = alignof(ConformanceEntry));
 
     SWIFT_DEBUG_DUMP;
     void dump(raw_ostream &os, unsigned indent = 0) const;
@@ -478,16 +473,6 @@ public:
   getSatisfiedProtocolRequirementsForMember(const ValueDecl *member,
                                             NominalTypeDecl *nominal,
                                             bool sorted);
-
-  // Only allow allocation of conformance lookup tables using the
-  // allocator in ASTContext or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = alignof(ConformanceLookupTable));
-
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;

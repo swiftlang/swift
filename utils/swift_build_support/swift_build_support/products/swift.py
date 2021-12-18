@@ -56,6 +56,12 @@ class Swift(product.Product):
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
 
+        # Add static vprintf flag
+        self.cmake_options.extend(self._enable_stdlib_static_vprintf)
+
+        # Add experimental string processing flag.
+        self.cmake_options.extend(self._enable_experimental_string_processing)
+
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -154,6 +160,16 @@ updated without updating swift.py?")
     def _enable_experimental_distributed(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL',
                  self.args.enable_experimental_distributed)]
+
+    @property
+    def _enable_stdlib_static_vprintf(self):
+        return [('SWIFT_STDLIB_STATIC_PRINT',
+                 self.args.build_swift_stdlib_static_print)]
+
+    @property
+    def _enable_experimental_string_processing(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL',
+                 self.args.enable_experimental_string_processing)]
 
     @classmethod
     def get_dependencies(cls):

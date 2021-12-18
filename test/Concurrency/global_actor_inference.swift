@@ -1,5 +1,8 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/dynamically_replaceable.swiftmodule -module-name dynamically_replaceable -warn-concurrency %S/Inputs/dynamically_replaceable.swift
+// RUN: %target-typecheck-verify-swift -I %t -disable-availability-checking
 // REQUIRES: concurrency
+import dynamically_replaceable
 
 actor SomeActor { }
 
@@ -44,7 +47,7 @@ protocol P1 {
 }
 
 protocol P2 {
-  @SomeGlobalActor func method1() // expected-note {{'method1()' declared here}}
+  @SomeGlobalActor func method1()
   func method2()
 }
 
@@ -143,14 +146,12 @@ class C5 {
 }
 
 protocol P3 {
-  @OtherGlobalActor func method1() // expected-note{{'method1()' declared here}}
+  @OtherGlobalActor func method1()
   func method2()
 }
 
 class C6: P2, P3 {
   func method1() { }
-    // expected-error@-1{{instance method 'method1()' must be isolated to the global actor 'SomeGlobalActor' to satisfy corresponding requirement from protocol 'P2'}}
-    // expected-error@-2{{instance method 'method1()' must be isolated to the global actor 'OtherGlobalActor' to satisfy corresponding requirement from protocol 'P3'}}
   func method2() { }
 
   func testMethod() {
@@ -256,7 +257,7 @@ func barSync() {
 
 @propertyWrapper
 @OtherGlobalActor
-struct WrapperOnActor<Wrapped> {
+struct WrapperOnActor<Wrapped: Sendable> {
   private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
@@ -286,7 +287,7 @@ public struct WrapperOnMainActor<Wrapped> {
 }
 
 @propertyWrapper
-actor WrapperActor<Wrapped> {
+actor WrapperActor<Wrapped: Sendable> {
   var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
@@ -345,7 +346,7 @@ actor WrapperActorBad1<Wrapped> {
 }
 
 @propertyWrapper
-actor WrapperActorBad2<Wrapped> {
+actor WrapperActorBad2<Wrapped: Sendable> {
   var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
@@ -383,7 +384,7 @@ actor ActorWithWrapper {
 }
 
 @propertyWrapper
-struct WrapperOnSomeGlobalActor<Wrapped> {
+struct WrapperOnSomeGlobalActor<Wrapped: Sendable> {
   private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
@@ -502,15 +503,24 @@ func acceptClosure<T>(_: () -> T) { }
 }
 
 // ----------------------------------------------------------------------
-// Unsafe main actor parameter annotation
+// Main actor that predates concurrency
 // ----------------------------------------------------------------------
-func takesUnsafeMainActor(@_unsafeMainActor fn: () -> Void) { }
+@_predatesConcurrency func takesUnsafeMainActor(fn: @MainActor () -> Void) { }
 
 @MainActor func onlyOnMainActor() { }
 
 func useUnsafeMainActor() {
   takesUnsafeMainActor {
     onlyOnMainActor() // okay due to parameter attribute
+  }
+}
+
+// ----------------------------------------------------------------------
+// @IBAction implies @MainActor(unsafe)
+// ----------------------------------------------------------------------
+class SomeWidgetThing {
+  @IBAction func onTouch(_ object: AnyObject) {
+    onlyOnMainActor() // okay
   }
 }
 
@@ -551,4 +561,12 @@ func useFooInADefer() -> String {
   }
 
   return "hello"
+}
+
+// ----------------------------------------------------------------------
+// Dynamic replacement
+// ----------------------------------------------------------------------
+@_dynamicReplacement(for: dynamicOnMainActor)
+func replacesDynamicOnMainActor() {
+  onlyOnMainActor()
 }

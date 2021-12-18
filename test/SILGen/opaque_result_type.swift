@@ -167,7 +167,7 @@ public class D {
     }()
 }
 
-// CHECK-LABEL: sil [ossa] @$s18opaque_result_type10tupleAsAnyQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s18opaque_result_type10tupleAsAnyQryF", 0) __ {
+// CHECK-LABEL: sil [ossa] @$s18opaque_result_type10tupleAsAnyQryF : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <@_opaqueReturnTypeOf("$s18opaque_result_type10tupleAsAnyQryF", 0) __> {
 public func tupleAsAny() -> some Any {
 // CHECK:      bb0(%0 : $*()):
 // CHECK-NEXT:   %1 = tuple ()

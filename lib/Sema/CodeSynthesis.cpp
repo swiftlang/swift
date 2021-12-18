@@ -95,18 +95,13 @@ Expr *swift::buildSelfReference(VarDecl *selfDecl,
   llvm_unreachable("bad self access kind");
 }
 
-/// Build an expression that evaluates the specified parameter list as a tuple
-/// or paren expr, suitable for use in an apply expr.
-Expr *swift::buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
-                                         ASTContext &ctx) {
-  SmallVector<Identifier, 4> labels;
-  SmallVector<SourceLoc, 4> labelLocs;
-  SmallVector<Expr *, 4> args;
-  SmallVector<AnyFunctionType::Param, 4> elts;
-
-  for (auto param : params) {
+/// Build an argument list that forwards references to the specified parameter
+/// list.
+ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
+                                                 ASTContext &ctx) {
+  SmallVector<Argument, 4> args;
+  for (auto *param : params) {
     auto type = param->getType();
-    elts.push_back(param->toFunctionParam(type));
 
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
     ref->setType(param->isInOut() ? LValueType::get(type) : type);
@@ -117,29 +112,9 @@ Expr *swift::buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
       ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
       ref->setType(type);
     }
-
-    args.push_back(ref);
-    
-    labels.push_back(param->getArgumentName());
-    labelLocs.push_back(SourceLoc());
+    args.emplace_back(SourceLoc(), param->getArgumentName(), ref);
   }
-
-  Expr *argExpr;
-  if (args.size() == 1 &&
-      labels[0].empty() &&
-      !isa<VarargExpansionExpr>(args[0])) {
-    argExpr = new (ctx) ParenExpr(SourceLoc(), args[0], SourceLoc(),
-                                  /*hasTrailingClosure=*/false);
-    argExpr->setImplicit();
-  } else {
-    argExpr = TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
-                                SourceLoc(), false, IsImplicit);
-  }
-
-  auto argTy = AnyFunctionType::composeTuple(ctx, elts, /*canonical*/false);
-  argExpr->setType(argTy);
-
-  return argExpr;
+  return ArgumentList::createImplicit(ctx, args);
 }
 
 static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
@@ -321,13 +296,14 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
            "Only 'distributed actor' type can gain implicit distributed actor init");
 
     if (swift::ensureDistributedModuleLoaded(decl)) {
-      auto transportDecl = ctx.getActorTransportDecl();
+      // copy access level of distributed actor init from the nominal decl
+      accessLevel = decl->getEffectiveAccess();
 
       // Create the parameter.
       auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_transport, Loc,
-                                      ctx.Id_transport, transportDecl);
+                                      ctx.Id_transport, decl);
       arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(transportDecl->getDeclaredInterfaceType());
+      arg->setInterfaceType(getDistributedActorTransportType(decl));
       arg->setImplicit();
 
       params.push_back(arg);
@@ -427,8 +403,9 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   column->setType(uintType);
   column->setBuiltinInitializer(uintInit);
 
-  auto *call = CallExpr::createImplicit(
-      ctx, ref, { className, initName, file, line, column }, {});
+  auto *argList = ArgumentList::forImplicitUnlabeled(
+      ctx, {className, initName, file, line, column});
+  auto *call = CallExpr::createImplicit(ctx, ref, argList);
   call->setType(ctx.getNeverType());
   call->setThrows(false);
 
@@ -490,11 +467,9 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
         depth = genericSig.getGenericParams().back()->getDepth() + 1;
 
       for (auto *param : genericParams->getParams()) {
-        auto *newParam = new (ctx) GenericTypeParamDecl(classDecl,
-                                                        param->getName(),
-                                                        SourceLoc(),
-                                                        depth,
-                                                        param->getIndex());
+        auto *newParam = new (ctx) GenericTypeParamDecl(
+            classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
+            depth, param->getIndex());
         newParams.push_back(newParam);
       }
 
@@ -541,8 +516,9 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
       auto lookupConformanceFn =
           [&](CanType depTy, Type substTy,
               ProtocolDecl *proto) -> ProtocolConformanceRef {
-        if (auto conf = subMap.lookupConformance(depTy, proto))
-          return conf;
+        if (depTy->getRootGenericParam()->getDepth() < superclassDepth)
+          if (auto conf = subMap.lookupConformance(depTy, proto))
+            return conf;
 
         return ProtocolConformanceRef(proto);
       };
@@ -557,14 +533,9 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
       subMap = SubstitutionMap::get(superclassCtorSig,
                                     substFn, lookupConformanceFn);
 
-      genericSig = evaluateOrDefault(
-          ctx.evaluator,
-          AbstractGenericSignatureRequest{
-            classSig.getPointer(),
-            std::move(newParamTypes),
-            std::move(requirements)
-          },
-          GenericSignature());
+      genericSig = buildGenericSignature(ctx, classSig,
+                                         std::move(newParamTypes),
+                                         std::move(requirements));
     }
   }
 
@@ -678,11 +649,9 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   superclassCtorRefExpr->setThrows(false);
 
   auto *bodyParams = ctor->getParameters();
-  auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
+  auto *ctorArgs = buildForwardingArgumentList(bodyParams->getArray(), ctx);
   auto *superclassCallExpr =
-    CallExpr::create(ctx, superclassCtorRefExpr, ctorArgs,
-                     superclassCtor->getName().getArgumentNames(), { },
-                     /*hasTrailingClosure=*/false, /*implicit=*/true);
+      CallExpr::createImplicit(ctx, superclassCtorRefExpr, ctorArgs);
 
   if (auto *funcTy = type->getAs<FunctionType>())
     type = funcTy->getResult();
@@ -691,6 +660,9 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
 
   Expr *expr = superclassCallExpr;
 
+  if (superclassCtor->hasAsync()) {
+    expr = new (ctx) AwaitExpr(SourceLoc(), expr, type, /*implicit=*/true);
+  }
   if (superclassCtor->hasThrows()) {
     expr = new (ctx) TryExpr(SourceLoc(), expr, type, /*implicit=*/true);
   }
@@ -806,7 +778,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               classDecl->getBraces().Start,
                               superclassCtor->isFailable(),
                               /*FailabilityLoc=*/SourceLoc(),
-                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                              /*Async=*/superclassCtor->hasAsync(),
+                              /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
                               bodyParams, overrideInfo.GenericParams,
@@ -989,10 +962,16 @@ HasUserDefinedDesignatedInitRequest::evaluate(Evaluator &evaluator,
                                               NominalTypeDecl *decl) const {
   assert(!decl->hasClangNode());
 
-  for (auto *member : decl->getMembers())
-    if (auto *ctor = dyn_cast<ConstructorDecl>(member))
-      if (ctor->isDesignatedInit() && !ctor->isSynthesized())
-        return true;
+  auto results = decl->lookupDirect(DeclBaseName::createConstructor());
+  for (auto *member : results) {
+    if (isa<ExtensionDecl>(member->getDeclContext()))
+      continue;
+
+    auto *ctor = cast<ConstructorDecl>(member);
+    if (ctor->isDesignatedInit() && !ctor->isSynthesized())
+      return true;
+  }
+
   return false;
 }
 
@@ -1023,11 +1002,17 @@ static void collectNonOveriddenSuperclassInits(
   // overrides, which we don't want to consider as viable delegates for
   // convenience inits.
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
-  for (auto member : subclass->getMembers())
-    if (auto ctor = dyn_cast<ConstructorDecl>(member))
-      if (!ctor->hasStubImplementation())
-        if (auto overridden = ctor->getOverriddenDecl())
-          overriddenInits.insert(overridden);
+
+  auto ctors = subclass->lookupDirect(DeclBaseName::createConstructor());
+  for (auto *member : ctors) {
+    if (isa<ExtensionDecl>(member->getDeclContext()))
+      continue;
+
+    auto *ctor = cast<ConstructorDecl>(member);
+    if (!ctor->hasStubImplementation())
+      if (auto overridden = ctor->getOverriddenDecl())
+        overriddenInits.insert(overridden);
+  }
 
   superclassDecl->synthesizeSemanticMembersIfNeeded(
     DeclBaseName::createConstructor());
@@ -1059,11 +1044,13 @@ static void collectNonOveriddenSuperclassInits(
 static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
   // Bail out if we're validating one of our constructors already;
   // we'll revisit the issue later.
-  for (auto member : decl->getMembers()) {
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      if (ctor->isRecursiveValidation())
-        return;
-    }
+  auto results = decl->lookupDirect(DeclBaseName::createConstructor());
+  for (auto *member : results) {
+    if (isa<ExtensionDecl>(member->getDeclContext()))
+      continue;
+
+    if (member->isRecursiveValidation())
+      return;
   }
 
   decl->setAddedImplicitInitializers();
@@ -1118,19 +1105,22 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
     // A designated or required initializer has not been overridden.
 
     bool alreadyDeclared = false;
-    for (auto *member : decl->getMembers()) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        // Skip any invalid constructors.
-        if (ctor->isInvalid())
-          continue;
 
-        auto type = swift::getMemberTypeForComparison(ctor, nullptr);
-        auto parentType = swift::getMemberTypeForComparison(superclassCtor, ctor);
+    auto results = decl->lookupDirect(DeclBaseName::createConstructor());
+    for (auto *member : results) {
+      if (isa<ExtensionDecl>(member->getDeclContext()))
+        continue;
 
-        if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
-          alreadyDeclared = true;
-          break;
-        }
+      auto *ctor = cast<ConstructorDecl>(member);
+
+      // Skip any invalid constructors.
+      if (ctor->isInvalid())
+        continue;
+
+      auto type = swift::getMemberTypeForComparison(ctor, nullptr);
+      if (isOverrideBasedOnType(ctor, type, superclassCtor)) {
+        alreadyDeclared = true;
+        break;
       }
     }
 

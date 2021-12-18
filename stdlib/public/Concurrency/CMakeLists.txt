@@ -10,13 +10,18 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(LLVM_OPTIONAL_SOURCES
-  ${swift_concurrency_objc_sources})
+if(NOT swift_concurrency_extra_sources)
+  set(swift_concurrency_extra_sources)
+endif()
 
-set(swift_concurrency_link_libraries
-  swiftCore)
+if(NOT swift_concurrency_install_component)
+  set(swift_concurrency_install_component stdlib)
+endif()
 
-if(SWIFT_CONCURRENCY_USES_DISPATCH)
+set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
+set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS)
+
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     include_directories(AFTER
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
@@ -27,6 +32,33 @@ if(SWIFT_CONCURRENCY_USES_DISPATCH)
     list(APPEND swift_concurrency_link_libraries
       dispatch)
   endif()
+elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded" OR
+       "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "hooked")
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+    "-DSWIFT_CONCURRENCY_ENABLE_DISPATCH=0")
+else()
+  message(FATAL_ERROR "Invalid value for SWIFT_CONCURRENCY_GLOBAL_EXECUTOR (\"${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}\").")
+endif()
+
+
+if(NOT SWIFT_CONCURRENCY_USES_DISPATCH)
+
+endif()
+
+if(NOT swift_concurrency_async_fp_mode)
+  set(swift_concurrency_async_fp_mode "always")
+endif()
+
+# Don't emit extended frame info on platforms other than darwin, system
+# backtracer and system debugger are unlikely to support it.
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+    "-fswift-async-fp=${swift_concurrency_async_fp_mode}")
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
+    "-Xfrontend"
+    "-swift-async-frame-pointer=${swift_concurrency_async_fp_mode}")
+else()
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
 endif()
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
@@ -77,7 +109,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncThrowingStream.swift
   AsyncStream.cpp
   Deque.swift
-  ${swift_concurrency_objc_sources}
+  ${swift_concurrency_extra_sources}
+  linker-support/magic-symbols-for-install-name.c
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
@@ -89,13 +122,13 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   LINK_LIBRARIES ${swift_concurrency_link_libraries}
 
   C_COMPILE_FLAGS
-    -Dswift_Concurrency_EXPORTS
+    -Dswift_Concurrency_EXPORTS ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
+    -I${SWIFT_SOURCE_DIR}/stdlib/include
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
-    -Xfrontend -define-availability
-    -Xfrontend \"SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0\"
-  LINK_FLAGS "${SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS}"
-  INSTALL_IN_COMPONENT stdlib
+    ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
+  ${swift_concurrency_options}
+  INSTALL_IN_COMPONENT ${swift_concurrency_install_component}
 )

@@ -512,6 +512,10 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   // use %inout_addr
 bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
+  // Disable in OSSA because KeyPathProjector is not fully ported
+  if (AI->getFunction()->hasOwnership())
+    return false;
+
   SILFunction *callee = AI->getReferencedFunctionOrNull();
   if (!callee)
     return false;
@@ -1401,7 +1405,7 @@ hasOnlyRecursiveOwnershipUsers(ApplyInst *ai, SILInstruction *ignoreUser,
     foundUsers.push_back(user);
   }
   return true;
-};
+}
 
 /// We only know how to simulate reference call effects for unary
 /// function calls that take their argument @owned or @guaranteed and return an

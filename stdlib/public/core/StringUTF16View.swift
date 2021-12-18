@@ -158,7 +158,7 @@ extension String.UTF16View: BidirectionalCollection {
 
   @inlinable @inline(__always)
   public func index(before idx: Index) -> Index {
-    precondition(!idx.isZeroPosition)
+    _precondition(!idx.isZeroPosition)
     if _slowPath(_guts.isForeign) { return _foreignIndex(before: idx) }
     if _guts.isASCII { return idx.priorEncoded }
 
@@ -405,6 +405,7 @@ extension String.UTF16View.Index {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 // Reflection
 extension String.UTF16View: CustomReflectable {
   /// Returns a mirror that reflects the UTF-16 view of a string.
@@ -412,6 +413,7 @@ extension String.UTF16View: CustomReflectable {
     return Mirror(self, unlabeledChildren: self)
   }
 }
+#endif
 
 // Slicing
 extension String.UTF16View {

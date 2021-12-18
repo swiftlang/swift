@@ -17,6 +17,7 @@
 #include "GenDistributed.h"
 
 #include "BitPatternBuilder.h"
+#include "ClassTypeInfo.h"
 #include "ExtraInhabitants.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -32,7 +33,12 @@ using namespace swift;
 using namespace irgen;
 
 llvm::Value *irgen::emitDistributedActorInitializeRemote(
-    IRGenFunction &IGF, llvm::Value *actorMetatype, Explosion &out) {
+    IRGenFunction &IGF, SILType selfType, llvm::Value *actorMetatype, Explosion &out) {
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                             /*forBackwardDeployment=*/false);
+  llvm::Type *destType = classLayout.getType()->getPointerTo();
+
   auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
   actorMetatype =
       IGF.Builder.CreateBitCast(actorMetatype, IGF.IGM.TypeMetadataPtrTy);
@@ -41,17 +47,9 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->setDoesNotThrow();
 
-  out.add(call);
+  auto result = IGF.Builder.CreateBitCast(call, destType);
 
-  return call;
-}
+  out.add(result);
 
-void irgen::emitDistributedActorDestroy(IRGenFunction &IGF,
-                                                 llvm::Value *actor) {
-  auto fn = IGF.IGM.getDistributedActorDestroyFn();
-  actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-
-  auto call = IGF.Builder.CreateCall(fn, {actor});
-  call->setCallingConv(IGF.IGM.SwiftCC);
-  call->setDoesNotThrow();
+  return result;
 }

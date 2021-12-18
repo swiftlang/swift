@@ -31,10 +31,6 @@ enum class TypeResolutionStage : uint8_t {
   /// Produces a complete interface type where all member references have been
   /// resolved.
   Interface,
-
-  /// Produces a contextual type involving archetypes within the context of
-  /// the type.
-  Contextual,
 };
 
 /// Display a type resolution stage.

@@ -26,7 +26,7 @@ class Module;
 }
 
 namespace {
-class AnnotatedTypePrinter;
+class CodeCompletionStringPrinter;
 }
 
 namespace swift {
@@ -71,7 +71,7 @@ struct ExpectedTypeContext {
 };
 
 class CodeCompletionResultBuilder {
-  friend AnnotatedTypePrinter;
+  friend CodeCompletionStringPrinter;
   
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
@@ -87,12 +87,11 @@ class CodeCompletionResultBuilder {
       CurrentModule;
   ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
-      CodeCompletionResult::Unknown;
+      CodeCompletionResult::ExpectedTypeRelation::Unknown;
   bool Cancelled = false;
-  ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
       CodeCompletionResult::NotRecommendedReason::None;
-  StringRef BriefDocComment = StringRef();
+  StringRef BriefDocComment;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -195,6 +194,12 @@ public:
     }
   }
 
+  void addRequiredKeyword() {
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+        "required ");
+  }
+
   void addOverrideKeyword() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::OverrideKeyword, "override ");
@@ -242,11 +247,6 @@ public:
     addChunkWithTextNoCopy(
        CodeCompletionString::Chunk::ChunkKind::EffectsSpecifierKeyword,
        " async");
-  }
-
-  void addDeclDocCommentWords(ArrayRef<std::pair<StringRef, StringRef>> Pairs) {
-    assert(Kind == CodeCompletionResult::ResultKind::Declaration);
-    CommentWords = Pairs;
   }
 
   void addAnnotatedRethrows() {

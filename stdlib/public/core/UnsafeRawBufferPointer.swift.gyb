@@ -96,6 +96,26 @@
 public struct Unsafe${Mutable}RawBufferPointer {
   @usableFromInline
   internal let _position, _end: Unsafe${Mutable}RawPointer?
+
+  /// Creates a buffer over the specified number of contiguous bytes starting
+  /// at the given pointer.
+  ///
+  /// - Parameters:
+  ///   - start: The address of the memory that starts the buffer. If `starts`
+  ///     is `nil`, `count` must be zero. However, `count` may be zero even
+  ///     for a non-`nil` `start`.
+  ///   - count: The number of bytes to include in the buffer. `count` must not
+  ///     be negative.
+  @inlinable
+  public init(
+    @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
+  ) {
+    _debugPrecondition(count >= 0, "${Self} with negative count")
+    _debugPrecondition(count == 0 || start != nil,
+      "${Self} has a nil start and nonzero count")
+    _position = start
+    _end = start.map { $0 + _assumeNonNegative(count) }
+  }
 }
 
 %if not mutable:
@@ -144,6 +164,26 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   @inlinable
   public func makeIterator() -> Iterator {
     return Iterator(_position: _position, _end: _end)
+  }
+
+  /// Copies the elements of `self` to the memory at `destination.baseAddress`,
+  /// stopping when either `self` or `destination` is exhausted.
+  ///
+  /// - Returns: an iterator over any remaining elements of `self` and the
+  ///   number of elements copied.
+  @inlinable // unsafe-performance
+  @_alwaysEmitIntoClient
+  public func _copyContents(
+    initializing destination: UnsafeMutableBufferPointer<UInt8>
+  ) -> (Iterator, UnsafeMutableBufferPointer<UInt8>.Index) {
+    guard let s = _position, let e = _end, e > s, !destination.isEmpty else {
+      return (makeIterator(), 0)
+    }
+    let destinationAddress = destination.baseAddress._unsafelyUnwrappedUnchecked
+    let d = UnsafeMutableRawPointer(destinationAddress)
+    let n = Swift.min(destination.count, s.distance(to: e))
+    d.copyMemory(from: s, byteCount: n)
+    return (Iterator(_position: s.advanced(by: n), _end: e), n)
   }
 }
 
@@ -434,26 +474,6 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
   }
 %  end # mutable
-
-  /// Creates a buffer over the specified number of contiguous bytes starting
-  /// at the given pointer.
-  ///
-  /// - Parameters:
-  ///   - start: The address of the memory that starts the buffer. If `starts`
-  ///     is `nil`, `count` must be zero. However, `count` may be zero even
-  ///     for a non-`nil` `start`.
-  ///   - count: The number of bytes to include in the buffer. `count` must not
-  ///     be negative.
-  @inlinable
-  public init(
-    @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
-  ) {
-    _debugPrecondition(count >= 0, "${Self} with negative count")
-    _debugPrecondition(count == 0 || start != nil,
-      "${Self} has a nil start and nonzero count")
-    _position = start
-    _end = start.map { $0 + _assumeNonNegative(count) }
-  }
 
   /// Creates a new buffer over the same memory as the given buffer.
   ///

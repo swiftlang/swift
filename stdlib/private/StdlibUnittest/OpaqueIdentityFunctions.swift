@@ -66,7 +66,7 @@ public func getUInt64(_ x: UInt64) -> UInt64 { return _opaqueIdentity(x) }
 public func getUInt(_ x: UInt) -> UInt { return _opaqueIdentity(x) }
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 @inline(never)
 public func getFloat16(_ x: Float16) -> Float16 { return _opaqueIdentity(x) }
 #endif

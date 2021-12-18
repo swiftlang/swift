@@ -859,7 +859,7 @@ public:
   ProjectionTree &operator=(ProjectionTree &&) = default;
 
   /// Compute liveness and use information in this projection tree using Base.
-  /// All debug instructions (debug_value, debug_value_addr) are ignored.
+  /// All debug_value instructions are ignored.
   void computeUsesAndLiveness(SILValue Base);
 
   /// Create a root SILValue iout of the given leaf node values by walking on

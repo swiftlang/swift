@@ -185,7 +185,11 @@ public func != <T: Equatable>(lhs: T, rhs: T) -> Bool
 extension RawRepresentable where RawValue: Hashable, Self: Hashable {
   @inlinable // trivial
   public var hashValue: Int {
-    return rawValue.hashValue
+    // Note: in Swift 5.5 and below, this used to return `rawValue.hashValue`.
+    // The current definition matches the default `hashValue` implementation,
+    // so that RawRepresentable types don't need to implement both `hashValue`
+    // and `hash(into:)` to customize their hashing.
+    _hashValue(for: self)
   }
 
   @inlinable // trivial

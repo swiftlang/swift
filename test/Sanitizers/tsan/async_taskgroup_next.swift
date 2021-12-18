@@ -11,7 +11,7 @@
 
 var scratchBuffer: UnsafeMutableBufferPointer<Int> = .allocate(capacity: 1000)
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func completeFastOrSlow(n: Int) async -> Int {
   if n % 2 == 0 {
     await Task.sleep(2_000_000_000)
@@ -21,7 +21,7 @@ func completeFastOrSlow(n: Int) async -> Int {
   return n
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_sum_nextOnCompletedOrPending() async {
   scratchBuffer.initialize(repeating: 0)
 
@@ -57,7 +57,7 @@ func test_sum_nextOnCompletedOrPending() async {
   assert(sum == expected, "Expected: \(expected), got: \(sum)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_sum_nextOnCompletedOrPending()

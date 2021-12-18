@@ -367,7 +367,7 @@ typedef ::testing::Types<
         CtorTester, CtorTester, 4,
         llvm::SmallDenseMap<CtorTester, unsigned, 4, CtorTesterMapInfo>>>
     BlotMapVectorTestTypes;
-TYPED_TEST_CASE(BlotMapVectorTest, BlotMapVectorTestTypes);
+TYPED_TEST_SUITE(BlotMapVectorTest, BlotMapVectorTestTypes, );
 
 // Empty map tests
 TYPED_TEST(BlotMapVectorTest, EmptyIntMapTest) {

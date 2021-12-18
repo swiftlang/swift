@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,10 +24,11 @@
 
 import TestsUtils
 
-public let TypeFlood = BenchmarkInfo(
-  name: "TypeFlood",
-  runFunction: run_TypeFlood,
-  tags: [.validation, .metadata])
+public let benchmarks =
+  BenchmarkInfo(
+    name: "TypeFlood",
+    runFunction: run_TypeFlood,
+    tags: [.validation, .metadata])
 
 protocol Pingable {}
 
@@ -101,9 +102,9 @@ func flood2<T>(_ x: T) {
 }
 
 @inline(never)
-public func run_TypeFlood(_ N: Int) {
+public func run_TypeFlood(_ n: Int) {
 
-  for _ in 1...N {
+  for _ in 1...n {
     flood3(Some1<Some1<Some1<Int>>>())
     flood3(Some1<Some1<Some0<Int>>>())
     flood3(Some1<Some0<Some1<Int>>>())

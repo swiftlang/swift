@@ -133,6 +133,11 @@ class Lexer {
   /// the next token doesn't have a comment.
   const char *CommentStart;
 
+  /// If this is not \c nullptr, all tokens after this point are treated as eof.
+  /// Used to cut off lexing early when we detect that the nesting level is too
+  /// deep.
+  const char *LexerCutOffPoint = nullptr;
+
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
@@ -220,6 +225,28 @@ public:
 
     CurPtr = BufferStart + Offset;
     lexImpl();
+  }
+
+  /// Cut off lexing at the current position. The next token to be lexed will
+  /// be an EOF token, even if there is still source code to be lexed.
+  /// The current and next token (returned by \c peekNextToken ) are not
+  /// modified. The token after \c NextToken will be the EOF token.
+  void cutOffLexing() {
+    // If we already have a cut off point, don't push it further towards the
+    // back.
+    if (LexerCutOffPoint == nullptr || LexerCutOffPoint >= CurPtr) {
+      LexerCutOffPoint = CurPtr;
+    }
+  }
+
+  /// If a lexer cut off point has been set returns the offset in the buffer at
+  /// which lexing is being cut off.
+  Optional<size_t> lexingCutOffOffset() const {
+    if (LexerCutOffPoint) {
+      return LexerCutOffPoint - BufferStart;
+    } else {
+      return None;
+    }
   }
 
   bool isKeepingComments() const {
@@ -580,6 +607,15 @@ private:
   bool lexUnknown(bool EmitDiagnosticsIfToken);
 
   NulCharacterKind getNulCharacterKind(const char *Ptr) const;
+
+  /// Emit diagnostics for single-quote string and suggest replacement
+  /// with double-quoted equivalent.
+  ///
+  /// Or, if we're in strawperson mode, we will emit a custom
+  /// error message instead, determined by the Swift library.
+  void diagnoseSingleQuoteStringLiteral(const char *TokStart,
+                                        const char *TokEnd);
+
 };
 
 /// A lexer that can lex trivia into its pieces

@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -requirement-machine=off)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-lexical-lifetimes)
+
 // REQUIRES: executable_test
 
 // Would fail due to unavailability of swift_autoDiffCreateLinearMapContext.

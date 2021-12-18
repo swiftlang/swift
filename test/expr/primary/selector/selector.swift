@@ -157,7 +157,16 @@ extension SomeProtocol {
     let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector because protocol 'SomeProtocol' is not exposed to Objective-C}} {{none}}
   }
 
-  func anotherFunction() { 
+  func anotherFunction() {
     print("Hello world!")
  }
+}
+
+@objc class OverloadedFuncAndProperty {
+  @objc static func f() {}
+  @objc var f: Int { 0 }
+}
+
+func test() -> Selector {
+  #selector(OverloadedFuncAndProperty.f)
 }

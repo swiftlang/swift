@@ -88,8 +88,8 @@ class BuilderClosureVisitor
 
   /// Produce a builder call to the given named function with the given
   /// arguments.
-  Expr *buildCallIfWanted(SourceLoc loc,
-                          Identifier fnName, ArrayRef<Expr *> args,
+  Expr *buildCallIfWanted(SourceLoc loc, Identifier fnName,
+                          ArrayRef<Expr *> argExprs,
                           ArrayRef<Identifier> argLabels) {
     if (!cs)
       return nullptr;
@@ -120,23 +120,24 @@ class BuilderClosureVisitor
     }
     cs->setType(typeExpr, MetatypeType::get(builderType));
 
-    SmallVector<SourceLoc, 4> argLabelLocs;
-    for (auto i : indices(argLabels)) {
-      argLabelLocs.push_back(args[i]->getStartLoc());
+    SmallVector<Argument, 4> args;
+    for (auto i : indices(argExprs)) {
+      auto *expr = argExprs[i];
+      auto label = argLabels.empty() ? Identifier() : argLabels[i];
+      auto labelLoc = argLabels.empty() ? SourceLoc() : expr->getStartLoc();
+      args.emplace_back(labelLoc, label, expr);
     }
 
     auto memberRef = new (ctx) UnresolvedDotExpr(
         typeExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
         /*implicit=*/true);
     memberRef->setFunctionRefKind(FunctionRefKind::SingleApply);
-    SourceLoc openLoc = args.empty() ? loc : args.front()->getStartLoc();
-    SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
-    Expr *result = CallExpr::create(ctx, memberRef, openLoc, args,
-                                    argLabels, argLabelLocs, closeLoc,
-                                    /*trailing closures*/{},
-                                    /*implicit*/true);
 
-    return result;
+    auto openLoc = args.empty() ? loc : argExprs.front()->getStartLoc();
+    auto closeLoc = args.empty() ? loc : argExprs.back()->getEndLoc();
+
+    auto *argList = ArgumentList::createImplicit(ctx, openLoc, args, closeLoc);
+    return CallExpr::createImplicit(ctx, memberRef, argList);
   }
 
   /// Check whether the builder supports the given operation.
@@ -653,7 +654,8 @@ protected:
     auto someRef = new (ctx) UnresolvedDotExpr(
         optionalTypeExpr, loc, DeclNameRef(ctx.getIdentifier("some")),
         DeclNameLoc(loc), /*implicit=*/true);
-    return CallExpr::createImplicit(ctx, someRef, arg, { });
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
+    return CallExpr::createImplicit(ctx, someRef, argList);
   }
 
   Expr *buildNoneExpr(SourceLoc endLoc) {
@@ -873,10 +875,12 @@ protected:
         arrayVarRef, endLoc, DeclNameRef(ctx.getIdentifier("append")),
         DeclNameLoc(endLoc), /*implicit=*/true);
     arrayAppendRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+
     auto bodyVarRef = buildVarRef(bodyVar, endLoc);
-    Expr *arrayAppendCall = CallExpr::create(
-        ctx, arrayAppendRef, endLoc, { bodyVarRef } , { Identifier() },
-        { endLoc }, endLoc, /*trailingClosures=*/{}, /*implicit=*/true);
+    auto *argList = ArgumentList::createImplicit(
+        ctx, endLoc, {Argument::unlabeled(bodyVarRef)}, endLoc);
+    Expr *arrayAppendCall =
+        CallExpr::createImplicit(ctx, arrayAppendRef, argList);
     arrayAppendCall = cs->generateConstraints(arrayAppendCall, dc);
     if (!arrayAppendCall) {
       hadError = true;
@@ -1458,6 +1462,14 @@ public:
         return nullptr;
     }
 
+    // Setup the types of our case body var decls.
+    for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      assert(expected->hasName());
+      auto prev = expected->getParentVarDecl();
+      auto type = solution.resolveInterfaceType(solution.getType(prev));
+      expected->setInterfaceType(type);
+    }
+
     // Transform the body of the case.
     auto body = cast<BraceStmt>(caseStmt->getBody());
     auto captured = takeCapturedStmt(body);
@@ -1657,6 +1669,14 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
+  if (cs.isDebugMode()) {
+    auto &log = llvm::errs();
+
+    log << "--- Applying result builder to function ---\n";
+    func->dump(log);
+    log << '\n';
+  }
+
   if (auto result = cs.matchResultBuilder(
           func, builderType, resultContextType, resultConstraintKind,
           cs.getConstraintLocator(func->getBody()))) {
@@ -1709,7 +1729,16 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
           solutions.front(),
           SolutionApplicationTarget(func))) {
     performSyntacticDiagnosticsForTarget(*result, /*isExprStmt*/ false);
-    return result->getFunctionBody();
+    auto *body = result->getFunctionBody();
+
+    if (cs.isDebugMode()) {
+      auto &log = llvm::errs();
+      log << "--- Type-checked function body ---\n";
+      body->dump(log);
+      log << '\n';
+    }
+
+    return body;
   }
 
   return nullptr;
@@ -1830,8 +1859,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
         return elt.first == fn;
       }) == resultBuilderTransformed.end() &&
          "already transformed this body along this path!?!");
-  resultBuilderTransformed.push_back(
-      std::make_pair(fn, std::move(*applied)));
+  resultBuilderTransformed.insert(std::make_pair(fn, std::move(*applied)));
 
   // If builder is applied to the closure expression then
   // `closure body` to `closure result` matching should
@@ -1941,7 +1969,7 @@ public:
         return nullptr;
 
       if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
-        if (shouldTypeCheckInEnclosingExpression(closure)) {
+        if (closure->hasSingleExpressionBody()) {
           hasError |= containsErrorExpr(closure->getSingleExpressionBody());
           return hasError ? nullptr : expr;
         }

@@ -59,7 +59,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CharacterProperties
     single-source/Chars
     single-source/ClassArrayGetter
-    single-source/Codable
+    single-source/CodableTest
     single-source/Combos
     single-source/DataBenchmarks
     single-source/DeadArray
@@ -76,7 +76,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryCopy
     single-source/DictionaryGroup
     single-source/DictionaryKeysContains
-    single-source/DictionaryLiteral
+    single-source/DictionaryLiteralTest
     single-source/DictionaryOfAnyHashableStrings
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
@@ -112,11 +112,11 @@ set(SWIFT_BENCH_MODULES
     single-source/LuhnAlgoLazy
     single-source/MapReduce
     single-source/Memset
-    single-source/Mirror
+    single-source/MirrorTest
     single-source/MonteCarloE
     single-source/MonteCarloPi
     single-source/NSDictionaryCastToSwift
-    single-source/NSError
+    single-source/NSErrorTest
     single-source/NSStringConversion
     single-source/NibbleSort
     single-source/NIOChannelPipeline
@@ -143,7 +143,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ProtocolConformance
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
-    single-source/Queue
+    single-source/QueueTest
     single-source/RC4
     single-source/RGBHistogram
     single-source/Radix2CooleyTukey
@@ -186,7 +186,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringSwitch
     single-source/StringTests
     single-source/StringWalk
-    single-source/Substring
+    single-source/SubstringTest
     single-source/Suffix
     single-source/SuperChars
     single-source/TwoSum

@@ -210,21 +210,15 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
         auto eltType = Addr->getType().getEnumElementType(
             c.first, Builder.getModule(), Builder.getTypeExpansionContext());
         eltType = eltType.getObjectType();
-        if (eltType.isTrivial(Builder.getFunction())) {
-          c.second->createPhiArgument(eltType, OwnershipKind::None);
-        } else {
-          c.second->createPhiArgument(eltType, OwnershipKind::Guaranteed);
-        }
+        sei->createResult(c.second, eltType);
       }
       Builder.setInsertionPoint(c.second->front().getIterator());
-      Builder.emitEndBorrowOperation(SEAI->getLoc(), EnumVal);
+      Builder.emitEndBorrowOperation(sei->getLoc(), EnumVal);
     }
-
+    sei->createDefaultResult();
     if (auto defaultBlock = sei->getDefaultBBOrNull()) {
-      defaultBlock.get()->createPhiArgument(EnumVal->getType(),
-                                            OwnershipKind::Guaranteed);
       Builder.setInsertionPoint(defaultBlock.get()->front().getIterator());
-      Builder.emitEndBorrowOperation(SEAI->getLoc(), EnumVal);
+      Builder.emitEndBorrowOperation(sei->getLoc(), EnumVal);
     }
   }
 
@@ -508,12 +502,15 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
   for (auto *use : AS->getUses()) {
     SILInstruction *user = use->getUser();
     switch (user->getKind()) {
-      case SILInstructionKind::DebugValueAddrInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
       case SILInstructionKind::InjectEnumAddrInst:
         // We'll check init_enum_addr below.
         break;
+      case SILInstructionKind::DebugValueInst:
+        if (DebugValueInst::hasAddrVal(user))
+          break;
+        return false;
       case SILInstructionKind::InitEnumDataAddrInst: {
         auto *ieda = cast<InitEnumDataAddrInst>(user);
         auto *el = ieda->getElement();
@@ -569,7 +566,6 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
     SILInstruction *user = use->getUser();
     switch (user->getKind()) {
       case SILInstructionKind::InjectEnumAddrInst:
-      case SILInstructionKind::DebugValueAddrInst:
         eraseInstFromFunction(*user);
         break;
       case SILInstructionKind::DestroyAddrInst:
@@ -599,6 +595,12 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
         eraseInstFromFunction(*svi);
         break;
       }
+      case SILInstructionKind::DebugValueInst:
+        if (DebugValueInst::hasAddrVal(user)) {
+          eraseInstFromFunction(*user);
+          break;
+        }
+        LLVM_FALLTHROUGH;
       default:
         llvm_unreachable("unexpected alloc_stack user");
     }
@@ -802,6 +804,18 @@ SILInstruction *SILCombiner::optimizeLoadFromStringLiteral(LoadInst *LI) {
   return Builder.createIntegerLiteral(LI->getLoc(), LI->getType(), str[index]);
 }
 
+static bool isShiftRightByAtLeastOne(SILInstruction *inst) {
+  auto *bi = dyn_cast<BuiltinInst>(inst);
+  if (!bi)
+    return false;
+  if (bi->getBuiltinInfo().ID != BuiltinValueKind::LShr)
+    return false;
+  auto *shiftVal = dyn_cast<IntegerLiteralInst>(bi->getArguments()[1]);
+  if (!shiftVal)
+    return false;
+  return shiftVal->getValue().isStrictlyPositive();
+}
+
 /// Returns true if \p LI loads a zero integer from the empty Array, Dictionary
 /// or Set singleton.
 static bool isZeroLoadFromEmptyCollection(SingleValueInstruction *LI) {
@@ -824,15 +838,23 @@ static bool isZeroLoadFromEmptyCollection(SingleValueInstruction *LI) {
       }
       case ValueKind::StructElementAddrInst: {
         auto *SEA = cast<StructElementAddrInst>(addr);
-        // For Array, we only support "count". The value of "capacityAndFlags"
-        // is not defined in the ABI and could change in another version of the
-        // runtime (the capacity must be 0, but the flags may be not 0).
-        if (SEA->getStructDecl()->getName().is("_SwiftArrayBodyStorage") &&
-            !SEA->getField()->getName().is("count")) {
-          return false;
-        }
         addr = SEA->getOperand();
-        break;
+        if (!SEA->getStructDecl()->getName().is("_SwiftArrayBodyStorage"))
+          break;
+        if (SEA->getField()->getName().is("count"))
+          break;
+        // For Array, the value of `capacityAndFlags` has only a zero capacity
+        // but not necessarily a zero flag (in fact, the flag is 1).
+        // Therefore only replace `capacityAndFlags` with zero if the flag is
+        // masked out by a right-shift of 1.
+        if (SEA->getField()->getName().is("_capacityAndFlags")) {
+          for (Operand *loadUse : LI->getUses()) {
+            if (!isShiftRightByAtLeastOne(loadUse->getUser()))
+              return false;
+          }
+          break;
+        }
+        return false;
       }
       case ValueKind::RefElementAddrInst: {
         auto *REA = cast<RefElementAddrInst>(addr);
@@ -856,6 +878,13 @@ static bool isZeroLoadFromEmptyCollection(SingleValueInstruction *LI) {
       case ValueKind::EndCOWMutationInst:
         addr = cast<SingleValueInstruction>(addr)->getOperand(0);
         break;
+      case ValueKind::MultipleValueInstructionResult:
+        if (auto *bci = dyn_cast<BeginCOWMutationInst>(
+                                              addr->getDefiningInstruction())) {
+          addr = bci->getOperand();
+          break;
+        }
+        return false;
       default:
         return false;
     }
@@ -1213,7 +1242,7 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *dvi) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
+SILInstruction *SILCombiner::legacyVisitStrongRetainInst(StrongRetainInst *SRI) {
   assert(!SRI->getFunction()->hasOwnership());
 
   // Retain of ThinToThickFunction is a no-op.
@@ -1821,7 +1850,7 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   return eraseInstFromFunction(*tedai);
 }
 
-SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
+SILInstruction *SILCombiner::legacyVisitStrongReleaseInst(StrongReleaseInst *SRI) {
   assert(!SRI->getFunction()->hasOwnership());
 
   // Release of ThinToThickFunction is a no-op.
@@ -1997,16 +2026,15 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     //
     // 3. In each destination block, we need to create an argument and end the
     //    lifetime of that argument.
-    auto enumOperandType = SEI->getEnumOperand()->getType();
-    if (DefaultBB) {
-      auto *defaultArg =
-          DefaultBB->createPhiArgument(enumOperandType, OwnershipKind::Owned);
-      SILBuilderWithScope innerBuilder(defaultArg->getNextInstruction(),
-                                       Builder);
-      auto loc = RegularLocation::getAutoGeneratedLocation();
-      innerBuilder.emitDestroyValueOperation(loc, defaultArg);
+    SILValue selectEnumOperand = SEI->getEnumOperand();
+    SILValue switchEnumOperand = selectEnumOperand;
+    if (selectEnumOperand.getOwnershipKind() != OwnershipKind::None) {
+      switchEnumOperand =
+          makeCopiedValueAvailable(selectEnumOperand, Builder.getInsertionBB());
     }
-
+    auto *switchEnum = Builder.createSwitchEnum(
+        SEI->getLoc(), switchEnumOperand, DefaultBB, Cases);
+    auto enumOperandType = SEI->getEnumOperand()->getType();
     for (auto pair : Cases) {
       // We only need to create the phi argument if our case doesn't have an
       // associated value.
@@ -2018,22 +2046,24 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
 
       auto enumEltType =
           enumOperandType.getEnumElementType(enumEltDecl, block->getParent());
-      auto *arg = block->createPhiArgument(enumEltType, OwnershipKind::Owned);
+      auto *arg = switchEnum->createResult(block, enumEltType);
       SILBuilderWithScope innerBuilder(arg->getNextInstruction(), Builder);
-      auto loc = RegularLocation::getAutoGeneratedLocation();
-      innerBuilder.emitDestroyValueOperation(loc, arg);
+      // The switch enum may change ownership resulting in Guaranteed or None.
+      if (arg->getOwnershipKind() == OwnershipKind::Owned) {
+        auto loc = RegularLocation::getAutoGeneratedLocation();
+        innerBuilder.emitDestroyValueOperation(loc, arg);
+      }
     }
-
-    SILValue selectEnumOperand = SEI->getEnumOperand();
-    SILValue switchEnumOperand = selectEnumOperand;
-    if (selectEnumOperand.getOwnershipKind() != OwnershipKind::None) {
-      switchEnumOperand = makeCopiedValueAvailable(selectEnumOperand,
-                                                   Builder.getInsertionBB());
+    if (auto defaultArg = switchEnum->createDefaultResult()) {
+      SILBuilderWithScope innerBuilder(defaultArg->getNextInstruction(), SEI);
+      // The switch enum may change ownership resulting in Guaranteed or None.
+      if (defaultArg->getOwnershipKind() == OwnershipKind::Owned) {
+        auto loc = RegularLocation::getAutoGeneratedLocation();
+        innerBuilder.emitDestroyValueOperation(loc, defaultArg);
+      }
     }
-    return Builder.createSwitchEnum(SEI->getLoc(), switchEnumOperand, DefaultBB,
-                                    Cases);
+    return switchEnum;
   }
-
   return nullptr;
 }
 

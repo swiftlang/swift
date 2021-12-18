@@ -238,10 +238,10 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
     return;
   if (!isa<ConstructorRefCallExpr>(CE->getFn()))
     return;
-  auto *ParenE = dyn_cast<ParenExpr>(CE->getArg());
-  if (!ParenE)
+  auto *unaryArg = CE->getArgs()->getUnlabeledUnaryExpr();
+  if (!unaryArg)
     return;
-  auto *ME = dyn_cast<MemberRefExpr>(ParenE->getSubExpr());
+  auto *ME = dyn_cast<MemberRefExpr>(unaryArg);
   if (!ME)
     return;
   ValueDecl *VD = ME->getMember().getDecl();
@@ -365,7 +365,7 @@ static LabeledStmt *findUnlabeledBreakOrContinueStmtTarget(
 ///
 /// \returns the target, if one was found, or \c nullptr if no such target
 /// exists.
-static LabeledStmt *findBreakOrContinueStmtTarget(
+LabeledStmt *swift::findBreakOrContinueStmtTarget(
     ASTContext &ctx, SourceFile *sourceFile,
     SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
     bool isContinue, DeclContext *dc) {
@@ -596,7 +596,7 @@ static void checkFallthroughPatternBindingsAndTypes(
 /// Check the correctness of a 'fallthrough' statement.
 ///
 /// \returns true if an error occurred.
-static bool checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt) {
+bool swift::checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt) {
   CaseStmt *fallthroughSource;
   CaseStmt *fallthroughDest;
   ASTContext &ctx = dc->getASTContext();
@@ -1422,14 +1422,14 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     // Otherwise, complain.  Start with more specific diagnostics.
 
     // Diagnose unused constructor calls.
-    if (callee && isa<ConstructorDecl>(callee) && !call->isImplicit()) {
+    if (isa_and_nonnull<ConstructorDecl>(callee) && !call->isImplicit()) {
       DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
                callee->getDeclContext()->getDeclaredInterfaceType())
-        .highlight(call->getArg()->getSourceRange());
+        .highlight(call->getArgs()->getSourceRange());
       return;
     }
     
-    SourceRange SR1 = call->getArg()->getSourceRange(), SR2;
+    SourceRange SR1 = call->getArgs()->getSourceRange(), SR2;
     if (auto *BO = dyn_cast<BinaryExpr>(call)) {
       SR1 = BO->getLHS()->getSourceRange();
       SR2 = BO->getRHS()->getSourceRange();
@@ -1613,7 +1613,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
       if (auto classTy = selfTy->getClassOrBoundGenericClass()) {
         assert(classTy->getSuperclass());
         auto &Diags = fromCtor->getASTContext().Diags;
-        Diags.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
+        Diags.diagnose(apply->getArgs()->getLoc(), diag::chain_convenience_init,
                        classTy->getSuperclass());
         ctor->diagnose(diag::convenience_init_here);
       }
@@ -1954,6 +1954,10 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   const auto &tyOpts = ctx.TypeCheckerOpts;
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(AFD);
+
+  auto SF = AFD->getParentSourceFile();
+  if (SF)
+    TypeChecker::buildTypeRefinementContextHierarchyDelayed(*SF, AFD);
 
   BraceStmt *body = AFD->getBody();
   assert(body && "Expected body to type-check");

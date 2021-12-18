@@ -19,7 +19,7 @@ import SwiftReflectionTest
 
 class MyClass<T> {}
 
-if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
+if #available(SwiftStdlib 5.1, *) {
   // Imported class wrapped in AnyObject
 
   // CHECK: Type reference:

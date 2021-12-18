@@ -289,7 +289,7 @@ func testCopyS(_ arg: StructOfInt) -> StructOfInt {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify9testCopySyAA11StructOfIntVADF : $@convention(thin) (StructOfInt) -> StructOfInt {
 // CHECK: bb0(%0 : $StructOfInt):
-// CHECK:   alloc_stack $StructOfInt, let, name "lhs"
+// CHECK:   alloc_stack [lexical] $StructOfInt, let, name "lhs"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [var]
 // CHECK-NOT: begin_access
 // CHECK:   assign %0 to [[UNINIT]] : $*StructOfInt
@@ -568,7 +568,7 @@ enum OptionalWithMap<Wrapped> {
 // CHECK: [[BBSOME]]:
 // CHECK-NOT: begin_access
 // CHECK: [[ADR:%.*]] = unchecked_take_enum_data_addr [[STK]]
-// CHECK: alloc_stack $Wrapped, let, name "y"
+// CHECK: alloc_stack [lexical] $Wrapped, let, name "y"
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [take] [[ADR]] to [initialization]
 // ----- call transform.
@@ -925,7 +925,7 @@ func testOpenExistential(p: PBar) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF : $@convention(thin) (@in_guaranteed PBar) -> () {
 // CHECK: bb0(%0 : $*PBar):
-// CHECK: [[Q0:%.*]] = alloc_stack $Optional<Q>, let, name "q0"
+// CHECK: [[Q0:%.*]] = alloc_stack [lexical] $Optional<Q>, let, name "q0"
 // CHECK: [[PBAR:%.*]] = alloc_stack $PBar
 // CHECK-NOT: begin_access
 // CHECK: copy_addr %0 to [initialization] [[PBAR]] : $*PBar
@@ -937,7 +937,7 @@ func testOpenExistential(p: PBar) {
 // CHECK: inject_enum_addr [[Q0]] : $*Optional<Q>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
 // CHECK: apply %{{.*}}<Q>([[Q0]], {{.*}}) : $@convention(method) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, _OptionalNilComparisonType, @thin Optional<τ_0_0>.Type) -> Bool
-// CHECK: [[Q:%.*]] = alloc_stack $Q, let, name "q"
+// CHECK: [[Q:%.*]] = alloc_stack [lexical] $Q, let, name "q"
 // CHECK: [[OPT_Q:%.*]] = alloc_stack $Optional<Q>
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [[Q0]] to [initialization] [[OPT_Q]] : $*Optional<Q>

@@ -285,14 +285,14 @@ bb0(%0 :@owned  $Child):
 
 // CHECK-LABEL: sil [ossa] @cleanup_debuginsts :
 // CHECK:   copy_addr [take]
-// CHECK-NOT: debug_value_addr
+// CHECK-NOT: debug_value {{.*}} expr op_deref
 // CHECK-LABEL: } // end sil function 'cleanup_debuginsts'
 sil [ossa] @cleanup_debuginsts : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   %2 = alloc_stack $T
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   copy_addr %0 to [initialization] %2 : $*T
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   destroy_addr %0 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T

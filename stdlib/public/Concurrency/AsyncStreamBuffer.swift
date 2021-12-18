@@ -51,9 +51,9 @@ func _lock(_ ptr: UnsafeRawPointer)
 func _unlock(_ ptr: UnsafeRawPointer)
 #endif
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncStream {
-  internal final class _Storage: UnsafeSendable {
+  internal final class _Storage: @unchecked Sendable {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
 
     struct State {
@@ -283,9 +283,9 @@ extension AsyncStream {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream {
-  internal final class _Storage: UnsafeSendable {
+  internal final class _Storage: @unchecked Sendable {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
     enum Terminal {
       case finished
@@ -543,7 +543,7 @@ extension AsyncThrowingStream {
 }
 
 // this is used to store closures; which are two words
-final class _AsyncStreamCriticalStorage<Contents> {
+final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
   var _value: Contents
   private init(_doNotCallMe: ()) {
     fatalError("_AsyncStreamCriticalStorage must be initialized by create")

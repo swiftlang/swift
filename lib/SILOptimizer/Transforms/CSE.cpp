@@ -732,8 +732,10 @@ bool CSE::processLazyPropertyGetters() {
     SILBasicBlock *callBlock = ai->getParent();
 
     // Inline the getter...
+    InstructionDeleter deleter;
     SILInliner::inlineFullApply(ai, SILInliner::InlineKind::PerformanceInline,
-                                FuncBuilder);
+                                FuncBuilder, deleter);
+    deleter.cleanupDeadInstructions();
     
     // ...and fold the switch_enum in the first block to the Optional.some case.
     // The Optional.none branch becomes dead.
@@ -1033,7 +1035,10 @@ bool CSE::processNode(DominanceInfoNode *Node) {
         OwnershipRAUWHelper helper(RAUWFixupContext,
                                    cast<SingleValueInstruction>(Inst),
                                    cast<SingleValueInstruction>(AvailInst));
-        if (!helper.isValid())
+        // If RAUW requires cloning the original, then there's no point. If it
+        // also requires introducing a copy and new borrow scope, then it's a
+        // very bad idea.
+        if (!helper.isValid() || helper.requiresCopyBorrowAndClone())
           continue;
         // Replace SingleValueInstruction using OSSA RAUW here
         nextI = helper.perform();

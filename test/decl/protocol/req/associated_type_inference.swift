@@ -658,6 +658,12 @@ struct S39<B>: P39 {}
 
 // Test that we can handle an analogous complex case involving all kinds of
 // type witness resolution.
+//
+// FIXME: Except there's too much circularity here, and this really can't
+// work. The problem is that S40 conforms to P40c, and we can't check the
+// conformance without computing the requirement signature of P40c, but the
+// requirement signature computation depends on the conformance, via the
+// 'D == S40<Never>' requirement.
 protocol P40a {
   associatedtype A
   associatedtype B: P40a
@@ -665,12 +671,14 @@ protocol P40a {
   func foo(arg: A)
 }
 protocol P40b: P40a {
-  associatedtype C = (A, B.A, D.D, E) -> Self
-  associatedtype D: P40b
-  associatedtype E: Equatable
+  associatedtype C = (A, B.A, D.D, E) -> Self // expected-note {{protocol requires nested type 'C'; do you want to add it?}}
+  associatedtype D: P40b // expected-note {{protocol requires nested type 'D'; do you want to add it?}}
+  associatedtype E: Equatable // expected-note {{protocol requires nested type 'E'; do you want to add it?}}
 }
 protocol P40c: P40b where D == S40<Never> {}
 struct S40<E: Equatable>: P40c {
+  // expected-error@-1 {{type 'S40<E>' does not conform to protocol 'P40b'}}
+  // expected-error@-2 {{type 'S40<E>' does not conform to protocol 'P40c'}}
   func foo(arg: Never) {}
 
   typealias B = Self

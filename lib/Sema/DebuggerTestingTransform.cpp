@@ -208,19 +208,18 @@ private:
     auto *PODeclRef = new (Ctx)
         UnresolvedDeclRefExpr(StringForPrintObjectName,
                               DeclRefKind::Ordinary, DeclNameLoc());
-    Expr *POArgs[] = {DstRef};
-    Identifier POLabels[] = {Identifier()};
-    auto *POCall = CallExpr::createImplicit(Ctx, PODeclRef, POArgs, POLabels);
+    auto *POArgList = ArgumentList::forImplicitUnlabeled(Ctx, {DstRef});
+    auto *POCall = CallExpr::createImplicit(Ctx, PODeclRef, POArgList);
     POCall->setThrows(false);
 
     // Create the call to checkExpect.
-    Identifier CheckExpectLabels[] = {Identifier(), Identifier()};
-    Expr *CheckExpectArgs[] = {Varname, POCall};
     UnresolvedDeclRefExpr *CheckExpectDRE = new (Ctx)
         UnresolvedDeclRefExpr(DebuggerTestingCheckExpectName,
                               DeclRefKind::Ordinary, DeclNameLoc());
-    auto *CheckExpectExpr = CallExpr::createImplicit(
-        Ctx, CheckExpectDRE, CheckExpectArgs, CheckExpectLabels);
+    auto *CheckArgList =
+        ArgumentList::forImplicitUnlabeled(Ctx, {Varname, POCall});
+    auto *CheckExpectExpr =
+        CallExpr::createImplicit(Ctx, CheckExpectDRE, CheckArgList);
     CheckExpectExpr->setThrows(false);
 
     // Create the closure.

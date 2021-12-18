@@ -117,7 +117,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -335,7 +335,7 @@ static bool isStructurallyIdentical(SILValue LHS, SILValue RHS) {
   return (lResult->ResultIndex == rResult->ResultIndex &&
           lResult->Instruction->isIdenticalTo(rResult->Instruction,
                                               isStructurallyIdentical));
-};
+}
 
 /// Compare two sequences of SIL instructions. They should be structurally
 /// equivalent.

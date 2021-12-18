@@ -226,7 +226,7 @@ bool CursorInfoResolver::visitDeclReference(ValueDecl *D,
                                             ReferenceMetaData Data) {
   if (isDone())
     return false;
-  if (Data.isImplicit)
+  if (Data.isImplicit || !Range.isValid())
     return true;
   return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
 }
@@ -1033,7 +1033,7 @@ bool RangeResolver::walkToStmtPre(Stmt *S) {
   Impl->analyze(S);
   Impl->enter(S);
   return true;
-};
+}
 
 bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
   if (D->isImplicit())
@@ -1053,7 +1053,7 @@ bool RangeResolver::walkToExprPost(Expr *E) {
 bool RangeResolver::walkToStmtPost(Stmt *S) {
   Impl->leave(S);
   return !Impl->hasResult();
-};
+}
 
 bool RangeResolver::walkToDeclPost(Decl *D) {
   Impl->leave(D);

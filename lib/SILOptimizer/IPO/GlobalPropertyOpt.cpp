@@ -219,7 +219,6 @@ bool GlobalPropertyOpt::canAddressEscape(SILValue V, bool acceptStore) {
     // These instructions do not cause the address to escape.
     if (isa<LoadInst>(User) ||
         isa<DebugValueInst>(User) ||
-        isa<DebugValueAddrInst>(User) ||
         isa<StrongReleaseInst>(User) ||
         isa<StrongRetainInst>(User) ||
         isa<DeallocBoxInst>(User) ||

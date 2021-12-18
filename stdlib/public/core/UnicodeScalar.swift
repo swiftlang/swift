@@ -34,13 +34,13 @@ extension Unicode {
   ///     // Prints "✈︎"
   @frozen
   public struct Scalar: Sendable {
+    @usableFromInline
+    internal var _value: UInt32
+
     @inlinable
     internal init(_value: UInt32) {
       self._value = _value
     }
-
-    @usableFromInline
-    internal var _value: UInt32
   }
 }
 
@@ -388,12 +388,13 @@ extension Unicode.Scalar: Comparable {
 extension Unicode.Scalar {
   @frozen
   public struct UTF16View: Sendable {
+    @usableFromInline
+    internal var value: Unicode.Scalar
+
     @inlinable
     internal init(value: Unicode.Scalar) {
       self.value = value
     }
-    @usableFromInline
-    internal var value: Unicode.Scalar
   }
 
   @inlinable
@@ -435,23 +436,24 @@ extension Unicode.Scalar.UTF16View: RandomAccessCollection {
 }
 
 extension Unicode.Scalar {
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @available(SwiftStdlib 5.1, *)
   @frozen
   public struct UTF8View: Sendable {
+    @usableFromInline
+    internal var value: Unicode.Scalar
+
     @inlinable
     internal init(value: Unicode.Scalar) {
       self.value = value
     }
-    @usableFromInline
-    internal var value: Unicode.Scalar
   }
 
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @available(SwiftStdlib 5.1, *)
   @inlinable
   public var utf8: UTF8View { return UTF8View(value: self) }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension Unicode.Scalar.UTF8View: RandomAccessCollection {
   public typealias Indices = Range<Int>
 

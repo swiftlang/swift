@@ -42,8 +42,7 @@ TypeConverter::getBridgedParam(SILFunctionTypeRepresentation rep,
                                AbstractionPattern pattern,
                                AnyFunctionType::Param param,
                                Bridgeability bridging) {
-  assert(!param.getParameterFlags().isInOut() &&
-         !param.getParameterFlags().isVariadic());
+  assert(!param.getParameterFlags().isVariadic());
 
   auto bridged = getLoweredBridgedType(pattern, param.getPlainType(), bridging,
                                        rep, TypeConverter::ForArgument);
@@ -120,7 +119,7 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
   }
 
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
-};
+}
 
 Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
                                            Type t, Bridgeability bridging,

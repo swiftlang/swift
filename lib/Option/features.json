@@ -8,6 +8,12 @@
     },
     {
       "name": "index-unit-output-path"
+    },
+    {
+      "name": "library-level"
+    },
+    {
+      "name": "emit-abi-descriptor"
     }
   ]
 }

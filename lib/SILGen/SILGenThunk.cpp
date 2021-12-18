@@ -296,7 +296,8 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         auto noneErrorBB = SGF.createBasicBlock();
         returnBB = SGF.createBasicBlockAfter(noneErrorBB);
         auto &C = SGF.getASTContext();
-        
+        SwitchEnumInst *switchEnum = nullptr;
+
         // Check whether there's an error, based on the presence of a flag
         // parameter. If there is a flag parameter, test it against zero.
         if (flagIndex) {
@@ -326,17 +327,16 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
             {C.getOptionalSomeDecl(), someErrorBB},
             {C.getOptionalNoneDecl(), noneErrorBB}
           };
-          
-          SGF.B.createSwitchEnum(loc, errorArgument.borrow(SGF, loc).getValue(),
-                                 /*default*/ nullptr,
-                                 switchErrorBBs);
+
+          switchEnum = SGF.B.createSwitchEnum(
+              loc, errorArgument.borrow(SGF, loc).getValue(),
+              /*default*/ nullptr, switchErrorBBs);
         }
         
         SGF.B.emitBlock(someErrorBB);
         
-        auto matchedErrorTy = errorArgument.getType().getOptionalObjectType();
-        ManagedValue matchedError;
         Scope errorScope(SGF, loc);
+        ManagedValue matchedError;
         if (flagIndex) {
           // Force-unwrap the error argument, since the flag condition should
           // guarantee that an error did occur.
@@ -344,8 +344,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                                  errorArgument.borrow(SGF, loc),
                                                  /*implicit*/ true);
         } else {
-          matchedError = SGF.B
-            .createGuaranteedTransformingTerminatorArgument(matchedErrorTy);
+          matchedError = SGF.B.createOptionalSomeResult(switchEnum);
         }
         
         // Resume the continuation as throwing the given error, bridged to a

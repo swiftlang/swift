@@ -145,9 +145,9 @@ bb0(%0 : $T):
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   %[[PREV1:.*]] = alloc_stack $T
 // CHECK:   %[[PREV2:.*]] = alloc_stack $T
-// CHECK:   debug_value_addr %0 : $*T, var, name "t", argno 1
-// CHECK:   debug_value_addr %1 : $*T, var, name "u", argno 2
-// CHECK:   debug_value_addr %2 : $*T
+// CHECK:   debug_value %0 : $*T, var, name "t", argno 1, expr op_deref
+// CHECK:   debug_value %1 : $*T, var, name "u", argno 2, expr op_deref
+// CHECK:   debug_value %2 : $*T, {{.*}} expr op_deref
 // CHECK:   copy_addr [take] %0 to [initialization] %[[PREV1]] : $*T
 // CHECK:   copy_addr %2 to [initialization] %0 : $*T
 // CHECK:   destroy_addr %[[PREV1]] : $*T
@@ -162,8 +162,8 @@ bb0(%0 : $T):
 // CHECK-LABEL: } // end sil function 'f050_storeinout'
 sil @f050_storeinout : $@convention(thin) <T> (@inout T, @inout T, @in T) -> () {
 bb0(%0 : $*T, %1 : $*T, %2 : $T):
-  debug_value_addr %0 : $*T, var, name "t", argno 1
-  debug_value_addr %1 : $*T, var, name "u", argno 2
+  debug_value %0 : $*T, var, name "t", argno 1, expr op_deref
+  debug_value %1 : $*T, var, name "u", argno 2, expr op_deref
   debug_value %2 : $T, let, name "x", argno 3
   %6 = copy_value %2 : $T
   %7 = load %0 : $*T

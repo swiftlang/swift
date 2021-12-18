@@ -28,7 +28,7 @@ endfunction()
 function(get_swift_test_versioned_target_triple variant_triple_out_var sdk arch build_flavor)
   if(build_flavor STREQUAL "ios-like")
     # Use the macCatalyst target triple and compiler resources for the iOS-like build flavor.
-    set(variant_triple "${arch}-apple-ios13.0-macabi")
+    set(variant_triple "${arch}-apple-ios13.1-macabi")
   else()
     get_versioned_target_triple(variant_triple ${sdk} ${arch} "${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
   endif()

@@ -5,7 +5,7 @@
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t
 // REQUIRES: objc_interop
 
-// PRINT-LABEL: struct ErrorDomain : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-LABEL: struct ErrorDomain : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var rawValue: String { get }
@@ -26,7 +26,7 @@
 // PRINT-NEXT:  extension Food {
 // PRINT-NEXT:    static let err: ErrorDomain
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct ClosedEnum : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT:  struct ClosedEnum : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
@@ -37,14 +37,14 @@
 // PRINT-NEXT:    static let secondEntry: ClosedEnum
 // PRINT-NEXT:    static let thirdEntry: ClosedEnum
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct IUONewtype : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT:  struct IUONewtype : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
-// PRINT-NEXT:  struct MyFloat : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT:  struct MyFloat : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:    init(_ rawValue: Float)
 // PRINT-NEXT:    init(rawValue: Float)
 // PRINT-NEXT:    let rawValue: Float
@@ -56,7 +56,7 @@
 // PRINT-NEXT:    static let version: MyFloat{{$}}
 // PRINT-NEXT:  }
 //
-// PRINT-LABEL: struct MyInt : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-LABEL: struct MyInt : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:    init(_ rawValue: Int32)
 // PRINT-NEXT:    init(rawValue: Int32)
 // PRINT-NEXT:    let rawValue: Int32
@@ -83,7 +83,7 @@
 // PRINT-NEXT:  let Notification: String
 // PRINT-NEXT:  let swiftNamedNotification: String
 //
-// PRINT-LABEL: struct CFNewType : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-LABEL: struct CFNewType : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
@@ -97,7 +97,7 @@
 // PRINT-NEXT:  func FooAudited() -> CFNewType
 // PRINT-NEXT:  func FooUnaudited() -> Unmanaged<CFString>
 //
-// PRINT-LABEL: struct MyABINewType : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-LABEL: struct MyABINewType : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
@@ -114,7 +114,7 @@
 // PRINT-NEXT:  func takeMyABIOldType(_: MyABIOldType!)
 // PRINT-NEXT:  func takeMyABINewTypeNonNull(_: MyABINewType)
 // PRINT-NEXT:  func takeMyABIOldTypeNonNull(_: MyABIOldType)
-// PRINT-LABEL: struct MyABINewTypeNS : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-LABEL: struct MyABINewTypeNS : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:    init(_ rawValue: String)
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var rawValue: String { get }
@@ -128,12 +128,12 @@
 // PRINT-NEXT:  func takeMyABIOldTypeNonNullNS(_: String)
 //
 // PRINT-NEXT:  struct NSSomeContext {
-// PRINT-NEXT:    var i: Int32
 // PRINT-NEXT:    init()
 // PRINT-NEXT:    init(i: Int32)
+// PRINT-NEXT:    var i: Int32
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSSomeContext {
-// PRINT-NEXT:    struct Name : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT:    struct Name : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:      init(_ rawValue: String)
 // PRINT-NEXT:      init(rawValue: String)
 // PRINT-NEXT:      var rawValue: String { get }
@@ -145,13 +145,13 @@
 // PRINT-NEXT:    static let myContextName: NSSomeContext.Name
 // PRINT-NEXT:  }
 //
-// PRINT-NEXT: struct TRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT: struct TRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:   init(_ rawValue: OpaquePointer)
 // PRINT-NEXT:   init(rawValue: OpaquePointer)
 // PRINT-NEXT:   let rawValue: OpaquePointer
 // PRINT-NEXT:   typealias RawValue = OpaquePointer
 // PRINT-NEXT: }
-// PRINT-NEXT: struct ConstTRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT: struct ConstTRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:   init(_ rawValue: OpaquePointer)
 // PRINT-NEXT:   init(rawValue: OpaquePointer)
 // PRINT-NEXT:   let rawValue: OpaquePointer
@@ -169,13 +169,13 @@
 // PRINT-NEXT:   func use()
 // PRINT-NEXT: }
 //
-// PRINT-NEXT: struct TRefRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT: struct TRefRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:   init(_ rawValue: UnsafeMutablePointer<OpaquePointer>)
 // PRINT-NEXT:   init(rawValue: UnsafeMutablePointer<OpaquePointer>)
 // PRINT-NEXT:   let rawValue: UnsafeMutablePointer<OpaquePointer>
 // PRINT-NEXT:   typealias RawValue = UnsafeMutablePointer<OpaquePointer>
 // PRINT-NEXT: }
-// PRINT-NEXT: struct ConstTRefRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT: struct ConstTRefRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable, @unchecked Sendable {
 // PRINT-NEXT:   init(_ rawValue: UnsafePointer<OpaquePointer>)
 // PRINT-NEXT:   init(rawValue: UnsafePointer<OpaquePointer>)
 // PRINT-NEXT:   let rawValue: UnsafePointer<OpaquePointer>
@@ -238,19 +238,19 @@ func testFixit() {
 func testNonEphemeralInitParams(x: OpaquePointer) {
   var x = x
 
-  _ = TRefRef(&x) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(_:)'}}
+  _ = TRefRef(&x) // expected-warning {{argument #1 must be a pointer that outlives the call to 'init(_:)'}}
   // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafeMutablePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
   // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  _ = TRefRef(rawValue: &x) // expected-warning {{inout expression creates a temporary pointer, but argument 'rawValue' should be a pointer that outlives the call to 'init(rawValue:)'}}
+  _ = TRefRef(rawValue: &x) // expected-warning {{argument 'rawValue' must be a pointer that outlives the call to 'init(rawValue:)'}}
   // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafeMutablePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
   // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  _ = ConstTRefRef(&x) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(_:)'}}
+  _ = ConstTRefRef(&x) // expected-warning {{argument #1 must be a pointer that outlives the call to 'init(_:)'}}
   // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  _ = ConstTRefRef(rawValue: &x) // expected-warning {{inout expression creates a temporary pointer, but argument 'rawValue' should be a pointer that outlives the call to 'init(rawValue:)'}}
+  _ = ConstTRefRef(rawValue: &x) // expected-warning {{argument 'rawValue' must be a pointer that outlives the call to 'init(rawValue:)'}}
   // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 }

@@ -93,6 +93,7 @@ public:
 /// force exitBranchAndCleanup to be run.
 class SwitchEnumBuilder {
 public:
+  // The ManagedValue argument will be invalid for no-payload cases.
   using NormalCaseHandler =
       std::function<void(ManagedValue, SwitchCaseFullExpr &&)>;
   using DefaultCaseHandler =
@@ -193,6 +194,8 @@ public:
 
 private:
   SILGenFunction &getSGF() const { return builder.getSILGenFunction(); }
+
+  ManagedValue emitDefaultCase(SwitchEnumInst *switchEnum);
 };
 
 } // end Lowering namespace

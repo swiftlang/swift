@@ -98,7 +98,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -950,6 +950,10 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
   // destroy foldedVal at the end of the borrow scope.
   assert(originalVal.getOwnershipKind() == OwnershipKind::Guaranteed);
 
+  // FIXME: getUniqueBorrowScopeIntroducingValue may look though various storage
+  // casts. There's no reason to think that it's valid to replace uses of
+  // originalVal with a new borrow of the the "introducing value". All casts
+  // potentially need to be cloned.
   Optional<BorrowedValue> originalScopeBegin =
       getUniqueBorrowScopeIntroducingValue(originalVal);
   assert(originalScopeBegin &&
@@ -1246,7 +1250,7 @@ static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
         }
         (void)deletedInstructions.insert(deadInst);
       });
-  InstructionDeleter deleter(callbacks);
+  InstructionDeleter deleter(std::move(callbacks));
 
   unsigned startIndex = 0;
   while (startIndex < worklist.size()) {
@@ -1510,8 +1514,8 @@ static ApplyInst *getAsOSLogMessageInit(SILInstruction *inst) {
 }
 
 /// Return true iff the SIL function \c fun is a method of the \c OSLogMessage
-/// type.
-bool isMethodOfOSLogMessage(SILFunction &fun) {
+/// type or a type that has the @_semantics("oslog.message.type") annotation.
+static bool isMethodOfOSLogMessage(SILFunction &fun) {
   DeclContext *declContext = fun.getDeclContext();
   if (!declContext)
     return false;
@@ -1527,7 +1531,8 @@ bool isMethodOfOSLogMessage(SILFunction &fun) {
   NominalTypeDecl *typeDecl = parentContext->getSelfNominalTypeDecl();
   if (!typeDecl)
     return false;
-  return typeDecl->getName() == fun.getASTContext().Id_OSLogMessage;
+  return typeDecl->getName() == fun.getASTContext().Id_OSLogMessage
+    || typeDecl->hasSemanticsAttr(semantics::OSLOG_MESSAGE_TYPE);
 }
 
 class OSLogOptimization : public SILFunctionTransform {

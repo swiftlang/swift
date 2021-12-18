@@ -19,7 +19,7 @@ internal class SCC: SPP {
 
 // CHECK-LABEL: sil hidden [noinline] @$s30existential_transform_soletype4opt11bs5Int32VAA3SPP_p_tF : $@convention(thin) (@in_guaranteed SPP) -> Int32 {
 // CHECK: bb0(%0 : $*SPP):
-// CHECK:   debug_value_addr
+// CHECK:   debug_value {{.*}} expr op_deref
 // CHECK:   function_ref @$s30existential_transform_soletype4opt21bs5Int32VAA3SPP_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SPP> (@in_guaranteed τ_0_0) -> Int32 // user: %4
 // CHECK:   open_existential_addr
 // CHECK:   apply
@@ -31,9 +31,9 @@ internal class SCC: SPP {
 // CHECK:   alloc_stack
 // CHECK:   init_existential_addr
 // CHECK:   copy_addr
-// CHECK:   debug_value_addr
+// CHECK:   debug_value {{.*}} expr op_deref
 // CHECK:   open_existential_addr
-// CHECK:   witness_method 
+// CHECK:   witness_method
 // CHECK:   apply
 // CHECK:   dealloc_stack
 // CHECK:   return

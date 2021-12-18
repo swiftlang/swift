@@ -13,6 +13,7 @@ add_swift_host_library(swiftAST STATIC
   AbstractSourceFileDepGraphFactory.cpp
   AccessNotes.cpp
   AccessRequests.cpp
+  ArgumentList.cpp
   ASTContext.cpp
   ASTDemangler.cpp
   ASTDumper.cpp
@@ -73,13 +74,18 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   RawComment.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/GeneratingConformances.cpp
   RequirementMachine/GenericSignatureQueries.cpp
+  RequirementMachine/HomotopyReduction.cpp
+  RequirementMachine/KnuthBendix.cpp
   RequirementMachine/PropertyMap.cpp
-  RequirementMachine/ProtocolGraph.cpp
+  RequirementMachine/PropertyUnification.cpp
+  RequirementMachine/RequirementLowering.cpp
   RequirementMachine/RequirementMachine.cpp
+  RequirementMachine/RequirementMachineRequests.cpp
   RequirementMachine/RewriteContext.cpp
+  RequirementMachine/RewriteLoop.cpp
   RequirementMachine/RewriteSystem.cpp
-  RequirementMachine/RewriteSystemCompletion.cpp
   RequirementMachine/Symbol.cpp
   RequirementMachine/Term.cpp
   SILLayout.cpp

@@ -129,7 +129,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
     let i = _guts.scalarAlign(i)
-    precondition(i._encodedOffset > 0)
+    _precondition(i._encodedOffset > 0)
     // TODO(String performance): isASCII fast-path
 
     if _fastPath(_guts.isFastUTF8) {
@@ -382,6 +382,7 @@ extension String.UnicodeScalarIndex {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 // Reflection
 extension String.UnicodeScalarView: CustomReflectable {
   /// Returns a mirror that reflects the Unicode scalars view of a string.
@@ -389,7 +390,7 @@ extension String.UnicodeScalarView: CustomReflectable {
     return Mirror(self, unlabeledChildren: self)
   }
 }
-
+#endif
 
 //===--- Slicing Support --------------------------------------------------===//
 /// In Swift 3.2, in the absence of type context,

@@ -128,12 +128,23 @@ static llvm::cl::opt<bool> EnableExperimentalConcurrency(
     "enable-experimental-concurrency",
     llvm::cl::desc("Whether to enable experimental concurrency or not"));
 
+static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
+    "enable-experimental-string-processing",
+    llvm::cl::desc("Whether to enable experimental string processing or not"));
+
 static llvm::cl::opt<std::string>
     SDK("sdk", llvm::cl::desc("Path to the SDK to build against"));
 
 static llvm::cl::list<std::string>
     ImportPaths("I",
                 llvm::cl::desc("Add a directory to the import search path"));
+
+static llvm::cl::opt<std::string>
+Triple("target", llvm::cl::desc("target triple"));
+
+static llvm::cl::opt<std::string> ResourceDir(
+    "resource-dir",
+    llvm::cl::desc("The directory that holds the compiler resource files"));
 
 enum class DumpType {
   REWRITTEN,
@@ -288,6 +299,11 @@ int main(int argc, char *argv[]) {
 
   Invocation.setSDKPath(options::SDK);
   Invocation.setImportSearchPaths(options::ImportPaths);
+  if (!options::Triple.empty())
+    Invocation.setTargetTriple(options::Triple);
+
+  if (!options::ResourceDir.empty())
+    Invocation.setRuntimeResourcePath(options::ResourceDir);
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
@@ -298,6 +314,9 @@ int main(int argc, char *argv[]) {
 
   if (options::EnableExperimentalConcurrency)
     Invocation.getLangOptions().EnableExperimentalConcurrency = true;
+
+  if (options::EnableExperimentalStringProcessing)
+    Invocation.getLangOptions().EnableExperimentalStringProcessing = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
@@ -399,9 +418,9 @@ int main(int argc, char *argv[]) {
 
   if (options::Action == RefactoringKind::None) {
     llvm::SmallVector<RefactoringKind, 32> Kinds;
-    bool RangeStartMayNeedRename = false;
-    collectAvailableRefactorings(SF, Range, RangeStartMayNeedRename, Kinds,
-                                 {&PrintDiags});
+    bool CollectRangeStartRefactorings = false;
+    collectAvailableRefactorings(SF, Range, CollectRangeStartRefactorings,
+                                 Kinds, {&PrintDiags});
     llvm::outs() << "Action begins\n";
     for (auto Kind : Kinds) {
       llvm::outs() << getDescriptiveRefactoringKindName(Kind) << "\n";
@@ -425,7 +444,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  SmallVector<std::unique_ptr<SourceEditConsumer>> Consumers;
+  SmallVector<std::unique_ptr<SourceEditConsumer>, 32> Consumers;
   if (!options::RewrittenOutputFile.empty() ||
       options::DumpIn == options::DumpType::REWRITTEN) {
     Consumers.emplace_back(new SourceEditOutputConsumer(

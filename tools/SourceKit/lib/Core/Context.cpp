@@ -27,7 +27,7 @@ GlobalConfig::update(Optional<unsigned> CompletionMaxASTContextReuseCount,
     State.CompletionOpts.CheckDependencyInterval =
         *CompletionCheckDependencyInterval;
   return State;
-};
+}
 
 GlobalConfig::Settings::CompletionOptions
 GlobalConfig::getCompletionOpts() const {
@@ -44,7 +44,8 @@ SourceKit::Context::Context(
       DiagnosticDocumentationPath(DiagnosticDocumentationPath),
       NotificationCtr(
           new NotificationCenter(shouldDispatchNotificationsOnMain)),
-      Config(new GlobalConfig()) {
+      Config(new GlobalConfig()), ReqTracker(new RequestTracker()),
+      SlowRequestSim(new SlowRequestSimulator(ReqTracker)) {
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
 }

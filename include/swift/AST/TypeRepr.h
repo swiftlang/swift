@@ -48,7 +48,8 @@ enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
 /// Representation of a type as written in source.
-class alignas(1 << TypeReprAlignInBits) TypeRepr {
+class alignas(1 << TypeReprAlignInBits) TypeRepr
+    : public ASTAllocated<TypeRepr> {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
@@ -165,18 +166,6 @@ public:
   bool hasOpaque();
 
   //*** Allocation Routines ************************************************/
-
-  void *operator new(size_t bytes, const ASTContext &C,
-                     unsigned Alignment = alignof(TypeRepr));
-
-  void *operator new(size_t bytes, void *data) {
-    assert(data);
-    return data;
-  }
-
-  // Make placement new and vanilla new/delete illegal for TypeReprs.
-  void *operator new(size_t bytes) = delete;
-  void operator delete(void *data) = delete;
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
@@ -1029,6 +1018,21 @@ public:
   static bool classof(const IsolatedTypeRepr *T) { return true; }
 };
 
+/// An '_const' type.
+/// \code
+///   x : _const Int
+/// \endcode
+class CompileTimeConstTypeRepr : public SpecifierTypeRepr {
+public:
+  CompileTimeConstTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::CompileTimeConst, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::CompileTimeConst;
+  }
+  static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+};
+
 /// A TypeRepr for a known, fixed type.
 ///
 /// Fixed type representations should be used sparingly, in places
@@ -1298,6 +1302,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Owned:
   case TypeReprKind::Isolated:
   case TypeReprKind::Placeholder:
+  case TypeReprKind::CompileTimeConst:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

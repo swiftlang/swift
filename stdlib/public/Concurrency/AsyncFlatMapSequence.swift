@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that concatenates the results of calling
   /// the given transformation with each element of this sequence.
@@ -49,8 +49,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence that concatenates the results of calling a given
 /// transformation with each element of this sequence.
-@available(SwiftStdlib 5.5, *)
-@frozen
+@available(SwiftStdlib 5.1, *)
 public struct AsyncFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -58,7 +57,7 @@ public struct AsyncFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSe
   @usableFromInline
   let transform: (Base.Element) async -> SegmentOfResult
 
-  @inlinable
+  @usableFromInline
   init(
     _ base: Base,
     transform: @escaping (Base.Element) async -> SegmentOfResult
@@ -68,7 +67,7 @@ public struct AsyncFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSe
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncFlatMapSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///
@@ -79,7 +78,6 @@ extension AsyncFlatMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the flat map sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -93,7 +91,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
-    @inlinable
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
       transform: @escaping (Base.Element) async -> SegmentOfResult

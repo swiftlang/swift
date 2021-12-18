@@ -46,7 +46,7 @@ func get(holder holder: inout Holder) -> C {
 }
 // CHECK-LABEL: sil hidden [ossa] @$ss3get6holders1CCs6HolderVz_tF : $@convention(thin) (@inout Holder) -> @owned C {
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
-// CHECK-NEXT:   debug_value_addr %0 : $*Holder, var, name "holder", argno 1 
+// CHECK-NEXT:   debug_value %0 : $*Holder, var, name "holder", argno 1, expr op_deref
 // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [unknown] [[ADDR]] : $*Holder
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[READ]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = load [trivial] [[T0]] : $*@sil_unmanaged C
@@ -63,5 +63,4 @@ func project(fn fn: () -> Holder) -> C {
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()
 // CHECK-NEXT: [[T1:%.*]] = struct_extract [[T0]] : $Holder, #Holder.value
 // CHECK-NEXT: [[T2:%.*]] = strong_copy_unmanaged_value [[T1]]
-// CHECK-NOT: destroy_value [[BORROWED_FN_COPY]]
 // CHECK-NEXT: return [[T2]]

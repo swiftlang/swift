@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
-// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
-// RUN: %target-swift-frontend -I %t -Onone -emit-sil %s | %FileCheck %s --check-prefix=NONE
+// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT -check-prefix=OPT-%target-os
+// RUN: %target-swift-frontend -I %t -Onone -emit-sil %s | %FileCheck %s --check-prefix=NONE -check-prefix=NONE-%target-os
 
 
 // RUN: %empty-directory(%t)
@@ -13,33 +13,41 @@
 // RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module.swiftinterface %S/Inputs/pre_specialized_module.swift
+// RUN: %target-swift-frontend -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module.swiftinterface %S/Inputs/pre_specialized_module.swift -module-name pre_specialized_module
 // RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 import pre_specialized_module
 
 // Make sure we generate the public pre-specialized entry points.
 
-// OPT: sil @$s14pre_specialize10testPublic1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
-// OPT: sil @$s14pre_specialize10testPublic1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
+// OPT-DAG: sil @$s14pre_specialize10testPublic1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
+// OPT-DAG: sil @$s14pre_specialize10testPublic1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
+// OPT-macosx-DAG: sil [available 10.5] @$s14pre_specialize10testPublic1tyx_tlFSd_Ts5 : $@convention(thin) (Double) -> () {
+// OPT-linux-gnu-DAG: sil @$s14pre_specialize10testPublic1tyx_tlFSd_Ts5 : $@convention(thin) (Double) -> () {
 
-// NONE: sil @$s14pre_specialize10testPublic1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
-// NONE: sil @$s14pre_specialize10testPublic1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
+// NONE-DAG: sil @$s14pre_specialize10testPublic1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
+// NONE-DAG: sil @$s14pre_specialize10testPublic1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
+// NONE-macosx-DAG: sil [available 10.5] @$s14pre_specialize10testPublic1tyx_tlFSd_Ts5 : $@convention(thin) (Double) -> () {
+// NONE-linux-gnu-DAG: sil @$s14pre_specialize10testPublic1tyx_tlFSd_Ts5 : $@convention(thin) (Double) -> () {
 
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where T == Float)
+@_specialize(exported: true, availability: macOS 10.5, *; where T == Double)
 public func testPublic<T>(t: T) {
   print(t)
 }
 
-// OPT: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
-// OPT: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
+// OPT-macosx-DAG: sil [available 10.5] @$s14pre_specialize18testEmitIntoClient1tyx_tlFSd_Ts5 : $@convention(thin) (Double) -> () {
+// OPT-linux-gnu-DAG: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSd_Ts5 : $@convention(thin) (Double) -> () {
+// OPT-DAG: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
+// OPT-DAG: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
 
 // NONE: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSf_Ts5 : $@convention(thin) (Float) -> () {
 // NONE: sil @$s14pre_specialize18testEmitIntoClient1tyx_tlFSi_Ts5 : $@convention(thin) (Int) -> () {
 
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where T == Float)
+@_specialize(exported: true, availability: macOS 10.5, *; where T == Double)
 @_alwaysEmitIntoClient
 internal func testEmitIntoClient<T>(t: T) {
   print(t)
@@ -50,6 +58,8 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT:   apply [[F1]]
 // OPT:   [[F2:%.*]] = function_ref @$s22pre_specialized_module20publicPrespecializedyyxlFSd_Ts5 : $@convention(thin) (Double) -> ()
 // OPT:   apply [[F2]]
+// OPT-macosx:   [[F6:%.*]] = function_ref @$s22pre_specialized_module20publicPrespecializedyyxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// OPT-macosx:    apply [[F6]]<SomeData>
 // OPT:   [[F3:%.*]] = function_ref @$s22pre_specialized_module36internalEmitIntoClientPrespecializedyyxlFSi_Ts5 : $@convention(thin) (Int) -> ()
 // OPT:   apply [[F3]]
 // OPT:   [[F4:%.*]] = function_ref @$s22pre_specialized_module36internalEmitIntoClientPrespecializedyyxlFSd_Ts5 : $@convention(thin) (Double) -> ()
@@ -80,9 +90,18 @@ internal func testEmitIntoClient<T>(t: T) {
 public func usePrespecializedEntryPoints() {
   publicPrespecialized(1)
   publicPrespecialized(1.0)
+  publicPrespecialized(SomeData())
   useInternalEmitIntoClientPrespecialized(2)
   useInternalEmitIntoClientPrespecialized(2.0)
   useInternalThing(2)
+}
+// OPT-macosx: sil [available 10.50] @$s14pre_specialize40usePrespecializedEntryPointsAvailabilityyyF : $@convention(thin) () -> () {
+// OPT-macosx:  [[F1:%.*]] = function_ref @$s22pre_specialized_module20publicPrespecializedyyxlFAA8SomeDataV_Ts5 : $@convention(thin) (SomeData) -> ()
+// OPT-macosx:  apply [[F1]](
+// OPT-macosx: } // end sil function '$s14pre_specialize40usePrespecializedEntryPointsAvailabilityyyF'
+@available(macOS 10.50, *)
+public func usePrespecializedEntryPointsAvailability() {
+  publicPrespecialized(SomeData())
 }
 // OPT: sil [signature_optimized_thunk] [always_inline] @$s22pre_specialized_module16publicInlineableyyxlFSd_Ts5 : $@convention(thin) (Double) -> () {
 // NONE: sil @$s22pre_specialized_module16publicInlineableyyxlFSd_Ts5 : $@convention(thin) (Double) -> () {

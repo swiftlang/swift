@@ -503,6 +503,18 @@ bool FrontendInputsAndOutputs::hasPrivateModuleInterfaceOutputPath() const {
         return outs.PrivateModuleInterfaceOutputPath;
       });
 }
+bool FrontendInputsAndOutputs::hasABIDescriptorOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ABIDescriptorOutputPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasModuleSemanticInfoOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.ModuleSemanticInfoOutputPath;
+      });
+}
 bool FrontendInputsAndOutputs::hasModuleSummaryOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
@@ -513,6 +525,18 @@ bool FrontendInputsAndOutputs::hasTBDPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
         return outs.TBDPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasYAMLOptRecordPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.YAMLOptRecordPath;
+      });
+}
+bool FrontendInputsAndOutputs::hasBitstreamOptRecordPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.BitstreamOptRecordPath;
       });
 }
 

@@ -119,7 +119,8 @@ static Expr *checkConstantness(Expr *expr) {
       continue;
     }
     if (BinaryExpr *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
-      expressionsToCheck.push_back(binaryExpr->getArg());
+      expressionsToCheck.push_back(binaryExpr->getLHS());
+      expressionsToCheck.push_back(binaryExpr->getRHS());
       continue;
     }
     if (InjectIntoOptionalExpr *optionalExpr =
@@ -179,7 +180,8 @@ static Expr *checkConstantness(Expr *expr) {
 
     // If this is an enum case, check whether the arguments are constants.
     if (isa<EnumElementDecl>(calledValue)) {
-      expressionsToCheck.push_back(apply->getArg());
+      for (auto arg : *apply->getArgs())
+        expressionsToCheck.push_back(arg.getExpr());
       continue;
     }
 
@@ -196,7 +198,9 @@ static Expr *checkConstantness(Expr *expr) {
     // constants.
     if (!hasConstantEvaluableAttr(callee))
       return expr;
-    expressionsToCheck.push_back(apply->getArg());
+
+    for (auto arg : *apply->getArgs())
+      expressionsToCheck.push_back(arg.getExpr());
   }
   return nullptr;
 }
@@ -280,7 +284,8 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
   }
   // If this is OSLogMessage, it should be a string-interpolation literal.
   Identifier declName = nominalDecl->getName();
-  if (declName == astContext.Id_OSLogMessage) {
+  if (declName == astContext.Id_OSLogMessage ||
+      nominalDecl->hasSemanticsAttr(semantics::OSLOG_MESSAGE_TYPE)) {
     diags.diagnose(errorLoc, diag::oslog_message_must_be_string_interpolation);
     return;
   }
@@ -311,16 +316,9 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
     return;
 
   // Check that the arguments at the constantArgumentIndices are constants.
-  Expr *argumentExpr = callExpr->getArg();
   SmallVector<Expr *, 4> arguments;
-  if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(argumentExpr)) {
-    auto elements = tupleExpr->getElements();
-    arguments.append(elements.begin(), elements.end());
-  } else if (ParenExpr *parenExpr = dyn_cast<ParenExpr>(argumentExpr)) {
-    arguments.push_back(parenExpr->getSubExpr());
-  } else {
-    arguments.push_back(argumentExpr);
-  }
+  for (auto arg : *callExpr->getArgs())
+    arguments.push_back(arg.getExpr());
 
   for (unsigned constantIndex : constantArgumentIndices) {
     assert(constantIndex < arguments.size() &&

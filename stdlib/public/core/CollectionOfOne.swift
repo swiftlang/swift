@@ -165,11 +165,13 @@ extension CollectionOfOne: CustomDebugStringConvertible {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension CollectionOfOne: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["element": _element])
   }
 }
+#endif
 
 extension CollectionOfOne: Sendable where Element: Sendable { }
 extension CollectionOfOne.Iterator: Sendable where Element: Sendable { }

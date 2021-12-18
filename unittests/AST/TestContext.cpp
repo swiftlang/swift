@@ -24,8 +24,9 @@ static Decl *createOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
                                 Identifier name) {
   auto wrapped = new (ctx) GenericTypeParamDecl(fileForLookups,
                                                 ctx.getIdentifier("Wrapped"),
-                                                SourceLoc(), /*depth*/0,
-                                                /*index*/0);
+                                                SourceLoc(),
+                                                /*type sequence*/ false,
+                                                /*depth*/0, /*index*/0);
   auto params = GenericParamList::create(ctx, SourceLoc(), wrapped,
                                          SourceLoc());
   auto decl = new (ctx) EnumDecl(SourceLoc(), name, SourceLoc(),
@@ -35,11 +36,12 @@ static Decl *createOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
 }
 
 TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
-    : Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
-                           ClangImporterOpts, SymbolGraphOpts,
-                           SourceMgr, Diags)) {
+    : Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
+                           ClangImporterOpts, SymbolGraphOpts, SourceMgr,
+                           Diags)) {
   registerParseRequestFunctions(Ctx.evaluator);
   registerTypeCheckerRequestFunctions(Ctx.evaluator);
+  registerClangImporterRequestFunctions(Ctx.evaluator);
   auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
   auto *module = ModuleDecl::create(stdlibID, Ctx);
   Ctx.addLoadedModule(module);

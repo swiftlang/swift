@@ -16,7 +16,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
-#include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -113,20 +112,41 @@ void Term::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     id.AddPointer(symbol.getOpaquePointer());
 }
 
-/// Shortlex order on terms.
+bool Term::containsUnresolvedSymbols() const {
+  for (auto symbol : *this) {
+    if (symbol.getKind() == Symbol::Kind::Name)
+      return true;
+  }
+
+  return false;
+}
+
+namespace {
+
+/// Shortlex order on symbol ranges.
 ///
 /// First we compare length, then perform a lexicographic comparison
-/// on symbols if the two terms have the same length.
-int MutableTerm::compare(const MutableTerm &other,
-                         const ProtocolGraph &graph) const {
-  if (size() != other.size())
-    return size() < other.size() ? -1 : 1;
+/// on symbols if the two ranges have the same length.
+///
+/// This is used to implement Term::compare() and MutableTerm::compare()
+/// below.
+template<typename Iter>
+int shortlexCompare(Iter lhsBegin, Iter lhsEnd,
+                    Iter rhsBegin, Iter rhsEnd,
+                    RewriteContext &ctx) {
+  unsigned lhsSize = (lhsEnd - lhsBegin);
+  unsigned rhsSize = (rhsEnd - rhsBegin);
+  if (lhsSize != rhsSize)
+    return lhsSize < rhsSize ? -1 : 1;
 
-  for (unsigned i = 0, e = size(); i < e; ++i) {
-    auto lhs = (*this)[i];
-    auto rhs = other[i];
+  while (lhsBegin != lhsEnd) {
+    auto lhs = *lhsBegin;
+    auto rhs = *rhsBegin;
 
-    int result = lhs.compare(rhs, graph);
+    ++lhsBegin;
+    ++rhsBegin;
+
+    int result = lhs.compare(rhs, ctx);
     if (result != 0) {
       assert(lhs != rhs);
       return result;
@@ -136,6 +156,18 @@ int MutableTerm::compare(const MutableTerm &other,
   }
 
   return 0;
+}
+
+}
+
+/// Shortlex order on terms.
+int Term::compare(Term other, RewriteContext &ctx) const {
+  return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
+}
+
+/// Shortlex order on mutable terms.
+int MutableTerm::compare(const MutableTerm &other, RewriteContext &ctx) const {
+  return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 
 /// Replace the subterm in the range [from,to) with \p rhs.

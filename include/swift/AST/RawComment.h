@@ -55,6 +55,10 @@ struct SingleRawComment {
     return getKind() == CommentKind::OrdinaryLine ||
            getKind() == CommentKind::LineDoc;
   }
+
+  bool isGyb() const {
+    return RawText.startswith("// ###");
+  }
 };
 
 struct RawComment {

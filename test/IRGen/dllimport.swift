@@ -1,5 +1,5 @@
-// RUN: %swift -target thumbv7--windows-itanium -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
-// RUN: %swift -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport -primary-file %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
+// RUN: %swift -Xllvm -sil-disable-pass=GenericSpecializer -target thumbv7--windows-itanium -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
+// RUN: %swift -Xllvm -sil-disable-pass=GenericSpecializer -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -disable-legacy-type-info -parse-stdlib -module-name dllimport -primary-file %s -o - -enable-source-import -I %S | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
 
 // REQUIRES: CODEGENERATOR=ARM
 
@@ -37,7 +37,6 @@ public func g() {
 }
 
 // CHECK-NO-OPT-DAG: declare dllimport %swift.refcounted* @swift_allocObject(%swift.type*, i32, i32)
-// CHECK-NO-OPT-DAG: declare dllimport void @swift_deallocObject(%swift.refcounted*, i32, i32)
 // CHECK-NO-OPT-DAG: declare dllimport void @swift_release(%swift.refcounted*)
 // CHECK-NO-OPT-DAG: declare dllimport %swift.refcounted* @swift_retain(%swift.refcounted* returned)
 // CHECK-NO-OPT-DAG: @"$s9dllexport1pMp" = external dllimport global %swift.protocol

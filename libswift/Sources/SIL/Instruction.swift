@@ -30,7 +30,8 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   }
 
   final public var description: String {
-    SILNode_debugDescription(bridgedNode).takeString()
+    var s = SILNode_debugDescription(bridgedNode)
+    return String(cString: s.c_str())
   }
   
   final public var operands: OperandArray {
@@ -40,7 +41,18 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   fileprivate var resultCount: Int { 0 }
   fileprivate func getResult(index: Int) -> Value { fatalError() }
 
-  final public var results: InstructionResults { InstructionResults(self) }
+  public struct Results : RandomAccessCollection {
+    fileprivate let inst: Instruction
+    fileprivate let numResults: Int
+
+    public var startIndex: Int { 0 }
+    public var endIndex: Int { numResults }
+    public subscript(_ index: Int) -> Value { inst.getResult(index: index) }
+  }
+
+  final public var results: Results {
+    Results(inst: self, numResults: resultCount)
+  }
 
   final public var location: Location {
     return Location(bridgedLocation: SILInstruction_getLocation(bridged))
@@ -103,26 +115,6 @@ extension OptionalBridgedInstruction {
   var instruction: Instruction? { obj.getAs(Instruction.self) }
 }
 
-public struct InstructionResults : Sequence, IteratorProtocol {
-  let inst: Instruction
-  let numResults: Int
-  var index: Int = 0
-
-  init(_ inst: Instruction) {
-    self.inst = inst
-    numResults = inst.resultCount
-  }
-
-  public mutating func next() -> Value? {
-    let idx = index
-    if idx < numResults {
-      index += 1
-      return inst.getResult(index: idx)
-    }
-    return nil
-  }
-}
-
 public class SingleValueInstruction : Instruction, Value {
   final public var definingInstruction: Instruction? { self }
 
@@ -132,12 +124,15 @@ public class SingleValueInstruction : Instruction, Value {
 
 public final class MultipleValueInstructionResult : Value {
   final public var description: String {
-    SILNode_debugDescription(bridgedNode).takeString()
+    var s = SILNode_debugDescription(bridgedNode)
+    return String(cString: s.c_str())
   }
 
-  public var definingInstruction: Instruction? {
+  public var instruction: Instruction {
     MultiValueInstResult_getParent(bridged).instruction
   }
+
+  public var definingInstruction: Instruction? { instruction }
 
   var bridged: BridgedMultiValueResult {
     BridgedMultiValueResult(obj: SwiftObject(self))
@@ -160,6 +155,16 @@ public class MultipleValueInstruction : Instruction {
   }
 }
 
+/// Instructions, which have a single operand.
+public protocol UnaryInstruction : AnyObject {
+  var operands: OperandArray { get }
+  var operand: Value { get }
+}
+
+extension UnaryInstruction {
+  public var operand: Value { operands[0].value }
+}
+
 //===----------------------------------------------------------------------===//
 //                             no-value instructions
 //===----------------------------------------------------------------------===//
@@ -174,6 +179,14 @@ final public class StoreInst : Instruction {
   public var destinationOperand: Operand { return operands[1] }
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
+  
+  // must match with enum class StoreOwnershipQualifier
+  public enum StoreOwnership: Int {
+    case unqualified = 0, initialize = 1, assign = 2, trivial = 3
+  }
+  public var destinationOwnership: StoreOwnership {
+    StoreOwnership(rawValue: StoreInst_getStoreOwnership(bridged))!
+  }
 }
 
 final public class CopyAddrInst : Instruction {
@@ -183,57 +196,39 @@ final public class CopyAddrInst : Instruction {
   public var destination: Value { return destinationOperand.value }
 }
 
-final public class EndAccessInst : Instruction {
+final public class EndAccessInst : Instruction, UnaryInstruction {
   public var beginAccess: BeginAccessInst {
-    return operands[0].value as! BeginAccessInst
+    return operand as! BeginAccessInst
   }
 }
 
-final public class EndBorrowInst : Instruction {
-  public var borrowedValue: Value { return operands[0].value }
-}
+final public class EndBorrowInst : Instruction, UnaryInstruction {}
 
-final public class DeallocStackInst : Instruction {
+final public class DeallocStackInst : Instruction, UnaryInstruction {
   public var allocstack: AllocStackInst {
-    return operands[0].value as! AllocStackInst
+    return operand as! AllocStackInst
   }
 }
 
-final public class CondFailInst : Instruction {
-  public var condition: Value { operands[0].value }
-  
+final public class CondFailInst : Instruction, UnaryInstruction {
   public override var mayTrap: Bool { true }
 
   public var message: String { CondFailInst_getMessage(bridged).string }
 }
 
-final public class FixLifetimeInst : Instruction {
-  public var value: Value { operands[0].value }
-}
+final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 
-final public class DebugValueInst : Instruction {
-  public var value: Value { operands[0].value }
-}
-
-final public class DebugValueAddrInst : Instruction {
-  public var address: Value { operands[0].value }
-}
+final public class DebugValueInst : Instruction, UnaryInstruction {}
 
 final public class UnconditionalCheckedCastAddrInst : Instruction {
   public override var mayTrap: Bool { true }
 }
 
-final public class SetDeallocatingInst : Instruction {
-  public var reference: Value { operands[0].value }
-}
+final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
 
-final public class DeallocRefInst : Instruction {
-  public var reference: Value { operands[0].value }
-}
+final public class DeallocRefInst : Instruction, UnaryInstruction {}
 
-public class RefCountingInst : Instruction {
-  final public var reference: Value { operands[0].value }
-}
+public class RefCountingInst : Instruction, UnaryInstruction {}
 
 final public class StrongRetainInst : RefCountingInst {
 }
@@ -247,13 +242,9 @@ final public class StrongReleaseInst : RefCountingInst {
 final public class ReleaseValueInst : RefCountingInst {
 }
 
-final public class DestroyValueInst : Instruction {
-  public var value: Value { operands[0].value }
-}
+final public class DestroyValueInst : Instruction, UnaryInstruction {}
 
-final public class DestroyAddrInst : Instruction {
-  public var address: Value { operands[0].value }
-}
+final public class DestroyAddrInst : Instruction, UnaryInstruction {}
 
 final public class UnimplementedRefCountingInst : RefCountingInst {}
 
@@ -266,43 +257,64 @@ final public class UnimplementedRefCountingInst : RefCountingInst {}
 final public class UnimplementedSingleValueInst : SingleValueInstruction {
 }
 
-final public class LoadInst : SingleValueInstruction {
-  public var address: Value { operands[0].value }
-}
+final public class LoadInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class LoadBorrowInst : SingleValueInstruction {
-  public var address: Value { operands[0].value }
-}
+final public class LoadBorrowInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {}
 
-final public class UpcastInst : SingleValueInstruction {
-  public var source: Value { operands[0].value }
-}
+final public class UpcastInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class InitExistentialRefInst : SingleValueInstruction {
-  public var reference: Value { operands[0].value }
-}
+final public
+class UncheckedRefCastInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class OpenExistentialRefInst : SingleValueInstruction {
-  public var existential: Value { operands[0].value }
-}
+final public
+class RawPointerToRefInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class InitExistentialMetatypeInst : SingleValueInstruction {
-  public var existential: Value { operands[0].value }
-}
+final public
+class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class OpenExistentialMetatypeInst : SingleValueInstruction {
-  public var existentialMetatype: Value { operands[0].value }
-}
+final public
+class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class ValueMetatypeInst : SingleValueInstruction {
-  public var value: Value { operands[0].value }
-}
+final public
+class IndexAddrInst : SingleValueInstruction {}
 
-final public class ExistentialMetatypeInst : SingleValueInstruction {
-  public var existential: Value { operands[0].value }
-}
+final public
+class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialBoxValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 
 public class GlobalAccessInst : SingleValueInstruction {
   final public var global: GlobalVariable {
@@ -314,74 +326,89 @@ final public class GlobalAddrInst : GlobalAccessInst {}
 
 final public class GlobalValueInst : GlobalAccessInst {}
 
+final public class IntegerLiteralInst : SingleValueInstruction {}
+
 final public class TupleInst : SingleValueInstruction {
 }
 
-final public class TupleExtractInst : SingleValueInstruction {
-  public var tuple: Value { operands[0].value }
+final public class TupleExtractInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { TupleExtractInst_fieldIndex(bridged) }
 }
 
-final public class TupleElementAddrInst : SingleValueInstruction {
-  public var tupleAddress: Value { operands[0].value }
+final public
+class TupleElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { TupleElementAddrInst_fieldIndex(bridged) }
 }
 
 final public class StructInst : SingleValueInstruction {
 }
 
-final public class StructExtractInst : SingleValueInstruction {
-  public var structOp: Value { operands[0].value }
+final public class StructExtractInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { StructExtractInst_fieldIndex(bridged) }
 }
 
-final public class StructElementAddrInst : SingleValueInstruction {
-  public var structAddress: Value { operands[0].value }
+final public
+class StructElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { StructElementAddrInst_fieldIndex(bridged) }
 }
 
 final public class EnumInst : SingleValueInstruction {
-  public var payload: Value { operands[0].value }
   public var caseIndex: Int { EnumInst_caseIndex(bridged) }
+  
+  public var operand: Value? { operands.first?.value }
 }
 
-final public class UncheckedEnumDataInst : SingleValueInstruction {
-  public var enumOp: Value { operands[0].value }
+final public
+class UncheckedEnumDataInst : SingleValueInstruction, UnaryInstruction {
   public var caseIndex: Int { UncheckedEnumDataInst_caseIndex(bridged) }
 }
 
-final public class RefElementAddrInst : SingleValueInstruction {
-  public var reference: Value { operands[0].value }
+final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { RefElementAddrInst_fieldIndex(bridged) }
 }
 
-final public class RefTailAddrInst : SingleValueInstruction {
-  public var reference: Value { operands[0].value }
-}
+final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class UnconditionalCheckedCastInst : SingleValueInstruction {
+final public
+class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
   public override var mayTrap: Bool { true }
 }
 
-final public class UnconditionalCheckedCastValueInst : SingleValueInstruction {
+final public
+class UnconditionalCheckedCastValueInst : SingleValueInstruction,
+                                          UnaryInstruction {
   public override var mayTrap: Bool { true }
 }
 
-final public class BeginAccessInst : SingleValueInstruction {
-  public var address: Value { operands[0].value }
-}
+final public
+class ConvertFunctionInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class BeginBorrowInst : SingleValueInstruction {
-  public var source: Value { operands[0].value }
-}
+final public
+class ThinToThickFunctionInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class CopyValueInst : SingleValueInstruction {
-  public var source: Value { operands[0].value }
-}
+final public
+class ObjCExistentialMetatypeToObjectInst : SingleValueInstruction,
+                                            UnaryInstruction {}
 
-final public class ClassifyBridgeObjectInst : SingleValueInstruction {
-  public var reference: Value { operands[0].value }
-}
+final public
+class ObjCMetatypeToObjectInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class BridgeObjectToRefInst : SingleValueInstruction,
+                                           UnaryInstruction {}
+
+final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { PartialApplyInst_numArguments(bridged) }
@@ -392,6 +419,17 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   
   public var singleDirectResult: Value? { self }
 }
+
+final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class SuperMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class ObjCMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class ObjCSuperMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class WitnessMethodInst : SingleValueInstruction {}
+
 
 //===----------------------------------------------------------------------===//
 //                      single-value allocation instructions
@@ -408,9 +446,6 @@ final public class AllocRefInst : SingleValueInstruction, Allocation {
 final public class AllocRefDynamicInst : SingleValueInstruction, Allocation {
 }
 
-final public class AllocValueBufferInst : SingleValueInstruction, Allocation {
-}
-
 final public class AllocBoxInst : SingleValueInstruction, Allocation {
 }
 
@@ -421,7 +456,10 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 //                            multi-value instructions
 //===----------------------------------------------------------------------===//
 
-final public class BeginCOWMutationInst : MultipleValueInstruction {
+final public class BeginCOWMutationInst : MultipleValueInstruction,
+                                          UnaryInstruction {
+  public var uniquenessResult: Value { return getResult(index: 0) }
+  public var bufferResult: Value { return getResult(index: 1) }
 }
 
 final public class DestructureStructInst : MultipleValueInstruction {
@@ -449,10 +487,10 @@ public class TermInst : Instruction {
 final public class UnreachableInst : TermInst {
 }
 
-final public class ReturnInst : TermInst {
+final public class ReturnInst : TermInst, UnaryInstruction {
 }
 
-final public class ThrowInst : TermInst {
+final public class ThrowInst : TermInst, UnaryInstruction {
 }
 
 final public class YieldInst : TermInst {
@@ -524,15 +562,15 @@ final public class SwitchEnumAddrInst : TermInst {
 final public class DynamicMethodBranchInst : TermInst {
 }
 
-final public class AwaitAsyncContinuationInst : TermInst {
+final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 }
 
-final public class CheckedCastBranchInst : TermInst {
+final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
 }
 
-final public class CheckedCastAddrBranchInst : TermInst {
+final public class CheckedCastAddrBranchInst : TermInst, UnaryInstruction {
 }
 
-final public class CheckedCastValueBranchInst : TermInst {
+final public class CheckedCastValueBranchInst : TermInst, UnaryInstruction {
 }
 

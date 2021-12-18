@@ -2022,6 +2022,12 @@ enum class JobPriority : size_t {
   Unspecified     = 0x00,
 };
 
+/// A tri-valued comparator which orders higher priorities first.
+inline int descendingPriorityOrder(JobPriority lhs,
+                                   JobPriority rhs) {
+  return (lhs == rhs ? 0 : lhs > rhs ? -1 : 1);
+}
+
 /// Flags for task creation.
 class TaskCreateFlags : public FlagSet<size_t> {
 public:

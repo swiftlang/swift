@@ -365,7 +365,7 @@ bb0(%0 : $*private_proto_private_class):
 
 sil private @call_through_private_proto_1 : $@convention(thin) <T where T : private_proto_1> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   %2 = witness_method $T, #private_proto_1.theMethod : $@convention(witness_method: private_proto_1) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> ()
   %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_1) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*T
@@ -393,7 +393,7 @@ bb0(%0 : $*private_proto_internal_class):
 
 sil private @call_through_private_proto_2 : $@convention(thin) <T where T : private_proto_2> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   %2 = witness_method $T, #private_proto_2.theMethod : $@convention(witness_method: private_proto_2) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> ()
   %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_2) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*T
@@ -423,7 +423,7 @@ bb0(%0 : $*private_proto_public_class):
 
 sil private @call_through_private_proto_3 : $@convention(thin) <T where T : private_proto_3> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   %2 = witness_method $T, #private_proto_3.theMethod : $@convention(witness_method: private_proto_3) <τ_0_0 where τ_0_0 : private_proto_3> (@in_guaranteed τ_0_0) -> ()
   %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_3) <τ_0_0 where τ_0_0 : private_proto_3> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*T
@@ -451,7 +451,7 @@ bb0(%0 : $*private_proto_public_class_private_method):
 
 sil private @call_through_private_proto_4 : $@convention(thin) <T where T : private_proto_4> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T
+  debug_value %0 : $*T, expr op_deref
   %2 = witness_method $T, #private_proto_4.theMethod : $@convention(witness_method: private_proto_4) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> ()
   %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_4) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*T

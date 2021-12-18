@@ -21,6 +21,8 @@
 
 #include "swift/Basic/LLVM.h"
 
+#include <string>
+
 namespace swift {
 class Decl;
 class AbstractStorageDecl;
@@ -60,6 +62,9 @@ bool printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS);
 /// Prints out the USR for the given Decl.
 /// \returns true if it failed, false on success.
 bool printDeclUSR(const Decl *D, raw_ostream &OS);
+
+/// Demangle a mangle-name-based USR to a human readable name.
+std::string demangleUSR(StringRef mangled);
 
 } // namespace ide
 } // namespace swift

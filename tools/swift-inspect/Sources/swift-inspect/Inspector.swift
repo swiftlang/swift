@@ -34,6 +34,13 @@ class Inspector {
     mach_port_deallocate(mach_task_self_, task)
   }
 
+  func addReflectionInfoFromLoadedImages(context: SwiftReflectionContextRef) {
+    _ = CSSymbolicatorForeachSymbolOwnerAtTime(symbolicator, kCSNow, { owner in
+      let address = CSSymbolOwnerGetBaseAddress(owner);
+      let _ = swift_reflection_addImage(context, address)
+      })
+  }
+
   static func findTask(_ pid: pid_t, tryForkCorpse: Bool) -> task_t {
     var task = task_t()
     var kr = task_for_pid(mach_task_self_, pid, &task)
@@ -78,6 +85,25 @@ class Inspector {
                                                           kCSNow)
     return (CSSymbolGetName(symbol),
             CSSymbolOwnerGetName(CSSymbolGetSymbolOwner(symbol)))
+  }
+
+  func enumerateMallocs(callback: (swift_addr_t, UInt64) -> Void) {
+    withoutActuallyEscaping(callback) {
+      withUnsafePointer(to: $0) {
+        task_enumerate_malloc_blocks(task, UnsafeMutableRawPointer(mutating: $0), CUnsignedInt(MALLOC_PTR_IN_USE_RANGE_TYPE), {
+          (task, context, type, ranges, count) in
+          let callback = context!.assumingMemoryBound(to: ((swift_addr_t, UInt64) -> Void).self).pointee
+          for i in 0..<Int(count) {
+            let range = ranges[i]
+            callback(swift_addr_t(range.address), UInt64(range.size))
+          }
+        })
+      }
+    }
+  }
+
+  func read(address: swift_addr_t, size: Int) -> UnsafeRawPointer? {
+    return task_peek(task, address, mach_vm_size_t(size))
   }
 
   enum Callbacks {

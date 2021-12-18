@@ -139,7 +139,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool &isFramework, bool &isSystemModule) override;
+                  bool skipBuildingInterface, bool &isFramework,
+                  bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
                   ImportPath::Element ModuleID,
@@ -148,7 +149,7 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-                  bool IsFramework) override;
+                  bool skipBuildingInterface, bool IsFramework) override;
 
   bool canImportModule(ImportPath::Element mID, llvm::VersionTuple version,
                        bool underlyingVersion) override;
@@ -298,12 +299,14 @@ struct ModuleInterfaceLoaderOptions {
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
   bool disableBuildingInterface = false;
+  bool downgradeInterfaceVerificationError = false;
   std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
     disableInterfaceLock(Opts.DisableInterfaceFileLock),
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
     disableBuildingInterface(Opts.DisableBuildingInterface),
+    downgradeInterfaceVerificationError(Opts.DowngradeInterfaceVerificationError),
     mainExecutablePath(Opts.MainExecutablePath)
   {
     switch (Opts.RequestedAction) {
@@ -400,7 +403,7 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-     bool IsFramework) override;
+     bool skipBuildingInterface, bool IsFramework) override;
 
   bool isCached(StringRef DepPath) override;
 public:
@@ -430,7 +433,8 @@ public:
       const ClangImporterOptions &ClangOpts, StringRef CacheDir,
       StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
       StringRef ModuleName, StringRef InPath,
-      StringRef OutPath, bool SerializeDependencyHashes,
+      StringRef OutPath, StringRef ABIOutputPath,
+      bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules);
 };

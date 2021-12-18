@@ -25,6 +25,22 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
+// Does the runtime use a cooperative global executor?
+#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
+#else
+#define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 0
+#endif
+
+// Does the runtime integrate with libdispatch?
+#ifndef SWIFT_CONCURRENCY_ENABLE_DISPATCH
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+#define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
+#else
+#define SWIFT_CONCURRENCY_ENABLE_DISPATCH 1
+#endif
+#endif
+
 namespace swift {
 class DefaultActor;
 class TaskOptionRecord;
@@ -618,19 +634,6 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 NearestTaskDeadline
 swift_task_getNearestDeadline(AsyncTask *task);
 
-/// Run the given async function and block the current thread until
-/// it returns.  This is a hack added for testing purposes; eventually
-/// top-level code will be an async context, and the need for this in
-/// tests should go away.  We *definitely* do not want this to be part
-/// of the standard feature set.
-///
-/// The argument is a `() async -> ()` function, whose ABI is currently
-/// quite complex.  Eventually this should use a different convention;
-/// that's rdar://72105841.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_runAndBlockThread(const void *function,
-                                  HeapObject *functionContext);
-
 /// Switch the current task to a new executor if we aren't already
 /// running on a compatible executor.
 ///
@@ -667,16 +670,23 @@ void swift_task_enqueue(Job *job, ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
+/// A count in nanoseconds.
+using JobDelay = unsigned long long;
+
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDelay(unsigned long long delay, Job *job);
+void swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job);
 
 /// Enqueue the given job on the main executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
 
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
+
 /// Enqueue the given job on the main executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
+
+#endif
 
 /// A hook to take over global enqueuing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobal_original)(Job *job);
@@ -719,10 +729,6 @@ void swift_defaultActor_deallocateResilient(HeapObject *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_distributedActor_remote_initialize(const Metadata *actorType);
-
-/// Destroy the runtime storage for a default actor.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_distributedActor_destroy(DefaultActor *actor);
 
 /// Enqueue a job on the default actor implementation.
 ///
@@ -818,6 +824,17 @@ void swift_task_reportUnexpectedExecutor(
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);
+
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+
+/// Donate this thread to the global executor until either the
+/// given condition returns true or we've run out of cooperative
+/// tasks to run.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
+                                                  void *context);
+
+#endif
 
 #ifdef __APPLE__
 /// A magic symbol whose address is the mask to apply to a frame pointer to

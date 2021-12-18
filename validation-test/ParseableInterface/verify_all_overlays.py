@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # Note that this test should still "pass" when no swiftinterfaces have been
 # generated.

@@ -43,19 +43,16 @@ public protocol P {
   associatedtype T
 }
 
-public struct S<A: P> where A.T == S<A> { // expected-error {{circular reference}}
-// expected-note@-1 {{type declared here}}
-// expected-error@-2 {{generic struct 'S' references itself}}
-// expected-note@-3 {{while resolving type 'S<A>'}}
+public struct S<A: P> where A.T == S<A> {
+// expected-error@-1 {{generic struct 'S' has self-referential generic requirements}}
+// expected-note@-2 {{while resolving type 'S<A>'}}
   func f(a: A.T) {
     g(a: id(t: a)) // `a` has error type which is diagnosed as circular reference
-    // expected-error@-1 {{conflicting arguments to generic parameter 'T' ('A.T' (associated type of protocol 'P') vs. 'S<A>')}}
     _ = A.T.self
   }
 
   func g(a: S<A>) {
     f(a: id(t: a))
-    // expected-error@-1 {{conflicting arguments to generic parameter 'T' ('S<A>' vs. 'A.T' (associated type of protocol 'P'))}}
     _ = S<A>.self
   }
 
@@ -72,10 +69,9 @@ protocol PI {
   associatedtype T : I
 }
 
-struct SI<A: PI> : I where A : I, A.T == SI<A> { // expected-error {{circular reference}}
-// expected-note@-1 {{type declared here}}
-// expected-error@-2 {{generic struct 'SI' references itself}}
-// expected-note@-3 {{while resolving type 'SI<A>'}}
+struct SI<A: PI> : I where A : I, A.T == SI<A> {
+// expected-error@-1 {{generic struct 'SI' has self-referential generic requirements}}
+// expected-note@-2 {{while resolving type 'SI<A>'}}
   func ggg<T : I>(t: T.Type) -> T {
     return T()
   }

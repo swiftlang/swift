@@ -17,6 +17,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ObjCBridge.h"
+#include "swift/Runtime/Portability.h"
 #include <vector>
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -39,13 +40,10 @@ using namespace swift;
 
 @implementation __SwiftNull : NSObject
 
-//   int
- // asprintf(char **ret, const char *format, ...);
-
 - (id)description {
   char *str = NULL;
   const char *clsName = class_getName([self class]);
-  int fmtResult = asprintf(&str, "<%s %p depth = %u>", clsName,
+  int fmtResult = swift_asprintf(&str, "<%s %p depth = %u>", clsName,
                                                        (void*)self,
                                                        self->depth);
   (void)fmtResult;

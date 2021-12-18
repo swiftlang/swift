@@ -22,7 +22,7 @@ struct Point {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor TestActor {
   // expected-note@+1{{mutation of this property is only permitted within the actor}}
   var position = Point(x: 0, y: 0)
@@ -37,15 +37,15 @@ actor TestActor {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func modifyAsynchronously(_ foo: inout Int) async { foo += 1 }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 enum Container {
   static let modifyAsyncValue = modifyAsynchronously
 }
 
 // external function call
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension TestActor {
 
   // Can't pass actor-isolated primitive into a function
@@ -82,7 +82,7 @@ extension TestActor {
 }
 
 // internal method call
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension TestActor {
   func modifyByValue(_ other: inout Int) async {
     other += value1
@@ -95,7 +95,7 @@ extension TestActor {
 }
 
 // external class method call
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 class NonAsyncClass {
   func modifyOtherAsync(_ other : inout Int) async {
     // ...
@@ -107,7 +107,7 @@ class NonAsyncClass {
 }
 
 // Calling external class/struct async function
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension TestActor {
   // Can't pass state into async method of another class
 
@@ -136,12 +136,12 @@ extension TestActor {
 }
 
 // Check implicit async testing
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor DifferentActor {
   func modify(_ state: inout Int) {}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension TestActor {
   func modify(_ state: inout Int) {}
 
@@ -160,7 +160,7 @@ extension TestActor {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor MyActor {
   var points: [Point] = []
   var int: Int = 0
@@ -194,7 +194,7 @@ actor MyActor {
 
 // Verify global actor protection
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @globalActor
 struct MyGlobalActor {
   static let shared = TestActor()
@@ -207,34 +207,34 @@ struct MyGlobalActor {
 
 // expected-error@+3{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
 // expected-error@+2{{var 'number' isolated to global actor 'MyGlobalActor' can not be used 'inout' from a non-isolated context}}
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 5.1, *) {
 let _ = Task.detached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
 }
 
 // attempt to pass global state owned by the global actor to another async function
 // expected-error@+2{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MyGlobalActor func sneaky() async { await modifyAsynchronously(&number) }
 
 // It's okay to pass actor state inout to synchronous functions!
 
 func globalSyncFunction(_ foo: inout Int) { }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MyGlobalActor func globalActorSyncFunction(_ foo: inout Int) { }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MyGlobalActor func globalActorAsyncOkay() async { globalActorSyncFunction(&number) }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MyGlobalActor func globalActorAsyncOkay2() async { globalSyncFunction(&number) }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MyGlobalActor func globalActorSyncOkay() { globalSyncFunction(&number) }
 
 // Gently unwrap things that are fine
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct Cat {
   mutating func meow() async { }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct Dog {
   var cat: Cat?
 

@@ -14,7 +14,7 @@ import TestsUtils
 
 
 // - Definitions
-public let IntegerParsing = [
+public let benchmarks = [
   // IntSmall
   BenchmarkInfo(name: "ParseInt.IntSmall.Decimal",
     runFunction: run_ParseIntFromIntSmallDecimal,
@@ -287,296 +287,296 @@ private let uint64UncommonRadixStrings: [String]
 
 // IntSmall
 @inline(never)
-public func run_ParseIntFromIntSmallDecimal(N: Int) {
+public func run_ParseIntFromIntSmallDecimal(n: Int) {
   var result: Int = 0
-  let count = N * 20
+  let count = n * 20
   for _ in 0..<count {
     for string in intSmallDecimalStrings {
       result &+= Int(string, radix: 10)!
     }
   }
-  CheckResults(result == intSmallValuesSum &* Int(count))
+  check(result == intSmallValuesSum &* Int(count))
 }
 
 @inline(never)
-public func run_ParseIntFromIntSmallBinary(N: Int) {
+public func run_ParseIntFromIntSmallBinary(n: Int) {
   var result: Int = 0
-  let count = N * 20
+  let count = n * 20
   for _ in 0..<count {
     for string in intSmallBinaryStrings {
       result &+= Int(string, radix: 2)!
     }
   }
-  CheckResults(result == intSmallValuesSum &* Int(count))
+  check(result == intSmallValuesSum &* Int(count))
 }
 
 @inline(never)
-public func run_ParseIntFromIntSmallHex(N: Int) {
+public func run_ParseIntFromIntSmallHex(n: Int) {
   var result: Int = 0
-  let count = N * 20
+  let count = n * 20
   for _ in 0..<count {
     for string in intSmallHexStrings {
       result &+= Int(string, radix: 16)!
     }
   }
-  CheckResults(result == intSmallValuesSum &* Int(count))
+  check(result == intSmallValuesSum &* Int(count))
 }
 
 @inline(never)
-public func run_ParseIntFromIntSmallUncommonRadix(N: Int) {
+public func run_ParseIntFromIntSmallUncommonRadix(n: Int) {
   var result: Int = 0
-  let count = N * 20
+  let count = n * 20
   for _ in 0..<count {
     for string in intSmallUncommonRadixStrings {
       result &+= Int(string, radix: 7)!
     }
   }
-  CheckResults(result == intSmallValuesSum &* Int(count))
+  check(result == intSmallValuesSum &* Int(count))
 }
 
 // UIntSmall
 @inline(never)
-public func run_ParseIntFromUIntSmallDecimal(N: Int) {
+public func run_ParseIntFromUIntSmallDecimal(n: Int) {
   var result: UInt = 0
-  let count = N * 20
+  let count = n * 20
   for _ in 0..<count {
     for string in uintSmallDecimalStrings {
       result &+= UInt(string, radix: 10)!
     }
   }
-  CheckResults(result == uintSmallValuesSum &* UInt(count))
+  check(result == uintSmallValuesSum &* UInt(count))
 }
 
 @inline(never)
-public func run_ParseIntFromUIntSmallBinary(N: Int) {
+public func run_ParseIntFromUIntSmallBinary(n: Int) {
   var result: UInt = 0
-  let count = N * 20
+  let count = n * 20
   for _ in 0..<count {
     for string in uintSmallBinaryStrings {
       result &+= UInt(string, radix: 2)!
     }
   }
-  CheckResults(result == uintSmallValuesSum &* UInt(count))
+  check(result == uintSmallValuesSum &* UInt(count))
 }
 
 @inline(never)
-public func run_ParseIntFromUIntSmallHex(N: Int) {
+public func run_ParseIntFromUIntSmallHex(n: Int) {
   var result: UInt = 0
-  let count = N * 20
+  let count = n * 20
   for _ in 0..<count {
     for string in uintSmallHexStrings {
       result &+= UInt(string, radix: 16)!
     }
   }
-  CheckResults(result == uintSmallValuesSum &* UInt(count))
+  check(result == uintSmallValuesSum &* UInt(count))
 }
 
 @inline(never)
-public func run_ParseIntFromUIntSmallUncommonRadix(N: Int) {
+public func run_ParseIntFromUIntSmallUncommonRadix(n: Int) {
   var result: UInt = 0
-  let count = N * 20
+  let count = n * 20
   for _ in 0..<count {
     for string in uintSmallUncommonRadixStrings {
       result &+= UInt(string, radix: 7)!
     }
   }
-  CheckResults(result == uintSmallValuesSum &* UInt(count))
+  check(result == uintSmallValuesSum &* UInt(count))
 }
 
 // Int32
 @inline(never)
-public func run_ParseIntFromInt32Decimal(N: Int) {
+public func run_ParseIntFromInt32Decimal(n: Int) {
   var result: Int32 = 0
-  let count = N * 8
+  let count = n * 8
   for _ in 0..<count {
     for string in int32DecimalStrings {
       result &+= Int32(string, radix: 10)!
     }
   }
-  CheckResults(result == int32ValuesSum &* Int32(count))
+  check(result == int32ValuesSum &* Int32(count))
 }
 
 @inline(never)
-public func run_ParseIntFromInt32Binary(N: Int) {
+public func run_ParseIntFromInt32Binary(n: Int) {
   var result: Int32 = 0
-  let count = N * 8
+  let count = n * 8
   for _ in 0..<count {
     for string in int32BinaryStrings {
       result &+= Int32(string, radix: 2)!
     }
   }
-  CheckResults(result == int32ValuesSum &* Int32(count))
+  check(result == int32ValuesSum &* Int32(count))
 }
 
 @inline(never)
-public func run_ParseIntFromInt32Hex(N: Int) {
+public func run_ParseIntFromInt32Hex(n: Int) {
   var result: Int32 = 0
-  let count = N * 8
+  let count = n * 8
   for _ in 0..<count {
     for string in int32HexStrings {
       result &+= Int32(string, radix: 16)!
     }
   }
-  CheckResults(result == int32ValuesSum &* Int32(count))
+  check(result == int32ValuesSum &* Int32(count))
 }
 
 @inline(never)
-public func run_ParseIntFromInt32UncommonRadix(N: Int) {
+public func run_ParseIntFromInt32UncommonRadix(n: Int) {
   var result: Int32 = 0
-  let count = N * 8
+  let count = n * 8
   for _ in 0..<count {
     for string in int32UncommonRadixStrings {
       result &+= Int32(string, radix: 7)!
     }
   }
-  CheckResults(result == int32ValuesSum &* Int32(count))
+  check(result == int32ValuesSum &* Int32(count))
 }
 
 // Int64
 @inline(never)
-public func run_ParseIntFromInt64Decimal(N: Int) {
+public func run_ParseIntFromInt64Decimal(n: Int) {
   var result: Int64 = 0
-  let count = N * 4
+  let count = n * 4
   for _ in 0..<count {
     for string in int64DecimalStrings {
       result &+= Int64(string, radix: 10)!
     }
   }
-  CheckResults(result == int64ValuesSum &* Int64(count))
+  check(result == int64ValuesSum &* Int64(count))
 }
 
 @inline(never)
-public func run_ParseIntFromInt64Binary(N: Int) {
+public func run_ParseIntFromInt64Binary(n: Int) {
   var result: Int64 = 0
-  let count = N * 4
+  let count = n * 4
   for _ in 0..<count {
     for string in int64BinaryStrings {
       result &+= Int64(string, radix: 2)!
     }
   }
-  CheckResults(result == int64ValuesSum &* Int64(count))
+  check(result == int64ValuesSum &* Int64(count))
 }
 
 @inline(never)
-public func run_ParseIntFromInt64Hex(N: Int) {
+public func run_ParseIntFromInt64Hex(n: Int) {
   var result: Int64 = 0
-  let count = N * 4
+  let count = n * 4
   for _ in 0..<count {
     for string in int64HexStrings {
       result &+= Int64(string, radix: 16)!
     }
   }
-  CheckResults(result == int64ValuesSum &* Int64(count))
+  check(result == int64ValuesSum &* Int64(count))
 }
 
 @inline(never)
-public func run_ParseIntFromInt64UncommonRadix(N: Int) {
+public func run_ParseIntFromInt64UncommonRadix(n: Int) {
   var result: Int64 = 0
-  let count = N * 4
+  let count = n * 4
   for _ in 0..<count {
     for string in int64UncommonRadixStrings {
       result &+= Int64(string, radix: 7)!
     }
   }
-  CheckResults(result == int64ValuesSum &* Int64(count))
+  check(result == int64ValuesSum &* Int64(count))
 }
 
 // UInt32
 @inline(never)
-public func run_ParseIntFromUInt32Decimal(N: Int) {
+public func run_ParseIntFromUInt32Decimal(n: Int) {
   var result: UInt32 = 0
-  let count = N * 8
+  let count = n * 8
   for _ in 0..<count {
     for string in uint32DecimalStrings {
       result &+= UInt32(string, radix: 10)!
     }
   }
-  CheckResults(result == uint32ValuesSum &* UInt32(count))
+  check(result == uint32ValuesSum &* UInt32(count))
 }
 
 @inline(never)
-public func run_ParseIntFromUInt32Binary(N: Int) {
+public func run_ParseIntFromUInt32Binary(n: Int) {
   var result: UInt32 = 0
-  let count = N * 8
+  let count = n * 8
   for _ in 0..<count {
     for string in uint32BinaryStrings {
       result &+= UInt32(string, radix: 2)!
     }
   }
-  CheckResults(result == uint32ValuesSum &* UInt32(count))
+  check(result == uint32ValuesSum &* UInt32(count))
 }
 
 @inline(never)
-public func run_ParseIntFromUInt32Hex(N: Int) {
+public func run_ParseIntFromUInt32Hex(n: Int) {
   var result: UInt32 = 0
-  let count = N * 8
+  let count = n * 8
   for _ in 0..<count {
     for string in uint32HexStrings {
       result &+= UInt32(string, radix: 16)!
     }
   }
-  CheckResults(result == uint32ValuesSum &* UInt32(count))
+  check(result == uint32ValuesSum &* UInt32(count))
 }
 
 @inline(never)
-public func run_ParseIntFromUInt32UncommonRadix(N: Int) {
+public func run_ParseIntFromUInt32UncommonRadix(n: Int) {
   var result: UInt32 = 0
-  let count = N * 8
+  let count = n * 8
   for _ in 0..<count {
     for string in uint32UncommonRadixStrings {
       result &+= UInt32(string, radix: 7)!
     }
   }
-  CheckResults(result == uint32ValuesSum &* UInt32(count))
+  check(result == uint32ValuesSum &* UInt32(count))
 }
 
 // UInt64
 @inline(never)
-public func run_ParseIntFromUInt64Decimal(N: Int) {
+public func run_ParseIntFromUInt64Decimal(n: Int) {
   var result: UInt64 = 0
-  let count = N * 4
+  let count = n * 4
   for _ in 0..<count {
     for string in uint64DecimalStrings {
       result &+= UInt64(string, radix: 10)!
     }
   }
-  CheckResults(result == uint64ValuesSum &* UInt64(count))
+  check(result == uint64ValuesSum &* UInt64(count))
 }
 
 @inline(never)
-public func run_ParseIntFromUInt64Binary(N: Int) {
+public func run_ParseIntFromUInt64Binary(n: Int) {
   var result: UInt64 = 0
-  let count = N * 4
+  let count = n * 4
   for _ in 0..<count {
     for string in uint64BinaryStrings {
       result &+= UInt64(string, radix: 2)!
     }
   }
-  CheckResults(result == uint64ValuesSum &* UInt64(count))
+  check(result == uint64ValuesSum &* UInt64(count))
 }
 
 @inline(never)
-public func run_ParseIntFromUInt64Hex(N: Int) {
+public func run_ParseIntFromUInt64Hex(n: Int) {
   var result: UInt64 = 0
-  let count = N * 4
+  let count = n * 4
   for _ in 0..<count {
     for string in uint64HexStrings {
       result &+= UInt64(string, radix: 16)!
     }
   }
-  CheckResults(result == uint64ValuesSum &* UInt64(count))
+  check(result == uint64ValuesSum &* UInt64(count))
 }
 
 @inline(never)
-public func run_ParseIntFromUInt64UncommonRadix(N: Int) {
+public func run_ParseIntFromUInt64UncommonRadix(n: Int) {
   var result: UInt64 = 0
-  let count = N * 4
+  let count = n * 4
   for _ in 0..<count {
     for string in uint64UncommonRadixStrings {
       result &+= UInt64(string, radix: 7)!
     }
   }
-  CheckResults(result == uint64ValuesSum &* UInt64(count))
+  check(result == uint64ValuesSum &* UInt64(count))
 }
 
 

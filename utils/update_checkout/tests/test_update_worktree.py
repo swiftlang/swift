@@ -53,7 +53,7 @@ class WorktreeTestCase(scheme_mock.SchemeMockTestCase):
         self.call([self.update_checkout_path,
                    '--config', self.config_path,
                    '--source-root', self.worktree_path,
-                   '--scheme', 'master'])
+                   '--scheme', 'main'])
 
     def setUp(self):
         super(WorktreeTestCase, self).setUp()

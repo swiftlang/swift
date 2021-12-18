@@ -164,19 +164,23 @@ extension Unicode.UTF8: _UnicodeEncoding {
   @frozen
   public struct ForwardParser: Sendable {
     public typealias _Buffer = _UIntBuffer<UInt8>
+
+    public var _buffer: _Buffer
+
     @inline(__always)
     @inlinable
     public init() { _buffer = _Buffer() }
-    public var _buffer: _Buffer
   }
 
   @frozen
   public struct ReverseParser: Sendable {
     public typealias _Buffer = _UIntBuffer<UInt8>
+
+    public var _buffer: _Buffer
+
     @inline(__always)
     @inlinable
     public init() { _buffer = _Buffer() }
-    public var _buffer: _Buffer
   }
 }
 

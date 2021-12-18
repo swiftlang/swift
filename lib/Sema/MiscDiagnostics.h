@@ -34,8 +34,9 @@ namespace swift {
   class ValueDecl;
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
-void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
-                                     bool isExprStmt);
+void performSyntacticExprDiagnostics(
+    const Expr *E, const DeclContext *DC,
+    bool isExprStmt, bool disableExprAvailabiltyChecking = false);
 
 /// Emit diagnostics for a given statement.
 void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
@@ -54,15 +55,14 @@ void fixItAccess(InFlightDiagnostic &diag,
                  bool isForSetter = false,
                  bool shouldUseDefaultAccess = false);
 
-/// Emit fix-its to correct the argument labels in \p expr, which is the
-/// argument tuple or single argument of a call.
+/// Emit fix-its to correct the argument labels in \p argList.
 ///
 /// If \p existingDiag is null, the fix-its will be attached to an appropriate
 /// error diagnostic.
 ///
 /// \returns true if the issue was diagnosed
 bool diagnoseArgumentLabelError(ASTContext &ctx,
-                                Expr *expr,
+                                const ArgumentList *argList,
                                 ArrayRef<Identifier> newNames,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);

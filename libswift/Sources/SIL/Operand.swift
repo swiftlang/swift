@@ -46,6 +46,10 @@ public struct Operand : CustomStringConvertible, CustomReflectable {
   
   public var index: Int { instruction.operands.getIndex(of: self) }
   
+  /// True if the operand is used to describe a type dependency, but it's not
+  /// used as value.
+  public var isTypeDependent: Bool { Operand_isTypeDependent(bridged) != 0 }
+  
   public var description: String { "operand #\(index) of \(instruction)" }
   
   public var customMirror: Mirror { Mirror(self, children: []) }
@@ -77,6 +81,14 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
     let c: [Mirror.Child] = map { (label: nil, value: $0.value) }
     return Mirror(self, children: c)
   }
+  
+  public subscript(bounds: Range<Int>) -> OperandArray {
+    precondition(bounds.lowerBound >= 0)
+    precondition(bounds.upperBound <= endIndex)
+    return OperandArray(opArray: BridgedArrayRef(
+      data: opArray.data + bounds.lowerBound &* BridgedOperandSize,
+      numElements: bounds.upperBound - bounds.lowerBound))
+  }
 }
 
 public struct UseList : Sequence, CustomReflectable {
@@ -97,6 +109,13 @@ public struct UseList : Sequence, CustomReflectable {
 
   init(_ firstOpPtr: OptionalBridgedOperand) {
     self.firstOpPtr = firstOpPtr.op
+  }
+
+  public var isSingleUse: Bool {
+    if let opPtr = firstOpPtr {
+      return Operand_nextUse(BridgedOperand(op: opPtr)).op == nil
+    }
+    return false
   }
 
   public func makeIterator() -> Iterator {

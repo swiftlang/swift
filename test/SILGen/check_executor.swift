@@ -13,9 +13,13 @@ import _Concurrency
 // CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 @MainActor public func onMainActor() { }
 
+// CHECK-CANONICAL-LABEL: sil [ossa] @$s4test17onMainActorUnsafeyyF
+// CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+@_predatesConcurrency @MainActor public func onMainActorUnsafe() { }
+
 func takeClosure(_ fn: @escaping () -> Int) { }
 
-func takeUnsafeMainActorClosure(@_unsafeMainActor _ fn: @escaping () -> Int) { }
+@_predatesConcurrency func takeUnsafeMainActorClosure(_ fn: @MainActor @escaping () -> Int) { }
 
 public actor MyActor {
   var counter = 0
@@ -32,8 +36,8 @@ public actor MyActor {
     }
   }
 
-  // CHECK-RAW-LABEL: sil private [ossa] @$s4test7MyActorC0A10UnsafeMainyyFSiycfU_
-  // CHECK-RAW-NOT: _checkExpectedExecutor
+  // CHECK-RAW-LABEL: sil private [ossa] @$s4test7MyActorC0A10UnsafeMainyyFSiyScMYccfU_
+  // CHECK-RAW: _checkExpectedExecutor
   // CHECK-RAW: onMainActor
   // CHECK-RAW: return
   public func testUnsafeMain() {

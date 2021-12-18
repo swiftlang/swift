@@ -30,6 +30,20 @@
 
 namespace swift {
 
+enum class LexicalLifetimesOption : uint8_t {
+  // Do not insert any lexical lifetimes.
+  Off = 0,
+
+  // Insert lexical lifetimes in SILGen, but remove them before leaving Raw SIL.
+  Early,
+
+  // Insert lexical lifetimes and do not remove them until OSSA is lowered. This
+  // is experimental.
+  ExperimentalLate,
+};
+
+class SILModule;
+
 class SILOptions {
 public:
   /// Controls the aggressiveness of the performance inliner.
@@ -43,6 +57,9 @@ public:
 
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
+
+  /// Enable experimental support for emitting defined borrow scopes.
+  LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::Early;
 
   /// Force-run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
@@ -75,7 +92,10 @@ public:
 
   /// Controls whether cross module optimization is enabled.
   bool CrossModuleOptimization = false;
-  
+
+  /// Enables experimental performance annotations.
+  bool EnablePerformanceAnnotations = false;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
@@ -189,6 +209,15 @@ public:
   /// }
   bool EnableDynamicReplacementCanCallPreviousImplementation = true;
 
+  /// Are we parsing the stdlib, i.e. -parse-stdlib?
+  bool ParseStdlib = false;
+
+  /// If true, check for leaking instructions when the SILModule is destructed.
+  ///
+  /// Warning: this is not thread safe. It can only be enabled in case there
+  /// is a single SILModule in a single thread.
+  bool checkSILModuleLeaks = false;
+
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;
@@ -211,6 +240,12 @@ public:
   bool shouldOptimize() const {
     return OptMode > OptimizationMode::NoOptimization;
   }
+
+  /// Returns true if we support inserting lexical lifetimes given the current
+  /// SIL stage.
+  ///
+  /// Defined in SILModule.h.
+  bool supportsLexicalLifetimes(const SILModule &mod) const;
 };
 
 } // end namespace swift

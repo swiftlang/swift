@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that contains, in order, the elements of
   /// the base sequence that satisfy the given predicate.
@@ -43,8 +43,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence that contains, in order, the elements of
 /// the base sequence that satisfy a given predicate.
-@available(SwiftStdlib 5.5, *)
-@frozen
+@available(SwiftStdlib 5.1, *)
 public struct AsyncFilterSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -52,7 +51,7 @@ public struct AsyncFilterSequence<Base: AsyncSequence> {
   @usableFromInline
   let isIncluded: (Element) async -> Bool
 
-  @inlinable
+  @usableFromInline
   init(
     _ base: Base, 
     isIncluded: @escaping (Base.Element) async -> Bool
@@ -62,7 +61,7 @@ public struct AsyncFilterSequence<Base: AsyncSequence> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncFilterSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///
@@ -73,7 +72,6 @@ extension AsyncFilterSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the filter sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -81,7 +79,7 @@ extension AsyncFilterSequence: AsyncSequence {
     @usableFromInline
     let isIncluded: (Base.Element) async -> Bool
 
-    @inlinable
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
       isIncluded: @escaping (Base.Element) async -> Bool

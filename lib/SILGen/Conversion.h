@@ -59,6 +59,11 @@ public:
   static bool isBridgingKind(KindTy kind) {
     return kind <= LastBridgingKind;
   }
+  
+  static bool isReabstractionKind(KindTy kind) {
+    // Update if we end up with more kinds!
+    return !isBridgingKind(kind);
+  }
 
 private:
   KindTy Kind;
@@ -138,6 +143,10 @@ public:
 
   bool isBridging() const {
     return isBridgingKind(getKind());
+  }
+  
+  bool isReabstraction() const {
+    return isReabstractionKind(getKind());
   }
 
   AbstractionPattern getReabstractionOrigType() const {
@@ -264,12 +273,21 @@ private:
   StateTy getState() const {
     return State;
   }
+  
+  InitializationPtr OwnedSubInitialization;
 
 public:
   ConvertingInitialization(Conversion conversion, SGFContext finalContext)
     : State(Uninitialized), TheConversion(conversion),
       FinalContext(finalContext) {}
 
+  ConvertingInitialization(Conversion conversion,
+                           InitializationPtr subInitialization)
+    : State(Uninitialized), TheConversion(conversion),
+      FinalContext(SGFContext(subInitialization.get())) {
+    OwnedSubInitialization = std::move(subInitialization);
+  }
+  
   /// Return the conversion to apply to the unconverted value.
   const Conversion &getConversion() const {
     return TheConversion;
@@ -328,11 +346,16 @@ public:
   ConvertingInitialization *getAsConversion() override {
     return this;
   }
+  
+  // Get the abstraction pattern, if any, the value is converted to.
+  Optional<AbstractionPattern> getAbstractionPattern() const override;
 
   // Bookkeeping.
   void finishInitialization(SILGenFunction &SGF) override {
     assert(getState() == Initialized);
     State = Finished;
+    if (OwnedSubInitialization)
+      OwnedSubInitialization->finishInitialization(SGF);
   }
 };
 

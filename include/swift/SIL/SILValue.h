@@ -28,6 +28,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
@@ -642,6 +643,9 @@ public:
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
 };
 
 inline SILNodePointer::SILNodePointer(SILValue value) : node(value) { }
@@ -1057,6 +1061,12 @@ public:
 
   /// Returns true if this ends the lifetime of an owned operand.
   bool isConsuming() const;
+
+  bool endsLocalBorrowScope() const {
+    auto ownership = getOperandOwnership();
+    return ownership == OperandOwnership::EndBorrow
+           || ownership == OperandOwnership::Reborrow;
+  }
 
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;

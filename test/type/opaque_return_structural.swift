@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-structural-opaque-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 // Tests for experimental extensions to opaque return type support.
 
@@ -85,3 +85,14 @@ func structuralMemberLookupBad() {
   tup.0.paul();
   tup.0.d(); // expected-error{{value of type 'some P' has no member 'd'}}
 }
+
+// expected-error@+1 {{'some' cannot appear in parameter position in result type '(some P) -> Void'}}
+func opaqueParameter() -> (some P) -> Void {}
+
+// expected-error@+1 {{'some' cannot appear in parameter position in result type '((some P) -> Void) -> Void'}}
+func opaqueParameter() -> ((some P) -> Void) -> Void {}
+
+typealias Takes<T> = (T) -> Void
+
+// expected-error@+1 {{'some' cannot appear in parameter position in result type 'Takes<some P>' (aka '(some P) -> ()')}}
+func indirectOpaqueParameter() -> Takes<some P> {}

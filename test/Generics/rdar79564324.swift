@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/Inputs/rdar79564324_other.swift -emit-module-path %t/rdar79564324_other.swiftmodule -requirement-machine=on -debug-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module %S/Inputs/rdar79564324_other.swift -emit-module-path %t/rdar79564324_other.swiftmodule -requirement-machine=on -dump-requirement-machine 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen %s -I %t -requirement-machine=on
 
 import rdar79564324_other
@@ -23,16 +23,20 @@ public func test<T : P>(_ t: T) where T == T.A {
 
 // CHECK-LABEL: Requirement machine for <τ_0_0, τ_0_1 where τ_0_0 == τ_0_0.A, τ_0_1 : P, τ_0_0.A == τ_0_1.A>
 // CHECK-NEXT: Rewrite system: {
-// CHECK-NEXT: - [P].A => [P:A]
+// CHECK-NEXT: - [P].[P] => [P] [permanent]
+// CHECK-NEXT: - [P].A => [P:A] [permanent]
 // CHECK-NEXT: - [P:A].[P] => [P:A]
 // CHECK-NEXT: - τ_0_0.[P:A] => τ_0_0
 // CHECK-NEXT: - τ_0_1.[P] => τ_0_1
 // CHECK-NEXT: - τ_0_1.[P:A] => τ_0_0
+// CHECK-NEXT: - [P].[P:A] => [P:A]
 // CHECK-NEXT: - [P:A].A => [P:A].[P:A]
 // CHECK-NEXT: - τ_0_0.[P] => τ_0_0
 // CHECK-NEXT: - τ_0_1.A => τ_0_0
 // CHECK-NEXT: - τ_0_0.A => τ_0_0
 // CHECK-NEXT: }
+// CHECK-NEXT: Rewrite loops: {
+// CHECK:      }
 // CHECK-NEXT: Property map: {
 // CHECK-NEXT:   [P:A] => { conforms_to: [P] }
 // CHECK-NEXT:   τ_0_1 => { conforms_to: [P] }

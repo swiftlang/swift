@@ -89,21 +89,26 @@ namespace swift {
   /// formed during expression type-checking.
   class UnresolvedMemberTypeCheckCompletionCallback: public TypeCheckCompletionCallback {
   public:
-    struct Result {
+    struct ExprResult {
       Type ExpectedTy;
       bool IsImplicitSingleExpressionReturn;
     };
 
   private:
     CodeCompletionExpr *CompletionExpr;
-    SmallVector<Result, 4> Results;
+    SmallVector<ExprResult, 4> ExprResults;
+    SmallVector<Type, 1> EnumPatternTypes;
     bool GotCallback = false;
 
   public:
     UnresolvedMemberTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr)
     : CompletionExpr(CompletionExpr) {}
 
-    ArrayRef<Result> getResults() const { return Results; }
+    ArrayRef<ExprResult> getExprResults() const { return ExprResults; }
+
+    /// If we are completing in a pattern matching position, the types of all
+    /// enums for whose cases are valid as an \c EnumElementPattern.
+    ArrayRef<Type> getEnumPatternTypes() const { return EnumPatternTypes; }
 
     /// True if at least one solution was passed via the \c sawSolution
     /// callback.

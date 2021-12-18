@@ -196,7 +196,7 @@ internal class KK : PP {
 
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform13wrap_inout_cp1aSiAA2PP_pz_tF : $@convention(thin) (@inout PP) -> Int {
 // CHECK: bb0(%0 : $*PP):
-// CHECK: debug_value_addr
+// CHECK: debug_value {{.*}} expr op_deref
 // CHECK: load
 // CHECK: [[O1:%.*]] = open_existential_ref
 // CHECK:  witness_method $@opened("{{.*}}") PP, #PP.foo : <Self where Self : PP> (Self) -> () -> Int, %3 : $@opened("{{.*}}PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int 
@@ -350,9 +350,9 @@ struct MyStruct : Foo {
 // CHECK:   alloc_stack
 // CHECK:   init_existential_addr
 // CHECK:   copy_addr
-// CHECK:   debug_value_addr 
+// CHECK:   debug_value {{.*}} expr op_deref
 // CHECK:   open_existential_addr
-// CHECK:   witness_method 
+// CHECK:   witness_method
 // CHECK:   apply
 // CHECK:   dealloc_stack
 // CHECK:   return
@@ -382,7 +382,7 @@ class RC: RP {
 // CHECK:   copy_addr
 // CHECK:   debug_value
 // CHECK:   debug_value
-// CHECK:   debug_value_addr
+// CHECK:   debug_value {{.*}} expr op_deref
 // CHECK:   struct_extract
 // CHECK:   struct_extract
 // CHECK:   integer_literal

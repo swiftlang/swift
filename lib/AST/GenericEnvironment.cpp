@@ -86,10 +86,14 @@ Optional<Type> GenericEnvironment::getMappingIfPresent(
 
 Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
                                             Type type) {
-  assert(!type->hasArchetype() && "already have a contextual type");
+  assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
+         "already have a contextual type");
+  assert((env || !type->hasTypeParameter()) &&
+         "no generic environment provided for type with type parameters");
 
-  if (!env)
-    return type.substDependentTypesWithErrorTypes();
+  if (!env) {
+    return type;
+  }
 
   return env->mapTypeIntoContext(type);
 }
@@ -116,11 +120,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
   auto requirements = genericSig->getLocalRequirements(depType);
 
-  // FIXME: With the RequirementMachine, we will always have an anchor.
-  if (requirements.concreteType && !requirements.anchor) {
-    if (requirements.concreteType->is<ErrorType>())
-      return requirements.concreteType;
-
+  if (requirements.concreteType) {
     return mapTypeIntoContext(requirements.concreteType,
                               conformanceLookupFn);
   }
@@ -137,9 +137,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   if (auto depMemTy = requirements.anchor->getAs<DependentMemberType>()) {
     parentArchetype =
       getOrCreateArchetypeFromInterfaceType(depMemTy->getBase())
-        ->getAs<ArchetypeType>();
-    if (!parentArchetype)
-      return ErrorType::get(depMemTy);
+        ->castTo<ArchetypeType>();
 
     auto name = depMemTy->getName();
     if (auto type = parentArchetype->getNestedTypeIfKnown(name))
@@ -153,39 +151,32 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     addMapping(genericParam, ErrorType::get(ctx));
   }
 
-  Type result;
-
-  // If this equivalence class is mapped to a concrete type, produce that
-  // type.
-  if (requirements.concreteType) {
-    result = mapTypeIntoContext(requirements.concreteType,
-                                conformanceLookupFn);
-  } else {
-    // Substitute into the superclass.
-    Type superclass = requirements.superclass;
-    if (superclass && superclass->hasTypeParameter()) {
-      superclass = mapTypeIntoContext(superclass,
-                                      conformanceLookupFn);
-      if (superclass->is<ErrorType>())
-        superclass = Type();
-    }
-
-    if (parentArchetype) {
-      auto *depMemTy = requirements.anchor->castTo<DependentMemberType>();
-      result = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
-                                           requirements.protos, superclass,
-                                           requirements.layout);
-    } else {
-      result = PrimaryArchetypeType::getNew(ctx, this, genericParam,
-                                            requirements.protos, superclass,
-                                            requirements.layout);
-    }
+  // Substitute into the superclass.
+  Type superclass = requirements.superclass;
+  if (superclass && superclass->hasTypeParameter()) {
+    superclass = mapTypeIntoContext(superclass,
+                                    conformanceLookupFn);
+    if (superclass->is<ErrorType>())
+      superclass = Type();
   }
 
-  // Cache the new archetype for future lookups.
-  if (auto depMemTy = requirements.anchor->getAs<DependentMemberType>()) {
+  Type result;
+
+  if (parentArchetype) {
+    auto *depMemTy = requirements.anchor->castTo<DependentMemberType>();
+    result = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
+                                         requirements.protos, superclass,
+                                         requirements.layout);
     parentArchetype->registerNestedType(depMemTy->getName(), result);
+  } else if (genericParam->isTypeSequence()) {
+    result = SequenceArchetypeType::get(ctx, this, genericParam,
+                                        requirements.protos, superclass,
+                                        requirements.layout);
+    addMapping(genericParam, result);
   } else {
+    result = PrimaryArchetypeType::getNew(ctx, this, genericParam,
+                                          requirements.protos, superclass,
+                                          requirements.layout);
     addMapping(genericParam, result);
   }
 
@@ -240,8 +231,8 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
 Type GenericEnvironment::mapTypeIntoContext(
                                 Type type,
                                 LookupConformanceFn lookupConformance) const {
-  assert(!type->hasOpenedExistential() &&
-         "Opened existentials are special and so are you");
+  assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
+         "already have a contextual type");
 
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,

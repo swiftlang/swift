@@ -1,3 +1,6 @@
+// rdar://84233775
+// REQUIRES: rdar84233775
+
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test,optimized_stdlib
 

@@ -12,11 +12,13 @@
 
 import SIL
 import OptimizerBridging
+import ExperimentalRegex
 
 @_cdecl("initializeLibSwift")
 public func initializeLibSwift() {
   registerSILClasses()
   registerSwiftPasses()
+  registerParser()
 }
 
 private func registerPass(
@@ -38,5 +40,8 @@ private func registerPass<InstType: Instruction>(
 private func registerSwiftPasses() {
   registerPass(silPrinterPass, { silPrinterPass.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
+  registerPass(simplifyBeginCOWMutationPass, { simplifyBeginCOWMutationPass.run($0) })
   registerPass(simplifyGlobalValuePass, { simplifyGlobalValuePass.run($0) })
+  registerPass(simplifyStrongRetainPass, { simplifyStrongRetainPass.run($0) })
+  registerPass(simplifyStrongReleasePass, { simplifyStrongReleasePass.run($0) })
 }

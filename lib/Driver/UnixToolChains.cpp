@@ -85,6 +85,9 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
+  if (getTriple().isAndroid())
+    return "lld";
+
   switch (getTriple().getArch()) {
   case llvm::Triple::arm:
   case llvm::Triple::aarch64:
@@ -358,7 +361,9 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   // These custom arguments should be right before the object file at the end.
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgsExcept(Arguments, {options::OPT_linker_option_Group},
+                                {options::OPT_l});
+  ToolChain::addLinkedLibArgs(context.Args, Arguments);
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
@@ -382,9 +387,12 @@ toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
 
   ArgStringList Arguments;
 
+  const char *AR;
   // Configure the toolchain.
-  const char *AR =
-      context.OI.LTOVariant != OutputInfo::LTOKind::None ? "llvm-ar" : "ar";
+  if (getTriple().isAndroid())
+    AR = "llvm-ar";
+  else
+    AR = context.OI.LTOVariant != OutputInfo::LTOKind::None ? "llvm-ar" : "ar";
   Arguments.push_back("crs");
 
   Arguments.push_back(

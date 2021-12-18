@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,11 +12,12 @@
 
 import TestsUtils
 
-public let CaptureProp = BenchmarkInfo(
-  name: "CaptureProp",
-  runFunction: run_CaptureProp,
-  tags: [.validation, .api, .refcount],
-  legacyFactor: 10)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "CaptureProp",
+    runFunction: run_CaptureProp,
+    tags: [.validation, .api, .refcount],
+    legacyFactor: 10)
 
 func sum(_ x:Int, y:Int) -> Int {
   return x + y
@@ -32,9 +33,9 @@ func benchCaptureProp<S : Sequence
   return IteratorSequence(it).reduce(initial, f)
 }
 
-public func run_CaptureProp(_ N: Int) {
+public func run_CaptureProp(_ n: Int) {
   let a = 1...10_000
-  for _ in 1...10*N {
+  for _ in 1...10*n {
     _ = benchCaptureProp(a, sum)
   }
 }

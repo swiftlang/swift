@@ -116,7 +116,6 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       worklist.append(inst->use_begin(), inst->use_end());
       break;
     }
-    case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::AddressToPointerInst:
       // Ignore these uses, they don't affect formal accesses.
       break;
@@ -124,6 +123,10 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
       processPartialApply(info, argumentIndex, cast<PartialApplyInst>(user),
                           operand, order);
       break;
+    case SILInstructionKind::DebugValueInst:
+      if (DebugValueInst::hasAddrVal(user))
+        break;
+      LLVM_FALLTHROUGH;
     default:
       // FIXME: These likely represent scenarios in which we're not generating
       // begin access markers. Ignore these for now. But we really should

@@ -273,12 +273,9 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
       requirements.push_back(req);
     }
   }
-  return evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{derivativeGenSig.getPointer(),
-                                      /*addedGenericParams*/ {},
-                                      std::move(requirements)},
-      nullptr);
+  return buildGenericSignature(ctx, derivativeGenSig,
+                               /*addedGenericParams*/ {},
+                               std::move(requirements));
 }
 
 // Given the rest of a `Builtin.applyDerivative_{jvp|vjp}` or

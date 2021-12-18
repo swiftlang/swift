@@ -56,7 +56,7 @@ func dumpGenericMetadata(
   let metadatas = allocations.findGenericMetadata(in: context)
   let backtraces = backtraceStyle != nil ? context.allocationBacktraces : [:]
 
-  print("Address","Allocation","Size","Offset","Name", separator: "\t")
+  print("Address","Allocation","Size","Offset","isArrayOfClass", "Name", separator: "\t")
   for metadata in metadatas {
     print("\(hex: metadata.ptr)", terminator: "\t")
 
@@ -66,6 +66,7 @@ func dumpGenericMetadata(
     } else {
       print("???\t???\t???", terminator: "\t")
     }
+    print(metadata.isArrayOfClass, terminator: "\t")
     print(metadata.name)
     if let allocation = metadata.allocation {
       printBacktrace(style: backtraceStyle, for: allocation.ptr, in: backtraces, inspector: inspector)
@@ -87,6 +88,22 @@ func dumpMetadataCacheNodes(
     print("\(hex: allocation.ptr)\t\(allocation.tag)\t\(tagName)\t" +
           "\(allocation.size)\t\(hex: node.Left)\t\(hex: node.Right)")
   }
+}
+
+func dumpArrays(
+  context: SwiftReflectionContextRef,
+  inspector: Inspector
+) throws {
+  print("Address","Size","Count","Is Class", separator: "\t")
+  inspector.enumerateMallocs(callback: { (pointer, size) in
+    let metadata = swift_reflection_ptr_t(swift_reflection_metadataForObject(context, UInt(pointer)))
+    guard metadata != 0 else { return }
+    guard context.isAContiguousArray(metadata: metadata) else { return }
+    let isClass = context.isAContiguousArrayOfClassElementType(metadata: metadata)
+    let count = context.arrayCount(array: pointer, reader: inspector.read)
+    let countStr = count.map({ String($0) }) ?? "<unknown>"
+    print("\(hex: pointer)\t\(size)\t\(countStr)\t\(isClass)")
+  })
 }
 
 func printBacktrace(
@@ -126,6 +143,8 @@ func makeReflectionContext(
     argFail("Failed to create reflection context")
   }
 
+  inspector.addReflectionInfoFromLoadedImages(context: reflectionContext)
+
   return (inspector, reflectionContext)
 }
 
@@ -149,6 +168,7 @@ struct SwiftInspect: ParsableCommand {
       DumpRawMetadata.self,
       DumpGenericMetadata.self,
       DumpCacheNodes.self,
+      DumpArrays.self,
     ])
 }
 
@@ -159,10 +179,10 @@ struct UniversalOptions: ParsableArguments {
 
 struct BacktraceOptions: ParsableArguments {
   @Flag(help: "Show the backtrace for each allocation")
-  var backtrace: Bool
+  var backtrace: Bool = false
 
   @Flag(help: "Show a long-form backtrace for each allocation")
-  var backtraceLong: Bool
+  var backtraceLong: Bool = false
 
   var style: Backtrace.Style? {
     backtrace ? .oneLine :
@@ -234,6 +254,20 @@ struct DumpCacheNodes: ParsableCommand {
     try withReflectionContext(nameOrPid: options.nameOrPid) {
       try dumpMetadataCacheNodes(context: $0,
                                  inspector: $1)
+    }
+  }
+}
+
+struct DumpArrays: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Print the target's metadata cache nodes.")
+
+  @OptionGroup()
+  var options: UniversalOptions
+
+  func run() throws {
+    try withReflectionContext(nameOrPid: options.nameOrPid) {
+      try dumpArrays(context: $0, inspector: $1)
     }
   }
 }

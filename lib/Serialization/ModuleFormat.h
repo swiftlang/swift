@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 624; // new BodyKind for AbstractFunctionDecl
+const uint16_t SWIFTMODULE_VERSION_MINOR = 646; // hasHermeticSealAtLink option
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -754,7 +754,10 @@ namespace control_block {
   enum {
     METADATA = 1,
     MODULE_NAME,
-    TARGET
+    TARGET,
+    SDK_NAME,
+    REVISION,
+    IS_OSSA
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -779,6 +782,21 @@ namespace control_block {
     TARGET,
     BCBlob // LLVM triple
   >;
+
+  using SDKNameLayout = BCRecordLayout<
+    SDK_NAME,
+    BCBlob
+  >;
+
+  using RevisionLayout = BCRecordLayout<
+    REVISION,
+    BCBlob
+  >;
+
+  using IsOSSALayout = BCRecordLayout<
+    IS_OSSA,
+    BCFixed<1>
+  >;
 }
 
 /// The record types within the options block (a sub-block of the control
@@ -791,12 +809,14 @@ namespace options_block {
     XCC,
     IS_SIB,
     IS_STATIC_LIBRARY,
+    HAS_HERMETIC_SEAL_AT_LINK,
     IS_TESTABLE,
     RESILIENCE_STRATEGY,
     ARE_PRIVATE_IMPORTS_ENABLED,
     IS_IMPLICIT_DYNAMIC_ENABLED,
     IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED,
     MODULE_ABI_NAME,
+    IS_CONCURRENCY_CHECKED,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -816,6 +836,10 @@ namespace options_block {
 
   using IsStaticLibraryLayout = BCRecordLayout<
     IS_STATIC_LIBRARY
+  >;
+
+  using HasHermeticSealAtLinkLayout = BCRecordLayout<
+    HAS_HERMETIC_SEAL_AT_LINK
   >;
 
   using IsTestableLayout = BCRecordLayout<
@@ -842,6 +866,10 @@ namespace options_block {
   using ModuleABINameLayout = BCRecordLayout<
     MODULE_ABI_NAME,
     BCBlob
+  >;
+
+  using IsConcurrencyCheckedLayout = BCRecordLayout<
+    IS_CONCURRENCY_CHECKED
   >;
 }
 
@@ -967,10 +995,11 @@ namespace decls_block {
     SubstitutionMapIDField // substitution map
   >;
 
-  using GenericTypeParamTypeLayout = BCRecordLayout<
-    GENERIC_TYPE_PARAM_TYPE,
+  using GenericTypeParamTypeLayout = BCRecordLayout<GENERIC_TYPE_PARAM_TYPE,
+    BCFixed<1>,  // type sequence?
     DeclIDField, // generic type parameter decl or depth
-    BCVBR<4>     // index + 1, or zero if we have a generic type parameter decl
+    BCVBR<4> // index + 1, or zero if we have a generic type
+            // parameter decl
   >;
 
   using DependentMemberTypeLayout = BCRecordLayout<
@@ -1023,7 +1052,8 @@ namespace decls_block {
     BCFixed<1>,          // non-ephemeral?
     ValueOwnershipField, // inout, shared or owned?
     BCFixed<1>,          // isolated
-    BCFixed<1>           // noDerivative?
+    BCFixed<1>,          // noDerivative?
+    BCFixed<1>           // compileTimeConst
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -1061,7 +1091,15 @@ namespace decls_block {
     TypeIDField, // root archetype
     TypeIDField // interface type relative to root
   >;
-  
+
+  using SequenceArchetypeTypeLayout = BCRecordLayout<
+    SEQUENCE_ARCHETYPE_TYPE,
+    GenericSignatureIDField, // generic environment
+    BCVBR<4>,                // generic type parameter depth
+    BCVBR<4> // index + 1, or zero if we have a generic type
+             // parameter decl
+  >;
+
   using DynamicSelfTypeLayout = BCRecordLayout<
     DYNAMIC_SELF_TYPE,
     TypeIDField          // self type
@@ -1178,12 +1216,12 @@ namespace decls_block {
     // Trailed by generic parameters (if any).
   >;
 
-  using GenericTypeParamDeclLayout = BCRecordLayout<
-    GENERIC_TYPE_PARAM_DECL,
-    IdentifierIDField,  // name
-    BCFixed<1>,         // implicit flag
-    BCVBR<4>,           // depth
-    BCVBR<4>            // index
+  using GenericTypeParamDeclLayout = BCRecordLayout<GENERIC_TYPE_PARAM_DECL,
+    IdentifierIDField, // name
+    BCFixed<1>,        // implicit flag
+    BCFixed<1>,        // type sequence?
+    BCVBR<4>,          // depth
+    BCVBR<4>           // index
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<
@@ -1252,7 +1290,6 @@ namespace decls_block {
     BCFixed<1>,             // implicit flag
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
-    BCFixed<1>,             // existential-type-supported?
     AccessLevelField,       // access level
     BCVBR<4>,               // number of inherited types
     BCArray<TypeIDField>    // inherited types, followed by dependency types
@@ -1332,6 +1369,8 @@ namespace decls_block {
     BCFixed<1>,              // isIUO?
     BCFixed<1>,              // isVariadic?
     BCFixed<1>,              // isAutoClosure?
+    BCFixed<1>,              // isIsolated?
+    BCFixed<1>,              // isCompileTimeConst?
     DefaultArgumentField,    // default argument kind
     BCBlob                   // default argument text
   >;
@@ -1872,6 +1911,11 @@ namespace decls_block {
     BCFixed<2>  // inline value
   >;
 
+  using NonSendableDeclAttrLayout = BCRecordLayout<
+    NonSendable_DECL_ATTR,
+    BCFixed<1>  // assumed flag
+  >;
+
   using OptimizeDeclAttrLayout = BCRecordLayout<
     Optimize_DECL_ATTR,
     BCFixed<2>  // optimize value
@@ -1911,15 +1955,16 @@ namespace decls_block {
   >;
 
   using SpecializeDeclAttrLayout = BCRecordLayout<
-    Specialize_DECL_ATTR,
-    BCFixed<1>, // exported flag
-    BCFixed<1>, // specialization kind
-    GenericSignatureIDField, // specialized signature
-    DeclIDField, // target function
-    BCVBR<4>,   // # of arguments (+1) or 1 if simple decl name, 0 if no target
-    BCVBR<4>,   // # of SPI groups
-    BCArray<IdentifierIDField> // target function pieces, spi groups
-  >;
+      Specialize_DECL_ATTR,
+      BCFixed<1>,              // exported flag
+      BCFixed<1>,              // specialization kind
+      GenericSignatureIDField, // specialized signature
+      DeclIDField,             // target function
+      BCVBR<4>, // # of arguments (+1) or 1 if simple decl name, 0 if no target
+      BCVBR<4>, // # of SPI groups
+      BCVBR<4>, // # of availability attributes
+      BCArray<IdentifierIDField> // target function pieces, spi groups
+      >;
 
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
@@ -1947,6 +1992,8 @@ namespace decls_block {
     DeclIDField, // Original function declaration.
     BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
   >;
+
+  using TypeSequenceDeclAttrLayout = BCRecordLayout<TypeSequence_DECL_ATTR>;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
@@ -2024,7 +2071,7 @@ namespace identifier_block {
   };
 
   using IdentifierDataLayout = BCRecordLayout<IDENTIFIER_DATA, BCBlob>;
-};
+}
 
 /// The record types within the index block.
 ///

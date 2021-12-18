@@ -90,8 +90,9 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
     if (result->getSemanticContext() == SemanticContextKind::OtherModule) {
       builder.setModuleImportDepth(depth.lookup(result->getModuleName()));
 
-      if (info.completionContext->typeContextKind == TypeContextKind::Required &&
-          result->getKind() == Completion::Declaration) {
+      if (info.completionContext->typeContextKind ==
+              TypeContextKind::Required &&
+          result->getKind() == Completion::ResultKind::Declaration) {
         // FIXME: because other-module results are cached, they will not be
         // given a type-relation of invalid.  As a hack, we look at the text of
         // the result type and look for 'Void'.
@@ -114,7 +115,8 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
           }
         }
         if (isVoid)
-          builder.setExpectedTypeRelation(Completion::Invalid);
+          builder.setExpectedTypeRelation(
+              Completion::ExpectedTypeRelation::Invalid);
       }
     }
 
@@ -412,10 +414,10 @@ bool FilterRules::hideCompletion(SwiftResult *completion, StringRef filterName,
   }
 
   switch (completion->getKind()) {
-  case Completion::BuiltinOperator:
-  case Completion::Declaration:
+  case Completion::ResultKind::BuiltinOperator:
+  case Completion::ResultKind::Declaration:
     break;
-  case Completion::Keyword: {
+  case Completion::ResultKind::Keyword: {
     auto I = hideKeyword.find(completion->getKeywordKind());
     if (I != hideKeyword.end())
       return I->second;
@@ -423,7 +425,7 @@ bool FilterRules::hideCompletion(SwiftResult *completion, StringRef filterName,
       return true;
     break;
   }
-  case Completion::Pattern: {
+  case Completion::ResultKind::Pattern: {
     if (customKind) {
       // FIXME: individual custom completions
       if (hideCustomCompletions)
@@ -431,7 +433,7 @@ bool FilterRules::hideCompletion(SwiftResult *completion, StringRef filterName,
     }
     break;
   }
-  case Completion::Literal: {
+  case Completion::ResultKind::Literal: {
     auto I = hideValueLiteral.find(completion->getLiteralKind());
     if (I != hideValueLiteral.end())
       return I->second;
@@ -471,7 +473,8 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
 
       if (options.hideLowPriority &&
           (completion->isNotRecommended() ||
-           completion->getExpectedTypeRelation() == Completion::Invalid))
+           completion->getExpectedTypeRelation() ==
+               Completion::ExpectedTypeRelation::Invalid))
         continue;
 
       NameStyle style(completion->getName());
@@ -479,9 +482,10 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
       if (hideUnderscore && options.reallyHideAllUnderscores)
         continue;
 
-      bool hideByNameStyle = options.hideByNameStyle &&
-                             completion->getKind() == Completion::Declaration &&
-                             !matchesExpectedStyle(completion, style);
+      bool hideByNameStyle =
+          options.hideByNameStyle &&
+          completion->getKind() == Completion::ResultKind::Declaration &&
+          !matchesExpectedStyle(completion, style);
 
       hideByNameStyle |= hideUnderscore;
 
@@ -497,13 +501,14 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
           if (*depth == 0) // Treat as if it's "thismodule"
             break;
         }
-        if (completion->getExpectedTypeRelation() >= Completion::Convertible ||
-            (completion->getKind() == Completion::Literal &&
+        if (completion->getExpectedTypeRelation() >=
+                Completion::ExpectedTypeRelation::Convertible ||
+            (completion->getKind() == Completion::ResultKind::Literal &&
              completionKind != CompletionKind::StmtOrExpr &&
              typeContextKind < TypeContextKind::Required))
           break;
 
-        if (completion->getKind() == Completion::Keyword &&
+        if (completion->getKind() == Completion::ResultKind::Keyword &&
             completionKind == CompletionKind::StmtOrExpr &&
             isHighPriorityKeyword(completion->getKeywordKind()))
           break;
@@ -529,9 +534,10 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
 
     // Hide literals other than the ones that are also keywords if they don't
     // match the expected types.
-    if (completion->getKind() == Completion::Literal &&
+    if (completion->getKind() == Completion::ResultKind::Literal &&
         typeContextKind == TypeContextKind::Required &&
-        completion->getExpectedTypeRelation() < Completion::Convertible &&
+        completion->getExpectedTypeRelation() <
+            Completion::ExpectedTypeRelation::Convertible &&
         completion->getLiteralKind() !=
             CodeCompletionLiteralKind::BooleanLiteral &&
         completion->getLiteralKind() != CodeCompletionLiteralKind::NilLiteral)
@@ -541,10 +547,11 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     if (options.fuzzyMatching && filterText.size() >= options.minFuzzyLength) {
       match = pattern.matchesCandidate(completion->getName());
     } else {
-      match = completion->getName().startswith_lower(filterText);
+      match = completion->getName().startswith_insensitive(filterText);
     }
 
-    bool isExactMatch = match && completion->getName().equals_lower(filterText);
+    bool isExactMatch =
+        match && completion->getName().equals_insensitive(filterText);
 
     if (isExactMatch) {
       if (!exactMatch) { // first match
@@ -598,7 +605,8 @@ static double getSemanticContextScore(bool useImportDepth,
     break;
   }
   case SemanticContextKind::None: {
-    order = completion->getKind() == Completion::Keyword ? 5.5 : 8.0;
+    order =
+        completion->getKind() == Completion::ResultKind::Keyword ? 5.5 : 8.0;
     break;
   }
   }
@@ -624,12 +632,12 @@ static double combinedScore(const Options &options, double matchScore,
 
 static int compareResultName(Item &a, Item &b) {
   // Sort first by filter name (case-insensitive).
-  if (int primary = StringRef(a.name).compare_lower(b.name))
+  if (int primary = StringRef(a.name).compare_insensitive(b.name))
     return primary;
 
   // Next, sort by full description text.
   return a.description.compare(b.description);
-};
+}
 
 namespace {
 enum class ResultBucket {
@@ -669,8 +677,9 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
     return ResultBucket::Operator;
 
   switch (completion->getKind()) {
-  case Completion::Literal:
-    if (completion->getExpectedTypeRelation() >= Completion::Convertible) {
+  case Completion::ResultKind::Literal:
+    if (completion->getExpectedTypeRelation() >=
+        Completion::ExpectedTypeRelation::Convertible) {
       return ResultBucket::LiteralTypeMatch;
     } else if (!hasRequiredTypes) {
       return ResultBucket::Literal;
@@ -679,26 +688,26 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
       // but we treat them as keywords instead of literals for prioritization.
       return ResultBucket::Normal;
     }
-  case Completion::Keyword:
+  case Completion::ResultKind::Keyword:
     return isHighPriorityKeyword(completion->getKeywordKind())
                ? ResultBucket::HighPriorityKeyword
                : ResultBucket::Normal;
-  case Completion::Pattern:
-  case Completion::Declaration:
+  case Completion::ResultKind::Pattern:
+  case Completion::ResultKind::Declaration:
     switch (completion->getExpectedTypeRelation()) {
-    case swift::ide::CodeCompletionResult::Convertible:
-    case swift::ide::CodeCompletionResult::Identical:
+    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Convertible:
+    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Identical:
       return ResultBucket::NormalTypeMatch;
-    case swift::ide::CodeCompletionResult::NotApplicable:
-    case swift::ide::CodeCompletionResult::Unknown:
-    case swift::ide::CodeCompletionResult::Unrelated:
+    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::NotApplicable:
+    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Unknown:
+    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Unrelated:
       return ResultBucket::Normal;
-    case swift::ide::CodeCompletionResult::Invalid:
+    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Invalid:
       if (!skipMetaGroups)
         return ResultBucket::NotRecommended;
       return ResultBucket::Normal;
     }
-  case Completion::BuiltinOperator:
+  case Completion::ResultKind::BuiltinOperator:
     llvm_unreachable("operators should be handled above");
   }
 }
@@ -842,7 +851,8 @@ static bool isTopNonLiteralResult(Item &item, ResultBucket literalBucket) {
     return completion->getSemanticContext() <=
            SemanticContextKind::CurrentNominal;
   case ResultBucket::LiteralTypeMatch:
-    return completion->getExpectedTypeRelation() >= Completion::Convertible;
+    return completion->getExpectedTypeRelation() >=
+           Completion::ExpectedTypeRelation::Convertible;
   default:
     llvm_unreachable("invalid literal bucket");
   }
@@ -1165,14 +1175,13 @@ Completion *CompletionBuilder::finish() {
     if (current.isOperator())
       opKind = current.getOperatorKind();
 
-    if (current.getKind() == SwiftResult::Declaration) {
+    if (current.getKind() == SwiftResult::ResultKind::Declaration) {
       base = SwiftResult(
-          semanticContext, flair, current.getNumBytesToErase(), completionString,
-          current.getAssociatedDeclKind(), current.isSystem(),
-          current.getModuleName(), current.getSourceFilePath(),
-          current.getNotRecommendedReason(), current.getDiagnosticSeverity(),
-          current.getDiagnosticMessage(), current.getBriefDocComment(),
-          current.getAssociatedUSRs(), current.getDeclKeywords(),
+          semanticContext, flair, current.getNumBytesToErase(),
+          completionString, current.getAssociatedDeclKind(), current.isSystem(),
+          current.getModuleName(), current.getNotRecommendedReason(),
+          current.getDiagnosticSeverity(), current.getDiagnosticMessage(),
+          current.getBriefDocComment(), current.getAssociatedUSRs(),
           typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext, flair,

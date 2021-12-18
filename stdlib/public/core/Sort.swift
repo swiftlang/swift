@@ -439,7 +439,7 @@ internal func _merge<Element>(
     }
   }
 
-  // FIXME: Remove this, it works around rdar://problem/45044610
+  // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
   return true
 }
 
@@ -534,7 +534,7 @@ extension UnsafeMutableBufferPointer {
     runs[i - 1] = low..<high
     runs.remove(at: i)
 
-    // FIXME: Remove this, it works around rdar://problem/45044610
+    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
     return result
   }
   
@@ -571,7 +571,7 @@ extension UnsafeMutableBufferPointer {
     // If W > X + Y, X > Y + Z, and Y > Z, then the invariants are satisfied
     // for the entirety of `runs`.
     
-    // FIXME: Remove this, it works around rdar://problem/45044610
+    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
     var result = true
 
     // The invariant is always in place for a single element.
@@ -626,7 +626,7 @@ extension UnsafeMutableBufferPointer {
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows -> Bool {
-    // FIXME: Remove this, it works around rdar://problem/45044610
+    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
     var result = true
     while runs.count > 1 {
       result = try result && _mergeRuns(
@@ -651,7 +651,7 @@ extension UnsafeMutableBufferPointer {
       return
     }
 
-    // FIXME: Remove this, it works around rdar://problem/45044610
+    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
     var result = true
 
     // Use array's allocating initializer to create a temporary buffer---this
@@ -695,7 +695,7 @@ extension UnsafeMutableBufferPointer {
       _internalInvariant(runs.count == 1, "Didn't complete final merge")
     }
 
-    // FIXME: Remove this, it works around rdar://problem/45044610
-    precondition(result)
+    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
+    _precondition(result)
   }
 }

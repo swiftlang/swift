@@ -36,6 +36,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ConformingMethodList.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
@@ -283,6 +284,11 @@ static llvm::cl::list<std::string>
 SwiftVersion("swift-version", llvm::cl::desc("Swift version"),
              llvm::cl::cat(Category));
 
+static llvm::cl::opt<std::string>
+ToolsDirectory("tools-directory",
+               llvm::cl::desc("Path to external executables (ld, clang, binutils)"),
+               llvm::cl::cat(Category));
+
 static llvm::cl::list<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
                 llvm::cl::cat(Category));
@@ -460,16 +466,16 @@ CodeCompletionComments("code-completion-comments",
                        llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-CodeCOmpletionAnnotateResults("code-completion-annotate-results",
+CodeCompletionSourceText("code-completion-sourcetext",
+                         llvm::cl::desc("Include source texts in code completion results"),
+                         llvm::cl::cat(Category),
+                         llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+CodeCompletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::desc("annotate completion results with XML"),
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-CodeCompletionSourceFileInfo("code-completion-sourcefileinfo",
-                             llvm::cl::desc("print module source file information"),
-                             llvm::cl::cat(Category),
-                             llvm::cl::init(false));
 
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
@@ -792,6 +798,15 @@ AllowCompilerErrors("allow-compiler-errors",
                     llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
                     llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+  DefineAvailability("define-availability",
+                     llvm::cl::desc("Define a macro for @available"),
+                     llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+SerializedPathObfuscate("serialized-path-obfuscate", llvm::cl::desc("Path to access notes file"),
+                    llvm::cl::cat(Category));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -821,16 +836,30 @@ static bool setBufferForFile(StringRef SourceFilename,
   return false;
 }
 
-static bool doCodeCompletionImpl(
-    CodeCompletionCallbacksFactory *callbacksFactory,
-    const CompilerInvocation &InitInvok,
-    StringRef SourceFilename,
-    StringRef SecondSourceFileName,
-    StringRef CodeCompletionToken,
-    bool CodeCompletionDiagnostics) {
+/// Result returned from \c performWithCompletionLikeOperationParams.
+struct CompletionLikeOperationParams {
+  swift::CompilerInvocation &Invocation;
+  llvm::ArrayRef<const char *> Args;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
+  llvm::MemoryBuffer *CompletionBuffer;
+  unsigned int Offset;
+  swift::DiagnosticConsumer *DiagC;
+};
+
+/// Run \p PerformOperation with the parameters that are needed to perform a
+/// completion like operation on a \c CompletionInstance. This function will
+/// return the same value as \p PerformOperation.
+/// In case there was an error setting up the parameters for the operation,
+/// this method returns \c true and does not call \p PerformOperation.
+static bool performWithCompletionLikeOperationParams(
+    const CompilerInvocation &InitInvok, StringRef SourceFilename,
+    StringRef SecondSourceFileName, StringRef CodeCompletionToken,
+    bool CodeCompletionDiagnostics,
+    llvm::function_ref<bool(CompletionLikeOperationParams Params)>
+        PerformOperation) {
   std::unique_ptr<llvm::MemoryBuffer> FileBuf;
   if (setBufferForFile(SourceFilename, FileBuf))
-    return 1;
+    return true;
 
   unsigned Offset;
 
@@ -840,7 +869,7 @@ static bool doCodeCompletionImpl(
   if (Offset == ~0U) {
     llvm::errs() << "could not find code completion token \""
                  << CodeCompletionToken << "\"\n";
-    return 1;
+    return true;
   }
   llvm::outs() << "found code completion token " << CodeCompletionToken
                << " at offset " << Offset << "\n";
@@ -854,19 +883,72 @@ static bool doCodeCompletionImpl(
         SecondSourceFileName);
   }
 
-  std::string Error;
   PrintingDiagnosticConsumer PrintDiags;
-  CompletionInstance CompletionInst;
-  auto isSuccess = CompletionInst.performOperation(
-      Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
-      Offset, Error,
-      CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-      [&](CompilerInstance &CI, bool reusingASTContext) {
-        assert(!reusingASTContext && "reusing AST context without enabling it");
-        auto *SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF, *callbacksFactory);
+
+  CompletionLikeOperationParams Params{Invocation,
+                                       /*Args=*/{},
+                                       llvm::vfs::getRealFileSystem(),
+                                       CleanFile.get(),
+                                       Offset,
+                                       CodeCompletionDiagnostics ? &PrintDiags
+                                                                 : nullptr};
+
+  return PerformOperation(Params);
+}
+
+template <typename ResultType>
+static int printResult(CancellableResult<ResultType> Result,
+                       llvm::function_ref<int(ResultType &)> PrintSuccess) {
+  switch (Result.getKind()) {
+  case CancellableResultKind::Success: {
+    return PrintSuccess(Result.getResult());
+  }
+  case CancellableResultKind::Failure:
+    llvm::errs() << "error: " << Result.getError() << '\n';
+    return 1;
+  case CancellableResultKind::Cancelled:
+    llvm::errs() << "request cancelled\n";
+    return 1;
+    break;
+  }
+}
+
+static int printTypeContextInfo(
+    CancellableResult<TypeContextInfoResult> CancellableResult) {
+  return printResult<TypeContextInfoResult>(
+      CancellableResult, [](TypeContextInfoResult &Result) {
+        llvm::outs() << "-----BEGIN TYPE CONTEXT INFO-----\n";
+        for (auto resultItem : Result.Results) {
+          llvm::outs() << "- TypeName: ";
+          resultItem.ExpectedTy.print(llvm::outs());
+          llvm::outs() << "\n";
+
+          llvm::outs() << "  TypeUSR: ";
+          printTypeUSR(resultItem.ExpectedTy, llvm::outs());
+          llvm::outs() << "\n";
+
+          llvm::outs() << "  ImplicitMembers:";
+          if (resultItem.ImplicitMembers.empty())
+            llvm::outs() << " []";
+          llvm::outs() << "\n";
+          for (auto VD : resultItem.ImplicitMembers) {
+            llvm::outs() << "   - ";
+
+            llvm::outs() << "Name: ";
+            VD->getName().print(llvm::outs());
+            llvm::outs() << "\n";
+
+            StringRef BriefDoc = VD->getBriefComment();
+            if (!BriefDoc.empty()) {
+              llvm::outs() << "     DocBrief: \"";
+              llvm::outs() << VD->getBriefComment();
+              llvm::outs() << "\"\n";
+            }
+          }
+        }
+        llvm::outs() << "-----END TYPE CONTEXT INFO-----\n";
+        return 0;
       });
-  return isSuccess ? 0 : 1;
 }
 
 static int doTypeContextInfo(const CompilerInvocation &InitInvok,
@@ -874,18 +956,65 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
                              StringRef SecondSourceFileName,
                              StringRef CodeCompletionToken,
                              bool CodeCompletionDiagnostics) {
-  // Create a CodeCompletionConsumer.
-  std::unique_ptr<ide::TypeContextInfoConsumer> Consumer(
-      new ide::PrintingTypeContextInfoConsumer(llvm::outs()));
+  return performWithCompletionLikeOperationParams(
+      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      CodeCompletionDiagnostics,
+      [&](CompletionLikeOperationParams Params) -> bool {
+        CompletionInstance CompletionInst;
+        int ExitCode = 2;
+        CompletionInst.typeContextInfo(
+            Params.Invocation, Params.Args, Params.FileSystem,
+            Params.CompletionBuffer, Params.Offset, Params.DiagC,
+            [&](CancellableResult<TypeContextInfoResult> Result) {
+              ExitCode = printTypeContextInfo(Result);
+            });
+        return ExitCode;
+      });
+}
 
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeTypeContextInfoCallbacksFactory(*Consumer));
+static int printConformingMethodList(
+    CancellableResult<ConformingMethodListResults> CancellableResult) {
+  return printResult<ConformingMethodListResults>(
+      CancellableResult, [](ConformingMethodListResults &Results) {
+        auto Result = Results.Result;
+        if (!Result) {
+          return 0;
+        }
+        llvm::outs() << "-----BEGIN CONFORMING METHOD LIST-----\n";
 
-  return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
-                              SecondSourceFileName, CodeCompletionToken,
-                              CodeCompletionDiagnostics);
+        llvm::outs() << "- TypeName: ";
+        Result->ExprType.print(llvm::outs());
+        llvm::outs() << "\n";
+
+        llvm::outs() << "- Members: ";
+        if (Result->Members.empty())
+          llvm::outs() << " []";
+        llvm::outs() << "\n";
+        for (auto VD : Result->Members) {
+          auto funcTy = cast<FuncDecl>(VD)->getMethodInterfaceType();
+          funcTy = Result->ExprType->getTypeOfMember(
+              Result->DC->getParentModule(), VD, funcTy);
+          auto resultTy = funcTy->castTo<FunctionType>()->getResult();
+
+          llvm::outs() << "   - Name: ";
+          VD->getName().print(llvm::outs());
+          llvm::outs() << "\n";
+
+          llvm::outs() << "     TypeName: ";
+          resultTy.print(llvm::outs());
+          llvm::outs() << "\n";
+
+          StringRef BriefDoc = VD->getBriefComment();
+          if (!BriefDoc.empty()) {
+            llvm::outs() << "     DocBrief: \"";
+            llvm::outs() << VD->getBriefComment();
+            llvm::outs() << "\"\n";
+          }
+        }
+
+        llvm::outs() << "-----END CONFORMING METHOD LIST-----\n";
+        return 0;
+      });
 }
 
 static int
@@ -898,18 +1027,108 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
   for (auto &name : expectedTypeNames)
     typeNames.push_back(name.c_str());
 
-  // Create a CodeCompletionConsumer.
-  std::unique_ptr<ide::ConformingMethodListConsumer> Consumer(
-      new ide::PrintingConformingMethodListConsumer(llvm::outs()));
+  return performWithCompletionLikeOperationParams(
+      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      CodeCompletionDiagnostics,
+      [&](CompletionLikeOperationParams Params) -> bool {
+        CompletionInstance CompletionInst;
+        int ExitCode = 2;
+        CompletionInst.conformingMethodList(
+            Params.Invocation, Params.Args, Params.FileSystem,
+            Params.CompletionBuffer, Params.Offset, Params.DiagC, typeNames,
+            [&](CancellableResult<ConformingMethodListResults> Result) {
+              ExitCode = printConformingMethodList(Result);
+            });
+        return ExitCode;
+      });
+}
 
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeConformingMethodListCallbacksFactory(typeNames, *Consumer));
+static void
+printCodeCompletionResultsImpl(MutableArrayRef<CodeCompletionResult *> Results,
+                               llvm::raw_ostream &OS, bool IncludeKeywords,
+                               bool IncludeComments, bool IncludeSourceText,
+                               bool PrintAnnotatedDescription) {
+  unsigned NumResults = 0;
+  for (auto Result : Results) {
+    if (!IncludeKeywords &&
+        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
+      continue;
+    ++NumResults;
+  }
+  if (NumResults == 0)
+    return;
 
-  return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
-                              SecondSourceFileName, CodeCompletionToken,
-                              CodeCompletionDiagnostics);
+  OS << "Begin completions, " << NumResults << " items\n";
+  for (auto Result : Results) {
+    if (!IncludeKeywords &&
+        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
+      continue;
+    Result->printPrefix(OS);
+    if (PrintAnnotatedDescription) {
+      printCodeCompletionResultDescriptionAnnotated(
+          *Result, OS, /*leadingPunctuation=*/false);
+      OS << "; typename=";
+      printCodeCompletionResultTypeNameAnnotated(*Result, OS);
+    } else {
+      Result->getCompletionString()->print(OS);
+    }
+
+    OS << "; name=";
+    printCodeCompletionResultFilterName(*Result, OS);
+
+    if (IncludeSourceText) {
+      OS << "; sourcetext=";
+      SmallString<64> buf;
+      {
+        llvm::raw_svector_ostream bufOS(buf);
+        printCodeCompletionResultSourceText(*Result, bufOS);
+      }
+      OS.write_escaped(buf);
+    }
+
+    StringRef comment = Result->getBriefDocComment();
+    if (IncludeComments && !comment.empty()) {
+      OS << "; comment=" << comment;
+    }
+
+    if (Result->getDiagnosticSeverity() !=
+        CodeCompletionDiagnosticSeverity::None) {
+      OS << "; diagnostics=" << comment;
+      switch (Result->getDiagnosticSeverity()) {
+      case CodeCompletionDiagnosticSeverity::Error:
+        OS << "error";
+        break;
+      case CodeCompletionDiagnosticSeverity::Warning:
+        OS << "warning";
+        break;
+      case CodeCompletionDiagnosticSeverity::Remark:
+        OS << "remark";
+        break;
+      case CodeCompletionDiagnosticSeverity::Note:
+        OS << "note";
+        break;
+      case CodeCompletionDiagnosticSeverity::None:
+        llvm_unreachable("none");
+      }
+      OS << ":" << Result->getDiagnosticMessage();
+    }
+
+    OS << "\n";
+  }
+  OS << "End completions\n";
+}
+
+static int printCodeCompletionResults(
+    CancellableResult<CodeCompleteResult> CancellableResult,
+    bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
+    bool PrintAnnotatedDescription) {
+  return printResult<CodeCompleteResult>(
+      CancellableResult, [&](CodeCompleteResult &Result) {
+        printCodeCompletionResultsImpl(
+            Result.Results, llvm::outs(), IncludeKeywords, IncludeComments,
+            IncludeSourceText, PrintAnnotatedDescription);
+        return 0;
+      });
 }
 
 static int doCodeCompletion(const CompilerInvocation &InitInvok,
@@ -920,7 +1139,9 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionKeywords,
                             bool CodeCompletionComments,
                             bool CodeCompletionAnnotateResults,
-                            bool CodeCompletionSourceFileInfo) {
+                            bool CodeCompletionAddInitsToTopLevel,
+                            bool CodeCompletionCallPatternHeuristics,
+                            bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -929,22 +1150,26 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-  CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
+  CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
+  CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
 
-  // Create a CodeCompletionConsumer.
-  std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
-      new ide::PrintingCodeCompletionConsumer(
-          llvm::outs(), CodeCompletionKeywords, CodeCompletionComments,
-          CodeCompletionAnnotateResults));
-
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeCodeCompletionCallbacksFactory(CompletionContext, *Consumer));
-
-  return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
-                              SecondSourceFileName, CodeCompletionToken,
-                              CodeCompletionDiagnostics);
+  return performWithCompletionLikeOperationParams(
+      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      CodeCompletionDiagnostics,
+      [&](CompletionLikeOperationParams Params) -> bool {
+        CompletionInstance Inst;
+        int ExitCode = 2;
+        Inst.codeComplete(
+            Params.Invocation, Params.Args, Params.FileSystem,
+            Params.CompletionBuffer, Params.Offset, Params.DiagC,
+            CompletionContext,
+            [&](CancellableResult<CodeCompleteResult> Result) {
+              ExitCode = printCodeCompletionResults(
+                  Result, CodeCompletionKeywords, CodeCompletionComments,
+                  CodeCompletionSourceText, CodeCompletionAnnotateResults);
+            });
+        return ExitCode;
+      });
 }
 
 namespace {
@@ -1126,7 +1351,9 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionKeywords,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
-                                 bool CodeCompletionSourceFileInfo) {
+                                 bool CodeCompletionAddInitsToTopLevel,
+                                 bool CodeCompletionCallPatternHeuristics,
+                                 bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
     llvm::errs() << "error opening input file: "
@@ -1238,6 +1465,9 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     if (Token.IncludeComments)
       IncludeComments = *Token.IncludeComments;
 
+    auto IncludeSourceText = CodeCompletionSourceText;
+    // TODO: Implement per token 'sourcetext' option.
+
     // Store the result to a string.
     std::string ResultStr;
     llvm::raw_string_ostream OS(ResultStr);
@@ -1247,32 +1477,41 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     auto completionBuffer = ide::makeCodeCompletionMemoryBuffer(
         CleanFile.get(), Offset, CleanFile->getBufferIdentifier());
 
+    ide::CodeCompletionContext CompletionContext(CompletionCache);
+    CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
+    CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
+    CompletionContext.setCallPatternHeuristics(
+        CodeCompletionCallPatternHeuristics);
+
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
     bool wasASTContextReused = false;
-    bool isSuccess = CompletionInst.performOperation(
+    std::string completionError = "";
+    bool CallbackCalled = false;
+    CompletionInst.codeComplete(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
-        Error, CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-        [&](CompilerInstance &CI, bool reusingASTContext) {
-          // Create a CodeCompletionConsumer.
-          std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
-              new ide::PrintingCodeCompletionConsumer(OS, IncludeKeywords,
-                                                      IncludeComments,
-                                                      CodeCompletionAnnotateResults));
-
-          // Create a factory for code completion callbacks that will feed the
-          // Consumer.
-          ide::CodeCompletionContext CompletionContext(CompletionCache);
-          CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-          CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
-          std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-              ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                                      *Consumer));
-
-          auto *SF = CI.getCodeCompletionFile();
-          performCodeCompletionSecondPass(*SF, *callbacksFactory);
-          wasASTContextReused = reusingASTContext;
+        CodeCompletionDiagnostics ? &PrintDiags : nullptr, CompletionContext,
+        [&](CancellableResult<CodeCompleteResult> Result) {
+          CallbackCalled = true;
+          switch (Result.getKind()) {
+          case CancellableResultKind::Success: {
+            wasASTContextReused =
+                Result->Info.completionContext->ReusingASTContext;
+            printCodeCompletionResultsImpl(Result->Results, OS, IncludeKeywords,
+                                           IncludeComments, IncludeSourceText,
+                                           CodeCompletionAnnotateResults);
+            break;
+          }
+          case CancellableResultKind::Failure:
+            completionError = "error: " + Result.getError();
+            break;
+          case CancellableResultKind::Cancelled:
+            completionError = "request cancelled";
+            break;
+          }
         });
+    assert(CallbackCalled &&
+           "We should always receive a callback call for code completion");
     auto completionEnd = std::chrono::high_resolution_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         completionEnd - completionStart);
@@ -1300,13 +1539,18 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     }
 
     llvm::raw_fd_ostream fileOut(resultFD, /*shouldClose=*/true);
-    fileOut << ResultStr;
-    fileOut.close();
-
-    if (!isSuccess) {
-      llvm::errs() << "error: " << Error << "\n";
+    if (completionError == "error: did not find code completion token") {
+      // Do not consider failure to find the code completion token as a critical
+      // failure that returns a non-zero exit code. Instead, allow the caller to
+      // match the error message.
+      fileOut << completionError;
+    } else if (!completionError.empty()) {
+      llvm::errs() << completionError << '\n';
       return 1;
+    } else {
+      fileOut << ResultStr;
     }
+    fileOut.close();
 
     if (options::SkipFileCheck)
       continue;
@@ -1636,15 +1880,15 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
             SM, BufferID, Invocation.getMainFileSyntaxParsingCache(),
             syntaxArena);
 
-    ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
-                      Invocation.getLangOptions(),
-                      Invocation.getTypeCheckerOptions(),
-                      Invocation.getModuleName(),
-                      SynTreeCreator,
-                      Invocation.getMainFileSyntaxParsingCache());
+    ParserUnit Parser(
+        SM, SourceFileKind::Main, BufferID, Invocation.getLangOptions(),
+        Invocation.getTypeCheckerOptions(), Invocation.getSILOptions(),
+        Invocation.getModuleName(), SynTreeCreator,
+        Invocation.getMainFileSyntaxParsingCache());
 
     registerParseRequestFunctions(Parser.getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
+    registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
 
     Parser.getDiagnosticEngine().addConsumer(PrintDiags);
 
@@ -1873,13 +2117,13 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
                     Invocation.getLangOptions(),
                     Invocation.getTypeCheckerOptions(),
-                    Invocation.getModuleName(),
-                    SynTreeCreator,
-                    Invocation.getMainFileSyntaxParsingCache());
+                    Invocation.getSILOptions(), Invocation.getModuleName(),
+                    SynTreeCreator, Invocation.getMainFileSyntaxParsingCache());
 
   registerParseRequestFunctions(Parser.getParser().Context.evaluator);
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
+  registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -1992,6 +2236,9 @@ private:
   }
 
   void annotateSourceEntity(const SemanticSourceEntity &Entity) {
+    if (!Entity.Range.isValid())
+      return;
+
     const char *LocPtr =
         BufStart + SM.getLocOffsetInBuffer(Entity.Range.getStart(), BufferID);
 
@@ -2383,7 +2630,15 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto remangled = Demangle::mangleNode(typeNode);
+      auto mangling = Demangle::mangleNode(typeNode);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "Couldn't remangle type (failed at Node "
+                     << mangling.error().node << " with error "
+                     << mangling.error().code << ":" << mangling.error().line
+                     << ")\n";
+        return EXIT_FAILURE;
+      }
+      auto remangled = mangling.result();
 
       auto LTD = M->lookupLocalType(remangled);
 
@@ -2542,7 +2797,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
     {
       GroupNamesPrinter Printer(llvm::outs());
       llvm::SmallVector<Decl*, 256> Results;
-      M->getDisplayDecls(Results);
+      swift::getTopLevelDeclsForDisplay(M, Results);
       for (auto R : Results) {
         Printer.addDecl(R);
       }
@@ -2567,6 +2822,9 @@ static void printModuleMetadata(ModuleDecl *MD) {
     OS << "mtime=" << info.getLastModified() << "; ";
     OS << "size=" << info.getFileSize();
     OS << "\n";
+  });
+  MD->collectSerializedSearchPath([&](StringRef path) {
+    OS << "searchpath=" << path << ";\n";
   });
 }
 
@@ -3816,17 +4074,17 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    ide::PrintingCodeCompletionConsumer Consumer(
-        llvm::outs(), options::CodeCompletionKeywords,
-        options::CodeCompletionComments,
-        options::CodeCOmpletionAnnotateResults);
     for (StringRef filename : options::InputFilenames) {
       auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
       if (!resultsOpt) {
         // FIXME: error?
         continue;
       }
-      Consumer.handleResults(resultsOpt->get()->Sink.Results);
+      printCodeCompletionResultsImpl(
+          resultsOpt->get()->Sink.Results, llvm::outs(),
+          options::CodeCompletionKeywords, options::CodeCompletionComments,
+          options::CodeCompletionSourceText,
+          options::CodeCompletionAnnotateResults);
     }
 
     return 0;
@@ -3863,6 +4121,17 @@ int main(int argc, char *argv[]) {
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
+
+  if (!options::DefineAvailability.empty()) {
+    InitInvok.getLangOptions().AvailabilityMacros.push_back(options::DefineAvailability);
+  }
+  for (auto map: options::SerializedPathObfuscate) {
+    auto SplitMap = StringRef(map).split('=');
+    InitInvok.getFrontendOptions().serializedPathObfuscator
+      .addMapping(SplitMap.first, SplitMap.second);
+    InitInvok.getSearchPathOptions().DeserializedPathRecoverer
+      .addMapping(SplitMap.first, SplitMap.second);
+  }
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
   InitInvok.getLangOptions().EnableCrossImportOverlays =
@@ -3911,6 +4180,12 @@ int main(int argc, char *argv[]) {
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
   }
+  if (!options::ToolsDirectory.empty()) {
+    SmallString<128> toolsDir(options::ToolsDirectory);
+    llvm::sys::path::append(toolsDir, "clang");
+    InitInvok.getClangImporterOptions().clangPath =
+        std::string(toolsDir);
+  }
   if (!options::ModuleCachePath.empty()) {
     // Honor the *last* -module-cache-path specified.
     InitInvok.getClangImporterOptions().ModuleCachePath =
@@ -3943,10 +4218,6 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
-  InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
-      options::CodeCompleteInitsInPostfixExpr;
-  InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=
-      options::CodeCompleteCallPatternHeuristics;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
@@ -4054,8 +4325,10 @@ int main(int argc, char *argv[]) {
                                      options::CodeCompletionDiagnostics,
                                      options::CodeCompletionKeywords,
                                      options::CodeCompletionComments,
-                                     options::CodeCOmpletionAnnotateResults,
-                                     options::CodeCompletionSourceFileInfo);
+                                     options::CodeCompletionAnnotateResults,
+                                     options::CodeCompleteInitsInPostfixExpr,
+                                     options::CodeCompleteCallPatternHeuristics,
+                                     options::CodeCompletionSourceText);
     break;
 
   case ActionType::CodeCompletion:
@@ -4070,8 +4343,10 @@ int main(int argc, char *argv[]) {
                                 options::CodeCompletionDiagnostics,
                                 options::CodeCompletionKeywords,
                                 options::CodeCompletionComments,
-                                options::CodeCOmpletionAnnotateResults,
-                                options::CodeCompletionSourceFileInfo);
+                                options::CodeCompletionAnnotateResults,
+                                options::CodeCompleteInitsInPostfixExpr,
+                                options::CodeCompleteCallPatternHeuristics,
+                                options::CodeCompletionSourceText);
     break;
 
   case ActionType::REPLCodeCompletion:

@@ -464,7 +464,7 @@ void Job::printSummary(raw_ostream &os) const {
 bool Job::writeArgsToResponseFile() const {
   assert(hasResponseFile());
   std::error_code EC;
-  llvm::raw_fd_ostream OS(ResponseFile->path, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OS(ResponseFile->path, EC, llvm::sys::fs::OF_None);
   if (EC) {
     return true;
   }

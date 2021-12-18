@@ -1,7 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | not %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir %s
-
-// XFAIL: asserts
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-protocol-signatures=on %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -requirement-machine-protocol-signatures=on %s
 
 // CHECK: Requirement signature: <Self where Self.Field : FieldAlgebra>
 public protocol VectorSpace {

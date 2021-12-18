@@ -407,6 +407,18 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.wide") {
   buffer[0..<2] = buffer[0..<3]
 }
 
+UnsafeRawBufferPointerTestSuite.test("_copyContents") {
+  let a = Array<UInt8>(0..<20)
+  let b = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: 10*a.count)
+  defer { b.deallocate() }
+  var (unwritten, written) = a.withUnsafeBytes {
+    bytes in
+    bytes._copyContents(initializing: b)
+  }
+  expectNil(unwritten.next())
+  expectEqual(written, a.count)
+}
+
 UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
   var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }

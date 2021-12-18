@@ -103,6 +103,18 @@ func multipleArgsNoWarning(_ x : Int, _ y : Int) {
   }
 }
 
+struct A {}
+struct B {}
+
+func deadEndBlockInElseBranch(_ x : Int) {
+  if x != 0 {
+    deadEndBlockInElseBranch(x - 1) // no warning
+  } else {
+    _ = unsafeBitCast(A(), to: B.self)
+  }
+}
+
+
 struct Str {
   var x = 27
 

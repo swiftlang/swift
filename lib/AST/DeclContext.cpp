@@ -39,12 +39,6 @@ STATISTIC(NumLazyIterableDeclContexts,
 STATISTIC(NumUnloadedLazyIterableDeclContexts,
           "# of serialized iterable declaration contexts never loaded");
 
-// Only allow allocation of DeclContext using the allocator in ASTContext.
-void *DeclContext::operator new(size_t Bytes, ASTContext &C,
-                                unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 ASTContext &DeclContext::getASTContext() const {
   return getParentModule()->getASTContext();
 }
@@ -145,7 +139,7 @@ void DeclContext::forEachGenericContext(
         if (auto *gpList = genericCtx->getGenericParams())
           fn(gpList);
     }
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 }
 
 unsigned DeclContext::getGenericContextDepth() const {
@@ -873,6 +867,10 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
       if (d->isImplicit())
         return true;
 
+      // Imported decls won't have complete location info.
+      if (d->hasClangNode())
+        return true;
+
       return false;
     };
 
@@ -968,6 +966,10 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   return true;
 }
 
+void IterableDeclContext::setHasLazyMembers(bool hasLazyMembers) const {
+  FirstDeclAndLazyMembers.setInt(hasLazyMembers);
+}
+
 void IterableDeclContext::loadAllMembers() const {
   ASTContext &ctx = getASTContext();
 
@@ -992,7 +994,7 @@ void IterableDeclContext::loadAllMembers() const {
     return;
 
   // Don't try to load all members re-entrant-ly.
-  FirstDeclAndLazyMembers.setInt(false);
+  setHasLazyMembers(false);
 
   const Decl *container = getDecl();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,

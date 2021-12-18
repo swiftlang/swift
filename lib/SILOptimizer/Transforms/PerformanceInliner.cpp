@@ -447,7 +447,7 @@ bool SILPerformanceInliner::isProfitableToInline(
           // The access is dynamic and has no nested conflict
           // See if the storage location is considered by
           // access enforcement optimizations
-          auto storage = AccessedStorage::compute(BAI->getSource());
+          auto storage = AccessStorage::compute(BAI->getSource());
           if (BAI->hasNoNestedConflict() && (storage.isFormalAccessBase())) {
             BlockW.updateBenefit(ExclusivityBenefitWeight,
                                  ExclusivityBenefitBase);
@@ -946,6 +946,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (AppliesToInline.empty())
     return false;
 
+  InstructionDeleter deleter;
+
   // Second step: do the actual inlining.
   // We inline in reverse order, because for very large blocks with many applies
   // to inline, splitting the block at every apply would be quadratic.
@@ -979,9 +981,11 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // If for whatever reason we can not inline this function, inlineFullApply
     // will assert, so we are safe making this assumption.
     SILInliner::inlineFullApply(AI, SILInliner::InlineKind::PerformanceInline,
-                                FuncBuilder);
+                                FuncBuilder, deleter);
     ++NumFunctionsInlined;
   }
+  deleter.cleanupDeadInstructions();
+  
   // The inliner splits blocks at call sites. Re-merge trivial branches to
   // reestablish a canonical CFG.
   mergeBasicBlocks(Caller);

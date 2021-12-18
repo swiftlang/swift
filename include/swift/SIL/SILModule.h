@@ -109,6 +109,7 @@ class SILUndef;
 class SourceFile;
 class SerializedSILLoader;
 class SILFunctionBuilder;
+class SILOptFunctionBuilder;
 class SILRemarkStreamer;
 
 namespace Lowering {
@@ -352,6 +353,8 @@ private:
   /// lowering ownership in transparent functions.
   /// This gets set in OwnershipModelEliminator pass.
   bool regDeserializationNotificationHandlerForAllFuncOME;
+
+  bool prespecializedFunctionDeclsImported;
 
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
@@ -894,11 +897,32 @@ public:
   /// declaration context ought to be serialized as part of this module.
   bool
   shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC) const;
+
+  /// Gather prespecialized from extensions.
+  void performOnceForPrespecializedImportedExtensions(
+      llvm::function_ref<void(AbstractFunctionDecl *)> action);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   M.print(OS);
   return OS;
+}
+
+inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
+  switch (mod.getStage()) {
+  case SILStage::Raw:
+    // In Raw SIL, we support lexical lifetimes as long as lexical lifetimes is
+    // not turned off all the way. This means lexical lifetimes is set to either
+    // early or experimental late.
+    return LexicalLifetimes != LexicalLifetimesOption::Off;
+  case SILStage::Canonical:
+    // In Canonical SIL, we only support lexical lifetimes when in experimental
+    // late mode.
+    return LexicalLifetimes == LexicalLifetimesOption::ExperimentalLate;
+  case SILStage::Lowered:
+    // We do not support OSSA in Lowered SIL, so this is always false.
+    return false;
+  }
 }
 
 /// Print a simple description of a SILModule for the request evaluator.

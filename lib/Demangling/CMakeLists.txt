@@ -9,7 +9,8 @@ add_swift_host_library(swiftDemangling STATIC
   Punycode.cpp
   Remangler.cpp)
 target_compile_definitions(swiftDemangling PRIVATE
-  LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
+  LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1
+  SWIFT_SUPPORT_OLD_MANGLING=1)
 
 # NOTE: Runtime libraries that depend on swiftDemangling should define
 # SWIFT_INLINE_NAMESPACE to specify the identifier that will be used for an

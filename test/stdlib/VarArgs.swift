@@ -3,6 +3,13 @@
 
 import Swift
 
+// Work around the inability for static-library based Swift runtime builds to
+// directly link against Darwin.swiftmodule by using a benign dependency on
+// StdlibUnittest.
+// https://bugs.swift.org/browse/SR-15118
+import StdlibUnittest
+runAllTests()
+
 #if canImport(Darwin)
   import Darwin
   #if _runtime(_ObjC)

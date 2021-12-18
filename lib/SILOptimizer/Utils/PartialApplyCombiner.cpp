@@ -98,16 +98,13 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
 
   for (Operand *argOp : argsToHandle) {
     SILValue arg = argOp->get();
-    int argIdx = ApplySite(pai).getAppliedArgIndex(*argOp);
-    SILDebugVariable dbgVar(/*Constant*/ true, argIdx);
-
     SILValue tmp = arg;
     SILBuilderWithScope builder(pai, builderCtxt);
     if (arg->getType().isObject()) {
       tmp = builder.emitCopyValueOperation(pai->getLoc(), arg);
     } else {
       // Copy address-arguments into a stack-allocated temporary.
-      tmp = builder.createAllocStack(pai->getLoc(), arg->getType(), dbgVar);
+      tmp = builder.createAllocStack(pai->getLoc(), arg->getType());
       builder.createCopyAddr(pai->getLoc(), arg, tmp, IsTake_t::IsNotTake,
                              IsInitialization_t::IsInitialization);
     }

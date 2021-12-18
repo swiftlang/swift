@@ -14,7 +14,7 @@ import Swift
 // CHECK: return
 sil [noinline] [ossa] @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
-  debug_value_addr %0 : $*T, let, name "t" // id: %1
+  debug_value %0 : $*T, let, name "t", expr op_deref // id: %1
   // function_ref specialize_recursive_generics.recursive_generics <A>(A) -> ()
   %2 = function_ref @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %5
   %3 = alloc_stack $T                             // users: %4, %5, %6
@@ -39,8 +39,8 @@ bb0(%0 : $*T):
 
 sil [noinline] [ossa] @_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_ : $@convention(thin) <T, U> (@in T, @in U) -> () {
 bb0(%0 : $*T, %1 : $*U):
-  debug_value_addr %0 : $*T, let, name "t" // id: %2
-  debug_value_addr %1 : $*U, let, name "u" // id: %3
+  debug_value %0 : $*T, let, name "t", expr op_deref // id: %2
+  debug_value %1 : $*U, let, name "u", expr op_deref // id: %3
   // function_ref specialize_recursive_generics.recursive_generics_with_different_substitutions <A, B>(A, B) -> ()
   %4 = function_ref @_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () // user: %9
   %5 = alloc_stack $U                             // users: %6, %9, %11

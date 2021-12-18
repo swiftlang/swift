@@ -22,6 +22,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/BinaryFormat/MachO.h"
 
 #include "Callee.h"
 #include "Explosion.h"
@@ -289,6 +290,35 @@ void IRGenFunction::emitTSanInoutAccessCall(llvm::Value *address) {
   Builder.CreateCall(fn, {castAddress, callerPC, castTag});
 }
 
+// This is shamelessly copied from clang's codegen. We need to get the clang
+// functionality into a shared header so that platforms only
+// needs to be updated in one place.
+static unsigned getBaseMachOPlatformID(const llvm::Triple &TT) {
+  switch (TT.getOS()) {
+  case llvm::Triple::Darwin:
+  case llvm::Triple::MacOSX:
+    return llvm::MachO::PLATFORM_MACOS;
+  case llvm::Triple::IOS:
+    return llvm::MachO::PLATFORM_IOS;
+  case llvm::Triple::TvOS:
+    return llvm::MachO::PLATFORM_TVOS;
+  case llvm::Triple::WatchOS:
+    return llvm::MachO::PLATFORM_WATCHOS;
+  default:
+    return /*Unknown platform*/ 0;
+  }
+}
+
+llvm::Value *
+IRGenFunction::emitTargetOSVersionAtLeastCall(llvm::Value *major,
+                                              llvm::Value *minor,
+                                              llvm::Value *patch) {
+  auto *fn = cast<llvm::Function>(IGM.getPlatformVersionAtLeastFn());
+
+  llvm::Value *platformID =
+    llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
+  return Builder.CreateCall(fn, {platformID, major, minor, patch});
+}
 
 /// Initialize a relative indirectable pointer to the given value.
 /// This always leaves the value in the direct state; if it's not a
@@ -446,7 +476,9 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
       auto scaledIndex =
         int64_t(byteOffset.getValue()) / int64_t(objectSize.getValue());
       auto indexValue = IGM.getSize(Size(scaledIndex));
-      auto slotPtr = Builder.CreateInBoundsGEP(base, indexValue);
+      auto slotPtr = Builder.CreateInBoundsGEP(
+          base->getType()->getScalarType()->getPointerElementType(), base,
+          indexValue);
 
       return Address(slotPtr, objectAlignment);
     }
@@ -684,8 +716,11 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   // swift_continuation_await, emit the old inline sequence.  This can
   // be removed as soon as we're sure that such SDKs don't exist.
   if (!useContinuationAwait) {
-    auto contAwaitSyncAddr =
-        Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 1);
+    auto contAwaitSyncAddr = Builder.CreateStructGEP(
+        AsyncCoroutineCurrentContinuationContext->getType()
+            ->getScalarType()
+            ->getPointerElementType(),
+        AsyncCoroutineCurrentContinuationContext, 1);
 
     auto pendingV = llvm::ConstantInt::get(
         contAwaitSyncAddr->getType()->getPointerElementType(),
@@ -694,7 +729,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
         contAwaitSyncAddr->getType()->getPointerElementType(),
         unsigned(ContinuationStatus::Awaited));
     auto results = Builder.CreateAtomicCmpXchg(
-        contAwaitSyncAddr, pendingV, awaitedV,
+        contAwaitSyncAddr, pendingV, awaitedV, llvm::MaybeAlign(),
         llvm::AtomicOrdering::Release /*success ordering*/,
         llvm::AtomicOrdering::Acquire /* failure ordering */,
         llvm::SyncScope::System);
@@ -754,9 +789,13 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   // to the error destination.
   if (optionalErrorBB) {
     auto normalContBB = createBasicBlock("await.async.normal");
-    auto contErrResultAddr = Address(
-        Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 2),
-        pointerAlignment);
+    auto contErrResultAddr =
+        Address(Builder.CreateStructGEP(
+                    AsyncCoroutineCurrentContinuationContext->getType()
+                        ->getScalarType()
+                        ->getPointerElementType(),
+                    AsyncCoroutineCurrentContinuationContext, 2),
+                pointerAlignment);
     auto errorRes = Builder.CreateLoad(contErrResultAddr);
     auto nullError = llvm::Constant::getNullValue(errorRes->getType());
     auto hasError = Builder.CreateICmpNE(errorRes, nullError);
@@ -769,8 +808,11 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   // result slot, load from the temporary we created during
   // get_async_continuation.
   if (!isIndirectResult) {
-    auto contResultAddrAddr =
-        Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 3);
+    auto contResultAddrAddr = Builder.CreateStructGEP(
+        AsyncCoroutineCurrentContinuationContext->getType()
+            ->getScalarType()
+            ->getPointerElementType(),
+        AsyncCoroutineCurrentContinuationContext, 3);
     auto resultAddrVal =
         Builder.CreateLoad(Address(contResultAddrAddr, pointerAlignment));
     // Take the result.

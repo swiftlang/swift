@@ -33,6 +33,7 @@
 #include "swift/Basic/SuccessorMap.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/RuntimeEffect.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -85,7 +86,6 @@ namespace clang {
 
 namespace swift {
   class GenericSignature;
-  class GenericSignatureBuilder;
   class AssociatedConformance;
   class AssociatedType;
   class ASTContext;
@@ -319,6 +319,8 @@ private:
 
   llvm::SmallVector<ClassDecl *, 4> ClassesForEagerInitialization;
 
+  llvm::SmallVector<ClassDecl *, 4> ObjCActorsNeedingSuperclassSwizzle;
+
   /// The order in which all the SIL function definitions should
   /// appear in the translation unit.
   llvm::DenseMap<SILFunction*, unsigned> FunctionOrder;
@@ -407,6 +409,7 @@ public:
   void emitReflectionMetadataVersion();
 
   void emitEagerClassInitialization();
+  void emitObjCActorsNeedingSuperclassSwizzle();
 
   // Emit the code to replace dynamicReplacement(for:) functions.
   void emitDynamicReplacements();
@@ -499,6 +502,7 @@ public:
 
 
   void addClassForEagerInitialization(ClassDecl *ClassDecl);
+  void addBackDeployedObjCActorInitialization(ClassDecl *ClassDecl);
 
   unsigned getFunctionOrder(SILFunction *F) {
     auto it = FunctionOrder.find(F);
@@ -519,7 +523,7 @@ public:
   /// Return the effective triple used by clang.
   llvm::Triple getEffectiveClangTriple();
 
-  const llvm::DataLayout &getClangDataLayout();
+  const llvm::StringRef getClangDataLayoutString();
 };
 
 class ConstantReference {
@@ -756,7 +760,15 @@ public:
   unsigned InvariantMetadataID; /// !invariant.load
   unsigned DereferenceableID;   /// !dereferenceable
   llvm::MDNode *InvariantNode;
-  
+
+#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
+  RuntimeEffect effectOfRuntimeFuncs = RuntimeEffect::NoEffect;
+  llvm::SmallVector<const char *> emittedRuntimeFuncs;
+
+  void registerRuntimeEffect(ArrayRef<RuntimeEffect> realtime,
+                             const char *funcName);
+#endif
+
   llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
@@ -1023,9 +1035,9 @@ public:
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
 
-  llvm::Constant *emitSwiftProtocols();
-  llvm::Constant *emitProtocolConformances();
-  llvm::Constant *emitTypeMetadataRecords();
+  llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
+  llvm::Constant *emitProtocolConformances(bool asContiguousArray);
+  llvm::Constant *emitTypeMetadataRecords(bool asContiguousArray);
   llvm::Constant *emitFieldDescriptors();
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
@@ -1093,6 +1105,7 @@ private:
                                            LinkEntity entity);
                                            
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
+  llvm::DenseMap<LinkEntity, llvm::Constant*> IndirectAsyncFunctionPointers;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
@@ -1448,13 +1461,26 @@ public:
                                                      bool isDestroyer,
                                                      bool isForeign,
                                                      ForDefinition_t forDefinition);
-  llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
-                                        bool isPattern,
-                                        bool isConstant,
-                                        ConstantInitFuture init,
-                                        llvm::StringRef section = {});
+
+  void setVCallVisibility(llvm::GlobalVariable *var,
+                          llvm::GlobalObject::VCallVisibility visibility,
+                          std::pair<uint64_t, uint64_t> range);
+
+  void addVTableTypeMetadata(
+      ClassDecl *decl, llvm::GlobalVariable *var,
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries);
+
+  llvm::GlobalValue *defineTypeMetadata(
+      CanType concreteType, bool isPattern, bool isConstant,
+      ConstantInitFuture init, llvm::StringRef section = {},
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
+
+  void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
+                                      llvm::Constant *dependsOn);
+  void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
+                                      const ProtocolConformance *conformance);
 
   llvm::Constant *
   getAddrOfTypeMetadata(CanType concreteType,
@@ -1688,7 +1714,17 @@ private:
   void addLazyConformances(const IterableDeclContext *idc);
 
 //--- Global context emission --------------------------------------------------
+  bool hasSwiftAsyncFunctionDef = false;
+  llvm::Value *extendedFramePointerFlagsWeakRef = nullptr;
+
+  /// Emit a weak reference to the `swift_async_extendedFramePointerFlags`
+  /// symbol needed by Swift async functions.
+  void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
+  bool isConcurrencyAvailable();
+  void noteSwiftAsyncFunctionDef() {
+    hasSwiftAsyncFunctionDef = true;
+  }
   void emitRuntimeRegistration();
   void emitVTableStubs();
   void emitTypeVerifier();

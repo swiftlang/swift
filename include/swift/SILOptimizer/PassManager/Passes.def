@@ -114,12 +114,12 @@ PASS(CrossModuleSerializationSetup, "cross-module-serialization-setup",
      "Setup serialization flags for cross-module optimization")
 PASS(AccessSummaryDumper, "access-summary-dump",
      "Dump Address Parameter Access Summary")
-PASS(AccessedStorageAnalysisDumper, "accessed-storage-analysis-dump",
-     "Dump Accessed Storage Analysis Summaries")
+PASS(AccessStorageAnalysisDumper, "access-storage-analysis-dump",
+     "Dump Access Storage Analysis Summaries")
 PASS(AccessPathVerification, "access-path-verification",
-     "Verify Access Paths (and Accessed Storage)")
-PASS(AccessedStorageDumper, "accessed-storage-dump",
-     "Dump Accessed Storage Information")
+     "Verify Access Paths (and Access Storage)")
+PASS(AccessStorageDumper, "access-storage-dump",
+     "Dump Access Storage Information")
 PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
@@ -237,6 +237,8 @@ PASS(RedundantLoadElimination, "redundant-load-elim",
      "Redundant Load Elimination")
 PASS(DeadStoreElimination, "dead-store-elim",
      "Dead Store Elimination")
+PASS(MandatoryGenericSpecializer, "mandatory-generic-specializer",
+     "Mandatory Generic Function Specialization on Static Types")
 PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
 PASS(ExistentialSpecializer, "existential-specializer",
@@ -308,14 +310,13 @@ PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
      "Eliminate Ownership Annotation of SIL")
+PASS(ModulePrinter, "module-printer",
+     "Print the module")
 PASS(NestedSemanticFunctionCheck, "nested-semantic-function-check",
      "Diagnose improperly nested '@_semantics' functions")
 PASS(NonTransparentFunctionOwnershipModelEliminator,
      "non-transparent-func-ownership-model-eliminator",
      "Eliminate Ownership Annotations from non-transparent SIL Functions")
-PASS(NonStdlibNonTransparentFunctionOwnershipModelEliminator,
-     "non-stdlib-non-transparent-func-ownership-model-eliminator",
-     "Eliminate Ownership Annotations from non-transparent SIL Functions only when not processing the stdlib.")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
 PASS(AlwaysInlineInliner, "always-inline",
@@ -323,6 +324,8 @@ PASS(AlwaysInlineInliner, "always-inline",
 PASS(PerfInliner, "inline",
      "Performance Function Inlining")
 PASS(PerformanceConstantPropagation, "performance-constant-propagation",
+     "Constant Propagation for Performance without Diagnostics")
+PASS(PerformanceDiagnostics, "performance-diagnostics",
      "Constant Propagation for Performance without Diagnostics")
 PASS(PredictableMemoryAccessOptimizations, "predictable-memaccess-opts",
      "Predictable Memory Access Optimizations for Diagnostics")
@@ -417,11 +420,21 @@ PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS(AssemblyVisionRemarkGenerator, "assembly-vision-remark-generator",
      "Emit assembly vision remarks that provide source level guidance of where runtime calls ended up")
+PASS(MoveOnlyChecker, "sil-move-only-checker",
+     "Pass that enforces move only invariants on raw SIL")
+PASS(MoveKillsCopyableValuesChecker, "sil-move-kills-copyable-values-checker",
+     "Pass that checks that any copyable (non-move only) value that is passed "
+     "to _move do not have any uses later than the _move")
+PASS(LexicalLifetimeEliminator, "sil-lexical-lifetime-eliminator",
+     "Pass that removes lexical lifetime markers from borrows and alloc stack")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
+SWIFT_INSTRUCTION_PASS(BeginCOWMutationInst, "simplify-begin_cow_mutation")
 SWIFT_INSTRUCTION_PASS_WITH_LEGACY(GlobalValueInst, "simplify-global_value")
+SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongRetainInst, "simplify-strong_retain")
+SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongReleaseInst, "simplify-strong_release")
 
 #undef IRGEN_PASS
 #undef SWIFT_FUNCTION_PASS

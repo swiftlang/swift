@@ -73,7 +73,7 @@ public func testStructWithCopyConstructorAndSubobjectCopyConstructorAndValue()
 // CHECK: [[VAL:%.*]] = getelementptr inbounds %TSo33StructWithCopyConstructorAndValueV, %TSo33StructWithCopyConstructorAndValueV* %0, i32 0, i32 0
 // CHECK: [[VAL_VAL:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[VAL]], i32 0, i32 0
 // CHECK: [[LHS:%.*]] = load i32, i32* [[VAL_VAL]]
-// CHECK: [[OUT:%.*]] = icmp eq i32 %1, 42
+// CHECK: [[OUT:%.*]] = icmp eq i32 [[LHS]], 42
 // CHECK: ret i1 [[OUT]]
 public func test(obj: StructWithCopyConstructorAndValue) -> Bool {
   return obj.value == 42

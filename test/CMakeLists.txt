@@ -145,8 +145,12 @@ if(NOT SWIFT_INCLUDE_TOOLS)
   else()
     list(APPEND SWIFT_LIT_ARGS
       "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
+      "--param" "swift_native_llvm_tools_path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
       "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
-      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
+      "--param" "swift_native_clang_tools_path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
+      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+      "--param" "swift_native_swift_tools_path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+      )
   endif()
   if(SWIFT_BUILD_STDLIB)
     list(APPEND SWIFT_LIT_ARGS
@@ -159,13 +163,19 @@ if (SWIFT_TEST_USE_LEAKS)
   list(APPEND SWIFT_LIT_ARGS "--param" "leaks-all")
 endif()
 
+if (SWIFT_ENABLE_ARRAY_COW_CHECKS)
+  list(APPEND SWIFT_LIT_ARGS
+       "--param" "array_cow_checks")
+endif()
+
 if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
   list(APPEND SWIFT_LIT_ARGS
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
-if(SWIFT_TOOLS_ENABLE_LIBSWIFT)
-  list(APPEND SWIFT_LIT_ARGS "--param" "libswift")
+if (LIBSWIFT_BUILD_MODE)
+  list(APPEND SWIFT_LIT_ARGS
+       "--param" "libswift_build_mode=${LIBSWIFT_BUILD_MODE}")
 endif()
 
 if (LLVM_USE_SANITIZER STREQUAL "Address")
@@ -181,7 +191,18 @@ normalize_boolean_spelling(SWIFT_BUILD_SYNTAXPARSERLIB)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+normalize_boolean_spelling(SWIFT_BACK_DEPLOY_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
+normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
+normalize_boolean_spelling(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
+normalize_boolean_spelling(SWIFT_OPTIMIZED)
+normalize_boolean_spelling(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+normalize_boolean_spelling(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+normalize_boolean_spelling(SWIFT_HAVE_LIBXML2)
+normalize_boolean_spelling(SWIFT_INCLUDE_TOOLS)
+normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -358,8 +379,16 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "concurrency")
         endif()
 
+        if(SWIFT_BACK_DEPLOY_CONCURRENCY)
+          list(APPEND LIT_ARGS "--param" "back_deploy_concurrency")
+        endif()
+
         if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
           list(APPEND LIT_ARGS "--param" "distributed")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+          list(APPEND LIT_ARGS "--param" "string_processing")
         endif()
 
         foreach(test_subset ${TEST_SUBSETS})

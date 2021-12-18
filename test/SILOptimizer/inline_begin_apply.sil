@@ -44,6 +44,11 @@ unwind:
   unwind
 }
 
+sil [transparent] [ossa] @test_unreachable : $@yield_once <C: SomeClass> () -> (@yields @in Indirect<C>) {
+entry:
+  unreachable 
+}
+
 // CHECK-LABEL: sil @test_simple_call
 // CHECK: bb0(%0 : $Builtin.Int1):
 // CHECK:  [[MARKER:%.*]] = function_ref @marker
@@ -84,6 +89,40 @@ sil @test_simple_call : $(Builtin.Int1) -> () {
 entry(%flag : $Builtin.Int1):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %0 = function_ref @test_one_yield : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
+  (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
+  destroy_addr %value : $*Indirect<SomeSubclass>
+  cond_br %flag, yes, no
+
+yes:
+  %10 = integer_literal $Builtin.Int32, 10
+  apply %marker(%10) : $@convention(thin) (Builtin.Int32) -> ()
+  end_apply %token
+  %20 = integer_literal $Builtin.Int32, 20
+  apply %marker(%20) : $@convention(thin) (Builtin.Int32) -> ()
+  br cont
+
+no:
+  %11 = integer_literal $Builtin.Int32, 11
+  apply %marker(%11) : $@convention(thin) (Builtin.Int32) -> ()
+  abort_apply %token
+  %21 = integer_literal $Builtin.Int32, 21
+  apply %marker(%21) : $@convention(thin) (Builtin.Int32) -> ()
+  br cont
+
+cont:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_unreachable_call :
+// CHECK: bb0(%0 : $Builtin.Int1):
+// CHECK:  [[MARKER:%.*]] = function_ref @marker
+// CHECK:  unreachable
+// CHECK: } // end sil function 'test_unreachable_call'
+sil @test_unreachable_call : $(Builtin.Int1) -> () {
+entry(%flag : $Builtin.Int1):
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  %0 = function_ref @test_unreachable : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
   (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
   destroy_addr %value : $*Indirect<SomeSubclass>
   cond_br %flag, yes, no

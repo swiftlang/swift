@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifdef SWIFT_ENABLE_REFLECTION
+
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/Casting.h"
@@ -41,27 +43,6 @@
 #include <stdarg.h>
 
 namespace {
-int asprintf(char **strp, const char *fmt, ...) {
-  va_list argp0, argp1;
-
-  va_start(argp0, fmt);
-  va_copy(argp1, argp0);
-
-  int length = _vscprintf(fmt, argp0);
-
-  *strp = reinterpret_cast<char *>(malloc(length + 1));
-  if (*strp == nullptr)
-    return -1;
-
-  length = _vsnprintf(*strp, length, fmt, argp1);
-  (*strp)[length] = '\0';
-
-  va_end(argp0);
-  va_end(argp1);
-
-  return length;
-}
-
 char *strndup(const char *s, size_t n) {
   size_t length = std::min(strlen(s), n);
 
@@ -287,7 +268,7 @@ struct TupleImpl : ReflectionMirrorImpl {
     if (!hasLabel) {
       // The name is the stringized element number '.0'.
       char *str;
-      asprintf(&str, ".%" PRIdPTR, i);
+      swift_asprintf(&str, ".%" PRIdPTR, i);
       *outName = str;
     }
     
@@ -358,6 +339,7 @@ static bool _shouldReportMissingReflectionMetadataWarnings() {
 /// at runtime. This is usually mostly harmless, but it's good to alert
 /// users that it happens.
 static void
+SWIFT_FORMAT(1, 2)
 missing_reflection_metadata_warning(const char *fmt, ...) {
   bool shouldWarn =
     SWIFT_LAZY_CONSTANT(_shouldReportMissingReflectionMetadataWarnings());
@@ -1106,3 +1088,5 @@ id swift_reflectionMirror_quickLookObject(OpaqueValue *value, const Metadata *T)
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->quickLookObject(); });
 }
 #endif
+
+#endif  // SWIFT_ENABLE_REFLECTION

@@ -334,6 +334,58 @@ void IRGenModule::emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
   getAddrOfLLVMVariable(entity, init, DebugTypeInfo());
 }
 
+void IRGenModule::setVCallVisibility(llvm::GlobalVariable *var,
+                          llvm::GlobalObject::VCallVisibility vis,
+                          std::pair<uint64_t, uint64_t> range) {
+  // Insert attachment of !vcall_visibility !{ vis, range.first, range.second }
+  var->addMetadata(
+      llvm::LLVMContext::MD_vcall_visibility,
+      *llvm::MDNode::get(getLLVMContext(),
+                         {
+                             llvm::ConstantAsMetadata::get(
+                                 llvm::ConstantInt::get(Int64Ty, vis)),
+                             llvm::ConstantAsMetadata::get(
+                                 llvm::ConstantInt::get(Int64Ty, range.first)),
+                             llvm::ConstantAsMetadata::get(
+                                 llvm::ConstantInt::get(Int64Ty, range.second)),
+                         }));
+  // Insert attachment of !typed_global_not_for_cfi !{}
+  var->addMetadata("typed_global_not_for_cfi",
+                   *llvm::MDNode::get(getLLVMContext(), {}));
+}
+
+void IRGenModule::addVTableTypeMetadata(
+    ClassDecl *decl, llvm::GlobalVariable *var,
+    SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries) {
+  if (vtableEntries.empty())
+    return;
+
+  uint64_t minOffset = UINT64_MAX;
+  uint64_t maxOffset = 0;
+  for (auto ventry : vtableEntries) {
+    auto method = ventry.second;
+    auto offset = ventry.first.getValue();
+    var->addTypeMetadata(offset, typeIdForMethod(*this, method));
+    minOffset = std::min(minOffset, offset);
+    maxOffset = std::max(maxOffset, offset);
+  }
+
+  using VCallVisibility = llvm::GlobalObject::VCallVisibility;
+  VCallVisibility vis = VCallVisibility::VCallVisibilityPublic;
+  auto AS = decl->getFormalAccessScope();
+  if (AS.isFileScope()) {
+    vis = VCallVisibility::VCallVisibilityTranslationUnit;
+  } else if (AS.isPrivate() || AS.isInternal()) {
+    vis = VCallVisibility::VCallVisibilityLinkageUnit;
+  } else if (getOptions().InternalizeAtLink) {
+    vis = VCallVisibility::VCallVisibilityLinkageUnit;
+  }
+
+  auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getValue();
+  setVCallVisibility(var, vis,
+                     std::make_pair(minOffset, maxOffset + relptrSize));
+}
+
 namespace {
   template<class Impl>
   class ContextDescriptorBuilderBase {
@@ -799,7 +851,7 @@ namespace {
       SILDeclRef func(entry.getFunction());
 
       // Emit the dispatch thunk.
-      if (Resilient)
+      if (Resilient || IGM.getOptions().WitnessMethodElimination)
         IGM.emitDispatchThunk(func);
 
       // Classify the function.
@@ -847,8 +899,9 @@ namespace {
           B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy);
         int offset = WitnessTableFirstRequirementOffset;
         auto firstReqAdjustment = llvm::ConstantInt::get(IGM.Int32Ty, -offset);
-        address = llvm::ConstantExpr::getGetElementPtr(nullptr, address,
-                                                       firstReqAdjustment);
+        address = llvm::ConstantExpr::getGetElementPtr(
+          address->getType()->getPointerElementType(), address,
+          firstReqAdjustment);
 
         IGM.defineProtocolRequirementsBaseDescriptor(Proto, address);
       }
@@ -1232,7 +1285,11 @@ namespace {
       auto addr = IGM.getAddrOfTypeContextDescriptor(Type, HasMetadata,
                                                      B.finishAndCreateFuture());
       auto var = cast<llvm::GlobalVariable>(addr);
-      
+
+      if (IGM.getOptions().VirtualFunctionElimination) {
+        asImpl().addVTableTypeMetadata(var);
+      }
+
       var->setConstant(true);
       IGM.setTrueConstGlobal(var);
       return var;
@@ -1440,6 +1497,10 @@ namespace {
       B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
         getType()->getDeclaredType()->getCanonicalType()));
     }
+
+    void addVTableTypeMetadata(llvm::GlobalVariable *var) {
+      // Structs don't have vtables.
+    }
   };
   
   class EnumContextDescriptorBuilder
@@ -1522,6 +1583,10 @@ namespace {
       B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
         getType()->getDeclaredType()->getCanonicalType()));
     }
+
+    void addVTableTypeMetadata(llvm::GlobalVariable *var) {
+      // Enums don't have vtables.
+    }
   };
   
   class ClassContextDescriptorBuilder
@@ -1546,6 +1611,11 @@ namespace {
 
     SmallVector<SILDeclRef, 8> VTableEntries;
     SmallVector<std::pair<SILDeclRef, SILDeclRef>, 8> OverrideTableEntries;
+
+    // As we're constructing the vtable, VTableEntriesForVFE stores the offset
+    // (from the beginning of the global) for each vtable slot. The offsets are
+    // later turned into !type metadata attributes.
+    SmallVector<std::pair<Size, SILDeclRef>, 8> VTableEntriesForVFE;
 
   public:
     ClassContextDescriptorBuilder(IRGenModule &IGM, ClassDecl *Type,
@@ -1703,6 +1773,13 @@ namespace {
       IGM.defineMethodDescriptor(fn, Type,
                       B.getAddrOfCurrentPosition(IGM.MethodDescriptorStructTy));
 
+      if (IGM.getOptions().VirtualFunctionElimination) {
+        auto offset = B.getNextOffsetFromGlobal() +
+                      // 1st field of MethodDescriptorStructTy
+                      Size(IGM.DataLayout.getTypeAllocSize(IGM.Int32Ty));
+        VTableEntriesForVFE.push_back(std::pair<Size, SILDeclRef>(offset, fn));
+      }
+
       // Actually build the descriptor.
       auto descriptor = B.beginStruct(IGM.MethodDescriptorStructTy);
       buildMethodDescriptorFields(IGM, VTable, fn, descriptor);
@@ -1710,12 +1787,21 @@ namespace {
 
       // Emit method dispatch thunk if the class is resilient.
       auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
-      if (Resilient &&
-          func->getEffectiveAccess() >= AccessLevel::Public) {
+
+      if ((Resilient && func->getEffectiveAccess() >= AccessLevel::Public) ||
+          IGM.getOptions().VirtualFunctionElimination) {
         IGM.emitDispatchThunk(fn);
       }
     }
-    
+
+    void addVTableTypeMetadata(llvm::GlobalVariable *var) {
+      if (!IGM.getOptions().VirtualFunctionElimination)
+        return;
+      assert(VTable && "no vtable?!");
+
+      IGM.addVTableTypeMetadata(getType(), var, VTableEntriesForVFE);
+    }
+
     void emitNonoverriddenMethod(SILDeclRef fn) {
       // TODO: Derivative functions do not distinguish themselves in the mangled
       // names of method descriptor symbols yet, causing symbol name collisions.
@@ -1728,10 +1814,18 @@ namespace {
       // method for external clients.
       
       // Emit method dispatch thunk.
-      if (hasPublicVisibility(fn.getLinkage(NotForDefinition))) {
-        IGM.emitDispatchThunk(fn);
+     if (hasPublicVisibility(fn.getLinkage(NotForDefinition)) ||
+         IGM.getOptions().VirtualFunctionElimination) {
+       IGM.emitDispatchThunk(fn);
+     }
+
+      if (IGM.getOptions().VirtualFunctionElimination) {
+        auto offset = B.getNextOffsetFromGlobal() +
+                      // 1st field of MethodDescriptorStructTy
+                      Size(IGM.DataLayout.getTypeAllocSize(IGM.Int32Ty));
+        VTableEntriesForVFE.push_back(std::pair<Size, SILDeclRef>(offset, fn));
       }
-      
+
       // Emit a freestanding method descriptor structure. This doesn't have to
       // exist in the table in the class's context descriptor since it isn't
       // in the vtable, but external clients need to be able to link against the
@@ -1761,6 +1855,17 @@ namespace {
     }
 
     void emitMethodOverrideDescriptor(SILDeclRef baseRef, SILDeclRef declRef) {
+      if (IGM.getOptions().VirtualFunctionElimination) {
+        auto offset =
+            B.getNextOffsetFromGlobal() +
+            // 1st field of MethodOverrideDescriptorStructTy
+            Size(IGM.DataLayout.getTypeAllocSize(IGM.RelativeAddressTy)) +
+            // 2nd field of MethodOverrideDescriptorStructTy
+            Size(IGM.DataLayout.getTypeAllocSize(IGM.RelativeAddressTy));
+        VTableEntriesForVFE.push_back(
+            std::pair<Size, SILDeclRef>(offset, baseRef));
+      }
+
       auto descriptor = B.beginStruct(IGM.MethodOverrideDescriptorStructTy);
 
       // The class containing the base method.
@@ -1946,7 +2051,6 @@ namespace {
       case SILLinkage::Hidden:
       case SILLinkage::HiddenExternal:
       case SILLinkage::Private:
-      case SILLinkage::PrivateExternal:
         return true;
         
       case SILLinkage::Shared:
@@ -2900,6 +3004,11 @@ namespace {
 
     Size AddressPoint;
 
+    // As we're constructing the vtable, VTableEntriesForVFE stores the offset
+    // (from the beginning of the global) for each vtable slot. The offsets are
+    // later turned into !type metadata attributes.
+    SmallVector<std::pair<Size, SILDeclRef>, 8> VTableEntriesForVFE;
+
   public:
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              ConstantStructBuilder &builder,
@@ -3201,10 +3310,19 @@ namespace {
         }
       }
 
+      if (IGM.getOptions().VirtualFunctionElimination) {
+        auto offset = B.getNextOffsetFromGlobal();
+        VTableEntriesForVFE.push_back(std::pair<Size, SILDeclRef>(offset, fn));
+      }
+
       PointerAuthSchema schema =
           afd->hasAsync() ? IGM.getOptions().PointerAuth.AsyncSwiftClassMethods
                           : IGM.getOptions().PointerAuth.SwiftClassMethods;
       B.addSignedPointer(ptr, schema, fn);
+    }
+
+    SmallVector<std::pair<Size, SILDeclRef>, 8> getVTableEntriesForVFE() {
+      return VTableEntriesForVFE;
     }
 
     void addPlaceholder(MissingMemberDecl *m) {
@@ -3805,6 +3923,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   bool canBeConstant;
 
   auto strategy = IGM.getClassMetadataStrategy(classDecl);
+  SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries;
 
   switch (strategy) {
   case ClassMetadataStrategy::Resilient: {
@@ -3846,6 +3965,9 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     canBeConstant = builder.canBeConstant();
 
     builder.createMetadataAccessFunction();
+    if (IGM.getOptions().VirtualFunctionElimination) {
+      vtableEntries = builder.getVTableEntriesForVFE();
+    }
     break;
   }
   }
@@ -3859,7 +3981,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
   bool isPattern = (strategy == ClassMetadataStrategy::Resilient);
   auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
-                                    init.finishAndCreateFuture(), section);
+                                    init.finishAndCreateFuture(), section,
+                                    vtableEntries);
 
   // If the class does not require dynamic initialization, or if it only
   // requires dynamic initialization on a newer Objective-C runtime, add it
@@ -5128,6 +5251,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Hashable:
   case KnownProtocolKind::CaseIterable:
   case KnownProtocolKind::Comparable:
+  case KnownProtocolKind::SIMD:
   case KnownProtocolKind::SIMDScalar:
   case KnownProtocolKind::BinaryInteger:
   case KnownProtocolKind::ObjectiveCBridgeable:

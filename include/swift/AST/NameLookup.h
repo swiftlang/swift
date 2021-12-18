@@ -641,9 +641,7 @@ public:
   /// Look for members of a nominal type or extension scope.
   ///
   /// \return true if the lookup should be stopped at this point.
-  virtual bool
-  lookInMembers(DeclContext *const scopeDC,
-                NominalTypeDecl *const nominal) = 0;
+  virtual bool lookInMembers(const DeclContext *scopeDC) const = 0;
 
   /// Called for local VarDecls that might not yet be in scope.
   ///
@@ -680,8 +678,7 @@ public:
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// Eventually this functionality should move into ASTScopeLookup
-  bool lookInMembers(DeclContext *const,
-                     NominalTypeDecl *const) override {
+  bool lookInMembers(const DeclContext *) const override {
     return false;
   }
 
@@ -696,7 +693,7 @@ public:
 } // end namespace namelookup
 
 /// The interface into the ASTScope subsystem
-class ASTScope {
+class ASTScope : public ASTAllocated<ASTScope> {
   friend class ast_scope::ASTScopeImpl;
   ast_scope::ASTSourceFileScope *const impl;
 
@@ -754,20 +751,6 @@ public:
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>);
-
-  // Make vanilla new illegal for ASTScopes.
-  void *operator new(size_t bytes) = delete;
-  // Need this because have virtual destructors
-  void operator delete(void *data) {}
-
-  // Only allow allocation of scopes using the allocator of a particular source
-  // file.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ASTScope));
-  void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
-    return Mem;
-  }
 
 private:
   static ast_scope::ASTSourceFileScope *createScopeTree(SourceFile *);

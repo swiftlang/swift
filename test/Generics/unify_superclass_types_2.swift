@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine=on -debug-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -requirement-machine=on -dump-requirement-machine 2>&1 | %FileCheck %s
 
 // Note: The GSB fails this test, because it doesn't implement unification of
 // superclass type constructor arguments.
@@ -36,6 +36,8 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-NEXT: - τ_0_0.[P2:A2].[concrete: Int] => τ_0_0.[P2:A2]
 // CHECK-NEXT: - τ_0_0.[P1:A1].[concrete: String] => τ_0_0.[P1:A1]
 // CHECK-NEXT: - τ_0_0.[P2:B2] => τ_0_0.[P1:B1]
+// CHECK:      }
+// CHECK-NEXT: Rewrite loops: {
 // CHECK:      }
 // CHECK-NEXT: Property map: {
 // CHECK-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Generic<Int, τ_0_0, τ_0_1> with <[P1:A1], [P1:B1]>] }

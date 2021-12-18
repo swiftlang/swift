@@ -18,6 +18,7 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ExtInfo.h"
@@ -53,6 +54,7 @@ namespace swift {
 
 enum class AllocationArena;
 class ArchetypeType;
+class ArgumentList;
 class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
@@ -122,7 +124,8 @@ public:
     HasTypeVariable      = 0x01,
 
     /// This type expression contains a context-dependent archetype, either a
-    /// PrimaryArchetypeType or OpenedArchetypeType.
+    /// \c PrimaryArchetypeType, \c OpenedArchetypeType, or
+    /// \c SequenceArchetype.
     HasArchetype         = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
@@ -293,7 +296,8 @@ using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 /// Base class for all types which describe the Swift and SIL ASTs.
 ///
 /// See TypeNodes.def for a succinct description of the full class hierarchy.
-class alignas(1 << TypeAlignInBits) TypeBase {
+class alignas(1 << TypeAlignInBits) TypeBase
+    : public ASTAllocated<std::aligned_storage<8, 8>::type> {
   
   friend class ASTContext;
   TypeBase(const TypeBase&) = delete;
@@ -799,7 +803,7 @@ public:
 
   /// Check if this is a CGFloat type from CoreGraphics framework
   /// on macOS or Foundation on Linux.
-  bool isCGFloatType();
+  bool isCGFloat();
 
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
@@ -950,7 +954,7 @@ public:
                 CanType subst,
                 ArchetypeType *upperBound,
                 ArrayRef<ProtocolConformanceRef> substConformances)> substFn);
-  
+
   /// Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
   bool matches(Type other, TypeMatchOptions matchOptions);
@@ -1185,6 +1189,15 @@ public:
   /// types.
   Type lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals);
 
+  /// Remove concurrency-related types and constraints from the given
+  /// type
+  ///
+  /// \param recurse Whether to recurse into function types.
+  ///
+  /// \param dropGlobalActor Whether to drop a global actor from a function
+  /// type.
+  Type stripConcurrency(bool recurse, bool dropGlobalActor);
+
   /// Whether this is the AnyObject type.
   bool isAnyObject();
 
@@ -1232,17 +1245,6 @@ public:
   /// return `None`.
   Optional<TangentSpace>
   getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
-
-private:
-  // Make vanilla new/delete illegal for Types.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-public:
-  // Only allow allocation of Types using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t bytes, const ASTContext &ctx,
-                     AllocationArena arena, unsigned alignment = 8);
-  void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 };
 
 /// AnyGenericType - This abstract class helps types ensure that fields
@@ -1414,7 +1416,7 @@ public:
     return T->getKind() == TypeKind::BuiltinRawPointer;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawPointerType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawPointerType, BuiltinType)
 
 /// BuiltinRawContinuationType - The builtin raw unsafe continuation type.
 /// In C, this is a non-null AsyncTask*.  This pointer is completely
@@ -1429,7 +1431,7 @@ public:
     return T->getKind() == TypeKind::BuiltinRawUnsafeContinuation;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawUnsafeContinuationType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawUnsafeContinuationType, BuiltinType)
 
 /// BuiltinExecutorType - The builtin executor-ref type.  In C, this
 /// is the ExecutorRef struct type.
@@ -1442,7 +1444,7 @@ public:
     return T->getKind() == TypeKind::BuiltinExecutor;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinExecutorType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinExecutorType, BuiltinType)
 
 /// BuiltinJobType - The builtin job type.  In C, this is a
 /// non-null Job*.  This pointer is completely unmanaged (the unscheduled
@@ -1456,7 +1458,7 @@ public:
     return T->getKind() == TypeKind::BuiltinJob;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinJobType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinJobType, BuiltinType)
 
 /// BuiltinDefaultActorStorageType - The type of the stored property
 /// that's added implicitly to default actors.  No C equivalent because
@@ -1472,7 +1474,7 @@ public:
     return T->getKind() == TypeKind::BuiltinDefaultActorStorage;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDefaultActorStorageType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDefaultActorStorageType, BuiltinType)
 
 /// BuiltinNativeObjectType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
@@ -1486,7 +1488,7 @@ public:
     return T->getKind() == TypeKind::BuiltinNativeObject;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinNativeObjectType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinNativeObjectType, BuiltinType)
 
 /// A type that contains an owning reference to a heap object packed with
 /// additional bits. The type uses a bit to discriminate native Swift objects
@@ -1500,7 +1502,7 @@ public:
     return T->getKind() == TypeKind::BuiltinBridgeObject;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBridgeObjectType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBridgeObjectType, BuiltinType)
 
 /// BuiltinUnsafeValueBufferType - The builtin opaque fixed-size value
 /// buffer type, into which storage for an arbitrary value can be
@@ -1519,7 +1521,7 @@ public:
     return T->getKind() == TypeKind::BuiltinUnsafeValueBuffer;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnsafeValueBufferType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnsafeValueBufferType, BuiltinType)
 
 /// A builtin vector type.
 class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {
@@ -1750,7 +1752,7 @@ public:
 
   BuiltinIntegerWidth getWidth() const = delete;
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerLiteralType, AnyBuiltinIntegerType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerLiteralType, AnyBuiltinIntegerType)
 
 inline BuiltinIntegerWidth AnyBuiltinIntegerType::getWidth() const {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(this)) {
@@ -1924,7 +1926,7 @@ public:
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
-  enum ParameterFlags : uint8_t {
+  enum ParameterFlags : uint16_t {
     None         = 0,
     Variadic     = 1 << 0,
     AutoClosure  = 1 << 1,
@@ -1933,32 +1935,36 @@ class ParameterTypeFlags {
     Ownership    = 7 << OwnershipShift,
     NoDerivative = 1 << 6,
     Isolated     = 1 << 7,
-    NumBits = 8
+    CompileTimeConst = 1 << 8,
+    NumBits = 9
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
 
-  ParameterTypeFlags(OptionSet<ParameterFlags, uint8_t> val) : value(val) {}
+  ParameterTypeFlags(OptionSet<ParameterFlags, uint16_t> val) : value(val) {}
 
 public:
   ParameterTypeFlags() = default;
-  static ParameterTypeFlags fromRaw(uint8_t raw) {
+  static ParameterTypeFlags fromRaw(uint16_t raw) {
     return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
   }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
-                     ValueOwnership ownership, bool isolated, bool noDerivative)
+                     ValueOwnership ownership, bool isolated, bool noDerivative,
+                     bool compileTimeConst)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(ownership) << OwnershipShift |
               (isolated ? Isolated : 0) |
-              (noDerivative ? NoDerivative : 0)) {}
+              (noDerivative ? NoDerivative : 0) |
+              (compileTimeConst ? CompileTimeConst : 0)){}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ValueOwnership ownership,
-                    bool isolated, bool isNoDerivative);
+                    bool isolated, bool isNoDerivative,
+                    bool compileTimeConst);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1968,6 +1974,7 @@ public:
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
   bool isIsolated() const { return value.contains(Isolated); }
+  bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
 
   ValueOwnership getValueOwnership() const {
@@ -1982,6 +1989,11 @@ public:
   ParameterTypeFlags withInOut(bool isInout) const {
     return withValueOwnership(isInout ? ValueOwnership::InOut
                                       : ValueOwnership::Default);
+  }
+
+  ParameterTypeFlags withCompileTimeConst(bool isConst) const {
+    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeConst
+                                      : value | ParameterTypeFlags::CompileTimeConst);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
@@ -2090,7 +2102,8 @@ public:
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getValueOwnership(),
-                              /*isolated*/ false, /*noDerivative*/ false);
+                              /*isolated*/ false, /*noDerivative*/ false,
+                              /*compileTimeConst*/false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -2848,6 +2861,23 @@ public:
 
     bool hasInternalLabel() const { return !InternalLabel.empty(); }
     Identifier getInternalLabel() const { return InternalLabel; }
+
+    /// Return true if argument name is valid and matches \c paramName.
+    ///
+    /// The three tests to check if argument name is valid are:
+    /// 1. allow argument if it matches \c paramName,
+    /// 2. allow argument if  $_  for omitted projected value label,
+    /// 3. allow argument if it matches \c paramName without its \c $ prefix.
+    bool matchParameterLabel(Identifier const &paramName) const {
+      auto argLabel = getLabel();
+      if (argLabel == paramName)
+        return true;
+      if ((argLabel.str() == "$_") && paramName.empty())
+        return true;
+      if (argLabel.hasDollarPrefix() && argLabel.str().drop_front() == paramName.str())
+        return true;
+      return false;
+    }
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
 
@@ -2871,6 +2901,9 @@ public:
 
     /// Whether the parameter is 'isolated'.
     bool isIsolated() const { return Flags.isIsolated(); }
+
+    /// Whether the parameter is 'isCompileTimeConst'.
+    bool isCompileTimeConst() const { return Flags.isCompileTimeConst(); }
 
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
@@ -3012,17 +3045,12 @@ protected:
   }
 
 public:
-  /// Break a tuple or paren type into an array of \c AnyFunctionType::Params.
-  static void decomposeTuple(Type type,
-                             SmallVectorImpl<Param> &result);
-
   /// Take an array of parameters and turn it into a tuple or paren type.
+  ///
+  /// \param wantParamFlags Whether to preserve the parameter flags from the
+  /// given set of parameters.
   static Type composeTuple(ASTContext &ctx, ArrayRef<Param> params,
-                           bool canonicalVararg);
-  static Type composeTuple(ASTContext &ctx, CanParamArrayRef params,
-                           bool canonicalVararg) {
-    return composeTuple(ctx, params.getOriginalArray(), canonicalVararg);
-  }
+                           bool wantParamFlags = true);
 
   /// Given two arrays of parameters determine if they are equal in their
   /// canonicalized form. Internal labels and type sugar is *not* taken into
@@ -3034,11 +3062,11 @@ public:
   /// account.
   static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
-  /// Given an array of parameters and an array of labels of the
+  /// Given an array of parameters and an argument list of the
   /// same length, update each parameter to have the corresponding label.
   /// The internal parameter labels remain the same.
   static void relabelParams(MutableArrayRef<Param> params,
-                            ArrayRef<Identifier> labels);
+                            ArgumentList *argList);
 
   Type getResult() const { return Output; }
   ArrayRef<Param> getParams() const;
@@ -3391,8 +3419,6 @@ struct ParameterListInfo {
   SmallBitVector defaultArguments;
   SmallBitVector acceptsUnlabeledTrailingClosures;
   SmallBitVector propertyWrappers;
-  SmallBitVector unsafeSendable;
-  SmallBitVector unsafeMainActor;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
 
@@ -3412,16 +3438,6 @@ public:
   /// The ParamDecl at the given index if the parameter has an applied
   /// property wrapper.
   bool hasExternalPropertyWrapper(unsigned paramIdx) const;
-
-  /// Whether the given parameter is unsafe Sendable, meaning that
-  /// we will treat it as Sendable in a context that has adopted concurrency
-  /// features.
-  bool isUnsafeSendable(unsigned paramIdx) const;
-
-  /// Whether the given parameter is unsafe MainActor, meaning that
-  /// we will treat it as being part of the main actor but that it is not
-  /// part of the type system.
-  bool isUnsafeMainActor(unsigned paramIdx) const;
 
   /// Whether the given parameter is a closure that should allow capture of
   /// 'self' to be implicit, without requiring "self.".
@@ -4103,7 +4119,7 @@ substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
                                     TypeExpansionContext context);
 namespace Lowering {
   class TypeConverter;
-};
+}
 
 /// SILFunctionType - The lowered type of a function value, suitable
 /// for use by SIL.
@@ -4649,7 +4665,9 @@ public:
       AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr,
-      bool isReabstractionThunk = false);
+      bool isReabstractionThunk = false,
+      CanType origTypeOfAbstraction = CanType());
+
 
   /// Returns the type of the transpose function for the given parameter
   /// indices, transpose function generic signature (optional), and other
@@ -5689,6 +5707,50 @@ CanArchetypeType getParent() const {
 }
 END_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
 
+/// An archetype that represents an opaque element of a type sequence in context.
+///
+/// \code
+/// struct Foo<@_typeSequence Ts> { var xs: @_typeSequence Ts }
+/// func foo<@_typeSequence T>(_ xs: T...) where T: P {  }
+/// \endcode
+class SequenceArchetypeType final
+    : public ArchetypeType,
+      private ArchetypeTrailingObjects<SequenceArchetypeType> {
+  friend TrailingObjects;
+  friend ArchetypeType;
+
+  GenericEnvironment *Environment;
+
+public:
+  /// getNew - Create a new sequence archetype with the given name.
+  ///
+  /// The ConformsTo array will be minimized then copied into the ASTContext
+  /// by this routine.
+  static CanTypeWrapper<SequenceArchetypeType>
+  get(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
+      GenericTypeParamType *InterfaceType,
+      SmallVectorImpl<ProtocolDecl *> &ConformsTo, Type Superclass,
+      LayoutConstraint Layout);
+
+  /// Retrieve the generic environment in which this archetype resides.
+  GenericEnvironment *getGenericEnvironment() const { return Environment; }
+
+  GenericTypeParamType *getInterfaceType() const {
+    return cast<GenericTypeParamType>(InterfaceType.getPointer());
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SequenceArchetype;
+  }
+
+private:
+  SequenceArchetypeType(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
+                        Type InterfaceType, ArrayRef<ProtocolDecl *> ConformsTo,
+                        Type Superclass, LayoutConstraint Layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(SequenceArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(SequenceArchetypeType, ArchetypeType)
+
 template<typename Type>
 const Type *ArchetypeType::getSubclassTrailingObjects() const {
   if (auto contextTy = dyn_cast<PrimaryArchetypeType>(this)) {
@@ -5703,6 +5765,9 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
   if (auto childTy = dyn_cast<NestedArchetypeType>(this)) {
     return childTy->getTrailingObjects<Type>();
   }
+  if (auto childTy = dyn_cast<SequenceArchetypeType>(this)) {
+    return childTy->getTrailingObjects<Type>();
+  }
   llvm_unreachable("unhandled ArchetypeType subclass?");
 }
   
@@ -5710,6 +5775,8 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
 ///
 /// \sa GenericTypeParamDecl
 class GenericTypeParamType : public SubstitutableType {
+  static constexpr unsigned TYPE_SEQUENCE_BIT = (1 << 30);
+
   using DepthIndexTy = llvm::PointerEmbeddedInt<unsigned, 31>;
 
   /// The generic type parameter or depth/index.
@@ -5717,8 +5784,8 @@ class GenericTypeParamType : public SubstitutableType {
 
 public:
   /// Retrieve a generic type parameter at the given depth and index.
-  static GenericTypeParamType *get(unsigned depth, unsigned index,
-                                   const ASTContext &ctx);
+  static GenericTypeParamType *get(bool isTypeSequence, unsigned depth,
+                                   unsigned index, const ASTContext &ctx);
 
   /// Retrieve the declaration of the generic type parameter, or null if
   /// there is no such declaration.
@@ -5753,6 +5820,15 @@ public:
   /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
   unsigned getIndex() const;
 
+  /// Returns \c true if this generic type parameter is declared as a type
+  /// sequence.
+  ///
+  /// \code
+  /// func foo<@_typeSequence T>(_ : T...) { }
+  /// struct Foo<@_typeSequence T> { }
+  /// \encode
+  bool isTypeSequence() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::GenericTypeParam;
@@ -5766,18 +5842,19 @@ private:
                         RecursiveTypeProperties::HasTypeParameter),
       ParamOrDepthIndex(param) { }
 
-  explicit GenericTypeParamType(unsigned depth,
-                                unsigned index,
-                                const ASTContext &ctx)
-    : SubstitutableType(TypeKind::GenericTypeParam, &ctx,
-                        RecursiveTypeProperties::HasTypeParameter),
-      ParamOrDepthIndex(depth << 16 | index) { }
+  explicit GenericTypeParamType(bool isTypeSequence, unsigned depth,
+                                unsigned index, const ASTContext &ctx)
+      : SubstitutableType(TypeKind::GenericTypeParam, &ctx,
+                          RecursiveTypeProperties::HasTypeParameter),
+        ParamOrDepthIndex(depth << 16 | index |
+                          ((isTypeSequence ? 1 : 0) << 30)) {}
 };
 BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
-  static CanGenericTypeParamType get(unsigned depth, unsigned index,
-                                     const ASTContext &C) {
-    return CanGenericTypeParamType(GenericTypeParamType::get(depth, index, C));
-  }
+static CanGenericTypeParamType get(bool isTypeSequence, unsigned depth,
+                                   unsigned index, const ASTContext &C) {
+  return CanGenericTypeParamType(
+      GenericTypeParamType::get(isTypeSequence, depth, index, C));
+}
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 
 /// A type that refers to a member type of some type that is dependent on a
@@ -6271,7 +6348,8 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
-    ValueOwnership ownership, bool isolated, bool isNoDerivative) {
+    ValueOwnership ownership, bool isolated, bool isNoDerivative,
+    bool compileTimeConst) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -6282,7 +6360,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     ownership = ValueOwnership::InOut;
   }
   return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isolated,
-          isNoDerivative};
+          isNoDerivative, compileTimeConst};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
@@ -6329,7 +6407,8 @@ constexpr bool TypeBase::isSugaredType<id##Type>() { \
 #include "swift/AST/TypeNodes.def"
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamType *p)
-  : Depth(p->getDepth()), Index(p->getIndex()) { }
+    : TypeSequence(p->isTypeSequence()), Depth(p->getDepth()),
+      Index(p->getIndex()) {}
 
 inline TypeBase *TypeBase::getDesugaredType() {
   if (!isa<SugarType>(this))

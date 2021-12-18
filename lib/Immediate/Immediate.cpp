@@ -33,7 +33,8 @@
 #include "llvm/ExecutionEngine/Orc/DebugUtils.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/ExecutionEngine/Orc/OrcRPCTargetProcessControl.h"
+#include "llvm/ExecutionEngine/Orc/ObjectTransformLayer.h"
+#include "llvm/ExecutionEngine/Orc/OrcRPCExecutorProcessControl.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -238,7 +239,7 @@ int swift::RunImmediately(CompilerInstance &CI,
   // This must be done here, before any library loading has been done, to avoid
   // racing with the static initializers in user code.
   // Setup interpreted process arguments.
-  using ArgOverride = void (*)(const char **, int);
+  using ArgOverride = void (* SWIFT_CC(swift))(const char **, int);
 #if defined(_WIN32)
   auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
   if (!stdlib) {

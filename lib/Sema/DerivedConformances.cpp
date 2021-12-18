@@ -312,6 +312,14 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_unownedExecutor))
       return getRequirement(KnownProtocolKind::Actor);
 
+    // DistributedActor.id
+    if(name.isSimpleName(ctx.Id_id))
+      return getRequirement(KnownProtocolKind::DistributedActor);
+
+    // DistributedActor.actorTransport
+    if(name.isSimpleName(ctx.Id_actorTransport))
+      return getRequirement(KnownProtocolKind::DistributedActor);
+
     return nullptr;
   }
 
@@ -349,6 +357,17 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_into)
         return getRequirement(KnownProtocolKind::Hashable);
+    }
+
+    // static DistributedActor.resolve(_:using:)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_resolve &&
+        func->isStatic()) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2 &&
+          argumentNames[0] == Identifier() &&
+          argumentNames[1] == ctx.Id_using) {
+        return getRequirement(KnownProtocolKind::DistributedActor);
+      }
     }
 
     return nullptr;
@@ -431,8 +450,8 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   Expr *ref = new (ctx) DeclRefExpr(declRef, DeclNameLoc(),
                                     /*Implicit=*/true,
                                     AccessSemantics::Ordinary, fnType);
-  CallExpr *call =
-    CallExpr::createImplicit(ctx, ref, args, /*labels*/ {});
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, args);
+  auto *call = CallExpr::createImplicit(ctx, ref, argList);
   call->setType(resultType);
   call->setThrows(false);
 
@@ -542,7 +561,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
     return true;
   }
 
-  // A non-final class can't have an protocol-witnesss initializer in an
+  // A non-final class can't have a protocol-witnesses initializer in an
   // extension.
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
     if (!CD->isSemanticallyFinal() && isa<ConstructorDecl>(synthesizing) &&
@@ -551,6 +570,16 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
           diag::cannot_synthesize_init_in_extension_of_nonfinal,
           getProtocolType(), synthesizing->getName());
       return true;
+    }
+  }
+
+  if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
+    if (ED->getAllCases().empty() &&
+        (Protocol->isSpecificProtocol(KnownProtocolKind::Encodable) ||
+         Protocol->isSpecificProtocol(KnownProtocolKind::Decodable))) {
+      ED->diagnose(diag::codable_synthesis_empty_enum_not_supported,
+                   getProtocolType(), Nominal->getBaseIdentifier());
+      return false;
     }
   }
 

@@ -1090,7 +1090,7 @@ extension Array: RangeReplaceableCollection {
   @inline(never)
   @inlinable // @specializable
   internal mutating func _copyToNewBuffer(oldCount: Int) {
-    let newCount = oldCount + 1
+    let newCount = oldCount &+ 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
       countForNewBuffer: oldCount, minNewCapacity: newCount)
     _buffer._arrayOutOfPlaceUpdate(&newBuffer, oldCount, 0)
@@ -1101,7 +1101,7 @@ extension Array: RangeReplaceableCollection {
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.beginCOWMutation()) {
       _createNewBuffer(bufferIsUnique: false,
-                       minimumCapacity: count + 1,
+                       minimumCapacity: count &+ 1,
                        growForAppend: true)
     }
   }
@@ -1121,9 +1121,9 @@ extension Array: RangeReplaceableCollection {
     let capacity = _buffer.mutableCapacity
     _internalInvariant(capacity == 0 || _buffer.isMutableAndUniquelyReferenced())
 
-    if _slowPath(oldCount + 1 > capacity) {
+    if _slowPath(oldCount &+ 1 > capacity) {
       _createNewBuffer(bufferIsUnique: capacity > 0,
-                       minimumCapacity: oldCount + 1,
+                       minimumCapacity: oldCount &+ 1,
                        growForAppend: true)
     }
   }
@@ -1135,9 +1135,9 @@ extension Array: RangeReplaceableCollection {
     newElement: __owned Element
   ) {
     _internalInvariant(_buffer.isMutableAndUniquelyReferenced())
-    _internalInvariant(_buffer.mutableCapacity >= _buffer.mutableCount + 1)
+    _internalInvariant(_buffer.mutableCapacity >= _buffer.mutableCount &+ 1)
 
-    _buffer.mutableCount = oldCount + 1
+    _buffer.mutableCount = oldCount &+ 1
     (_buffer.mutableFirstElementAddress + oldCount).initialize(to: newElement)
   }
 
@@ -1414,6 +1414,7 @@ extension Array {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension Array: CustomReflectable {
   /// A mirror that reflects the array.
   public var customMirror: Mirror {
@@ -1423,6 +1424,7 @@ extension Array: CustomReflectable {
       displayStyle: .collection)
   }
 }
+#endif
 
 extension Array: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
@@ -1604,32 +1606,18 @@ extension Array {
     _makeMutableAndUnique()
     let count = _buffer.mutableCount
 
-    // Ensure that body can't invalidate the storage or its bounds by
-    // moving self into a temporary working array.
-    // NOTE: The stack promotion optimization that keys of the
-    // "array.withUnsafeMutableBufferPointer" semantics annotation relies on the
-    // array buffer not being able to escape in the closure. It can do this
-    // because we swap the array buffer in self with an empty buffer here. Any
-    // escape via the address of self in the closure will therefore escape the
-    // empty array.
-
-    var work = Array()
-    (work, self) = (self, work)
-
-    // Create an UnsafeBufferPointer over work that we can pass to body
-    let pointer = work._buffer.mutableFirstElementAddress
+    // Create an UnsafeBufferPointer that we can pass to body
+    let pointer = _buffer.mutableFirstElementAddress
     var inoutBufferPointer = UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
-    // Put the working array back before returning.
     defer {
       _precondition(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
         "Array withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
-
-      (work, self) = (self, work)
       _endMutation()
+      _fixLifetime(self)
     }
 
     // Invoke the body.
@@ -2002,4 +1990,4 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
   }
 }
 
-extension Array: Sendable, UnsafeSendable where Element: Sendable { }
+extension Array: @unchecked Sendable where Element: Sendable { }

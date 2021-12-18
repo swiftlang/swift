@@ -249,7 +249,8 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    if (!isa<PrimaryArchetypeType>(archetype))
+    if (!isa<PrimaryArchetypeType>(archetype) &&
+        !isa<SequenceArchetypeType>(archetype))
       return Type();
 
     type = cast<GenericTypeParamType>(
@@ -295,7 +296,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
   // The generic parameter may not be canonical. Retrieve the canonical
   // type, which will be dependent.
-  CanType canonicalType = genericSig->getCanonicalTypeInContext(genericParam);
+  CanType canonicalType = genericSig.getCanonicalTypeInContext(genericParam);
 
   // If nothing changed, we don't have a replacement.
   if (canonicalType == type) return Type();
@@ -365,8 +366,10 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
-  if (!genericSig->requiresProtocol(type, proto))
-    return ProtocolConformanceRef::forInvalid();
+  if (!genericSig->requiresProtocol(type, proto)) {
+    Type substType = type.subst(*this);
+    return ProtocolConformanceRef::forMissingOrInvalid(substType, proto);
+  }
 
   auto accessPath =
     genericSig->getConformanceAccessPath(type, proto);
@@ -584,19 +587,18 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
       if (how == CombineSubstitutionMaps::AtDepth) {
         if (gp->getDepth() < firstDepthOrIndex)
           return Type();
-        return GenericTypeParamType::get(
-          gp->getDepth() + secondDepthOrIndex - firstDepthOrIndex,
-          gp->getIndex(),
-          ctx);
+        return GenericTypeParamType::get(gp->isTypeSequence(),
+                                         gp->getDepth() + secondDepthOrIndex -
+                                             firstDepthOrIndex,
+                                         gp->getIndex(), ctx);
       }
 
       assert(how == CombineSubstitutionMaps::AtIndex);
       if (gp->getIndex() < firstDepthOrIndex)
         return Type();
       return GenericTypeParamType::get(
-        gp->getDepth(),
-        gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex,
-        ctx);
+          gp->isTypeSequence(), gp->getDepth(),
+          gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex, ctx);
     }
 
     return type;

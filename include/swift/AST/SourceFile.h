@@ -89,9 +89,6 @@ private:
   /// same module.
   mutable Identifier PrivateDiscriminator;
 
-  /// A synthesized file corresponding to this file, created on-demand.
-  SynthesizedFileUnit *SynthesizedFile = nullptr;
-
   /// The root TypeRefinementContext for this SourceFile.
   ///
   /// This is set during type checking.
@@ -409,11 +406,6 @@ public:
   Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
 
-  /// Returns the synthesized file for this source file, if it exists.
-  SynthesizedFileUnit *getSynthesizedFile() const { return SynthesizedFile; };
-
-  SynthesizedFileUnit &getOrCreateSynthesizedFile();
-
   virtual bool walk(ASTWalker &walker) override;
 
   /// The buffer ID for the file that was imported, or None if there
@@ -515,7 +507,7 @@ public:
   /// null if the context hierarchy has not been built yet. Use
   /// TypeChecker::getOrBuildTypeRefinementContext() to get a built
   /// root of the hierarchy.
-  TypeRefinementContext *getTypeRefinementContext();
+  TypeRefinementContext *getTypeRefinementContext() const;
 
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);

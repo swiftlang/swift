@@ -15,10 +15,14 @@ target_sources(swiftSILOptimizer PRIVATE
   DiagnoseUnreachable.cpp
   Differentiation.cpp
   IRGenPrepare.cpp
+  LexicalLifetimeEliminator.cpp
   LowerHopToActor.cpp
   MandatoryInlining.cpp
+  MoveOnlyChecker.cpp
+  MoveKillsCopyableValuesChecker.cpp
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
+  PerformanceDiagnostics.cpp
   PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp

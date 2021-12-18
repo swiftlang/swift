@@ -136,15 +136,11 @@ array.withUnsafeBufferPointer {
   // expected-error@-1 {{no exact matches in call to initializer}}
   // expected-note@-2 {{candidate expects value of type 'UnsafeRawPointer' for parameter #1}}
   // expected-note@-3 {{candidate expects value of type 'UnsafeMutableRawPointer' for parameter #1}}
-  // expected-note@-4 {{candidate expects value of type 'OpaquePointer' for parameter #1}}
-  // expected-note@-5 {{candidate expects value of type 'Builtin.RawPointer' for parameter #1}}
 
   UnsafeRawPointer($0) as UnsafeBufferPointer<UInt16> // expected-error {{cannot convert value of type 'UnsafeRawPointer' to type 'UnsafeBufferPointer<UInt16>' in coercion}}
   // expected-error@-1 {{no exact matches in call to initializer}}
   // expected-note@-2 {{found candidate with type '(UnsafeRawPointer) -> UnsafeRawPointer'}}
-  // expected-note@-3 {{found candidate with type '(Builtin.RawPointer) -> UnsafeRawPointer'}}
-  // expected-note@-4 {{found candidate with type '(OpaquePointer) -> UnsafeRawPointer'}}
-  // expected-note@-5 {{found candidate with type '(UnsafeMutableRawPointer) -> UnsafeRawPointer'}}
+  // expected-note@-3 {{found candidate with type '(UnsafeMutableRawPointer) -> UnsafeRawPointer'}}
 }
 
 func SR12689_1(_ u: Int) -> String { "" } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}

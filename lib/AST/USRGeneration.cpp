@@ -19,6 +19,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Demangling/Demangler.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -253,6 +254,18 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
 
   Mangle::ASTMangler NewMangler;
   return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
+}
+
+std::string ide::demangleUSR(StringRef mangled) {
+  if (mangled.startswith(getUSRSpacePrefix())) {
+    mangled = mangled.substr(getUSRSpacePrefix().size());
+  }
+  SmallString<128> buffer;
+  buffer += "$s";
+  buffer += mangled;
+  mangled = buffer.str();
+  Demangler Dem;
+  return nodeToString(Dem.demangleSymbol(mangled));
 }
 
 std::string

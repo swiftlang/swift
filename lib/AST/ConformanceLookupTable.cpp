@@ -54,13 +54,6 @@ ProtocolDecl *ConformanceLookupTable::ConformanceEntry::getProtocol() const {
   return Conformance.get<ProtocolConformance *>()->getProtocol();
 }
 
-void *ConformanceLookupTable::ConformanceEntry::operator new(
-        size_t Bytes,
-        ASTContext &C,
-        unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 void ConformanceLookupTable::ConformanceEntry::markSupersededBy(
        ConformanceLookupTable &table,
        ConformanceEntry *entry,
@@ -120,12 +113,6 @@ void ConformanceLookupTable::ConformanceEntry::dump(raw_ostream &os,
     os << " superseded_by=@" << static_cast<const void *>(SupersededBy);
 
   os << ")\n";
-}
-
-void *ConformanceLookupTable::operator new(size_t Bytes,
-                                           ASTContext &C,
-                                           unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
 }
 
 ConformanceLookupTable::ConformanceLookupTable(ASTContext &ctx) {
@@ -798,7 +785,30 @@ DeclContext *ConformanceLookupTable::getConformingContext(
     // Grab the superclass entry and continue searching for a
     // non-inherited conformance.
     // FIXME: Ambiguity detection and resolution.
-    entry = superclassDecl->ConformanceTable->Conformances[protocol].front();
+    const auto &superclassConformances =
+        superclassDecl->ConformanceTable->Conformances[protocol];
+    if (superclassConformances.empty()) {
+      assert(protocol->isSpecificProtocol(KnownProtocolKind::Sendable));
+
+      // Go dig for a superclass that does conform to Sendable.
+      // FIXME: This is a hack because the inherited conformances aren't
+      // getting updated properly.
+      Type classTy = nominal->getDeclaredInterfaceType();
+      ModuleDecl *module = nominal->getParentModule();
+      do {
+        Type superclassTy = classTy->getSuperclassForDecl(superclassDecl);
+        if (superclassTy->is<ErrorType>())
+          return nullptr;
+        auto inheritedConformance = module->lookupConformance(
+            superclassTy, protocol);
+        if (inheritedConformance)
+          return superclassDecl;
+      } while ((superclassDecl = superclassDecl->getSuperclassDecl()));
+
+      return nullptr;
+    }
+
+    entry = superclassConformances.front();
     nominal = superclassDecl;
   }
 
@@ -894,6 +904,8 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
           // Set the conformance loader to the loader stashed inside
           // the attribute.
           normalConf->setLazyLoader(attr->getLazyLoader(), /*context=*/0);
+          if (attr->isUnchecked())
+            normalConf->setUnchecked();
           break;
         }
       }

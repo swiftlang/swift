@@ -16,7 +16,7 @@ import TestsUtils
 #if _runtime(_ObjC)
 import Foundation
 
-public let DictionaryBridgeToObjC = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "DictionaryBridgeToObjC_Bridge",
     runFunction: run_DictionaryBridgeToObjC_BridgeToObjC,
@@ -55,32 +55,32 @@ let numbers: [String: Int] = [
 ]
 
 @inline(never)
-public func run_DictionaryBridgeToObjC_BridgeToObjC(_ N: Int) {
-  for _ in 1 ... 100 * N {
+public func run_DictionaryBridgeToObjC_BridgeToObjC(_ n: Int) {
+  for _ in 1 ... 100 * n {
     blackHole(numbers as NSDictionary)
   }
 }
 
 @inline(never)
-public func run_DictionaryBridgeToObjC_Access(_ N: Int) {
+public func run_DictionaryBridgeToObjC_Access(_ n: Int) {
   let d = numbers as NSDictionary
   blackHole(d.object(forKey: "one")) // Force bridging of contents
-  for _ in 1 ... 100 * N {
+  for _ in 1 ... 100 * n {
     for key in numbers.keys {
-      CheckResults(identity(d).object(forKey: key) != nil)
+      check(identity(d).object(forKey: key) != nil)
     }
   }
 }
 
 @inline(never)
-public func run_DictionaryBridgeToObjC_BulkAccess(_ N: Int) {
+public func run_DictionaryBridgeToObjC_BulkAccess(_ n: Int) {
   let d = numbers as NSDictionary
-  for _ in 1 ... 100 * N {
+  for _ in 1 ... 100 * n {
     let d2 = NSDictionary(dictionary: identity(d))
-    CheckResults(d2.count == d.count)
+    check(d2.count == d.count)
   }
 }
 
 #else // !_runtime(ObjC)
-public let DictionaryBridgeToObjC: [BenchmarkInfo] = []
+public let benchmarks: [BenchmarkInfo] = []
 #endif

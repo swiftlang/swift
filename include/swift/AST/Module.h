@@ -163,7 +163,8 @@ class OverlayFile;
 /// output binary and logical module (such as a single library or executable).
 ///
 /// \sa FileUnit
-class ModuleDecl : public DeclContext, public TypeDecl {
+class ModuleDecl
+    : public DeclContext, public TypeDecl, public ASTAllocated<ModuleDecl> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
@@ -175,6 +176,9 @@ public:
   ///
   /// For a Swift module, this will only ever have one component, but an
   /// imported Clang module might actually be a submodule.
+  ///
+  /// *Note: see `StringRef operator*()` for details on the returned name for printing
+  /// for a Swift module.
   class ReverseFullNameIterator {
   public:
     // Make this look like a valid STL iterator.
@@ -193,6 +197,9 @@ public:
       current = clangModule;
     }
 
+    /// Returns the name of the current module.
+    /// Note that for a Swift module, it returns the current module's real (binary) name,
+    /// which can be different from the name if module aliasing was used (see `-module-alias`).
     StringRef operator*() const;
     ReverseFullNameIterator &operator++();
 
@@ -207,6 +214,9 @@ public:
 
     /// This is a convenience function that writes the entire name, in forward
     /// order, to \p out.
+    ///
+    /// It calls `StringRef operator*()` under the hood (see for more detail on the
+    /// returned name for a Swift module).
     void printForward(raw_ostream &out, StringRef delim = ".") const;
   };
 
@@ -256,6 +266,9 @@ private:
 
   AccessNotesFile accessNotes;
 
+  /// Used by the debugger to bypass resilient access to fields.
+  bool BypassResilience = false;
+
   ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
 
 public:
@@ -288,6 +301,12 @@ public:
 
   AccessNotesFile &getAccessNotes() { return accessNotes; }
   const AccessNotesFile &getAccessNotes() const { return accessNotes; }
+
+  /// Return whether the module was imported with resilience disabled. The
+  /// debugger does this to access private fields.
+  bool getBypassResilience() const { return BypassResilience; }
+  /// Only to be called by MemoryBufferSerializedModuleLoader.
+  void setBypassResilience() { BypassResilience = true; }
 
   ArrayRef<FileUnit *> getFiles() {
     assert(!Files.empty() || failedToLoad());
@@ -356,6 +375,15 @@ public:
     ModuleABIName = name;
   }
 
+  /// Retrieve the actual module name of an alias used for this module (if any).
+  ///
+  /// For example, if '-module-alias Foo=Bar' is passed in when building the main module,
+  /// and this module is (a) not the main module and (b) is named Foo, then it returns
+  /// the real (physically on-disk) module name Bar.
+  ///
+  /// If no module aliasing is set, it will return getName(), i.e. Foo.
+  Identifier getRealName() const;
+
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;
   void setUserModuleVersion(llvm::VersionTuple UserVer) {
@@ -364,6 +392,7 @@ public:
   llvm::VersionTuple getUserModuleVersion() const {
     return UserModuleVersion;
   }
+
 private:
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
@@ -488,6 +517,15 @@ public:
     Bits.ModuleDecl.HasIncrementalInfo = enabled;
   }
 
+  /// Returns true if this module was built with
+  /// -experimental-hermetic-seal-at-link.
+  bool hasHermeticSealAtLink() const {
+    return Bits.ModuleDecl.HasHermeticSealAtLink;
+  }
+  void setHasHermeticSealAtLink(bool enabled = true) {
+    Bits.ModuleDecl.HasHermeticSealAtLink = enabled;
+  }
+
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
   bool isSystemModule() const {
@@ -511,6 +549,16 @@ public:
 
   bool isMainModule() const {
     return Bits.ModuleDecl.IsMainModule;
+  }
+
+  /// Whether this module has been compiled with comprehensive checking for
+  /// concurrency, e.g., Sendable checking.
+  bool isConcurrencyChecked() const {
+    return Bits.ModuleDecl.IsConcurrencyChecked;
+  }
+
+  void setIsConcurrencyChecked(bool value = true) {
+    Bits.ModuleDecl.IsConcurrencyChecked = value;
   }
 
   /// For the main module, retrieves the list of primary source files being
@@ -621,11 +669,11 @@ public:
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
-  // Is \p attr accessible as an explictly imported SPI from this module?
+  // Is \p attr accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(const SpecializeAttr *attr,
                        const ValueDecl *targetDecl) const;
 
-  // Is \p spiGroup accessible as an explictly imported SPI from this module?
+  // Is \p spiGroup accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(Identifier spiGroup, const ModuleDecl *fromModule) const;
 
   /// \sa getImportedModules
@@ -666,9 +714,10 @@ public:
   /// This assumes that \p module was imported.
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
-  /// Returns true if a function, which is using \p nominal, can be serialized
-  /// by cross-module-optimization.
-  bool canBeUsedForCrossModuleOptimization(NominalTypeDecl *nominal) const;
+  /// Returns true if decl context or its content can be serialized by
+  /// cross-module-optimization.
+  /// The \p ctxt can e.g. be a NominalType or the context of a function.
+  bool canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const;
 
   /// Finds all top-level decls of this module.
   ///
@@ -718,7 +767,9 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   ///
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
-  /// shadowed clang module.
+  /// shadowed clang module. It does not force synthesized top-level decls that
+  /// should be printed to be added; use \c swift::getTopLevelDeclsForDisplay()
+  /// for that.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
 
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
@@ -771,6 +822,9 @@ public:
   ///
   /// For a Swift module, this will only ever have one component, but an
   /// imported Clang module might actually be a submodule.
+  ///
+  /// *Note: see `StringRef operator*()` for details on the returned name for printing
+  /// for a Swift module.
   ReverseFullNameIterator getReverseFullModuleName() const {
     return ReverseFullNameIterator(this);
   }
@@ -779,6 +833,8 @@ public:
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
 
+  void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const;
   /// Retrieve a fingerprint value that summarizes the contents of this module.
   ///
   /// This interface hash a of a module is guaranteed to change if the interface
@@ -812,16 +868,8 @@ public:
     return D->getKind() == DeclKind::Module;
   }
 
-private:
-  // Make placement new and vanilla new/delete illegal for Modules.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-public:
-  // Only allow allocation of Modules using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, const ASTContext &C,
-                     unsigned Alignment = alignof(ModuleDecl));
+  using ASTAllocated<ModuleDecl>::operator new;
+  using ASTAllocated<ModuleDecl>::operator delete;
 };
 
 /// Wraps either a swift module or a clang one.

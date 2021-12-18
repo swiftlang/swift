@@ -126,7 +126,7 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
 
   std::string srcTypeName = nameForMetadata(srcType);
   std::string destTypeName = nameForMetadata(destType);
-  const char *msg = "Found unexpected null pointer value"
+  const char * const msg = "Found unexpected null pointer value"
                     " while trying to cast value of type '%s' (%p)"
                     " to '%s' (%p)%s\n";
   if (runtime::bincompat::unexpectedObjCNullWhileCastingIsFatal()) {
@@ -274,7 +274,7 @@ _tryCastFromClassToObjCBridgeable(
 
   // The extra byte is for the tag on the T?
   const std::size_t inlineValueSize = 3 * sizeof(void*);
-  alignas(std::max_align_t) char inlineBuffer[inlineValueSize + 1];
+  alignas(MaximumAlignment) char inlineBuffer[inlineValueSize + 1];
   void *optDestBuffer;
   if (destType->getValueWitnesses()->getStride() <= inlineValueSize) {
     // Use the inline buffer.

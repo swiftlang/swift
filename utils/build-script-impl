@@ -50,6 +50,7 @@ KNOWN_SETTINGS=(
     check-args-only                               ""                "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     only-execute                                  "all"             "Only execute the named action (see implementation)"
     check-incremental-compilation                 "0"               "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
+    enable-array-cow-checks                       "0"               "set tp 1 compile the stdlib with Array COW checks enabled (only relevant for assert builds)"
 
     ## Build Mode Options
     enable-asan                                   ""                "enable Address Sanitizer"
@@ -64,7 +65,7 @@ KNOWN_SETTINGS=(
     build-runtime-with-host-compiler              ""                "use the host c++ compiler to build everything"
     build-stdlib-deployment-targets               "all"             "space-separated list that filters which of the configured targets to build the Swift standard library for, or 'all'"
     build-toolchain-only                          ""                "If set, only build the necessary tools to build an external toolchain"
-    libswift                                      ""                "Build the compiler with libswift"
+    libswift                                      ""                "Build the compiler with libswift with mode 'hosttools', 'bootstrapping' or 'bootstrapping-with-hostlibs'"
     cmake-generator                               "Unix Makefiles"  "kind of build system to generate; see output of 'cmake --help' for choices"
     llvm-num-parallel-lto-link-jobs               ""                "The number of parallel link jobs to use when compiling llvm"
     reconfigure                                   ""                "force a CMake configuration run even if CMakeCache.txt already exists"
@@ -94,7 +95,6 @@ KNOWN_SETTINGS=(
     android-icu-uc                                ""                "Path to libicuuc.so"
     android-icu-uc-include                        ""                "Path to a directory containing headers for libicuuc"
     android-ndk                                   ""                "An absolute path to the NDK that will be used as a libc implementation for Android builds"
-    android-ndk-gcc-version                       ""                "The GCC version to use when building for Android. Currently only 4.9 is supported"
 
     ## Darwin Options
     darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration"
@@ -152,6 +152,11 @@ KNOWN_SETTINGS=(
     build-swift-stdlib-unittest-extra             "0"               "set to 1 to build optional StdlibUnittest components"
     build-swift-tools                             "1"               "set to 1 to build Swift host tools"
 
+    ## Skip cleaning build directories ...
+    skip-clean-libdispatch                        "0"               "skip cleaning the libdispatch build"
+    skip-clean-foundation                         "0"               "skip cleaning the foundation build"
+    skip-clean-xctest                             "0"               "skip cleaning the xctest build"
+
     ## Test Options
     llvm-include-tests                            "1"               "Set to true to generate testing targets for LLVM. Set to true by default."
     long-test                                     "0"               "set to run the long test suite"
@@ -197,20 +202,30 @@ KNOWN_SETTINGS=(
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
-    swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Apple platfors, 0 otherwise"
+    swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Darwin platforms, 0 otherwise"
     swift-enable-compatibility-overrides          "1"               "whether to support back-deploying compatibility fixes for newer apps running on older runtimes"
-    swift-runtime-macho-no-dyld                   "0"               "whether to build stdlib assuming the runtime environment does not support dynamic modules"
+    swift-enable-reflection                       "1"               "whether to support reflection and mirrors"
+    swift-stdlib-has-dladdr                       "1"               "whether to build stdlib assuming the runtime environment provides dladdr API"
+    swift-stdlib-supports-backtrace-reporting     ""                "whether to build stdlib assuming the runtime environment provides the backtrace(3) API, if not set defaults to true on all platforms except for Cygwin, Haiku and wasm"
+    swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
     swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
+    swift-stdlib-has-commandline                  "1"               "whether to build stdlib with the CommandLine enum and support for argv/argc"
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
+    swift-stdlib-has-darwin-libmalloc             "1"               "whether the Darwin build of stdlib can use extended libmalloc APIs"
+    swift-stdlib-has-asl                          ""                "whether the stdlib can use the asl_log API, defaults to true on Darwin, false otherwise"
+    swift-stdlib-has-stdin                        "1"               "whether to build stdlib assuming the platform supports stdin and getline API"
+    swift-stdlib-has-environ                      "1"               "whether to build stdlib assuming the platform supports environment variables"
+    swift-stdlib-lto                              ""                "enable LLVM LTO on the stdlib, valid values are empty string (no LTO), 'full' and 'thin'"
     swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
 
     ## FREESTANDING Stdlib Options
-    swift-freestanding-sdk                      ""                "which SDK to use when building the FREESTANDING stdlib"
-    swift-freestanding-triple-name              ""                "which triple name (e.g. 'none-macho') to use when building the FREESTANDING stdlib"
-    swift-freestanding-module-name              ""                "which .swiftmodule name (e.g. 'freestanding') to use when building the FREESTANDING stdlib"
-    swift-freestanding-archs                    ""                "space-separated list of which architectures to build when building the FREESTANDING stdlib"
+    swift-freestanding-flavor                     ""                "when building the FREESTANDING stdlib, which build style to use (options: apple, linux)"
+    swift-freestanding-sdk                        ""                "which SDK to use when building the FREESTANDING stdlib"
+    swift-freestanding-triple-name                ""                "which triple name (e.g. 'none-macho') to use when building the FREESTANDING stdlib"
+    swift-freestanding-module-name                ""                "which .swiftmodule name (e.g. 'freestanding') to use when building the FREESTANDING stdlib"
+    swift-freestanding-archs                      ""                "space-separated list of which architectures to build when building the FREESTANDING stdlib"
 
     ## Uncategorised
     install-prefix                                ""                "installation prefix"
@@ -233,6 +248,7 @@ KNOWN_SETTINGS=(
     skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
     skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
+    enable-extract-symbol-dry-run-test            ""                "If we are dry-running, still run the extract symbol phase so that we can test it"
 )
 
 components=(
@@ -335,6 +351,24 @@ function true_false() {
         *)
             echo "true_false: unknown value: $1" >&2
             exit 1
+            ;;
+    esac
+}
+
+function to_libswift_buildmode() {
+    case "$1" in
+        false | FALSE | 0)
+            echo "OFF"
+            ;;
+        true | TRUE | 1 | "")
+            if [[ "$(uname -s)" == "Darwin" ]] ; then
+              echo "BOOTSTRAPPING-WITH-HOSTLIBS"
+            else
+              echo "BOOTSTRAPPING"
+            fi
+            ;;
+        *)
+            echo `toupper $1`
             ;;
     esac
 }
@@ -485,6 +519,7 @@ function set_build_options_for_host() {
             # variable.
             if [[ "${PREFIX}" ]] ; then
                 llvm_cmake_options+=(
+                    -DCLANG_DEFAULT_LINKER:STRING="lld"
                     -DDEFAULT_SYSROOT:STRING="$(dirname ${PREFIX})"
                 )
             fi
@@ -1864,7 +1899,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
-                        -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC:STRING="${ANDROID_ICU_UC}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
@@ -1942,7 +1976,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS="${SWIFT_STDLIB_ENABLE_ASSERTIONS}"
                 fi
 
-
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
@@ -1951,15 +1984,21 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
-                    -DSWIFT_TOOLS_ENABLE_LIBSWIFT:STRING=$(true_false "${LIBSWIFT}")
+                    -DLIBSWIFT_BUILD_MODE:STRING=$(to_libswift_buildmode "${LIBSWIFT}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_ENABLE_COMPATIBILITY_OVERRIDES:BOOL=$(true_false "${SWIFT_ENABLE_COMPATIBILITY_OVERRIDES}")
                     -DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME:BOOL=$(true_false "${SWIFT_STDLIB_SINGLE_THREADED_RUNTIME}")
                     -DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS:BOOL=$(true_false "${SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS}")
-                    -DSWIFT_RUNTIME_MACHO_NO_DYLD:BOOL=$(true_false "${SWIFT_RUNTIME_MACHO_NO_DYLD}")
+                    -DSWIFT_STDLIB_HAS_DLADDR:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DLADDR}")
+                    -DSWIFT_RUNTIME_STATIC_IMAGE_INSPECTION:BOOL=$(true_false "${SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION}")
                     -DSWIFT_STDLIB_OS_VERSIONING:BOOL=$(true_false "${SWIFT_STDLIB_OS_VERSIONING}")
+                    -DSWIFT_STDLIB_HAS_COMMANDLINE:BOOL=$(true_false "${SWIFT_STDLIB_HAS_COMMANDLINE}")
+                    -DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC}")
+                    -DSWIFT_STDLIB_HAS_STDIN:BOOL=$(true_false "${SWIFT_STDLIB_HAS_STDIN}")
+                    -DSWIFT_STDLIB_HAS_ENVIRON:BOOL=$(true_false "${SWIFT_STDLIB_HAS_ENVIRON}")
+                    -DSWIFT_STDLIB_ENABLE_LTO:STRING="${SWIFT_STDLIB_LTO}"
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
@@ -1967,6 +2006,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
+                    -DSWIFT_ENABLE_ARRAY_COW_CHECKS:BOOL=$(true_false "${ENABLE_ARRAY_COW_CHECKS}")
                     -DSWIFT_REPORT_STATISTICS:BOOL=$(true_false "${REPORT_STATISTICS}")
                     -DSWIFT_BUILD_DYNAMIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_STDLIB}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")
@@ -2037,10 +2077,17 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${SWIFT_OBJC_INTEROP}" == "0" ]] ; then
+                if [[ "${SWIFT_OBJC_INTEROP}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DSWIFT_DISABLE_OBJC_INTEROP:BOOL=True
+                        -DSWIFT_STDLIB_ENABLE_OBJC_INTEROP:BOOL=$(true_false "${SWIFT_OBJC_INTEROP}")
+                    )
+                fi
+
+                if [[ "${SWIFT_ENABLE_REFLECTION}" == "0" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_ENABLE_REFLECTION:BOOL=FALSE
                     )
                 fi
 
@@ -2065,10 +2112,31 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING:BOOL=$(true_false "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING}")
+                    )
+                fi
+
+                if [[ "${SWIFT_STDLIB_HAS_ASL}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_HAS_ASL:BOOL=$(true_false "${SWIFT_STDLIB_HAS_ASL}")
+                    )
+                fi
+
                 if [ "${SWIFT_INSTALL_COMPONENTS}" ] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
+                    )
+                fi
+
+                if [ "${SWIFT_FREESTANDING_FLAVOR}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_FREESTANDING_FLAVOR:STRING="${SWIFT_FREESTANDING_FLAVOR}"
                     )
                 fi
 
@@ -2309,6 +2377,14 @@ for host in "${ALL_HOSTS[@]}"; do
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
                 SWIFT_BUILD_DIR=$(build_directory ${host} swift)
 
+                if [[ "${SKIP_CLEAN_XCTEST}" == "0" ]]
+                then
+                  # The Swift project might have been changed, but CMake might
+                  # not be aware and will not rebuild.
+                  echo "Cleaning the XCTest build directory"
+                  call rm -rf "${XCTEST_BUILD_DIR}"
+                fi
+
                 case "${host}" in
                 macosx-*)
                   # Staging: require opt-in for building with dispatch
@@ -2336,12 +2412,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
-                  # FIXME: Always re-build XCTest on non-darwin platforms.
-                  # The Swift project might have been changed, but CMake might
-                  # not be aware and will not rebuild.
-                  echo "Cleaning the XCTest build directory"
-                  call rm -rf "${XCTEST_BUILD_DIR}"
-
                   cmake_options=(
                     ${cmake_options[@]}
                     -DCMAKE_BUILD_TYPE:STRING="${XCTEST_BUILD_TYPE}"
@@ -2401,11 +2471,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=()
                 fi
 
-                # FIXME: Always re-build XCTest on non-darwin platforms.
-                # The Swift project might have been changed, but CMake might
-                # not be aware and will not rebuild.
-                echo "Cleaning the Foundation build directory"
-                call rm -rf "${build_dir}"
+                if [[ "${SKIP_CLEAN_FOUNDATION}" == "0" ]]
+                then
+                  # The Swift project might have been changed, but CMake might
+                  # not be aware and will not rebuild.
+                  echo "Cleaning the Foundation build directory"
+                  call rm -rf "${build_dir}"
+                fi
 
                 # Set the PKG_CONFIG_PATH so that core-foundation can find the libraries and
                 # header files
@@ -2466,11 +2538,13 @@ for host in "${ALL_HOSTS[@]}"; do
                   exit 1
                 ;;
                 *)
-                  # FIXME: Always re-build XCTest on non-darwin platforms.
-                  # The Swift project might have been changed, but CMake might
-                  # not be aware and will not rebuild.
-                  echo "Cleaning the libdispatch build directory"
-                  call rm -rf "${LIBDISPATCH_BUILD_DIR}"
+                  if [[ "${SKIP_CLEAN_LIBDISPATCH}" == "0" ]]
+                  then
+                    # The Swift project might have been changed, but CMake might
+                    # not be aware and will not rebuild.
+                    echo "Cleaning the libdispatch build directory"
+                    call rm -rf "${LIBDISPATCH_BUILD_DIR}"
+                  fi
 
                   cmake_options=(
                     -DENABLE_SWIFT=YES
@@ -3246,40 +3320,45 @@ for host in "${ALL_HOSTS[@]}"; do
 
         # Copy executables and shared libraries from the `host_install_destdir` to
         # INSTALL_SYMROOT and run dsymutil on them.
-        (cd "${CURRENT_INSTALL_DIR}" &&
-         find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
-         filter_paths "${DARWIN_SYMROOT_PATH_FILTERS}" | \
-         cpio --insecure -pdm -v "${host_symroot}")
-
-        dsymutil_path=
-        if [[ -n "${DARWIN_INSTALL_EXTRACT_SYMBOLS_USE_JUST_BUILT_DSYMUTIL}" ]]; then
-            dsymutil_path=$(find_just_built_local_host_llvm_tool dsymutil)
+        if [[ -n "${DRY_RUN}" ]] && [[ -z "${ENABLE_EXTRACT_SYMBOL_DRY_RUN_TEST}" ]]; then
+            echo "DRY_RUN! Coping executables and shared libraries from the `host_install_destdir` to
+                  INSTALL_SYMROOT and running dsymutil on them."
         else
-            dsymutil_path=$(xcrun_find_tool dsymutil)
+          (cd "${CURRENT_INSTALL_DIR}" &&
+           find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
+           filter_paths "${DARWIN_SYMROOT_PATH_FILTERS}" | \
+           cpio --insecure -pdm -v "${host_symroot}")
+
+            dsymutil_path=
+            if [[ -n "${DARWIN_INSTALL_EXTRACT_SYMBOLS_USE_JUST_BUILT_DSYMUTIL}" ]]; then
+                dsymutil_path=$(find_just_built_local_host_llvm_tool dsymutil)
+            else
+                dsymutil_path=$(xcrun_find_tool dsymutil)
+            fi
+
+            # Run dsymutil on executables and shared libraries.
+            #
+            # Exclude shell scripts and static archives.
+            # Tweak carefully the amount of parallelism -- dsymutil can be memory intensive and
+            # as such too many instance can exhaust the memory and slow down/panic the machine
+            printJSONStartTimestamp dsymutil
+            (cd "${host_symroot}" &&
+             find ./"${CURRENT_PREFIX}" -perm -0111 -type f -not -name "*.a" -not -name "*.py" -print | \
+               xargs -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path})
+            printJSONEndTimestamp dsymutil
+
+            # Strip executables, shared libraries and static libraries in
+            # `host_install_destdir`.
+            find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
+              '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
+              xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
+
+            # Codesign dylibs after strip tool
+            # rdar://45388785
+            find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
+              '(' -name "*.dylib" ')' -type f -print | \
+              xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool codesign) -f -s -
         fi
-
-        # Run dsymutil on executables and shared libraries.
-        #
-        # Exclude shell scripts and static archives.
-        # Tweak carefully the amount of parallelism -- dsymutil can be memory intensive and
-        # as such too many instance can exhaust the memory and slow down/panic the machine
-        printJSONStartTimestamp dsymutil
-        (cd "${host_symroot}" &&
-         find ./"${CURRENT_PREFIX}" -perm -0111 -type f -not -name "*.a" -not -name "*.py" -print | \
-           xargs -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path})
-        printJSONEndTimestamp dsymutil
-
-        # Strip executables, shared libraries and static libraries in
-        # `host_install_destdir`.
-        find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
-          '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
-          xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
-
-        # Codesign dylibs after strip tool
-        # rdar://45388785
-        find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
-          '(' -name "*.dylib" ')' -type f -print | \
-          xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool codesign) -f -s -
 
         { set +x; } 2>/dev/null
     fi

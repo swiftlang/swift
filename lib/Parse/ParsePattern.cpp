@@ -152,10 +152,6 @@ static ParserStatus parseDefaultArgument(
 /// Determine whether we are at the start of a parameter name when
 /// parsing a parameter.
 bool Parser::startsParameterName(bool isClosure) {
-  // '_' cannot be a type, so it must be a parameter name.
-  if (Tok.is(tok::kw__))
-    return true;
-
   // To have a parameter name here, we need a name.
   if (!Tok.canBeArgumentLabel())
     return false;
@@ -263,7 +259,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     while (Tok.is(tok::kw_inout) ||
            Tok.isContextualKeyword("__shared") ||
            Tok.isContextualKeyword("__owned") ||
-           Tok.isContextualKeyword("isolated")) {
+           Tok.isContextualKeyword("isolated") ||
+           Tok.isContextualKeyword("_const")) {
 
       if (Tok.isContextualKeyword("isolated")) {
         // did we already find an 'isolated' type modifier?
@@ -288,6 +285,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
         // consume 'isolated' as type modifier
         param.IsolatedLoc = consumeToken();
+        continue;
+      }
+
+      if (Tok.isContextualKeyword("_const")) {
+        param.CompileConstLoc = consumeToken();
         continue;
       }
 
@@ -593,6 +595,12 @@ mapParsedParameters(Parser &parser,
         param->setIsolated();
       }
 
+      if (paramInfo.CompileConstLoc.isValid()) {
+        type = new (parser.Context) CompileTimeConstTypeRepr(
+            type, paramInfo.CompileConstLoc);
+        param->setCompileTimeConst();
+      }
+
       param->setTypeRepr(type);
 
       // Dig through the type to find any attributes or modifiers that are
@@ -618,6 +626,12 @@ mapParsedParameters(Parser &parser,
               param->setIsolated(true);
             unwrappedType = STR->getBase();
             continue;;
+          }
+
+          if (auto *CTR = dyn_cast<CompileTimeConstTypeRepr>(unwrappedType)) {
+            param->setCompileTimeConst(true);
+            unwrappedType = CTR->getBase();
+            continue;
           }
 
           break;
@@ -1056,24 +1070,16 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
           contextChange.emplace(*this, CurDeclContext, &dummyContext);
         }
         
-        SourceLoc lParenLoc, rParenLoc;
-        SmallVector<Expr *, 2> args;
-        SmallVector<Identifier, 2> argLabels;
-        SmallVector<SourceLoc, 2> argLabelLocs;
-        SmallVector<TrailingClosure, 2> trailingClosures;
-        ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
-                                            /*isPostfix=*/true,
-                                            /*isExprBasic=*/false,
-                                            lParenLoc, args, argLabels,
-                                            argLabelLocs, rParenLoc,
-                                            trailingClosures,
-                                            SyntaxKind::Unknown);
-        if (status.isSuccess() && !status.hasCodeCompletion()) {
+        SmallVector<ExprListElt, 2> elts;
+        auto argListResult = parseArgumentList(tok::l_paren, tok::r_paren,
+                                               /*isExprBasic*/ false);
+        if (!argListResult.isParseErrorOrHasCompletion()) {
           backtrack.cancelBacktrack();
           
           // Suggest replacing ':' with '='
-          diagnose(lParenLoc, diag::initializer_as_typed_pattern)
-            .highlight({Ty.get()->getStartLoc(), rParenLoc})
+          auto *args = argListResult.get();
+          diagnose(args->getLParenLoc(), diag::initializer_as_typed_pattern)
+            .highlight({Ty.get()->getStartLoc(), args->getRParenLoc()})
             .fixItReplace(colonLoc, " = ");
           result.setIsParseError();
         }
@@ -1228,9 +1234,6 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
   SyntaxParsingContext TuplePatternCtxt(SyntaxContext,
                                         SyntaxKind::TuplePattern);
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
-  if (ParsingPatternTuple.isFailed()) {
-    return makeParserError();
-  }
   SourceLoc LPLoc = consumeToken(tok::l_paren);
   SourceLoc RPLoc;
 

@@ -7,7 +7,7 @@ class Foo<T> {
   var value: T {
     // CHECK-LABEL: sil private [ossa] @$s35didset_oldvalue_not_accessed_silgen3FooC5valuexvW : $@convention(method) <T> (@guaranteed Foo<T>) -> ()
     // CHECK: debug_value %0 : $Foo<T>, let, name "self", argno {{[0-9]+}}
-    // CHECK-NOT: debug_value_addr %0 : $*T, let, name "oldValue", argno {{[0-9]+}}
+    // CHECK-NOT: debug_value %0 : $*T, let, name "oldValue", argno {{[0-9]+}}, {{.*}} expr op_deref
     didSet { print("didSet called!") }
   }
 
@@ -20,7 +20,7 @@ let foo = Foo(value: "Hello")
 // Foo.value.setter //
 
 // CHECK-LABEL: sil hidden [ossa] @$s35didset_oldvalue_not_accessed_silgen3FooC5valuexvs : $@convention(method) <T> (@in T, @guaranteed Foo<T>) -> ()
-// CHECK: debug_value_addr [[VALUE:%.*]] : $*T, let, name "value", argno {{[0-9+]}}
+// CHECK: debug_value [[VALUE:%.*]] : $*T, let, name "value", argno {{[0-9+]}}, {{.*}} expr op_deref
 // CHECK-NEXT: debug_value [[SELF:%.*]] : $Foo<T>, let, name "self", argno {{[0-9+]}}
 // CHECK-NEXT: [[ALLOC_STACK:%.*]] = alloc_stack $T
 // CHECK-NEXT: copy_addr [[VALUE]] to [initialization] [[ALLOC_STACK]] : $*T

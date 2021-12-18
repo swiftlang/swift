@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 // FIXME(id-as-any): make Swift errors boxed in NSError eagerly bridged.
 

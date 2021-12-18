@@ -103,12 +103,6 @@ bool TypeRepr::hasOpaque() {
   return findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
 }
 
-/// Standard allocator for TypeReprs.
-void *TypeRepr::operator new(size_t Bytes, const ASTContext &C,
-                             unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
 SourceLoc TypeRepr::findUncheckedAttrLoc() const {
   auto typeRepr = this;
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
@@ -231,6 +225,8 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
 
   if (hasAttr(TAK_async))
     Printer.printSimpleAttr("@async") << " ";
+  if (hasAttr(TAK_opened))
+    Printer.printSimpleAttr("@opened") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,

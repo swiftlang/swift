@@ -301,8 +301,10 @@ class InheritedProtocolCollector {
   static const StringLiteral DummyProtocolName;
 
   using AvailableAttrList = TinyPtrVector<const AvailableAttr *>;
+  using OtherAttrList = TinyPtrVector<const DeclAttribute*>;
   using ProtocolAndAvailability =
-    std::tuple<ProtocolDecl *, AvailableAttrList, bool /*isUnchecked*/>;
+    std::tuple<ProtocolDecl *, AvailableAttrList, bool /*isUnchecked*/,
+    OtherAttrList>;
 
   /// Protocols that will be included by the ASTPrinter without any extra work.
   SmallVector<ProtocolDecl *, 8> IncludedProtocols;
@@ -338,6 +340,17 @@ class InheritedProtocolCollector {
     return cache.getValue();
   }
 
+  static OtherAttrList getOtherAttrList(const Decl *D) {
+    OtherAttrList results;
+    while (D) {
+      for (auto *result: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+        results.push_back(result);
+      }
+      D = D->getDeclContext()->getAsDecl();
+    }
+    return results;
+  }
+
   static bool canPrintProtocolTypeNormally(Type type, const Decl *D) {
     return isPublicOrUsableFromInline(type);
   }
@@ -369,7 +382,8 @@ class InheritedProtocolCollector {
           ExtraProtocols.push_back(
             ProtocolAndAvailability(protoTy->getDecl(),
                                     getAvailabilityAttrs(D, availableAttrs),
-                                    inherited.isUnchecked));
+                                    inherited.isUnchecked,
+                                    getOtherAttrList(D)));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
@@ -389,7 +403,8 @@ class InheritedProtocolCollector {
         ExtraProtocols.push_back(
           ProtocolAndAvailability(conf->getProtocol(),
                                   getAvailabilityAttrs(D, availableAttrs),
-                                  isUncheckedConformance(conf)));
+                                  isUncheckedConformance(conf),
+                                  getOtherAttrList(D)));
       }
     }
   }
@@ -550,6 +565,7 @@ public:
       auto proto = std::get<0>(protoAndAvailability);
       auto availability = std::get<1>(protoAndAvailability);
       auto isUnchecked = std::get<2>(protoAndAvailability);
+      auto otherAttrs = std::get<3>(protoAndAvailability);
       proto->walkInheritedProtocols(
           [&](ProtocolDecl *inherited) -> TypeWalker::Action {
         if (!handledProtocols.insert(inherited).second)
@@ -571,7 +587,8 @@ public:
             conformanceDeclaredInModule(M, nominal, inherited) &&
             !M->isImportedImplementationOnly(inherited->getParentModule())) {
           protocolsToPrint.push_back(
-            ProtocolAndAvailability(inherited, availability, isUnchecked));
+            ProtocolAndAvailability(inherited, availability, isUnchecked,
+                                    otherAttrs));
           return TypeWalker::Action::SkipChildren;
         }
 
@@ -586,6 +603,7 @@ public:
       auto proto = std::get<0>(protoAndAvailability);
       auto availability = std::get<1>(protoAndAvailability);
       auto isUnchecked = std::get<2>(protoAndAvailability);
+      auto otherAttrs = std::get<3>(protoAndAvailability);
 
       bool haveFeatureChecks = printOptions.PrintCompatibilityFeatureChecks &&
         printCompatibilityFeatureChecksPre(printer, proto);
@@ -595,6 +613,7 @@ public:
       attrs.insert(attrs.end(), availability.begin(), availability.end());
       auto spiAttributes = proto->getAttrs().getAttributes<SPIAccessControlAttr>();
       attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
+      attrs.insert(attrs.end(), otherAttrs.begin(), otherAttrs.end());
       DeclAttributes::print(printer, printOptions, attrs);
 
       printer << "extension ";

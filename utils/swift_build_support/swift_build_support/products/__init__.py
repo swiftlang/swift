@@ -10,6 +10,7 @@
 #
 # ----------------------------------------------------------------------------
 
+from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
 from .earlyswiftdriver import EarlySwiftDriver
@@ -26,6 +27,8 @@ from .playgroundsupport import PlaygroundSupport
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
+from .swiftdocc import SwiftDocC
+from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
 from .swiftevolve import SwiftEvolve
 from .swiftformat import SwiftFormat
@@ -36,6 +39,7 @@ from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
 
 __all__ = [
+    'BackDeployConcurrency',
     'CMark',
     'Ninja',
     'Foundation',
@@ -61,4 +65,6 @@ __all__ = [
     'SourceKitLSP',
     'Benchmarks',
     'TSanLibDispatch',
+    'SwiftDocC',
+    'SwiftDocCRender'
 ]

@@ -86,7 +86,7 @@ syn keyword swiftKeyword break case continue default do else for if in static sw
 syn keyword swiftKeyword sil internal thunk skipwhite
 syn keyword swiftKeyword public hidden private shared public_external hidden_external skipwhite
 syn keyword swiftKeyword getter setter allocator initializer enumelt destroyer globalaccessor objc skipwhite
-syn keyword swiftKeyword alloc_global alloc_stack alloc_ref alloc_ref_dynamic alloc_box alloc_existential_box alloc_value_buffer dealloc_stack dealloc_box dealloc_existential_box dealloc_ref dealloc_partial_ref dealloc_value_buffer skipwhite
+syn keyword swiftKeyword alloc_global alloc_stack alloc_ref alloc_ref_dynamic alloc_box alloc_existential_box dealloc_stack dealloc_box dealloc_existential_box dealloc_ref dealloc_partial_ref skipwhite
 syn keyword swiftKeyword debug_value debug_value_addr skipwhite
 syn keyword swiftKeyword load load_unowned store assign mark_uninitialized mark_function_escape copy_addr destroy_addr index_addr index_raw_pointer bind_memory to skipwhite
 syn keyword swiftKeyword strong_retain strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_unowned store_weak fix_lifetime autorelease_value set_deallocating is_unique is_escaping_closure skipwhite
@@ -104,7 +104,7 @@ syn keyword swiftKeyword objc_existential_metatype_to_object objc_metatype_to_ob
 syn keyword swiftKeyword unconditional_checked_cast unconditional_checked_cast_addr unconditional_checked_cast_value skipwhite
 syn keyword swiftKeyword cond_fail skipwhite
 syn keyword swiftKeyword unreachable return throw br cond_br switch_value select_enum select_enum_addr select_value switch_enum switch_enum_addr dynamic_method_br checked_cast_br checked_cast_value_br checked_cast_addr_br skipwhite
-syn keyword swiftKeyword project_box project_existential_box project_value_buffer project_block_storage init_block_storage_header copy_block mark_dependence skipwhite
+syn keyword swiftKeyword project_box project_existential_box project_block_storage init_block_storage_header copy_block mark_dependence skipwhite
 
 syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 syn region swiftTypeAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftTypeName

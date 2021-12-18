@@ -48,18 +48,27 @@ void executePassPipelinePlan(SILModule *SM, const SILPassPipelinePlan &plan,
 class LibswiftPassInvocation {
   /// Backlink to the pass manager.
   SILPassManager *passManager;
-  
+
+  /// The currently optimized function.
+  SILFunction *function = nullptr;
+
   /// Non-null if this is an instruction pass, invoked from SILCombine.
-  SILCombiner *silCombiner;
+  SILCombiner *silCombiner = nullptr;
 
   /// All slabs, allocated by the pass.
   SILModule::SlabList allocatedSlabs;
 
 public:
-  LibswiftPassInvocation(SILPassManager *passManager, SILCombiner *silCombiner) :
-    passManager(passManager), silCombiner(silCombiner) {}
+  LibswiftPassInvocation(SILPassManager *passManager, SILFunction *function,
+                         SILCombiner *silCombiner) :
+    passManager(passManager), function(function), silCombiner(silCombiner) {}
+
+  LibswiftPassInvocation(SILPassManager *passManager) :
+    passManager(passManager) {}
 
   SILPassManager *getPassManager() const { return passManager; }
+
+  SILFunction *getFunction() const { return function; }
 
   FixedSizeSlab *allocSlab(FixedSizeSlab *afterSlab);
 
@@ -70,6 +79,9 @@ public:
 
   /// Called by the pass when changes are made to the SIL.
   void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);
+
+  /// Called by the pass manager before the pass starts running.
+  void startPassRun(SILFunction *function);
 
   /// Called by the pass manager when the pass has finished.
   void finishedPassRun();

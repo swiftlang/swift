@@ -250,6 +250,46 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     return &pbe;
   }
 
+  llvm::SmallVector<VarDecl *, 2> vars;
+  binding->getPattern(entryNumber)->collectVariables(vars);
+  bool isReq = false;
+  if (auto *d = binding->getDeclContext()->getAsDecl()) {
+    isReq = isa<ProtocolDecl>(d);
+  }
+  for (auto *sv: vars) {
+    bool hasConst = sv->getAttrs().getAttribute<CompileTimeConstAttr>();
+    if (!hasConst)
+      continue;
+    bool hasStatic = StaticSpelling != StaticSpellingKind::None;
+    // only static _const let/var is supported
+    if (!hasStatic) {
+      binding->diagnose(diag::require_static_for_const);
+      continue;
+    }
+    if (isReq) {
+      continue;
+    }
+    auto varSourceFile = binding->getDeclContext()->getParentSourceFile();
+    auto isVarInInterfaceFile =
+        varSourceFile && varSourceFile->Kind == SourceFileKind::Interface;
+    // Don't diagnose too strictly for textual interfaces.
+    if (isVarInInterfaceFile) {
+      continue;
+    }
+    // var is only allowed in a protocol.
+    if (!sv->isLet()) {
+      binding->diagnose(diag::require_let_for_const);
+    }
+    // Diagnose when an init isn't given and it's not a compile-time constant
+    if (auto *init = binding->getInit(entryNumber)) {
+      if (!init->isSemanticallyConstExpr()) {
+        binding->diagnose(diag::require_const_initializer_for_const);
+      }
+    } else {
+      binding->diagnose(diag::require_const_initializer_for_const);
+    }
+  }
+
   // If we have a type but no initializer, check whether the type is
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
@@ -265,6 +305,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // If the pattern contains some form of unresolved type, we'll need to
   // check the initializer.
   if (patternType->hasUnresolvedType() ||
+      patternType->hasPlaceholder() ||
       patternType->hasUnboundGenericType()) {
     if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
                                              patternType)) {
@@ -296,8 +337,6 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // If the pattern binding appears in a type or library file context, then
   // it must bind at least one variable.
   if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
-    llvm::SmallVector<VarDecl *, 2> vars;
-    binding->getPattern(entryNumber)->collectVariables(vars);
     if (vars.empty()) {
       // Selector for error message.
       enum : unsigned {
@@ -544,11 +583,10 @@ static bool doesAccessorHaveBody(AccessorDecl *accessor) {
   return true;
 }
 
-
-/// Build a reference to the subscript index variables for this subscript
-/// accessor.
-static Expr *buildSubscriptIndexReference(ASTContext &ctx,
-                                          AccessorDecl *accessor) {
+/// Build an argument list referencing the subscript parameters for this
+/// subscript accessor.
+static ArgumentList *buildSubscriptArgumentList(ASTContext &ctx,
+                                                AccessorDecl *accessor) {
   // Pull out the body parameters, which we should have cloned
   // previously to be forwardable.  Drop the initial buffer/value
   // parameter in accessors that have one.
@@ -560,8 +598,8 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx,
     params = params.slice(1);
   }
 
-  // Okay, everything else should be forwarded, build the expression.
-  return buildArgumentForwardingExpr(params, ctx);
+  // Okay, everything else should be forwarded, build the argument list.
+  return buildForwardingArgumentList(params, ctx);
 }
 
 namespace {
@@ -918,22 +956,24 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     Expr *propertyKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
     propertyKeyPath = UnresolvedDotExpr::createImplicit(ctx, propertyKeyPath,
         enclosingSelfAccess->accessedProperty->getName());
-    propertyKeyPath = new (ctx) KeyPathExpr(
-        SourceLoc(), nullptr, propertyKeyPath, /*hasLeadingDot=*/true);
+    propertyKeyPath = KeyPathExpr::createImplicit(
+        ctx, /*backslashLoc*/ SourceLoc(), /*parsedRoot*/ nullptr,
+        propertyKeyPath, /*hasLeadingDot*/ true);
 
     // Key path referring to the backing storage property.
     Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
     storageKeyPath = UnresolvedDotExpr::createImplicit(ctx, storageKeyPath,
                                                        storage->getName());
-    storageKeyPath = new (ctx) KeyPathExpr(SourceLoc(), nullptr, storageKeyPath,
-                                           /*hasLeadingDot=*/true);
+    storageKeyPath = KeyPathExpr::createImplicit(
+        ctx, /*backslashLoc*/ SourceLoc(), /*parsedRoot*/ nullptr,
+        storageKeyPath, /*hasLeadingDot*/ true);
     Expr *args[3] = {selfDRE, propertyKeyPath, storageKeyPath};
 
-    SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
-    lookupExpr = SubscriptExpr::create(
-        ctx, wrapperMetatype, SourceLoc(), args,
-        subscriptDecl->getName().getArgumentNames(), { }, SourceLoc(),
-        /*trailingClosures=*/{}, subscriptDecl, /*Implicit=*/true);
+    auto *subscriptDecl = enclosingSelfAccess->subscript;
+    auto argList =
+        ArgumentList::forImplicitCallTo(subscriptDecl->getIndices(), args, ctx);
+    lookupExpr = SubscriptExpr::create(ctx, wrapperMetatype, argList,
+                                       subscriptDecl, /*Implicit=*/true);
 
     // FIXME: Since we're not resolving overloads or anything, we should be
     // building fully type-checked AST above; we already have all the
@@ -953,8 +993,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       }
     }
   } else if (isa<SubscriptDecl>(storage)) {
-    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
-    lookupExpr = SubscriptExpr::create(ctx, selfDRE, indices, memberRef,
+    auto *argList = buildSubscriptArgumentList(ctx, accessor);
+    lookupExpr = SubscriptExpr::create(ctx, selfDRE, argList, memberRef,
                                        /*IsImplicit=*/true, semantics);
 
     if (selfAccessKind == SelfAccessorKind::Super)
@@ -1082,7 +1122,9 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
   Nil->setType(copyMethodType->getParams()[0].getParameterType());
 
-  auto *Call = CallExpr::createImplicit(Ctx, DSCE, { Nil }, { Ctx.Id_with });
+  auto *argList =
+      ArgumentList::forImplicitCallTo(copyMethod->getParameters(), {Nil}, Ctx);
+  auto *Call = CallExpr::createImplicit(Ctx, DSCE, argList);
   Call->setType(copyMethodType->getResult());
   Call->setThrows(false);
 
@@ -1570,7 +1612,8 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
 
     CallExpr *Call = nullptr;
     if (arg) {
-      Call = CallExpr::createImplicit(Ctx, Callee, {ValueDRE}, {Identifier()});
+      auto *argList = ArgumentList::forImplicitUnlabeled(Ctx, {ValueDRE});
+      Call = CallExpr::createImplicit(Ctx, Callee, argList);
     } else {
       Call = CallExpr::createImplicitEmpty(Ctx, Callee);
     }
@@ -2872,16 +2915,17 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
         && parentPBD->isDefaultInitializable(patternNumber)
         && !wrapperInfo.defaultInit) {
       auto ty = parentPBD->getPattern(patternNumber)->getType();
-      if (auto defaultInit = TypeChecker::buildDefaultInitializer(ty))
-        parentPBD->setInit(patternNumber, defaultInit);
-    }
-
-    if (parentPBD->isInitialized(patternNumber) &&
-        !parentPBD->isInitializerChecked(patternNumber)) {
-      TypeChecker::typeCheckPatternBinding(parentPBD, patternNumber);
+      if (auto defaultInit = TypeChecker::buildDefaultInitializer(ty)) {
+        typeCheckSynthesizedWrapperInitializer(var, defaultInit);
+        parentPBD->setInit(0, defaultInit);
+        parentPBD->setInitializerChecked(0);
+      }
     }
 
     if ((initializer = parentPBD->getInit(patternNumber))) {
+      assert(parentPBD->isInitializerChecked(0) &&
+             "Initializer should to be type-checked");
+
       pbd->setInit(0, initializer);
       pbd->setInitializerChecked(0);
       wrappedValue = findWrappedValuePlaceholder(initializer);
@@ -3246,6 +3290,27 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
       return classifyWithHasStorageAttr(var);
     }
+  }
+
+  // Handle protocol requirements specially.
+  if (isa<ProtocolDecl>(storage->getDeclContext())) {
+    ReadImplKind readImpl = ReadImplKind::Stored;
+    // By default, treat the requirement as not having a setter.
+    WriteImplKind writeImpl = WriteImplKind::Immutable;
+    ReadWriteImplKind readWriteImpl = ReadWriteImplKind::Immutable;
+
+    if (storage->getParsedAccessor(AccessorKind::Set)) {
+      readImpl = ReadImplKind::Get;
+      writeImpl = WriteImplKind::Set;
+      readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+    } else if (storage->getParsedAccessor(AccessorKind::Get)) {
+      readImpl = ReadImplKind::Get;
+    }
+
+    StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
+    finishStorageImplInfo(storage, info);
+
+    return info;
   }
 
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);

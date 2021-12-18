@@ -1,0 +1,57 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-experimental-lexical-lifetimes %s -mem2reg | %FileCheck %s
+
+import Builtin
+import Swift
+
+class C {}
+
+sil [ossa] @_Ts5printFT3valSi_T_ : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: sil [ossa] @liveness0 :
+// CHECK-NOT: alloc_stack
+sil [ossa] @liveness0 : $@convention(thin) (@owned C, @owned C, @owned C, @owned C) -> () {
+bb0(%instance_1 : @owned $C, %instance_2 : @owned $C, %instance_3 : @owned $C, %instance_4 : @owned $C):
+  %addr_x = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr_x : $*C
+  cond_br undef, bb1, bb5
+
+bb1:
+  %addr_y = alloc_stack [lexical] $C
+  store %instance_2 to [init] %addr_y : $*C
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_value %instance_4 : $C
+  store %instance_3 to [assign] %addr_y : $*C
+  br bb4
+
+bb3:
+  destroy_value %instance_3 : $C
+  store %instance_4 to [assign] %addr_y : $*C
+  br bb4
+
+bb4:
+  // function_ref
+  %print = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (@guaranteed C) -> ()
+  %26 = load [take] %addr_y : $*C
+  %36 = apply %print(%26) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %26 : $C
+  dealloc_stack %addr_y : $*C
+  br bb6
+
+bb5:
+  destroy_value %instance_2 : $C
+  destroy_value %instance_3 : $C
+  destroy_value %instance_4 : $C
+  br bb6
+
+// We don't need a PHI node here because the value is dead!
+// CHECK: bb5:
+bb6:
+  destroy_addr %addr_x : $*C
+  dealloc_stack %addr_x : $*C
+  %40 = tuple ()
+  return %40 : $()
+}
+// CHECK-LABEL: } // end sil function 'liveness0'
+

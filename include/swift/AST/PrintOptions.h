@@ -235,6 +235,10 @@ struct PrintOptions {
   /// Whether to print unavailable parts of the AST.
   bool SkipUnavailable = false;
 
+  /// Whether to print synthesized extensions created by '@_nonSendable', even
+  /// if SkipImplicit or SkipUnavailable is set.
+  bool AlwaysPrintNonSendableExtensions = true;
+
   bool SkipSwiftPrivateClangDecls = false;
 
   /// Whether to skip internal stdlib declarations.
@@ -477,6 +481,10 @@ struct PrintOptions {
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
 
+  /// Whether to print @_specialize attributes that have an availability
+  /// parameter.
+  bool PrintSpecializeAttributeWithAvailability = true;
+
   /// \see ShouldQualifyNestedDeclarations
   enum class QualifyNestedDeclarations {
     Never,
@@ -663,6 +671,7 @@ struct PrintOptions {
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;
     PO.PrintParameterSpecifiers = true;
     PO.SkipImplicit = true;
+    PO.AlwaysPrintNonSendableExtensions = false;
     PO.AlwaysTryPrintParameterLabels = true;
     return PO;
   }

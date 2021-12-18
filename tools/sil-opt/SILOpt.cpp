@@ -31,6 +31,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "llvm/ADT/Statistic.h"
@@ -103,6 +104,20 @@ DisableObjCInterop("disable-objc-interop",
 static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
+
+static llvm::cl::opt<bool> EnableExperimentalLexicalLifetimes(
+    "enable-experimental-lexical-lifetimes",
+    llvm::cl::desc("Enable experimental lexical lifetimes. Mutually exclusive "
+                   "with disable-lexical-lifetimes."));
+
+static llvm::cl::opt<bool> DisableLexicalLifetimes(
+    "disable-lexical-lifetimes",
+    llvm::cl::desc("Disable the default early lexical lifetimes. Mutually "
+                   "exclusive with enable-experimental-lexical-lifetimes"));
+
+static llvm::cl::opt<bool>
+EnableExperimentalMoveOnly("enable-experimental-move-only",
+                   llvm::cl::desc("Enable experimental distributed actors."));
 
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
@@ -240,6 +255,9 @@ EmitVerboseSIL("emit-verbose-sil",
 
 static llvm::cl::opt<bool>
 EmitSIB("emit-sib", llvm::cl::desc("Emit serialized AST + SIL file(s)"));
+
+static llvm::cl::opt<bool>
+Serialize("serialize", llvm::cl::desc("Emit serialized AST + SIL file(s)"));
 
 static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
@@ -415,6 +433,10 @@ int main(int argc, char **argv) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     EnableExperimentalConcurrency;
+  Invocation.getLangOptions().EnableExperimentalDistributed =
+    EnableExperimentalDistributed;
+  Invocation.getLangOptions().EnableExperimentalMoveOnly =
+    EnableExperimentalMoveOnly;
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
@@ -467,6 +489,7 @@ int main(int argc, char **argv) {
   SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
   SILOpts.OptRecordFile = RemarksFilename;
   SILOpts.OptRecordPasses = RemarksPasses;
+  SILOpts.checkSILModuleLeaks = true;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
@@ -502,6 +525,23 @@ int main(int argc, char **argv) {
   SILOpts.EnableOSSAModules = EnableOSSAModules;
   SILOpts.EnableCopyPropagation = EnableCopyPropagation;
   SILOpts.DisableCopyPropagation = DisableCopyPropagation;
+
+  // Enable lexical lifetimes if it is set or if experimental move only is
+  // enabled. This is because move only depends on lexical lifetimes being
+  // enabled and it saved some typing ; ).
+  bool enableExperimentalLexicalLifetimes =
+      EnableExperimentalLexicalLifetimes | EnableExperimentalMoveOnly;
+  if (enableExperimentalLexicalLifetimes && DisableLexicalLifetimes) {
+    fprintf(
+        stderr,
+        "Error! Can not specify both -enable-experimental-lexical-lifetimes "
+        "and -disable-lexical-lifetimes!\n");
+    exit(-1);
+  }
+  if (enableExperimentalLexicalLifetimes)
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+  if (DisableLexicalLifetimes)
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::Off;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -603,7 +643,7 @@ int main(int argc, char **argv) {
   }
   }
 
-  if (EmitSIB) {
+  if (EmitSIB || Serialize) {
     llvm::SmallString<128> OutputFile;
     if (OutputFilename.size()) {
       OutputFile = OutputFilename;
@@ -619,10 +659,12 @@ int main(int argc, char **argv) {
 
     SerializationOptions serializationOpts;
     serializationOpts.OutputPath = OutputFile.c_str();
-    serializationOpts.SerializeAllSIL = true;
-    serializationOpts.IsSIB = true;
+    serializationOpts.SerializeAllSIL = EmitSIB;
+    serializationOpts.IsSIB = EmitSIB;
 
-    serialize(CI.getMainModule(), serializationOpts, SILMod.get());
+    symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
+
+    serialize(CI.getMainModule(), serializationOpts, symbolGraphOptions, SILMod.get());
   } else {
     const StringRef OutputFile = OutputFilename.size() ?
                                    StringRef(OutputFilename) : "-";
@@ -633,7 +675,7 @@ int main(int argc, char **argv) {
       SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !DisableASTDump);
     } else {
       std::error_code EC;
-      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
+      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::OF_None);
       if (EC) {
         llvm::errs() << "while opening '" << OutputFile << "': "
                      << EC.message() << '\n';

@@ -76,12 +76,16 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
       swift_Concurrency${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
 
-    if(NOT "${SWIFT_PRIMARY_VARIANT_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
+    if(NOT "${SWIFT_PRIMARY_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
       list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
         dispatch${SWIFT_PRIMARY_VARIANT_SUFFIX}
         BlocksRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}
         )
     endif()
+  endif()
+
+  if(NOT SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+    list(APPEND PLATFORM_SOURCES Mutex.cpp)
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
@@ -98,7 +102,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     weak.mm
     Refcounting.mm
     Actor.cpp
-    TaskStatus.cpp)
+    TaskStatus.cpp
+    Mutex.cpp)
 
   add_swift_unittest(SwiftRuntimeTests
     Array.cpp
@@ -106,7 +111,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     CompatibilityOverrideConcurrency.cpp
     Concurrent.cpp
     Metadata.cpp
-    Mutex.cpp
     Enum.cpp
     Refcounting.cpp
     Stdlib.cpp

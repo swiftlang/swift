@@ -191,7 +191,7 @@ bb0(%0 : $*Optional<T>):
   %1 = load_borrow %0 : $*Optional<T>
   switch_enum %1 : $Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
-bb1(%3 : $T):
+bb1(%3 : @guaranteed $T):
   end_borrow %1 : $Optional<T>
   %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
   br bb3
@@ -538,3 +538,101 @@ bb0(%0 : $Bool):
   %10 = tuple ()
   return %10 : $()
 }
+
+// MemoryLifetimeVerifier does not detect an error here due to reborrows
+sil [ossa] @test_load_borrow1 : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  destroy_addr %0 : $*Optional<T>
+  %1 = load_borrow %0 : $*Optional<T>
+  br bb1(%1 : $Optional<T>)
+
+bb1(%3 : @guaranteed $Optional<T>):
+  end_borrow %3 : $Optional<T>
+  br bb2
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_load_borrow2: memory is not initialized, but should
+sil [ossa] @test_load_borrow2 : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  destroy_addr %0 : $*Optional<T>
+  %1 = load_borrow %0 : $*Optional<T>
+  end_borrow %1 : $Optional<T>
+  br bb1
+
+bb1:
+  %r = tuple ()
+  return %r : $()
+}
+
+enum Result<T1, T2>{
+  case success(T1)
+  case failure(T2)
+}
+
+sil @try_get_error : $@convention(thin) () -> @error Error
+
+// CHECK: SIL memory lifetime failure in @test_init_enum_trivial_case: memory is not initialized, but should
+sil [ossa] @test_init_enum_trivial_case : $@convention(thin) () -> @error Error {
+bb0:
+  %0 = alloc_stack $Result<Int, Error>
+  %1 = function_ref @try_get_error : $@convention(thin) () -> @error Error
+  try_apply %1() : $@convention(thin) () -> @error Error, normal bb1, error bb2
+
+bb1(%3 : $()):
+  inject_enum_addr %0 : $*Result<Int, Error>, #Result.success!enumelt
+  br bb3
+
+
+bb2(%7 : @owned $Error):
+  %8 = init_enum_data_addr %0 : $*Result<Int, Error>, #Result.failure!enumelt
+  store %7 to [init] %8 : $*Error
+  inject_enum_addr %0 : $*Result<Int, Error>, #Result.failure!enumelt
+  br bb3
+
+bb3:
+  %12 = load [take] %0 : $*Result<Int, Error>
+  destroy_value %12 : $Result<Int, Error>
+  dealloc_stack %0 : $*Result<Int, Error>
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_double_enum_destroy: memory is not initialized, but should
+sil [ossa] @test_double_enum_destroy : $@convention(thin) (@in Optional<String>) -> () {
+bb0(%0 : $*Optional<String>):
+  %l = load_borrow %0 : $*Optional<String>
+  switch_enum %l : $Optional<String>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2 
+
+bb1(%a : @guaranteed $String):
+  end_borrow %l : $Optional<String>
+  %2 = load [take] %0 : $*Optional<String>
+  destroy_value %2 : $Optional<String>
+  br bb3 
+
+bb2:
+  end_borrow %l : $Optional<String>
+  %3 = load [take] %0 : $*Optional<String>
+  destroy_value %3 : $Optional<String>
+  %4 = load [take] %0 : $*Optional<String>
+  destroy_value %4 : $Optional<String>
+  br bb3 
+
+bb3:
+  %r = tuple ()
+  return %r : $() 
+}
+
+// CHECK: SIL memory lifetime failure in @test_destroy_enum_before_return: indirect argument is not alive at function return
+sil [ossa] @test_destroy_enum_before_return : $@convention(thin) () -> @out Optional<String> {
+bb0(%0 : $*Optional<String>):
+  %1 = enum $Optional<String>, #Optional.none!enumelt
+  store %1 to [trivial] %0 : $*Optional<String>
+  destroy_addr %0 : $*Optional<String>
+  %r = tuple ()
+  return %r : $() 
+}
+

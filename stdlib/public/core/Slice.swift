@@ -309,7 +309,7 @@ extension Slice: MutableCollection where Base: MutableCollection {
         _precondition(
           slice.baseAddress == copy.baseAddress &&
           slice.count == copy.count,
-          "Slice.withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+          "Slice.withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed")
       }
       return try body(&slice)
     }

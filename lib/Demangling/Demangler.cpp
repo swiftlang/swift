@@ -14,11 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/Compiler.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingUtils.h"
+#include "DemanglerAssert.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 using namespace swift;
 using namespace Mangle;
@@ -87,6 +91,15 @@ static bool isRequirement(Node::Kind kind) {
 // Public utility functions    //
 //////////////////////////////////
 
+LLVM_ATTRIBUTE_NORETURN void swift::Demangle::failAssert(const char *file,
+                                                         unsigned line,
+                                                         NodePointer node,
+                                                         const char *expr) {
+  fprintf(stderr, "%s:%u: assertion failed for Node %p: %s", file, line, node,
+          expr);
+  abort();
+}
+
 bool swift::Demangle::isContext(Node::Kind kind) {
   switch (kind) {
 #define NODE(ID)
@@ -119,6 +132,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::OutlinedVariable:
     case Node::Kind::OutlinedBridgedMethod:
     case Node::Kind::MergedFunction:
+    case Node::Kind::DistributedThunk:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -531,10 +545,12 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
   DemangleInitRAII state(*this, MangledName,
                          std::move(SymbolicReferenceResolver));
 
+#if SWIFT_SUPPORT_OLD_MANGLING
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
   if (nextIf("_Tt"))
     return demangleOldSymbolAsNode(Text, *this);
+#endif
 
   unsigned PrefixLength = getManglingPrefixLength(MangledName);
   if (PrefixLength == 0)
@@ -782,6 +798,18 @@ recur:
       case 'p':
         return createWithChild(
             Node::Kind::ProtocolConformanceRefInProtocolModule, popProtocol());
+
+      // Runtime records (type/protocol/conformance)
+      case 'c':
+        return createWithChild(Node::Kind::ProtocolConformanceDescriptorRecord,
+                               popProtocolConformance());
+      case 'n':
+        return createWithPoppedType(Node::Kind::NominalTypeDescriptorRecord);
+      case 'o': // XXX
+        return createWithChild(Node::Kind::OpaqueTypeDescriptorRecord, popNode());
+      case 'r':
+        return createWithChild(Node::Kind::ProtocolDescriptorRecord, popProtocol());
+
       default:
         pushBack();
         pushBack();
@@ -975,7 +1003,7 @@ NodePointer Demangler::createStandardSubstitution(
     return createSwiftType(Node::Kind::KIND, #TYPENAME);          \
   }
 
-#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)                   \
+#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                   \
   if (SecondLevel && Subst == #MANGLING[0]) {                    \
     return createSwiftType(Node::Kind::KIND, #TYPENAME);          \
   }
@@ -1658,6 +1686,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
+    case Node::Kind::Static:
       return false;
     default:
       return true;
@@ -2333,6 +2362,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'O': return createNode(Node::Kind::NonObjCAttribute);
     case 'D': return createNode(Node::Kind::DynamicAttribute);
     case 'd': return createNode(Node::Kind::DirectMethodReferenceAttribute);
+    case 'E': return createNode(Node::Kind::DistributedThunk);
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
     case 'm': return createNode(Node::Kind::MergedFunction);

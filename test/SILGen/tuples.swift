@@ -144,7 +144,7 @@ extension P {
   // CHECK-LABEL: sil [ossa] @$s6tuples1PPAAE12immutableUse5tupleyAA1CC5index_x5valuet_tFZ
   // CHECK: bb0([[TUP0:%.*]] : @guaranteed $C, [[TUP1:%.*]] : $*Self
   // Allocate space for the RValue.
-  // CHECK:   [[RVALUE:%.*]] = alloc_stack $(index: C, value: Self), let, name "tuple"
+  // CHECK:   [[RVALUE:%.*]] = alloc_stack [lexical] $(index: C, value: Self), let, name "tuple"
   //
   // Initialize the RValue. (This is here to help pattern matching).
   // CHECK:   [[ZERO_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 0
@@ -191,22 +191,22 @@ public func testTupleAssign(x: inout [Int]) {
 // CHECK:     [[X:%.*]] = copy_value %0 : $C
 // CHECK:     [[Z:%.*]] = copy_value %2 : $String
 // CHECK:     [[INPUT:%.*]] = tuple $(x: C, y: Int, z: String) ([[X]], %1, [[Z]])
-// CHECK:     [[OUTPUT:%.*]] = alloc_stack $(y: Optional<Int>, z: Any, x: AnyObject)
-// CHECK:     [[INPUT_BORROW:%.*]] = begin_borrow [[INPUT]] : $(x: C, y: Int, z: String)
+// CHECK:     [[INPUT_BORROW:%.*]] = begin_borrow [lexical] [[INPUT]] : $(x: C, y: Int, z: String)
+// CHECK:     [[OUTPUT:%.*]] = alloc_stack [lexical] $(y: Optional<Int>, z: Any, x: AnyObject)
 // CHECK:     [[INPUT_COPY:%.*]] = copy_value [[INPUT_BORROW]] : $(x: C, y: Int, z: String)
 // CHECK:     ([[X:%.*]], [[Y:%.*]], [[Z:%.*]]) = destructure_tuple %12 : $(x: C, y: Int, z: String)
-// CHECK:     [[Y_ADDR:%.*]] = tuple_element_addr %10 : $*(y: Optional<Int>, z: Any, x: AnyObject), 0
-// CHECK:     [[Z_ADDR:%.*]] = tuple_element_addr %10 : $*(y: Optional<Int>, z: Any, x: AnyObject), 1
-// CHECK:     [[X_ADDR:%.*]] = tuple_element_addr %10 : $*(y: Optional<Int>, z: Any, x: AnyObject), 2
+// CHECK:     [[Y_ADDR:%.*]] = tuple_element_addr [[OUTPUT]] : $*(y: Optional<Int>, z: Any, x: AnyObject), 0
+// CHECK:     [[Z_ADDR:%.*]] = tuple_element_addr [[OUTPUT]] : $*(y: Optional<Int>, z: Any, x: AnyObject), 1
+// CHECK:     [[X_ADDR:%.*]] = tuple_element_addr [[OUTPUT]] : $*(y: Optional<Int>, z: Any, x: AnyObject), 2
 // CHECK:     [[NEW_Y:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, %14 : $Int
 // CHECK:     store [[NEW_Y]] to [trivial] [[Y_ADDR]] : $*Optional<Int>
 // CHECK:     [[NEW_Z:%.*]] = init_existential_addr [[Z_ADDR]] : $*Any, $String
 // CHECK:     store [[Z]] to [init] [[NEW_Z]] : $*String
 // CHECK:     [[NEW_X:%.*]] = init_existential_ref [[X]] : $C : $C, $AnyObject
 // CHECK:     store [[NEW_X]] to [init] [[X_ADDR]] : $*AnyObject
-// CHECK:     end_borrow [[INPUT_BORROW]] : $(x: C, y: Int, z: String)
 // CHECK:     destroy_addr [[OUTPUT]] : $*(y: Optional<Int>, z: Any, x: AnyObject)
 // CHECK:     dealloc_stack [[OUTPUT]] : $*(y: Optional<Int>, z: Any, x: AnyObject)
+// CHECK:     end_borrow [[INPUT_BORROW]] : $(x: C, y: Int, z: String)
 // CHECK:     destroy_value [[INPUT]] : $(x: C, y: Int, z: String)
 
 public func testTupleSubtype(x: C, y: Int, z: String) {

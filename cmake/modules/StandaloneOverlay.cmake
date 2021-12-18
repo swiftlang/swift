@@ -73,6 +73,9 @@ option(SWIFT_ENABLE_MODULE_INTERFACES
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
   "Build type for the Swift standard library and SDK overlays.")
 
+file(STRINGS "../../utils/availability-macros.def" SWIFT_STDLIB_AVAILABILITY_DEFINITIONS)
+list(FILTER SWIFT_STDLIB_AVAILABILITY_DEFINITIONS EXCLUDE REGEX "^\\s*(#.*)?$")
+
 set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
   "Semicolon-separated list of architectures to configure on Darwin platforms. \
 If left empty all default architectures are configured.")
@@ -82,6 +85,9 @@ set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
 targets on Darwin platforms. These targets are in addition to the full \
 library targets.")
 
+option(SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS
+       "Build stdlib with fast-path context descriptor lookups based on well-known short manglings."
+       TRUE)
 
 # -----------------------------------------------------------------------------
 # Constants
@@ -90,7 +96,7 @@ set(CMAKE_INSTALL_PREFIX
   "${SWIFT_DEST_ROOT}${TOOLCHAIN_DIR}/usr")
 
 
-set(SWIFT_APPLE_PLATFORMS
+set(SWIFT_DARWIN_PLATFORMS
   OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR)
 
 # Flags used to indicate we are building a standalone overlay.

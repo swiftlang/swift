@@ -1,0 +1,13 @@
+# REQUIRES: standalone_build
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --verbose-build --dry-run --cmake %cmake 2>&1 | %FileCheck %s
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --verbose-build --dry-run --cmake %cmake --infer 2>&1 | %FileCheck %s
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --verbose-build --dry-run --cmake %cmake --infer --swiftpm 2>&1 | %FileCheck %s
+
+# Make sure we run the merged hosts lipo step regardless of whether or not we
+# are building anything from the 2nd build-script-impl phase with or without
+# infer.
+
+# CHECK: --only-execute merged-hosts-lipo

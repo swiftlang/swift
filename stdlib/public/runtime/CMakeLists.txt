@@ -53,6 +53,7 @@ set(swift_runtime_sources
     ImageInspectionELF.cpp
     ImageInspectionCOFF.cpp
     ImageInspectionStatic.cpp
+    ImageInspectionWasm.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
     Metadata.cpp
@@ -228,7 +229,7 @@ foreach(sdk ${SWIFT_SDKS})
       endif()
       set(libpthread -lpthread)
       set(android_libraries)
-      if(sdk STREQUAL ANDROID)
+      if(${sdk} STREQUAL ANDROID)
         set(android_libraries -llog)
         set(libpthread)
       endif()

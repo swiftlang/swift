@@ -71,6 +71,7 @@ void SwitchEnumBuilder::emit() && {
       subjectExprOperand.getType().isAddressOnly(builder.getFunction()) &&
       getSGF().silConv.useLoweredAddresses();
   using DeclBlockPair = std::pair<EnumElementDecl *, SILBasicBlock *>;
+  SwitchEnumInst *switchEnum = nullptr;
   {
     // TODO: We could store the data in CaseBB form and not have to do this.
     llvm::SmallVector<DeclBlockPair, 8> caseBlocks;
@@ -101,9 +102,9 @@ void SwitchEnumBuilder::emit() && {
           subjectExprOperand = builder.createLoadCopy(loc, subjectExprOperand);
         }
       }
-      builder.createSwitchEnum(loc, subjectExprOperand.forward(getSGF()),
-                               defaultBlock, caseBlocks, caseBlockCountsRef,
-                               defaultBlockCount);
+      switchEnum = builder.createSwitchEnum(
+          loc, subjectExprOperand.forward(getSGF()), defaultBlock, caseBlocks,
+          caseBlockCountsRef, defaultBlockCount);
     }
   }
 
@@ -122,7 +123,9 @@ void SwitchEnumBuilder::emit() && {
     builder.emitBlock(defaultBlock);
     ManagedValue input = subjectExprOperand;
     if (!isAddressOnly) {
-      input = builder.createOwnedPhiArgument(subjectExprOperand.getType());
+      /// Produces an invalid ManagedValue for a no-payload unique default case.
+      input = ManagedValue::forForwardedRValue(
+          getSGF(), switchEnum->createDefaultResult());
     }
     handler(input, std::move(presentScope));
     builder.clearInsertionPoint();
@@ -137,6 +140,11 @@ void SwitchEnumBuilder::emit() && {
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
                                     CleanupLocation(loc), branchDest);
+    // Begin a new binding scope, which is popped when the next innermost debug
+    // scope ends. The cleanup location loc isn't the perfect source location
+    // but it's close enough.
+    builder.getSILGenFunction().enterDebugScope(loc,
+                                                /*isBindingScope=*/true);
 
     builder.emitBlock(caseBlock);
 
@@ -147,7 +155,7 @@ void SwitchEnumBuilder::emit() && {
           decl, builder.getModule(), builder.getFunction());
       input = subjectExprOperand;
       if (!isAddressOnly) {
-        input = builder.createOwnedPhiArgument(inputType);
+        input = builder.createForwardedTermResult(inputType);
       }
     }
     handler(input, std::move(presentScope));
@@ -168,7 +176,9 @@ void SwitchEnumBuilder::emit() && {
     builder.emitBlock(defaultBlock);
     ManagedValue input = subjectExprOperand;
     if (!isAddressOnly) {
-      input = builder.createOwnedPhiArgument(subjectExprOperand.getType());
+      /// Produces an invalid ManagedValue for a no-payload unique default case.
+      input = ManagedValue::forForwardedRValue(
+          getSGF(), switchEnum->createDefaultResult());
     }
     handler(input, std::move(presentScope));
     builder.clearInsertionPoint();

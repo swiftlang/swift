@@ -347,7 +347,7 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
     // CHECK: [[YES]]:
     guard case .Nil = tree else { return }
 
-    // CHECK:   [[X:%.*]] = alloc_stack $T
+    // CHECK:   [[X:%.*]] = alloc_stack [lexical] $T
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   switch_enum [[ARG_COPY]] : $TreeA<T>, case #TreeA.Leaf!enumelt: [[YES:bb[0-9]+]], default [[NO2:bb[0-9]+]]
     // CHECK: [[YES]]([[BOX:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <T>):
@@ -383,7 +383,7 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
     // CHECK:   br
     if case .Nil = tree { }
 
-    // CHECK:   [[X:%.*]] = alloc_stack $T
+    // CHECK:   [[X:%.*]] = alloc_stack [lexical] $T
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   switch_enum [[ARG_COPY]] : $TreeA<T>, case #TreeA.Leaf!enumelt: [[YES:bb[0-9]+]], default [[NO5:bb[0-9]+]]
     // CHECK: [[NO5]]([[ORIGINAL_VALUE:%.*]] : @owned $TreeA<T>):
@@ -429,7 +429,7 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
     // CHECK:   destroy_addr [[TMP1]]
     guard case .Nil = tree else { return }
 
-    // CHECK:   [[X:%.*]] = alloc_stack $T
+    // CHECK:   [[X:%.*]] = alloc_stack [lexical] $T
     // CHECK:   copy_addr %0 to [initialization] [[TMP2:%.*]] :
     // CHECK:   switch_enum_addr [[TMP2]] : $*TreeB<T>, case #TreeB.Leaf!enumelt: [[YES:bb[0-9]+]], default [[NO2:bb[0-9]+]]
     // CHECK: [[YES]]:
@@ -438,8 +438,8 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
     // CHECK:   dealloc_stack [[TMP2]]
     guard case .Leaf(let x) = tree else { return }
 
-    // CHECK:   [[L:%.*]] = alloc_stack $TreeB
-    // CHECK:   [[R:%.*]] = alloc_stack $TreeB
+    // CHECK:   [[L:%.*]] = alloc_stack [lexical] $TreeB
+    // CHECK:   [[R:%.*]] = alloc_stack [lexical] $TreeB
     // CHECK:   copy_addr %0 to [initialization] [[TMP3:%.*]] :
     // CHECK:   switch_enum_addr [[TMP3]] : $*TreeB<T>, case #TreeB.Branch!enumelt: [[YES:bb[0-9]+]], default [[NO3:bb[0-9]+]]
     // CHECK: [[YES]]:
@@ -448,8 +448,8 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
     // CHECK:   [[TUPLE_ADDR:%.*]] = project_box [[BOX]]
     // CHECK:   copy_addr [[TUPLE_ADDR]] to [initialization] [[TUPLE_COPY:%.*]] :
     // CHECK:   [[L_COPY:%.*]] = tuple_element_addr [[TUPLE_COPY]]
-    // CHECK:   copy_addr [take] [[L_COPY]] to [initialization] [[L]]
     // CHECK:   [[R_COPY:%.*]] = tuple_element_addr [[TUPLE_COPY]]
+    // CHECK:   copy_addr [take] [[L_COPY]] to [initialization] [[L]]
     // CHECK:   copy_addr [take] [[R_COPY]] to [initialization] [[R]]
     // CHECK:   destroy_value [[BOX]]
     guard case .Branch(left: let l, right: let r) = tree else { return }
@@ -468,7 +468,7 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
     // CHECK:   destroy_addr [[TMP]]
     if case .Nil = tree { }
 
-    // CHECK:   [[X:%.*]] = alloc_stack $T
+    // CHECK:   [[X:%.*]] = alloc_stack [lexical] $T
     // CHECK:   copy_addr %0 to [initialization] [[TMP:%.*]] :
     // CHECK:   switch_enum_addr [[TMP]] : $*TreeB<T>, case #TreeB.Leaf!enumelt: [[YES:bb[0-9]+]], default [[NO:bb[0-9]+]]
     // CHECK: [[NO]]:
@@ -480,8 +480,8 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
     // CHECK:   destroy_addr [[X]]
     if case .Leaf(let x) = tree { }
 
-    // CHECK:   [[L:%.*]] = alloc_stack $TreeB
-    // CHECK:   [[R:%.*]] = alloc_stack $TreeB
+    // CHECK:   [[L:%.*]] = alloc_stack [lexical] $TreeB
+    // CHECK:   [[R:%.*]] = alloc_stack [lexical] $TreeB
     // CHECK:   copy_addr %0 to [initialization] [[TMP:%.*]] :
     // CHECK:   switch_enum_addr [[TMP]] : $*TreeB<T>, case #TreeB.Branch!enumelt: [[YES:bb[0-9]+]], default [[NO:bb[0-9]+]]
     // CHECK: [[NO]]:
@@ -492,8 +492,8 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
     // CHECK:   [[TUPLE_ADDR:%.*]] = project_box [[BOX]]
     // CHECK:   copy_addr [[TUPLE_ADDR]] to [initialization] [[TUPLE_COPY:%.*]] :
     // CHECK:   [[L_COPY:%.*]] = tuple_element_addr [[TUPLE_COPY]]
-    // CHECK:   copy_addr [take] [[L_COPY]] to [initialization] [[L]]
     // CHECK:   [[R_COPY:%.*]] = tuple_element_addr [[TUPLE_COPY]]
+    // CHECK:   copy_addr [take] [[L_COPY]] to [initialization] [[L]]
     // CHECK:   copy_addr [take] [[R_COPY]] to [initialization] [[R]]
     // CHECK:   destroy_value [[BOX]]
     // CHECK:   destroy_addr [[R]]

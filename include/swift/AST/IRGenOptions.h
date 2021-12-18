@@ -81,6 +81,12 @@ enum class IRGenEmbedMode : unsigned {
   EmbedBitcode
 };
 
+enum class SwiftAsyncFramePointerKind : unsigned {
+   Auto, // Choose Swift async extended frame info based on deployment target.
+   Always, // Unconditionally emit Swift async extended frame info.
+   Never,  // Don't emit Swift async extended frame info.
+};
+
 using clang::PointerAuthSchema;
 
 struct PointerAuthOptions : clang::PointerAuthOptions {
@@ -282,6 +288,8 @@ public:
 
   IRGenLLVMLTOKind LLVMLTOKind : 2;
 
+  SwiftAsyncFramePointerKind SwiftAsyncFramePointer : 2;
+
   /// Add names to LLVM values.
   unsigned HasValueNamesSetting : 1;
   unsigned ValueNames : 1;
@@ -303,6 +311,7 @@ public:
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
   unsigned LazyInitializeProtocolConformances : 1;
+  unsigned IndirectAsyncFunctionPointer : 1;
 
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
@@ -327,6 +336,10 @@ public:
   /// vw functions instead of outlined copy/destroy functions.
   unsigned UseTypeLayoutValueHandling : 1;
 
+  /// Also force structs to be lowered to aligned group TypeLayouts rather than
+  /// using TypeInfo entries.
+  unsigned ForceStructTypeLayouts : 1;
+
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
@@ -342,6 +355,20 @@ public:
   
   /// Whether to disable using mangled names for accessing concrete type metadata.
   unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
+
+  /// Whether to disable referencing stdlib symbols via mangled names in
+  /// reflection mangling.
+  unsigned DisableStandardSubstitutionsInReflectionMangling : 1;
+
+  unsigned EnableGlobalISel : 1;
+
+  unsigned VirtualFunctionElimination : 1;
+
+  unsigned WitnessMethodElimination : 1;
+
+  unsigned ConditionalRuntimeRecords : 1;
+
+  unsigned InternalizeAtLink : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -370,6 +397,8 @@ public:
   /// Pull in runtime compatibility shim libraries by autolinking.
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
+  Optional<llvm::VersionTuple>
+      AutolinkRuntimeCompatibilityConcurrencyLibraryVersion;
 
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
@@ -387,16 +416,24 @@ public:
         Playground(false),
         EmitStackPromotionChecks(false), FunctionSections(false),
         PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
-        LLVMLTOKind(IRGenLLVMLTOKind::None), HasValueNamesSetting(false),
+        LLVMLTOKind(IRGenLLVMLTOKind::None),
+        SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
+        HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
-        LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
+        LazyInitializeProtocolConformances(false),
+        IndirectAsyncFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseTypeLayoutValueHandling(true),
+        UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
-        DisableConcreteTypeMetadataMangledNameAccessors(false), CmdArgs(),
+        DisableConcreteTypeMetadataMangledNameAccessors(false),
+        DisableStandardSubstitutionsInReflectionMangling(false),
+        EnableGlobalISel(false), VirtualFunctionElimination(false),
+        WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
+        InternalizeAtLink(false),
+        CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 

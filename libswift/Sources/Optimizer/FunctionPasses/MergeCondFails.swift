@@ -17,8 +17,8 @@ let mergeCondFailsPass = FunctionPass(name: "merge-cond_fails", runMergeCondFail
 /// Return true if the operand of the cond_fail instruction looks like
 /// the overflow bit of an arithmetic instruction.
 private func hasOverflowConditionOperand(_ cfi: CondFailInst) -> Bool {
-  if let tei = cfi.condition as? TupleExtractInst {
-    return tei.tuple is BuiltinInst
+  if let tei = cfi.operand as? TupleExtractInst {
+    return tei.operand is BuiltinInst
   }
   return false
 }
@@ -29,7 +29,7 @@ private func hasOverflowConditionOperand(_ cfi: CondFailInst) -> Bool {
 /// write in between them.
 /// This pass merges cond_fail instructions by building the disjunction of
 /// their operands.
-private func runMergeCondFails(function: Function, context: FunctionPassContext) {
+private func runMergeCondFails(function: Function, context: PassContext) {
 
   // Merge cond_fail instructions if there is no side-effect or read in
   // between them.
@@ -59,7 +59,7 @@ private func runMergeCondFails(function: Function, context: FunctionPassContext)
 /// Try to merge the cond_fail instructions. Returns true if any could
 /// be merge.
 private func mergeCondFails(_ condFailToMerge: inout StackList<CondFailInst>,
-                            context: FunctionPassContext) {
+                            context: PassContext) {
   guard let lastCFI = condFailToMerge.last else {
     return
   }
@@ -73,10 +73,10 @@ private func mergeCondFails(_ condFailToMerge: inout StackList<CondFailInst>,
       mergedCond = builder.createBuiltinBinaryFunction(name: "or",
                                         operandType: prevCond.type,
                                         resultType: prevCond.type,
-                                        arguments: [prevCond, cfi.condition])
+                                        arguments: [prevCond, cfi.operand])
       didMerge = true
     } else {
-      mergedCond = cfi.condition
+      mergedCond = cfi.operand
     }
   }
   if !didMerge {

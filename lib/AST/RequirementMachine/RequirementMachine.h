@@ -18,7 +18,6 @@
 #include <vector>
 
 #include "PropertyMap.h"
-#include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
 
@@ -28,10 +27,12 @@ class raw_ostream;
 
 namespace swift {
 
+class AbstractGenericSignatureRequestRQM;
 class ASTContext;
 class AssociatedTypeDecl;
 class CanType;
 class GenericTypeParamType;
+class InferredGenericSignatureRequestRQM;
 class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
@@ -45,14 +46,19 @@ class RewriteContext;
 /// generic signatures and interface types.
 class RequirementMachine final {
   friend class swift::ASTContext;
+  friend class swift::rewriting::RewriteContext;
+  friend class swift::AbstractGenericSignatureRequestRQM;
+  friend class swift::InferredGenericSignatureRequestRQM;
 
   CanGenericSignature Sig;
+  SmallVector<Type, 2> Params;
+  ArrayRef<const ProtocolDecl *> Protos;
 
   RewriteContext &Context;
   RewriteSystem System;
   PropertyMap Map;
 
-  bool Debug = false;
+  bool Dump = false;
   bool Complete = false;
   unsigned RequirementMachineStepLimit;
   unsigned RequirementMachineDepthLimit;
@@ -60,14 +66,14 @@ class RequirementMachine final {
   UnifiedStatsReporter *Stats;
 
   /// All conformance access paths computed so far.
-  llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
+  llvm::DenseMap<std::pair<Term, ProtocolDecl *>,
                  ConformanceAccessPath> ConformanceAccessPaths;
 
   /// Conformance access paths computed during the last round. All elements
   /// have the same length. If a conformance access path of greater length
   /// is requested, we refill CurrentConformanceAccessPaths with all paths of
   /// length N+1, and add them to the ConformanceAccessPaths map.
-  std::vector<std::pair<CanType, ConformanceAccessPath>>
+  std::vector<std::pair<Term, ConformanceAccessPath>>
       CurrentConformanceAccessPaths;
 
   explicit RequirementMachine(RewriteContext &rewriteCtx);
@@ -77,12 +83,29 @@ class RequirementMachine final {
   RequirementMachine &operator=(const RequirementMachine &) = delete;
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
-  void addGenericSignature(CanGenericSignature sig);
+  void initWithGenericSignature(CanGenericSignature sig);
+  void initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
+  void initWithAbstractRequirements(
+      ArrayRef<GenericTypeParamType *> genericParams,
+      ArrayRef<Requirement> requirements);
+  void initWithWrittenRequirements(
+      ArrayRef<GenericTypeParamType *> genericParams,
+      ArrayRef<StructuralRequirement> requirements);
 
   bool isComplete() const;
-  void computeCompletion();
+
+  void computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
+
+  std::vector<Requirement> buildRequirementsFromRules(
+    ArrayRef<unsigned> rules,
+    TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  TypeArrayView<GenericTypeParamType> getGenericParams() const {
+    return TypeArrayView<GenericTypeParamType>(
+      ArrayRef<Type>(Params));
+  }
 
 public:
   ~RequirementMachine();
@@ -96,9 +119,11 @@ public:
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
   GenericSignature::RequiredProtocols getRequiredProtocols(Type depType) const;
-  Type getSuperclassBound(Type depType) const;
+  Type getSuperclassBound(Type depType,
+                          TypeArrayView<GenericTypeParamType> genericParams) const;
   bool isConcreteType(Type depType) const;
-  Type getConcreteType(Type depType) const;
+  Type getConcreteType(Type depType,
+                       TypeArrayView<GenericTypeParamType> genericParams) const;
   bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
   bool isCanonicalTypeInContext(Type type) const;
   Type getCanonicalTypeInContext(Type type,
@@ -107,8 +132,15 @@ public:
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
+  llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
+  computeMinimalProtocolRequirements();
+
+  std::vector<Requirement> computeMinimalGenericSignatureRequirements();
+
   void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;
+
+  DebugOptions getDebugOptions() const { return Context.getDebugOptions(); }
 };
 
 } // end namespace rewriting

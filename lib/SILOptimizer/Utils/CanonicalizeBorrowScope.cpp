@@ -29,14 +29,11 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/Statistic.h"
 
 using namespace swift;
-
-STATISTIC(NumOuterCopies, "number of copy_value instructions added for a "
-                          "borrow scope");
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Local utilities
@@ -455,7 +452,8 @@ public:
     // Update this operand bypassing any copies.
     SILValue value = use->get();
     use->set(scope.findDefInBorrowScope(value));
-    ForwardingOperand(use).setOwnershipKind(OwnershipKind::Guaranteed);
+    ForwardingOperand(use).setForwardingOwnershipKind(
+        OwnershipKind::Guaranteed);
     deleteCopyChain(value, scope.getDeleter());
     return true;
   }
@@ -570,7 +568,8 @@ public:
       LLVM_DEBUG(llvm::dbgs() << "  Deleted " << *user);
     } else {
       use->set(scope.findDefInBorrowScope(use->get()));
-      ForwardingOperand(use).setOwnershipKind(OwnershipKind::Guaranteed);
+      ForwardingOperand(use).setForwardingOwnershipKind(
+          OwnershipKind::Guaranteed);
     }
     deleteCopyChain(innerValue, scope.getDeleter());
     return true;
@@ -659,7 +658,7 @@ SILValue RewriteOuterBorrowUses::createOuterValues(SILValue innerValue) {
   scope.getCallbacks().createdNewInst(clone);
   Operand *use = &clone->getOperandRef(0);
   use->set(incomingOuterVal);
-  ForwardingOperand(use).setOwnershipKind(OwnershipKind::Owned);
+  ForwardingOperand(use).setForwardingOwnershipKind(OwnershipKind::Owned);
 
   LLVM_DEBUG(llvm::dbgs() << "  Hoisted forward " << *clone);
 
@@ -778,9 +777,15 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
 
 bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
     SILFunctionArgument *arg) {
+  BorrowedValue borrow(arg);
+  if (!borrow)
+    return false;
+
+  initBorrow(borrow);
+
   LLVM_DEBUG(llvm::dbgs() << "*** Canonicalize Borrow: " << borrowedValue);
 
-  initBorrow(BorrowedValue(arg));
+  SWIFT_DEFER { liveness.clear(); };
 
   RewriteInnerBorrowUses innerRewriter(*this);
   beginVisitBorrowScopeUses(); // reset the def/use worklist

@@ -72,7 +72,7 @@ static void tryRemoveRetainReleasePairsBetween(
     if (!CurInst->mayHaveSideEffects())
       continue;
 
-    if (isa<DebugValueInst>(CurInst) || isa<DebugValueAddrInst>(CurInst))
+    if (isa<DebugValueInst>(CurInst))
       continue;
 
     if (isa<ApplyInst>(CurInst) || isa<PartialApplyInst>(CurInst))
@@ -140,8 +140,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
              (isa<RetainValueInst>(*NextInstIter) ||
               isa<StrongRetainInst>(*NextInstIter) ||
               !NextInstIter->mayHaveSideEffects() ||
-              isa<DebugValueInst>(*NextInstIter) ||
-              isa<DebugValueAddrInst>(*NextInstIter)))
+              isa<DebugValueInst>(*NextInstIter)))
        ++NextInstIter;
       if (&*NextInstIter != CurInst) {
         LLVM_DEBUG(llvm::dbgs() << "Last retain right before match failed\n");

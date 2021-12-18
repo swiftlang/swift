@@ -81,14 +81,14 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   ArrayRef<llvm::Type*>(types.begin(),
                                                         types.size()),
                                   name, packed);
-};
+}
 
 /// A helper for creating pointer-to-struct types.
 static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
                                                   StringRef name,
                                   std::initializer_list<llvm::Type*> types) {
   return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
-};
+}
 
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
@@ -192,19 +192,18 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF,
-                         StringRef ModuleName, StringRef OutputFilename,
+                         SourceFile *SF, StringRef ModuleName,
+                         StringRef OutputFilename,
                          StringRef MainInputFilenameForDebugInfo,
                          StringRef PrivateDiscriminator)
-    : LLVMContext(new llvm::LLVMContext()),
-      IRGen(irgen), Context(irgen.SIL.getASTContext()),
+    : LLVMContext(new llvm::LLVMContext()), IRGen(irgen),
+      Context(irgen.SIL.getASTContext()),
       // The LLVMContext (and the IGM itself) will get deleted by the IGMDeleter
       // as long as the IGM is registered with the IRGenerator.
-      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext,
-                                            irgen.Opts,
+      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext, irgen.Opts,
                                             ModuleName, PrivateDiscriminator)),
       Module(*ClangCodeGen->GetModule()),
-      DataLayout(irgen.getClangDataLayout()),
+      DataLayout(irgen.getClangDataLayoutString()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
       silConv(irgen.SIL), OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
@@ -699,6 +698,21 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
+  const auto WillReturn = llvm::Attribute::WillReturn;
+
+#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
+  const auto NoEffect = RuntimeEffect::NoEffect;
+  const auto Locking = RuntimeEffect::Locking;
+  const auto Allocating = RuntimeEffect::Allocating;
+  const auto Deallocating = RuntimeEffect::Deallocating;
+  const auto RefCounting = RuntimeEffect::RefCounting;
+  const auto ObjectiveC = RuntimeEffect::ObjectiveC;
+  const auto Concurrency = RuntimeEffect::Concurrency;
+  const auto AutoDiff = RuntimeEffect::AutoDiff;
+  const auto MetaData = RuntimeEffect::MetaData;
+  const auto Casting = RuntimeEffect::Casting;
+  const auto ExclusivityChecking = RuntimeEffect::ExclusivityChecking;
+#endif
 
   RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
     return RuntimeAvailability::AlwaysAvailable;
@@ -942,23 +956,39 @@ llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
       LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
 }
 
+#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
+void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
+                                         const char *funcName) {
+  for (RuntimeEffect rt : effect) {
+    effectOfRuntimeFuncs = RuntimeEffect((unsigned)effectOfRuntimeFuncs |
+                                         (unsigned)rt);
+    emittedRuntimeFuncs.push_back(funcName);
+  }
+}
+#else
+#define registerRuntimeEffect(...)
+#endif
+
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS) \
-  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT) \
+  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS), \
+                QUOTE(ATTRS), QUOTE(EFFECT))
 
 #define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
 #define NO_ARGS {}
 #define ATTRS(...) { __VA_ARGS__ }
 #define NO_ATTRS {}
+#define EFFECT(...) { __VA_ARGS__ }
 
-#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS)        \
+#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT)\
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
+    registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
-                        AVAILABILITY(this->Context),                          \
+                        AVAILABILITY(this->Context),                           \
                         RETURNS, ARGS, ATTRS);                                 \
   }
 
@@ -1134,6 +1164,22 @@ void IRGenerator::addClassForEagerInitialization(ClassDecl *ClassDecl) {
   ClassesForEagerInitialization.push_back(ClassDecl);
 }
 
+void IRGenerator::addBackDeployedObjCActorInitialization(ClassDecl *ClassDecl) {
+  if (!ClassDecl->isActor())
+    return;
+
+  if (!ClassDecl->isObjC())
+    return;
+
+  // If we are not back-deploying concurrency, there's nothing to do.
+  ASTContext &ctx = ClassDecl->getASTContext();
+  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
+  if (deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability()))
+    return;
+
+  ObjCActorsNeedingSuperclassSwizzle.push_back(ClassDecl);
+}
+
 llvm::AttributeList IRGenModule::getAllocAttrs() {
   if (AllocAttrs.isEmpty()) {
     AllocAttrs =
@@ -1235,7 +1281,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
     if (quote)
       buffer += '"';
     buffer += library;
-    if (!library.endswith_lower(".lib"))
+    if (!library.endswith_insensitive(".lib"))
       buffer += ".lib";
     if (quote)
       buffer += '"';
@@ -1466,13 +1512,6 @@ void AutolinkKind::writeEntries(llvm::SetVector<llvm::MDNode *, Vector, Set> Ent
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
         IGM.getLLVMContext(), EntriesString, /*AddNull=*/false);
-    // Mark the swift1_autolink_entries section with the SHF_EXCLUDE attribute
-    // to get the linker to drop it in the final linked binary.
-    // LLVM doesn't provide an interface to specify section attributs in the
-    // IR so we pass the attribute with inline assembly.
-    if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
-      IGM.Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"
-                                       "\"0x80000000\"");
     auto var =
         new llvm::GlobalVariable(*IGM.getModule(), EntriesConstant->getType(),
                                  true, llvm::GlobalValue::PrivateLinkage,
@@ -1644,6 +1683,7 @@ bool IRGenModule::finalize() {
   if (!ClangCodeGen->GetModule())
     return false;
 
+  emitSwiftAsyncExtendedFrameInfoWeakRef();
   emitAutolinkInfo();
   emitGlobalLists();
   if (DebugInfo)
@@ -1702,7 +1742,7 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
       (Triple.isOSDarwin() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
-    return true;
+    return IRGen.Opts.PrespecializeGenericMetadata;
   }
   auto &context = getSwiftModule()->getASTContext();
   auto deploymentAvailability =
@@ -1761,12 +1801,12 @@ llvm::Triple IRGenerator::getEffectiveClangTriple() {
   return llvm::Triple(CI->getTargetInfo().getTargetOpts().Triple);
 }
 
-const llvm::DataLayout &IRGenerator::getClangDataLayout() {
+const llvm::StringRef IRGenerator::getClangDataLayoutString() {
   return static_cast<ClangImporter *>(
              SIL.getASTContext().getClangModuleLoader())
       ->getTargetInfo()
-      .getDataLayout();
-  }
+      .getDataLayoutString();
+}
 
 TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
   return TypeExpansionContext::maximal(getSwiftModule(),
@@ -1775,4 +1815,44 @@ TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
 
 const TypeLayoutEntry &IRGenModule::getTypeLayoutEntry(SILType T) {
   return Types.getTypeLayoutEntry(T);
+}
+
+
+void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
+  if (!hasSwiftAsyncFunctionDef || extendedFramePointerFlagsWeakRef)
+    return;
+  if (IRGen.Opts.SwiftAsyncFramePointer !=
+      SwiftAsyncFramePointerKind::Auto)
+    return;
+  if (isConcurrencyAvailable())
+    return;
+
+  // Emit a weak reference to the `swift_async_extendedFramePointerFlags` symbol
+  // needed by Swift async functions.
+  auto symbolName = "swift_async_extendedFramePointerFlags";
+  if ((extendedFramePointerFlagsWeakRef = Module.getGlobalVariable(symbolName)))
+    return;
+  extendedFramePointerFlagsWeakRef = new llvm::GlobalVariable(Module, Int8PtrTy, false,
+                                         llvm::GlobalValue::ExternalWeakLinkage, nullptr,
+                                         symbolName);
+
+  // The weak imported extendedFramePointerFlagsWeakRef gets optimized out
+  // before being added back as a strong import.
+  // Declarations can't be added to the used list, so we create a little
+  // global that can't be used from the program, but can be in the used list to
+  // avoid optimizations.
+  llvm::GlobalVariable *usage = new llvm::GlobalVariable(
+      Module, extendedFramePointerFlagsWeakRef->getType(), false,
+      llvm::GlobalValue::LinkOnceODRLinkage,
+      static_cast<llvm::GlobalVariable *>(extendedFramePointerFlagsWeakRef),
+      "_swift_async_extendedFramePointerFlagsUser");
+  usage->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  addUsedGlobal(usage);
+}
+
+bool IRGenModule::isConcurrencyAvailable() {
+  auto &ctx = getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+    AvailabilityContext::forDeploymentTarget(ctx);
+  return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }

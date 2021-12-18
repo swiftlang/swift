@@ -172,11 +172,28 @@ public:
   }
 };
 
-// Return the minimum Swift runtime version that supports demangling a given
-// type.
-static llvm::VersionTuple
-getRuntimeVersionThatSupportsDemanglingType(IRGenModule &IGM,
-                                            CanType type) {
+Optional<llvm::VersionTuple>
+getRuntimeVersionThatSupportsDemanglingType(CanType type) {
+  // The Swift 5.5 runtime is the first version able to demangle types
+  // related to concurrency.
+  bool needsConcurrency = type.findIf([](CanType t) -> bool {
+    if (auto fn = dyn_cast<AnyFunctionType>(t)) {
+      if (fn->isAsync() || fn->isSendable() || fn->hasGlobalActor())
+        return true;
+
+      for (const auto &param : fn->getParams()) {
+        if (param.isIsolated())
+          return true;
+      }
+
+      return false;
+    }
+    return false;
+  });
+  if (needsConcurrency) {
+    return llvm::VersionTuple(5, 5);
+  }
+
   // Associated types of opaque types weren't mangled in a usable form by the
   // Swift 5.1 runtime, so we needed to add a new mangling in 5.2.
   if (type->hasOpaqueArchetype()) {
@@ -194,8 +211,8 @@ getRuntimeVersionThatSupportsDemanglingType(IRGenModule &IGM,
     // guards, so we don't need to limit availability of mangled names
     // involving them.
   }
-  
-  return llvm::VersionTuple(5, 0);
+
+  return None;
 }
 
 // Produce a fallback mangled type name that uses an open-coded callback
@@ -271,6 +288,20 @@ getTypeRefByFunction(IRGenModule &IGM,
   return {constant, 6};
 }
 
+bool swift::irgen::mangledNameIsUnknownToDeployTarget(IRGenModule &IGM,
+                                                      CanType type) {
+  if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
+          IGM.Context.LangOpts.Target)) {
+    if (auto minimumSupportedRuntimeVersion =
+            getRuntimeVersionThatSupportsDemanglingType(type)) {
+      if (*runtimeCompatVersion < *minimumSupportedRuntimeVersion) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 static std::pair<llvm::Constant *, unsigned>
 getTypeRefImpl(IRGenModule &IGM,
                CanType type,
@@ -287,14 +318,10 @@ getTypeRefImpl(IRGenModule &IGM,
     // If the minimum deployment target's runtime demangler wouldn't understand
     // this mangled name, then fall back to generating a "mangled name" with a
     // symbolic reference with a callback function.
-    if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget
-                                      (IGM.Context.LangOpts.Target)) {
-      if (*runtimeCompatVersion <
-            getRuntimeVersionThatSupportsDemanglingType(IGM, type)) {
-        return getTypeRefByFunction(IGM, sig, type);
-      }
+    if (mangledNameIsUnknownToDeployTarget(IGM, type)) {
+      return getTypeRefByFunction(IGM, sig, type);
     }
-      
+
     break;
 
   case MangledTypeRefRole::Reflection:
@@ -476,7 +503,8 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   // Set the low bit.
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  addr = llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+  addr = llvm::ConstantExpr::getGetElementPtr(
+    addr->getType()->getPointerElementType(), addr, bitConstant);
 
   // Update the entry.
   entry = {var, addr};
@@ -648,11 +676,20 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getAssociatedTypeMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(
-      [&](IRGenModule &IGM, ConstantInit init) -> llvm::Constant* {
-       return IGM.getAddrOfReflectionAssociatedTypeDescriptor(Conformance,init);
-      },
-      section);
+    llvm::GlobalVariable *var = ReflectionMetadataBuilder::emit(
+        [&](IRGenModule &IGM, ConstantInit init) -> llvm::Constant * {
+          return IGM.getAddrOfReflectionAssociatedTypeDescriptor(Conformance,
+                                                                 init);
+        },
+        section);
+
+    if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
+      // Allow dead-stripping `var` (the reflection record) when the protocol
+      // or type (from the conformance) is not referenced.
+      IGM.appendLLVMUsedConditionalEntry(var, Conformance);
+    }
+
+    return var;
   }
 };
 
@@ -828,12 +865,21 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getFieldTypeMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(
-      [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant* {
-        return IGM.getAddrOfReflectionFieldDescriptor(
-          NTD->getDeclaredType()->getCanonicalType(), definition);
-      },
-      section);
+    llvm::GlobalVariable *var = ReflectionMetadataBuilder::emit(
+        [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant * {
+          return IGM.getAddrOfReflectionFieldDescriptor(
+              NTD->getDeclaredType()->getCanonicalType(), definition);
+        },
+        section);
+
+    if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
+      // Allow dead-stripping `var` (the reflection record) when the type
+      // (NTD) is not referenced.
+      auto ref = IGM.getTypeEntityReference(const_cast<NominalTypeDecl *>(NTD));
+      IGM.appendLLVMUsedConditionalEntry(var, ref.getValue());
+    }
+
+    return var;
   }
 };
 

@@ -381,7 +381,7 @@ bb0(%0 : $KK):
 
 sil hidden [noinline] @$s21existential_transform13wrap_inout_cp1as5Int32VAA2PP_pz_tF : $@convention(thin) (@inout PP) -> Int32 {
 bb0(%0 : $*PP):
-  debug_value_addr %0 : $*PP, var, name "a", argno 1 
+  debug_value %0 : $*PP, var, name "a", argno 1, expr op_deref
   %2 = load %0 : $*PP                             
   %3 = open_existential_ref %2 : $PP to $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP 
   %4 = witness_method $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP, #PP.foo : <Self where Self : PP> (Self) -> () -> Int32, %3 : $@opened("CC969B02-AC7C-11E8-B742-D0817AD4059B") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int32 

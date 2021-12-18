@@ -544,7 +544,7 @@ class SR14120 {
   func test2() {
     doVoidStuff { [self] in
       doVoidStuff {
-        // expected-error@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
+        // expected-warning@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
         // expected-note@-2 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
         // expected-note@+1 {{reference 'self.' explicitly}}
         operation()
@@ -580,7 +580,7 @@ class SR14120 {
     doVoidStuff { [self] in
       doVoidStuff { [self] in
         doVoidStuff {
-          // expected-error@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
+          // expected-warning@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
           // expected-note@-2 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
           // expected-note@+1 {{reference 'self.' explicitly}}
           operation()
@@ -693,4 +693,19 @@ func testSR13239_Variadic_Twos() -> Int {
   }, {
     print("hello")
   })
+}
+
+// rdar://82545600: this should just be a warning until Swift 6
+public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
+    var property = false
+
+    private init() {
+        doVoidStuff { [unowned self] in
+            doVoidStuff {}
+            doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+                doVoidStuff {}
+                property = false // expected-warning {{reference to property 'property' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+            }
+        }
+    }
 }

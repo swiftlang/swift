@@ -16,6 +16,7 @@
 
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
 namespace swift {
@@ -38,10 +39,14 @@ void Context::clear() {
 }
 
 NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
+#if SWIFT_SUPPORT_OLD_MANGLING
   if (isMangledName(MangledName)) {
     return D->demangleSymbol(MangledName);
   }
   return demangleOldSymbolAsNode(MangledName, *D);
+#else
+  return D->demangleSymbol(MangledName);
+#endif
 }
 
 NodePointer Context::demangleTypeAsNode(llvm::StringRef MangledName) {
@@ -76,7 +81,7 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
 static llvm::StringRef stripSuffix(llvm::StringRef Name) {
   // A suffix always ends with a digit. Do this quick check to avoid scanning through the whole
   // symbol name if the symbol has no suffix (= the common case).
-  if (isdigit(Name.back())) {
+  if (swift::Mangle::isDigit(Name.back())) {
     size_t dotPos = Name.find('.');
     if (dotPos != StringRef::npos) {
       Name = Name.substr(0, dotPos);
@@ -216,7 +221,11 @@ std::string Context::getModuleName(llvm::StringRef mangledName) {
     }
     default:
       if (isSpecialized(node)) {
-        node = getUnspecialized(node, *D);
+        auto unspec = getUnspecialized(node, *D);
+        if (!unspec.isSuccess())
+          node = nullptr;
+        else
+          node = unspec.result();
         break;
       }
       if (isContext(node->getKind())) {

@@ -20,7 +20,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -115,14 +114,6 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   assert(repr && "Declaration does not have an opaque result type");
   auto *dc = originatingDecl->getInnermostDeclContext();
   auto &ctx = dc->getASTContext();
-
-  // Support for structural opaque result types is hidden behind a compiler flag
-  // until the proposal gets approved.
-  if (!ctx.LangOpts.EnableExperimentalStructuralOpaqueTypes &&
-      !isa<OpaqueReturnTypeRepr>(repr)) {
-    ctx.Diags.diagnose(repr->getLoc(), diag::structural_opaque_types_are_experimental);
-    return nullptr;
-  }
 
   // Protocol requirements can't have opaque return types.
   //
@@ -219,7 +210,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
 
-    auto *paramType = GenericTypeParamType::get(opaqueSignatureDepth, i, ctx);
+    auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
+                                                opaqueSignatureDepth, i, ctx);
     genericParamTypes.push_back(paramType);
 
     // Try to resolve the constraint repr in the parent decl context. It should
@@ -257,13 +249,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  auto interfaceSignature = evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        outerGenericSignature.getPointer(),
-        std::move(genericParamTypes),
-        std::move(requirements)},
-      GenericSignature());
+  auto interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
+                                                  genericParamTypes,
+                                                  std::move(requirements));
 
   // Create the OpaqueTypeDecl for the result type.
   // It has the same parent context and generic environment as the originating
@@ -289,6 +277,28 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                    /*unboundTyOpener*/ nullptr,
                                    /*placeholderHandler*/ nullptr)
           .resolveType(repr);
+
+  // Opaque types cannot be used in parameter position.
+  Type desugared = interfaceType->getDesugaredType();
+  bool hasError = desugared.findIf([&](Type type) -> bool {
+    if (auto *fnType = type->getAs<FunctionType>()) {
+      for (auto param : fnType->getParams()) {
+        if (!param.getPlainType()->hasOpaqueArchetype())
+          continue;
+
+        ctx.Diags.diagnose(repr->getLoc(),
+                           diag::opaque_type_in_parameter,
+                           interfaceType);
+        return true;
+      }
+    }
+
+    return false;
+  });
+
+  if (hasError)
+    return nullptr;
+
   auto metatype = MetatypeType::get(interfaceType);
   opaqueDecl->setInterfaceType(metatype);
   return opaqueDecl;
@@ -517,44 +527,6 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 /// Generic types
 ///
 
-GenericSignature TypeChecker::checkGenericSignature(
-                      GenericParamSource paramSource,
-                      DeclContext *dc,
-                      GenericSignature parentSig,
-                      bool allowConcreteGenericParams,
-                      SmallVector<Requirement, 2> additionalRequirements,
-                      SmallVector<TypeLoc, 2> inferenceSources) {
-  if (auto genericParamList = paramSource.dyn_cast<GenericParamList *>())
-    assert(genericParamList && "Missing generic parameters?");
-
-  auto request = InferredGenericSignatureRequest{
-    dc->getParentModule(), parentSig.getPointer(), paramSource,
-    additionalRequirements, inferenceSources,
-    allowConcreteGenericParams};
-  auto sig = evaluateOrDefault(dc->getASTContext().evaluator,
-                               request, nullptr);
-
-  // Debugging of the generic signature builder and generic signature
-  // generation.
-  if (dc->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
-    llvm::errs() << "\n";
-    if (auto *VD = dyn_cast_or_null<ValueDecl>(dc->getAsDecl())) {
-      VD->dumpRef(llvm::errs());
-      llvm::errs() << "\n";
-    } else {
-      dc->printContext(llvm::errs());
-    }
-    llvm::errs() << "Generic signature: ";
-    sig->print(llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "Canonical generic signature: ";
-    sig.getCanonicalSignature()->print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-
-  return sig;
-}
-
 /// Form the interface type of an extension from the raw type and the
 /// extension's list of generic parameters.
 static Type formExtensionInterfaceType(
@@ -597,7 +569,7 @@ static Type formExtensionInterfaceType(
   if (!nominal->isGeneric() || isa<ProtocolDecl>(nominal)) {
     resultType = NominalType::get(nominal, parentType,
                                   nominal->getASTContext());
-  } else {
+  } else if (genericParams) {
     auto currentBoundType = type->getAs<BoundGenericType>();
 
     // Form the bound generic type with the type parameters provided.
@@ -649,6 +621,8 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
 GenericSignature
 GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                   GenericContext *GC) const {
+  auto &ctx = GC->getASTContext();
+
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
   // it.
   if (auto PD = dyn_cast<ProtocolDecl>(GC)) {
@@ -660,7 +634,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     // Debugging of the generic signature builder and generic signature
     // generation.
-    if (GC->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
+    if (ctx.TypeCheckerOpts.DebugGenericSignatures) {
       llvm::errs() << "\n";
       PD->printContext(llvm::errs());
       llvm::errs() << "Generic signature: ";
@@ -698,10 +672,10 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // If there is no generic context for the where clause to
     // rely on, diagnose that now and bail out.
     if (!GC->isGenericContext()) {
-      GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
-                                         GC->getParent()->isModuleScopeContext()
-                                             ? diag::where_nongeneric_toplevel
-                                             : diag::where_nongeneric_ctx);
+      ctx.Diags.diagnose(where->getWhereLoc(),
+                         GC->getParent()->isModuleScopeContext()
+                             ? diag::where_nongeneric_toplevel
+                             : diag::where_nongeneric_ctx);
       return nullptr;
     }
   }
@@ -806,10 +780,33 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     inferenceSources.emplace_back(nullptr, extInterfaceType);
   }
 
-  return TypeChecker::checkGenericSignature(
-      GC, GC, parentSig,
-      allowConcreteGenericParams,
-      sameTypeReqs, inferenceSources);
+  auto request = InferredGenericSignatureRequest{
+      GC->getParentModule(), parentSig.getPointer(),
+      GC->getGenericParams(), WhereClauseOwner(GC),
+      sameTypeReqs, inferenceSources,
+      allowConcreteGenericParams};
+  auto sig = evaluateOrDefault(ctx.evaluator, request,
+                               GenericSignatureWithError()).getPointer();
+
+  // Debugging of the generic signature builder and generic signature
+  // generation.
+  if (ctx.TypeCheckerOpts.DebugGenericSignatures) {
+    llvm::errs() << "\n";
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
+      VD->dumpRef(llvm::errs());
+      llvm::errs() << "\n";
+    } else {
+      GC->printContext(llvm::errs());
+    }
+    llvm::errs() << "Generic signature: ";
+    sig->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Canonical generic signature: ";
+    sig.getCanonicalSignature()->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  return sig;
 }
 
 ///
@@ -817,7 +814,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 ///
 
 RequirementCheckResult TypeChecker::checkGenericArguments(
-    DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
+    ModuleDecl *module, SourceLoc loc, SourceLoc noteLoc, Type owner,
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
@@ -832,7 +829,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   SmallVector<RequirementSet, 8> pendingReqs;
   pendingReqs.push_back({requirements, {}});
 
-  auto *module = dc->getParentModule();
   ASTContext &ctx = module->getASTContext();
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
@@ -841,14 +837,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       auto req = rawReq;
       if (current.Parents.empty()) {
         auto substed = rawReq.subst(
-            [&](SubstitutableType *type) -> Type {
-              auto substType = substitutions(type);
-              if (substType->hasTypeParameter())
-                return dc->mapTypeIntoContext(substType);
-              return substType;
-            },
-            LookUpConformanceInModule(module),
-            options);
+            substitutions, LookUpConformanceInModule(module), options);
         if (!substed) {
           // Another requirement will fail later; just continue.
           valid = false;
@@ -990,9 +979,6 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                                               /*unboundTyOpener*/ nullptr,
                                               /*placeholderHandler*/ nullptr);
     break;
-
-  case TypeResolutionStage::Contextual:
-    llvm_unreachable("No clients care about this. Use mapTypeIntoContext()");
   }
 
   auto &reqRepr = getRequirement();

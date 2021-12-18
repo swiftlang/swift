@@ -5,21 +5,19 @@
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_sum_nextOnCompleted() async {
   let numbers = [1, 2, 3, 4, 5]
   let expected = 15 // FIXME: numbers.reduce(0, +) this hangs?
 
-  let sum = try! await withTaskGroup(of: Int.self) {
-    (group) async -> Int in
+  let sum = try! await withTaskGroup(of: Int.self) { group async -> Int in
     for n in numbers {
       group.spawn {
-        () async -> Int in
         print("  complete group.spawn { \(n) }")
         return n
       }
@@ -27,17 +25,13 @@ func test_sum_nextOnCompleted() async {
 
     // We specifically want to await on completed child tasks in this test,
     // so give them some time to complete before we hit group.next()
-    await Task.sleep(2_000_000_000)
+    try! await Task.sleep(nanoseconds: 2_000_000_000)
 
     var sum = 0
-    do {
-      while let r = try await group.next() {
-        print("next: \(r)")
-        sum += r
-        print("sum: \(sum)")
-      }
-    } catch {
-      print("ERROR: \(error)")
+    while let r = await group.next() {
+      print("next: \(r)")
+      sum += r
+      print("sum: \(sum)")
     }
 
     assert(group.isEmpty, "Group must be empty after we consumed all tasks")
@@ -66,7 +60,7 @@ func test_sum_nextOnCompleted() async {
   print("result: \(sum)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_sum_nextOnCompleted()

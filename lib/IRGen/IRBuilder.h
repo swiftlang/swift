@@ -124,7 +124,8 @@ public:
 
   llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
                              const llvm::Twine &name = "") {
-    llvm::LoadInst *load = IRBuilderBase::CreateLoad(addr, name);
+    llvm::LoadInst *load = IRBuilderBase::CreateLoad(
+        addr->getType()->getPointerElementType(), addr, name);
     load->setAlignment(llvm::MaybeAlign(align.getValue()).valueOrOne());
     return load;
   }

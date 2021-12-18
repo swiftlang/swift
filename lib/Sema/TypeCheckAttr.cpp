@@ -17,15 +17,17 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -92,6 +94,8 @@ public:
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(RestatedObjCConformance)
   IGNORED_ATTR(Semantics)
+  IGNORED_ATTR(NoLocks)
+  IGNORED_ATTR(NoAllocation)
   IGNORED_ATTR(EmitAssemblyVisionRemarks)
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(SILGenName)
@@ -107,13 +111,13 @@ public:
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(SpecializeExtension)
   IGNORED_ATTR(Sendable)
+  IGNORED_ATTR(NonSendable)
   IGNORED_ATTR(AtRethrows)
   IGNORED_ATTR(AtReasync)
-  IGNORED_ATTR(UnsafeSendable)
-  IGNORED_ATTR(UnsafeMainActor)
   IGNORED_ATTR(ImplicitSelfCapture)
   IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Isolated)
+  IGNORED_ATTR(PredatesConcurrency)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -175,6 +179,7 @@ public:
   }
 
   void visitFinalAttr(FinalAttr *attr);
+  void visitCompileTimeConstAttr(CompileTimeConstAttr *attr) {}
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
@@ -239,6 +244,7 @@ public:
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
+  void visitTypeSequenceAttr(TypeSequenceAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
 
@@ -256,16 +262,71 @@ public:
 
   void visitActorAttr(ActorAttr *attr);
   void visitDistributedActorAttr(DistributedActorAttr *attr);
-  void visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr);
   void visitGlobalActorAttr(GlobalActorAttr *attr);
   void visitAsyncAttr(AsyncAttr *attr);
   void visitMarkerAttr(MarkerAttr *attr);
 
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
+
+  void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
 };
 
 } // end anonymous namespace
+
+void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
+  // Only allow for this attribute to be used when experimental move only is
+  // enabled.
+  if (!D->getASTContext().LangOpts.EnableExperimentalMoveOnly) {
+    auto error =
+        diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  auto *dc = D->getDeclContext();
+
+  // If we have a param decl that is marked as no implicit copy, change our
+  // default specifier to be owned.
+  if (auto *paramDecl = dyn_cast<ParamDecl>(D)) {
+    // We only handle non-lvalue arguments today.
+    if (paramDecl->getSpecifier() == ParamDecl::Specifier::InOut) {
+      auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+      diagnoseAndRemoveAttr(attr, error);
+      return;
+    }
+    return;
+  }
+
+  auto *vd = dyn_cast<VarDecl>(D);
+  if (!vd) {
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  // If we have a 'var' instead of a 'let', bail. We only support on local
+  // lets.
+  if (!vd->isLet()) {
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  // We only support local lets.
+  if (!dc->isLocalContext()) {
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  // We do not support static vars either yet.
+  if (dc->isTypeContext() && vd->isStatic()) {
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+}
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
   DeclContext *dc = D->getDeclContext();
@@ -737,8 +798,25 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
 
   if (auto extension = dyn_cast<ExtensionDecl>(D)) {
     if (attr->getAccess() == AccessLevel::Open) {
-      diagnose(attr->getLocation(), diag::access_control_extension_open)
-        .fixItReplace(attr->getRange(), "public");
+      auto diag =
+          diagnose(attr->getLocation(), diag::access_control_extension_open);
+      diag.fixItRemove(attr->getRange());
+      for (auto Member : extension->getMembers()) {
+        if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+          if (VD->getAttrs().hasAttribute<AccessControlAttr>())
+            continue;
+
+          StringRef accessLevel = VD->isObjC() ? "open " : "public ";
+
+          if (auto *FD = dyn_cast<FuncDecl>(VD))
+            diag.fixItInsert(FD->getFuncLoc(), accessLevel);
+
+          if (auto *VAD = dyn_cast<VarDecl>(VD))
+            diag.fixItInsert(VAD->getParentPatternBinding()->getLoc(),
+                             accessLevel);
+        }
+      }
+
       attr->setInvalid();
       return;
     }
@@ -803,7 +881,6 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
                    diag::access_control_non_objc_open_member,
                    isa<AbstractFunctionDecl>(VD))
               .fixItReplace(attr->getRange(), "public");
-          attr->setInvalid();
         }
       }
     }
@@ -1884,39 +1961,29 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
   Expr *returnedExpr;
 
   if (mainFunction->hasAsync()) {
-    // Pass main into _runAsyncMain(_ asyncFunc: () async throws -> ())
-    // Resulting $main looks like:
-    // $main() { _runAsyncMain(main) }
+    // Ensure that the concurrency module is loaded
     auto *concurrencyModule = context.getLoadedModule(context.Id_Concurrency);
     if (!concurrencyModule) {
       context.Diags.diagnose(mainFunction->getAsyncLoc(),
                              diag::async_main_no_concurrency);
       auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
-      SmallVector<ASTNode, 1> stmts;
-      stmts.push_back(result);
-      auto body = BraceStmt::create(context, SourceLoc(), stmts,
-                                    SourceLoc(), /*Implicit*/true);
-
+      ASTNode stmts[] = {result};
+      auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc(),
+                                    /*Implicit*/ true);
       return std::make_pair(body, /*typechecked*/true);
     }
 
-    SmallVector<ValueDecl *, 1> decls;
-    concurrencyModule->lookupQualified(
-        concurrencyModule,
-        DeclNameRef(context.getIdentifier("_runAsyncMain")),
-        NL_QualifiedDefault | NL_IncludeUsableFromInline,
-        decls);
-    assert(!decls.empty() && "Failed to find _runAsyncMain");
-    FuncDecl *runner = cast<FuncDecl>(decls[0]);
-
-    auto asyncRunnerDeclRef = ConcreteDeclRef(runner, substitutionMap);
-
-    DeclRefExpr *funcExpr = new (context) DeclRefExpr(asyncRunnerDeclRef,
-                                                      DeclNameLoc(),
-                                                      /*implicit=*/true);
-    funcExpr->setType(runner->getInterfaceType());
-    auto *callExpr = CallExpr::createImplicit(context, funcExpr, memberRefExpr, {});
-    returnedExpr = callExpr;
+    // $main() async { await main() }
+    Expr *awaitExpr =
+        new (context) AwaitExpr(callExpr->getLoc(), callExpr,
+                                context.TheEmptyTupleType, /*implicit*/ true);
+    if (mainFunction->hasThrows()) {
+      // $main() async throws { try await main() }
+      awaitExpr =
+          new (context) TryExpr(callExpr->getLoc(), awaitExpr,
+                                context.TheEmptyTupleType, /*implicit*/ true);
+    }
+    returnedExpr = awaitExpr;
   } else if (mainFunction->hasThrows()) {
     auto *tryExpr = new (context) TryExpr(
         callExpr->getLoc(), callExpr, context.TheEmptyTupleType, /*implicit=*/true);
@@ -2033,11 +2100,14 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
       DeclName(context, DeclBaseName(context.Id_MainEntryPoint),
                ParameterList::createEmpty(context)),
       /*NameLoc=*/SourceLoc(),
-      /*Async=*/false,
+      /*Async=*/mainFunction->hasAsync(),
       /*Throws=*/mainFunction->hasThrows(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TupleType::getEmpty(context), declContext);
   func->setSynthesized(true);
+  // It's never useful to provide a dynamic replacement of this function--it is
+  // just a pass-through to MainType.main.
+  func->setIsDynamic(false);
 
   auto *params = context.Allocate<MainTypeAttrParams>();
   params->mainFunction = mainFunction;
@@ -2141,7 +2211,7 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
                                             ASTContext &ctx) {
   bool hadError = false;
 
-  auto specializedReqs = specializedSig->requirementsNotSatisfiedBy(originalSig);
+  auto specializedReqs = specializedSig.requirementsNotSatisfiedBy(originalSig);
   for (auto specializedReq : specializedReqs) {
     if (!specializedReq.getFirstType()->is<GenericTypeParamType>()) {
       ctx.Diags.diagnose(attr->getLocation(),
@@ -2236,28 +2306,18 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     return;
   }
 
-  // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(D->getASTContext());
+  InferredGenericSignatureRequest request{
+      DC->getParentModule(),
+      genericSig.getPointer(),
+      /*genericParams=*/nullptr,
+      WhereClauseOwner(FD, attr),
+      /*addedRequirements=*/{},
+      /*inferenceSources=*/{},
+      /*allowConcreteGenericParams=*/true};
 
-  // First, add the old generic signature.
-  Builder.addGenericSignature(genericSig);
-
-  // Go over the set of requirements, adding them to the builder.
-  WhereClauseOwner(FD, attr).visitRequirements(TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr *reqRepr) {
-        // Add the requirement to the generic signature builder.
-        using FloatingRequirementSource =
-          GenericSignatureBuilder::FloatingRequirementSource;
-        Builder.addRequirement(req, reqRepr,
-                               FloatingRequirementSource::forExplicit(
-                                 reqRepr->getSeparatorLoc()),
-                               nullptr, DC->getParentModule());
-        return false;
-      });
-
-  // Check the result.
-  auto specializedSig = std::move(Builder).computeGenericSignature(
-      /*allowConcreteGenericParams=*/true);
+  auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
+                                          GenericSignatureWithError())
+      .getPointer();
 
   // Check the validity of provided requirements.
   checkSpecializeAttrRequirements(attr, genericSig, specializedSig, Ctx);
@@ -2495,7 +2555,7 @@ static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
   }
 
   assert(!isa<FuncDecl>(results[0]));
-  
+
   auto *origStorage = cast<AbstractStorageDecl>(results[0]);
   if (forDynamicReplacement && !origStorage->isDynamic()) {
     Diags.diagnose(attr->getLocation(),
@@ -2710,13 +2770,13 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    return TypeResolution::forContextual(PD, None,
-                                         // Unbound generics and placeholders
-                                         // are not allowed within this
-                                         // attribute.
-                                         /*unboundTyOpener*/ nullptr,
-                                         /*placeholderHandler*/ nullptr)
-        .resolveType(typeEraserRepr);
+    return TypeResolution::resolveContextualType(
+        typeEraserRepr, PD, None,
+        // Unbound generics and placeholders
+        // are not allowed within this
+        // attribute.
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -2893,9 +2953,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
   Type T = attr->getProtocolType();
   if (!T && attr->getProtocolTypeRepr()) {
-    T = TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
-            .resolveType(attr->getProtocolTypeRepr());
+    T = TypeResolution::resolveContextualType(attr->getProtocolTypeRepr(), DC,
+                                              None, /*unboundTyOpener*/ nullptr,
+                                              /*placeholderHandler*/ nullptr);
   }
 
   // Definite error-types were already diagnosed in resolveType.
@@ -2965,7 +3025,30 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto nominal = evaluateOrDefault(
     Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
 
+  // Diagnose errors.
   if (!nominal) {
+    auto typeRepr = attr->getTypeRepr();
+
+    auto type = TypeResolution::forInterface(dc, TypeResolverContext::CustomAttr,
+                                             // Unbound generics and placeholders
+                                             // are not allowed within this
+                                             // attribute.
+                                             /*unboundTyOpener*/ nullptr,
+                                             /*placeholderHandler*/ nullptr)
+        .resolveType(typeRepr);
+
+    if (type->is<ErrorType>()) {
+      // Type resolution has failed, and we should have diagnosed something already.
+      assert(Ctx.hadError());
+    } else {
+      // Otherwise, something odd happened.
+      std::string typeName;
+      llvm::raw_string_ostream out(typeName);
+      typeRepr->print(out);
+
+      Ctx.Diags.diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
+    }
+
     attr->setInvalid();
     return;
   }
@@ -2985,7 +3068,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     if (isa<ParamDecl>(D)) {
       // Check for unsupported declarations.
       auto *context = D->getDeclContext()->getAsDecl();
-      if (context && isa<SubscriptDecl>(context)) {
+      if (isa_and_nonnull<SubscriptDecl>(context)) {
         diagnose(attr->getLocation(),
                  diag::property_wrapper_param_not_supported,
                  context->getDescriptiveKind());
@@ -3056,9 +3139,9 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     }
 
     // Diagnose and ignore arguments.
-    if (attr->getArg()) {
+    if (attr->hasArgs()) {
       diagnose(attr->getLocation(), diag::result_builder_arguments)
-        .highlight(attr->getArg()->getSourceRange());
+        .highlight(attr->getArgs()->getSourceRange());
     }
 
     // Complain if this isn't the primary result-builder attribute.
@@ -3221,6 +3304,13 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
   // it won't necessarily be able to say why.
 }
 
+void AttributeChecker::visitTypeSequenceAttr(TypeSequenceAttr *attr) {
+  if (!isa<GenericTypeParamDecl>(D)) {
+    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::type_sequence_on_non_generic_param);
+  }
+}
+
 void AttributeChecker::visitNonEphemeralAttr(NonEphemeralAttr *attr) {
   auto *param = cast<ParamDecl>(D);
   auto type = param->getInterfaceType()->lookThroughSingleOptionalType();
@@ -3273,9 +3363,9 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
                AttrName);
       return;
     }
-    if (IntroVer.getValue() >= Attr->MovedVersion) {
+    if (IntroVer.getValue() > Attr->MovedVersion) {
       diagnose(AtLoc,
-               diag::originally_definedin_must_after_available_version,
+               diag::originally_definedin_must_not_before_available_version,
                AttrName);
       return;
     }
@@ -3578,7 +3668,7 @@ static bool conformsToDifferentiable(Type type, ModuleDecl *module,
     return true;
   auto tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
   return type->isEqual(tanType);
-};
+}
 
 IndexSubset *TypeChecker::inferDifferentiabilityParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
@@ -3977,9 +4067,7 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
 /// `checkGenericSignature` is used to check generic signatures, if specified.
 /// Otherwise, generic signatures are checked for equality.
 static bool checkFunctionSignature(
-    CanAnyFunctionType required, CanType candidate,
-    Optional<std::function<bool(GenericSignature, GenericSignature)>>
-        checkGenericSignature = None) {
+    CanAnyFunctionType required, CanType candidate) {
   // Check that candidate is actually a function.
   auto candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
   if (!candidateFnTy)
@@ -3992,23 +4080,15 @@ static bool checkFunctionSignature(
   // Check that generic signatures match.
   auto requiredGenSig = required.getOptGenericSignature();
   auto candidateGenSig = candidateFnTy.getOptGenericSignature();
-  // Call generic signature check function, if specified.
-  // Otherwise, check that generic signatures are equal.
-  if (!checkGenericSignature) {
-    if (candidateGenSig != requiredGenSig)
-      return false;
-  } else if (!(*checkGenericSignature)(requiredGenSig, candidateGenSig)) {
+  // Check that the candidate signature's generic parameters are a subset of
+  // those of the required signature.
+  if (requiredGenSig && candidateGenSig &&
+      candidateGenSig.getGenericParams().size()
+          > requiredGenSig.getGenericParams().size())
     return false;
-  }
-
-  // Map type into the required function type's generic signature, if it exists.
-  // This is significant when the required generic signature has same-type
-  // requirements while the candidate generic signature does not.
-  auto mapType = [&](Type type) {
-    if (!requiredGenSig)
-      return type->getCanonicalType();
-    return requiredGenSig->getCanonicalTypeInContext(type);
-  };
+  // Check that the requirements are satisfied.
+  if (!candidateGenSig.requirementsNotSatisfiedBy(requiredGenSig).empty())
+    return false;
 
   // Check that parameter types match, disregarding labels.
   if (required->getNumParams() != candidateFnTy->getNumParams())
@@ -4018,14 +4098,16 @@ static bool checkFunctionSignature(
                   [&](AnyFunctionType::Param x, AnyFunctionType::Param y) {
                     auto xInstanceTy = x.getOldType()->getMetatypeInstanceType();
                     auto yInstanceTy = y.getOldType()->getMetatypeInstanceType();
-                    return xInstanceTy->isEqual(mapType(yInstanceTy));
+                    return xInstanceTy->isEqual(
+                        requiredGenSig.getCanonicalTypeInContext(yInstanceTy));
                   }))
     return false;
 
   // If required result type is not a function type, check that result types
   // match exactly.
   auto requiredResultFnTy = dyn_cast<AnyFunctionType>(required.getResult());
-  auto candidateResultTy = mapType(candidateFnTy.getResult());
+  auto candidateResultTy =
+      requiredGenSig.getCanonicalTypeInContext(candidateFnTy.getResult());
   if (!requiredResultFnTy) {
     auto requiredResultTupleTy = dyn_cast<TupleType>(required.getResult());
     auto candidateResultTupleTy = dyn_cast<TupleType>(candidateResultTy);
@@ -4044,7 +4126,7 @@ static bool checkFunctionSignature(
 
   // Required result type is a function. Recurse.
   return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
-};
+}
 
 /// Returns an `AnyFunctionType` from the given parameters, result type, and
 /// generic signature.
@@ -4262,7 +4344,8 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
   // - If the `@differentiable` attribute has a `where` clause, use it to
   //   compute the derivative generic signature.
   // - Otherwise, use the original function's generic signature by default.
-  derivativeGenSig = original->getGenericSignature();
+  auto originalGenSig = original->getGenericSignature();
+  derivativeGenSig = originalGenSig;
 
   // Handle the `where` clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
@@ -4287,7 +4370,6 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
       return true;
     }
 
-    auto originalGenSig = original->getGenericSignature();
     if (!originalGenSig) {
       // `where` clauses are valid only when the original function is generic.
       diags
@@ -4300,51 +4382,35 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
       return true;
     }
 
-    // Build a new generic signature for autodiff derivative functions.
-    GenericSignatureBuilder builder(ctx);
-    // Add the original function's generic signature.
-    builder.addGenericSignature(originalGenSig);
+    InferredGenericSignatureRequest request{
+        original->getParentModule(),
+        originalGenSig.getPointer(),
+        /*genericParams=*/nullptr,
+        WhereClauseOwner(original, attr),
+        /*addedRequirements=*/{},
+        /*inferenceSources=*/{},
+        /*allowConcreteParams=*/true};
 
-    using FloatingRequirementSource =
-        GenericSignatureBuilder::FloatingRequirementSource;
+    // Compute generic signature for derivative functions.
+    derivativeGenSig = evaluateOrDefault(ctx.evaluator, request,
+                                         GenericSignatureWithError())
+        .getPointer();
 
-    bool errorOccurred = false;
-    WhereClauseOwner(original, attr)
-        .visitRequirements(
-            TypeResolutionStage::Structural,
-            [&](const Requirement &req, RequirementRepr *reqRepr) {
-              switch (req.getKind()) {
-              case RequirementKind::SameType:
-              case RequirementKind::Superclass:
-              case RequirementKind::Conformance:
-                break;
+    bool hadInvalidRequirements = false;
+    for (auto req : derivativeGenSig.requirementsNotSatisfiedBy(originalGenSig)) {
+      if (req.getKind() == RequirementKind::Layout) {
+        // Layout requirements are not supported.
+        diags
+            .diagnose(attr->getLocation(),
+                      diag::differentiable_attr_layout_req_unsupported);
+        hadInvalidRequirements = true;
+      }
+    }
 
-              // Layout requirements are not supported.
-              case RequirementKind::Layout:
-                diags
-                    .diagnose(attr->getLocation(),
-                              diag::differentiable_attr_layout_req_unsupported)
-                    .highlight(reqRepr->getSourceRange());
-                errorOccurred = true;
-                return false;
-              }
-
-              // Add requirement to generic signature builder.
-              builder.addRequirement(
-                  req, reqRepr, FloatingRequirementSource::forExplicit(
-                    reqRepr->getSeparatorLoc()),
-                  nullptr, original->getModuleContext());
-              return false;
-            });
-
-    if (errorOccurred) {
+    if (hadInvalidRequirements) {
       attr->setInvalid();
       return true;
     }
-
-    // Compute generic signature for derivative functions.
-    derivativeGenSig = std::move(builder).computeGenericSignature(
-        /*allowConcreteGenericParams=*/true);
   }
 
   attr->setDerivativeGenericSignature(derivativeGenSig);
@@ -4654,22 +4720,6 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   auto *originalFnType =
       getDerivativeOriginalFunctionType(derivativeInterfaceType);
 
-  // Returns true if the generic parameters in `source` satisfy the generic
-  // requirements in `target`.
-  std::function<bool(GenericSignature, GenericSignature)>
-      checkGenericSignatureSatisfied = [&](GenericSignature source,
-                                           GenericSignature target) {
-        // If target is null, then its requirements are satisfied.
-        if (!target)
-          return true;
-        // If source is null but target is not null, then target's
-        // requirements are not satisfied.
-        if (!source)
-          return false;
-
-        return target->requirementsNotSatisfiedBy(source).empty();
-      };
-
   // Returns true if the derivative function and original function candidate are
   // defined in compatible type contexts. If the derivative function and the
   // original function candidate have different parents, return false.
@@ -4702,8 +4752,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     // Error if the original candidate does not have the expected type.
     if (!checkFunctionSignature(
             cast<AnyFunctionType>(originalFnType->getCanonicalType()),
-            originalCandidate->getInterfaceType()->getCanonicalType(),
-            checkGenericSignatureSatisfied))
+            originalCandidate->getInterfaceType()->getCanonicalType()))
       return AbstractFunctionDeclLookupErrorKind::CandidateTypeMismatch;
     return None;
   };
@@ -4712,11 +4761,10 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
     const auto options =
         TypeResolutionOptions(None) | TypeResolutionFlags::AllowModule;
-    baseType =
-        TypeResolution::forContextual(derivative->getDeclContext(), options,
-                                      /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
-            .resolveType(baseTypeRepr);
+    baseType = TypeResolution::resolveContextualType(
+        baseTypeRepr, derivative->getDeclContext(), options,
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
   }
   if (baseType && baseType->hasError())
     return true;
@@ -5293,39 +5341,22 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     return;
   }
 
-  // Returns true if the generic parameters in `source` satisfy the generic
-  // requirements in `target`.
-  std::function<bool(GenericSignature, GenericSignature)>
-      checkGenericSignatureSatisfied = [&](GenericSignature source,
-                                           GenericSignature target) {
-        // If target is null, then its requirements are satisfied.
-        if (!target)
-          return true;
-        // If source is null but target is not null, then target's
-        // requirements are not satisfied.
-        if (!source)
-          return false;
-
-        return target->requirementsNotSatisfiedBy(source).empty();
-      };
-
   auto isValidOriginalCandidate = [&](AbstractFunctionDecl *originalCandidate)
       -> Optional<AbstractFunctionDeclLookupErrorKind> {
     // Error if the original candidate does not have the expected type.
     if (!checkFunctionSignature(
             cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
-            originalCandidate->getInterfaceType()->getCanonicalType(),
-            checkGenericSignatureSatisfied))
+            originalCandidate->getInterfaceType()->getCanonicalType()))
       return AbstractFunctionDeclLookupErrorKind::CandidateTypeMismatch;
     return None;
   };
 
   Type baseType;
   if (attr->getBaseTypeRepr()) {
-    baseType = TypeResolution::forContextual(transpose->getDeclContext(), None,
-                                             /*unboundTyOpener*/ nullptr,
-                                             /*placeholderHandler*/ nullptr)
-                   .resolveType(attr->getBaseTypeRepr());
+    baseType = TypeResolution::resolveContextualType(
+        attr->getBaseTypeRepr(), transpose->getDeclContext(), None,
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
   }
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
@@ -5418,7 +5449,7 @@ void AttributeChecker::visitActorAttr(ActorAttr *attr) {
 void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   auto dc = D->getDeclContext();
 
-  // distributed can be applied to actor class definitions and async functions
+  // distributed can be applied to actor definitions and their methods
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
     // distributed can not be applied to stored properties
     diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
@@ -5464,9 +5495,10 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       return;
     } else if (auto protoDecl = dc->getSelfProtocolDecl()){
       if (!protoDecl->inheritsFromDistributedActor()) {
-        // TODO: could suggest adding `: DistributedActor` to the protocol as well
-        diagnoseAndRemoveAttr(
+        auto diag = diagnoseAndRemoveAttr(
             attr, diag::distributed_actor_func_not_in_distributed_actor);
+        diagnoseDistributedFunctionInNonDistributedActorProtocol(
+            protoDecl, diag);
         return;
       }
     } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {
@@ -5491,7 +5523,13 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       // distributed actors. Attempts of nonisolated access would be
       // cross-actor, and that means they might be accessing on a remote actor,
       // in which case the stored property storage does not exist.
-      if (nominal && nominal->isDistributedActor()) {
+      //
+      // The synthesized "id" and "actorTransport" are the only exceptions,
+      // because the implementation mirrors them.
+      if (nominal && nominal->isDistributedActor() &&
+          !(var->isImplicit() &&
+            (var->getName() == Ctx.Id_id ||
+             var->getName() == Ctx.Id_actorTransport))) {
         diagnoseAndRemoveAttr(attr,
                               diag::nonisolated_distributed_actor_storage);
         return;
@@ -5516,19 +5554,29 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       return;
     }
   }
+  
+  // `nonisolated` on most actor initializers is invalid or redundant.
+  if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+      if (nominal->isAnyActor()) {
+        if (ctor->isConvenienceInit()) {
+          // all convenience inits are `nonisolated` by default
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_convenience_init)
+            .warnUntilSwiftVersion(6);
+          return;
+          
+        } else if (!ctor->hasAsync()) {
+          // the isolation for a synchronous init cannot be `nonisolated`.
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
+            .warnUntilSwiftVersion(6);
+          return;
+        }
+      }
+    }
+  }
 
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     (void)getActorIsolation(VD);
-  }
-}
-
-void AttributeChecker::visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr) {
-  /// user-inaccessible _distributedActorIndependent can only be applied to let properties
-  if (auto var = dyn_cast<VarDecl>(D)) {
-    if (!var->isLet()) {
-      diagnoseAndRemoveAttr(attr, diag::distributed_actor_independent_property_must_be_let);
-      return;
-    }
   }
 }
 
@@ -5607,6 +5655,12 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
       inheritedProto->diagnose(
           diag::decl_declared_here, inheritedProto->getName());
     }
+  }
+
+  if (Type superclass = proto->getSuperclass()) {
+    proto->diagnose(
+        diag::marker_protocol_inherit_class,
+        proto->getName(), superclass);
   }
 
   // A marker protocol cannot have any requirements.

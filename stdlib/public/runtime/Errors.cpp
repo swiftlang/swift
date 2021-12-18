@@ -14,12 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__HAIKU__) || defined(__wasi__)
-#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
-#else
-#define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
-#endif
-
 #if defined(_WIN32)
 #include <mutex>
 #endif
@@ -31,14 +25,13 @@
 #include <string.h>
 #if defined(_WIN32)
 #include <io.h>
-#else
-#include <unistd.h>
 #endif
 #include <stdarg.h>
 
 #include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Portability.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -52,7 +45,7 @@
 #include <execinfo.h>
 #endif
 
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
@@ -72,7 +65,7 @@ enum: uint32_t {
 
 using namespace swift;
 
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING && SWIFT_STDLIB_HAS_DLADDR
 static bool getSymbolNameAddr(llvm::StringRef libraryName,
                               const SymbolInfo &syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
@@ -135,7 +128,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 
 void swift::dumpStackTraceEntry(unsigned index, void *framePC,
                                 bool shortOutput) {
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING && !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+#if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING && SWIFT_STDLIB_HAS_DLADDR
   SymbolInfo syminfo;
 
   // 0 is failure for lookupSymbol
@@ -223,7 +216,7 @@ static _Unwind_Reason_Code SwiftUnwindFrame(struct _Unwind_Context *context, voi
 
 SWIFT_ALWAYS_INLINE
 static bool withCurrentBacktraceImpl(std::function<void(void **, int)> call) {
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
   constexpr unsigned maxSupportedStackDepth = 128;
   void *addrs[maxSupportedStackDepth];
 #if defined(_WIN32)
@@ -288,7 +281,7 @@ reportOnCrash(uint32_t flags, const char *message)
   char *oldMessage = (char *)CRGetCrashLogMessage();
   char *newMessage;
   if (oldMessage) {
-    asprintf(&newMessage, "%s%s", oldMessage, message);
+    swift_asprintf(&newMessage, "%s%s", oldMessage, message);
     if (malloc_size(oldMessage)) free(oldMessage);
   } else {
     newMessage = strdup(message);
@@ -317,14 +310,15 @@ reportNow(uint32_t flags, const char *message)
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
 #else
-  write(STDERR_FILENO, message, strlen(message));
+  fputs(message, stderr);
+  fflush(stderr);
 #endif
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
 #endif
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
   if (flags & FatalErrorFlags::ReportBacktrace) {
     fputs("Current stack trace:\n", stderr);
     printCurrentBacktrace();
@@ -365,26 +359,6 @@ void swift::swift_reportError(uint32_t flags,
 #endif
   reportNow(flags, message);
   reportOnCrash(flags, message);
-}
-
-static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
-#if defined(_WIN32)
-  int len = _vscprintf(fmt, ap);
-  if (len < 0)
-    return -1;
-  char *buffer = reinterpret_cast<char *>(malloc(len + 1));
-  if (!buffer)
-    return -1;
-  int result = vsprintf(buffer, fmt, ap);
-  if (result < 0) {
-    free(buffer);
-    return -1;
-  }
-  *strp = buffer;
-  return result;
-#else
-  return vasprintf(strp, fmt, ap);
-#endif
 }
 
 // Report a fatal error to system console, stderr, and crash logs, then abort.

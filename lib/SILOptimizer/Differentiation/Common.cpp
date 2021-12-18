@@ -259,10 +259,6 @@ findDebugLocationAndVariable(SILValue originalValue) {
       return dvi->getVarInfo().map([&](SILDebugVariable var) {
         return std::make_pair(dvi->getDebugLocation(), var);
       });
-    if (auto *dvai = dyn_cast<DebugValueAddrInst>(use->getUser()))
-      return dvai->getVarInfo().map([&](SILDebugVariable var) {
-        return std::make_pair(dvai->getDebugLocation(), var);
-      });
   }
   return None;
 }

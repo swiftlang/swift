@@ -8,10 +8,10 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 enum TL {
   @TaskLocal
   static var number: Int = 2
@@ -19,7 +19,7 @@ enum TL {
 
 // ==== ------------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func bindAroundGroupSpawn() async {
   await TL.$number.withValue(1111) { // ok
     await withTaskGroup(of: Int.self) { group in
@@ -36,7 +36,7 @@ func bindAroundGroupSpawn() async {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await bindAroundGroupSpawn()

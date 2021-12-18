@@ -31,11 +31,8 @@ namespace {
 /// A utility for verifying memory lifetime.
 ///
 /// The MemoryLifetime utility checks the lifetime of memory locations.
-/// This is limited to memory locations which are guaranteed to be not aliased,
-/// like @in or @inout parameters. Also, alloc_stack locations are handled.
-///
-/// In addition to verification, the MemoryLifetime class can be used as utility
-/// (e.g. base class) for optimizations, which need to compute memory lifetime.
+/// This is limited to memory locations which can be handled by
+/// `MemoryLocations`.
 class MemoryLifetimeVerifier {
 
   using Bits = MemoryLocations::Bits;
@@ -70,7 +67,7 @@ class MemoryLifetimeVerifier {
 
   /// Issue an error if any bit in \p wrongBits is set.
   void require(const Bits &wrongBits, const Twine &complaint,
-                               SILInstruction *where);
+               SILInstruction *where, bool excludeTrivialEnums = false);
 
   /// Require that all the subLocation bits of the location, associated with
   /// \p addr, are clear in \p bits.
@@ -178,6 +175,16 @@ static bool isTrivialEnumElem(EnumElementDecl *elem, SILType enumType,
         enumType.getEnumElementType(elem, function).isTrivial(*function);
 }
 
+static bool injectsNoPayloadCase(InjectEnumAddrInst *IEAI) {
+  if (!IEAI->getElement()->hasAssociatedValues())
+    return true;
+  SILType enumType = IEAI->getOperand()->getType();
+  SILFunction *function = IEAI->getFunction();
+  SILType elemType = enumType.getEnumElementType(IEAI->getElement(), function);
+  // Handle empty types (e.g. the empty tuple) as no-payload.
+  return elemType.isEmpty(*function);
+}
+
 static bool isOrHasEnum(SILType type) {
   return type.getASTType().findIf([](Type ty) {
     return ty->getEnumOrBoundGenericEnum() != nullptr;
@@ -245,10 +252,11 @@ void MemoryLifetimeVerifier::reportError(const Twine &complaint,
 }
 
 void MemoryLifetimeVerifier::require(const Bits &wrongBits,
-                                const Twine &complaint, SILInstruction *where) {
+                                const Twine &complaint, SILInstruction *where,
+                                bool excludeTrivialEnums) {
   for (int errorLocIdx = wrongBits.find_first(); errorLocIdx >= 0;
        errorLocIdx = wrongBits.find_next(errorLocIdx)) {
-    if (!isEnumTrivialAt(errorLocIdx, where))
+    if (!excludeTrivialEnums || !isEnumTrivialAt(errorLocIdx, where))
       reportError(complaint, errorLocIdx, where);
   }
 }
@@ -256,8 +264,8 @@ void MemoryLifetimeVerifier::require(const Bits &wrongBits,
 void MemoryLifetimeVerifier::requireBitsClear(const Bits &bits, SILValue addr,
                                              SILInstruction *where) {
   if (auto *loc = locations.getLocation(addr)) {
-    require(bits & loc->subLocations,
-            "memory is initialized, but shouldn't", where);
+    require(bits & loc->subLocations, "memory is initialized, but shouldn't",
+            where, /*excludeTrivialEnums*/ true);
   }
 }
 
@@ -349,7 +357,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::InjectEnumAddrInst: {
         auto *IEAI = cast<InjectEnumAddrInst>(&I);
         int enumIdx = locations.getLocationIdx(IEAI->getOperand());
-        if (enumIdx >= 0 && !IEAI->getElement()->hasAssociatedValues()) {
+        if (enumIdx >= 0 && injectsNoPayloadCase(IEAI)) {
           // This is a bit tricky: an injected no-payload case means that the
           // "full" enum is initialized. So, for the purpose of dataflow, we
           // treat it like a full initialization of the payload data.
@@ -495,7 +503,8 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
       BlockState &predState = dataFlow[pred];
       if (predState.reachableFromEntry) {
         require((bs.data.entrySet ^ predState.exitSet) & nonTrivialLocations,
-          "lifetime mismatch in predecessors", pred->getTerminator());
+          "lifetime mismatch in predecessors", pred->getTerminator(),
+          /*excludeTrivialEnums*/ true);
       }
     }
 
@@ -508,13 +517,15 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
         require(expectedReturnBits & ~bs.data.exitSet,
           "indirect argument is not alive at function return", term);
         require(bs.data.exitSet & ~expectedReturnBits & nonTrivialLocations,
-          "memory is initialized at function return but shouldn't", term);
+          "memory is initialized at function return but shouldn't", term,
+           /*excludeTrivialEnums*/ true);
         break;
       case SILInstructionKind::ThrowInst:
         require(expectedThrowBits & ~bs.data.exitSet,
           "indirect argument is not alive at throw", term);
         require(bs.data.exitSet & ~expectedThrowBits & nonTrivialLocations,
-          "memory is initialized at throw but shouldn't", term);
+          "memory is initialized at throw but shouldn't", term,
+           /*excludeTrivialEnums*/ true);
         break;
       default:
         break;
@@ -588,7 +599,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::InjectEnumAddrInst: {
         auto *IEAI = cast<InjectEnumAddrInst>(&I);
         int enumIdx = locations.getLocationIdx(IEAI->getOperand());
-        if (enumIdx >= 0 && !IEAI->getElement()->hasAssociatedValues()) {
+        if (enumIdx >= 0 && injectsNoPayloadCase(IEAI)) {
           // Again, an injected no-payload case is treated like a "full"
           // initialization. See initDataflowInBlock().
           requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);
@@ -610,8 +621,17 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::ValueMetatypeInst:
       case SILInstructionKind::IsUniqueInst:
       case SILInstructionKind::FixLifetimeInst:
-      case SILInstructionKind::DebugValueAddrInst:
         requireBitsSet(bits, I.getOperand(0), &I);
+        break;
+      case SILInstructionKind::DebugValueInst:
+        // We don't want to check `debug_value` instructions that
+        // are used to mark variable declarations (e.g. its SSA value is
+        // an alloc_stack), which don't have any `op_deref` in its
+        // di-expression, because that memory does't need to be initialized
+        // when `debug_value` is referencing it.
+        if (cast<DebugValueInst>(&I)->hasAddrVal() &&
+            cast<DebugValueInst>(&I)->exprStartsWithDeref())
+          requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
         // Note that despite the name, unchecked_take_enum_data_addr does _not_

@@ -481,7 +481,6 @@ swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
   SourceManager SM;
   unsigned bufID = SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(
       StringRef(source, len), "syntax_parse_source"));
-  TypeCheckerOptions tyckOpts;
   LangOptions langOpts;
   langOpts.BuildSyntaxTree = true;
   langOpts.ParseForSyntaxTreeOnly = true;
@@ -494,8 +493,8 @@ swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
     std::make_shared<CLibParseActions>(*this, SM, bufID);
   // We have to use SourceFileKind::Main to avoid diagnostics like
   // illegal_top_level_expr
-  ParserUnit PU(SM, SourceFileKind::Main, bufID, langOpts, tyckOpts,
-                "syntax_parse_module", std::move(parseActions),
+  ParserUnit PU(SM, SourceFileKind::Main, bufID, langOpts, TypeCheckerOptions(),
+                SILOptions(), "syntax_parse_module", std::move(parseActions),
                 /*SyntaxCache=*/nullptr);
   std::unique_ptr<SynParserDiagConsumer> pConsumer;
   if (DiagHandler) {

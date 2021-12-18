@@ -23,7 +23,7 @@ let oddStringMap: [Int: String] = Dictionary(uniqueKeysWithValues:
 
 let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
 
-public let DictionaryCompactMapValues = [
+public let benchmarks = [
   BenchmarkInfo(name: "DictionaryCompactMapValuesOfNilValue",
     runFunction: compactMapValues, tags: t,
     setUpFunction: { blackHole(smallOddNumMap); blackHole(compactOddNums)},
@@ -34,14 +34,14 @@ public let DictionaryCompactMapValues = [
     legacyFactor: 54),
 ]
 
-func compactMapValues(N: Int) {
-  for _ in 1...20*N {
-    CheckResults(smallOddNumMap.compactMapValues({$0}) == compactOddNums)
+func compactMapValues(n: Int) {
+  for _ in 1...20*n {
+    check(smallOddNumMap.compactMapValues({$0}) == compactOddNums)
   }
 }
 
-func compactMapValuesInt(N: Int) {
-  for _ in 1...20*N {
-    CheckResults(oddStringMap.compactMapValues(Int.init) == compactOddNums)
+func compactMapValuesInt(n: Int) {
+  for _ in 1...20*n {
+    check(oddStringMap.compactMapValues(Int.init) == compactOddNums)
   }
 }

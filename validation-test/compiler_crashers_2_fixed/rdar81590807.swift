@@ -12,6 +12,12 @@
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
+// Enable with rdar://85526879
+// UNSUPPORTED: CPU=arm64e
+
+// rdar://82123254
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 func run(on object: PFXObject) async throws {
   // CHECK: passSync

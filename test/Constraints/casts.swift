@@ -549,3 +549,105 @@ extension ChangeType where T == String? {
   var foo: String? { return self.delta?.previous as? String } // OK
   var bar: String? { self.delta?.next }
 }
+
+// SR-15038
+protocol ExperimentDeserializable {
+  static func deserializeExperiment(_ value: Any) -> Self?
+}
+
+extension String: ExperimentDeserializable {
+  static func deserializeExperiment(_ value: Any) -> String? { value as? String }
+}
+
+extension Int: ExperimentDeserializable {
+  static func deserializeExperiment(_ value: Any) -> Int? { value as? Int }
+}
+
+class Constant<T> {
+  private init(getUnderlyingValue: @escaping () -> T) {
+    print(getUnderlyingValue())
+  }
+}
+
+struct Thing {
+  let storage: [String: Any]
+}
+
+extension Constant where T: Sequence, T.Element: ExperimentDeserializable {
+  static func foo<U>(thing: Thing, defaultValue: T) -> T where T == [U] {
+    guard let array = thing.storage["foo"] as? [Any] else {
+      fatalError()
+    }
+
+    let value = array.map(T.Element.deserializeExperiment) as? [T.Element] ?? defaultValue // OK
+    return value
+  }
+}
+
+// Array
+func decodeStringOrInt<T: FixedWidthInteger>() -> [T] {
+  let stringWrapped = [String]()
+  if let values = stringWrapped.map({ $0.isEmpty ? 0 : T($0) }) as? [T] { // OK
+    return values
+  } else {
+    fatalError()
+  }
+}
+
+// Set 
+func decodeStringOrIntSet<T: FixedWidthInteger>() -> Set<T> {
+  let stringWrapped = [String]()
+  if let values = Set(stringWrapped.map({ $0.isEmpty ? 0 : T($0) })) as? Set<T> { // OK
+    return values
+  } else {
+    fatalError()
+  }
+}
+
+// Dictionary
+func decodeStringOrIntDictionary<T: FixedWidthInteger>() -> [Int: T] {
+  let stringWrapped = [String]()
+  if let values = Dictionary(uniqueKeysWithValues: stringWrapped.map({ $0.isEmpty ? (0, 0) : (0, T($0)) })) as? [Int: T] { // OK
+    return values
+  } else {
+    fatalError()
+  }
+}
+
+
+// SR-15281
+struct SR15281_A { }
+struct SR15281_B {
+  init(a: SR15281_A) { }
+}
+
+struct SR15281_S {
+  var a: SR15281_A? = SR15281_A()
+
+  var b: SR15281_B {
+    a.flatMap(SR15281_B.init(a:)) // expected-error{{cannot convert return expression of type 'SR15281_B?' to return type 'SR15281_B'}} {{34-34=!}}
+  }
+
+  var b1: SR15281_B {
+    a.flatMap(SR15281_B.init(a:)) as! SR15281_B 
+    // expected-warning@-1 {{forced cast from 'SR15281_B?' to 'SR15281_B' only unwraps optionals; did you mean to use '!'?}} {{34-34=!}} {{34-48=}}
+  }
+}
+
+class SR15281_AC {}
+class SR15281_BC {
+  init(a: SR15281_AC) { }
+}
+class SR15281_CC: SR15281_BC {}
+
+struct SR15281_SC {
+  var a: SR15281_AC? = SR15281_AC()
+
+  var b: SR15281_BC {
+    a.flatMap(SR15281_BC.init(a:)) // expected-error{{cannot convert return expression of type 'SR15281_BC?' to return type 'SR15281_BC'}} {{35-35=!}}
+  }
+
+  var c: SR15281_BC {
+    a.flatMap(SR15281_CC.init(a:)) // expected-error{{cannot convert return expression of type 'SR15281_CC?' to return type 'SR15281_BC'}} {{35-35=!}}
+  }
+}

@@ -129,11 +129,9 @@ class ObjCTest {
   // CHECK: {{^}$}}
 
   // OPT-LABEL: define hidden %0* @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
-  // OPT: [[ARG_CASTED:%.*]] = bitcast %0* %2 to %objc_object*
-  // OPT: [[ARG_RECASTED:%.*]] = bitcast %objc_object* [[ARG_CASTED]] to i8*
   // OPT: [[ARG_CASTED2:%.*]] = bitcast %0* %2 to i8*
-  // OPT: tail call i8* @llvm.objc.retainAutoreleaseReturnValue(i8* [[ARG_RECASTED]])
-  // OPT: [[CAST_FOR_RETURN:%.*]] = bitcast i8* [[ARG_CASTED2]] to %0*
+  // OPT: [[RES:%.*]] = tail call i8* @llvm.objc.retainAutoreleaseReturnValue(i8* [[ARG_CASTED2]])
+  // OPT: [[CAST_FOR_RETURN:%.*]] = bitcast i8* [[RES]] to %0*
   // OPT: ret %0* [[CAST_FOR_RETURN]]
   // OPT: {{^}$}}
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {

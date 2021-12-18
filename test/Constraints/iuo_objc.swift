@@ -25,7 +25,7 @@ func iuo_error(prop: IUOProperty) {
   let _: Coat? = prop.iuo!.optional!()
   let _: Coat? = prop.iuo!.optional!()!
   let _: Coat = prop.iuo.optional()
-  // expected-error@-1 {{value of optional type '(() -> Coat)?' must be unwrapped}}
+  // expected-error@-1 {{value of optional type '(() -> Coat?)?' must be unwrapped}}
   // expected-note@-2{{coalesce}}
   // expected-note@-3{{force-unwrap}}
   let _: Coat = prop.iuo.optional()!
@@ -35,7 +35,7 @@ func iuo_error(prop: IUOProperty) {
   let _: Coat = prop.iuo.optional!()
   let _: Coat = prop.iuo.optional!()!
   let _: Coat = prop.iuo!.optional()
-  // expected-error@-1 {{value of optional type '(() -> Coat)?' must be unwrapped}}
+  // expected-error@-1 {{value of optional type '(() -> Coat?)?' must be unwrapped}}
   // expected-note@-2{{coalesce}}
   // expected-note@-3{{force-unwrap}}
   

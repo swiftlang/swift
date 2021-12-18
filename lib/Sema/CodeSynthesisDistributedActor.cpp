@@ -31,158 +31,6 @@
 using namespace swift;
 
 /******************************************************************************/
-/******************************* RESOLVE FUNCTION *****************************/
-/******************************************************************************/
-
-/// Synthesizes the
-///
-/// \verbatim
-/// static resolve(_ address: ActorAddress,
-///                using transport: ActorTransport) throws -> Self {
-///   <filled in by SILGenDistributed>
-/// }
-/// \endverbatim
-///
-/// factory function in the AST, with an empty body. Its body is
-/// expected to be filled-in during SILGen.
-// TODO(distributed): move this synthesis to DerivedConformance style
-static void addFactoryResolveFunction(ClassDecl *decl) {
-  assert(decl->isDistributedActor());
-  auto &C = decl->getASTContext();
-
-  auto mkParam = [&](Identifier argName, Identifier paramName, Type ty) -> ParamDecl* {
-    auto *param = new (C) ParamDecl(SourceLoc(),
-                                    SourceLoc(), argName,
-                                    SourceLoc(), paramName, decl);
-    param->setImplicit();
-    param->setSpecifier(ParamSpecifier::Default);
-    param->setInterfaceType(ty);
-    return param;
-  };
-
-  auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-
-  // (_ identity: AnyActorIdentity, using transport: ActorTransport)
-  auto *params = ParameterList::create(
-      C,
-      /*LParenLoc=*/SourceLoc(),
-      /*params=*/{  mkParam(Identifier(), C.Id_identity, addressType),
-                    mkParam(C.Id_using, C.Id_transport, transportType)
-                  },
-      /*RParenLoc=*/SourceLoc()
-      );
-
-  // Func name: resolve(_:using:)
-  DeclName name(C, C.Id_resolve, params);
-
-  // Expected type: (Self) -> (AnyActorIdentity, ActorTransport) throws -> (Self)
-  auto *factoryDecl =
-      FuncDecl::createImplicit(C, StaticSpellingKind::KeywordStatic,
-                               name, SourceLoc(),
-                               /*async=*/false,
-                               /*throws=*/true,
-                               /*genericParams=*/nullptr,
-                               params,
-                               /*returnType*/decl->getDeclaredInterfaceType(),
-                               decl);
-
-  factoryDecl->setDistributedActorFactory(); // TODO(distributed): should we mark this specifically as the resolve factory?
-  factoryDecl->copyFormalAccessFrom(decl, /*sourceIsParentContext=*/true);
-
-  decl->addMember(factoryDecl);
-}
-
-/******************************************************************************/
-/******************************** PROPERTIES **********************************/
-/******************************************************************************/
-
-// TODO: deduplicate with 'declareDerivedProperty' from DerivedConformance...
-std::pair<VarDecl *, PatternBindingDecl *>
-createStoredProperty(ClassDecl *classDecl, ASTContext &ctx,
-                     VarDecl::Introducer introducer, Identifier name,
-                     Type propertyInterfaceType, Type propertyContextType,
-                     bool isStatic, bool isFinal) {
-  auto parentDC = classDecl;
-
-  VarDecl *propDecl = new (ctx)
-      VarDecl(/*IsStatic*/ isStatic, introducer,
-                           SourceLoc(), name, parentDC);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
-  propDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyInterfaceType);
-
-  Pattern *propPat = NamedPattern::createImplicit(ctx, propDecl);
-  propPat->setType(propertyContextType);
-
-  propPat = TypedPattern::createImplicit(ctx, propPat, propertyContextType);
-  propPat->setType(propertyContextType);
-
-  auto *pbDecl = PatternBindingDecl::createImplicit(
-      ctx, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
-      parentDC);
-  return {propDecl, pbDecl};
-}
-
-/// Adds the following, fairly special, properties to each distributed actor:
-/// - actorTransport
-/// - id
-// TODO(distributed): move this synthesis to DerivedConformance style
-static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
-  assert(decl->isDistributedActor());
-
-  auto &C = decl->getASTContext();
-
-  // ```
-  // @_distributedActorIndependent
-  // let id: AnyActorIdentity // TODO: move to `nonisolated var id {}` once we have the new allocation scheme
-  // ```
-  {
-    auto propertyType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-
-    VarDecl *propDecl;
-    PatternBindingDecl *pbDecl;
-    std::tie(propDecl, pbDecl) = createStoredProperty(
-        decl, C,
-        VarDecl::Introducer::Let, C.Id_id,
-        propertyType, propertyType,
-        /*isStatic=*/false, /*isFinal=*/true);
-
-    // mark as @_distributedActorIndependent, allowing access to it from everywhere
-    propDecl->getAttrs().add(
-        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true)); // TODO: remove and move to nonisolated once new constructors land
-
-    decl->addMember(propDecl);
-    decl->addMember(pbDecl);
-  }
-
-  // ```
-  // @_distributedActorIndependent
-  // let actorTransport: ActorTransport
-  // ```
-  // (no need for @actorIndependent because it is an immutable let)
-  {
-    auto propertyType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-
-    VarDecl *propDecl;
-    PatternBindingDecl *pbDecl;
-    std::tie(propDecl, pbDecl) = createStoredProperty(
-        decl, C,
-        VarDecl::Introducer::Let, C.Id_actorTransport,
-        propertyType, propertyType,
-        /*isStatic=*/false, /*isFinal=*/true);
-
-    // mark as @_distributedActorIndependent, allowing access to it from everywhere
-    propDecl->getAttrs().add(
-        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true)); // TODO: remove and move to nonisolated once new constructors land
-
-    decl->addMember(propDecl);
-    decl->addMember(pbDecl);
-  }
-}
-
-/******************************************************************************/
 /*************************** _REMOTE_ FUNCTIONS *******************************/
 /******************************************************************************/
 
@@ -243,39 +91,38 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
   file->setBuiltinInitializer(staticStringInit);
 
   auto startLineAndCol = SM.getPresumedLineAndColumnForLoc(distributedFunc->getStartLoc());
-//  auto *line = new (ctx) MagicIdentifierLiteralExpr(
-//      MagicIdentifierLiteralExpr::Line, loc, /*Implicit=*/true);
-//  auto *line = new (ctx) IntegerLiteralExpr(startLineAndCol.first, loc,
-//                                            /*implicit*/ true);
   auto *line = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.first);
   line->setType(uintType);
   line->setBuiltinInitializer(uintInit);
 
-//  auto *column = new (ctx) MagicIdentifierLiteralExpr(
-//      MagicIdentifierLiteralExpr::Column, loc, /*Implicit=*/true);
   auto *column = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.second);
   column->setType(uintType);
   column->setBuiltinInitializer(uintInit);
 
-  auto *call = CallExpr::createImplicit(
-      ctx, ref, { className, funcName, file, line, column }, {});
+  auto *argList = ArgumentList::forImplicitUnlabeled(
+      ctx, {className, funcName, file, line, column});
+  auto *call = CallExpr::createImplicit(ctx, ref, argList);
   call->setType(ctx.getNeverType());
   call->setThrows(false);
 
   SmallVector<ASTNode, 2> stmts;
-  stmts.push_back(call); // something() -> Never
-  // stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr)); // FIXME: this causes 'different types for return type: String vs. ()'
+  stmts.push_back(call);
   auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
                                 /*implicit=*/true);
   return { body, /*isTypeChecked=*/true };
 }
 
-static Identifier makeRemoteFuncIdentifier(FuncDecl* func) {
-  auto &C = func->getASTContext();
-  auto localFuncName = func->getBaseIdentifier().str().str();
+static Identifier makeRemoteFuncIdentifier(FuncDecl* distributedFunc) {
+  auto &C = distributedFunc->getASTContext();
+  assert(distributedFunc->isDistributed());
+  auto localFuncName = distributedFunc->getBaseIdentifier().str().str();
   auto remoteFuncIdent = C.getIdentifier("_remote_" + localFuncName);
   return remoteFuncIdent;
 }
+
+/******************************************************************************/
+/************************ SYNTHESIS ENTRY POINT *******************************/
+/******************************************************************************/
 
 /// Create a remote stub for the passed in \c func.
 /// The remote stub function is not user accessible and mirrors the API of
@@ -290,10 +137,23 @@ static Identifier makeRemoteFuncIdentifier(FuncDecl* func) {
 ///
 /// and is intended to be replaced by a transport library by providing an
 /// appropriate @_dynamicReplacement function.
-static void addImplicitRemoteActorFunction(ClassDecl *decl, FuncDecl *func) {
-  auto &C = decl->getASTContext();
-  auto parentDC = decl;
+static AbstractFunctionDecl *addImplicitDistributedActorRemoteFunction(
+    DeclContext *parentDC, AbstractFunctionDecl *AFD) {
+  auto nominal = parentDC->getSelfNominalTypeDecl();
+  if (!nominal || !nominal->isDistributedActor())
+    return nullptr;
 
+  auto func = dyn_cast<FuncDecl>(AFD);
+  if (!func || !func->isDistributed())
+    return nullptr;
+
+  // ==== if the remote func already exists, return it
+  if (auto existing = nominal->lookupDirectRemoteFunc(func))
+    return existing;
+
+  // ==== Synthesize and add 'remote' func to the actor decl
+
+  auto &C = func->getASTContext();
   auto remoteFuncIdent = makeRemoteFuncIdentifier(func);
 
   auto params = ParameterList::clone(C, func->getParameters());
@@ -311,12 +171,15 @@ static void addImplicitRemoteActorFunction(ClassDecl *decl, FuncDecl *func) {
   remoteFuncDecl->getAttrs().add(
       new (C) DynamicAttr(/*implicit=*/true));
 
-  // @_distributedActorIndependent
+  // nonisolated
+  remoteFuncDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit=*/true));
+
+  // nonisolated
   remoteFuncDecl->getAttrs().add(
-      new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*IsImplicit=*/true));
 
   // users should never have to access this function directly;
-  // it is only invoked from our distributed function thunk if the actor is remote.
+  // it is only invoked from our distributed instance method thunk if the actor is remote.
   remoteFuncDecl->setUserAccessible(false);
   remoteFuncDecl->setSynthesized();
 
@@ -325,36 +188,24 @@ static void addImplicitRemoteActorFunction(ClassDecl *decl, FuncDecl *func) {
   // same access control as the original function is fine
   remoteFuncDecl->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
 
-  decl->addMember(remoteFuncDecl);
+  cast<IterableDeclContext>(parentDC->getAsDecl())->addMember(remoteFuncDecl);
+
+  return remoteFuncDecl;
 }
 
-/// Synthesize dynamic _remote stub functions for each encountered distributed function.
-static void addImplicitRemoteActorFunctions(ClassDecl *decl) {
-  assert(decl->isDistributedActor());
+AbstractFunctionDecl *GetDistributedRemoteFuncRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *func) const {
 
-  for (auto member : decl->getMembers()) {
-    auto func = dyn_cast<FuncDecl>(member);
-    if (func && func->isDistributed()) {
-      addImplicitRemoteActorFunction(decl, func);
-    }
-  }
-}
+  if (!func->isDistributed())
+    return nullptr;
 
-/******************************************************************************/
-/************************ SYNTHESIS ENTRY POINT *******************************/
-/******************************************************************************/
+  auto &C = func->getASTContext();
+  DeclContext *DC = func->getDeclContext();
 
-/// Entry point for adding all computed members to a distributed actor decl.
-void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
-  // Bail out if not a distributed actor definition.
-  if (!decl->isDistributedActor())
-    return;
+  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
 
-  // If the _Distributed module is missing we cannot synthesize anything.
-  if (!swift::ensureDistributedModuleLoaded(decl))
-    return;
-
-  addFactoryResolveFunction(decl);
-  addImplicitDistributedActorStoredProperties(decl);
-  addImplicitRemoteActorFunctions(decl);
+  return addImplicitDistributedActorRemoteFunction(DC, func);
 }

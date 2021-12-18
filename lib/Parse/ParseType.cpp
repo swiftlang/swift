@@ -37,7 +37,8 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        const TypeAttributes &attrs,
                                        ParamDecl::Specifier specifier,
                                        SourceLoc specifierLoc,
-                                       SourceLoc isolatedLoc) {
+                                       SourceLoc isolatedLoc,
+                                       SourceLoc constLoc) {
   // Apply those attributes that do apply.
   if (!attrs.empty()) {
     ty = new (Context) AttributedTypeRepr(attrs, ty);
@@ -63,6 +64,10 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   // Apply 'isolated'.
   if (isolatedLoc.isValid()) {
     ty = new (Context) IsolatedTypeRepr(ty, isolatedLoc);
+  }
+
+  if (constLoc.isValid()) {
+    ty = new (Context) CompileTimeConstTypeRepr(ty, constLoc);
   }
 
   return ty;
@@ -157,6 +162,7 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-simple '!'
 ///     type-collection
 ///     type-array
+///     '_'
 ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
@@ -189,6 +195,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     ty = parseTypeCollection();
     break;
   }
+  case tok::kw__:
+    ty = makeParserResult(new (Context) PlaceholderTypeRepr(consumeToken()));
+    break;
   case tok::kw_protocol:
     if (startsWithLess(peekToken())) {
       ty = parseOldStyleProtocolComposition();
@@ -318,7 +327,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
                                      LAngleLoc, Args, RAngleLoc);
   return makeParserResult(applyAttributeToType(repr, attrs,
                                                ParamDecl::Specifier::Owned,
-                                               SourceLoc(), SourceLoc()));
+                                               SourceLoc(), SourceLoc(),
+                                               SourceLoc()));
 }
 
 
@@ -342,8 +352,10 @@ ParserResult<TypeRepr> Parser::parseType(
   ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
   SourceLoc isolatedLoc;
+  SourceLoc constLoc;
   TypeAttributes attrs;
-  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, attrs);
+  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, constLoc,
+                                   attrs);
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
@@ -540,12 +552,14 @@ ParserResult<TypeRepr> Parser::parseType(
     if (tyR)
       tyR->walk(walker);
   }
-  if (specifierLoc.isValid() || isolatedLoc.isValid() || !attrs.empty())
+  if (specifierLoc.isValid() || isolatedLoc.isValid() || !attrs.empty() ||
+      constLoc.isValid())
     SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
   return makeParserResult(
       status,
-      applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc));
+      applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc,
+                           constLoc));
 }
 
 ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
@@ -1013,10 +1027,6 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   TypeContext.setCreateSyntax(SyntaxKind::TupleType);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
 
-  if (ParsingTypeTuple.isFailed()) {
-    return makeParserError();
-  }
-
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   unsigned EllipsisIdx;
@@ -1468,6 +1478,9 @@ bool Parser::canParseType() {
     }
     if (!consumeIf(tok::r_square))
       return false;
+    break;
+  case tok::kw__:
+    consumeToken();
     break;
 
 

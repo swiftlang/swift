@@ -5,20 +5,22 @@
 
 import TestsUtils
 
-public var COWTree = BenchmarkInfo(
-  name: "COWTree",
-  runFunction: run_COWTree,
-  tags: [.validation, .abstraction, .String],
-  legacyFactor: 20
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "COWTree",
+    runFunction: run_COWTree,
+    tags: [.validation, .abstraction, .String],
+    legacyFactor: 20
+  ),
+]
 
 @inline(never)
-public func run_COWTree(_ N: Int) {
+public func run_COWTree(_ n: Int) {
   var tree1 = Tree<String>()
   var tree2 = Tree<String>()
   var tree3 = Tree<String>()
 
-  for _ in 1...50*N {
+  for _ in 1...50*n {
     tree1 = Tree<String>()
     tree1.insert("Emily")
     tree2 = tree1
@@ -31,7 +33,7 @@ public func run_COWTree(_ N: Int) {
     }
   }
 
-  CheckResults(checkRef(tree1, tree2, tree3))
+  check(checkRef(tree1, tree2, tree3))
 }
 
 @inline(never)

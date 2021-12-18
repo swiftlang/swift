@@ -728,6 +728,8 @@ private:
     auto resultTy = getForeignResultType(
         FD, funcTy, asyncConvention, errorConvention);
 
+    os << "SWIFT_EXTERN ";
+
     // The result type may be a partial function type we need to close
     // up later.
     PrintMultiPartType multiPart(*this);
@@ -771,7 +773,7 @@ private:
 
     printAvailability(FD);
 
-    os << ';';
+    os << ";\n";
   }
 
   enum class PrintLeadingSpace : bool {
@@ -2017,7 +2019,7 @@ auto DeclAndTypePrinter::getImpl() -> Implementation {
 }
 
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
-  return isVisibleToObjC(VD, minRequiredAccess) &&
+  return !VD->isInvalid() && isVisibleToObjC(VD, minRequiredAccess) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
 }
 

@@ -31,6 +31,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=TYPE_MODULE_QUALIFIER | %FileCheck %s -check-prefix=MODULE_QUALIFIER
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=EXPR_MODULE_QUALIFIER | %FileCheck %s -check-prefix=MODULE_QUALIFIER
 
+// Disabled due to CI failures on macosx-arm64 & watchsimulator-i386 (https://ci.swift.org/job/swift-PR-macos/29960/console)
+// REQUIRES: rdar85471345
+
 import Foo
 // Don't import FooHelper directly in this test!
 // import FooHelper
@@ -122,6 +125,9 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_BAR-DAG: Decl[GlobalVar]/OtherModule[Bar]:    BAR_MACRO_1[#Int32#]{{; name=.+$}}
 // CLANG_BAR-DAG: Decl[Struct]/OtherModule[Bar]:       SomeItemSet[#SomeItemSet#]
 // CLANG_BAR-DAG: Decl[TypeAlias]/OtherModule[Bar]:    SomeEnvironment[#SomeItemSet#]
+// CLANG_BAR-DAG: Decl[TypeAlias]/OtherModule[__ObjC]: __NSConstantString[#__NSConstantString_tag#]; name=__NSConstantString
+// CLANG_BAR-DAG: Decl[TypeAlias]/OtherModule[__ObjC]: __builtin_ms_va_list[#UnsafeMutablePointer<CChar>#]; name=__builtin_ms_va_list
+// CLANG_BAR-DAG: Decl[TypeAlias]/OtherModule[__ObjC]: __builtin_va_list[#(__va_list_tag)#]; name=__builtin_va_list
 // CLANG_BAR: End completions
 
 // CLANG_BOTH_FOO_BAR: Begin completions
@@ -148,12 +154,15 @@ func testCompleteModuleQualifiedFoo2() {
   Foo#^CLANG_QUAL_FOO_2^#
 // If the number of results below changes, then you need to add a result to the
 // list below.
-// CLANG_QUAL_FOO_2: Begin completions, 76 items
+// CLANG_QUAL_FOO_2: Begin completions, 82 items
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .FooClassBase[#FooClassBase#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .FooClassDerived[#FooClassDerived#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .ClassWithInternalProt[#ClassWithInternalProt#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:       ._InternalStruct[#_InternalStruct#]
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]:        .FooClassPropertyOwnership[#FooClassPropertyOwnership#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule[__ObjC]: .__NSConstantString[#__NSConstantString_tag#]; name=__NSConstantString
+// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule[__ObjC]: .__builtin_ms_va_list[#UnsafeMutablePointer<CChar>#]; name=__builtin_ms_va_list
+// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule[__ObjC]: .__builtin_va_list[#(__va_list_tag)#]; name=__builtin_va_list
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: ._internalTopLevelFunc()[#Void#]
 // CLANG_QUAL_FOO_2-DAG: Decl[Enum]/OtherModule[Foo]:         .FooComparisonResult[#FooComparisonResult#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[FreeFunction]/OtherModule[Foo]: .fooFunc1({#(a): Int32#})[#Int32#]{{; name=.+$}}
@@ -217,6 +226,9 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG:  Decl[Class]/OtherModule[Foo]:        .FooRepeatedMembers[#FooRepeatedMembers#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Class]/OtherModule[Foo]: .FooClassWithClassProperties[#FooClassWithClassProperties#];
 // CLANG_QUAL_FOO_2-DAG: Decl[Enum]/OtherModule[Foo]: .SCNFilterMode[#SCNFilterMode#];
+// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule[__ObjC]: .__NSConstantString[#__NSConstantString_tag#]; name=__NSConstantString
+// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule[__ObjC]: .__builtin_ms_va_list[#UnsafeMutablePointer<CChar>#]; name=__builtin_ms_va_list
+// CLANG_QUAL_FOO_2-DAG: Decl[TypeAlias]/OtherModule[__ObjC]: .__builtin_va_list[#(__va_list_tag)#]; name=__builtin_va_list
 // CLANG_QUAL_FOO_2: End completions
 }
 
@@ -224,7 +236,7 @@ func testCompleteModuleQualifiedBar1() {
   Bar.#^CLANG_QUAL_BAR_1^#
 // If the number of results below changes, this is an indication that you need
 // to add a result to the appropriate list.  Do not just bump the number!
-// CLANG_QUAL_BAR_1: Begin completions, 8 items
+// CLANG_QUAL_BAR_1: Begin completions, 11 items
 }
 
 func testCompleteFunctionCall1() {

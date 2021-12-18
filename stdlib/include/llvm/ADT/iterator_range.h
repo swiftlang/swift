@@ -18,7 +18,6 @@
 #ifndef LLVM_ADT_ITERATOR_RANGE_H
 #define LLVM_ADT_ITERATOR_RANGE_H
 
-#include <iterator>
 #include <utility>
 
 inline namespace __swift { inline namespace __runtime {

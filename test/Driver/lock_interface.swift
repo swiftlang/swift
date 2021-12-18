@@ -1,3 +1,4 @@
+// REQUIRES: radar82261445
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/sdk)
 // RUN: %empty-directory(%t/module-cache-lock)

@@ -294,6 +294,10 @@ public:
   /// even though they are technically trivial.
   bool isTrivial(const SILFunction &F) const;
 
+  /// True if the type is an empty tuple or an empty struct or a tuple or
+  /// struct containing only empty types.
+  bool isEmpty(const SILFunction &F) const;
+
   /// True if the type, or the referenced type of an address type, is known to
   /// be a scalar reference-counted type such as a class, box, or thick function
   /// type. Returns false for non-trivial aggregates.
@@ -615,6 +619,9 @@ public:
 
   /// Get the SIL token type.
   static SILType getSILTokenType(const ASTContext &C);
+
+  /// Return '()'
+  static SILType getEmptyTupleType(const ASTContext &C);
 
   //
   // Utilities for treating SILType as a pointer-like type.

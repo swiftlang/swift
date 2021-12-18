@@ -18,7 +18,7 @@ class Token(object):
         else:
             self.unprefixed_kind = unprefixed_kind
         self.serialization_code = serialization_code
-        self.text = text or ""
+        self.text = text
         self.classification = classification_by_name(classification)
         self.is_keyword = is_keyword
         self.requires_leading_space = requires_leading_space
@@ -336,7 +336,8 @@ SYNTAX_TOKENS = [
          serialization_code=105),
     Misc('UnspacedBinaryOperator', 'oper_binary_unspaced',
          serialization_code=107),
-    Misc('SpacedBinaryOperator', 'oper_binary_spaced', serialization_code=108),
+    Misc('SpacedBinaryOperator', 'oper_binary_spaced', serialization_code=108,
+         requires_leading_space=True, requires_trailing_space=True),
     Misc('PostfixOperator', 'oper_postfix', serialization_code=110),
     Misc('PrefixOperator', 'oper_prefix', serialization_code=109),
     Misc('DollarIdentifier', 'dollarident', classification='DollarIdentifier',

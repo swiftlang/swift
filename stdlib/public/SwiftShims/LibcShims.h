@@ -35,8 +35,6 @@ extern "C" {
 
 // Input/output <stdio.h>
 SWIFT_RUNTIME_STDLIB_INTERNAL
-int _swift_stdlib_putchar_unlocked(int c);
-SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                            __swift_size_t nitems);
 
@@ -86,6 +84,19 @@ static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
 #else
 #define CONST_CAST(type, value) (type)value
 #endif
+
+#ifndef _VA_LIST
+typedef __builtin_va_list va_list;
+#define _VA_LIST
+#endif
+
+static inline int _swift_stdlib_vprintf(const char * __restrict fmt, va_list args) {
+    extern int vprintf(const char * __restrict, va_list);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+    return vprintf(fmt, args);
+#pragma clang diagnostic pop
+}
 
 // Non-standard extensions
 #if defined(__APPLE__)

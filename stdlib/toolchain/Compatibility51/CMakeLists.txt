@@ -5,7 +5,7 @@ add_swift_target_library("${library_name}" STATIC
   Overrides.cpp
   ProtocolConformance.cpp
 
-  TARGET_SDKS ${SWIFT_APPLE_PLATFORMS}
+  TARGET_SDKS ${SWIFT_DARWIN_PLATFORMS}
 
   C_COMPILE_FLAGS ${CXX_COMPILE_FLAGS}
   LINK_FLAGS ${CXX_LINK_FLAGS}

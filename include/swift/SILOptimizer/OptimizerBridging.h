@@ -13,7 +13,9 @@
 #ifndef SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 #define SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 
-#include "../SIL/SILBridging.h"
+#include "swift/SIL/SILBridging.h"
+
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,8 +54,9 @@ void SILPassManager_registerFunctionPass(BridgedStringRef name,
 void SILCombine_registerInstructionPass(BridgedStringRef name,
                                         BridgedInstructionPassRunFn runFn);
 
-BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context,
-                                                  BridgedFunction function);
+SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context);
+
+BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context);
 
 BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
                                                    BridgedInstruction inst,
@@ -70,5 +73,7 @@ BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif

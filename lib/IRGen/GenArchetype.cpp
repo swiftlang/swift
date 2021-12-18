@@ -16,6 +16,7 @@
 
 #include "GenArchetype.h"
 
+#include "TypeLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -95,12 +96,13 @@ namespace {
 class OpaqueArchetypeTypeInfo
   : public ResilientTypeInfo<OpaqueArchetypeTypeInfo>
 {
-  OpaqueArchetypeTypeInfo(llvm::Type *type)
-    : ResilientTypeInfo(type, IsABIAccessible) {}
+  OpaqueArchetypeTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
+      : ResilientTypeInfo(type, abiAccessible) {}
 
 public:
-  static const OpaqueArchetypeTypeInfo *create(llvm::Type *type) {
-    return new OpaqueArchetypeTypeInfo(type);
+  static const OpaqueArchetypeTypeInfo *
+  create(llvm::Type *type, IsABIAccessible_t abiAccessible) {
+    return new OpaqueArchetypeTypeInfo(type, abiAccessible);
   }
 
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
@@ -125,13 +127,11 @@ class ClassArchetypeTypeInfo
 {
   ReferenceCounting RefCount;
 
-  ClassArchetypeTypeInfo(llvm::PointerType *storageType,
-                         Size size, const SpareBitVector &spareBits,
-                         Alignment align,
+  ClassArchetypeTypeInfo(llvm::PointerType *storageType, Size size,
+                         const SpareBitVector &spareBits, Alignment align,
                          ReferenceCounting refCount)
-    : HeapTypeInfo(storageType, size, spareBits, align),
-      RefCount(refCount)
-  {}
+      : HeapTypeInfo(refCount, storageType, size, spareBits, align),
+        RefCount(refCount) {}
 
 public:
   static const ClassArchetypeTypeInfo *create(llvm::PointerType *storageType,
@@ -342,7 +342,18 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
 
   // Otherwise, for now, always use an opaque indirect type.
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
-  return OpaqueArchetypeTypeInfo::create(storageType);
+
+  // Opaque result types can be private and from a different module. In this
+  // case we can't access their type metadata from another module.
+  IsABIAccessible_t abiAccessible = IsABIAccessible;
+  if (auto opaqueArchetype = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
+    auto &currentSILModule = IGM.getSILModule();
+    abiAccessible =
+        currentSILModule.isTypeMetadataAccessible(archetype->getCanonicalType())
+            ? IsABIAccessible
+            : IsNotABIAccessible;
+  }
+  return OpaqueArchetypeTypeInfo::create(storageType, abiAccessible);
 }
 
 static void setMetadataRef(IRGenFunction &IGF,
