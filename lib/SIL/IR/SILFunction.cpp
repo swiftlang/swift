@@ -86,6 +86,7 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
                     IsSerialized_t isSerialized, ProfileCounter entryCount,
                     IsDynamicallyReplaceable_t isDynamic,
+                    IsDistributed_t isDistributed,
                     IsExactSelfClass_t isExactSelfClass,
                     IsThunk_t isThunk,
                     SubclassScope classSubclassScope, Inline_t inlineStrategy,
@@ -108,14 +109,15 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
     // deleted. And afterwards the same specialization is created again.
     fn->init(linkage, name, loweredType, genericEnv, loc, isBareSILFunction,
              isTrans, isSerialized, entryCount, isThunk, classSubclassScope,
-             inlineStrategy, E, debugScope, isDynamic, isExactSelfClass);
+             inlineStrategy, E, debugScope, isDynamic, isExactSelfClass,
+             isDistributed);
     assert(fn->empty());
   } else {
     fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
                                 isBareSILFunction, isTrans, isSerialized,
                                 entryCount, isThunk, classSubclassScope,
                                 inlineStrategy, E, debugScope,
-                                isDynamic, isExactSelfClass);
+                                isDynamic, isExactSelfClass, isDistributed);
   }
   if (entry) entry->setValue(fn);
 
@@ -139,12 +141,13 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          Inline_t inlineStrategy, EffectsKind E,
                          const SILDebugScope *DebugScope,
                          IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass)
+                         IsExactSelfClass_t isExactSelfClass,
+                         IsDistributed_t isDistributed)
     : SwiftObjectHeader(registeredMetatype),
       Module(Module), Availability(AvailabilityContext::alwaysAvailable())  {
   init(Linkage, Name, LoweredType, genericEnv, Loc, isBareSILFunction, isTrans,
        isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
-       E, DebugScope, isDynamic, isExactSelfClass);
+       E, DebugScope, isDynamic, isExactSelfClass, isDistributed);
   
   // Set our BB list to have this function as its parent. This enables us to
   // splice efficiently basic blocks in between functions.
@@ -161,7 +164,8 @@ void SILFunction::init(SILLinkage Linkage, StringRef Name,
                          Inline_t inlineStrategy, EffectsKind E,
                          const SILDebugScope *DebugScope,
                          IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass) {
+                         IsExactSelfClass_t isExactSelfClass,
+                         IsDistributed_t isDistributed) {
   this->Name = Name;
   this->LoweredType = LoweredType;
   this->GenericEnv = genericEnv;
@@ -180,6 +184,7 @@ void SILFunction::init(SILLinkage Linkage, StringRef Name,
   this->IsWeakImported = false;
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
+  this->IsDistributed = isDistributed;
   this->Inlined = false;
   this->Zombie = false;
   this->HasOwnership = true,
@@ -676,6 +681,9 @@ SILFunction::isPossiblyUsedExternally() const {
     return true;
 
   if (ReplacedFunction)
+    return true;
+
+  if (isDistributed() && isThunk())
     return true;
 
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());

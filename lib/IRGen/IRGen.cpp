@@ -1118,6 +1118,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       IGM.emitSwiftProtocols(/*asContiguousArray*/ false);
       IGM.emitProtocolConformances(/*asContiguousArray*/ false);
       IGM.emitTypeMetadataRecords(/*asContiguousArray*/ false);
+      IGM.emitAccessibleFunctions();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
       irgen.emitEagerClassInitialization();
@@ -1360,6 +1361,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   irgen.emitProtocolConformances();
 
   irgen.emitTypeMetadataRecords();
+
+  irgen.emitAccessibleFunctions();
 
   irgen.emitReflectionMetadataVersion();
 

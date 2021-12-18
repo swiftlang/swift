@@ -74,5 +74,14 @@ void swift::initializeDynamicReplacementLookup() {
     return;
   addImageDynamicReplacementBlockCallback(start1, size1, start2, size2);
 }
+void swift::initializeAccessibleFunctionsLookup() {
+  void *start;
+  uintptr_t size;
+  GET_SECTION_START_AND_SIZE(start, size, MachOTextSegment,
+                             MachOAccessibleFunctionsSection);
+  if (start == nullptr || size == 0)
+    return;
+  addImageAccessibleFunctionBlockCallbackUnsafe(start, size);
+}
 
 #endif // defined(__MACH__) && defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)

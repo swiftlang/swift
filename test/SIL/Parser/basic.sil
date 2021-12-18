@@ -1725,6 +1725,13 @@ bb0:
   return %0 : $()
 }
 
+// CHECK-LABEL: sil hidden [distributed] @test_distributed_method
+sil hidden [distributed] @test_distributed_method : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
 struct EmptyStruct {}
 
 sil @test_empty_destructure : $@convention(thin) () -> () {
