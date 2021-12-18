@@ -30,6 +30,7 @@
 #include "SourceKit/SwiftLang/Factory.h"
 
 #include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
@@ -107,6 +108,7 @@ static SourceKit::Context *GlobalCtx = nullptr;
 void sourcekitd::initializeService(
     StringRef runtimeLibPath, StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification) {
+  INITIALIZE_LLVM();
   llvm::EnablePrettyStackTrace();
   GlobalCtx =
       new SourceKit::Context(runtimeLibPath, diagnosticDocumentationPath,
