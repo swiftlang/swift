@@ -2312,6 +2312,21 @@ enum class ContinuationStatus : size_t {
   Resumed = 2
 };
 
+/// Flags that go in a TargetAccessibleFunction structure.
+class AccessibleFunctionFlags : public FlagSet<uint32_t> {
+public:
+  enum {
+    /// Whether this is a "distributed" actor function.
+    Distributed = 0,
+  };
+
+  explicit AccessibleFunctionFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr AccessibleFunctionFlags() {}
+
+  /// Whether the this is a "distributed" actor function.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed, isDistributed, setDistributed)
+};
+
 } // end namespace swift
 
 #endif // SWIFT_ABI_METADATAVALUES_H

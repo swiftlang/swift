@@ -521,8 +521,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // classSubclassScope.
   TransformDescriptor.OptimizedFunction = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), IsNotDynamic, F->getEntryCount(),
-      F->isThunk(),
+      F->isTransparent(), F->isSerialized(), IsNotDynamic, IsNotDistributed,
+      F->getEntryCount(), F->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
   SILFunction *NewF = TransformDescriptor.OptimizedFunction.get();
