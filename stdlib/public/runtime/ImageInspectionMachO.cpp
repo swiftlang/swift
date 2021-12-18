@@ -43,6 +43,8 @@ constexpr const char DynamicReplacementSection[] =
     MachODynamicReplacementSection;
 constexpr const char DynamicReplacementSomeSection[] =
     MachODynamicReplacementSomeSection;
+constexpr const char AccessibleFunctionsSection[] =
+    MachOAccessibleFunctionsSection;
 constexpr const char TextSegment[] = MachOTextSegment;
 
 #if __POINTER_WIDTH__ == 64
@@ -157,6 +159,12 @@ void swift::initializeDynamicReplacementLookup() {
       addImageCallback2Sections<TextSegment, DynamicReplacementSection,
                                 TextSegment, DynamicReplacementSomeSection,
                                 addImageDynamicReplacementBlockCallback>);
+}
+
+void swift::initializeAccessibleFunctionsLookup() {
+  REGISTER_FUNC(
+      addImageCallback<TextSegment, AccessibleFunctionsSection,
+                       addImageAccessibleFunctionsBlockCallbackUnsafe>);
 }
 
 #if SWIFT_STDLIB_HAS_DLADDR

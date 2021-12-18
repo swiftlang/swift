@@ -131,12 +131,14 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::OutlinedBridgedMethod:
     case Node::Kind::MergedFunction:
     case Node::Kind::DistributedThunk:
+    case Node::Kind::DistributedMethodAccessor:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
     case Node::Kind::AsyncFunctionPointer:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
+    case Node::Kind::AccessibleFunctionRecord:
       return true;
     default:
       return false;
@@ -797,7 +799,7 @@ recur:
         return createWithChild(
             Node::Kind::ProtocolConformanceRefInProtocolModule, popProtocol());
 
-      // Runtime records (type/protocol/conformance)
+      // Runtime records (type/protocol/conformance/function)
       case 'c':
         return createWithChild(Node::Kind::ProtocolConformanceDescriptorRecord,
                                popProtocolConformance());
@@ -807,6 +809,8 @@ recur:
         return createWithChild(Node::Kind::OpaqueTypeDescriptorRecord, popNode());
       case 'r':
         return createWithChild(Node::Kind::ProtocolDescriptorRecord, popProtocol());
+      case 'F':
+        return createNode(Node::Kind::AccessibleFunctionRecord);
 
       default:
         pushBack();
@@ -2361,6 +2365,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'D': return createNode(Node::Kind::DynamicAttribute);
     case 'd': return createNode(Node::Kind::DirectMethodReferenceAttribute);
     case 'E': return createNode(Node::Kind::DistributedThunk);
+    case 'F': return createNode(Node::Kind::DistributedMethodAccessor);
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
     case 'm': return createNode(Node::Kind::MergedFunction);

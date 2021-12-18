@@ -27,6 +27,7 @@
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Mutex.h"
@@ -2003,4 +2004,78 @@ bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
 bool DefaultActorImpl::isDistributedRemote() {
   auto state = CurrentState.load(std::memory_order_relaxed);
   return state.Flags.isDistributedRemote();
+}
+
+static const AccessibleFunctionRecord *
+findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
+  if (auto *func = runtime::swift_findAccessibleFunction(targetNameStart,
+                                                         targetNameLength)) {
+    assert(func->Flags.isDistributed());
+    return func;
+  }
+  return nullptr;
+}
+
+/// func _executeDistributedTarget(
+///    on: AnyObject,
+///    _ targetName: UnsafePointer<UInt8>,
+///    _ targetNameLength: UInt,
+///    argumentBuffer: Builtin.RawPointer,
+///    resultBuffer: Builtin.RawPointer) async throws
+using TargetExecutorSignature =
+    AsyncSignature<void(DefaultActor *, const char *, size_t, void *, void *),
+                   /*throws=*/true>;
+
+SWIFT_CC(swiftasync)
+SWIFT_RUNTIME_STDLIB_SPI
+TargetExecutorSignature::FunctionType swift_distributed_execute_target;
+
+/// Accessor takes:
+///   - an async context
+///   - an argument buffer as a raw pointer
+///   - a result buffer as a raw pointer
+///   - a reference to an actor to execute method on.
+using DistributedAccessorSignature =
+    AsyncSignature<void(void *, void *, HeapObject *),
+                   /*throws=*/true>;
+
+SWIFT_CC(swiftasync)
+static DistributedAccessorSignature::ContinuationType
+    swift_distributed_execute_target_resume;
+
+SWIFT_CC(swiftasync)
+static void ::swift_distributed_execute_target_resume(
+    SWIFT_ASYNC_CONTEXT AsyncContext *context, SWIFT_CONTEXT void *error) {
+  auto parentCtx = context->Parent;
+  auto resumeInParent =
+      reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
+          parentCtx->ResumeParent);
+  swift_task_dealloc(context);
+  return resumeInParent(parentCtx, error);
+}
+
+SWIFT_CC(swiftasync)
+void ::swift_distributed_execute_target(
+    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext, DefaultActor *actor,
+    const char *targetNameStart, size_t targetNameLength, void *argumentBuffer,
+    void *resultBuffer) {
+  auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
+
+  if (!accessor)
+    return;
+
+  auto *asyncFnPtr = reinterpret_cast<
+      const AsyncFunctionPointer<DistributedAccessorSignature> *>(accessor);
+
+  DistributedAccessorSignature::FunctionType *accessorEntry =
+      asyncFnPtr->Function.get();
+
+  AsyncContext *calleeContext = reinterpret_cast<AsyncContext *>(
+      swift_task_alloc(asyncFnPtr->ExpectedContextSize));
+
+  calleeContext->Parent = callerContext;
+  calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+      swift_distributed_execute_target_resume);
+
+  accessorEntry(calleeContext, argumentBuffer, resultBuffer, actor);
 }
