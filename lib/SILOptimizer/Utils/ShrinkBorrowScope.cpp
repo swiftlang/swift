@@ -49,6 +49,8 @@ class ShrinkBorrowScope {
 
   SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts;
 
+  /// Instructions which are users of the simple (i.e. not reborrowed) extended
+  /// i.e. copied lifetime of the introducer.
   SmallPtrSet<SILInstruction *, 16> users;
 
   /// Deinit barriers that obstruct hoisting end_borrow instructions.
