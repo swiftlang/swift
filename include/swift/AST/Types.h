@@ -637,9 +637,9 @@ public:
   /// Determine whether the type is an opened existential type with Error inside
   bool isOpenedExistentialWithError();
 
-  /// Retrieve the set of opened existential archetypes that occur
-  /// within this type.
-  void getOpenedExistentials(SmallVectorImpl<OpenedArchetypeType *> &opened);
+  /// Retrieve the set of root opened archetypes that occur within this type.
+  void getRootOpenedExistentials(
+      SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
 
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
@@ -5536,7 +5536,8 @@ public:
   /// primary archetype.
   ArchetypeType *getParent() const;
 
-  /// Return the root archetype parent of this archetype.
+  /// Return the archetype that represents the root generic parameter of its
+  /// interface type.
   ArchetypeType *getRoot() const;
 
   /// Determine whether this is a root archetype within the environment.
@@ -5772,6 +5773,12 @@ public:
   
   /// Retrieve the opened existential type
   Type getOpenedExistentialType() const;
+
+  /// Return the archetype that represents the root generic parameter of its
+  /// interface type.
+  OpenedArchetypeType *getRoot() const {
+    return cast<OpenedArchetypeType>(ArchetypeType::getRoot());
+  }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;

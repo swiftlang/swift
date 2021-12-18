@@ -1018,9 +1018,9 @@ public:
            node->getKind() <= SILNodeKind::Last_SingleValueInstruction;
   }
 
-  /// If this is an instruction which "defines" an opened archetype, it is
+  /// If this is an instruction which "defines" a root opened archetype, it is
   /// returned.
-  CanArchetypeType getOpenedArchetype() const;
+  CanOpenedArchetypeType getDefinedOpenedArchetype() const;
 
   SILInstruction *getPreviousInstruction() {
     return SILInstruction::getPreviousInstruction();

@@ -455,19 +455,20 @@ bool TypeBase::hasOpenedExistentialWithRoot(
   });
 }
 
-void TypeBase::getOpenedExistentials(
-       SmallVectorImpl<OpenedArchetypeType *> &opened) {
+void TypeBase::getRootOpenedExistentials(
+    SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const {
   if (!hasOpenedExistential())
     return;
 
-  SmallPtrSet<ArchetypeType *, 4> known;
+  SmallPtrSet<OpenedArchetypeType *, 4> known;
   getCanonicalType().findIf([&](Type type) -> bool {
-    auto archetype = dyn_cast<OpenedArchetypeType>(type.getPointer());
+    auto *archetype = dyn_cast<OpenedArchetypeType>(type.getPointer());
     if (!archetype)
       return false;
 
-    if (known.insert(archetype).second)
-      opened.push_back(archetype);
+    auto *root = archetype->getRoot();
+    if (known.insert(root).second)
+      rootOpenedArchetypes.push_back(root);
 
     return false;
   });
@@ -3329,6 +3330,10 @@ ArchetypeType *ArchetypeType::getParent() const {
 }
 
 ArchetypeType *ArchetypeType::getRoot() const {
+  if (isRoot()) {
+    return const_cast<ArchetypeType *>(this);
+  }
+
   auto gp = InterfaceType->getRootGenericParam();
   assert(gp && "Missing root generic parameter?");
   return getGenericEnvironment()->mapTypeIntoContext(
@@ -4447,16 +4452,16 @@ static Type substType(Type derivedType,
     if (isa<GenericTypeParamType>(substOrig))
       return ErrorType::get(type);
 
-    // Opened existentials cannot be substituted in this manner,
-    // but if they appear in the original type this is not an
-    // error.
     auto origArchetype = cast<ArchetypeType>(substOrig);
-    if (isa<OpenedArchetypeType>(origArchetype->getRoot()))
-      return Type(type);
-
-    // Root archetypes must already have been substituted above.
-    if (origArchetype->isRoot())
-      return ErrorType::get(type);
+    if (origArchetype->isRoot()) {
+      // Root opened archetypes are not required to be substituted. Other root
+      // archetypes must already have been substituted above.
+      if (isa<OpenedArchetypeType>(origArchetype)) {
+        return Type(type);
+      } else {
+        return ErrorType::get(type);
+      }
+    }
 
     // For nested archetypes, we can substitute the parent.
     auto parent = origArchetype->getParent();

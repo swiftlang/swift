@@ -41,13 +41,12 @@ static void *allocateTrailingInst(SILFunction &F, CountTypes... counts) {
              alignof(Inst));
 }
 
-// Collect used open archetypes from a given type into the \p openedArchetypes.
-// \p openedArchetypes is being used as a set. We don't use a real set type here
-// for performance reasons.
-static void
-collectDependentTypeInfo(CanType Ty,
-                         SmallVectorImpl<CanArchetypeType> &openedArchetypes,
-                         bool &hasDynamicSelf) {
+/// Collect root open archetypes from a given type into \p RootOpenedArchetypes.
+/// \p RootOpenedArchetypes is being used as a set. We don't use a real set type
+/// here for performance reasons.
+static void collectDependentTypeInfo(
+    CanType Ty, SmallVectorImpl<CanOpenedArchetypeType> &RootOpenedArchetypes,
+    bool &hasDynamicSelf) {
   if (!Ty)
     return;
   if (Ty->hasDynamicSelfType())
@@ -55,56 +54,56 @@ collectDependentTypeInfo(CanType Ty,
   if (!Ty->hasOpenedExistential())
     return;
   Ty.visit([&](CanType t) {
-    if (t->isOpenedExistential()) {
-      // Add this opened archetype if it was not seen yet.
+    if (const auto opened = dyn_cast<OpenedArchetypeType>(t)) {
+      const auto root = cast<OpenedArchetypeType>(CanType(opened->getRoot()));
+
+      // Add this root opened archetype if it was not seen yet.
       // We don't use a set here, because the number of open archetypes
       // is usually very small and using a real set may introduce too
       // much overhead.
-      auto archetypeTy = cast<ArchetypeType>(t);
-      if (std::find(openedArchetypes.begin(), openedArchetypes.end(),
-                    archetypeTy) == openedArchetypes.end())
-        openedArchetypes.push_back(archetypeTy);
+      if (std::find(RootOpenedArchetypes.begin(), RootOpenedArchetypes.end(),
+                    root) == RootOpenedArchetypes.end())
+        RootOpenedArchetypes.push_back(root);
     }
   });
 }
 
-// Takes a set of open archetypes as input and produces a set of
-// references to open archetype definitions.
+/// Takes a set of root opened archetypes as input and produces a set of
+/// references to their definitions.
 static void buildTypeDependentOperands(
-    SmallVectorImpl<CanArchetypeType> &OpenedArchetypes,
-    bool hasDynamicSelf,
-    SmallVectorImpl<SILValue> &TypeDependentOperands, SILFunction &F) {
+    SmallVectorImpl<CanOpenedArchetypeType> &RootOpenedArchetypes,
+    bool hasDynamicSelf, SmallVectorImpl<SILValue> &TypeDependentOperands,
+    SILFunction &F) {
 
-  for (auto archetype : OpenedArchetypes) {
-    SILValue def = F.getModule().getOpenedArchetypeDef(archetype, &F);
+  for (const auto archetype : RootOpenedArchetypes) {
+    SILValue def = F.getModule().getRootOpenedArchetypeDef(archetype, &F);
     assert(def->getFunction() == &F &&
-           "def of opened archetype is in wrong function");
+           "def of root opened archetype is in wrong function");
     TypeDependentOperands.push_back(def);
   }
   if (hasDynamicSelf)
     TypeDependentOperands.push_back(F.getDynamicSelfMetadata());
 }
 
-// Collects all opened archetypes from a type and a substitutions list and form
-// a corresponding list of opened archetype operands.
-// We need to know the number of opened archetypes to estimate
-// the number of opened archetype operands for the instruction
-// being formed, because we need to reserve enough memory
-// for these operands.
+/// Collects all root opened archetypes from a type and a substitution list, and
+/// forms a corresponding list of operands.
+/// We need to know the number of root opened archetypes to estimate the number
+/// of corresponding operands for the instruction being formed, because we need
+/// to reserve enough memory for these operands.
 static void collectTypeDependentOperands(
                       SmallVectorImpl<SILValue> &TypeDependentOperands,
                       SILFunction &F,
                       CanType Ty,
                       SubstitutionMap subs = { }) {
-  SmallVector<CanArchetypeType, 4> openedArchetypes;
+  SmallVector<CanOpenedArchetypeType, 4> RootOpenedArchetypes;
   bool hasDynamicSelf = false;
-  collectDependentTypeInfo(Ty, openedArchetypes, hasDynamicSelf);
+  collectDependentTypeInfo(Ty, RootOpenedArchetypes, hasDynamicSelf);
   for (Type replacement : subs.getReplacementTypes()) {
     // Substitutions in SIL should really be canonical.
     auto ReplTy = replacement->getCanonicalType();
-    collectDependentTypeInfo(ReplTy, openedArchetypes, hasDynamicSelf);
+    collectDependentTypeInfo(ReplTy, RootOpenedArchetypes, hasDynamicSelf);
   }
-  buildTypeDependentOperands(openedArchetypes, hasDynamicSelf,
+  buildTypeDependentOperands(RootOpenedArchetypes, hasDynamicSelf,
                              TypeDependentOperands, F);
 }
 

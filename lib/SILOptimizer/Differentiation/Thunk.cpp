@@ -144,12 +144,13 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   // Does the thunk type involve an open existential type?
   CanOpenedArchetypeType openedExistential;
   auto archetypeVisitor = [&](CanType t) {
-    if (auto archetypeTy = dyn_cast<OpenedArchetypeType>(t)) {
+    if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
       if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
+        const auto root = cast<OpenedArchetypeType>(CanType(opened->getRoot()));
         assert((openedExistential == CanArchetypeType() ||
-                openedExistential == opened) &&
+                openedExistential == root) &&
                "one too many open existentials");
-        openedExistential = opened;
+        openedExistential = root;
       } else {
         hasArchetypes = true;
       }

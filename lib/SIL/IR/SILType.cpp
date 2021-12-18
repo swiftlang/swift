@@ -34,14 +34,14 @@ using namespace swift::Lowering;
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-CanArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+CanOpenedArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
   if (!Ty)
-    return CanArchetypeType();
+    return CanOpenedArchetypeType();
   while (auto MetaTy = dyn_cast<AnyMetatypeType>(Ty))
     Ty = MetaTy.getInstanceType();
   if (Ty->isOpenedExistential())
-    return cast<ArchetypeType>(Ty);
-  return CanArchetypeType();
+    return cast<OpenedArchetypeType>(Ty);
+  return CanOpenedArchetypeType();
 }
 
 SILType SILType::getExceptionType(const ASTContext &C) {
