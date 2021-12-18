@@ -8609,7 +8609,8 @@ bool ClassDecl::isNSObject() const {
   if (!getName().is("NSObject")) return false;
   ASTContext &ctx = getASTContext();
   return (getModuleContext()->getName() == ctx.Id_Foundation ||
-          getModuleContext()->getName() == ctx.Id_ObjectiveC);
+          getModuleContext()->getName() == ctx.Id_ObjectiveC ||
+          getModuleContext()->getName().is("SwiftFoundation"));
 }
 
 Type ClassDecl::getSuperclass() const {
