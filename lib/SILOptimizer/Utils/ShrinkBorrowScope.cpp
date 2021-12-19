@@ -47,12 +47,26 @@ class ShrinkBorrowScope {
 
   InstructionDeleter &deleter;
 
+  SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts;
+
+  /// Instructions which are users of the simple (i.e. not reborrowed) extended
+  /// i.e. copied lifetime of the introducer.
   SmallPtrSet<SILInstruction *, 16> users;
+
+  /// Deinit barriers that obstruct hoisting end_borrow instructions.
   llvm::SmallVector<std::pair<SILBasicBlock *, SILInstruction *>>
       barrierInstructions;
 
-  SmallPtrSet<SILBasicBlock *, 8> blocksWithReachedTops;
-  SmallPtrSet<SILBasicBlock *, 8> blocksToEndAtTop;
+  /// Blocks above which the borrow scope cannot be hoisted.
+  ///
+  /// Consequently, these blocks must begin with end_borrow %borrow.
+  ///
+  /// Note: These blocks aren't barrier blocks.  Rather the borrow scope is
+  ///       barred from being hoisted out of them.  That could happen because
+  ///       one of its predecessors is a barrier block (i.e. has a successor
+  ///       which is live) or because one of its predecessors has a terminator
+  ///       which is itself a deinit barrier.
+  SmallPtrSet<SILBasicBlock *, 8> barredBlocks;
 
   llvm::SmallDenseMap<ApplySite, size_t> transitiveUsesPerApplySite;
 
@@ -64,24 +78,34 @@ class ShrinkBorrowScope {
   // The instructions from which the shrinking starts, the scope ending
   // instructions, keyed off the block in which they appear.
   llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *> startingInstructions;
+  // The end _borrow instructions for this borrow scope that existed before
+  // ShrinkBorrowScope ran and which were not modified.
+  llvm::SmallPtrSet<SILInstruction *, 8> reusedEndBorrowInsts;
+
+  // Whether ShrinkBorrowScope made any changes to the function.
+  //
+  // It could have made one of the following sorts of changes:
+  // - deleted an end_borrow
+  // - created an end_borrow
+  // - rewrote the operand of an instruction
+  //   - ApplySite
+  //   - begin_borrow
+  //   - copy_value
+  bool madeChange;
 
 public:
-  ShrinkBorrowScope(BeginBorrowInst *bbi, InstructionDeleter &deleter)
-      : introducer(bbi), deleter(deleter) {}
+  ShrinkBorrowScope(BeginBorrowInst *bbi, InstructionDeleter &deleter,
+                    SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts)
+      : introducer(bbi), deleter(deleter),
+        modifiedCopyValueInsts(modifiedCopyValueInsts), madeChange(false) {}
 
   bool run();
 
   bool populateUsers();
   bool initializeWorklist();
   void findBarriers();
-  void rewrite();
-  void createEndBorrow(SILInstruction *insertionPoint);
-
-  bool reachedTopOfAllSuccessors(SILBasicBlock *block) {
-    return llvm::all_of(block->getSuccessorBlocks(), [=](auto *successor) {
-      return blocksWithReachedTops.contains(successor);
-    });
-  }
+  bool rewrite();
+  bool createEndBorrow(SILInstruction *insertionPoint);
 
   bool isBarrierApply(SILInstruction *instruction) {
     // For now, treat every apply (that doesn't use the borrowed value) as a
@@ -135,7 +159,11 @@ public:
     return 0;
   }
 
-  bool tryHoistOverInstruction(SILInstruction *instruction) {
+  bool canHoistOverInstruction(SILInstruction *instruction) {
+    return tryHoistOverInstruction(instruction, /*rewrite=*/false);
+  }
+
+  bool tryHoistOverInstruction(SILInstruction *instruction, bool rewrite = true) {
     if (users.contains(instruction)) {
       if (auto apply = ApplySite::isa(instruction)) {
         SmallVector<int, 2> rewritableArgumentIndices;
@@ -149,23 +177,41 @@ public:
         if (rewritableArgumentIndices.size() != usesInApply(apply)) {
           return false;
         }
-        // We can rewrite all the arguments which are transitive uses of the
-        // borrow.
-        for (auto index : rewritableArgumentIndices) {
-          auto argument = apply.getArgument(index);
-          auto borrowee = introducer->getOperand();
-          if (auto *cvi = dyn_cast<CopyValueInst>(argument)) {
-            cvi->setOperand(borrowee);
-          } else {
-            apply.setArgument(index, borrowee);
+        if (rewrite) {
+          // We can rewrite all the arguments which are transitive uses of the
+          // borrow.
+          for (auto index : rewritableArgumentIndices) {
+            auto argument = apply.getArgument(index);
+            auto borrowee = introducer->getOperand();
+            if (auto *cvi = dyn_cast<CopyValueInst>(argument)) {
+              cvi->setOperand(borrowee);
+              modifiedCopyValueInsts.push_back(cvi);
+              madeChange = true;
+            } else {
+              apply.setArgument(index, borrowee);
+              madeChange = true;
+            }
           }
         }
         return true;
       } else if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
         if (bbi->isLexical() &&
             canReplaceValueWithBorrowedValue(bbi->getOperand())) {
-          auto borrowee = introducer->getOperand();
-          bbi->setOperand(borrowee);
+          if (rewrite) {
+            auto borrowee = introducer->getOperand();
+            bbi->setOperand(borrowee);
+            madeChange = true;
+          }
+          return true;
+        }
+      } else if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+        if (canReplaceValueWithBorrowedValue(cvi->getOperand())) {
+          if (rewrite) {
+            auto borrowee = introducer->getOperand();
+            cvi->setOperand(borrowee);
+            madeChange = true;
+            modifiedCopyValueInsts.push_back(cvi);
+          }
           return true;
         }
       }
@@ -189,21 +235,21 @@ bool ShrinkBorrowScope::run() {
 
   findBarriers();
 
-  rewrite();
+  madeChange |= rewrite();
 
-  return true;
+  return madeChange;
 }
 
 bool ShrinkBorrowScope::populateUsers() {
-  SmallVector<Operand *, 16> usePoints;
-  if (!findInnerTransitiveGuaranteedUsesOfBorrowedValue(
-          BorrowedValue(introducer), &usePoints)) {
+  SmallVector<Operand *, 16> uses;
+  if (!findExtendedUsesOfSimpleBorrowedValue(BorrowedValue(introducer),
+                                             &uses)) {
     // If the value produced by begin_borrow escapes, don't shrink the borrow
     // scope.
     return false;
   }
-  for (auto *usePoint : usePoints) {
-    auto *user = usePoint->getUser();
+  for (auto *use : uses) {
+    auto *user = use->getUser();
     users.insert(user);
     if (auto apply = ApplySite::isa(user)) {
       ++transitiveUsesPerApplySite[apply];
@@ -236,22 +282,24 @@ void ShrinkBorrowScope::findBarriers() {
   // visited.
   //
   // TODO: Handle loops.
+
+  // Blocks to the top of which the borrow scope has been shrunk.
+  SmallPtrSet<SILBasicBlock *, 8> deadBlocks;
+  auto hasOnlyDeadSuccessors =
+      [&deadBlocks](SILBasicBlock *block) -> bool {
+    return llvm::all_of(block->getSuccessorBlocks(), [=](auto *successor) {
+      return deadBlocks.contains(successor);
+    });
+  };
+
   while (!worklist.empty()) {
     auto *block = worklist.pop_back_val();
     auto *startingInstruction = startingInstructions.lookup(block);
-    if (!startingInstruction && !reachedTopOfAllSuccessors(block)) {
-      continue;
-    }
-    if (!startingInstruction &&
-        !tryHoistOverInstruction(block->getTerminator())) {
-      // This block was walked to--it was not one containing one of the initial
-      // end_borrow instructions.  Check whether it forwards the ownership of
-      // the borrowed value (either directly or indirectly).  If it does, we
-      // must not hoist the end_borrow above it.
+    if (!startingInstruction && !hasOnlyDeadSuccessors(block)) {
       continue;
     }
     for (auto *successor : block->getSuccessorBlocks()) {
-      blocksToEndAtTop.erase(successor);
+      barredBlocks.erase(successor);
     }
 
     // We either have processed all successors of block or else it is a block
@@ -261,6 +309,14 @@ void ShrinkBorrowScope::findBarriers() {
     // contained an original scope-ending instruction, start scanning from it.
     SILInstruction *instruction =
         startingInstruction ? startingInstruction : block->getTerminator();
+    if (!startingInstruction) {
+      // That there's no starting instruction means that this this block did not
+      // contain an original introducer.  It was added to the worklist later.
+      // At that time, it was checked that this block (along with all that
+      // successor's other predecessors) had a terminator over which the borrow
+      // scope could be shrunk.  Shrink it now.
+      assert(tryHoistOverInstruction(block->getTerminator()));
+    }
     SILInstruction *barrier = nullptr;
     while ((instruction = getPreviousInstruction(instruction))) {
       if (instruction == introducer) {
@@ -276,44 +332,72 @@ void ShrinkBorrowScope::findBarriers() {
     if (barrier) {
       barrierInstructions.push_back({block, barrier});
     } else {
-      blocksWithReachedTops.insert(block);
-      blocksToEndAtTop.insert(block);
-      for (auto *predecessor : block->getPredecessorBlocks()) {
-        worklist.push_back(predecessor);
+      deadBlocks.insert(block);
+      barredBlocks.insert(block);
+      // If any of block's predecessor has a terminator over which the scope 
+      // can't be shrunk, the scope is barred from shrinking out of this block.
+      if (llvm::all_of(block->getPredecessorBlocks(), [&](auto *block) {
+            return canHoistOverInstruction(block->getTerminator());
+            })) {
+        // Otherwise, add all predecessors to the worklist and attempt to shrink
+        // the borrow scope through them.
+        for (auto *predecessor : block->getPredecessorBlocks()) {
+          worklist.push_back(predecessor);
+        }
       }
     }
   }
 }
 
-void ShrinkBorrowScope::rewrite() {
-  // Remove all the original end_borrow instructions.
-  for (auto pair : startingInstructions) {
-    deleter.forceDelete(pair.getSecond());
-  }
+bool ShrinkBorrowScope::rewrite() {
+  bool createdBorrow = false;
 
   // Insert the new end_borrow instructions that occur after deinit barriers.
   for (auto pair : barrierInstructions) {
     auto *insertionPoint = getNextInstruction(pair.second);
-    createEndBorrow(insertionPoint);
+    createdBorrow |= createEndBorrow(insertionPoint);
   }
 
   // Insert the new end_borrow instructions that occur at the beginning of
   // blocks which we couldn't hoist out of.
-  for (auto *block : blocksToEndAtTop) {
+  for (auto *block : barredBlocks) {
     auto *insertionPoint = &*block->begin();
-    createEndBorrow(insertionPoint);
+    createdBorrow |= createEndBorrow(insertionPoint);
   }
+
+  if (createdBorrow) {
+    // Remove all the original end_borrow instructions.
+    for (auto pair : startingInstructions) {
+      if (reusedEndBorrowInsts.contains(pair.second)) {
+        continue;
+      }
+      deleter.forceDelete(pair.getSecond());
+    }
+  }
+
+  return createdBorrow;
 }
 
-void ShrinkBorrowScope::createEndBorrow(SILInstruction *insertionPoint) {
+bool ShrinkBorrowScope::createEndBorrow(SILInstruction *insertionPoint) {
+  if (auto *ebi = dyn_cast<EndBorrowInst>(insertionPoint)) {
+    llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *>::iterator location;
+    if ((location = llvm::find_if(startingInstructions, [&](auto pair) -> bool {
+           return pair.second == insertionPoint;
+         })) != startingInstructions.end()) {
+      reusedEndBorrowInsts.insert(location->second);
+      return false;
+    }
+  }
   auto builder = SILBuilderWithScope(insertionPoint);
   builder.createEndBorrow(
       RegularLocation::getAutoGeneratedLocation(insertionPoint->getLoc()),
       introducer);
+  return true;
 }
 
-bool swift::shrinkBorrowScope(BeginBorrowInst *bbi,
-                              InstructionDeleter &deleter) {
-  ShrinkBorrowScope borrowShrinker(bbi, deleter);
+bool swift::shrinkBorrowScope(
+    BeginBorrowInst *bbi, InstructionDeleter &deleter,
+    SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts) {
+  ShrinkBorrowScope borrowShrinker(bbi, deleter, modifiedCopyValueInsts);
   return borrowShrinker.run();
 }

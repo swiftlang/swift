@@ -195,14 +195,9 @@ bool swift::findInnerTransitiveGuaranteedUses(
   return true;
 }
 
-/// Like findInnerTransitiveGuaranteedUses except that rather than it being a
-/// precondition that the provided value not be a BorrowedValue, it is a [type-
-/// system-enforced] precondition that the provided value be a BorrowedValue.
-///
-/// TODO: Merge with findInnerTransitiveGuaranteedUses.  Note that at the moment
-///       the two are _almost_ identical, but not quite because the other has a
-///       #if 0 and not just leaf uses but ALL uses are recorded.
-bool swift::findInnerTransitiveGuaranteedUsesOfBorrowedValue(
+/// Find all uses in the extended lifetime (i.e. including copies) of a simple
+/// (i.e. not reborrowed) borrow scope and its transitive uses.
+bool swift::findExtendedUsesOfSimpleBorrowedValue(
     BorrowedValue borrowedValue, SmallVectorImpl<Operand *> *usePoints) {
 
   auto recordUse = [&](Operand *use) {
@@ -220,21 +215,31 @@ bool swift::findInnerTransitiveGuaranteedUsesOfBorrowedValue(
   // membership check locally in this function (within a borrow scope) because
   // it isn't needed for the immediate uses, only the transitive uses.
   GraphNodeWorklist<Operand *, 8> worklist;
-  for (Operand *use : borrowedValue.value->getUses()) {
-    if (use->getOperandOwnership() != OperandOwnership::NonUse)
-      worklist.insert(use);
-  }
+  auto addUsesToWorklist = [&worklist](SILValue value) {
+    for (Operand *use : value->getUses()) {
+      if (use->getOperandOwnership() != OperandOwnership::NonUse)
+        worklist.insert(use);
+    }
+  };
+
+  addUsesToWorklist(borrowedValue.value);
 
   // --- Transitively follow forwarded uses and look for escapes.
 
   // usePoints grows in this loop.
   while (Operand *use = worklist.pop()) {
+    if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
+      addUsesToWorklist(cvi);
+    }
     switch (use->getOperandOwnership()) {
     case OperandOwnership::NonUse:
+      break;
+
     case OperandOwnership::TrivialUse:
     case OperandOwnership::ForwardingConsume:
     case OperandOwnership::DestroyingConsume:
-      llvm_unreachable("this operand cannot handle an inner guaranteed use");
+      recordUse(use);
+      break;
 
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
@@ -264,6 +269,7 @@ bool swift::findInnerTransitiveGuaranteedUsesOfBorrowedValue(
           AddressUseKind::NonEscaping) {
         return false;
       }
+      recordUse(use);
       break;
 
     case OperandOwnership::ForwardingBorrow: {
