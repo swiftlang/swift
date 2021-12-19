@@ -313,6 +313,38 @@ exit:
     return %instance_c : $C
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_some_barred_blocks : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]] : $C
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         br [[EXIT:bb[0-9]+]](undef : $C)
+// CHECK:       [[RIGHT]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]] : $C
+// CHECK:         br [[EXIT]]([[COPY]] : $C)
+// CHECK:       [[EXIT]]
+// CHECK:           end_borrow [[LIFETIME]] : $C
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_some_barred_blocks'
+sil [ossa] @dont_hoist_over_some_barred_blocks : $(@owned C) -> () {
+entry(%instance : @owned $C):
+    %borrow = begin_borrow %instance : $C
+    cond_br undef, left, right
+
+left:
+    br exit(undef : $C)
+
+right:
+    %copy = copy_value %borrow : $C
+    br exit(%copy : $C)
+
+exit(%thing : @owned $C):
+    end_borrow %borrow : $C
+    destroy_value %thing : $C
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
 // =============================================================================
 // branching tests                                                            }}
 // =============================================================================
@@ -661,6 +693,27 @@ entry(%instance : @owned $C):
 
   %result = tuple ()
   return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_over_try_apply_at_borrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK-NEXT:    try_apply undef([[INSTANCE]]) : $@convention(thin) (@guaranteed C) -> @error Error, normal bb1, error bb2 
+// CHECK-LABEL: } // end sil function 'hoist_over_try_apply_at_borrow'
+sil [ossa] @hoist_over_try_apply_at_borrow : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
+  %lifetime = begin_borrow %instance : $C
+  try_apply undef(%lifetime) : $@convention(thin) (@guaranteed C) -> @error Error, normal good, error bad
+
+good(%8 : $()):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  %13 = tuple ()
+  return %13 : $()
+
+bad(%15 : @owned $Error):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  throw %15 : $Error
 }
 
 // =============================================================================
