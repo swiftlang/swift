@@ -2198,7 +2198,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ $(true_false "${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}") == "TRUE" ]] ; then
+                if [[ $(true_false "${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}") == "TRUE" && \
+                      -d "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}" && \
+                      -n "$(ls -A "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}")" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=TRUE
