@@ -89,11 +89,6 @@ KNOWN_SETTINGS=(
     android-api-level                             ""                "The Android API level to target when building for Android. Currently only 21 or above is supported"
     android-arch                                  "armv7"           "The Android target architecture when building for Android"
     android-deploy-device-path                    ""                "Path on an Android device to which built Swift stdlib products will be deployed"
-    android-icu-data                              ""                "Path to libicudata.so"
-    android-icu-i18n                              ""                "Path to libicui18n.so"
-    android-icu-i18n-include                      ""                "Path to a directory containing headers libicui18n"
-    android-icu-uc                                ""                "Path to libicuuc.so"
-    android-icu-uc-include                        ""                "Path to a directory containing headers for libicuuc"
     android-ndk                                   ""                "An absolute path to the NDK that will be used as a libc implementation for Android builds"
 
     ## Darwin Options
@@ -1905,11 +1900,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
-                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC:STRING="${ANDROID_ICU_UC}"
-                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
-                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
-                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
-                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_DATA:STRING="${ANDROID_ICU_DATA}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
                         -DSWIFT_SDK_ANDROID_ARCHITECTURES:STRING="${ANDROID_ARCH}"
                     )
