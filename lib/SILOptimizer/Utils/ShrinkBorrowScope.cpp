@@ -159,7 +159,11 @@ public:
     return 0;
   }
 
-  bool tryHoistOverInstruction(SILInstruction *instruction) {
+  bool canHoistOverInstruction(SILInstruction *instruction) {
+    return tryHoistOverInstruction(instruction, /*rewrite=*/false);
+  }
+
+  bool tryHoistOverInstruction(SILInstruction *instruction, bool rewrite = true) {
     if (users.contains(instruction)) {
       if (auto apply = ApplySite::isa(instruction)) {
         SmallVector<int, 2> rewritableArgumentIndices;
@@ -173,35 +177,41 @@ public:
         if (rewritableArgumentIndices.size() != usesInApply(apply)) {
           return false;
         }
-        // We can rewrite all the arguments which are transitive uses of the
-        // borrow.
-        for (auto index : rewritableArgumentIndices) {
-          auto argument = apply.getArgument(index);
-          auto borrowee = introducer->getOperand();
-          if (auto *cvi = dyn_cast<CopyValueInst>(argument)) {
-            cvi->setOperand(borrowee);
-            modifiedCopyValueInsts.push_back(cvi);
-            madeChange = true;
-          } else {
-            apply.setArgument(index, borrowee);
-            madeChange = true;
+        if (rewrite) {
+          // We can rewrite all the arguments which are transitive uses of the
+          // borrow.
+          for (auto index : rewritableArgumentIndices) {
+            auto argument = apply.getArgument(index);
+            auto borrowee = introducer->getOperand();
+            if (auto *cvi = dyn_cast<CopyValueInst>(argument)) {
+              cvi->setOperand(borrowee);
+              modifiedCopyValueInsts.push_back(cvi);
+              madeChange = true;
+            } else {
+              apply.setArgument(index, borrowee);
+              madeChange = true;
+            }
           }
         }
         return true;
       } else if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
         if (bbi->isLexical() &&
             canReplaceValueWithBorrowedValue(bbi->getOperand())) {
-          auto borrowee = introducer->getOperand();
-          bbi->setOperand(borrowee);
-          madeChange = true;
+          if (rewrite) {
+            auto borrowee = introducer->getOperand();
+            bbi->setOperand(borrowee);
+            madeChange = true;
+          }
           return true;
         }
       } else if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
         if (canReplaceValueWithBorrowedValue(cvi->getOperand())) {
-          auto borrowee = introducer->getOperand();
-          cvi->setOperand(borrowee);
-          madeChange = true;
-          modifiedCopyValueInsts.push_back(cvi);
+          if (rewrite) {
+            auto borrowee = introducer->getOperand();
+            cvi->setOperand(borrowee);
+            madeChange = true;
+            modifiedCopyValueInsts.push_back(cvi);
+          }
           return true;
         }
       }
