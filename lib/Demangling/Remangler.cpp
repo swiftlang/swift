@@ -1611,12 +1611,14 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::DirectMethodReferenceAttribute:
       case Node::Kind::MergedFunction:
       case Node::Kind::DistributedThunk:
+      case Node::Kind::DistributedMethodAccessor:
       case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
       case Node::Kind::AsyncFunctionPointer:
       case Node::Kind::AsyncAwaitResumePartialFunction:
       case Node::Kind::AsyncSuspendResumePartialFunction:
+      case Node::Kind::AccessibleFunctionRecord:
         mangleInReverseOrder = true;
         break;
       default:
@@ -2245,6 +2247,12 @@ ManglingError Remangler::mangleMergedFunction(Node *node, unsigned depth) {
 ManglingError
 Remangler::mangleDistributedThunk(Node *node, unsigned depth) {
   Buffer << "TE";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDistributedMethodAccessor(Node *node, unsigned depth) {
+  Buffer << "TF";
   return ManglingError::Success;
 }
 
@@ -3371,6 +3379,12 @@ ManglingError Remangler::mangleGlobalVariableOnceDeclList(Node *node,
     RETURN_IF_ERROR(mangle(node->getChild(i), depth + 1));
     Buffer << '_';
   }
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
+                                                        unsigned depth) {
+  Buffer << "HF";
   return ManglingError::Success;
 }
 

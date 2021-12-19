@@ -9,7 +9,7 @@ distributed actor DA {
 }
 
 extension DA {
-  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17distributed_thunk2DAC1fyyFTE : $@convention(method) @async (@guaranteed DA) -> @error Error
+  // CHECK-LABEL: sil hidden [thunk] [distributed] [ossa] @$s17distributed_thunk2DAC1fyyFTE : $@convention(method) @async (@guaranteed DA) -> @error Error
   // CHECK: function_ref @swift_distributed_actor_is_remote
 
   // Call the actor function

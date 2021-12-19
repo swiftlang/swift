@@ -262,9 +262,9 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   SILFunction *NewF = FuncBuilder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
       OrigF->isBare(), OrigF->isTransparent(), Serialized, IsNotDynamic,
-      OrigF->getEntryCount(), OrigF->isThunk(), OrigF->getClassSubclassScope(),
-      OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
-      /*InsertBefore*/ OrigF, OrigF->getDebugScope());
+      IsNotDistributed, OrigF->getEntryCount(), OrigF->isThunk(),
+      OrigF->getClassSubclassScope(), OrigF->getInlineStrategy(),
+      OrigF->getEffectsKind(), /*InsertBefore*/ OrigF, OrigF->getDebugScope());
   if (!OrigF->hasOwnership()) {
     NewF->setOwnershipEliminated();
   }

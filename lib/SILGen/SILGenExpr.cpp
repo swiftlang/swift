@@ -2789,7 +2789,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
       (expansion == ResilienceExpansion::Minimal
        ? IsSerializable
        : IsNotSerialized),
-      ProfileCounter(), IsThunk, IsNotDynamic);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
   if (!thunk->empty())
     return thunk;
   
@@ -2948,7 +2948,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
       (expansion == ResilienceExpansion::Minimal
        ? IsSerializable
        : IsNotSerialized),
-      ProfileCounter(), IsThunk, IsNotDynamic);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
   if (!thunk->empty())
     return thunk;
   
@@ -3136,7 +3136,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         (expansion == ResilienceExpansion::Minimal
          ? IsSerializable
          : IsNotSerialized),
-        ProfileCounter(), IsThunk, IsNotDynamic);
+        ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
     if (!equals->empty()) {
       return;
     }
@@ -3313,7 +3313,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         (expansion == ResilienceExpansion::Minimal
          ? IsSerializable
          : IsNotSerialized),
-        ProfileCounter(), IsThunk, IsNotDynamic);
+        ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
     if (!hash->empty()) {
       return;
     }

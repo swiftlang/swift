@@ -68,7 +68,8 @@ set(swift_runtime_sources
     ReflectionMirror.cpp
     RuntimeInvocationsTracking.cpp
     SwiftDtoa.cpp
-    SwiftTLSContext.cpp)
+    SwiftTLSContext.cpp
+    AccessibleFunction.cpp)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES

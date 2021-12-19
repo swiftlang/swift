@@ -277,6 +277,18 @@ namespace llvm {
       return LHS == RHS;
     }
   };
+
+  template<>
+  struct PointerLikeTypeTraits<swift::rewriting::Symbol> {
+  public:
+    static inline void *getAsVoidPointer(swift::rewriting::Symbol Val) {
+      return const_cast<void *>(Val.getOpaquePointer());
+    }
+    static inline swift::rewriting::Symbol getFromVoidPointer(void *Ptr) {
+      return swift::rewriting::Symbol::fromOpaquePointer(Ptr);
+    }
+    enum { NumLowBitsAvailable = 1 };
+  };
 } // end namespace llvm
 
 #endif

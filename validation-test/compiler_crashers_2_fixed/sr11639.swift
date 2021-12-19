@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
 
 public protocol FooProtocol {
   associatedtype Bar
@@ -13,3 +13,6 @@ public protocol BazProtocol: FooProtocol {
   associatedtype Foo2Bar
   typealias Foo2 = Foo<Foo2Bar>
 }
+
+// CHECK-LABEL: sr11639.(file).BazProtocol@
+// CHECK-NEXT: Requirement signature: <Self where Self : FooProtocol, Self.Foo1 : FooProtocol, Self.Foo2Bar == Self.Foo1.Bar>

@@ -35,6 +35,7 @@ namespace llvm {
 
 namespace swift {
 
+class ProtocolConformance;
 class ProtocolDecl;
 enum class RequirementKind : unsigned;
 
@@ -172,7 +173,8 @@ class PropertyMap {
   using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
   llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
 
-  llvm::DenseSet<std::pair<unsigned, unsigned>> ConcreteConformanceRules;
+  llvm::DenseMap<std::pair<unsigned, unsigned>, ProtocolConformance *>
+      ConcreteConformances;
 
   DebugOptions Debug;
 

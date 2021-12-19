@@ -481,6 +481,16 @@ class LinkEntity {
     /// name is known.
     /// The pointer is a const char* of the name.
     KnownAsyncFunctionPointer,
+
+    /// The pointer is SILFunction*
+    DistributedMethodAccessor,
+    /// An async function pointer for a distributed method accessor.
+    /// The pointer is a SILFunction*.
+    DistributedMethodAccessorAsyncPointer,
+
+    /// Accessible function record, which describes a function that can be
+    /// looked up by name by the runtime.
+    AccessibleFunctionRecord,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -1236,6 +1246,13 @@ public:
           Kind, unsigned(LinkEntity::Kind::PartialApplyForwarderAsyncFunctionPointer));
       break;
 
+    case LinkEntity::Kind::DistributedMethodAccessor: {
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(LinkEntity::Kind::DistributedMethodAccessorAsyncPointer));
+      break;
+    }
+
     default:
       llvm_unreachable("Link entity kind cannot have an async function pointer");
     }
@@ -1260,6 +1277,24 @@ public:
     entity.SecondaryPointer = nullptr;
     entity.Data =
         LINKENTITY_SET_FIELD(Kind, unsigned(Kind::KnownAsyncFunctionPointer));
+    return entity;
+  }
+
+  static LinkEntity forDistributedMethodAccessor(SILFunction *method) {
+    LinkEntity entity;
+    entity.Pointer = method;
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::DistributedMethodAccessor));
+    return entity;
+  }
+
+  static LinkEntity forAccessibleFunctionRecord(SILFunction *func) {
+    LinkEntity entity;
+    entity.Pointer = func;
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::AccessibleFunctionRecord));
     return entity;
   }
 
@@ -1292,6 +1327,11 @@ public:
     case LinkEntity::Kind::PartialApplyForwarderAsyncFunctionPointer:
       entity.Data = LINKENTITY_SET_FIELD(
           Kind, unsigned(LinkEntity::Kind::PartialApplyForwarder));
+      break;
+
+    case LinkEntity::Kind::DistributedMethodAccessorAsyncPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DistributedMethodAccessor));
       break;
 
     default:
@@ -1341,7 +1381,9 @@ public:
     return getKind() == Kind::AsyncFunctionPointer ||
            getKind() == Kind::DynamicallyReplaceableFunctionVariable ||
            getKind() == Kind::DynamicallyReplaceableFunctionKey ||
-           getKind() == Kind::SILFunction;
+           getKind() == Kind::SILFunction ||
+           getKind() == Kind::DistributedMethodAccessor ||
+           getKind() == Kind::AccessibleFunctionRecord;
   }
 
   SILFunction *getSILFunction() const {
