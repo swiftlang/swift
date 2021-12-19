@@ -1,10 +1,10 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-string-processing
 // REQUIRES: libswift
 
-_ = '/abc/'
+var s = 'abc'
 
-_ = ('/[*/', '/+]/', '/.]/')
-// expected-error@-1 {{cannot parse regular expression}}
+var s1 = ('*', '+', '?')
+// expected-error@-1 3{{cannot start regex with quantifier}}
 
-_ = '/\w+/'
-_ = '/\'\\/'
+var s2 = '\w+'
+var s3 = '\'\\'

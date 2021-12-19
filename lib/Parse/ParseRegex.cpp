@@ -22,9 +22,13 @@
 
 // Regex parser delivered via libSwift
 #include "swift/Parse/ExperimentalRegexBridging.h"
-static RegexLiteralParsingFn regexLiteralParsingFn = nullptr;
-void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
-  regexLiteralParsingFn = fn;
+static ParseRegexStrawperson parseRegexStrawperson = nullptr;
+void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn) {
+  parseRegexStrawperson = fn;
+}
+// Exposes the presence of the regex parsing function to the lexer.
+bool Parser_hasParseRegexStrawperson() {
+  return parseRegexStrawperson != nullptr;
 }
 
 using namespace swift;
@@ -32,26 +36,24 @@ using namespace swift::syntax;
 
 ParserResult<Expr> Parser::parseExprRegexLiteral() {
   assert(Tok.is(tok::regex_literal));
-  assert(regexLiteralParsingFn);
+  assert(parseRegexStrawperson);
 
   SyntaxParsingContext LocalContext(SyntaxContext,
                                     SyntaxKind::RegexLiteralExpr);
-
-  auto regexText = Tok.getText();
+  // Strip off delimiters.
+  auto rawText = Tok.getText();
+  assert(rawText.front() == '\'' && rawText.back() == '\'');
+  auto regexText = rawText.slice(1, rawText.size() - 1);
 
   // Let the Swift library parse the contents, returning an error, or null if
   // successful.
   // TODO: We need to be able to pass back a source location to emit the error
   // at.
-  const char *errorStr = nullptr;
-  unsigned version;
-  regexLiteralParsingFn(regexText.str().c_str(), &errorStr, &version,
-                        /*captureStructureOut*/ nullptr,
-                        /*captureStructureSize*/ 0);
+  auto *errorStr = parseRegexStrawperson(regexText.str().c_str());
   if (errorStr)
     diagnose(Tok, diag::regex_literal_parsing_error, errorStr);
 
   auto loc = consumeToken();
   return makeParserResult(
-      RegexLiteralExpr::createParsed(Context, loc, regexText, version));
+      RegexLiteralExpr::createParsed(Context, loc, regexText));
 }

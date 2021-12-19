@@ -272,7 +272,6 @@ cmake^
     -DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES^
-    -DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%source_root%\swift-experimental-string-processing^
     -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;testsuite-tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
     -DPYTHON_EXECUTABLE:PATH=%PYTHON_HOME%\python.exe^
