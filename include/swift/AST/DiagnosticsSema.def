@@ -4763,6 +4763,9 @@ ERROR(async_unavailable_decl,none,
 ERROR(string_processing_lib_missing,none,
       "missing '%0' declaration, probably because the '_StringProcessing' "
       "module was not imported properly", (StringRef))
+ERROR(regex_capture_types_failed_to_decode,none,
+      "failed to decode capture types for regular expression literal; this may "
+      "be a compiler bug", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types

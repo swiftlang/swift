@@ -2246,8 +2246,9 @@ SourceLoc TapExpr::getEndLoc() const {
 
 RegexLiteralExpr *
 RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
-                               StringRef regexText, unsigned version) {
-  return new (ctx) RegexLiteralExpr(loc, regexText, version,
+                               StringRef regexText, unsigned version,
+                               ArrayRef<uint8_t> serializedCaps) {
+  return new (ctx) RegexLiteralExpr(loc, regexText, version, serializedCaps,
                                     /*implicit*/ false);
 }
 
