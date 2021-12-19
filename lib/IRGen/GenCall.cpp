@@ -4780,7 +4780,7 @@ Signature irgen::emitCastOfFunctionPointer(IRGenFunction &IGF,
                                            CanSILFunctionType fnType,
                                            bool forAsyncReturn) {
   // Figure out the function type.
-  // FIXME: cache async signature.
+  // FIXME: Cache async signature.
   auto sig = forAsyncReturn ? Signature::forAsyncReturn(IGF.IGM, fnType)
                             : IGF.IGM.getSignature(fnType);
 
