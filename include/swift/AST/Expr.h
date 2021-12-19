@@ -966,22 +966,17 @@ public:
 class RegexLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
   StringRef RegexText;
-  unsigned Version;
 
-  RegexLiteralExpr(SourceLoc loc, StringRef regexText, unsigned version,
-                   bool isImplicit)
+  RegexLiteralExpr(SourceLoc loc, StringRef regexText, bool isImplicit)
       : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Loc(loc),
-        RegexText(regexText), Version(version) {}
+        RegexText(regexText) {}
 
 public:
   static RegexLiteralExpr *createParsed(ASTContext &ctx, SourceLoc loc,
-                                        StringRef regexText, unsigned version);
+                                        StringRef regexText);
 
   /// Retrieve the raw regex text.
   StringRef getRegexText() const { return RegexText; }
-
-  /// Retrieve the version of the regex string.
-  unsigned getVersion() const { return Version; }
 
   SourceRange getSourceRange() const { return Loc; }
 

@@ -1910,31 +1910,10 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   RValue string = SGF.emitApplyAllocatingInitializer(
       expr, strInitDecl, std::move(strLiteralArgs),
       /*overriddenSelfType*/ Type(), SGFContext());
-
-  // The version of the regex string.
-  // %3 = integer_literal $Builtin.IntLiteral <version>
-  auto versionIntLiteral =
-      ManagedValue::forUnmanaged(SGF.B.createIntegerLiteral(
-          expr, SILType::getBuiltinIntegerLiteralType(SGF.getASTContext()),
-          expr->getVersion()));
-
-  using Param = AnyFunctionType::Param;
-  auto builtinIntTy = versionIntLiteral.getType().getASTType();
-  PreparedArguments versionIntBuiltinArgs(ArrayRef<Param>{Param(builtinIntTy)});
-  versionIntBuiltinArgs.add(
-      expr, RValue(SGF, {versionIntLiteral}, builtinIntTy));
-
-  // %4 = function_ref Int.init(_builtinIntegerLiteral: Builtin.IntLiteral)
-  // %5 = apply %5(%3, ...) -> $Int
-  auto intLiteralInit = ctx.getIntBuiltinInitDecl(ctx.getIntDecl());
-  RValue versionInt = SGF.emitApplyAllocatingInitializer(
-      expr, intLiteralInit, std::move(versionIntBuiltinArgs),
-      /*overriddenSelfType*/ Type(), SGFContext());
-
-  PreparedArguments args(ArrayRef<Param>{Param(ctx.getStringType()),
-                                         Param(ctx.getIntType())});
+  PreparedArguments args(
+      ArrayRef<AnyFunctionType::Param>({
+          AnyFunctionType::Param(ctx.getStringType())}));
   args.add(expr, std::move(string));
-  args.add(expr, std::move(versionInt));
   return args;
 }
 

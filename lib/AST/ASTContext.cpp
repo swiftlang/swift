@@ -1221,7 +1221,7 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   auto *spModule = getLoadedModule(Id_StringProcessing);
   DeclName name(*const_cast<ASTContext *>(this),
                 DeclBaseName::createConstructor(),
-                {Id_regexString, Id_version});
+                {Id_regexString});
   SmallVector<ValueDecl *, 1> results;
   spModule->lookupQualified(getRegexType(), DeclNameRef(name),
                             NL_IncludeUsableFromInline, results);

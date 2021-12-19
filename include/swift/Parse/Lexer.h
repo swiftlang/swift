@@ -595,9 +595,7 @@ private:
   void lexStringLiteral(unsigned CustomDelimiterLen = 0);
   void lexEscapedIdentifier();
 
-  /// Attempt to lex a regex literal, returning true if a regex literal was
-  /// lexed, false if this is not a regex literal.
-  bool tryLexRegexLiteral(const char *TokStart);
+  void lexRegexLiteral(const char *TokStart);
 
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char *,
@@ -614,6 +612,9 @@ private:
 
   /// Emit diagnostics for single-quote string and suggest replacement
   /// with double-quoted equivalent.
+  ///
+  /// Or, if we're in strawperson mode, we will emit a custom
+  /// error message instead, determined by the Swift library.
   void diagnoseSingleQuoteStringLiteral(const char *TokStart,
                                         const char *TokEnd);
 

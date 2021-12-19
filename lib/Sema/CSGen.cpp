@@ -1266,6 +1266,7 @@ namespace {
                            ctx.Id_Regex.str());
         return Type();
       }
+      auto substringType = ctx.getSubstringType();
       auto dynCapturesType = ctx.getDynamicCapturesType();
       if (!dynCapturesType) {
         ctx.Diags.diagnose(E->getLoc(),
@@ -1273,8 +1274,10 @@ namespace {
                            "DynamicCaptures");
         return Type();
       }
-      // TODO: Replace `DynamicCaptures` with type inferred from the regex.
-      return BoundGenericStructType::get(regexDecl, Type(), {dynCapturesType});
+      // TODO: Replace `(Substring, DynamicCaptures)` with type inferred from
+      // the regex.
+      auto matchType = TupleType::get({substringType, dynCapturesType}, ctx);
+      return BoundGenericStructType::get(regexDecl, Type(), {matchType});
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
