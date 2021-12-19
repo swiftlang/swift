@@ -438,8 +438,12 @@ void CopyPropagation::run() {
   //       blocks and pushing begin_borrows as we see them and then popping them
   //       off the end will result in shrinking inner borrow scopes first.
   while (auto *bbi = beginBorrowsToShrink.pop()) {
-    changed |= shrinkBorrowScope(bbi, deleter);
+    SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
+    changed |= shrinkBorrowScope(bbi, deleter, modifiedCopyValueInsts);
+    for (auto *cvi : modifiedCopyValueInsts)
+      defWorklist.updateForCopy(cvi);
   }
+  deleter.cleanupDeadInstructions();
 
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
