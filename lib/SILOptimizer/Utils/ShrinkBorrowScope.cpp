@@ -298,14 +298,6 @@ void ShrinkBorrowScope::findBarriers() {
     if (!startingInstruction && !hasOnlyDeadSuccessors(block)) {
       continue;
     }
-    if (!startingInstruction &&
-        !tryHoistOverInstruction(block->getTerminator())) {
-      // This block was walked to--it was not one containing one of the initial
-      // end_borrow instructions.  Check whether it forwards the ownership of
-      // the borrowed value (either directly or indirectly).  If it does, we
-      // must not hoist the end_borrow above it.
-      continue;
-    }
     for (auto *successor : block->getSuccessorBlocks()) {
       barredBlocks.erase(successor);
     }
@@ -317,6 +309,14 @@ void ShrinkBorrowScope::findBarriers() {
     // contained an original scope-ending instruction, start scanning from it.
     SILInstruction *instruction =
         startingInstruction ? startingInstruction : block->getTerminator();
+    if (!startingInstruction) {
+      // That there's no starting instruction means that this this block did not
+      // contain an original introducer.  It was added to the worklist later.
+      // At that time, it was checked that this block (along with all that
+      // successor's other predecessors) had a terminator over which the borrow
+      // scope could be shrunk.  Shrink it now.
+      assert(tryHoistOverInstruction(block->getTerminator()));
+    }
     SILInstruction *barrier = nullptr;
     while ((instruction = getPreviousInstruction(instruction))) {
       if (instruction == introducer) {
@@ -334,8 +334,16 @@ void ShrinkBorrowScope::findBarriers() {
     } else {
       deadBlocks.insert(block);
       barredBlocks.insert(block);
-      for (auto *predecessor : block->getPredecessorBlocks()) {
-        worklist.push_back(predecessor);
+      // If any of block's predecessor has a terminator over which the scope 
+      // can't be shrunk, the scope is barred from shrinking out of this block.
+      if (llvm::all_of(block->getPredecessorBlocks(), [&](auto *block) {
+            return canHoistOverInstruction(block->getTerminator());
+            })) {
+        // Otherwise, add all predecessors to the worklist and attempt to shrink
+        // the borrow scope through them.
+        for (auto *predecessor : block->getPredecessorBlocks()) {
+          worklist.push_back(predecessor);
+        }
       }
     }
   }
