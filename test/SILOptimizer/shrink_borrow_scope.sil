@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -29,7 +29,9 @@ class PointerWrapper {
 enum OneOfThree { case one, two, three }
 
 sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
 sil [ossa] @callee_optional_d_guaranteed: $@convention(thin) (@guaranteed Optional<D>) -> ()
+sil [ossa] @synchronization_point : $@convention(thin) () -> ()
 
 // =============================================================================
 // = DECLARATIONS                                                             }}
@@ -311,6 +313,38 @@ exit:
     return %instance_c : $C
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_some_barred_blocks : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]] : $C
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         br [[EXIT:bb[0-9]+]](undef : $C)
+// CHECK:       [[RIGHT]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]] : $C
+// CHECK:         br [[EXIT]]([[COPY]] : $C)
+// CHECK:       [[EXIT]]
+// CHECK:           end_borrow [[LIFETIME]] : $C
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_some_barred_blocks'
+sil [ossa] @dont_hoist_over_some_barred_blocks : $(@owned C) -> () {
+entry(%instance : @owned $C):
+    %borrow = begin_borrow %instance : $C
+    cond_br undef, left, right
+
+left:
+    br exit(undef : $C)
+
+right:
+    %copy = copy_value %borrow : $C
+    br exit(%copy : $C)
+
+exit(%thing : @owned $C):
+    end_borrow %borrow : $C
+    destroy_value %thing : $C
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
 // =============================================================================
 // branching tests                                                            }}
 // =============================================================================
@@ -408,12 +442,13 @@ exit:
 // CHECK-LABEL: sil [ossa] @hoist_over_struct : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE_C:%[^,]+]] : @owned $C, [[INSTANCE_D:%[^,]+]] : @owned $D):
 // CHECK:         [[LIFETIME_C:%[^,]+]] = begin_borrow [[INSTANCE_C]]
+// CHECK:         [[COPY_C:%[^,]+]] = copy_value [[LIFETIME_C]]
 // CHECK:         [[LIFETIME_D:%[^,]+]] = begin_borrow [[INSTANCE_D]]
 // CHECK:         [[REGISTER_4:%[^,]+]] = struct $CDCase ([[LIFETIME_C]] : $C, [[LIFETIME_D]] : $D)
 // CHECK:         end_borrow [[LIFETIME_C]]
 // CHECK:         end_borrow [[LIFETIME_D]]
 // CHECK:         destroy_value [[INSTANCE_D]]
-// CHECK:         return [[INSTANCE_C]]
+// CHECK:         return [[COPY_C]]
 // CHECK-LABEL: } // end sil function 'hoist_over_struct'
 sil [ossa] @hoist_over_struct : $@convention(thin) (@owned C, @owned D) -> @owned C {
 entry(%instance_c: @owned $C, %instance_d: @owned $D):
@@ -500,7 +535,6 @@ bb0:
 // CHECK:         load_weak
 // CHECK:         end_borrow
 // CHECK-LABEL: } // end sil function 'dont_hoist_over_load_weak'
-
 sil [ossa] @dont_hoist_over_load_weak : $@convention(thin) (@owned DBox) -> () {
 entry(%instance : @owned $DBox):
   %lifetime = begin_borrow [lexical] %instance : $DBox
@@ -529,6 +563,158 @@ entry(%instance : @owned $DBox):
 // which is subsequently deallocated by a deinit; if the load originally happens
 // before the deinit that would dealocated the pointed-to object, it must always
 // remain first.
+
+// Hoist over and rewrite copy of borrow.
+//
+// Everything in this test case except the copy_value and end_borrow is here in
+// order to obstruct other optimizations from kicking in that obfuscate that the
+// fact that the end_borrow was hoisted over the copy_value.
+// CHECK-LABEL: sil [ossa] @hoist_over_copy_of_borrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         {{%[^,]+}} = copy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_copy_of_borrow'
+sil [ossa] @hoist_over_copy_of_borrow : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  %lifetime = begin_borrow [lexical] %instance : $C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %_ = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %copy = copy_value %instance : $C
+  end_borrow %lifetime : $C
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %2 = apply %callee_owned(%copy) : $@convention(thin) (@owned C) -> ()
+  %result = tuple ()
+  return %result : $()
+}
+
+// Hoist over an apply that uses a copy of the borrow.
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_at_copy : {{.*}} {
+// CHECK-NOT:     copy_value
+// CHECK-LABEL: // end sil function 'hoist_over_apply_at_copy'
+sil [ossa] @hoist_over_apply_at_copy : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %lifetime = begin_borrow %instance : $C
+  %copy = copy_value %lifetime : $C
+  %1 = apply %callee_guaranteed(%copy) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %2 = apply %callee_guaranteed(%copy) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  destroy_value %copy : $C
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// Hoist over an apply that uses the borrow.
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_at_borrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK-LABEL: // end sil function 'hoist_over_apply_at_borrow'
+sil [ossa] @hoist_over_apply_at_borrow : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime = begin_borrow %instance : $C
+  %copy = copy_value %lifetime : $C
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %1 = apply %callee_owned(%copy) : $@convention(thin) (@owned C) -> ()
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %2 = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// Hoist over a begin_borrow of a copy_value of the original begin_borrow.
+//
+// Most of the test's contents are just to obstruct optimization.
+// CHECK-LABEL: sil [ossa] @hoist_over_borrow_of_copy : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         begin_borrow [[COPY]]
+// CHECK-LABEL: // end sil function 'hoist_over_borrow_of_copy'
+sil [ossa] @hoist_over_borrow_of_copy : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_1 = begin_borrow %instance : $C
+  %copy_1 = copy_value %lifetime_1 : $C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %1 = apply %callee_guaranteed(%copy_1) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %lifetime_2 = begin_borrow %copy_1 : $C
+  end_borrow %lifetime_1 : $C
+  %copy_2 = copy_value %lifetime_2 : $C
+  %2 = apply %callee_guaranteed(%copy_2) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronized2 = apply %synchronization_point() : $@convention(thin) () -> ()
+  end_borrow %lifetime_2 : $C
+  destroy_value %copy_1 : $C
+  destroy_value %copy_2 : $C
+  destroy_value %instance : $C
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// Hoist over copy_value of %copy, a copy_value of %borrow.
+// CHECK-LABEL: sil [ossa] @hoist_over_copy_of_copy : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]] : $C
+// CHECK:         [[COPY_1:%[^,]+]] = copy_value [[LIFETIME]] : $C
+// CHECK:         end_borrow [[LIFETIME]] : $C
+// CHECK:         copy_value [[INSTANCE]] : $C
+// CHECK-LABEL: } // end sil function 'hoist_over_copy_of_copy'
+sil [ossa] @hoist_over_copy_of_copy : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %lifetime_1 = begin_borrow %instance : $C
+  %copy_1 = copy_value %lifetime_1 : $C
+  %_ = apply %callee_guaranteed(%lifetime_1) : $@convention(thin) (@guaranteed C) -> ()
+  %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
+  %copy_2 = copy_value %copy_1 : $C
+  end_borrow %lifetime_1 : $C
+  %0 = apply %callee_owned(%instance) : $@convention(thin) (@owned C) -> ()
+  %1 = apply %callee_owned(%copy_1) : $@convention(thin) (@owned C) -> ()
+  %2 = apply %callee_owned(%copy_2) : $@convention(thin) (@owned C) -> ()
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_over_try_apply_at_borrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK-NEXT:    try_apply undef([[INSTANCE]]) : $@convention(thin) (@guaranteed C) -> @error Error, normal bb1, error bb2 
+// CHECK-LABEL: } // end sil function 'hoist_over_try_apply_at_borrow'
+sil [ossa] @hoist_over_try_apply_at_borrow : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
+  %lifetime = begin_borrow %instance : $C
+  try_apply undef(%lifetime) : $@convention(thin) (@guaranteed C) -> @error Error, normal good, error bad
+
+good(%8 : $()):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  %13 = tuple ()
+  return %13 : $()
+
+bad(%15 : @owned $Error):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  throw %15 : $Error
+}
 
 // =============================================================================
 // instruction tests                                                          }}
