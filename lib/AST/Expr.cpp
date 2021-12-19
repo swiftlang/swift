@@ -2246,8 +2246,9 @@ SourceLoc TapExpr::getEndLoc() const {
 
 RegexLiteralExpr *
 RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
-                               StringRef regexText) {
-  return new (ctx) RegexLiteralExpr(loc, regexText, /*implicit*/ false);
+                               StringRef regexText, unsigned version) {
+  return new (ctx) RegexLiteralExpr(loc, regexText, version,
+                                    /*implicit*/ false);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
