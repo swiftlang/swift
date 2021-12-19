@@ -634,13 +634,8 @@ function(add_libswift_module module)
                         ""
                         "DEPENDS"
                         ${ARGN})
-  set(raw_sources ${ALSM_UNPARSED_ARGUMENTS})
-  set(sources)
-  foreach(raw_source ${raw_sources})
-    get_filename_component(
-      raw_source "${raw_source}" REALPATH BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-    list(APPEND sources "${raw_source}")
-  endforeach()
+  set(sources ${ALSM_UNPARSED_ARGUMENTS})
+  list(TRANSFORM sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
 
   set(target_name "LibSwift${module}")
 
