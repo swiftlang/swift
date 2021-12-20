@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-  name: "libswift",
+  name: "SwiftCompilerSources",
   platforms: [
     .macOS("10.9"),
   ],

@@ -12,9 +12,9 @@
 
 extern "C" {
 
-void initializeLibSwift();
+void initializeSwiftModules();
 
 }
 
-void initializeLibSwift() {}
+void initializeSwiftModules() {}
 

@@ -111,7 +111,7 @@ This makes the SIL API easy to use and it allows to program in a "Swifty" style.
 
 Bridging SIL classes is implemented by including a two word Swift object header (`SwiftObjectHeader`) in the C++ definition of a class, like in `SILFunction`, `SILBasicBlock` or `SILNode`. This enables to use SIL objects on both, the C++ and the Swift, side.
 
-The Swift class metatypes are "registered" by `registerClass()`, called from `initializeLibSwift()`. On the C++ side, they are stored in static global variables (see `registerBridgedClass()`) and then used to initialize the object headers in the class constructors.
+The Swift class metatypes are "registered" by `registerClass()`, called from `initializeSwiftModules()`. On the C++ side, they are stored in static global variables (see `registerBridgedClass()`) and then used to initialize the object headers in the class constructors.
 
 The reference counts in the object header are initialized to "immortal", which let's all ARC operations on SIL objects be no-ops.
 

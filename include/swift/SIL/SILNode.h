@@ -116,8 +116,8 @@ public:
 ///   ValueBase subobject, the cast will yield a corrupted value.
 ///   Always use the LLVM casts (cast<>, dyn_cast<>, etc.) instead.
 class alignas(8) SILNode :
-  // SILNode contains a swift object header for bridging with libswift.
-  // For details see libswift/README.md.
+  // SILNode contains a swift object header for bridging with Swift.
+  // For details see SwiftCompilerSources/README.md.
   public SwiftObjectHeader {
 public:
   enum { NumVOKindBits = 3 };

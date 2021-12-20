@@ -468,7 +468,7 @@ void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
   eraseInstFromFunction(*inst);
 }
 
-/// Runs an instruction pass in libswift.
+/// Runs a Swift instruction pass.
 void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
                               void (*runFunction)(BridgedInstructionPassCtxt)) {
   Worklist.setLibswiftPassInvocation(&libswiftPassInvocation);
@@ -481,7 +481,7 @@ void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
 static llvm::StringMap<BridgedInstructionPassRunFn> libswiftInstPasses;
 static bool passesRegistered = false;
 
-// Called from libswift's initializeLibSwift().
+// Called from initializeSwiftModules().
 void SILCombine_registerInstructionPass(BridgedStringRef name,
                                         BridgedInstructionPassRunFn runFn) {
   libswiftInstPasses[getStringRef(name)] = runFn;
