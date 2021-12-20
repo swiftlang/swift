@@ -45,7 +45,7 @@ static FileOrError findModule(ASTContext &ctx, Identifier moduleID,
   // should be searched.
   StringRef moduleNameRef = ctx.getRealModuleName(moduleID).str();
 
-  for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
+  for (const auto &Path : ctx.SearchPathOpts.getImportSearchPaths()) {
     inputFilename = Path;
     llvm::sys::path::append(inputFilename, moduleNameRef);
     inputFilename.append(".swift");
