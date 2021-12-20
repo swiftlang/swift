@@ -744,8 +744,6 @@ function(_compile_swift_files
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "DYLD_LIBRARY_PATH=${bs_lib_dir}")
       elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD")
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "LD_LIBRARY_PATH=${bs_lib_dir}")
-      else()
-        message(FATAL_ERROR "TODO: bootstrapping support for ${SWIFT_HOST_VARIANT_SDK}")
       endif()
     endif()
 
