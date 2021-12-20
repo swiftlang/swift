@@ -2110,7 +2110,14 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (decl->isVariadic()) {
-    Ty = VariadicSequenceType::get(Ty);
+    // Handle the monovariadic/polyvariadic interface type split.
+    if (Ty->hasTypeSequence()) {
+      // Polyvariadic types (T...) for <T...> resolve to pack expansions.
+      Ty = PackExpansionType::get(Ty);
+    } else {
+      // Monovariadic types (T...) for <T> resolve to [T].
+      Ty = VariadicSequenceType::get(Ty);
+    }
     if (!ctx.getArrayDecl()) {
       ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
                          diag::sugar_type_not_found, 0);

@@ -1695,7 +1695,15 @@ public:
     return handleGenericNominalType(pattern.getType(), bgt,
                                     pattern.getGenericSignatureOrNull());
   }
-  
+
+  CanType visitPackType(PackType *pack, AbstractionPattern pattern) {
+    llvm_unreachable("Unimplemented!");
+  }
+
+  CanType visitPackExpansionType(PackExpansionType *pack, AbstractionPattern pattern) {
+    llvm_unreachable("Unimplemented!");
+  }
+
   CanType visitTupleType(TupleType *tuple, AbstractionPattern pattern) {
     if (auto gp = handleTypeParameterInAbstractionPattern(pattern, tuple))
       return gp;

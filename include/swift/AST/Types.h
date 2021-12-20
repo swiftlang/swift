@@ -159,7 +159,11 @@ public:
     /// This type contains a type placeholder.
     HasPlaceholder       = 0x800,
 
-    Last_Property = HasPlaceholder
+    /// This type contains a generic type parameter that is declared as a
+    /// type sequence
+    HasTypeSequence = 0x1000,
+
+    Last_Property = HasTypeSequence
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -216,6 +220,8 @@ public:
 
   /// Does a type with these properties structurally contain a placeholder?
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
+
+  bool hasTypeSequence() const { return Bits & HasTypeSequence; }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -419,6 +425,13 @@ protected:
     Count : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
+    : NumPadBits,
+
+    /// The number of elements of the tuple.
+    Count : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(BoundGenericType, TypeBase, 32,
     : NumPadBits,
 
@@ -598,6 +611,10 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
+  bool hasTypeSequence() const {
+    return getRecursiveProperties().hasTypeSequence();
+  }
+
   /// Determine whether the type involves the given opened existential
   /// archetype.
   bool hasOpenedExistential(OpenedArchetypeType *opened);
@@ -647,6 +664,13 @@ public:
   /// \c X<T> is not a type parameter. Use \c hasTypeParameter to determine
   /// whether a type parameter exists at any position.
   bool isTypeParameter();
+
+  /// Determine whether this type is a type sequence parameter, which is
+  /// either a GenericTypeParamType or a DependentMemberType.
+  ///
+  /// Like \c isTypeParameter, this routine will return \c false for types that
+  /// include type parameters in nested positions e.g. \c X<T...>.
+  bool isTypeSequenceParameter();
 
   /// Determine whether this type can dynamically be an optional type.
   ///
@@ -3424,6 +3448,7 @@ struct ParameterListInfo {
   SmallBitVector propertyWrappers;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
+  SmallBitVector variadicGenerics;
 
 public:
   ParameterListInfo() { }
@@ -3452,6 +3477,8 @@ public:
 
   /// Whether there is any contextual information set on this parameter list.
   bool anyContextualInfo() const;
+
+  bool isVariadicGenericParameter(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
@@ -5876,15 +5903,15 @@ public:
 private:
   friend class GenericTypeParamDecl;
 
-  explicit GenericTypeParamType(GenericTypeParamDecl *param)
-    : SubstitutableType(TypeKind::GenericTypeParam, nullptr,
-                        RecursiveTypeProperties::HasTypeParameter),
+  explicit GenericTypeParamType(GenericTypeParamDecl *param,
+                                RecursiveTypeProperties props)
+    : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
       ParamOrDepthIndex(param) { }
 
   explicit GenericTypeParamType(bool isTypeSequence, unsigned depth,
-                                unsigned index, const ASTContext &ctx)
-      : SubstitutableType(TypeKind::GenericTypeParam, &ctx,
-                          RecursiveTypeProperties::HasTypeParameter),
+                                unsigned index, RecursiveTypeProperties props,
+                                const ASTContext &ctx)
+      : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
         ParamOrDepthIndex(depth << 16 | index |
                           ((isTypeSequence ? 1 : 0) << 30)) {}
 };
@@ -6126,6 +6153,139 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
 
+/// PackType - The type of a pack of arguments provided to a
+/// \c PackExpansionType to guide the pack expansion process.
+///
+/// A pack type looks a lot like a tuple in the surface language, except there
+/// is no way for the user to spell a pack. Pack types are created by the solver
+/// when it encounters an apply of a variadic generic function, as in
+///
+/// \code
+/// func print<T...>(_ xs: T...) {}
+/// // Creates a pack type <String, Int, String>
+/// print("Macs say Hello in", 42, " different languages")
+/// \endcode
+///
+/// Pack types substituted into the variadic generic arguments of a
+/// \c PackExpansionType "trip" the pack expansion and cause it to produce a
+/// new pack type with the pack expansion pattern applied.
+///
+/// \code
+/// typealias Foo<T...> = (T?...)
+/// Foo<Int, String, Int> // Forces expansion to (Int?, String?, Int?)
+/// \endcode
+class PackType final : public TypeBase, public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<PackType, Type> {
+  friend class ASTContext;
+  friend TrailingObjects;
+
+public:
+  /// Creates a new, empty pack.
+  static PackType *getEmpty(const ASTContext &C);
+  /// Creates a pack from the types in \p elements.
+  static PackType *get(const ASTContext &C, ArrayRef<Type> elements);
+
+public:
+  /// Retrieves the number of elements in this pack.
+  unsigned getNumElements() const { return Bits.PackType.Count; }
+
+  /// Retrieves the type of the elements in the pack.
+  ArrayRef<Type> getElementTypes() const {
+    return {getTrailingObjects<Type>(), getNumElements()};
+  }
+
+  /// Returns the type of the element at the given \p index.
+  Type getElementType(unsigned index) const {
+    return getTrailingObjects<Type>()[index];
+  }
+
+public:
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getElementTypes());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Elements);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Pack;
+  }
+
+private:
+  PackType(ArrayRef<Type> elements, const ASTContext *CanCtx,
+           RecursiveTypeProperties properties)
+     : TypeBase(TypeKind::Pack, CanCtx, properties) {
+     Bits.PackType.Count = elements.size();
+     std::uninitialized_copy(elements.begin(), elements.end(),
+                             getTrailingObjects<Type>());
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
+  CanType getElementType(unsigned elementNo) const {
+    return CanType(getPointer()->getElementType(elementNo));
+  }
+
+  CanTypeArrayRef getElementTypes() const {
+    return CanTypeArrayRef(getPointer()->getElementTypes());
+  }
+END_CAN_TYPE_WRAPPER(PackType, Type)
+
+/// PackExpansionType - The interface type of the explicit expansion of a
+/// corresponding set of variadic generic parameters.
+///
+/// Pack expansions are spelled as single-element tuples with a single variadic
+/// component in most contexts except functions where they are allowed to appear
+/// without parentheses to match normal variadic declaration syntax.
+///
+/// \code
+/// func expand<T...>(_ xs: T...) -> (T...)
+///                         ~~~~     ~~~~~~
+/// \endcode
+///
+/// A pack expansion type comes equipped with a pattern type spelled before
+/// the ellipses - \c T in the examples above. This pattern type is the subject
+/// of the expansion of the pack that is tripped when its variadic generic
+/// parameter is substituted for a \c PackType.
+class PackExpansionType : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  Type patternType;
+
+public:
+  /// Create a pack expansion type from the given pattern type.
+  ///
+  /// It is not required that the pattern type actually contain a reference to
+  /// a variadic generic parameter.
+  static PackExpansionType *get(Type pattern);
+
+public:
+  /// Retrieves the pattern type of this pack expansion.
+  Type getPatternType() const { return patternType; }
+
+public:
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getPatternType());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &ID, Type patternType);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::PackExpansion;
+  }
+
+private:
+  PackExpansionType(Type patternType, const ASTContext *CanCtx)
+    : TypeBase(TypeKind::PackExpansion, CanCtx,
+               patternType->getRecursiveProperties()), patternType(patternType) {
+      assert(patternType);
+    }
+};
+BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+  CanType getPatternType() const {
+    return CanType(getPointer()->getPatternType());
+  }
+END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() {
   // If this type is canonical, it has the ASTContext in it.
@@ -6143,23 +6303,31 @@ inline ASTContext &TypeBase::getASTContext() {
 }
 
 inline bool TypeBase::isTypeVariableOrMember() {
-  if (is<TypeVariableType>())
-    return true;
+  Type t(this);
 
-  if (auto depMemTy = getAs<DependentMemberType>())
-    return depMemTy->getBase()->isTypeVariableOrMember();
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
 
-  return false;
+  return t->is<TypeVariableType>();
 }
 
 inline bool TypeBase::isTypeParameter() {
-  if (is<GenericTypeParamType>())
-    return true;
+  Type t(this);
 
-  if (auto depMemTy = getAs<DependentMemberType>())
-    return depMemTy->getBase()->isTypeParameter();
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
 
-  return false;
+  return t->is<GenericTypeParamType>();
+}
+
+inline bool TypeBase::isTypeSequenceParameter() {
+  Type t(this);
+
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
+
+  return t->is<GenericTypeParamType>() &&
+         t->castTo<GenericTypeParamType>()->isTypeSequence();
 }
 
 inline bool TypeBase::isMaterializable() {

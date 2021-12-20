@@ -124,6 +124,12 @@ bool TypeVariableType::Implementation::isSubscriptResultType() const {
          locator->isLastElement<LocatorPathElt::FunctionResult>();
 }
 
+bool TypeVariableType::Implementation::isTypeSequence() const {
+  return locator
+      && locator->isForGenericParameter()
+      && locator->getGenericParameter()->isTypeSequence();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
