@@ -252,11 +252,8 @@ __swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
     }
   } else {
     // This is the last element in the array which represents the last scalar
-    // name that Unicode defines (excluding variation selectors). This is
-    // U+E007F at the moment whose name is 'CANCEL TAG'. We add 4 because
-    // 'CANCEL' is found outside the byte area for words, but tag does.
-    // The resulting word indices look like this: [..., 0xFF, _, _, 0xXX];
-    nextScalarOffset = scalarOffset + 4;
+    // name that Unicode defines (excluding variation selectors).
+    nextScalarOffset = NAMES_LAST_SCALAR_OFFSET;
   }
 
   auto nameSize = nextScalarOffset - scalarOffset;
