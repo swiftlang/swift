@@ -563,6 +563,12 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
+    option('--cross-compile-append-host-target-to-destdir', toggle_true,
+           default=True,
+           help="Append each cross-compilation host target's name as a subdirectory "
+                "for each cross-compiled toolchain's destdir, useful when building "
+                "multiple toolchains and can be disabled if only cross-compiling one.")
+
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,

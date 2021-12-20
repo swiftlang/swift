@@ -126,6 +126,7 @@ EXPECTED_DEFAULTS = {
     'cmark_build_variant': 'Debug',
     'compiler_vendor': defaults.COMPILER_VENDOR,
     'coverage_db': None,
+    'cross_compile_append_host_target_to_destdir': True,
     'cross_compile_hosts': [],
     'darwin_deployment_version_ios':
         defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
@@ -532,6 +533,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--build-swift-static-stdlib'),
     EnableOption('--build-swift-stdlib-unittest-extra'),
     EnableOption('--build-swift-stdlib-static-print'),
+    EnableOption('--cross-compile-append-host-target-to-destdir'),
     EnableOption('--distcc'),
     EnableOption('--sccache'),
     EnableOption('--enable-asan'),
