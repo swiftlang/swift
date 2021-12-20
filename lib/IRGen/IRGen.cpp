@@ -1034,6 +1034,7 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
       irEntitiesToEmit.push_back(source->getIRLinkEntity());
       break;
     case SymbolSource::Kind::LinkerDirective:
+    case SymbolSource::Kind::CrossModuleOptimization:
     case SymbolSource::Kind::Unknown:
       llvm_unreachable("Not supported");
     }

@@ -692,15 +692,10 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
     return false;
   }
 
-  if (Invocation.getSILOptions().CrossModuleOptimization) {
-    Instance.getDiags().diagnose(SourceLoc(),
-                                 diag::tbd_not_supported_with_cmo);
-    return false;
-  }
-
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
-  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
+  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts,
+                  Instance.getPublicCMOSymbols());
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
@@ -1353,16 +1348,16 @@ static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
 
 static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
                                 ModuleOrSourceFile MSF,
-                                const llvm::Module &IRModule) {
-  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+                                const llvm::Module &IRModule,
+                                TBDSymbolSetPtr publicCMOSymbols) {
+  auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+  if (mode == FrontendOptions::TBDValidationMode::All &&
+      Invocation.getSILOptions().CrossModuleOptimization)
+    mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
+
   const bool canPerformTBDValidation = [&]() {
     // If the user has requested we skip validation, honor it.
     if (mode == FrontendOptions::TBDValidationMode::None) {
-      return false;
-    }
-
-    // Cross-module optimization does not support TBD.
-    if (Invocation.getSILOptions().CrossModuleOptimization) {
       return false;
     }
 
@@ -1426,9 +1421,10 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
   // noise from e.g. statically-linked libraries.
   Opts.embedSymbolsFromModules.clear();
   if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
-    return validateTBD(SF, IRModule, Opts, diagnoseExtraSymbolsInTBD);
+    return validateTBD(SF, IRModule, Opts, publicCMOSymbols,
+                       diagnoseExtraSymbolsInTBD);
   } else {
-    return validateTBD(MSF.get<ModuleDecl *>(), IRModule, Opts,
+    return validateTBD(MSF.get<ModuleDecl *>(), IRModule, Opts, publicCMOSymbols,
                        diagnoseExtraSymbolsInTBD);
   }
 }
@@ -1621,6 +1617,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return processCommandLineAndRunImmediately(
         Instance, std::move(SM), MSF, observer, ReturnValue);
 
+  TBDSymbolSetPtr publicCMOSymbols = SM->getPublicCMOSymbols();
+
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
       opts.InputsAndOutputs.copyOutputFilenames();
@@ -1635,7 +1633,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (!IRModule)
     return Instance.getDiags().hadAnyError();
 
-  if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
+  if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule(),
+                          publicCMOSymbols))
     return true;
 
   return generateCode(Instance, OutputFilename, IRModule.getModule(),

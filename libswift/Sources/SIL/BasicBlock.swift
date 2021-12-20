@@ -19,8 +19,7 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
   public var function: Function { SILBasicBlock_getFunction(bridged).function }
 
   public var description: String {
-    var s = SILBasicBlock_debugDescription(bridged)
-    return String(cString: s.c_str())
+    SILBasicBlock_debugDescription(bridged).takeString()
   }
 
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
