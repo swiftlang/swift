@@ -655,21 +655,21 @@ bool MinimalConformances::isValidConformancePath(
 
       if (!foundValidConformancePath)
         return false;
-    }
+    } else {
+      auto found = ParentPaths.find(ruleID);
+      if (found != ParentPaths.end()) {
+        SWIFT_DEFER {
+          visited.erase(ruleID);
+        };
+        visited.insert(ruleID);
 
-    auto found = ParentPaths.find(ruleID);
-    if (found != ParentPaths.end()) {
-      SWIFT_DEFER {
-        visited.erase(ruleID);
-      };
-      visited.insert(ruleID);
-
-      // If 'req' is based on some other conformance requirement
-      // `T.[P.]A : Q', we want to make sure that we have a
-      // non-redundant derivation for 'T : P'.
-      if (!isValidConformancePath(visited, found->second,
-                                  /*allowConcrete=*/false)) {
-        return false;
+        // If 'req' is based on some other conformance requirement
+        // `T.[P.]A : Q', we want to make sure that we have a
+        // non-redundant derivation for 'T : P'.
+        if (!isValidConformancePath(visited, found->second,
+                                    /*allowConcrete=*/false)) {
+          return false;
+        }
       }
     }
   }
