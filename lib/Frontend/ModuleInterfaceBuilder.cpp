@@ -74,7 +74,7 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
   llvm::vfs::FileSystem &fs = *sourceMgr.getFileSystem();
 
   auto &Opts = SubInstance.getASTContext().SearchPathOpts;
-  SmallString<128> SDKPath(Opts.SDKPath);
+  SmallString<128> SDKPath(Opts.getSDKPath());
   path::native(SDKPath);
   SmallString<128> ResourcePath(Opts.RuntimeResourcePath);
   path::native(ResourcePath);
@@ -280,7 +280,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;
 
     // Record any non-SDK module interface files for the debug info.
-    StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
+    StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.getSDKPath();
     if (!getRelativeDepPath(InPath, SDKPath))
       SerializationOpts.ModuleInterface = InPath;
 

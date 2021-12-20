@@ -148,7 +148,7 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
 
     // Try user-provided framework search paths first; frameworks contain
     // binaries as well as modules.
-    for (auto &frameworkDir : searchPathOpts.FrameworkSearchPaths) {
+    for (const auto &frameworkDir : searchPathOpts.getFrameworkSearchPaths()) {
       path = frameworkDir.Path;
       llvm::sys::path::append(path, frameworkPart.str());
       success = loadRuntimeLib(path);
