@@ -1895,7 +1895,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                  ? createFile(SourcePath, {}, {})
                  : DBuilder.createFile(RemappedFile, RemappedDir);
 
-  StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
+  StringRef Sysroot = IGM.Context.SearchPathOpts.getSDKPath();
   StringRef SDK;
   {
     auto B = llvm::sys::path::rbegin(Sysroot);
