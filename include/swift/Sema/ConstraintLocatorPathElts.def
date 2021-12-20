@@ -183,6 +183,12 @@ ABSTRACT_LOCATOR_PATH_ELT(AnyTupleElement)
   /// A tuple element referenced by name.
   CUSTOM_LOCATOR_PATH_ELT(NamedTupleElement)
 
+/// Pack types <T, U, V, ...>
+CUSTOM_LOCATOR_PATH_ELT(PackType)
+
+/// An element of a pack type - the T in <T, U, V, ...>
+CUSTOM_LOCATOR_PATH_ELT(PackElement)
+
 /// An unresolved member.
 SIMPLE_LOCATOR_PATH_ELT(UnresolvedMember)
 

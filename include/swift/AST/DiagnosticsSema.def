@@ -3700,8 +3700,8 @@ NOTE(specialize_explicit_type_instead,none,
      "did you mean to explicitly reference %0 instead?", (Type))
 ERROR(type_parameter_count_mismatch,none,
       "generic type %0 specialized with %select{too many|too few}3 type "
-      "parameters (got %2, but expected %1)",
-      (Identifier, unsigned, unsigned, bool))
+      "parameters (got %2, but expected %select{%1|at least %1}4)",
+      (Identifier, unsigned, unsigned, bool, bool))
 ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(descriptive_generic_type_declared_here,none,
@@ -4832,6 +4832,8 @@ ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
+ERROR(expansion_not_variadic,none,
+      "cannot create expansion with non-variadic type %0", (Type))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(enum_element_ellipsis,none,
