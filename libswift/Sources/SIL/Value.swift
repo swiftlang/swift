@@ -20,8 +20,7 @@ public protocol Value : AnyObject, CustomStringConvertible {
 
 extension Value {
   public var description: String {
-    var s = SILNode_debugDescription(bridgedNode)
-    return String(cString: s.c_str())
+    SILNode_debugDescription(bridgedNode).takeString()
   }
 
   public var uses: UseList {

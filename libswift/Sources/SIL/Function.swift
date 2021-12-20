@@ -18,8 +18,7 @@ final public class Function : CustomStringConvertible {
   }
 
   final public var description: String {
-    var s = SILFunction_debugDescription(bridged)
-    return String(cString: s.c_str())
+    return SILFunction_debugDescription(bridged).takeString()
   }
 
   public var entryBlock: BasicBlock {
