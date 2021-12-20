@@ -650,11 +650,13 @@ RewriteSystem::TypeWitness::TypeWitness(
          getConcreteConformance().getProtocol());
 }
 
-bool swift::rewriting::operator==(
-    const RewriteSystem::TypeWitness &lhs,
-    const RewriteSystem::TypeWitness &rhs) {
-  return (lhs.LHS == rhs.LHS &&
-          lhs.RHS == rhs.RHS);
+namespace swift {
+namespace rewriting {
+bool operator==(const RewriteSystem::TypeWitness &lhs,
+                const RewriteSystem::TypeWitness &rhs) {
+  return lhs.LHS == rhs.LHS && lhs.RHS == rhs.RHS;
+}
+}
 }
 
 void RewriteSystem::TypeWitness::dump(llvm::raw_ostream &out) const {
