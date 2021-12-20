@@ -159,6 +159,12 @@ func emitScalarNames(
     }
   }
   
+  result += """
+  #define NAMES_SCALARS_MAX_INDEX \(scalars.count - 1)
+  
+  
+  """
+  
   emitCollection(nameBytes, name: "_swift_stdlib_names", into: &result)
   
   return scalarNameIndices
