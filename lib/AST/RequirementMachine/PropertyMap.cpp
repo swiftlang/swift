@@ -340,7 +340,11 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
     if (rule.isSimplified())
       continue;
 
-    if (rule.isPermanent())
+    // Identity conformances ([P].[P] => [P]) are permanent rules, but we
+    // keep them around to ensure that concrete conformance introduction
+    // works in the case where the protocol's Self type is itself subject
+    // to a superclass or concrete type requirement.
+    if (rule.isPermanent() && !rule.isIdentityConformanceRule())
       continue;
 
     // Collect all rules of the form T.[p] => T where T is canonical.
