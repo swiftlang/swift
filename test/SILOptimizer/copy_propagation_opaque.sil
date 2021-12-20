@@ -392,11 +392,9 @@ bb0(%arg : @owned $T):
 }
 
 // CHECK-TRACE-LABEL: *** CopyPropagation: testBorrowCopy
-// CHECK-TRACE:  Outer copy          [[OUTERCOPY:%.*]] = copy_value %0 : $T
-// CHECK-TRACE:  Use of outer copy   destroy_value
-// CHECK-TRACE:  Deleting   %{{.*}} = copy_value
-// CHECK-TRACE:  Removing   destroy_value [[OUTERCOPY]] : $T
-// CHECK-TRACE:  Removing   [[OUTERCOPY]] = copy_value %0 : $T
+// CHECK-TRACE:        Canonicalizing: %0 = argument of bb0 : $T
+// CHECK-TRACE:        Removing   destroy_value [[REGISTER_1:%[^,]+]] : $T
+// CHECK-TRACE:        Removing   [[REGISTER_1]] = copy_value %0 : $T
 //
 // CHECK-LABEL: sil [ossa] @testBorrowCopy : $@convention(thin) <T> (@in T) -> () {
 // CHECK-LABEL: bb0(%0 : @owned $T):
@@ -416,11 +414,10 @@ bb0(%0 : @owned $T):
 }
 
 // CHECK-TRACE-LABEL: *** CopyPropagation: testCopyBorrow
-// CHECK-TRACE-NOT: Removing
 //
 // CHECK-LABEL: sil [ossa] @testCopyBorrow : $@convention(thin) <T> (@in T) -> () {
 // CHECK:       bb0(%0 : @owned $T):
-// CHECK-NEXT:  destroy_value %0 : $T
+// CHECK:       destroy_value %0 : $T
 // CHECK-NEXT:  tuple
 // CHECK-NEXT:  return
 // CHECK-LABEL: } // end sil function 'testCopyBorrow'

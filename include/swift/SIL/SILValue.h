@@ -438,7 +438,7 @@ public:
 
   template <class T> inline T *getSingleConsumingUserOfType() const;
 
-  /// Returns true if this operand has exactly two.
+  /// Returns true if this operand has exactly two uses.
   ///
   /// This is useful if one has found a predefined set of 2 unique users and
   /// wants to check if there are any other users without iterating over the

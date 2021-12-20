@@ -6,8 +6,13 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-add_libswift_module(Optimizer
-    DEPENDS SIL ExperimentalRegex)
+set(dependencies)
+list(APPEND dependencies SIL)
+if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+  list(APPEND dependencies ExperimentalRegex)
+endif()
+
+add_libswift_module(Optimizer DEPENDS ${dependencies})
 
 add_subdirectory(Analysis)
 add_subdirectory(InstructionPasses)
