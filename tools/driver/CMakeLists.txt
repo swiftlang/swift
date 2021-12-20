@@ -31,6 +31,7 @@ if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
   )
   target_link_libraries(swift-frontend-bootstrapping1
                         PRIVATE
+                          swiftCore-bootstrapping0
                           swiftDriverTool
                           libswift-bootstrapping1)
 
