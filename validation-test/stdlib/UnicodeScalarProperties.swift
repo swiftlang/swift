@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift %S/../../utils/gen-unicode-data/Data/DerivedCoreProperties.txt %S/../../utils/gen-unicode-data/Data/DerivedNormalizationProps.txt %S/../../utils/gen-unicode-data/Data/DerivedBinaryProperties.txt %S/../../utils/gen-unicode-data/Data/PropList.txt %S/../../utils/gen-unicode-data/Data/emoji-data.txt
+// RUN: %target-run-simple-swift %S/../../utils/gen-unicode-data/Data/
 // REQUIRES: executable_test
 // REQUIRES: long_test
 // REQUIRES: optimized_stdlib
@@ -80,6 +80,114 @@ if #available(SwiftStdlib 5.6, *) {
       expectEqual(props.isWhitespace, check("White_Space"))
       expectEqual(props.isXIDContinue, check("XID_Continue"))
       expectEqual(props.isXIDStart, check("XID_Start"))
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Numeric Properties
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.6, *) {
+  UnicodeScalarPropertiesTest.test("Numeric Properties") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      expectEqual(scalar.properties.numericType, numericTypes[scalar])
+      expectEqual(scalar.properties.numericValue, numericValues[scalar])
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Scalar Mappings
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.6, *) {
+  UnicodeScalarPropertiesTest.test("Scalar Mappings") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      if let upper = mappings[scalar]?["upper"] {
+        expectEqual(scalar.properties.uppercaseMapping, upper)
+      }
+
+      if let lower = mappings[scalar]?["lower"] {
+        expectEqual(scalar.properties.lowercaseMapping, lower)
+      }
+
+      if let title = mappings[scalar]?["title"] {
+        expectEqual(scalar.properties.titlecaseMapping, title)
+      }
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Scalar Age
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.6, *) {
+  UnicodeScalarPropertiesTest.test("Scalar Age") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      expectEqual(scalar.properties.age?.major, ages[scalar]?.major)
+      expectEqual(scalar.properties.age?.minor, ages[scalar]?.minor)
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Scalar General Category
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.6, *) {
+  UnicodeScalarPropertiesTest.test("Scalar General Category") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      expectEqual(scalar.properties.generalCategory, generalCategories[scalar])
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Scalar Name Alias
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.6, *) {
+  UnicodeScalarPropertiesTest.test("Scalar Name Alias") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      expectEqual(scalar.properties.nameAlias, nameAliases[scalar])
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Scalar Name
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 5.6, *) {
+  UnicodeScalarPropertiesTest.test("Scalar Name") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      expectEqual(scalar.properties.name, names[scalar])
     }
   }
 }
