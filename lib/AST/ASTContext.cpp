@@ -388,6 +388,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
+    llvm::FoldingSet<PackType> PackTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    MetatypeType*> MetatypeTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
@@ -469,6 +470,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
+  llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
@@ -620,6 +622,7 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
       TheUnresolvedType(new (*this, AllocationArena::Permanent)
                             UnresolvedType(*this)),
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
+      TheEmptyPackType(PackType::get(*this, {})),
       TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
                                               /*HasExplicitAnyObject=*/false)),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
@@ -2922,6 +2925,70 @@ Type TupleTypeElt::getType() const {
   return ElementType;
 }
 
+PackExpansionType *PackExpansionType::get(Type patternTy) {
+  assert(patternTy && "Missing pattern type in expansion");
+
+  auto &context = patternTy->getASTContext();
+  llvm::FoldingSetNodeID id;
+  PackExpansionType::Profile(id, patternTy);
+
+  void *insertPos;
+  if (PackExpansionType *expType =
+          context.getImpl().PackExpansionTypes.FindNodeOrInsertPos(id,
+                                                                   insertPos))
+    return expType;
+
+  const ASTContext *canCtx = patternTy->isCanonical() ? &context : nullptr;
+  PackExpansionType *expansionTy = new (context, AllocationArena::Permanent)
+      PackExpansionType(patternTy, canCtx);
+  context.getImpl().PackExpansionTypes.InsertNode(expansionTy, insertPos);
+  return expansionTy;
+}
+
+void PackExpansionType::Profile(llvm::FoldingSetNodeID &ID, Type patternType) {
+  ID.AddPointer(patternType.getPointer());
+}
+
+PackType *PackType::getEmpty(const ASTContext &C) {
+  return cast<PackType>(CanType(C.TheEmptyPackType));
+}
+
+PackType *PackType::get(const ASTContext &C, ArrayRef<Type> elements) {
+  RecursiveTypeProperties properties;
+  bool isCanonical = true;
+  for (Type eltTy : elements) {
+    properties |= eltTy->getRecursiveProperties();
+    if (!eltTy->isCanonical())
+      isCanonical = false;
+  }
+
+  auto arena = getArena(properties);
+
+  void *InsertPos = nullptr;
+  // Check to see if we've already seen this pack before.
+  llvm::FoldingSetNodeID ID;
+  PackType::Profile(ID, elements);
+
+  if (PackType *TT
+        = C.getImpl().getArena(arena).PackTypes.FindNodeOrInsertPos(ID,InsertPos))
+    return TT;
+
+  size_t bytes = totalSizeToAlloc<Type>(elements.size());
+  // TupleType will copy the fields list into ASTContext owned memory.
+  void *mem = C.Allocate(bytes, alignof(PackType), arena);
+  auto New =
+      new (mem) PackType(elements, isCanonical ? &C : nullptr, properties);
+  C.getImpl().getArena(arena).PackTypes.InsertNode(New, InsertPos);
+  return New;
+}
+
+void PackType::Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Elements) {
+  ID.AddInteger(Elements.size());
+  for (Type Ty : Elements) {
+    ID.AddPointer(Ty.getPointer());
+  }
+}
+
 Type AnyFunctionType::Param::getOldType() const {
   if (Flags.isInOut()) return InOutType::get(Ty);
   return Ty;
@@ -3425,7 +3492,7 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 12,
+  static_assert(RecursiveTypeProperties::BitWidth == 13,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -3478,6 +3545,8 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
     auto arrayDecl = ctx->getArrayDecl();
     if (!arrayDecl)
       type = ErrorType::get(*ctx);
+    else if (type->is<PackType>())
+      return type;
     else if (forCanonical)
       type = BoundGenericType::get(arrayDecl, Type(), {type});
     else
@@ -3721,8 +3790,12 @@ GenericTypeParamType *GenericTypeParamType::get(bool isTypeSequence,
   if (known != ctx.getImpl().GenericParamTypes.end())
     return known->second;
 
+  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
+  if (isTypeSequence)
+    props |= RecursiveTypeProperties::HasTypeSequence;
+
   auto result = new (ctx, AllocationArena::Permanent)
-      GenericTypeParamType(isTypeSequence, depth, index, ctx);
+      GenericTypeParamType(isTypeSequence, depth, index, props, ctx);
   ctx.getImpl().GenericParamTypes[{depthKey, index}] = result;
   return result;
 }
@@ -4008,7 +4081,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 12,
+  static_assert(RecursiveTypeProperties::BitWidth == 13,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();

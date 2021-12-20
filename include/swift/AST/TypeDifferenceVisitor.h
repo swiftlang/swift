@@ -130,6 +130,17 @@ public:
     return asImpl().visit(type1.getElementType(), type2.getElementType());
   }
 
+  bool visitPackType(CanPackType type1, CanPackType type2) {
+    return visitComponentArray(type1, type2,
+                               type1->getElementTypes(),
+                               type2->getElementTypes());
+  }
+
+  bool visitPackExpansionType(CanPackExpansionType type1,
+                              CanPackExpansionType type2) {
+    return asImpl().visit(type1.getPatternType(), type2.getPatternType());
+  }
+
   bool visitTupleType(CanTupleType type1, CanTupleType type2) {
     return visitComponentArray(type1, type2,
                                type1->getElements(), type2->getElements());

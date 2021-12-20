@@ -1507,6 +1507,10 @@ private:
                                       File, FwdDeclLine, Flags, MangledName);
     }
 
+    case TypeKind::Pack:
+    case TypeKind::PackExpansion:
+      llvm_unreachable("Unimplemented!");
+
     case TypeKind::Tuple: {
       // Tuples are also represented as structs.  Since tuples are ephemeral
       // (not nominal) they don't have a source location.
