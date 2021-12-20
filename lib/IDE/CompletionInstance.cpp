@@ -438,8 +438,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
                              newBufferStart.getAdvancedLoc(newInfo.EndOffset));
 
     auto *AFD = cast<AbstractFunctionDecl>(DC);
+    SM.setReplacedRange(AFD->getOriginalBodySourceRange(), newBodyRange);
     AFD->setBodyToBeReparsed(newBodyRange);
-    SM.setReplacedRange({AFD->getOriginalBodySourceRange(), newBodyRange});
     oldSF->clearScope();
 
     traceDC = AFD;

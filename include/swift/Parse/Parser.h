@@ -1195,9 +1195,11 @@ public:
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes,
                                        bool HasFuncKeyword = true);
-  BraceStmt *parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
+  BodyAndFingerprint
+  parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
-  BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
+  BodyAndFingerprint
+  parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
