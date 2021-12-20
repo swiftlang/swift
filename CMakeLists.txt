@@ -188,7 +188,8 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
     no effect on the target libraries (the standard library and the runtime).")
 
 # NOTE: We do not currently support building libswift with the Xcode generator.
-cmake_dependent_option(LIBSWIFT_BUILD_MODE "How to build libswift. Possible values are
+cmake_dependent_option(LIBSWIFT_BUILD_MODE [=[
+How to build libswift. Possible values are
     OFF:           the compiler is built without libswift
     HOSTTOOLS:     libswift is built with a pre-installed toolchain
     BOOTSTRAPPING: libswift is built with a 2-stage bootstrapping process
@@ -197,8 +198,8 @@ cmake_dependent_option(LIBSWIFT_BUILD_MODE "How to build libswift. Possible valu
     CROSSCOMPILE:  libswift is cross-compiled with a native host compiler, provided in
                    `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
     CROSSCOMPILE-WITH-HOSTLIBS:    libswift is built with a bootstrapping-with-hostlibs compiled
-                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`"
-  OFF "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" OFF)
+                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
+]=]  OFF "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" OFF)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
