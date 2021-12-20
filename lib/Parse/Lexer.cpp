@@ -33,6 +33,13 @@
 
 #include <limits>
 
+// Regex lexing delivered via libSwift.
+#include "swift/Parse/ExperimentalRegexBridging.h"
+static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
+void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
+  regexLiteralLexingFn = fn;
+}
+
 using namespace swift;
 using namespace swift::syntax;
 
@@ -1951,36 +1958,46 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
   }
 }
 
-void Lexer::lexRegexLiteral(const char *TokStart) {
+bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   assert(*TokStart == '\'');
 
-  bool HadError = false;
-  while (true) {
-    // Check if we reached the end of the literal without terminating.
-    if (CurPtr >= BufferEnd || *CurPtr == '\n' || *CurPtr == '\r') {
-      diagnose(TokStart, diag::lex_unterminated_regex);
-      return formToken(tok::unknown, TokStart);
-    }
+  // We need to have experimental string processing enabled, and have the
+  // parsing logic for regex literals available.
+  if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
+    return false;
 
-    const auto *CharStart = CurPtr;
-    uint32_t CharValue = validateUTF8CharacterAndAdvance(CurPtr, BufferEnd);
-    if (CharValue == ~0U) {
-      diagnose(CharStart, diag::lex_invalid_utf8);
-      HadError = true;
-      continue;
-    }
-    if (CharValue == '\\' && (*CurPtr == '\'' || *CurPtr == '\\')) {
-      // Skip escaped delimiter or \.
-      CurPtr++;
-    } else if (CharValue == '\'') {
-      // End of literal, stop.
-      break;
-    }
+  // Ask libswift to try and lex a regex literal.
+  // - Ptr will not be advanced if this is not for a regex literal.
+  // - ErrStr will be set if there is any error to emit.
+  // - CompletelyErroneous will be set if there was an error that cannot be
+  //   recovered from.
+  auto *Ptr = TokStart;
+  const char *ErrStr = nullptr;
+  bool CompletelyErroneous = regexLiteralLexingFn(&Ptr, BufferEnd, &ErrStr);
+  if (ErrStr)
+    diagnose(TokStart, diag::regex_literal_parsing_error, ErrStr);
+
+  // If we didn't make any lexing progress, this isn't a regex literal and we
+  // should fallback to lexing as something else.
+  if (Ptr == TokStart)
+    return false;
+
+  // Update to point to where we ended regex lexing.
+  assert(Ptr > TokStart && Ptr <= BufferEnd);
+  CurPtr = Ptr;
+
+  // If the lexing was completely erroneous, form an unknown token.
+  if (CompletelyErroneous) {
+    assert(ErrStr);
+    formToken(tok::unknown, TokStart);
+    return true;
   }
-  if (HadError)
-    return formToken(tok::unknown, TokStart);
 
+  // Otherwise, we either had a successful lex, or something that was
+  // recoverable.
+  assert(ErrStr || CurPtr[-1] == '\'');
   formToken(tok::regex_literal, TokStart);
+  return true;
 }
 
 /// lexEscapedIdentifier:
@@ -2528,11 +2545,11 @@ void Lexer::lexImpl() {
 
   case '\'':
     // If we have experimental string processing enabled, and have the parsing
-    // logic for regex literals, lex a single quoted string as a regex literal.
-    if (LangOpts.EnableExperimentalStringProcessing &&
-        Parser_hasParseRegexStrawperson()) {
-      return lexRegexLiteral(TokStart);
-    }
+    // logic for regex literals, try to lex a single quoted string as a regex
+    // literal.
+    if (tryLexRegexLiteral(TokStart))
+      return;
+
     // Otherwise lex as a string literal and emit a diagnostic.
     LLVM_FALLTHROUGH;
   case '"':
