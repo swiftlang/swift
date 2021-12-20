@@ -80,6 +80,10 @@ enum class ImportFlags {
   /// implementation detail of this file.
   SPIAccessControl = 0x10,
 
+  /// The module is imported assuming that the module itself predates
+  /// concurrency.
+  PredatesConcurrency = 0x20,
+
   /// Used for DenseMap.
   Reserved = 0x80
 };
@@ -542,6 +546,10 @@ struct AttributedImport {
 
   /// Names of explicitly imported SPI groups.
   ArrayRef<Identifier> spiGroups;
+
+  /// When the import declaration has a `@_predatesConcurrency` annotation, this
+  /// is the source range covering the annotation.
+  SourceRange predatesConcurrencyRange;
 
   AttributedImport(ModuleInfo module, ImportOptions options = ImportOptions(),
                    StringRef filename = {}, ArrayRef<Identifier> spiGroups = {})

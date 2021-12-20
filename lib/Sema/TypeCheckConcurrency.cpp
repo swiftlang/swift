@@ -674,6 +674,26 @@ static bool hasExplicitSendableConformance(NominalTypeDecl *nominal) {
           conformance.getConcrete())->isMissing());
 }
 
+/// Find the import that makes the given nominal declaration available.
+static Optional<AttributedImport<ImportedModule>> findImportFor(
+    NominalTypeDecl *nominal, const DeclContext *fromDC) {
+  // If the nominal type is from the current module, there's no import.
+  auto nominalModule = nominal->getParentModule();
+  if (nominalModule == fromDC->getParentModule())
+    return None;
+
+  auto fromSourceFile = fromDC->getParentSourceFile();
+  if (!fromSourceFile)
+    return None;
+
+  for (const auto &import : fromSourceFile->getImports()) {
+    if (import.module.importedModule == nominalModule)
+      return import;
+  }
+
+  return None;
+}
+
 /// Determine the diagnostic behavior for a Sendable reference to the given
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
@@ -686,12 +706,12 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 
   // Determine whether this nominal type is visible via a @_predatesConcurrency
   // import.
-  ImportDecl *predatesConcurrencyImport = nullptr;
+  auto import = findImportFor(nominal, fromDC);
 
   // When the type is explicitly non-Sendable...
   if (isExplicitlyNonSendable) {
     // @_predatesConcurrency imports downgrade the diagnostic to a warning.
-    if (predatesConcurrencyImport) {
+    if (import && import->options.contains(ImportFlags::PredatesConcurrency)) {
       // FIXME: Note that this @_predatesConcurrency import was "used".
       return DiagnosticBehavior::Warning;
     }
@@ -701,10 +721,13 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 
   // When the type is implicitly non-Sendable...
 
-  // @_predatesConcurrency always suppresses the diagnostic.
-  if (predatesConcurrencyImport) {
+  // @_predatesConcurrency suppresses the diagnostic in Swift 5.x, and
+  // downgrades it to a warning in Swift 6 and later.
+  if (import && import->options.contains(ImportFlags::PredatesConcurrency)) {
     // FIXME: Note that this @_predatesConcurrency import was "used".
-    return DiagnosticBehavior::Ignore;
+    return nominalModule->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
+        ? DiagnosticBehavior::Warning
+        : DiagnosticBehavior::Ignore;
   }
 
   return defaultDiagnosticBehavior();

@@ -548,6 +548,11 @@ UnboundImport::UnboundImport(ImportDecl *ID)
     spiGroups.append(attrSPIs.begin(), attrSPIs.end());
   }
   import.spiGroups = ID->getASTContext().AllocateCopy(spiGroups);
+
+  if (auto attr = ID->getAttrs().getAttribute<PredatesConcurrencyAttr>()) {
+    import.options |= ImportFlags::PredatesConcurrency;
+    import.predatesConcurrencyRange = attr->getRangeWithAt();
+  }
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {
