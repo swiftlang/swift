@@ -868,6 +868,9 @@ void MinimalConformances::computeMinimalConformances(bool firstPass) {
           llvm::dbgs() << " pass: ";
           llvm::dbgs() << System.getRule(ruleID).getLHS();
           llvm::dbgs() << "\n";
+          llvm::dbgs() << "-- via valid path: ";
+          dumpConformancePath(llvm::errs(), path);
+          llvm::dbgs() << "\n";
         }
 
         RedundantConformances.insert(ruleID);
@@ -897,6 +900,7 @@ void MinimalConformances::verifyMinimalConformances() const {
         llvm::errs() << "Redundant conformance is not recoverable:\n";
         llvm::errs() << rule << "\n\n";
         dumpMinimalConformanceEquations(llvm::errs());
+        dumpMinimalConformances(llvm::errs());
         abort();
       }
 
@@ -907,6 +911,7 @@ void MinimalConformances::verifyMinimalConformances() const {
       llvm::errs() << "Minimal conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
       dumpMinimalConformanceEquations(llvm::errs());
+      dumpMinimalConformances(llvm::errs());
       abort();
     }
   }
