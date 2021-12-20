@@ -2278,6 +2278,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
                                              .withThrows(true)
+                                             .withAsync(true)
                                              .build());
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
@@ -2287,6 +2288,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
                                          .withThrows(true)
+                                         .withAsync(true)
                                          .build());
     return {refType, refType};
   }
