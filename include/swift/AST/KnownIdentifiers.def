@@ -252,6 +252,7 @@ IDENTIFIER(zero)
 // String processing
 IDENTIFIER(Regex)
 IDENTIFIER_(regexString)
+IDENTIFIER(version)
 IDENTIFIER_(StringProcessing)
 
 // Distributed actors

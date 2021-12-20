@@ -59,9 +59,6 @@ class Swift(product.Product):
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
 
-        # Add experimental string processing flag.
-        self.cmake_options.extend(self._enable_experimental_string_processing)
-
         # Add freestanding related flags.
         self.cmake_options.extend(self._freestanding_is_darwin)
 
@@ -170,11 +167,6 @@ updated without updating swift.py?")
     def _enable_stdlib_static_vprintf(self):
         return [('SWIFT_STDLIB_STATIC_PRINT',
                  self.args.build_swift_stdlib_static_print)]
-
-    @property
-    def _enable_experimental_string_processing(self):
-        return [('SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL',
-                 self.args.enable_experimental_string_processing)]
 
     @property
     def _freestanding_is_darwin(self):

@@ -6,7 +6,16 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
+file(GLOB_RECURSE _LIBSWIFT_EXPERIMENTAL_REGEX_SOURCES
+  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_MatchingEngine/*.swift")
+set(LIBSWIFT_EXPERIMENTAL_REGEX_SOURCES)
+foreach(source ${_LIBSWIFT_EXPERIMENTAL_REGEX_SOURCES})
+  file(TO_CMAKE_PATH "${source}" source)
+  list(APPEND LIBSWIFT_EXPERIMENTAL_REGEX_SOURCES ${source})
+endforeach()
+message(STATUS "Using Experimental String Processing library for libswift ExperimentalRegex (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
+
 add_libswift_module(ExperimentalRegex
-  Regex.swift
-)
+  "${LIBSWIFT_EXPERIMENTAL_REGEX_SOURCES}"
+  Regex.swift)
 
