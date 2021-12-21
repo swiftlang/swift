@@ -394,6 +394,43 @@ bool swift::isLetAddress(SILValue address) {
 }
 
 //===----------------------------------------------------------------------===//
+//                      MARK: Deinitialization barriers.
+//===----------------------------------------------------------------------===//
+
+static bool isBarrierApply(FullApplySite) {
+  // TODO: check side effect analysis
+  return true;
+}
+
+static bool mayAccessPointer(SILInstruction *instruction) {
+  if (!instruction->mayReadOrWriteMemory())
+    return false;
+  bool fail = false;
+  visitAccessedAddress(instruction, [&fail](Operand *operand) {
+    auto accessStorage = AccessStorage::compute(operand->get());
+    if (accessStorage.getKind() != AccessRepresentation::Kind::Unidentified)
+      fail = true;
+  });
+  return fail;
+}
+
+static bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
+  // TODO: It is possible to do better here by looking at the address that is
+  //       being loaded.
+  return isa<LoadWeakInst>(instruction) || isa<LoadUnownedInst>(instruction);
+}
+
+bool swift::isDeinitBarrier(SILInstruction *instruction) {
+  if (instruction->maySynchronize()) {
+    if (auto apply = FullApplySite::isa(instruction)) {
+      return isBarrierApply(apply);
+    }
+    return true;
+  }
+  return mayLoadWeakOrUnowned(instruction) || mayAccessPointer(instruction);
+}
+
+//===----------------------------------------------------------------------===//
 //                         MARK: AccessRepresentation
 //===----------------------------------------------------------------------===//
 
