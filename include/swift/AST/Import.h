@@ -739,15 +739,12 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
     return detail::combineHashValue(
         ModuleInfoDMI::getHashValue(import.module),
         detail::combineHashValue(
-            SourceLocDMI::getHashValue(import.importLoc),
-            detail::combineHashValue(
-              ImportOptionsDMI::getHashValue(import.options),
-              StringRefDMI::getHashValue(import.sourceFileArg))));
+          ImportOptionsDMI::getHashValue(import.options),
+          StringRefDMI::getHashValue(import.sourceFileArg)));
   }
   static bool isEqual(const AttributedImport &a,
                       const AttributedImport &b) {
     return ModuleInfoDMI::isEqual(a.module, b.module) &&
-           SourceLocDMI::isEqual(a.importLoc, b.importLoc),
            ImportOptionsDMI::isEqual(a.options, b.options) &&
            StringRefDMI::isEqual(a.sourceFileArg, b.sourceFileArg) &&
            a.spiGroups == b.spiGroups;
