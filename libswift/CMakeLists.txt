@@ -60,14 +60,14 @@ else()
     # Bootstrapping - stage 1, using the compiler from level 0
 
     add_libswift(libswift-bootstrapping1
-      SWIFT_EXEC "${CMAKE_BINARY_DIR}/bootstrapping0/bin/swiftc"
+      SWIFT_EXEC $<TARGET_FILE_DIR:swift-frontend-bootstrapping0>/swiftc${CMAKE_EXECUTABLE_SUFFIX}
       DEPENDS ${b0_deps}
       BOOTSTRAPPING 1)
 
     # The final build, using the compiler from stage 1
 
     add_libswift(libswift
-        SWIFT_EXEC "${CMAKE_BINARY_DIR}/bootstrapping1/bin/swiftc"
+        SWIFT_EXEC $<TARGET_FILE_DIR:swift-frontend-bootstrapping1>/swiftc${CMAKE_EXECUTABLE_SUFFIX}
         DEPENDS ${b1_deps})
 
     if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
