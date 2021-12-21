@@ -263,7 +263,6 @@ _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
 }
 
 void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
-    const void *baseAddress,
     const void *records, uintptr_t recordsSize) {
   assert(recordsSize % sizeof(TypeMetadataRecord) == 0
          && "weird-sized type metadata section?!");
@@ -283,12 +282,10 @@ void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
                                recordsBegin, recordsEnd);
 }
 
-void swift::addImageTypeMetadataRecordBlockCallback(const void *baseAddress,
-                                                    const void *records,
+void swift::addImageTypeMetadataRecordBlockCallback(const void *records,
                                                     uintptr_t recordsSize) {
   TypeMetadataRecords.get();
-  addImageTypeMetadataRecordBlockCallbackUnsafe(baseAddress,
-                                                records, recordsSize);
+  addImageTypeMetadataRecordBlockCallbackUnsafe(records, recordsSize);
 }
 
 void
@@ -837,8 +834,7 @@ _registerProtocols(ProtocolMetadataPrivateState &C,
   C.SectionsToScan.push_back(ProtocolSection{begin, end});
 }
 
-void swift::addImageProtocolsBlockCallbackUnsafe(const void *baseAddress,
-                                                 const void *protocols,
+void swift::addImageProtocolsBlockCallbackUnsafe(const void *protocols,
                                                  uintptr_t protocolsSize) {
   assert(protocolsSize % sizeof(ProtocolRecord) == 0 &&
          "protocols section not a multiple of ProtocolRecord");
@@ -855,11 +851,10 @@ void swift::addImageProtocolsBlockCallbackUnsafe(const void *baseAddress,
                      recordsBegin, recordsEnd);
 }
 
-void swift::addImageProtocolsBlockCallback(const void *baseAddress,
-                                           const void *protocols,
+void swift::addImageProtocolsBlockCallback(const void *protocols,
                                            uintptr_t protocolsSize) {
   Protocols.get();
-  addImageProtocolsBlockCallbackUnsafe(baseAddress, protocols, protocolsSize);
+  addImageProtocolsBlockCallbackUnsafe(protocols, protocolsSize);
 }
 
 void swift::swift_registerProtocols(const ProtocolRecord *begin,
@@ -2482,7 +2477,6 @@ public:
 } // anonymous namespace
 
 void swift::addImageDynamicReplacementBlockCallback(
-    const void *baseAddress,
     const void *replacements, uintptr_t replacementsSize,
     const void *replacementsSome, uintptr_t replacementsSomeSize) {
 
