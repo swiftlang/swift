@@ -691,7 +691,7 @@ SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
 SIMPLE_DECL_ATTR(_predatesConcurrency, PredatesConcurrency,
   OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript |
   OnEnumElement | UserInaccessible |
-  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   125)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
