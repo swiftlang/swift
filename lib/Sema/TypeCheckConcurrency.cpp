@@ -756,16 +756,37 @@ static bool diagnoseSingleNonSendableType(
     // Don't emit any other diagnostics.
   } else if (type->is<FunctionType>()) {
     ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
-  } else if (nominal && nominal->getParentModule() == module &&
-             (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))) {
-    auto note = nominal->diagnose(
-        diag::add_nominal_sendable_conformance,
-        nominal->getDescriptiveKind(), nominal->getName());
-    addSendableFixIt(nominal, note, /*unchecked=*/false);
+  } else if (nominal && nominal->getParentModule() == module) {
+    // If the nominal type is in the current module, suggest adding
+    // `Sendable` if it might make sense. Otherwise, just complain.
+    if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+      auto note = nominal->diagnose(
+          diag::add_nominal_sendable_conformance,
+          nominal->getDescriptiveKind(), nominal->getName());
+      addSendableFixIt(nominal, note, /*unchecked=*/false);
+    } else {
+      nominal->diagnose(
+          diag::non_sendable_nominal, nominal->getDescriptiveKind(),
+          nominal->getName());
+    }
   } else if (nominal) {
+    // Note which nominal type does not conform to `Sendable`.
     nominal->diagnose(
         diag::non_sendable_nominal, nominal->getDescriptiveKind(),
         nominal->getName());
+
+    // If we can find an import in this context that makes this nominal
+    // type visible, note that it can be `@_predatesConcurrency` import.
+    auto import = findImportFor(nominal, fromContext.fromDC);
+    if (import && !import->options.contains(ImportFlags::PredatesConcurrency) &&
+        import->importLoc.isValid()) {
+      SourceLoc importLoc = import->importLoc;
+      ctx.Diags.diagnose(
+          importLoc, diag::add_predates_concurrency_import,
+          ctx.LangOpts.isSwiftVersionAtLeast(6),
+          nominal->getParentModule()->getName())
+        .fixItInsert(importLoc, "@_predatesConcurrency ");
+    }
   }
 
   return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;

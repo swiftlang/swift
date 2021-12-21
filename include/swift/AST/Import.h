@@ -537,6 +537,9 @@ struct AttributedImport {
   /// Information about the module and access path being imported.
   ModuleInfo module;
 
+  /// The location of the 'import' keyword, for an explicit import.
+  SourceLoc importLoc;
+
   /// Flags indicating which attributes of this import are present.
   ImportOptions options;
 
@@ -551,10 +554,11 @@ struct AttributedImport {
   /// is the source range covering the annotation.
   SourceRange predatesConcurrencyRange;
 
-  AttributedImport(ModuleInfo module, ImportOptions options = ImportOptions(),
+  AttributedImport(ModuleInfo module, SourceLoc importLoc = SourceLoc(),
+                   ImportOptions options = ImportOptions(),
                    StringRef filename = {}, ArrayRef<Identifier> spiGroups = {})
-      : module(module), options(options), sourceFileArg(filename),
-        spiGroups(spiGroups) {
+      : module(module), importLoc(importLoc), options(options),
+        sourceFileArg(filename), spiGroups(spiGroups) {
     assert(!(options.contains(ImportFlags::Exported) &&
              options.contains(ImportFlags::ImplementationOnly)) ||
            options.contains(ImportFlags::Reserved));
@@ -562,8 +566,8 @@ struct AttributedImport {
 
   template<class OtherModuleInfo>
   AttributedImport(ModuleInfo module, AttributedImport<OtherModuleInfo> other)
-    : AttributedImport(module, other.options, other.sourceFileArg,
-                       other.spiGroups) { }
+    : AttributedImport(module, other.importLoc, other.options,
+                       other.sourceFileArg, other.spiGroups) { }
 
   friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
                          const AttributedImport<ModuleInfo> &rhs) {
@@ -713,17 +717,20 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
   using ModuleInfoDMI = DenseMapInfo<ModuleInfo>;
   using ImportOptionsDMI = DenseMapInfo<swift::ImportOptions>;
   using StringRefDMI = DenseMapInfo<StringRef>;
+  using SourceLocDMI = DenseMapInfo<swift::SourceLoc>;
   // We can't include spiGroups in the hash because ArrayRef<Identifier> is not
   // DenseMapInfo-able, but we do check that the spiGroups match in isEqual().
 
   static inline AttributedImport getEmptyKey() {
     return AttributedImport(ModuleInfoDMI::getEmptyKey(),
+                            SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getEmptyKey(),
                             StringRefDMI::getEmptyKey(),
                             {});
   }
   static inline AttributedImport getTombstoneKey() {
     return AttributedImport(ModuleInfoDMI::getTombstoneKey(),
+                            SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getTombstoneKey(),
                             StringRefDMI::getTombstoneKey(),
                             {});
@@ -732,12 +739,15 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
     return detail::combineHashValue(
         ModuleInfoDMI::getHashValue(import.module),
         detail::combineHashValue(
-            ImportOptionsDMI::getHashValue(import.options),
-            StringRefDMI::getHashValue(import.sourceFileArg)));
+            SourceLocDMI::getHashValue(import.importLoc),
+            detail::combineHashValue(
+              ImportOptionsDMI::getHashValue(import.options),
+              StringRefDMI::getHashValue(import.sourceFileArg))));
   }
   static bool isEqual(const AttributedImport &a,
                       const AttributedImport &b) {
     return ModuleInfoDMI::isEqual(a.module, b.module) &&
+           SourceLocDMI::isEqual(a.importLoc, b.importLoc),
            ImportOptionsDMI::isEqual(a.options, b.options) &&
            StringRefDMI::isEqual(a.sourceFileArg, b.sourceFileArg) &&
            a.spiGroups == b.spiGroups;
