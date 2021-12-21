@@ -736,9 +736,7 @@ private:
     // but LLVM detects skeleton CUs by looking for a non-zero DWO id.
     // We use the lower 64 bits for debug info.
     uint64_t Signature =
-        Desc.getSignature()
-            ? (uint64_t)Desc.getSignature()[1] << 32 | Desc.getSignature()[0]
-            : ~1ULL;
+      Desc.getSignature() ? Desc.getSignature().truncatedValue() : ~1ULL;
 
     // Handle Clang modules.
     if (ClangModule) {
