@@ -1153,6 +1153,10 @@ namespace {
             }
           }
 
+          if (bridgedType->isConstraintType() &&
+              Impl.SwiftContext.LangOpts.EnableExplicitExistentialTypes)
+            bridgedType = ExistentialType::get(bridgedType);
+
           return { importedType,
                    ImportHint(ImportHint::ObjCBridged, bridgedType) };
         }
@@ -2457,6 +2461,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
       swiftParamTy = SwiftContext.getNSCopyingType();
+      if (SwiftContext.LangOpts.EnableExplicitExistentialTypes)
+        swiftParamTy = ExistentialType::get(swiftParamTy);
       if (!swiftParamTy)
         return {Type(), false};
       if (optionalityOfParam != OTK_None)

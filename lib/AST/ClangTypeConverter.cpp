@@ -749,6 +749,11 @@ ClangTypeConverter::visitProtocolCompositionType(ProtocolCompositionType *type) 
 }
 
 clang::QualType
+ClangTypeConverter::visitExistentialType(ExistentialType *type) {
+  return visit(type->getConstraintType());
+}
+
+clang::QualType
 ClangTypeConverter::visitBuiltinRawPointerType(BuiltinRawPointerType *type) {
   return ClangASTContext.VoidPtrTy;
 }
@@ -826,6 +831,9 @@ clang::QualType ClangTypeConverter::convert(Type type) {
     return it->second;
 
   // Try to do this without making cache entries for obvious cases.
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
+
   if (auto nominal = type->getAs<NominalType>()) {
     auto decl = nominal->getDecl();
     if (auto clangDecl = decl->getClangDecl()) {
