@@ -56,6 +56,9 @@ struct UnboundImport {
   /// determine the behavior expected for this import.
   AttributedImport<UnloadedImportedModule> import;
 
+  /// The source location to use when diagnosing errors for this import.
+  SourceLoc importLoc;
+
   /// If this UnboundImport directly represents an ImportDecl, contains the
   /// ImportDecl it represents. This should only be used for diagnostics and
   /// for updating the AST; if you want to read information about the import,
@@ -511,7 +514,7 @@ void ImportResolver::addImplicitImports() {
 }
 
 UnboundImport::UnboundImport(AttributedImport<UnloadedImportedModule> implicit)
-  : import(implicit),
+  : import(implicit), importLoc(),
     importOrUnderlyingModuleDecl(static_cast<ImportDecl *>(nullptr)) {}
 
 //===----------------------------------------------------------------------===//
@@ -522,7 +525,7 @@ UnboundImport::UnboundImport(AttributedImport<UnloadedImportedModule> implicit)
 UnboundImport::UnboundImport(ImportDecl *ID)
   : import(UnloadedImportedModule(ID->getImportPath(), ID->getImportKind()),
            ID->getStartLoc(), {}),
-    importOrUnderlyingModuleDecl(ID)
+    importLoc(ID->getLoc()), importOrUnderlyingModuleDecl(ID)
 {
   if (ID->isExported())
     import.options |= ImportFlags::Exported;
@@ -569,11 +572,10 @@ bool UnboundImport::checkNotTautological(const SourceFile &SF) {
 
   StringRef filename = llvm::sys::path::filename(SF.getFilename());
   if (filename.empty())
-    ctx.Diags.diagnose(import.importLoc, diag::sema_import_current_module,
+    ctx.Diags.diagnose(importLoc, diag::sema_import_current_module,
                        modulePath.front().Item);
   else
-    ctx.Diags.diagnose(import.importLoc,
-                       diag::sema_import_current_module_with_file,
+    ctx.Diags.diagnose(importLoc, diag::sema_import_current_module_with_file,
                        filename, modulePath.front().Item);
 
   return false;
@@ -583,7 +585,7 @@ bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {
   if (M)
     return true;
 
-  diagnoseNoSuchModule(SF.getParentModule(), import.importLoc,
+  diagnoseNoSuchModule(SF.getParentModule(), importLoc,
                        import.module.getModulePath(), /*nonfatalInREPL=*/true);
   return false;
 }
@@ -962,9 +964,9 @@ UnboundImport::UnboundImport(
     ASTContext &ctx, const UnboundImport &base, Identifier overlayName,
     const AttributedImport<ImportedModule> &declaringImport,
     const AttributedImport<ImportedModule> &bystandingImport)
-    : import(makeUnimportedCrossImportOverlay(
-                 ctx, overlayName, base, declaringImport),
-                 base.import.importLoc, {}),
+    : import(makeUnimportedCrossImportOverlay(ctx, overlayName, base,
+                                              declaringImport), {}),
+      importLoc(base.importLoc),
       importOrUnderlyingModuleDecl(declaringImport.module.importedModule)
 {
   // A cross-import is never private or testable, and never comes from a private
@@ -1098,8 +1100,7 @@ void ImportResolver::findCrossImports(
   // Find modules we need to import.
   SmallVector<Identifier, 4> names;
   declaringImport.module.importedModule->findDeclaredCrossImportOverlays(
-      bystandingImport.module.importedModule->getName(), names,
-      I.import.importLoc);
+      bystandingImport.module.importedModule->getName(), names, I.importLoc);
 
   // If we're diagnosing cases where we cross-import in both directions, get the
   // inverse list. Otherwise, leave the list empty.
@@ -1107,7 +1108,7 @@ void ImportResolver::findCrossImports(
   if (shouldDiagnoseRedundantCrossImports)
     bystandingImport.module.importedModule->findDeclaredCrossImportOverlays(
         declaringImport.module.importedModule->getName(), oppositeNames,
-        I.import.importLoc);
+        I.importLoc);
 
   if (ctx.Stats && !names.empty())
     ++ctx.Stats->getFrontendCounters().NumCrossImportsFound;
@@ -1124,14 +1125,13 @@ void ImportResolver::findCrossImports(
         declaringImport, bystandingImport);
 
     if (llvm::is_contained(oppositeNames, name))
-      ctx.Diags.diagnose(I.import.importLoc,
-                         diag::cross_imported_by_both_modules,
+      ctx.Diags.diagnose(I.importLoc, diag::cross_imported_by_both_modules,
                          declaringImport.module.importedModule->getName(),
                          bystandingImport.module.importedModule->getName(),
                          name);
 
     if (ctx.LangOpts.EnableCrossImportRemarks)
-      ctx.Diags.diagnose(I.import.importLoc, diag::cross_import_added,
+      ctx.Diags.diagnose(I.importLoc, diag::cross_import_added,
                          declaringImport.module.importedModule->getName(),
                          bystandingImport.module.importedModule->getName(),
                          name);
