@@ -15,8 +15,6 @@
 
 #include <cstdint>
 
-extern "C" const void *const __ImageBase;
-
 #define PASTE_EXPANDED(a,b) a##b
 #define PASTE(a,b) PASTE_EXPANDED(a,b)
 
@@ -64,7 +62,7 @@ static void swift_image_constructor() {
 
   sections = {
       swift::CurrentSectionMetadataVersion,
-      __ImageBase,
+      0,
 
       nullptr,
       nullptr,

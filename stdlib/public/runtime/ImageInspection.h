@@ -77,31 +77,22 @@ void initializeDynamicReplacementLookup();
 void initializeAccessibleFunctionsLookup();
 
 // Callbacks to register metadata from an image to the runtime.
-void addImageProtocolsBlockCallback(const void *baseAddress,
-                                    const void *start, uintptr_t size);
-void addImageProtocolsBlockCallbackUnsafe(const void *baseAddress,
-                                          const void *start, uintptr_t size);
-void addImageProtocolConformanceBlockCallback(const void *baseAddress,
-                                              const void *start,
+void addImageProtocolsBlockCallback(const void *start, uintptr_t size);
+void addImageProtocolsBlockCallbackUnsafe(const void *start, uintptr_t size);
+void addImageProtocolConformanceBlockCallback(const void *start,
                                               uintptr_t size);
-void addImageProtocolConformanceBlockCallbackUnsafe(const void *baseAddress,
-                                                    const void *start,
+void addImageProtocolConformanceBlockCallbackUnsafe(const void *start,
                                                     uintptr_t size);
-void addImageTypeMetadataRecordBlockCallback(const void *baseAddress,
-                                             const void *start,
+void addImageTypeMetadataRecordBlockCallback(const void *start,
                                              uintptr_t size);
-void addImageTypeMetadataRecordBlockCallbackUnsafe(const void *baseAddress,
-                                                   const void *start,
+void addImageTypeMetadataRecordBlockCallbackUnsafe(const void *start,
                                                    uintptr_t size);
-void addImageDynamicReplacementBlockCallback(const void *baseAddress,
-                                             const void *start, uintptr_t size,
+void addImageDynamicReplacementBlockCallback(const void *start, uintptr_t size,
                                              const void *start2,
                                              uintptr_t size2);
-void addImageAccessibleFunctionsBlockCallback(const void *baseAddress,
-                                              const void *start,
+void addImageAccessibleFunctionsBlockCallback(const void *start,
                                               uintptr_t size);
-void addImageAccessibleFunctionsBlockCallbackUnsafe(const void *baseAddress,
-                                                    const void *start,
+void addImageAccessibleFunctionsBlockCallbackUnsafe(const void *start,
                                                     uintptr_t size);
 
 int lookupSymbol(const void *address, SymbolInfo *info);

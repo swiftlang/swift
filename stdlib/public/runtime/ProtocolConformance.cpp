@@ -530,7 +530,6 @@ static void _registerProtocolConformances(ConformanceState &C,
 }
 
 void swift::addImageProtocolConformanceBlockCallbackUnsafe(
-    const void *baseAddress,
     const void *conformances, uintptr_t conformancesSize) {
   assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0 &&
          "conformances section not a multiple of ProtocolConformanceRecord");
@@ -575,11 +574,9 @@ void swift::addImageProtocolConformanceBlockCallbackUnsafe(
 }
 
 void swift::addImageProtocolConformanceBlockCallback(
-    const void *baseAddress,
     const void *conformances, uintptr_t conformancesSize) {
   Conformances.get();
-  addImageProtocolConformanceBlockCallbackUnsafe(baseAddress,
-                                                 conformances,
+  addImageProtocolConformanceBlockCallbackUnsafe(conformances,
                                                  conformancesSize);
 }
 
