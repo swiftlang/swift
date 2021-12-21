@@ -9,10 +9,17 @@ open class InvalidOpenExtension {
   open var openVar: Int { 3 } // No warning: Pure Swift properties can be open inside the class declaration.
 }
 extension InvalidOpenExtension {
-  open func nonObjcOpenMethod() { } // expected-warning {{non-'@objc' methods in extensions cannot be overridden; use 'public' instead}} {{3-7=public}}
-  open var nonObjcOpenVar: Int { 3 }  // expected-warning {{non-'@objc' properties in extensions cannot be overridden; use 'public' instead}} {{3-7=public}}
+  open func nonObjcOpenMethod() { } // expected-warning {{non-'@objc' instance method in extensions cannot be overridden; use 'public' instead}} {{3-7=public}}
+  open class func nonObjcOpenMethod() { } // expected-warning {{non-'@objc' class method in extensions cannot be overridden; use 'public' instead}} {{3-7=public}}
+  open var nonObjcOpenVar: Int { 3 }  // expected-warning {{non-'@objc' property in extensions cannot be overridden; use 'public' instead}} {{3-7=public}}
+  open subscript(_ index: Int) -> Int { 3 } // expected-warning {{non-'@objc' subscript in extensions cannot be overridden; use 'public' instead}} {{3-7=public}}
+  open convenience init(index: Int) { self.init() } // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}} // expected-warning {{non-'@objc' initializer in extensions cannot be overridden; use 'public' instead}}
+
   @objc open func objcOpenMethod() { } // No warning: @objc methods can be open inside extensions. 
   @objc open var objcOpenVar: Int { 3 } // No warning: @objc methods can be open inside extensions. 
+
+  open class nonObjcClassDecl  { }
+  open enum nonObjcEnumDecl { case one } // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}} {{3-7=public}}
 }
 
 // For extensions with access level less than open, '`open` modifier conflicts with...' warning will always precede the 'non-@objc member...' warning. 
@@ -28,7 +35,10 @@ public extension InvalidOpenExtension {
 open class ValidOpenExtension { }
 extension ValidOpenExtension {
     open func objcOpenMethod() { } // No warning: This declaration is implicitly @objc
+    open class func objcOpenMethod() { } // No warning: This declaration is implicitly @objc
     open var objcOpenVar: Int { 3 } // No warning: This declaration is implicitly @objc
+    open subscript(_ index: Int) -> Int { 3 } // No warning: This declaration is implicitly @objc
+    open convenience init(index: Int) { self.init() } // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
 }
 
 public extension ValidOpenExtension { 

@@ -874,13 +874,15 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
       }
     } else {
       if (auto VD = dyn_cast<ValueDecl>(D)) {
-        // Emit warning when trying to declare non-@objc `open` member inside an
-        // extension.
-        if (!VD->isObjC() && attr->getAccess() == AccessLevel::Open) {
-          diagnose(attr->getLocation(),
-                   diag::access_control_non_objc_open_member,
-                   isa<AbstractFunctionDecl>(VD))
-              .fixItReplace(attr->getRange(), "public");
+        if (!isa<NominalTypeDecl>(VD)) {
+          // Emit warning when trying to declare non-@objc `open` member inside
+          // an extension.
+          if (!VD->isObjC() && attr->getAccess() == AccessLevel::Open) {
+            diagnose(attr->getLocation(),
+                     diag::access_control_non_objc_open_member,
+                     VD->getDescriptiveKind())
+                .fixItReplace(attr->getRange(), "public");
+          }
         }
       }
     }

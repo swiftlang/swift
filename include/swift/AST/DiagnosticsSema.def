@@ -1515,8 +1515,8 @@ ERROR(access_control_open_bad_decl,none,
       "only classes and overridable class members can be declared 'open';"
       " use 'public'", ())
 WARNING(access_control_non_objc_open_member,none,
-      "non-'@objc' %select{properties|methods}0 in extensions cannot be overridden; use 'public' instead",
-      (bool))
+      "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
+      (DescriptiveDeclKind))
 
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
