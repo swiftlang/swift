@@ -15,6 +15,8 @@
 
 #include <cstddef>
 
+extern "C" const void *const __dso_handle;
+
 // Create empty sections to ensure that the start/stop symbols are synthesized
 // by the linker.  Otherwise, we may end up with undefined symbol references as
 // the linker table section was never constructed.
@@ -53,7 +55,7 @@ static void swift_image_constructor() {
 
   sections = {
       swift::CurrentSectionMetadataVersion,
-      0,
+      __dso_handle,
 
       nullptr,
       nullptr,

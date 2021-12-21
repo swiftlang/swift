@@ -39,7 +39,25 @@ typedef struct MetadataSectionRange {
 /// Identifies the address space ranges for the Swift metadata required by the Swift runtime.
 struct MetadataSections {
   __swift_uintptr_t version;
-  __swift_uintptr_t reserved;
+
+  /// The base address of the image where this metadata section was defined, as
+  /// reported when the section was registered with the Swift runtime.
+  ///
+  /// The value of this field is equivalent to the value of
+  /// \c SymbolInfo::baseAddress as returned from \c lookupSymbol() for a symbol
+  /// in the image that contains these sections.
+  ///
+  /// For Mach-O images, set this field to \c __dso_handle (i.e. the Mach header
+  /// for the image.) For ELF images, set it to \c __dso_handle (the runtime
+  /// will adjust it to the start of the ELF image when the image is loaded.)
+  /// For COFF images, set this field to \c __ImageBase.
+  ///
+  /// For platforms that have a single statically-linked image or no dynamic
+  /// loader (i.e. no equivalent of \c __dso_handle or \c __ImageBase), this
+  /// field is ignored and should be set to \c nullptr.
+  ///
+  /// \sa swift_addNewDSOImage()
+  const void *baseAddress;
 
   /// `next` and `prev` are used by the runtime to construct a
   /// circularly doubly linked list to quickly iterate over the metadata
