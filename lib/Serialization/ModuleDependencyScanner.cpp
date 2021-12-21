@@ -70,23 +70,27 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
   return dependencies.getError();
 }
 
-bool PlaceholderSwiftModuleScanner::findModule(
-    ImportPath::Element moduleID, SmallVectorImpl<char> *moduleInterfacePath,
-    std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-    bool skipBuildingInterface, bool &isFramework, bool &isSystemModule) {
-  StringRef moduleName = Ctx.getRealModuleName(moduleID.Item).str();
+
+std::error_code PlaceholderSwiftModuleScanner::findModuleFilesInDirectory(
+    ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
+    SmallVectorImpl<char> *ModuleInterfacePath,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    bool skipBuildingInterface, bool IsFramework) {
+  StringRef moduleName = Ctx.getRealModuleName(ModuleID.Item).str();
   auto it = PlaceholderDependencyModuleMap.find(moduleName);
+  // If no placeholder module stub path is given matches the name, return with an
+  // error code.
   if (it == PlaceholderDependencyModuleMap.end()) {
-    return false;
+    return std::make_error_code(std::errc::not_supported);
   }
   auto &moduleInfo = it->getValue();
   auto dependencies = ModuleDependencies::forPlaceholderSwiftModuleStub(
       moduleInfo.modulePath, moduleInfo.moduleDocPath,
       moduleInfo.moduleSourceInfoPath);
   this->dependencies = std::move(dependencies);
-  return true;
+  return std::error_code{};
 }
 
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,

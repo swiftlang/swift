@@ -177,12 +177,12 @@ namespace {
       // so that (a) we use the same code as search paths for imported modules,
       // and (b) search paths are always added after -Xcc options.
       SearchPathOptions &searchPathOpts = Ctx.SearchPathOpts;
-      for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
+      for (const auto &framepath : searchPathOpts.FrameworkSearchPaths) {
         Importer.addSearchPath(framepath.Path, /*isFramework*/true,
                                framepath.IsSystem);
       }
 
-      for (const auto &path : searchPathOpts.getImportSearchPaths()) {
+      for (auto path : searchPathOpts.ImportSearchPaths) {
         Importer.addSearchPath(path, /*isFramework*/false, /*isSystem=*/false);
       }
 
@@ -438,10 +438,9 @@ getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
   StringRef platform = swift::getPlatformNameForTriple(triple);
   StringRef arch = swift::getMajorArchitectureName(triple);
 
-  StringRef SDKPath = Opts.getSDKPath();
-  if (!SDKPath.empty()) {
+  if (!Opts.SDKPath.empty()) {
     buffer.clear();
-    buffer.append(SDKPath.begin(), SDKPath.end());
+    buffer.append(Opts.SDKPath.begin(), Opts.SDKPath.end());
     llvm::sys::path::append(buffer, "usr", "lib", "swift");
     llvm::sys::path::append(buffer, platform, arch, "glibc.modulemap");
 
@@ -497,7 +496,7 @@ importer::getNormalInvocationArguments(
   SmallString<128> shimsPath(searchPathOpts.RuntimeResourcePath);
   llvm::sys::path::append(shimsPath, "shims");
   if (!llvm::sys::fs::exists(shimsPath)) {
-    shimsPath = searchPathOpts.getSDKPath();
+    shimsPath = searchPathOpts.SDKPath;
     llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
     invocationArgStrs.insert(invocationArgStrs.end(),
                              {"-isystem", std::string(shimsPath.str())});
@@ -675,13 +674,13 @@ importer::getNormalInvocationArguments(
     }
   }
 
-  if (searchPathOpts.getSDKPath().empty()) {
+  if (searchPathOpts.SDKPath.empty()) {
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
   } else {
     if (triple.isWindowsMSVCEnvironment()) {
       llvm::SmallString<261> path; // MAX_PATH + 1
-      path = searchPathOpts.getSDKPath();
+      path = searchPathOpts.SDKPath;
       llvm::sys::path::append(path, "usr", "include");
       llvm::sys::path::native(path);
 
@@ -692,7 +691,7 @@ importer::getNormalInvocationArguments(
       // system root. On other targets, it seems to use --sysroot.
       invocationArgStrs.push_back(triple.isOSDarwin() ? "-isysroot"
                                                       : "--sysroot");
-      invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
+      invocationArgStrs.push_back(searchPathOpts.SDKPath);
     }
   }
 

@@ -647,9 +647,9 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
 #include "swift/AST/KnownIdentifiers.def"
 
   // Record the initial set of search paths.
-  for (StringRef path : SearchPathOpts.getImportSearchPaths())
+  for (StringRef path : SearchPathOpts.ImportSearchPaths)
     getImpl().SearchPathsSet[path] |= SearchPathKind::Import;
-  for (const auto &framepath : SearchPathOpts.getFrameworkSearchPaths())
+  for (const auto &framepath : SearchPathOpts.FrameworkSearchPaths)
     getImpl().SearchPathsSet[framepath.Path] |= SearchPathKind::Framework;
 
   // Register any request-evaluator functions available at the AST layer.
@@ -1629,13 +1629,10 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
     return;
   loaded |= kind;
 
-  if (isFramework) {
-    SearchPathOpts.addFrameworkSearchPath({searchPath, isSystem},
-                                          SourceMgr.getFileSystem().get());
-  } else {
-    SearchPathOpts.addImportSearchPath(searchPath,
-                                       SourceMgr.getFileSystem().get());
-  }
+  if (isFramework)
+    SearchPathOpts.FrameworkSearchPaths.push_back({searchPath, isSystem});
+  else
+    SearchPathOpts.ImportSearchPaths.push_back(searchPath.str());
 
   if (auto *clangLoader = getClangModuleLoader())
     clangLoader->addSearchPath(searchPath, isFramework, isSystem);
@@ -1770,22 +1767,28 @@ namespace {
 std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
 const {
   assert(LangOpts.Target.isOSDarwin());
-  return SearchPathOpts.getDarwinImplicitFrameworkSearchPaths();
+  SmallString<128> systemFrameworksScratch;
+  systemFrameworksScratch = SearchPathOpts.SDKPath;
+  llvm::sys::path::append(systemFrameworksScratch, "System", "Library", "Frameworks");
+
+  SmallString<128> frameworksScratch;
+  frameworksScratch = SearchPathOpts.SDKPath;
+  llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
+  return {systemFrameworksScratch.str().str(), frameworksScratch.str().str()};
 }
 
 llvm::StringSet<> ASTContext::getAllModuleSearchPathsSet()
 const {
   llvm::StringSet<> result;
-  auto ImportSearchPaths = SearchPathOpts.getImportSearchPaths();
-  result.insert(ImportSearchPaths.begin(), ImportSearchPaths.end());
+  result.insert(SearchPathOpts.ImportSearchPaths.begin(),
+                SearchPathOpts.ImportSearchPaths.end());
 
   // Framework paths are "special", they contain more than path strings,
   // but path strings are all we care about here.
   using FrameworkPathView = ArrayRefView<SearchPathOptions::FrameworkSearchPath,
                                          StringRef,
                                          pathStringFromFrameworkSearchPath>;
-  FrameworkPathView frameworkPathsOnly{
-      SearchPathOpts.getFrameworkSearchPaths()};
+  FrameworkPathView frameworkPathsOnly{SearchPathOpts.FrameworkSearchPaths};
   result.insert(frameworkPathsOnly.begin(), frameworkPathsOnly.end());
 
   if (LangOpts.Target.isOSDarwin()) {
@@ -1801,13 +1804,13 @@ const {
   SmallString<128> shimsPath(SearchPathOpts.RuntimeResourcePath);
   llvm::sys::path::append(shimsPath, "shims");
   if (!llvm::sys::fs::exists(shimsPath)) {
-    shimsPath = SearchPathOpts.getSDKPath();
+    shimsPath = SearchPathOpts.SDKPath;
     llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
   }
   result.insert(shimsPath.str());
 
   // Clang system modules are found in the SDK root
-  SmallString<128> clangSysRootPath(SearchPathOpts.getSDKPath());
+  SmallString<128> clangSysRootPath(SearchPathOpts.SDKPath);
   llvm::sys::path::append(clangSysRootPath, "usr", "include");
   result.insert(clangSysRootPath.str());
   return result;

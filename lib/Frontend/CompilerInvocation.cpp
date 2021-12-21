@@ -160,40 +160,38 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 
-  // If this is set, we don't want any runtime import paths.
-  if (SearchPathOpts.SkipRuntimeLibraryImportPaths) {
-    SearchPathOpts.setRuntimeLibraryImportPaths({});
-    return;
-  }
-
   // Set up the import paths containing the swiftmodules for the libraries in
   // RuntimeLibraryPath.
-  std::vector<std::string> RuntimeLibraryImportPaths;
-  RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+  SearchPathOpts.RuntimeLibraryImportPaths.clear();
+
+  // If this is set, we don't want any runtime import paths.
+  if (SearchPathOpts.SkipRuntimeLibraryImportPaths)
+    return;
+
+  SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
 
   // This is compatibility for <=5.3
   if (!Triple.isOSDarwin()) {
     llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
-    RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
 
-  if (!SearchPathOpts.getSDKPath().empty()) {
+  if (!SearchPathOpts.SDKPath.empty()) {
     if (tripleIsMacCatalystEnvironment(Triple)) {
-      LibPath = SearchPathOpts.getSDKPath();
+      LibPath = SearchPathOpts.SDKPath;
       llvm::sys::path::append(LibPath, "System", "iOSSupport");
       llvm::sys::path::append(LibPath, "usr", "lib", "swift");
-      RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+      SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
     }
 
-    LibPath = SearchPathOpts.getSDKPath();
+    LibPath = SearchPathOpts.SDKPath;
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
     if (!Triple.isOSDarwin()) {
       llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
       llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
     }
-    RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
-  SearchPathOpts.setRuntimeLibraryImportPaths(RuntimeLibraryImportPaths);
 }
 
 static void
@@ -261,7 +259,7 @@ void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
 }
 
 void CompilerInvocation::setSDKPath(const std::string &Path) {
-  SearchPathOpts.setSDKPath(Path);
+  SearchPathOpts.SDKPath = Path;
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
@@ -1193,20 +1191,14 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     return std::string(fullPath.str());
   };
 
-  std::vector<std::string> ImportSearchPaths(Opts.getImportSearchPaths());
   for (const Arg *A : Args.filtered(OPT_I)) {
-    ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
+    Opts.ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
-  Opts.setImportSearchPaths(ImportSearchPaths);
 
-  std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths(
-      Opts.getFrameworkSearchPaths());
   for (const Arg *A : Args.filtered(OPT_F, OPT_Fsystem)) {
-    FrameworkSearchPaths.push_back(
-        {resolveSearchPath(A->getValue()),
-         /*isSystem=*/A->getOption().getID() == OPT_Fsystem});
+    Opts.FrameworkSearchPaths.push_back({resolveSearchPath(A->getValue()),
+                           /*isSystem=*/A->getOption().getID() == OPT_Fsystem});
   }
-  Opts.setFrameworkSearchPaths(FrameworkSearchPaths);
 
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
@@ -1217,7 +1209,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
 
   if (const Arg *A = Args.getLastArg(OPT_sdk))
-    Opts.setSDKPath(A->getValue());
+    Opts.SDKPath = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();

@@ -2520,7 +2520,7 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 
     namespace path = llvm::sys::path;
     SmallString<128> scratch;
-    scratch = ctx.SearchPathOpts.getSDKPath();
+    scratch = ctx.SearchPathOpts.SDKPath;
     path::append(scratch, "System", "Library", "PrivateFrameworks");
     return hasPrefix(path::begin(modulePath), path::end(modulePath),
                      path::begin(scratch), path::end(scratch));

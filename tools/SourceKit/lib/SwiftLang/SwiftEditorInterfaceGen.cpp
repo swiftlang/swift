@@ -510,9 +510,9 @@ bool SwiftInterfaceGenContext::matches(StringRef ModuleName,
 
   const SearchPathOptions &SPOpts = Invok.getSearchPathOptions();
   const SearchPathOptions &ImplSPOpts = Impl.Invocation.getSearchPathOptions();
-  if (SPOpts.getImportSearchPaths() != ImplSPOpts.getImportSearchPaths())
+  if (SPOpts.ImportSearchPaths != ImplSPOpts.ImportSearchPaths)
     return false;
-  if (SPOpts.getFrameworkSearchPaths() != ImplSPOpts.getFrameworkSearchPaths())
+  if (SPOpts.FrameworkSearchPaths != ImplSPOpts.FrameworkSearchPaths)
     return false;
 
   if (Invok.getClangImporterOptions().ExtraArgs !=
@@ -857,14 +857,14 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
   addArgPair("-target", Invocation.getTargetTriple());
 
   const auto &SPOpts = Invocation.getSearchPathOptions();
-  addArgPair("-sdk", SPOpts.getSDKPath());
-  for (const auto &FramePath : SPOpts.getFrameworkSearchPaths()) {
+  addArgPair("-sdk", SPOpts.SDKPath);
+  for (auto &FramePath : SPOpts.FrameworkSearchPaths) {
     if (FramePath.IsSystem)
       addArgPair("-Fsystem", FramePath.Path);
     else
       addArgPair("-F", FramePath.Path);
   }
-  for (const auto &Path : SPOpts.getImportSearchPaths())
+  for (auto &Path : SPOpts.ImportSearchPaths)
     addArgPair("-I", Path);
 
   const auto &ClangOpts = Invocation.getClangImporterOptions();
