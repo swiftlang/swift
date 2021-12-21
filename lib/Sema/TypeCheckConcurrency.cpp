@@ -752,6 +752,14 @@ static bool diagnoseSingleNonSendableType(
 
   bool wasSuppressed = diagnose(type, behavior);
 
+  // If this type was imported from another module, try to find the
+  // corresponding import.
+  Optional<AttributedImport<swift::ImportedModule>> import;
+  SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
+  if (nominal && nominal->getParentModule() != module) {
+    import = findImportFor(nominal, fromContext.fromDC);
+  }
+
   if (behavior == DiagnosticBehavior::Ignore || wasSuppressed) {
     // Don't emit any other diagnostics.
   } else if (type->is<FunctionType>()) {
@@ -775,12 +783,10 @@ static bool diagnoseSingleNonSendableType(
         diag::non_sendable_nominal, nominal->getDescriptiveKind(),
         nominal->getName());
 
-    // If we can find an import in this context that makes this nominal
-    // type visible, remark that it can be `@_predatesConcurrency` import.
+    // If we found the import that makes this nominal type visible, remark
+    // that it can be @_predatesConcurrency import.
     // Only emit this remark once per source file, because it can happen a
     // lot.
-    SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
-    auto import = findImportFor(nominal, fromContext.fromDC);
     if (import && !import->options.contains(ImportFlags::PredatesConcurrency) &&
         import->importLoc.isValid() && sourceFile &&
         !sourceFile->hasImportUsedPredatesConcurrency(*import)) {
@@ -793,6 +799,14 @@ static bool diagnoseSingleNonSendableType(
 
       sourceFile->setImportUsedPredatesConcurrency(*import);
     }
+  }
+
+  // If we found an import that makes this nominal type visible, and that
+  // was a @_predatesConcurrency import, note that we have made use of the
+  // attribute.
+  if (import && import->options.contains(ImportFlags::PredatesConcurrency) &&
+      sourceFile) {
+    sourceFile->setImportUsedPredatesConcurrency(*import);
   }
 
   return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
