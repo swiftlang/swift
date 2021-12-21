@@ -1,6 +1,8 @@
 #import <Foundation/Foundation.h>
 
 @interface Bar : NSObject
++ (instancetype)barWithValue:(int)value __attribute__((objc_direct));
+- (instancetype)initWithValue:(int)value __attribute__((objc_direct));
 @property(direct) int directProperty;
 - (int)objectAtIndexedSubscript:(int)i __attribute__((objc_direct));
 - (void)setObject:(int)obj atIndexedSubscript:(int)i __attribute__((objc_direct));
