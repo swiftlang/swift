@@ -80,6 +80,8 @@ ERROR(error_unknown_arg,none,
       "unknown argument: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
       "invalid value '%1' in '%0'", (StringRef, StringRef))
+ERROR(error_invalid_arg_combination,none,
+      "unsupported argument combination: '%0' and '%1'", (StringRef, StringRef))
 WARNING(warning_invalid_locale_code,none,
       "unsupported locale code; supported locale codes are: '%0'", (StringRef))
 WARNING(warning_locale_path_not_found,none,

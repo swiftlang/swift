@@ -415,8 +415,8 @@ broadenSingleElementStores(StoreInst *storeInst,
 /// borrow scope--copy/destroy is insufficient by itself.
 ///
 /// FIXME: Technically this should be guarded by a compiler flag like
-/// -enable-copy-propagation until SILGen protects scoped variables by borrow
-/// scopes.
+/// -enable-copy-propagation until SILGen protects scoped variables by
+/// borrow scopes.
 static SILBasicBlock::iterator
 eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
   auto next = std::next(cvi->getIterator());
@@ -445,9 +445,13 @@ static SILBasicBlock::iterator
 eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   auto next = std::next(bbi->getIterator());
 
-  // Never eliminate lexical borrow scopes.  They must be kept to ensure that
-  // value lifetimes aren't observably shortened.
-  if (bbi->isLexical())
+  // Lexical borrow scopes can only be eliminated under certain circumstances:
+  // (1) They can never be eliminated if the module is in the raw stage, because
+  //     they may be needed for diagnostic.
+  // (2) They can never be eliminated if there is no enclosing lexical scope
+  //     which guarantees the lifetime of the value.
+  if (bbi->isLexical() && (bbi->getModule().getStage() == SILStage::Raw ||
+                           !isNestedLexicalBeginBorrow(bbi)))
     return next;
 
   // We know that our borrow is completely within the lifetime of its base value

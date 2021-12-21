@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-lexical-lifetime-eliminator %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -sil-lexical-lifetime-eliminator %s -enable-sil-verify-all | %FileCheck %s
 
 sil_stage raw
 
