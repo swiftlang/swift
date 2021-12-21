@@ -62,6 +62,14 @@ else()
   set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default TRUE)
 endif()
 
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
+  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "HAIKU")
+  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
+else()
+  set(SWIFT_STDLIB_HAS_LOCALE_default TRUE)
+endif()
+
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(SWIFT_STDLIB_HAS_ASL_default TRUE)
 else()
@@ -121,6 +129,10 @@ option(SWIFT_STDLIB_HAS_STDIN
 option(SWIFT_STDLIB_HAS_ENVIRON
        "Build stdlib assuming the platform supports environment variables."
        TRUE)
+
+option(SWIFT_STDLIB_HAS_LOCALE
+       "Build stdlib assuming the platform has locale support."
+       "${SWIFT_STDLIB_HAS_LOCALE_default}")
 
 option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
