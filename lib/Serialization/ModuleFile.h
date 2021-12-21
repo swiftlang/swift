@@ -352,6 +352,12 @@ public:
         llvm::inconvertibleErrorCode()));
   }
 
+  [[noreturn]] void fatal(StringRef msg) const {
+    fatal(llvm::make_error<llvm::StringError>(
+          msg,
+          llvm::inconvertibleErrorCode()));
+  }
+
   /// Outputs information useful for diagnostics to \p out
   void outputDiagnosticInfo(llvm::raw_ostream &os) const;
 
