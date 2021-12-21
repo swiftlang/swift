@@ -223,6 +223,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-passthrough-metadata-allocator   "0"               "whether stdlib should be built without a custom implementation of MetadataAllocator, relying on malloc+free instead"
     swift-stdlib-short-mangling-lookups           "1"               "whether to build stdlib with fast-path context descriptor lookups based on well-known short manglings"
     swift-stdlib-experimental-hermetic-seal-at-link     "0"         "whether stdlib should be built with -experimental-hermetic-seal-at-link"
+    swift-stdlib-has-type-printing                "1"               "whether stdlib should support printing user-friendly type name as strings at runtime"
     swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
     swift-enable-experimental-string-processing   "1"               "whether to build experimental string processing feature"
@@ -2012,6 +2013,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_ENABLE_LTO:STRING="${SWIFT_STDLIB_LTO}"
                     -DSWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR:BOOL=$(true_false "${SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR}")
                     -DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS:BOOL=$(true_false "${SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS}")
+                    -DSWIFT_STDLIB_HAS_TYPE_PRINTING:BOOL=$(true_false "${SWIFT_STDLIB_HAS_TYPE_PRINTING}")
                     -DSWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK:BOOL=$(true_false "${SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
