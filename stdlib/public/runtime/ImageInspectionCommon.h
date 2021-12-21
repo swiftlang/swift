@@ -52,7 +52,7 @@
 
 namespace swift {
 struct MetadataSections;
-static constexpr const uintptr_t CurrentSectionMetadataVersion = 2;
+static constexpr const uintptr_t CurrentSectionMetadataVersion = 1;
 }
 
 struct SectionInfo {
@@ -60,27 +60,14 @@ struct SectionInfo {
   const char *data;
 };
 
-/// Called by injected constructors when a dynamic library is loaded.
-///
-/// \param sections A structure describing the metadata sections in the
-///     newly-loaded image.
-///
-/// \warning The runtime keeps a reference to \a sections and may mutate it, so
-///   it \em must be mutable and long-lived (that is, statically or dynamically
-///   allocated.) The effect of passing a pointer to a local value is undefined.
+// Called by injected constructors when a dynamic library is loaded.
 SWIFT_RUNTIME_EXPORT
-void swift_addNewDSOImage(struct swift::MetadataSections *sections);
+void swift_addNewDSOImage(const void *addr);
 
 #ifndef NDEBUG
 
 SWIFT_RUNTIME_EXPORT
-const char *
-swift_getMetadataSectionName(const struct swift::MetadataSections *section);
-
-SWIFT_RUNTIME_EXPORT
-void swift_getMetadataSectionBaseAddress(
-  const struct swift::MetadataSections *section,
-  void const **out_actual, void const **out_expected);
+const char *swift_getMetadataSectionName(void *metadata_section);
 
 SWIFT_RUNTIME_EXPORT
 size_t swift_getMetadataSectionCount();
