@@ -218,6 +218,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-has-asl                          ""                "whether the stdlib can use the asl_log API, defaults to true on Darwin, false otherwise"
     swift-stdlib-has-stdin                        "1"               "whether to build stdlib assuming the platform supports stdin and getline API"
     swift-stdlib-has-environ                      "1"               "whether to build stdlib assuming the platform supports environment variables"
+    swift-stdlib-has-locale                       ""                "whether to build stdlib assuming the platform has locale support"
     swift-stdlib-lto                              ""                "enable LLVM LTO on the stdlib, valid values are empty string (no LTO), 'full' and 'thin'"
     swift-stdlib-enable-prespecialization         ""                "whether stdlib should be built with generic metadata prespecialization enabled, defaults to true on Darwin and Linux, false otherwise"
     swift-stdlib-passthrough-metadata-allocator   "0"               "whether stdlib should be built without a custom implementation of MetadataAllocator, relying on malloc+free instead"
@@ -2144,6 +2145,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_STDLIB_HAS_ASL:BOOL=$(true_false "${SWIFT_STDLIB_HAS_ASL}")
+                    )
+                fi
+
+                if [[ "${SWIFT_STDLIB_HAS_LOCALE}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_HAS_LOCALE:BOOL=$(true_false "${SWIFT_STDLIB_HAS_LOCALE}")
                     )
                 fi
 
