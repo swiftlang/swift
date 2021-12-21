@@ -860,6 +860,16 @@ ProtocolDecl *ASTContext::getErrorDecl() const {
   return getProtocol(KnownProtocolKind::Error);
 }
 
+CanType ASTContext::getErrorExistentialType() const {
+  Type errorType = getExceptionType();
+  if (LangOpts.EnableExplicitExistentialTypes &&
+      errorType->isConstraintType()) {
+    errorType = ExistentialType::get(errorType);
+  }
+
+  return errorType->getCanonicalType();
+}
+
 EnumElementDecl *ASTContext::getOptionalSomeDecl() const {
   if (!getImpl().OptionalSomeDecl)
     getImpl().OptionalSomeDecl = getOptionalDecl()->getUniqueElement(/*hasVal*/true);
@@ -4865,7 +4875,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (auto nsErrorTy = getNSErrorType()) {
       // The corresponding value type is Error.
       if (bridgedValueType)
-        *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
+        *bridgedValueType = getErrorExistentialType();
 
       return nsErrorTy;
     }
@@ -4902,7 +4912,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   if (findConformance(KnownProtocolKind::Error)) {
     // The corresponding value type is Error.
     if (bridgedValueType)
-      *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
+      *bridgedValueType = getErrorExistentialType();
 
     // Bridge to NSError.
     if (auto nsErrorTy = getNSErrorType())
