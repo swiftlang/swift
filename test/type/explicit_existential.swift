@@ -162,3 +162,5 @@ func testMetatypes() {
   let _: any P1.Type = ConcreteComposition.self
   let _: any (P1 & P2).Type = ConcreteComposition.self
 }
+
+func generic<T: any P1>(_ t: T) {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'any P1'}}

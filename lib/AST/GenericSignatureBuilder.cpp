@@ -4604,7 +4604,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   }
 
   // Check whether we have a reasonable constraint type at all.
-  if (!constraintType->isExistentialType() &&
+  if (!constraintType->is<ProtocolType>() &&
+      !constraintType->is<ProtocolCompositionType>() &&
       !constraintType->getClassOrBoundGenericClass()) {
     if (source.getLoc().isValid() && !constraintType->hasError()) {
       Impl->HadAnyError = true;
