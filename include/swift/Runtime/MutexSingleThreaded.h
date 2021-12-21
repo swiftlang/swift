@@ -21,33 +21,14 @@
 
 namespace swift {
 
-typedef void* ConditionHandle;
-typedef void* ConditionMutexHandle;
 typedef void* MutexHandle;
 typedef void* ReadWriteLockHandle;
 
-#define SWIFT_CONDITION_SUPPORTS_CONSTEXPR 1
 #define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 1
 #define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 1
 
-struct ConditionPlatformHelper {
-  static constexpr ConditionHandle staticInit() {
-    return nullptr;
-  };
-  static void init(ConditionHandle &condition) {}
-  static void destroy(ConditionHandle &condition) {}
-  static void notifyOne(ConditionHandle &condition) {}
-  static void notifyAll(ConditionHandle &condition) {}
-  static void wait(ConditionHandle &condition, MutexHandle &mutex) {
-    fatalError(0, "single-threaded runtime cannot wait for condition");
-  }
-};
-
 struct MutexPlatformHelper {
   static constexpr MutexHandle staticInit() { return nullptr; }
-  static constexpr ConditionMutexHandle conditionStaticInit() {
-    return nullptr;
-  }
   static void init(MutexHandle &mutex, bool checked = false) {}
   static void destroy(MutexHandle &mutex) {}
   static void lock(MutexHandle &mutex) {}

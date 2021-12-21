@@ -54,7 +54,8 @@ using mach_header_platform = mach_header;
 #endif
 
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
-         void CONSUME_BLOCK(const void *start, uintptr_t size)>
+         void CONSUME_BLOCK(const void *baseAddress,
+                            const void *start, uintptr_t size)>
 void addImageCallback(const mach_header *mh) {
 #if __POINTER_WIDTH__ == 64
   assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
@@ -70,17 +71,19 @@ void addImageCallback(const mach_header *mh) {
   if (!section)
     return;
   
-  CONSUME_BLOCK(section, size);
+  CONSUME_BLOCK(mh, section, size);
 }
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
-         void CONSUME_BLOCK(const void *start, uintptr_t size)>
+         void CONSUME_BLOCK(const void *baseAddress,
+                            const void *start, uintptr_t size)>
 void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   addImageCallback<SEGMENT_NAME, SECTION_NAME, CONSUME_BLOCK>(mh);
 }
 
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
           const char *SEGMENT_NAME2, const char *SECTION_NAME2,
-          void CONSUME_BLOCK(const void *start, uintptr_t size,
+          void CONSUME_BLOCK(const void *baseAddress,
+                             const void *start, uintptr_t size,
                              const void *start2, uintptr_t size2)>
 void addImageCallback2Sections(const mach_header *mh) {
 #if __POINTER_WIDTH__ == 64
@@ -106,11 +109,12 @@ void addImageCallback2Sections(const mach_header *mh) {
   if (!section2)
     size2 = 0;
 
-  CONSUME_BLOCK(section, size, section2, size2);
+  CONSUME_BLOCK(mh, section, size, section2, size2);
 }
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
           const char *SEGMENT_NAME2, const char *SECTION_NAME2,
-          void CONSUME_BLOCK(const void *start, uintptr_t size,
+          void CONSUME_BLOCK(const void *baseAddress,
+                             const void *start, uintptr_t size,
                              const void *start2, uintptr_t size2)>
 void addImageCallback2Sections(const mach_header *mh, intptr_t vmaddr_slide) {
   addImageCallback2Sections<SEGMENT_NAME, SECTION_NAME,
