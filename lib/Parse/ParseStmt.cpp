@@ -916,11 +916,13 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
 /// parseStmtDefer
 ///
 ///   stmt-defer:
-///     'defer' brace-stmt
+///     'defer' 'catch'? brace-stmt
 ///
 ParserResult<Stmt> Parser::parseStmtDefer() {
   SyntaxContext->setCreateSyntax(SyntaxKind::DeferStmt);
   SourceLoc DeferLoc = consumeToken(tok::kw_defer);
+  
+  bool isErrorOnly = consumeIf(tok::kw_catch);
   
   // Macro expand out the defer into a closure and call, which we can typecheck
   // and emit where needed.
@@ -966,7 +968,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                                        AccessSemantics::DirectToStorage);
   auto call = CallExpr::createImplicitEmpty(Context, DRE);
   
-  auto DS = new (Context) DeferStmt(DeferLoc, tempDecl, call);
+  auto DS = new (Context) DeferStmt(DeferLoc, tempDecl, call, isErrorOnly);
   return makeParserResult(Status, DS);
 }
 

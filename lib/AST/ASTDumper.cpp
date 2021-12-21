@@ -1484,7 +1484,8 @@ public:
   }
 
   void visitDeferStmt(DeferStmt *S) {
-    printCommon(S, "defer_stmt") << '\n';
+    printCommon(S, "defer_stmt") << (S->isErrorOnly() ? " error_only" : "")
+                                 << '\n';
     printRec(S->getTempDecl());
     OS << '\n';
     printRec(S->getCallExpr());
