@@ -589,11 +589,15 @@ Type ASTBuilder::createProtocolCompositionType(
     members.push_back(protocol->getDeclaredInterfaceType());
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
+
+  // FIXME: When explicit existential types are enabled, protocol
+  // compositions should be wrapped in ExistentialType based on
+  // context, similar to how protocol compositions are resolved
+  // during type resolution. For example, protocol compositions
+  // in parameter types should be wrapped in ExistentialType, but
+  // protocol compositions on the right side of a conformance
+  // requirement should not.
   Type composition = ProtocolCompositionType::get(Ctx, members, isClassBound);
-  if (Ctx.LangOpts.EnableExplicitExistentialTypes &&
-      !(composition->isAny() || composition->isAnyObject())) {
-    composition = ExistentialType::get(composition);
-  }
   return composition;
 }
 

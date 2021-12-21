@@ -902,6 +902,14 @@ private:
         Ty->dump(llvm::errs());
         abort();
       } else if (!Reconstructed->isEqual(Ty) &&
+                 // FIXME: Existential types are reconstructed without
+                 // an explicit ExistentialType wrapping the constraint.
+                 !(Ty->getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+                   Ty.transform([](Type type) -> Type {
+                     if (auto existential = type->getAs<ExistentialType>())
+                       return existential->getConstraintType();
+                     return type;
+                   })->isEqual(Reconstructed)) &&
                  !EqualUpToClangTypes().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
