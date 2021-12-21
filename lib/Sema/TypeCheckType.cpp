@@ -4085,7 +4085,8 @@ public:
       if (proto->existentialRequiresAny()) {
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
-                           proto->getName());
+                           proto->getName())
+            .limitBehavior(DiagnosticBehavior::Warning);
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
@@ -4101,7 +4102,8 @@ public:
 
             Ctx.Diags.diagnose(comp->getNameLoc(),
                                diag::existential_requires_any,
-                               protoDecl->getName());
+                               protoDecl->getName())
+                .limitBehavior(DiagnosticBehavior::Warning);
           }
         }
         return false;
