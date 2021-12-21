@@ -505,9 +505,9 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
     for (auto req : inheritedProto->getMembers()) {
       if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
-        // Ignore generic typealiases.
-        if (auto typeAliasReq = dyn_cast<TypeAliasDecl>(typeReq))
-          if (typeAliasReq->isGeneric())
+        // Ignore generic types.
+        if (auto genReq = dyn_cast<GenericTypeDecl>(req))
+          if (genReq->getGenericParams())
             continue;
 
         inheritedTypeDecls[typeReq->getName()].push_back(typeReq);
