@@ -1089,7 +1089,7 @@ extension ArraySlice: RangeReplaceableCollection {
     }
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1099,7 +1099,7 @@ extension ArraySlice: RangeReplaceableCollection {
     }
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1185,7 +1185,7 @@ extension ArraySlice {
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
+  @inlinable @inline(__always)
   public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {

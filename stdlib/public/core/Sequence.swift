@@ -1171,7 +1171,7 @@ extension Sequence {
     return (it,buffer.endIndex)
   }
     
-  @inlinable
+  @inlinable @inline(__always)
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

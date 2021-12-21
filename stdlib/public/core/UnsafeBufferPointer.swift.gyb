@@ -465,7 +465,7 @@ extension Unsafe${Mutable}BufferPointer {
     return try body(&self)
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -477,7 +477,7 @@ extension Unsafe${Mutable}BufferPointer {
     return try body(&self)
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -486,7 +486,7 @@ extension Unsafe${Mutable}BufferPointer {
 
 %  else:
 
-  @inlinable
+  @inlinable @inline(__always)
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

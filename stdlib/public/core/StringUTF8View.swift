@@ -538,7 +538,7 @@ extension String.Index {
 }
 
 extension String.UTF8View {
-  @inlinable
+  @inlinable @inline(__always)
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

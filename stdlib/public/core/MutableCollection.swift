@@ -232,7 +232,7 @@ extension MutableCollection {
     return nil
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
