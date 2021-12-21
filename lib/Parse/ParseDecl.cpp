@@ -7757,8 +7757,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   {
     // Parse the body.
     if (parseMemberDeclList(LBLoc, RBLoc,
-                            diag::expected_lbrace_class,
-                            diag::expected_rbrace_class,
+                            isExplicitActorDecl ? diag::expected_lbrace_actor
+                                                : diag::expected_lbrace_class,
+                            isExplicitActorDecl ? diag::expected_rbrace_actor
+                                                : diag::expected_rbrace_class,
                             CD))
       Status.setIsParseError();
   }
