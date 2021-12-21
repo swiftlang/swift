@@ -24,7 +24,7 @@ class Expr;
 class ValueDecl;
 
 namespace ide {
-enum class SemanticContextKind;
+enum class SemanticContextKind : uint8_t;
 
 /// Type check parent contexts of the given decl context, and the body of the
 /// given context until \c Loc if the context is a function body.

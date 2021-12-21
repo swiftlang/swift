@@ -57,7 +57,7 @@ namespace ide {
   class CompletionInstance;
   class OnDiskCodeCompletionCache;
   class SourceEditConsumer;
-  enum class CodeCompletionDeclKind;
+  enum class CodeCompletionDeclKind : uint8_t;
   enum class SyntaxNodeKind : uint8_t;
   enum class SyntaxStructureKind : uint8_t;
   enum class SyntaxStructureElementKind : uint8_t;

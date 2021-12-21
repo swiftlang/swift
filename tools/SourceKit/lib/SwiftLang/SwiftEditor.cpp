@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
@@ -612,7 +613,12 @@ struct SwiftSemanticToken {
     return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, getIsRef());
   }
 };
+#if !defined(_MSC_VER)
 static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
+// FIXME: MSVC doesn't pack bitfields with different underlying types.
+// Giving up to check this in MSVC for now, becasue static_assert is only for
+// keeping low memory usage.
+#endif
 
 class SwiftDocumentSemanticInfo :
     public ThreadSafeRefCountedBase<SwiftDocumentSemanticInfo> {
