@@ -3422,11 +3422,12 @@ public:
     }
 
     Type checkExceptionTypeExists(const char *where) {
-      auto exn = Ctx.getErrorDecl();
-      if (exn) return exn->getDeclaredInterfaceType();
+      if (!Ctx.getErrorDecl()) {
+        Out << "exception type does not exist in " << where << "\n";
+        abort();
+      }
 
-      Out << "exception type does not exist in " << where << "\n";
-      abort();
+      return Ctx.getErrorExistentialType();
     }
 
     bool isGoodSourceRange(SourceRange SR) {

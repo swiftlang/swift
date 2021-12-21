@@ -5250,7 +5250,7 @@ public:
       require(AACI->getErrorBB()->getNumArguments() == 1,
               "error successor must take one argument");
       auto arg = AACI->getErrorBB()->getArgument(0);
-      auto errorType = C.getErrorDecl()->getDeclaredType()->getCanonicalType();
+      auto errorType = C.getErrorExistentialType();
       requireSameType(arg->getType(),
                       SILType::getPrimitiveObjectType(errorType),
               "error successor argument must have Error type");

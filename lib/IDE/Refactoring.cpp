@@ -7830,7 +7830,8 @@ private:
                                  const AsyncHandlerDesc &HandlerDesc) {
     // If the error type is already Error, we can pass it as-is.
     auto ErrorType = *HandlerDesc.getErrorType();
-    if (ErrorType->getCanonicalType() == getASTContext().getExceptionType()) {
+    if (ErrorType->getCanonicalType() ==
+        getASTContext().getErrorExistentialType()) {
       OS << ErrorName;
       return;
     }

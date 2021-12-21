@@ -592,10 +592,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   
     auto *fn = cast<llvm::Function>(IGF.IGM.getWillThrowFn());
     auto error = args.claimNext();
+    auto errorTy = IGF.IGM.Context.getErrorExistentialType();
     auto errorBuffer = IGF.getCalleeErrorResultSlot(
-        SILType::getPrimitiveObjectType(IGF.IGM.Context.getErrorDecl()
-                                            ->getDeclaredInterfaceType()
-                                            ->getCanonicalType()));
+        SILType::getPrimitiveObjectType(errorTy));
     IGF.Builder.CreateStore(error, errorBuffer);
     
     auto context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
