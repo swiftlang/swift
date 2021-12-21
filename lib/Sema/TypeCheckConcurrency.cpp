@@ -776,16 +776,22 @@ static bool diagnoseSingleNonSendableType(
         nominal->getName());
 
     // If we can find an import in this context that makes this nominal
-    // type visible, note that it can be `@_predatesConcurrency` import.
+    // type visible, remark that it can be `@_predatesConcurrency` import.
+    // Only emit this remark once per source file, because it can happen a
+    // lot.
+    SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
     auto import = findImportFor(nominal, fromContext.fromDC);
     if (import && !import->options.contains(ImportFlags::PredatesConcurrency) &&
-        import->importLoc.isValid()) {
+        import->importLoc.isValid() && sourceFile &&
+        !sourceFile->hasImportUsedPredatesConcurrency(*import)) {
       SourceLoc importLoc = import->importLoc;
       ctx.Diags.diagnose(
           importLoc, diag::add_predates_concurrency_import,
           ctx.LangOpts.isSwiftVersionAtLeast(6),
           nominal->getParentModule()->getName())
         .fixItInsert(importLoc, "@_predatesConcurrency ");
+
+      sourceFile->setImportUsedPredatesConcurrency(*import);
     }
   }
 

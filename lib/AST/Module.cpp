@@ -2240,6 +2240,16 @@ SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   Imports = getASTContext().AllocateCopy(imports);
 }
 
+bool SourceFile::hasImportUsedPredatesConcurrency(
+    AttributedImport<ImportedModule> import) const {
+  return PredatesConcurrencyImportsUsed.count(import) != 0;
+}
+
+void SourceFile::setImportUsedPredatesConcurrency(
+    AttributedImport<ImportedModule> import) {
+  PredatesConcurrencyImportsUsed.insert(import);
+}
+
 bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
                                                    SourceFile *SF) const {
   return llvm::any_of(SF->getImports(),

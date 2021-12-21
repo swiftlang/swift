@@ -1952,7 +1952,7 @@ NOTE(non_sendable_nominal,none,
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
-NOTE(add_predates_concurrency_import,none,
+REMARK(add_predates_concurrency_import,none,
      "add '@_predatesConcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
