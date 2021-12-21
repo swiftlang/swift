@@ -1772,14 +1772,15 @@ for host in "${ALL_HOSTS[@]}"; do
                     # build of Swift depend on these for building and testing.
                     build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
                     # If we are not performing a toolchain only build, then we
-                    # also want to include FileCheck, not, llvm-nm for testing
-                    # purposes.
+                    # also want to include FileCheck, not, llvm-nm, and similar
+                    # for testing purposes.
                     if [[ ! "${BUILD_TOOLCHAIN_ONLY}" ]] ; then
                       build_targets=(
                           "${build_targets[@]}"
                           FileCheck
                           not
                           llvm-nm
+                          llvm-size
                       )
                     fi
                 fi

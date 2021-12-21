@@ -94,6 +94,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-profdata
       llvm-readelf
       llvm-readobj
+      llvm-size
       llvm-strings
       not
       split-file)
