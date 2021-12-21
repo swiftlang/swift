@@ -556,9 +556,11 @@ struct AttributedImport {
 
   AttributedImport(ModuleInfo module, SourceLoc importLoc = SourceLoc(),
                    ImportOptions options = ImportOptions(),
-                   StringRef filename = {}, ArrayRef<Identifier> spiGroups = {})
+                   StringRef filename = {}, ArrayRef<Identifier> spiGroups = {},
+                   SourceRange predatesConcurrencyRange = {})
       : module(module), importLoc(importLoc), options(options),
-        sourceFileArg(filename), spiGroups(spiGroups) {
+        sourceFileArg(filename), spiGroups(spiGroups),
+        predatesConcurrencyRange(predatesConcurrencyRange) {
     assert(!(options.contains(ImportFlags::Exported) &&
              options.contains(ImportFlags::ImplementationOnly)) ||
            options.contains(ImportFlags::Reserved));
@@ -567,7 +569,8 @@ struct AttributedImport {
   template<class OtherModuleInfo>
   AttributedImport(ModuleInfo module, AttributedImport<OtherModuleInfo> other)
     : AttributedImport(module, other.importLoc, other.options,
-                       other.sourceFileArg, other.spiGroups) { }
+                       other.sourceFileArg, other.spiGroups,
+                       other.predatesConcurrencyRange) { }
 
   friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
                          const AttributedImport<ModuleInfo> &rhs) {
