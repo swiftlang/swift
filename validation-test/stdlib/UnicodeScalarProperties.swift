@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: long_test
 // REQUIRES: optimized_stdlib
+// REQUIRES: objc_interop
 
 import StdlibUnittest
 import StdlibUnicodeUnittest

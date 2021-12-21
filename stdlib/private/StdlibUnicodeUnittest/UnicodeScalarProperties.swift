@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Unicode scalar tests are currently only avaible on Darwin, awaiting a sensible
+// file API...
+#if _runtime(_ObjC)
 import Foundation
 
 // Cache of opened files 
@@ -632,3 +635,4 @@ public let names: [Unicode.Scalar: String] = {
 
   return result
 }()
+#endif
