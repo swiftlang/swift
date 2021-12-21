@@ -1449,7 +1449,7 @@ namespace {
 //   load %elt1                             // non-use (unseen)
 //   %elt2 = struct_element_addr %base, #2  // outer projection (followed)
 //   load %elt2                             // exact use
-//   %sub = struct_element_addr %elt2,  #i  // inner projection (followed)
+//   %sub = struct_element_addr %elt2,  %i  // inner projection (followed)
 //   load %sub                              // inner use
 //
 // A use may be a BranchInst if the corresponding phi does not have common
@@ -1467,8 +1467,12 @@ class AccessPathDefUseTraversal {
   // The origin of the def-use traversal.
   AccessStorage storage;
 
-  // Remaining access path indices from the most recently visited def to any
-  // exact use in def-use order.
+  // Indices of the path to match from inner to outer component.
+  // A cursor is used to represent the most recently visited def.
+  // During def-use traversal, the cursor starts at the end of pathIndicies and
+  // decrements with each projection.
+  // The first index represents an exact match.
+  // Index < 0 represents some subobject of the requested path.
   SmallVector<AccessPath::Index, 4> pathIndices;
 
   // A point in the def-use traversal. isRef() is true only for object access
@@ -1884,8 +1888,8 @@ bool swift::visitAccessPathUses(AccessUseVisitor &visitor,
 }
 
 bool swift::visitAccessStorageUses(AccessUseVisitor &visitor,
-                                     AccessStorage storage,
-                                     SILFunction *function) {
+                                   AccessStorage storage,
+                                   SILFunction *function) {
   IndexTrieNode *emptyPath = function->getModule().getIndexTrieRoot();
   return visitAccessPathUses(visitor, AccessPath(storage, emptyPath, 0),
                              function);

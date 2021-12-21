@@ -1309,9 +1309,8 @@ struct AccessUseVisitor {
 ///
 /// Return true if all uses were collected. This is always true as long the \p
 /// visitor's visitUse method returns true.
-bool visitAccessStorageUses(AccessUseVisitor &visitor,
-                              AccessStorage storage,
-                              SILFunction *function);
+bool visitAccessStorageUses(AccessUseVisitor &visitor, AccessStorage storage,
+                            SILFunction *function);
 
 /// Visit the uses of \p accessPath.
 ///
