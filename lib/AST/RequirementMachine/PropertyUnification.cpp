@@ -307,8 +307,9 @@ static std::pair<Symbol, bool> unifySuperclasses(
   return std::make_pair(rhs, false);
 }
 
-/// Returns true if there was a conflict.
-bool PropertyBag::addProperty(
+/// Returns the old conflicting rule ID if there was a conflict,
+/// otherwise returns None.
+Optional<unsigned> PropertyBag::addProperty(
     Symbol property, unsigned ruleID, RewriteContext &ctx,
     SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
@@ -317,19 +318,20 @@ bool PropertyBag::addProperty(
   case Symbol::Kind::Protocol:
     ConformsTo.push_back(property.getProtocol());
     ConformsToRules.push_back(ruleID);
-    return false;
+    return None;
 
   case Symbol::Kind::Layout:
     if (!Layout) {
       Layout = property.getLayoutConstraint();
       LayoutRule = ruleID;
     } else {
+      assert(LayoutRule.hasValue());
       Layout = Layout.merge(property.getLayoutConstraint());
       if (!Layout->isKnownLayout())
-        return true;
+        return LayoutRule;
     }
 
-    return false;
+    return None;
 
   case Symbol::Kind::Superclass: {
     // FIXME: Also handle superclass vs concrete
@@ -338,15 +340,16 @@ bool PropertyBag::addProperty(
       Superclass = property;
       SuperclassRule = ruleID;
     } else {
+      assert(SuperclassRule.hasValue());
       auto pair = unifySuperclasses(*Superclass, property,
                                     ctx, inducedRules, debug);
       Superclass = pair.first;
       bool conflict = pair.second;
       if (conflict)
-        return true;
+        return SuperclassRule;
     }
 
-    return false;
+    return None;
   }
 
   case Symbol::Kind::ConcreteType: {
@@ -354,18 +357,19 @@ bool PropertyBag::addProperty(
       ConcreteType = property;
       ConcreteTypeRule = ruleID;
     } else {
+      assert(ConcreteTypeRule.hasValue());
       bool conflict = unifyConcreteTypes(*ConcreteType, property,
                                          ctx, inducedRules, debug);
       if (conflict)
-        return true;
+        return ConcreteTypeRule;
     }
 
-    return false;
+    return None;
   }
 
   case Symbol::Kind::ConcreteConformance:
     // FIXME
-    return false;
+    return None;
 
   case Symbol::Kind::Name:
   case Symbol::Kind::GenericParam:
@@ -533,10 +537,13 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       // With concrete types, a missing conformance is a conflict.
       if (requirementKind == RequirementKind::SameType) {
         // FIXME: Diagnose conflict
-        //
-        // FIXME: We should mark the more specific rule of the two
-        // as conflicting.
-        System.getRule(conformanceRuleID).markConflicting();
+        auto &concreteRule = System.getRule(concreteRuleID);
+        if (concreteRule.getRHS().size() == key.size())
+          concreteRule.markConflicting();
+
+        auto &conformanceRule = System.getRule(conformanceRuleID);
+        if (conformanceRule.getRHS().size() == key.size())
+          conformanceRule.markConflicting();
       }
 
       if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
