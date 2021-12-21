@@ -1325,6 +1325,45 @@ bool visitAccessPathUses(AccessUseVisitor &visitor, AccessPath accessPath,
 } // end namespace swift
 
 //===----------------------------------------------------------------------===//
+//                      MARK: UniqueAddressUses
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// Analyze and classify the leaf uses of unique storage.
+///
+/// Storage that has a unique set of roots within this function includes
+/// alloc_stack, alloc_box, exclusive argument, and global variables. All access
+/// to the storage within this function is derived from these roots.
+///
+/// Gather the kinds of uses that are typically relevant to algorithms:
+/// - loads       (including copies out of, not including inout args)
+/// - stores      (including copies into and inout args)
+/// - destroys    (of the entire aggregate)
+/// - debugUses   (only populated when preserveDebugInfo == false)
+/// - unknownUses (e.g. address_to_pointer, box escape)
+struct UniqueStorageUseVisitor {
+  static bool findUses(UniqueStorageUseVisitor &visitor);
+
+  SILFunction *function;
+  AccessStorage storage;
+
+  UniqueStorageUseVisitor(AccessStorage storage, SILFunction *function)
+      : function(function), storage(storage) {}
+
+  virtual ~UniqueStorageUseVisitor() = default;
+
+  virtual bool visitLoad(Operand *use) = 0;
+  virtual bool visitStore(Operand *use) = 0;
+  virtual bool visitDestroy(Operand *use) = 0;
+  virtual bool visitDealloc(Operand *use) = 0;
+  virtual bool visitDebugUse(Operand *use) = 0;
+  virtual bool visitUnknownUse(Operand *use) = 0;
+};
+
+} // namespace swift
+
+//===----------------------------------------------------------------------===//
 //             MARK: Helper API for specific formal access patterns
 //===----------------------------------------------------------------------===//
 

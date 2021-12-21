@@ -1924,6 +1924,110 @@ bool AccessPath::collectUses(SmallVectorImpl<Operand *> &uses,
 }
 
 //===----------------------------------------------------------------------===//
+//                      MARK: UniqueStorageUseVisitor
+//===----------------------------------------------------------------------===//
+
+struct GatherUniqueStorageUses : public AccessUseVisitor {
+  UniqueStorageUseVisitor &visitor;
+
+  GatherUniqueStorageUses(UniqueStorageUseVisitor &visitor)
+      : AccessUseVisitor(AccessUseType::Overlapping,
+                         NestedAccessType::IgnoreAccessBegin),
+        visitor(visitor) {}
+
+  bool visitUse(Operand *use, AccessUseType useTy) override;
+};
+
+bool UniqueStorageUseVisitor::findUses(UniqueStorageUseVisitor &visitor) {
+  assert(visitor.storage.isUniquelyIdentified());
+
+  GatherUniqueStorageUses gather(visitor);
+  return visitAccessStorageUses(gather, visitor.storage, visitor.function);
+}
+
+bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
+  unsigned operIdx = use->getOperandNumber();
+  auto *user = use->getUser();
+  assert(!user->isTypeDependentOperand(*use));
+
+  // TODO: handle non-escaping partial-applies just like a full apply. The
+  // address uses are the points where the partial apply is invoked.
+  if (FullApplySite apply = FullApplySite::isa(user)) {
+    switch (apply.getArgumentConvention(*use)) {
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_Out:
+      visitor.visitStore(use);
+      break;
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+      visitor.visitLoad(use);
+      break;
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Direct_Guaranteed:
+      // most likely an escape of a box
+      visitor.visitUnknownUse(use);
+      break;
+    }
+    return true;
+  }
+  switch (user->getKind()) {
+  case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::DestroyValueInst:
+    if (useTy == AccessUseType::Exact) {
+      visitor.visitDestroy(use);
+      return true;
+    }
+    visitor.visitUnknownUse(use);
+    return true;
+
+  case SILInstructionKind::DebugValueInst:
+    visitor.visitDebugUse(use);
+    return true;
+
+  case SILInstructionKind::LoadInst:
+  case SILInstructionKind::LoadWeakInst:
+  case SILInstructionKind::LoadUnownedInst:
+  case SILInstructionKind::ExistentialMetatypeInst:
+    visitor.visitLoad(use);
+    return true;
+
+  case SILInstructionKind::StoreInst:
+  case SILInstructionKind::StoreWeakInst:
+  case SILInstructionKind::StoreUnownedInst:
+    if (operIdx == CopyLikeInstruction::Dest) {
+      visitor.visitStore(use);
+      return true;
+    }
+    break;
+
+  case SILInstructionKind::InjectEnumAddrInst:
+    visitor.visitStore(use);
+    return true;
+
+  case SILInstructionKind::CopyAddrInst:
+    if (operIdx == CopyLikeInstruction::Dest) {
+      visitor.visitStore(use);
+      return true;
+    }
+    assert(operIdx == CopyLikeInstruction::Src);
+    visitor.visitLoad(use);
+    return true;
+
+  case SILInstructionKind::DeallocStackInst:
+    visitor.visitDealloc(use);
+    return true;
+
+  default:
+    break;
+  }
+  visitor.visitUnknownUse(use);
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 //             MARK: Helper API for specific formal access patterns
 //===----------------------------------------------------------------------===//
 
