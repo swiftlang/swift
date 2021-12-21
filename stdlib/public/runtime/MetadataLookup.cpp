@@ -1895,134 +1895,64 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
 
 // ==== Function metadata functions ----------------------------------------------
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
-unsigned
-swift_func_getParameterCount(const char *typeNameStart, size_t typeNameLength) {
+static llvm::Optional<llvm::StringRef>
+cstrToStringRef(const char *typeNameStart, size_t typeNameLength) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   for (char c : typeName) {
     if (c >= '\x01' && c <= '\x1F')
-      return -1;
+      return llvm::None;
   }
+  return typeName;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+unsigned
+swift_func_getParameterCount(const char *typeNameStart, size_t typeNameLength) {
+  llvm::Optional<llvm::StringRef> typeName =
+      cstrToStringRef(typeNameStart, typeNameLength);
+  if (!typeName)
+    return -1;
 
   StackAllocatedDemangler<1024> demangler;
-  auto node = demangler.demangleSymbol(typeName);
 
-  if (!node) {
-    return -1;
-  }
+  auto node = demangler.demangleSymbol(*typeName);
+  if (!node) return -2;
 
-  switch (node->getKind()) {
-  case Node::Kind::Global:
-    if (node->getNumChildren() <= 0)
-      return -1;
+  node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
+  if (!node) return -3;
+
+  node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
+  if (!node) return -4;
+
+  node = node->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/3);
+  // Get the "deepest" Tuple from the ArgumentTuple, that's the arguments
+  while (node && node->getKind() != Node::Kind::Tuple) {
     node = node->getFirstChild();
-    break;
-  default:
-    return -2;
   }
 
-  if (!node)
-    return -3;
-
-  switch (node->getKind()) {
-  case Node::Kind::Function: {
-    auto i = 0;
-    while (auto n = node->getChild(i)) {
-      if (n->getKind() == Node::Kind::Type) {
-        node = n;
-        break;
-      }
-      ++i;
-    }
-
-    if (node && node->getKind() == Node::Kind::Type &&
-        node->getNumChildren() == 1) {
-      node = node->getFirstChild();
-    }
-
-    break;
+  if (node) {
+    return node->getNumChildren();
   }
 
-  default:
-    return -1;
-  }
-
-  if (!node)
-    return -3;
-
-  for (auto n : *node) {
-    if (n->getKind() == Node::Kind::ArgumentTuple) {
-      while (n && n->getKind() != Node::Kind::Tuple) {
-        n = n->getFirstChild();
-      }
-
-      return n->getNumChildren();
-    }
-  }
-
-  return -9;
+  return -5;
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 const Metadata *_Nullable
 swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength) {
-  llvm::StringRef typeName(typeNameStart, typeNameLength);
-  for (char c : typeName) {
-    if (c >= '\x01' && c <= '\x1F')
-      return nullptr;
-  }
+  llvm::Optional<llvm::StringRef> typeName =
+      cstrToStringRef(typeNameStart, typeNameLength);
+  if (!typeName) return nullptr;
 
   StackAllocatedDemangler<1024> demangler;
-  auto node = demangler.demangleSymbol(typeName);
+  auto node = demangler.demangleSymbol(*typeName);
+  if (!node) return nullptr;
 
-  if (!node) {
-    return nullptr;
-  }
+  node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
+  if (!node) return nullptr;
 
-  switch (node->getKind()) {
-  case Node::Kind::Global:
-    if (node->getNumChildren() <= 0)
-      return nullptr;
-    node = node->getFirstChild();
-    break;
-  default:
-    return nullptr;
-  }
-
-  if (!node)
-    return nullptr;
-
-  switch (node->getKind()) {
-  case Node::Kind::Function: {
-    auto i = 0;
-    while (auto n = node->getChild(i)) {
-      if (n->getKind() == Node::Kind::Type) {
-        node = n;
-        break;
-      }
-      ++i;
-    }
-
-    if (node && node->getKind() == Node::Kind::Type &&
-        node->getNumChildren() == 1) {
-      node = node->getFirstChild();
-    }
-
-    break;
-  }
-
-  default:
-    return nullptr;
-  }
-
-  if (!node)
-    return nullptr;
-
-  for (auto n : *node) {
-    if (n->getKind() == Node::Kind::ReturnType) {
-      node = n;
-    }
-  }
+  node = node->findByKind(Node::Kind::ReturnType, /*maxDepth=*/4);
+  if (!node) return nullptr;
 
   DecodedMetadataBuilder builder(
       demangler,
@@ -2030,8 +1960,8 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength) {
       [](unsigned, unsigned) { return nullptr; },
       /*SubstDependentWitnessTableFn=*/
       [](const Metadata *, unsigned) { return nullptr; });
-  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
 
+  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
   auto builtTypeOrError = decoder.decodeMangledType(node);
   if (builtTypeOrError.isError()) {
     auto err = builtTypeOrError.getError();
@@ -2048,105 +1978,66 @@ unsigned
 swift_func_getParameterTypeInfo(
     const char *typeNameStart, size_t typeNameLength,
     Metadata const **types, unsigned typesLength) {
-  llvm::StringRef typeName(typeNameStart, typeNameLength);
-  for (char c : typeName) {
-    if (c >= '\x01' && c <= '\x1F')
-      return -1;
-  }
+  if (typesLength < 0) return -1;
 
-  if (typesLength < 0) {
-    return -1;
-  }
-  
+  llvm::Optional<llvm::StringRef> typeName =
+      cstrToStringRef(typeNameStart, typeNameLength);
+  if (!typeName) return -1;
+
   StackAllocatedDemangler<1024> demangler;
-  auto node = demangler.demangleSymbol(typeName);
+  auto node = demangler.demangleSymbol(*typeName);
+  if (!node) return -1;
 
-  if (!node) {
-    return -1;
-  }
+  node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
+  if (!node) return -3;
 
-  switch (node->getKind()) {
-  case Node::Kind::Global:
+  node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
+  if (!node) return -4;
+
+  node = node->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/3);
+  // Get the "deepest" Tuple from the ArgumentTuple, that's the arguments
+  while (node && node->getKind() != Node::Kind::Tuple) {
     node = node->getFirstChild();
-    break;
-  default:
-    return -1;
   }
 
-  if (!node)
-    return -2;
-
-  switch (node->getKind()) {
-  case Node::Kind::Function: {
-    auto i = 0;
-    while (auto n = node->getChild(i)) {
-      if (n->getKind() == Node::Kind::Type) {
-        node = n;
-        break;
-      }
-      ++i;
-    }
-
-    if (node && node->getKind() == Node::Kind::Type &&
-        node->getNumChildren() == 1) {
-      node = node->getFirstChild();
-    }
-
-    break;
+  // Only successfully return if the expected parameter count is the same
+  // as space prepared for it in the buffer.
+  if (!node || (node && node->getNumChildren() != typesLength)) {
+    return -5;
   }
 
-  default:
-    return -3;
-  }
+  DecodedMetadataBuilder builder(
+      demangler,
+      /*substGenericParam=*/
+      [](unsigned, unsigned) { return nullptr; },
+      /*SubstDependentWitnessTableFn=*/
+      [](const Metadata *, unsigned) { return nullptr; });
+  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
 
-  if (!node)
-    return -4;
+  auto typeIdx = 0;
+  // for each parameter (TupleElement), store it into the provided buffer
+  for (auto tupleElement : *node) {
+    assert(tupleElement->getKind() == Node::Kind::TupleElement);
+    assert(tupleElement->getNumChildren() == 1);
 
-  for (auto n : *node) {
-    if (n->getKind() == Node::Kind::ArgumentTuple) {
-      while (n && n->getKind() != Node::Kind::Tuple) {
-        n = n->getFirstChild();
-      }
+    auto typeNode = tupleElement->getFirstChild();
+    assert(typeNode->getKind() == Node::Kind::Type);
 
-      // Only successfully return if the expected parameter count is the same
-      // as space prepared for it in the buffer.
-      if (n->getNumChildren() != typesLength) {
-        return -1 * n->getNumChildren();
-      }
-
-      assert (n->getKind() == Node::Kind::Tuple);
-      auto i = 0;
-      // for each parameter (TupleElement), store it into the provided buffer
-      for (auto tupleElement : *n) {
-        assert(tupleElement->getKind() == Node::Kind::TupleElement);
-        assert(tupleElement->getNumChildren() == 1);
-
-        auto typeNode = tupleElement->getFirstChild();
-        assert(typeNode->getKind() == Node::Kind::Type);
-
-        DecodedMetadataBuilder builder(
-            demangler,
-            /*substGenericParam=*/
-            [](unsigned, unsigned) { return nullptr; },
-            /*SubstDependentWitnessTableFn=*/
-            [](const Metadata *, unsigned) { return nullptr; });
-        TypeDecoder<DecodedMetadataBuilder> decoder(builder);
-
-        auto builtTypeOrError = decoder.decodeMangledType(tupleElement);
-        if (builtTypeOrError.isError()) {
-          auto err = builtTypeOrError.getError();
-          char *errStr = err->copyErrorString();
-          err->freeErrorString(errStr);
-          i += 1;
-          continue;
-        }
-
-        types[i] = builtTypeOrError.getType();
-        i += 1;
-      } // end foreach parameter
-
-      return n->getNumChildren();
+    auto builtTypeOrError = decoder.decodeMangledType(tupleElement);
+    if (builtTypeOrError.isError()) {
+      auto err = builtTypeOrError.getError();
+      char *errStr = err->copyErrorString();
+      err->freeErrorString(errStr);
+      typeIdx += 1;
+      continue;
     }
+
+    types[typeIdx] = builtTypeOrError.getType();
+    typeIdx += 1;
+  } // end foreach parameter
+
+  if (node) {
+    return node->getNumChildren();
   }
 
   return -9;
@@ -2312,7 +2203,7 @@ buildEnvironmentPath(
   unsigned totalKeyParamCount = 0;
   auto genericParams = environment->getGenericParameters();
   for (unsigned numLocalParams : environment->getGenericParameterCounts()) {
-    // Adkjust totalParamCount so we have the # of local parameters.
+    // Adjust totalParamCount so we have the # of local parameters.
     numLocalParams -= totalParamCount;
 
     // Get the local generic parameters.

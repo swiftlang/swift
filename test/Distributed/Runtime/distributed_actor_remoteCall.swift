@@ -112,7 +112,6 @@ func test() async throws {
   // act as if we decoded an Invocation:
   var invocation = FakeInvocation()
 
-
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: helloName,

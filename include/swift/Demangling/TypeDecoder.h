@@ -1262,6 +1262,7 @@ return {}; // Not Implemented!
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing
     // the defining decl
     default:
+
       return MAKE_NODE_TYPE_ERROR0(Node, "unexpected kind");
     }
   }

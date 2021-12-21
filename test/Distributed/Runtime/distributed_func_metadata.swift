@@ -104,6 +104,8 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 
   static func test_count() {
     print("~~ \(#function)")
+    // CHECK: _getParameterCount: empty() = 0
+    print("_getParameterCount: empty() = \(_getParameterCount(mangledMethodName: empty))")
     // CHECK: _getParameterCount: one(s:) = 1
     print("_getParameterCount: one(s:) = \(_getParameterCount(mangledMethodName: one))")
     // CHECK: _getParameterCount: two(s:i:) = 2

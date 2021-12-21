@@ -251,10 +251,7 @@ extension DistributedActorSystem {
       print("EXECUTE the target: \(mangledTargetName)")
       try await _executeDistributedTarget(
           on: actor,
-//          mangledTargetName, UInt(mangledTargetName.count),
-//          "\(mangledTargetName)TE", UInt(mangledTargetName.count) + 2,
-//          "$s4main7GreeterC5helloSSyFTE", UInt("$s4main7GreeterC5helloSSyFTE".count),
-          "$s4main7GreeterC5helloyyFTE", UInt("$s4main7GreeterC5helloyyFTE".count), // no return value
+          mangledTargetName, UInt(mangledTargetName.count),
           argumentBuffer: hargs.buffer._rawValue,
           resultBuffer: resultBuffer?._rawValue
       )
