@@ -609,8 +609,7 @@ struct SwiftSemanticToken {
     return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, getIsRef());
   }
 };
-#if SWIFT_COMPILER_IS_MSVC
-#else
+#if !defined(_MSC_VER)
 static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
 // FIXME: MSVC doesn't pack bitfields with different underlying types.
 // Giving up to check this in MSVC for now, becasue static_assert is only for
