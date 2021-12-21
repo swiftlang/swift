@@ -1129,6 +1129,10 @@ ClangImporter::create(ASTContext &ctx,
 
   // Create a compiler instance.
   {
+    // The Clang modules produced by ClangImporter are always embedded in an
+    // ObjectFilePCHContainer and contain -gmodules debug info.
+    importer->Impl.Invocation->getCodeGenOpts().DebugTypeExtRefs = true;
+
     auto PCHContainerOperations =
       std::make_shared<clang::PCHContainerOperations>();
     PCHContainerOperations->registerWriter(
