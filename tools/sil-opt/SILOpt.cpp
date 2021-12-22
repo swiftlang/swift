@@ -465,10 +465,13 @@ static llvm::cl::opt<std::string> EnableRequirementMachine(
 
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
-  auto &opts = Module->getOptions();
+  const SILOptions &opts = Module->getOptions();
+  // If a specific pass was requested with -opt-mode=None, run the pass as a
+  // mandatory pass.
+  bool isMandatory = opts.OptMode == OptimizationMode::NoOptimization;
   executePassPipelinePlan(
       Module, SILPassPipelinePlan::getPassPipelineForKinds(opts, Passes),
-      /*isMandatory*/ false, IRGenMod);
+      isMandatory, IRGenMod);
 
   if (Module->getOptions().VerifyAll)
     Module->verify();
