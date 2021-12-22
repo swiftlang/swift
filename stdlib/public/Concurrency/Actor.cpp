@@ -1709,7 +1709,8 @@ static DistributedAccessorSignature::ContinuationType
 
 SWIFT_CC(swiftasync)
 static void ::swift_distributed_execute_target_resume(
-    SWIFT_ASYNC_CONTEXT AsyncContext *context, SWIFT_CONTEXT void *error) {
+    SWIFT_ASYNC_CONTEXT AsyncContext *context,
+    SWIFT_CONTEXT SwiftError *error) {
   auto parentCtx = context->Parent;
   auto resumeInParent =
       reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
