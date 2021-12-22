@@ -366,6 +366,12 @@ ERROR(expected_rbrace_class,none,
 ERROR(expected_colon_class, PointsToFirstBadToken,
       "expected ':' to begin inheritance clause",())
 
+// Actor
+ERROR(expected_lbrace_actor,PointsToFirstBadToken,
+      "expected '{' in actor", ())
+ERROR(expected_rbrace_actor,none,
+      "expected '}' in actor", ())
+
 // Protocol
 ERROR(generic_arguments_protocol,PointsToFirstBadToken,
       "protocols do not allow generic parameters; use associated types instead",
