@@ -2270,6 +2270,17 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, version, givenName);
+
+  // Add information about the async version of the name to the non-async
+  // version of the name.
+  if (!version.supportsConcurrency()) {
+    if (auto importedAsyncName = importName(decl, version.withConcurrency(true),
+                                            givenName)) {
+      res.info.hasAsyncAlternateInfo = importedAsyncName.info.hasAsyncInfo;
+      res.info.asyncInfo = importedAsyncName.info.asyncInfo;
+    }
+  }
+
   if (!givenName)
     importNameCache[key] = res;
   return res;

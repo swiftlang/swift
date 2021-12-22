@@ -942,7 +942,8 @@ public:
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
 
-  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type);
+  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type,
+                            bool sendableByDefault);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -1753,6 +1754,25 @@ public:
 /// Determines whether the given swift_attr attribute describes the main
 /// actor.
 bool isMainActorAttr(const clang::SwiftAttrAttr *swiftAttr);
+
+/// Apply an attribute to a function type.
+static inline Type applyToFunctionType(
+    Type type, llvm::function_ref<ASTExtInfo(ASTExtInfo)> transform) {
+  // Recurse into optional types.
+  if (Type objectType = type->getOptionalObjectType()) {
+    return OptionalType::get(applyToFunctionType(objectType, transform));
+  }
+
+  // Apply transform to function types.
+  if (auto funcType = type->getAs<FunctionType>()) {
+    auto newExtInfo = transform(funcType->getExtInfo());
+    if (!newExtInfo.isEqualTo(funcType->getExtInfo(), /*useClangTypes=*/true))
+      return FunctionType::get(funcType->getParams(), funcType->getResult(),
+                               newExtInfo);
+  }
+
+  return type;
+}
 
 }
 }

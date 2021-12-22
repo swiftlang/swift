@@ -1725,61 +1725,56 @@ ImportedType ClangImporter::Implementation::importPropertyType(
                     Bridgeability::Full, optionality);
 }
 
-/// Apply an attribute to a function type.
-static Type applyToFunctionType(
-    Type type, llvm::function_ref<ASTExtInfo(ASTExtInfo)> transform) {
-  // Recurse into optional types.
-  if (Type objectType = type->getOptionalObjectType()) {
-    return OptionalType::get(applyToFunctionType(objectType, transform));
-  }
-
-  // Apply @noescape to function types.
-  if (auto funcType = type->getAs<FunctionType>()) {
-    return FunctionType::get(funcType->getParams(), funcType->getResult(),
-                             transform(funcType->getExtInfo()));
-  }
-
-  return type;
-}
-
 Type ClangImporter::Implementation::applyParamAttributes(
-    const clang::ParmVarDecl *param, Type type) {
-  if (!param->hasAttrs())
-    return type;
+    const clang::ParmVarDecl *param, Type type, bool sendableByDefault) {
+  bool sendableRequested = sendableByDefault;
+  bool sendableDisqualified = false;
 
-  for (auto attr : param->getAttrs()) {
-    // Map __attribute__((noescape)) to @noescape.
-    if (isa<clang::NoEscapeAttr>(attr)) {
-      type = applyToFunctionType(type, [](ASTExtInfo extInfo) {
-        return extInfo.withNoEscape();
-      });
-
-      continue;
-    }
-
-    auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-    if (!swiftAttr)
-      continue;
-
-    // Map the main-actor attribute.
-    if (isMainActorAttr(swiftAttr)) {
-      if (Type mainActor = SwiftContext.getMainActorType()) {
-        type = applyToFunctionType(type, [&](ASTExtInfo extInfo) {
-          return extInfo.withGlobalActor(mainActor);
+  if (param->hasAttrs()) {
+    for (auto attr : param->getAttrs()) {
+      // Map __attribute__((noescape)) to @noescape.
+      if (isa<clang::NoEscapeAttr>(attr)) {
+        type = applyToFunctionType(type, [](ASTExtInfo extInfo) {
+          return extInfo.withNoEscape();
         });
+
+        continue;
       }
 
-      continue;
-    }
+      auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
+      if (!swiftAttr)
+        continue;
 
-    // Map @Sendable.
-    if (swiftAttr->getAttribute() == "@Sendable") {
-      type = applyToFunctionType(type, [](ASTExtInfo extInfo) {
-        return extInfo.withConcurrent();
-      });
+      // Map the main-actor attribute.
+      if (isMainActorAttr(swiftAttr)) {
+        if (Type mainActor = SwiftContext.getMainActorType()) {
+          type = applyToFunctionType(type, [&](ASTExtInfo extInfo) {
+            return extInfo.withGlobalActor(mainActor);
+          });
+          sendableDisqualified = true;
+        }
 
-      continue;
+        continue;
+      }
+
+      // Map @Sendable.
+      if (swiftAttr->getAttribute() == "@Sendable") {
+        sendableRequested = true;
+        continue;
+      }
+
+      // Map @_nonSendable.
+      if (swiftAttr->getAttribute() == "@_nonSendable") {
+        sendableDisqualified = true;
+        continue;
+      }
     }
+  }
+
+  if (!sendableDisqualified && sendableRequested) {
+    type = applyToFunctionType(type, [](ASTExtInfo extInfo) {
+      return extInfo.withConcurrent();
+    });
   }
 
   return type;
@@ -1986,7 +1981,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     // Apply attributes to the type.
     swiftParamTy = applyParamAttributes(
-        param, swiftParamTy);
+        param, swiftParamTy, /*sendableByDefault=*/false);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
@@ -2372,6 +2367,10 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   Optional<ForeignErrorConvention::Info> errorInfo =
       importedName.getErrorInfo();
   auto asyncInfo = importedName.getAsyncInfo();
+  bool isAsync = asyncInfo.hasValue();
+  if (!isAsync)
+    asyncInfo = importedName.getAsyncAlternateInfo();
+
   OptionalTypeKind OptionalityOfReturn;
   if (clangDecl->hasAttr<clang::ReturnsNonNullAttr>()) {
     OptionalityOfReturn = OTK_None;
@@ -2518,7 +2517,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       // Figure out if this is a completion handler parameter whose error
       // parameter is used to indicate throwing.
       Optional<unsigned> completionHandlerErrorParamIndex;
-      if (paramIsCompletionHandler) {
+      if (isAsync && paramIsCompletionHandler) {
         completionHandlerErrorParamIndex =
             asyncInfo->completionHandlerErrorParamIndex();
       }
@@ -2563,7 +2562,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
     // If this is a completion handler, figure out it's effect on the result
     // type but don't build it into the parameter type.
-    if (paramIsCompletionHandler) {
+    if (isAsync && paramIsCompletionHandler) {
       if (Type replacedSwiftResultTy =
               decomposeCompletionHandlerType(swiftParamTy, *asyncInfo)) {
         swiftResultTy = replacedSwiftResultTy;
@@ -2582,7 +2581,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     }
 
     // Apply Clang attributes to the parameter type.
-    swiftParamTy = applyParamAttributes(param, swiftParamTy);
+    swiftParamTy = applyParamAttributes(param, swiftParamTy,
+                  /*sendableByDefault=*/paramIsCompletionHandler);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
@@ -2657,7 +2657,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     swiftResultTy = SwiftContext.getNeverType();
   }
 
-  if (asyncInfo) {
+  if (isAsync) {
     asyncConvention = ForeignAsyncConvention(
         completionHandlerType, asyncInfo->completionHandlerParamIndex(),
         asyncInfo->completionHandlerErrorParamIndex(),
