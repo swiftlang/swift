@@ -1952,6 +1952,12 @@ NOTE(non_sendable_nominal,none,
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
+REMARK(add_predates_concurrency_import,none,
+     "add '@_predatesConcurrency' to %select{suppress|treat}0 "
+     "'Sendable'-related %select{warnings|errors}0 from module %1"
+     "%select{| as warnings}0", (bool, Identifier))
+REMARK(remove_predates_concurrency_import,none,
+     "'@_predatesConcurrency' attribute on module %0 is unused", (Identifier))
 WARNING(public_decl_needs_sendable,none,
         "public %0 %1 does not specify whether it is 'Sendable' or not",
         (DescriptiveDeclKind, DeclName))

@@ -80,6 +80,10 @@ enum class ImportFlags {
   /// implementation detail of this file.
   SPIAccessControl = 0x10,
 
+  /// The module is imported assuming that the module itself predates
+  /// concurrency.
+  PredatesConcurrency = 0x20,
+
   /// Used for DenseMap.
   Reserved = 0x80
 };
@@ -533,6 +537,9 @@ struct AttributedImport {
   /// Information about the module and access path being imported.
   ModuleInfo module;
 
+  /// The location of the 'import' keyword, for an explicit import.
+  SourceLoc importLoc;
+
   /// Flags indicating which attributes of this import are present.
   ImportOptions options;
 
@@ -543,10 +550,17 @@ struct AttributedImport {
   /// Names of explicitly imported SPI groups.
   ArrayRef<Identifier> spiGroups;
 
-  AttributedImport(ModuleInfo module, ImportOptions options = ImportOptions(),
-                   StringRef filename = {}, ArrayRef<Identifier> spiGroups = {})
-      : module(module), options(options), sourceFileArg(filename),
-        spiGroups(spiGroups) {
+  /// When the import declaration has a `@_predatesConcurrency` annotation, this
+  /// is the source range covering the annotation.
+  SourceRange predatesConcurrencyRange;
+
+  AttributedImport(ModuleInfo module, SourceLoc importLoc = SourceLoc(),
+                   ImportOptions options = ImportOptions(),
+                   StringRef filename = {}, ArrayRef<Identifier> spiGroups = {},
+                   SourceRange predatesConcurrencyRange = {})
+      : module(module), importLoc(importLoc), options(options),
+        sourceFileArg(filename), spiGroups(spiGroups),
+        predatesConcurrencyRange(predatesConcurrencyRange) {
     assert(!(options.contains(ImportFlags::Exported) &&
              options.contains(ImportFlags::ImplementationOnly)) ||
            options.contains(ImportFlags::Reserved));
@@ -554,8 +568,9 @@ struct AttributedImport {
 
   template<class OtherModuleInfo>
   AttributedImport(ModuleInfo module, AttributedImport<OtherModuleInfo> other)
-    : AttributedImport(module, other.options, other.sourceFileArg,
-                       other.spiGroups) { }
+    : AttributedImport(module, other.importLoc, other.options,
+                       other.sourceFileArg, other.spiGroups,
+                       other.predatesConcurrencyRange) { }
 
   friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
                          const AttributedImport<ModuleInfo> &rhs) {
@@ -705,17 +720,20 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
   using ModuleInfoDMI = DenseMapInfo<ModuleInfo>;
   using ImportOptionsDMI = DenseMapInfo<swift::ImportOptions>;
   using StringRefDMI = DenseMapInfo<StringRef>;
+  using SourceLocDMI = DenseMapInfo<swift::SourceLoc>;
   // We can't include spiGroups in the hash because ArrayRef<Identifier> is not
   // DenseMapInfo-able, but we do check that the spiGroups match in isEqual().
 
   static inline AttributedImport getEmptyKey() {
     return AttributedImport(ModuleInfoDMI::getEmptyKey(),
+                            SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getEmptyKey(),
                             StringRefDMI::getEmptyKey(),
                             {});
   }
   static inline AttributedImport getTombstoneKey() {
     return AttributedImport(ModuleInfoDMI::getTombstoneKey(),
+                            SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getTombstoneKey(),
                             StringRefDMI::getTombstoneKey(),
                             {});
@@ -724,8 +742,8 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
     return detail::combineHashValue(
         ModuleInfoDMI::getHashValue(import.module),
         detail::combineHashValue(
-            ImportOptionsDMI::getHashValue(import.options),
-            StringRefDMI::getHashValue(import.sourceFileArg)));
+          ImportOptionsDMI::getHashValue(import.options),
+          StringRefDMI::getHashValue(import.sourceFileArg)));
   }
   static bool isEqual(const AttributedImport &a,
                       const AttributedImport &b) {

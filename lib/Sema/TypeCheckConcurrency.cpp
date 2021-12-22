@@ -20,6 +20,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -674,6 +675,38 @@ static bool hasExplicitSendableConformance(NominalTypeDecl *nominal) {
           conformance.getConcrete())->isMissing());
 }
 
+/// Find the import that makes the given nominal declaration available.
+static Optional<AttributedImport<ImportedModule>> findImportFor(
+    NominalTypeDecl *nominal, const DeclContext *fromDC) {
+  // If the nominal type is from the current module, there's no import.
+  auto nominalModule = nominal->getParentModule();
+  if (nominalModule == fromDC->getParentModule())
+    return None;
+
+  auto fromSourceFile = fromDC->getParentSourceFile();
+  if (!fromSourceFile)
+    return None;
+
+  // Look to see if the owning module was directly imported.
+  for (const auto &import : fromSourceFile->getImports()) {
+    if (import.module.importedModule == nominalModule)
+      return import;
+  }
+
+  // Now look for transitive imports.
+  auto &importCache = nominal->getASTContext().getImportCache();
+  for (const auto &import : fromSourceFile->getImports()) {
+    auto &importSet = importCache.getImportSet(import.module.importedModule);
+    for (const auto &transitive : importSet.getTransitiveImports()) {
+      if (transitive.importedModule == nominalModule) {
+        return import;
+      }
+    }
+  }
+
+  return None;
+}
+
 /// Determine the diagnostic behavior for a Sendable reference to the given
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
@@ -686,12 +719,12 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 
   // Determine whether this nominal type is visible via a @_predatesConcurrency
   // import.
-  ImportDecl *predatesConcurrencyImport = nullptr;
+  auto import = findImportFor(nominal, fromDC);
 
   // When the type is explicitly non-Sendable...
   if (isExplicitlyNonSendable) {
     // @_predatesConcurrency imports downgrade the diagnostic to a warning.
-    if (predatesConcurrencyImport) {
+    if (import && import->options.contains(ImportFlags::PredatesConcurrency)) {
       // FIXME: Note that this @_predatesConcurrency import was "used".
       return DiagnosticBehavior::Warning;
     }
@@ -701,10 +734,13 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 
   // When the type is implicitly non-Sendable...
 
-  // @_predatesConcurrency always suppresses the diagnostic.
-  if (predatesConcurrencyImport) {
+  // @_predatesConcurrency suppresses the diagnostic in Swift 5.x, and
+  // downgrades it to a warning in Swift 6 and later.
+  if (import && import->options.contains(ImportFlags::PredatesConcurrency)) {
     // FIXME: Note that this @_predatesConcurrency import was "used".
-    return DiagnosticBehavior::Ignore;
+    return nominalModule->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
+        ? DiagnosticBehavior::Warning
+        : DiagnosticBehavior::Ignore;
   }
 
   return defaultDiagnosticBehavior();
@@ -729,20 +765,61 @@ static bool diagnoseSingleNonSendableType(
 
   bool wasSuppressed = diagnose(type, behavior);
 
+  // If this type was imported from another module, try to find the
+  // corresponding import.
+  Optional<AttributedImport<swift::ImportedModule>> import;
+  SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
+  if (nominal && nominal->getParentModule() != module) {
+    import = findImportFor(nominal, fromContext.fromDC);
+  }
+
   if (behavior == DiagnosticBehavior::Ignore || wasSuppressed) {
     // Don't emit any other diagnostics.
   } else if (type->is<FunctionType>()) {
     ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
-  } else if (nominal && nominal->getParentModule() == module &&
-             (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))) {
-    auto note = nominal->diagnose(
-        diag::add_nominal_sendable_conformance,
-        nominal->getDescriptiveKind(), nominal->getName());
-    addSendableFixIt(nominal, note, /*unchecked=*/false);
+  } else if (nominal && nominal->getParentModule() == module) {
+    // If the nominal type is in the current module, suggest adding
+    // `Sendable` if it might make sense. Otherwise, just complain.
+    if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+      auto note = nominal->diagnose(
+          diag::add_nominal_sendable_conformance,
+          nominal->getDescriptiveKind(), nominal->getName());
+      addSendableFixIt(nominal, note, /*unchecked=*/false);
+    } else {
+      nominal->diagnose(
+          diag::non_sendable_nominal, nominal->getDescriptiveKind(),
+          nominal->getName());
+    }
   } else if (nominal) {
+    // Note which nominal type does not conform to `Sendable`.
     nominal->diagnose(
         diag::non_sendable_nominal, nominal->getDescriptiveKind(),
         nominal->getName());
+
+    // If we found the import that makes this nominal type visible, remark
+    // that it can be @_predatesConcurrency import.
+    // Only emit this remark once per source file, because it can happen a
+    // lot.
+    if (import && !import->options.contains(ImportFlags::PredatesConcurrency) &&
+        import->importLoc.isValid() && sourceFile &&
+        !sourceFile->hasImportUsedPredatesConcurrency(*import)) {
+      SourceLoc importLoc = import->importLoc;
+      ctx.Diags.diagnose(
+          importLoc, diag::add_predates_concurrency_import,
+          ctx.LangOpts.isSwiftVersionAtLeast(6),
+          nominal->getParentModule()->getName())
+        .fixItInsert(importLoc, "@_predatesConcurrency ");
+
+      sourceFile->setImportUsedPredatesConcurrency(*import);
+    }
+  }
+
+  // If we found an import that makes this nominal type visible, and that
+  // was a @_predatesConcurrency import, note that we have made use of the
+  // attribute.
+  if (import && import->options.contains(ImportFlags::PredatesConcurrency) &&
+      sourceFile) {
+    sourceFile->setImportUsedPredatesConcurrency(*import);
   }
 
   return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
