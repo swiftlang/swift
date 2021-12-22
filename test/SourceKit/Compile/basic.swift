@@ -1,3 +1,5 @@
+// REQUIRES: rdar86809003
+
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/out)
 // RUN: split-file %s %t
@@ -11,10 +13,6 @@
 // RUN:     -shell -- echo "# close" == \
 // RUN:     -req=compile.close -name c1 \
 // RUN: | %FileCheck %s
-
-// UNSUPPORTED: CPU=arm64
-// UNSUPPORTED: CPU=arm64e
-// UNSUPPORTED: CPU=aarch64
 
 // CHECK-LABEL: # start
 // CHECK-NEXT: {

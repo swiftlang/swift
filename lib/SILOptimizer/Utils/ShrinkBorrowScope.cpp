@@ -21,23 +21,6 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                           MARK: Local utilities
-//===----------------------------------------------------------------------===//
-
-// TODO: Move to be member function on SILInstruction.
-static SILInstruction *getPreviousInstruction(SILInstruction *inst) {
-  auto pos = inst->getIterator();
-  return pos == inst->getParent()->begin() ? nullptr
-                                           : &*std::prev(inst->getIterator());
-}
-
-// TODO: Move to be member function on SILInstruction.
-static SILInstruction *getNextInstruction(SILInstruction *inst) {
-  auto nextPos = std::next(inst->getIterator());
-  return nextPos == inst->getParent()->end() ? nullptr : &*nextPos;
-}
-
-//===----------------------------------------------------------------------===//
 //                       MARK: ShrinkBorrowScope
 //===----------------------------------------------------------------------===//
 
@@ -318,7 +301,7 @@ void ShrinkBorrowScope::findBarriers() {
       assert(tryHoistOverInstruction(block->getTerminator()));
     }
     SILInstruction *barrier = nullptr;
-    while ((instruction = getPreviousInstruction(instruction))) {
+    while ((instruction = instruction->getPreviousInstruction())) {
       if (instruction == introducer) {
         barrier = instruction;
         break;
@@ -354,7 +337,7 @@ bool ShrinkBorrowScope::rewrite() {
 
   // Insert the new end_borrow instructions that occur after deinit barriers.
   for (auto pair : barrierInstructions) {
-    auto *insertionPoint = getNextInstruction(pair.second);
+    auto *insertionPoint = pair.second->getNextInstruction();
     createdBorrow |= createEndBorrow(insertionPoint);
   }
 

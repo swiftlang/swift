@@ -45,13 +45,18 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
   // at.
   const char *errorStr = nullptr;
   unsigned version;
+  auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
+      RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
+          regexText.size()));
   regexLiteralParsingFn(regexText.str().c_str(), &errorStr, &version,
-                        /*captureStructureOut*/ nullptr,
-                        /*captureStructureSize*/ 0);
-  if (errorStr)
+                        /*captureStructureOut*/ capturesBuf.data(),
+                        /*captureStructureSize*/ capturesBuf.size());
+  if (errorStr) {
     diagnose(Tok, diag::regex_literal_parsing_error, errorStr);
+    return makeParserError();
+  }
 
   auto loc = consumeToken();
-  return makeParserResult(
-      RegexLiteralExpr::createParsed(Context, loc, regexText, version));
+  return makeParserResult(RegexLiteralExpr::createParsed(
+      Context, loc, regexText, version, capturesBuf));
 }

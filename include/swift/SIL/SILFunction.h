@@ -839,6 +839,15 @@ public:
     OptMode = unsigned(mode);
   }
 
+  /// True if debug information must be preserved (-Onone).
+  ///
+  /// If this is false (-O), then the presence of debug info must not affect the
+  /// outcome of any transformations.
+  ///
+  /// Typically used to determine whether a debug_value is a normal SSA use or
+  /// incidental use.
+  bool preserveDebugInfo() const;
+
   PerformanceConstraints getPerfConstraints() const { return perfConstraints; }
 
   void setPerfConstraints(PerformanceConstraints perfConstr) {
