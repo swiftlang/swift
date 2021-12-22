@@ -20,6 +20,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -686,9 +687,21 @@ static Optional<AttributedImport<ImportedModule>> findImportFor(
   if (!fromSourceFile)
     return None;
 
+  // Look to see if the owning module was directly imported.
   for (const auto &import : fromSourceFile->getImports()) {
     if (import.module.importedModule == nominalModule)
       return import;
+  }
+
+  // Now look for transitive imports.
+  auto &importCache = nominal->getASTContext().getImportCache();
+  for (const auto &import : fromSourceFile->getImports()) {
+    auto &importSet = importCache.getImportSet(import.module.importedModule);
+    for (const auto &transitive : importSet.getTransitiveImports()) {
+      if (transitive.importedModule == nominalModule) {
+        return import;
+      }
+    }
   }
 
   return None;
