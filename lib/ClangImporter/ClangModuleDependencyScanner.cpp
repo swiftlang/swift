@@ -19,6 +19,9 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
+#include "llvm/CAS/CASDB.h"
+#include "llvm/CAS/CASFileSystem.h"
+#include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Signals.h"
 
@@ -42,10 +45,12 @@ public:
 
   DependencyScanningTool tool;
 
-  ClangModuleDependenciesCacheImpl()
+  ClangModuleDependenciesCacheImpl(
+      llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> SharedFS)
       : importHackFileCache(),
-        service(ScanningMode::MinimizedSourcePreprocessing, ScanningOutputFormat::Full),
-        tool(service) { }
+        service(ScanningMode::MinimizedSourcePreprocessing,
+                ScanningOutputFormat::Full, SharedFS),
+        tool(service) {}
   ~ClangModuleDependenciesCacheImpl();
 
   /// Retrieve the name of the file used for the "import hack" that is
@@ -158,7 +163,12 @@ static ClangModuleDependenciesCacheImpl *getOrCreateClangImpl(
     ModuleDependenciesCache &cache) {
   auto clangImpl = cache.getClangImpl();
   if (!clangImpl) {
-    clangImpl = new ClangModuleDependenciesCacheImpl();
+    // FIXME: Need to pass the CAS from commandline.
+    auto CAS = llvm::cantFail(
+        llvm::cas::createOnDiskCAS(llvm::cas::getDefaultOnDiskCASPath()));
+    auto FS = llvm::cantFail(
+        llvm::cas::createCachingOnDiskFileSystem(std::move(CAS)));
+    clangImpl = new ClangModuleDependenciesCacheImpl(FS);
     cache.setClangImpl(clangImpl,
                        [](ClangModuleDependenciesCacheImpl *ptr) {
       delete ptr;
