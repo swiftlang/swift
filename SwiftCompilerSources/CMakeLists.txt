@@ -107,6 +107,8 @@ function(add_swift_compiler_modules_library name)
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
 
+  set(all_obj_files)
+  set(all_module_targets)
   get_property(modules GLOBAL PROPERTY "swift_compiler_modules")
   foreach(module ${modules})
 
@@ -148,10 +150,12 @@ function(add_swift_compiler_modules_library name)
       COMMENT "Building swift module ${module}")
 
     set("${module}_dep_target" ${dep_target})
+    set(all_module_targets ${all_module_targets} ${dep_target})
   endforeach()
 
   # Create a static library containing all module object files.
   add_library(${name} STATIC ${all_obj_files})
+  add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
 endfunction()
