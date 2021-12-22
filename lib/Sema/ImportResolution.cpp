@@ -480,7 +480,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
       !clangImporter->importBridgingHeader(bridgingHeaderPath, module)) {
     auto *headerModule = clangImporter->getImportedHeaderModule();
     assert(headerModule && "Didn't load bridging header?");
-    imports.emplace_back(ImportedModule(headerModule), ImportFlags::Exported);
+    imports.emplace_back(
+        ImportedModule(headerModule), SourceLoc(), ImportFlags::Exported);
   }
 
   // Implicitly import the underlying Clang half of this module if needed.
@@ -490,7 +491,7 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
     ImportPath::Builder importPath(module->getName());
     unloadedImports.emplace_back(UnloadedImportedModule(importPath.copyTo(ctx),
                                                         /*isScoped=*/false),
-                                 ImportFlags::Exported);
+                                 SourceLoc(), ImportFlags::Exported);
   }
 
   return { ctx.AllocateCopy(imports), ctx.AllocateCopy(unloadedImports) };
@@ -523,7 +524,7 @@ UnboundImport::UnboundImport(AttributedImport<UnloadedImportedModule> implicit)
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
   : import(UnloadedImportedModule(ID->getImportPath(), ID->getImportKind()),
-           {}),
+           ID->getStartLoc(), {}),
     importLoc(ID->getLoc()), importOrUnderlyingModuleDecl(ID)
 {
   if (ID->isExported())
@@ -548,6 +549,11 @@ UnboundImport::UnboundImport(ImportDecl *ID)
     spiGroups.append(attrSPIs.begin(), attrSPIs.end());
   }
   import.spiGroups = ID->getASTContext().AllocateCopy(spiGroups);
+
+  if (auto attr = ID->getAttrs().getAttribute<PredatesConcurrencyAttr>()) {
+    import.options |= ImportFlags::PredatesConcurrency;
+    import.predatesConcurrencyRange = attr->getRangeWithAt();
+  }
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {

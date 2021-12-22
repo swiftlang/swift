@@ -844,7 +844,8 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     ImportPath::Builder importPath(Context->getIdentifier(moduleStr));
     UnloadedImportedModule import(importPath.copyTo(*Context),
                                   /*isScoped=*/false);
-    imports.AdditionalUnloadedImports.emplace_back(import, options);
+    imports.AdditionalUnloadedImports.emplace_back(
+        import, SourceLoc(), options);
   };
 
   for (auto &moduleStrAndTestable : frontendOpts.getImplicitImportModuleNames()) {

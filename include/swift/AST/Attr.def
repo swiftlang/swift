@@ -690,7 +690,7 @@ SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
 
 SIMPLE_DECL_ATTR(_predatesConcurrency, PredatesConcurrency,
   OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript |
-  OnEnumElement | UserInaccessible |
+  OnEnumElement | OnImport | UserInaccessible |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   125)
 
