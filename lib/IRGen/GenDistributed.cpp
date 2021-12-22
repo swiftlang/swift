@@ -116,7 +116,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   // `self` of the distributed actor is going to be passed as an argument
   // to this accessor function.
   auto extInfo = SILExtInfoBuilder()
-                     .withRepresentation(SILFunctionTypeRepresentation::Thick)
+                     .withRepresentation(SILFunctionTypeRepresentation::Thin)
                      .withAsync()
                      .build();
 
@@ -132,7 +132,8 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
       /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Guaranteed,
       {/*argumentBuffer=*/getRawPointerParmeter(),
-       /*resultBuffer=*/getRawPointerParmeter()},
+       /*resultBuffer=*/getRawPointerParmeter(),
+       /*actor=*/methodTy->getParameters().back()},
       /*Yields=*/{},
       /*Results=*/{},
       /*ErrorResult=*/methodTy->getErrorResult(),
