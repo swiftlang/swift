@@ -704,7 +704,9 @@ public:
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
 
-  ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var);
+  /// Generate code to obtain the address of the given global variable.
+  ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var,
+                                     Optional<ActorIsolation> actorIso);
 
   /// Generate a lazy global initializer.
   void emitLazyGlobalInitializer(PatternBindingDecl *binding,
