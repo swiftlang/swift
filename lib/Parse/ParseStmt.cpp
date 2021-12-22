@@ -1618,12 +1618,23 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     ThePattern = makeParserResult(AP);
   }
 
-  // Conditional bindings must have an initializer.
+  // Conditional bindings can have the format:
+  //  `let newBinding = <expr>`, or
+  //  `let newBinding`, which is shorthand for `let newBinding = newBinding`
   ParserResult<Expr> Init;
   if (Tok.is(tok::equal)) {
     SyntaxParsingContext InitCtxt(SyntaxContext, SyntaxKind::InitializerClause);
     consumeToken();
     Init = parseExprBasic(diag::expected_expr_conditional_var);
+  } else if (!ThePattern.isNull() && !ThePattern.getPtrOrNull()->getBoundName().empty()) {
+    auto bindingName = new DeclNameRef(ThePattern.getPtrOrNull()->getBoundName());
+    auto loc = new DeclNameLoc(ThePattern.getPtrOrNull()->getEndLoc());
+    auto declRefExpr = new (Context) UnresolvedDeclRefExpr(*bindingName,
+                                                           DeclRefKind::Ordinary,
+                                                           *loc);
+    
+    declRefExpr->setImplicit();
+    Init = makeParserResult(declRefExpr);
   } else {
     diagnose(Tok, diag::conditional_var_initializer_required);
   }
