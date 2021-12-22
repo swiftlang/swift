@@ -142,6 +142,10 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   nodeMetatypes[(unsigned)kind] = metatype;
 }
 
+SILBuilder SILBuilder_init(BridgedInstruction i) {
+  return SILBuilder(castToInst(inst));
+}
+
 //===----------------------------------------------------------------------===//
 //                            Bridging C functions
 //===----------------------------------------------------------------------===//

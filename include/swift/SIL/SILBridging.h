@@ -14,6 +14,12 @@
 #define SWIFT_SIL_SILBRIDGING_H
 
 #include "BridgedSwiftObject.h"
+
+#include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/ForeignAsyncConvention.h"
+#include "swift/SIL/SILBuilder.h"
+
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -146,6 +152,8 @@ typedef enum {
 
 
 typedef intptr_t SwiftInt;
+
+swift::SILBuilder SILBuilder_init(BridgedInstruction i);
 
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
 

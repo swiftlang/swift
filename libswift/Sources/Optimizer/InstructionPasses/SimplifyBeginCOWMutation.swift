@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SILBridging
 import SIL
 
 /// Simplify begin_cow_mutation instructions.
@@ -64,8 +65,10 @@ private func optimizeEmptySingleton(_ beginCOW: BeginCOWMutationInst,
     /// in an infinite loop in SILCombine.
     return
   }
-  let builder = Builder(at: beginCOW, location: beginCOW.location, context)
-  let zero = builder.createIntegerLiteral(0, type: beginCOW.uniquenessResult.type);
+  var builder = Builder(at: beginCOW)
+  let zero = builder.createIntegerLiteral(at: beginCOW.location,
+                                          type: beginCOW.uniquenessResult.type,
+                                          value: 0)
   context.replaceAllUses(of: beginCOW.uniquenessResult, with: zero)
 }
 
