@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
+// REQUIRES: rdar_86809882
+
 import Builtin
 import Swift
 
