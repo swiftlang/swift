@@ -1,5 +1,3 @@
-// REQUIRES: rdar86809003
-
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/out)
 // RUN: split-file %s %t
