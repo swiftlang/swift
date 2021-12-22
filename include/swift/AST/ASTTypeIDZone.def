@@ -17,6 +17,7 @@
 
 SWIFT_TYPEID(ActorIsolation)
 SWIFT_TYPEID(AncestryFlags)
+SWIFT_TYPEID(BodyAndFingerprint)
 SWIFT_TYPEID(BodyInitKind)
 SWIFT_TYPEID(BodyInitKindAndExpr)
 SWIFT_TYPEID(CtorInitializerKind)

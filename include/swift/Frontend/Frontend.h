@@ -53,6 +53,7 @@
 
 namespace swift {
 
+class FrontendObserver;
 class SerializedModuleLoaderBase;
 class MemoryBufferSerializedModuleLoader;
 class SILModule;
@@ -666,6 +667,9 @@ public:
   /// library, returning \c false if we should continue, i.e. no error.
   bool loadStdlibIfNeeded();
 
+  /// If \p fn returns true, exits early and returns true.
+  bool forEachFileToTypeCheck(llvm::function_ref<bool(SourceFile &)> fn);
+
 private:
   /// Compute the parsing options for a source file in the main module.
   SourceFile::ParsingOptions getSourceFileParsingOptions(bool forPrimary) const;
@@ -678,8 +682,6 @@ private:
   /// \c true.
   bool loadPartialModulesAndImplicitImports(
       ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const;
-
-  void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
   void finishTypeChecking();
 

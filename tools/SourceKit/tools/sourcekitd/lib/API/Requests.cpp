@@ -974,6 +974,46 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     return;
   }
 
+  if (ReqUID == RequestCompile) {
+    Optional<StringRef> Name = Req.getString(KeyName);
+    if (!Name.hasValue())
+      return Rec(createErrorRequestInvalid("missing 'key.name'"));
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.performCompile(
+        *Name, Args, std::move(vfsOptions), CancellationToken,
+        [Rec](const RequestResult<CompilationResult> &result) {
+          if (result.isCancelled())
+            return Rec(createErrorRequestCancelled());
+          if (result.isError())
+            return Rec(createErrorRequestFailed(result.getError()));
+
+          const CompilationResult &info = result.value();
+
+          ResponseBuilder builder;
+
+          builder.getDictionary().set(KeyValue, info.ResultStatus);
+          auto diagsArray = builder.getDictionary().setArray(KeyDiagnostics);
+          for (auto diagInfo : info.Diagnostics) {
+            auto elem = diagsArray.appendDictionary();
+            fillDictionaryForDiagnosticInfo(elem, diagInfo);
+          }
+          Rec(builder.createResponse());
+        });
+    return;
+  }
+
+  if (ReqUID == RequestCompileClose) {
+    Optional<StringRef> Name = Req.getString(KeyName);
+    if (!Name.hasValue())
+      return Rec(createErrorRequestInvalid("missing 'key.name'"));
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.closeCompile(*Name);
+
+    return Rec(ResponseBuilder().createResponse());
+  }
+
   if (!SourceFile.hasValue() && !SourceText.hasValue() &&
       ReqUID != RequestCodeCompleteUpdate)
     return Rec(createErrorRequestInvalid(

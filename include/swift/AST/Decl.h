@@ -5904,6 +5904,38 @@ public:
   }
 };
 
+class BodyAndFingerprint {
+  llvm::PointerIntPair<BraceStmt *, 1, bool> BodyAndHasFp;
+  Fingerprint Fp;
+
+public:
+  BodyAndFingerprint(BraceStmt *body, Optional<Fingerprint> fp)
+      : BodyAndHasFp(body, fp.hasValue()),
+        Fp(fp.hasValue() ? *fp : Fingerprint::ZERO()) {}
+  BodyAndFingerprint() : BodyAndFingerprint(nullptr, None) {}
+
+  BraceStmt *getBody() const { return BodyAndHasFp.getPointer(); }
+
+  Optional<Fingerprint> getFingerprint() const {
+    if (BodyAndHasFp.getInt())
+      return Fp;
+    else
+      return None;
+  }
+
+  void setFingerprint(Optional<Fingerprint> fp) {
+    if (fp.hasValue()) {
+      Fp = *fp;
+      BodyAndHasFp.setInt(true);
+    } else {
+      Fp = Fingerprint::ZERO();
+      BodyAndHasFp.setInt(false);
+    }
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, BodyAndFingerprint value);
+
 /// Base class for function-like declarations.
 class AbstractFunctionDecl : public GenericContext, public ValueDecl {
   friend class NeedsNewVTableEntryRequest;
@@ -5986,7 +6018,7 @@ protected:
   union {
     /// This enum member is active if getBodyKind() is BodyKind::Parsed or
     /// BodyKind::TypeChecked.
-    BraceStmt *Body;
+    BodyAndFingerprint BodyAndFP;
 
     /// This enum member is active if getBodyKind() is BodyKind::Deserialized.
     StringRef BodyStringRepresentation;
@@ -6022,9 +6054,10 @@ protected:
                        bool Throws, SourceLoc ThrowsLoc,
                        bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
-      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent, GenericParams),
-        ValueDecl(Kind, Parent, Name, NameLoc),
-        Body(nullptr), AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc) {
+      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent,
+                       GenericParams),
+        ValueDecl(Kind, Parent, Name, NameLoc), BodyAndFP(), AsyncLoc(AsyncLoc),
+        ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
@@ -6195,8 +6228,9 @@ public:
   void setBodyToBeReparsed(SourceRange bodyRange);
 
   /// Provide the parsed body for the function.
-  void setBodyParsed(BraceStmt *S) {
+  void setBodyParsed(BraceStmt *S, Optional<Fingerprint> fp = None) {
     setBody(S, BodyKind::Parsed);
+    BodyAndFP.setFingerprint(fp);
   }
 
   /// Was there a nested type declaration detected when parsing this
@@ -6285,6 +6319,15 @@ public:
   /// source range must be in the same buffer as the location of the declaration
   /// itself.
   void keepOriginalBodySourceRange();
+
+  /// Retrieve the fingerprint of the body. Note that this is not affected by
+  /// the body of the local functions or the members of the local types in this
+  /// function.
+  Optional<Fingerprint> getBodyFingerprint() const;
+
+  /// Retrieve the fingerprint of the body including the local type members and
+  /// the local funcition bodies.
+  Optional<Fingerprint> getBodyFingerprintIncludingLocalTypeMembers() const;
 
   /// Retrieve the source range of the *original* function body.
   ///
