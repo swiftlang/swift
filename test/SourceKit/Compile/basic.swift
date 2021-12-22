@@ -12,6 +12,9 @@
 // RUN:     -req=compile.close -name c1 \
 // RUN: | %FileCheck %s
 
+// UNSUPPORTED: CPU=arm64
+// UNSUPPORTED: CPU=arm64e
+
 // CHECK-LABEL: # start
 // CHECK-NEXT: {
 // CHECK-NEXT:   key.diagnostics: [
