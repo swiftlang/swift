@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking
-// REQUIRES: concurrency
 
 func asyncFunc(_ value: String) async {}
 

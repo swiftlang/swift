@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime

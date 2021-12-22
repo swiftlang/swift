@@ -1,6 +1,5 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 
-// REQUIRES: concurrency
 // REQUIRES: objc_interop
 
 import Foundation

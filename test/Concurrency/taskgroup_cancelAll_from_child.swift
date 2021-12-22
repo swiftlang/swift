@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking
-// REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
 func test_taskGroup_cancelAll() async {

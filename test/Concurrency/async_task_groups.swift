@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 // REQUIRES: libdispatch
 
 @available(SwiftStdlib 5.1, *)

@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift(-parse-as-library  -Xfrontend -disable-availability-checking %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime

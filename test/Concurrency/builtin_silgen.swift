@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -parse-as-library -parse-stdlib -emit-sil -o - | %FileCheck %s
 
-// REQUIRES: concurrency
 
 import _Concurrency
 

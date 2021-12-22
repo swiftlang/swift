@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift
-// REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
 class NotSendable { // expected-note 8{{class 'NotSendable' does not conform to the 'Sendable' protocol}}

@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking %import-libdispatch -warn-concurrency
-// REQUIRES: concurrency
 // REQUIRES: libdispatch
 
 import Dispatch

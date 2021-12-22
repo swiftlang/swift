@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -debugger-support
-// REQUIRES: concurrency
 
 // This test simulates LLDB's expression evaluator makeing an otherwise illegal
 // synchronous call into an extension of an actor, as it would to run `p n` in

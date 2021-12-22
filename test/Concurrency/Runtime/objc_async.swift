@@ -4,7 +4,6 @@
 // RUN: %target-run %t/objc_async | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 // REQUIRES: objc_interop
 
 // rdar://76038845

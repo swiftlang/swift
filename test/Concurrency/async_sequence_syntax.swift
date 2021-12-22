@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking
-// REQUIRES: concurrency
 
 // expected-note@+2{{add 'async' to function 'missingAsync' to make it asynchronous}}
 @available(SwiftStdlib 5.1, *)

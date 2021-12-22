@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
 // RUN: %target-typecheck-verify-swift -I %t  -disable-availability-checking -warn-concurrency
-// REQUIRES: concurrency
 
 import OtherActors // expected-remark{{add '@_predatesConcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@_predatesConcurrency }}
 

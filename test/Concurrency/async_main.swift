@@ -2,7 +2,6 @@
 // RUN: %target-build-swift  -Xfrontend -disable-availability-checking -Xfrontend -parse-as-library %s -o %t_binary
 // RUN: %target-run %t_binary | %FileCheck %s --check-prefix=CHECK-EXEC
 
-// REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
 

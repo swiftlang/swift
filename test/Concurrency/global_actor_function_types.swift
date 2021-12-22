@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking
-// REQUIRES: concurrency
 
 actor SomeActor { }
 

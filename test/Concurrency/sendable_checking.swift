@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift
-// REQUIRES: concurrency
 // REQUIRES: OS=macosx
 
 @available(SwiftStdlib 5.1, *)

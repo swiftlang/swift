@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library)
 
-// REQUIRES: concurrency
 // REQUIRES: executable_test
 
 // rdar://76038845

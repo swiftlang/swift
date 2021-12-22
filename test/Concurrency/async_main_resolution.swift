@@ -6,7 +6,6 @@
 // sync main is nested deeper in protocols than async, use async
 // async and sync are same level, use async
 
-// REQUIRES: concurrency
 // UNSUPPORTED: VENDOR=apple
 
 // Async is deeper in the protocol chain from `MyMain`, use sync

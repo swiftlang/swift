@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/dynamically_replaceable.swiftmodule -module-name dynamically_replaceable -warn-concurrency %S/Inputs/dynamically_replaceable.swift
 // RUN: %target-typecheck-verify-swift -I %t -disable-availability-checking
-// REQUIRES: concurrency
 import dynamically_replaceable
 
 actor SomeActor { }

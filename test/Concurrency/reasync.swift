@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-availability-checking
-// REQUIRES: concurrency
 
 //// Basic definitions and parsing
 

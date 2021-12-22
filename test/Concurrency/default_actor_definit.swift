@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil %s  -disable-availability-checking | %FileCheck %s
-// REQUIRES: concurrency
 
 actor A {
   var x: String = "Hello"

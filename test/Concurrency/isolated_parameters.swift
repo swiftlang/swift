@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
-// REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
 actor A {

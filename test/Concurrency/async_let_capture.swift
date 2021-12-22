@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking 
-// REQUIRES: concurrency
 
 func autoclosureCapture(_: @autoclosure () async throws -> Int) async {}
 func nonescapingCapture(_: () async throws -> Int) {}

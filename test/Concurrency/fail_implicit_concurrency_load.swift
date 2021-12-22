@@ -1,7 +1,6 @@
 // This test ensures that if implicit import of the Concurrency module is enabled,
 // but no such module can be located (here verified by forcing explicit modules),
 // a warning diagnostic is emitted.
-// REQUIRES: concurrency
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/inputs
 

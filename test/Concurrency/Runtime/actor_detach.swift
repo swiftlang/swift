@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking) | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 // REQUIRES: foundation
 
 // REQUIRES: concurrency_runtime

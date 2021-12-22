@@ -2,7 +2,6 @@
 // RUN: %FileCheck %s < %t.log
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 // REQUIRES: libdispatch
 
 // rdar://76038845

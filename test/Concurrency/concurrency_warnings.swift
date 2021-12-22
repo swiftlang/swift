@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -warn-concurrency
-// REQUIRES: concurrency
 
 class GlobalCounter {
   var counter: Int = 0

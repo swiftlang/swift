@@ -6,7 +6,6 @@
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 

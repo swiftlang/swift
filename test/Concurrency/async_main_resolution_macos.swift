@@ -39,7 +39,6 @@
 // RUN: not %target-swift-frontend -target x86_64-apple-macosx10.9 -DNO_SYNC -DNO_ASYNC -typecheck -dump-ast -parse-as-library %s 2>&1 | %FileCheck %s --check-prefix=CHECK-IS-ERROR
 // RUN: not %target-swift-frontend -target x86_64-apple-macosx11.9 -DNO_SYNC -DNO_ASYNC -typecheck -dump-ast -parse-as-library %s 2>&1 | %FileCheck %s --check-prefix=CHECK-IS-ERROR-ASYNC
 
-// REQUIRES: concurrency
 // REQUIRES: OS=macosx
 
 #if ASYNC_NESTED

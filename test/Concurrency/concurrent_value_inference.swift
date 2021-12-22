@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -enable-library-evolution -warn-concurrency
-// REQUIRES: concurrency
 
 class C1 { } // expected-note{{class 'C1' does not conform to the 'Sendable' protocol}}
 final class C2: Sendable { }

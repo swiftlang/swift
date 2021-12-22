@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) 2>&1 | %FileCheck %s --dump-input=always
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 // REQUIRES: swift_task_debug_log
 
 // REQUIRES: concurrency_runtime

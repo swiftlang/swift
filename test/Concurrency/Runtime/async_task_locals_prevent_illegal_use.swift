@@ -6,7 +6,6 @@
 // We then check stderr for the expected error message using filecheck as usual.
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime

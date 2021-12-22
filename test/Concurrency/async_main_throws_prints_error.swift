@@ -4,7 +4,6 @@
 // RUN: %target-run %t/main  > %t/log 2>&1 || true
 // RUN: %FileCheck %s < %t/log
 
-// REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
 

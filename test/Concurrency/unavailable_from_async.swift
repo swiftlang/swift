@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/UnavailableFunction.swiftmodule -module-name UnavailableFunction -warn-concurrency %S/Inputs/UnavailableFunction.swift
 // RUN: %target-swift-frontend -typecheck -verify -I %t %s
 
-// REQUIRES: concurrency
 
 import UnavailableFunction
 

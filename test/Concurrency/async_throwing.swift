@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking
-// REQUIRES: concurrency
 
 // These tests cover various interactions with async functions that are
 // either throws or rethrows.

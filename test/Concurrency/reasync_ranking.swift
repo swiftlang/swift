@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-availability-checking
-// REQUIRES: concurrency
 
 // We don't want 'reasync' overloads to have a higher score in the
 // case of a sync vs reasync mismatch the way 'async' overloads do,

@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -verify %s
 
-// REQUIRES: concurrency
 
 // NOTE: Once `-swift-version 6` exists, you should update this test so that
 // most of its warnings are expected to be errors. This test intentionally does

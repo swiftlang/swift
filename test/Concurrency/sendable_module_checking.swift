@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 // RUN: %target-swift-frontend -typecheck -disable-availability-checking -I %t 2>&1 %s | %FileCheck %s
 
-// REQUIRES: concurrency
 
 import StrictModule
 import NonStrictModule

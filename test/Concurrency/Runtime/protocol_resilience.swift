@@ -9,7 +9,6 @@
 // RUN: %target-run %t/main %t/%target-library-name(resilient_protocol)
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime

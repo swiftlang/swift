@@ -4,7 +4,6 @@
 // RUN: MallocStackLogging=1 %target-run %t/voucher_propagation
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 
 // Use objc_interop as a proxy for voucher support in the OS.
 // REQUIRES: objc_interop

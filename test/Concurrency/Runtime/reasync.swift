@@ -5,7 +5,6 @@
 // RUN: %target-run %t/main
 
 // REQUIRES: executable_test
-// REQUIRES: concurrency
 
 import StdlibUnittest
 import reasync

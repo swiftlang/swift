@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -swift-version 6 -verify %s
 
 // Requires 'asserts' for Swift 6 mode.
-// REQUIRES: concurrency && asserts
+// REQUIRES: asserts
 
 enum BogusError: Error {
     case blah
