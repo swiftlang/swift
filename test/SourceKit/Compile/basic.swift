@@ -14,6 +14,7 @@
 
 // UNSUPPORTED: CPU=arm64
 // UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: CPU=aarch64
 
 // CHECK-LABEL: # start
 // CHECK-NEXT: {
