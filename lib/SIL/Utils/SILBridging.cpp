@@ -142,6 +142,10 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   nodeMetatypes[(unsigned)kind] = metatype;
 }
 
+SILBuilder SILBuilder_init(BridgedInstruction i) {
+  return SILBuilder(castToInst(i));
+}
+
 //===----------------------------------------------------------------------===//
 //                            Bridging C functions
 //===----------------------------------------------------------------------===//
@@ -500,18 +504,3 @@ BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
       getStringRef(name), getSILType(operandType), getSILType(resultType),
       getSILValues(arguments, argValues))};
 }
-
-BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge) {
-  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-  return {builder.createCondFail(getRegularLocation(loc),
-    castToSILValue(condition), getStringRef(messge))};
-}
-
-BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedType type, SwiftInt value) {
-  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
-  return {builder.createIntegerLiteral(getRegularLocation(loc),
-                                       getSILType(type), value)};
-}
-

@@ -55,16 +55,27 @@ public struct Builder {
   public func createCondFail(condition: Value, message: String) -> CondFailInst {
     notifyInstructionsChanged()
     return message.withBridgedStringRef { messageStr in
-      let cf = SILBuilder_createCondFail(
-        bridgedInsPoint, location.bridgedLocation, condition.bridged, messageStr)
-      return cf.getAs(CondFailInst.self)
+      var builder = SILBuilder_init(bridgedInsPoint)
+      let cf = builder.createCondFail(
+        unsafeBitCast(location, to: swift.SILLocation.self),
+        unsafeBitCast(condition.bridged, to: swift.SILValue.self),
+        unsafeBitCast(messageStr, to: llvm.StringRef.self),
+        /*inverted*/false)
+      return Unmanaged<Instruction>.fromOpaque(UnsafeRawPointer(cf)!)
+        .takeUnretainedValue()
+        as! CondFailInst
     }
   }
   
   public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
     notifyInstructionsChanged()
-    let literal = SILBuilder_createIntegerLiteral(
-      bridgedInsPoint, location.bridgedLocation, type.bridged, value)
-    return literal.getAs(IntegerLiteralInst.self)
+    var builder = SILBuilder_init(bridgedInsPoint)
+    let literal = builder.createIntegerLiteral(
+      unsafeBitCast(location, to: swift.SILLocation.self),
+      unsafeBitCast(type, to: swift.SILType.self),
+      value)
+    return Unmanaged<Instruction>.fromOpaque(UnsafeRawPointer(literal)!)
+      .takeUnretainedValue()
+      as! IntegerLiteralInst
   }
 }
