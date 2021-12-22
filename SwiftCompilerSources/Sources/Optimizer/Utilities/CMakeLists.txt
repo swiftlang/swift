@@ -6,7 +6,5 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-libswift_sources(Optimizer
-  SILPrinter.swift
-  MergeCondFails.swift
-)
+swift_compiler_sources(Optimizer
+  OptUtils.swift)

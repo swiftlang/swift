@@ -20,7 +20,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/InitializeLibSwift.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -505,7 +505,7 @@ int main(int argc, char **argv) {
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
-  initializeLibSwift();
+  initializeSwiftModules();
 
   if (PrintStats)
     llvm::EnableStatistics();

@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-string-processing %s | %FileCheck %s
-// REQUIRES: libswift
+// REQUIRES: swift_in_compiler
 
 var s = '/abc/'
 // CHECK: [[REGEX_STR_LITERAL:%[0-9]+]] = string_literal utf8 "'/abc/'"

@@ -184,7 +184,7 @@ EXPECTED_DEFAULTS = {
     'legacy_impl': False,
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
-    'libswift_mode': None,
+    'bootstrapping_mode': None,
     'lit_args': '-sv',
     'llbuild_assertions': True,
     'lldb_assertions': True,
@@ -747,8 +747,8 @@ EXPECTED_OPTIONS = [
     SetOption('--lto', dest='lto_type'),
     ChoicesOption('--lto', dest='lto_type', choices=['thin', 'full']),
 
-    SetOption('--libswift', dest='libswift_mode'),
-    ChoicesOption('--libswift', dest='libswift_mode',
+    SetOption('--bootstrapping', dest='bootstrapping_mode'),
+    ChoicesOption('--bootstrapping', dest='bootstrapping_mode',
                   choices=['off', 'hosttools', 'bootstrapping',
                            'bootstrapping-with-hostlibs']),
 

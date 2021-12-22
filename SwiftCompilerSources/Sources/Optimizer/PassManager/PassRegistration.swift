@@ -17,8 +17,8 @@ import OptimizerBridging
 import ExperimentalRegex
 #endif
 
-@_cdecl("initializeLibSwift")
-public func initializeLibSwift() {
+@_cdecl("initializeSwiftModules")
+public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftPasses()
 
