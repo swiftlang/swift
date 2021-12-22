@@ -985,6 +985,10 @@ def create_argument_parser():
 
     option('--build-swift-stdlib-static-print', toggle_true,
            help='Build constant_vprintf support')
+           
+    option('--build-swift-stdlib-unicode-data', toggle_true,
+           default=True,
+           help='Include Unicode data in the standard library. Note: required for full String functionality')
 
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')

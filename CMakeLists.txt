@@ -97,6 +97,11 @@ option(SWIFT_BUILD_STATIC_STDLIB
 option(SWIFT_STDLIB_STATIC_PRINT
     "Build compile-time evaluated vprintf()"
     FALSE)
+    
+option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
+    "Include Unicode data files in the standard library.
+    NOTE: Disabling this will cause many String methods to crash."
+    TRUE)
 
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
@@ -1020,6 +1025,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Concurrency Support: ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support: ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
   message(STATUS "String Processing Support: ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
+  message(STATUS "Unicode Support: ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")

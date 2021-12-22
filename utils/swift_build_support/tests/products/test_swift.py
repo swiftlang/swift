@@ -62,6 +62,7 @@ class SwiftTestCase(unittest.TestCase):
             enable_experimental_concurrency=False,
             enable_experimental_distributed=False,
             build_swift_stdlib_static_print=False,
+            stdlib_unicode_data=True,
             swift_freestanding_is_darwin=False,
             build_swift_private_stdlib=True)
 

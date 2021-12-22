@@ -152,6 +152,10 @@ option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
 option(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK
        "Should stdlib be built with -experimental-hermetic-seal-at-link"
        FALSE)
+       
+option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
+       "Should stdlib be built with full unicode support"
+       TRUE)
 
 set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This

@@ -541,6 +541,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--build-swift-stdlib-unittest-extra'),
     EnableOption('--build-swift-stdlib-static-print'),
     EnableOption('--build-swift-private-stdlib'),
+    EnableOption('--build-swift-stdlib-unicode-data'),
     EnableOption('--distcc'),
     EnableOption('--sccache'),
     EnableOption('--enable-asan'),

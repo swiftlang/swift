@@ -10,10 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_STDLIB_ENABLE_UNICODE_DATA
+
 #if defined(__APPLE__)
 #include "Apple/ScalarPropsData.h"
 #else
 #include "Common/ScalarPropsData.h"
+#endif
+
+#else
+#include "swift/Runtime/Debug.h"
 #endif
 
 #include "../SwiftShims/UnicodeData.h"
@@ -21,7 +27,9 @@
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar) {
-
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto lowerBoundIndex = 0;
   auto endIndex = BIN_PROPS_COUNT;
   auto upperBoundIndex = endIndex - 1;
@@ -72,10 +80,14 @@ __swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar) {
   // scalars from 0x0 to 0x10FFFF, but if somehow this branch gets reached,
   // return 0 to indicate no properties.
   return 0;
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getNumericType(__swift_uint32_t scalar) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto lowerBoundIndex = 0;
   auto endIndex = NUMERIC_TYPE_COUNT;
   auto upperBoundIndex = endIndex - 1;
@@ -110,10 +122,14 @@ __swift_uint8_t _swift_stdlib_getNumericType(__swift_uint32_t scalar) {
   // array.
   // Return the max here to indicate that we couldn't find one.
   return std::numeric_limits<__swift_uint8_t>::max();
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 double _swift_stdlib_getNumericValue(__swift_uint32_t scalar) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto levelCount = NUMERIC_VALUES_LEVEL_COUNT;
   __swift_intptr_t scalarIdx = _swift_stdlib_getMphIdx(scalar, levelCount,
                                                   _swift_stdlib_numeric_values_keys,
@@ -122,10 +138,14 @@ double _swift_stdlib_getNumericValue(__swift_uint32_t scalar) {
 
   auto valueIdx = _swift_stdlib_numeric_values_indices[scalarIdx];
   return _swift_stdlib_numeric_values[valueIdx];
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const char *_swift_stdlib_getNameAlias(__swift_uint32_t scalar) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
                                                     _swift_stdlib_nameAlias,
                                                   _swift_stdlib_nameAlias_ranks);
@@ -135,11 +155,15 @@ const char *_swift_stdlib_getNameAlias(__swift_uint32_t scalar) {
   }
 
   return _swift_stdlib_nameAlias_data[dataIdx];
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_int32_t _swift_stdlib_getMapping(__swift_uint32_t scalar,
                                          __swift_uint8_t mapping) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
                                                     _swift_stdlib_mappings,
                                                   _swift_stdlib_mappings_ranks);
@@ -178,12 +202,16 @@ __swift_int32_t _swift_stdlib_getMapping(__swift_uint32_t scalar,
   }
 
   return _swift_stdlib_mappings_data[mappingIdx];
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const __swift_uint8_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar,
                                                        __swift_uint8_t mapping,
                                                      __swift_intptr_t *length) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
                                                  _swift_stdlib_special_mappings,
                                           _swift_stdlib_special_mappings_ranks);
@@ -218,12 +246,16 @@ const __swift_uint8_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar,
     default:
       return nullptr;
   }
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
                                              __swift_uint8_t *buffer,
                                              __swift_intptr_t capacity) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto setOffset = _swift_stdlib_names_scalar_sets[scalar >> 7];
 
   if (setOffset == std::numeric_limits<__swift_uint16_t>::max()) {
@@ -300,10 +332,14 @@ __swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
 
   // The return value is the number of initialized bytes.
   return c;
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint16_t _swift_stdlib_getAge(__swift_uint32_t scalar) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto lowerBoundIndex = 0;
   auto endIndex = AGE_COUNT;
   auto upperBoundIndex = endIndex - 1;
@@ -338,10 +374,14 @@ __swift_uint16_t _swift_stdlib_getAge(__swift_uint32_t scalar) {
   // array.
   // Return the max here to indicate that we couldn't find one.
   return std::numeric_limits<__swift_uint16_t>::max();
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getGeneralCategory(__swift_uint32_t scalar) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
   auto lowerBoundIndex = 0;
   auto endIndex = GENERAL_CATEGORY_COUNT;
   auto upperBoundIndex = endIndex - 1;
@@ -376,4 +416,5 @@ __swift_uint8_t _swift_stdlib_getGeneralCategory(__swift_uint32_t scalar) {
   // array.
   // Return the max here to indicate that we couldn't find one.
   return std::numeric_limits<__swift_uint8_t>::max();
+#endif
 }
