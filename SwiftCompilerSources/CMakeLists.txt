@@ -142,7 +142,7 @@ function(add_swift_compiler_modules_library name)
               "-target" ${target}
               "-module-name" ${module} "-emit-module"
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
-              "-parse-as-library" ${sources}
+              "-static" "-parse-as-library" ${sources}
               "-wmo" ${swift_compile_options}
               "-I" "${SWIFT_SOURCE_DIR}/include/swift"
               "-I" "${SWIFT_SOURCE_DIR}/include"
