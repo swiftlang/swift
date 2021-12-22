@@ -4431,9 +4431,6 @@ ERROR(distributed_actor_protocol_illegal_inheritance,none,
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
 
-ERROR(unowned_executor_outside_actor,none,
-      "'unownedExecutor' can only be implemented within the main "
-      "definition of an actor", ())
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
