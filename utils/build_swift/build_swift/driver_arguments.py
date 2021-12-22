@@ -544,9 +544,9 @@ def create_argument_parser():
            default=defaults.llvm_install_components(),
            help='A semi-colon split list of llvm components to install')
 
-    option('--libswift', store('libswift_mode'),
+    option('--bootstrapping', store('bootstrapping_mode'),
            choices=['off', 'hosttools', 'bootstrapping', 'bootstrapping-with-hostlibs'],
-           help='The libswift build mode. For details see libswift/README.md')
+           help='The bootstrapping build mode for swift compiler modules')
 
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')

@@ -123,7 +123,7 @@ public:
     setInsertionPoint(I);
   }
 
-  // Used by libswift bridging.
+  // Used by swift bridging.
   explicit SILBuilder(SILInstruction *I, const SILDebugScope *debugScope)
       : TempContext(I->getFunction()->getModule()),
         C(TempContext), F(I->getFunction()), CurDebugScope(debugScope) {

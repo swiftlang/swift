@@ -243,7 +243,7 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
   runFunction({{f}, {passManager->getLibswiftPassInvocation()}});
 }
 
-// Called from libswift's initializeLibSwift().
+// Called from initializeSwiftModules().
 void SILPassManager_registerFunctionPass(BridgedStringRef name,
                                          BridgedFunctionPassRunFn runFn) {
   bridgedPassRunFunctions[getStringRef(name)] = runFn;

@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-string-processing
-// REQUIRES: libswift
+// REQUIRES: swift_in_compiler
 
 let r0 = '/./' // okay
 

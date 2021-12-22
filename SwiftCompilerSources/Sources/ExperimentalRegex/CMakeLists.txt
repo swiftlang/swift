@@ -15,7 +15,7 @@ foreach(source ${_LIBSWIFT_EXPERIMENTAL_REGEX_SOURCES})
 endforeach()
 message(STATUS "Using Experimental String Processing library for libswift ExperimentalRegex (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
 
-add_libswift_module(ExperimentalRegex
+add_swift_compiler_module(ExperimentalRegex
   "${LIBSWIFT_EXPERIMENTAL_REGEX_SOURCES}"
   Regex.swift)
 

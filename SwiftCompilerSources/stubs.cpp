@@ -1,4 +1,4 @@
-//===--- InitializeLibSwift.h -----------------------------------*- C++ -*-===//
+//===--- LibSwiftStubs.cpp ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,17 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_INITIALIZELIBSWIFT_H
-#define SWIFT_BASIC_INITIALIZELIBSWIFT_H
-
-#ifdef __cplusplus
 extern "C" {
-#endif
 
-void initializeLibSwift();
+void initializeSwiftModules();
 
-#ifdef __cplusplus
 }
-#endif
 
-#endif // SWIFT_BASIC_INITIALIZELIBSWIFT_H
+void initializeSwiftModules() {}
+
