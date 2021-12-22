@@ -6039,7 +6039,7 @@ static bool isImpliedByConformancePredatingConcurrency(
     return false;
 
   auto impliedProto = implied->getProtocol();
-  if (impliedProto->predatesConcurrency() ||
+  if (impliedProto->preconcurrency() ||
       impliedProto->isSpecificProtocol(KnownProtocolKind::Error) ||
       impliedProto->isSpecificProtocol(KnownProtocolKind::CodingKey))
     return true;
@@ -6073,7 +6073,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   ProtocolConformance *SendableConformance = nullptr;
   bool sendableConformanceIsUnchecked = false;
-  bool sendableConformancePredatesConcurrency = false;
+  bool sendableConformancePreconcurrency = false;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
     // Check and record normal conformances.
@@ -6107,7 +6107,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         if (normal->isUnchecked())
           sendableConformanceIsUnchecked = true;
         else if (isImpliedByConformancePredatingConcurrency(normal))
-          sendableConformancePredatesConcurrency = true;
+          sendableConformancePreconcurrency = true;
         else if (isa<InheritedProtocolConformance>(conformance))
           sendableConformanceIsUnchecked = true;
       }
@@ -6145,7 +6145,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   // Check constraints of Sendable.
   if (SendableConformance && !sendableConformanceIsUnchecked) {
     SendableCheck check = SendableCheck::Explicit;
-    if (sendableConformancePredatesConcurrency)
+    if (sendableConformancePreconcurrency)
       check = SendableCheck::ImpliedByStandardProtocol;
     else if (SendableConformance->getSourceKind() ==
                  ConformanceEntryKind::Synthesized)

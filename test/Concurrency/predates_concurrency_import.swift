@@ -5,10 +5,10 @@
 
 // RUN: %target-typecheck-verify-swift -typecheck  -I %t
 
-@_predatesConcurrency import NonStrictModule
-@_predatesConcurrency import StrictModule
-@_predatesConcurrency import OtherActors
-// expected-remark@-1{{'@_predatesConcurrency' attribute on module 'OtherActors' is unused}}{{1-23=}}
+@preconcurrency import NonStrictModule
+@_predatesConcurrency import StrictModule // expected-warning{{'@_predatesConcurrency' has been renamed to '@preconcurrency'}}
+@preconcurrency import OtherActors
+// expected-remark@-1{{'@preconcurrency' attribute on module 'OtherActors' is unused}}{{1-17=}}
 
 func acceptSendable<T: Sendable>(_: T) { }
 

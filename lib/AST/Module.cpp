@@ -2245,14 +2245,14 @@ SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   Imports = getASTContext().AllocateCopy(imports);
 }
 
-bool SourceFile::hasImportUsedPredatesConcurrency(
+bool SourceFile::hasImportUsedPreconcurrency(
     AttributedImport<ImportedModule> import) const {
-  return PredatesConcurrencyImportsUsed.count(import) != 0;
+  return PreconcurrencyImportsUsed.count(import) != 0;
 }
 
-void SourceFile::setImportUsedPredatesConcurrency(
+void SourceFile::setImportUsedPreconcurrency(
     AttributedImport<ImportedModule> import) {
-  PredatesConcurrencyImportsUsed.insert(import);
+  PreconcurrencyImportsUsed.insert(import);
 }
 
 bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
