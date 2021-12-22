@@ -59,8 +59,8 @@ class Output;
 namespace swift {
 
 /// The payload for the FixedSizeSlab.
-/// This is a super-class rather than a member of FixedSizeSlab to make bridging
-/// with libswift easier.
+/// This is a super-class rather than a member of FixedSizeSlab to make swift
+/// bridging easier.
 class FixedSizeSlabPayload {
 public:
   /// The capacity of the payload.
