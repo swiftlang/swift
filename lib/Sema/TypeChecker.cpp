@@ -264,6 +264,23 @@ void swift::performTypeChecking(SourceFile &SF) {
                                  TypeCheckSourceFileRequest{&SF}, {});
 }
 
+/// If any of the imports in this source file was @_predatesConcurrency but
+/// there were no diagnostics downgraded or suppressed due to that
+/// @_predatesConcurrency, suggest that the attribute be removed.
+static void diagnoseUnnecessaryPredatesConcurrencyImports(SourceFile &sf) {
+  ASTContext &ctx = sf.getASTContext();
+  for (const auto &import : sf.getImports()) {
+    if (import.options.contains(ImportFlags::PredatesConcurrency) &&
+        import.importLoc.isValid() &&
+        !sf.hasImportUsedPredatesConcurrency(import)) {
+      ctx.Diags.diagnose(
+          import.importLoc, diag::remove_predates_concurrency_import,
+          import.module.importedModule->getName())
+        .fixItRemove(import.predatesConcurrencyRange);
+    }
+  }
+}
+
 evaluator::SideEffect
 TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   assert(SF && "Source file cannot be null!");
@@ -304,6 +321,8 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
     typeCheckDelayedFunctions(*SF);
   }
+
+  diagnoseUnnecessaryPredatesConcurrencyImports(*SF);
 
   // Check to see if there's any inconsistent @_implementationOnly imports.
   evaluateOrDefault(
