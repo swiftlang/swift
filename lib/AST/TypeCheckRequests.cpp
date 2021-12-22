@@ -1347,7 +1347,7 @@ Optional<BraceStmt *> TypeCheckFunctionBodyRequest::getCachedResult() const {
     return nullptr;
 
   case BodyKind::TypeChecked:
-    return afd->Body;
+    return afd->BodyAndFP.getBody();
 
   case BodyKind::Synthesize:
   case BodyKind::Parsed:

@@ -55,12 +55,11 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
 
   bool childContainedInParent = [&]() {
     // HACK: For code completion. Handle replaced range.
-    if (const auto &replacedRange = sourceMgr.getReplacedRange()) {
-      auto originalRange = Lexer::getCharSourceRangeFromSourceRange(
-          sourceMgr, replacedRange.Original);
-      auto newRange = Lexer::getCharSourceRangeFromSourceRange(
-          sourceMgr, replacedRange.New);
-
+    for (const auto &pair : sourceMgr.getReplacedRanges()) {
+      auto originalRange =
+          Lexer::getCharSourceRangeFromSourceRange(sourceMgr, pair.first);
+      auto newRange =
+          Lexer::getCharSourceRangeFromSourceRange(sourceMgr, pair.second);
       if (range.contains(originalRange) &&
           newRange.contains(childCharRange))
         return true;
