@@ -898,7 +898,7 @@ public:
   void setHoisted(bool hoisted = true) { Bits.Decl.Hoisted = hoisted; }
 
   /// Whether this declaration predates the introduction of concurrency.
-  bool predatesConcurrency() const;
+  bool preconcurrency() const;
 
 public:
   bool escapedFromIfConfig() const {

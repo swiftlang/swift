@@ -117,7 +117,7 @@ public:
   IGNORED_ATTR(ImplicitSelfCapture)
   IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Isolated)
-  IGNORED_ATTR(PredatesConcurrency)
+  IGNORED_ATTR(Preconcurrency)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {

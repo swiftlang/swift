@@ -2,22 +2,22 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
-@_predatesConcurrency func unsafelySendableClosure(_ closure: @Sendable () -> Void) { }
+@preconcurrency func unsafelySendableClosure(_ closure: @Sendable () -> Void) { }
 
-@_predatesConcurrency func unsafelyMainActorClosure(_ closure: @MainActor () -> Void) { }
+@preconcurrency func unsafelyMainActorClosure(_ closure: @MainActor () -> Void) { }
 
-@_predatesConcurrency func unsafelyDoEverythingClosure(_ closure: @MainActor @Sendable () -> Void) { }
+@preconcurrency func unsafelyDoEverythingClosure(_ closure: @MainActor @Sendable () -> Void) { }
 
 struct X {
-  @_predatesConcurrency func unsafelyDoEverythingClosure(_ closure: @MainActor @Sendable () -> Void) { }
+  @preconcurrency func unsafelyDoEverythingClosure(_ closure: @MainActor @Sendable () -> Void) { }
 
-  @_predatesConcurrency var sendableVar: @Sendable () -> Void
-  @_predatesConcurrency var mainActorVar: @MainActor () -> Void
+  @preconcurrency var sendableVar: @Sendable () -> Void
+  @preconcurrency var mainActorVar: @MainActor () -> Void
 
-  @_predatesConcurrency
+  @preconcurrency
   subscript(_: @MainActor () -> Void) -> (@Sendable () -> Void) { {} }
 
-  @_predatesConcurrency
+  @preconcurrency
   static subscript(statically _: @MainActor () -> Void) -> (@Sendable () -> Void) { { } }
 }
 
@@ -53,10 +53,10 @@ func testElsewhere(x: X) {
   let _: Int = X[statically: { onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
 }
 
-@MainActor @_predatesConcurrency func onMainActorAlways() { }
+@MainActor @preconcurrency func onMainActorAlways() { }
 // expected-note@-1{{are implicitly asynchronous}}
 
-@_predatesConcurrency @MainActor class MyModelClass {
+@preconcurrency @MainActor class MyModelClass {
  // expected-note@-1{{are implicitly asynchronous}}
  func f() { }
   // expected-note@-1{{are implicitly asynchronous}}
@@ -87,7 +87,7 @@ func testCallsWithAsync() async {
 // ---------------------------------------------------------------------------
 // Protocols that inherit Sendable and predate concurrency.
 // ---------------------------------------------------------------------------
-@_predatesConcurrency protocol P: Sendable { }
+@preconcurrency protocol P: Sendable { }
 protocol Q: P { }
 
 class NS { } // expected-note 3{{class 'NS' does not conform to the 'Sendable' protocol}}
@@ -108,7 +108,7 @@ struct S3: Q, Sendable {
 // Historical attribute names do nothing (but are permitted)
 // ---------------------------------------------------------------------------
 func aFailedExperiment(@_unsafeSendable _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of @_predatesConcurrency}}
+// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of @preconcurrency}}
 
 func anothingFailedExperiment(@_unsafeMainActor _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of @_predatesConcurrency}}
+// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of @preconcurrency}}

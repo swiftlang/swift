@@ -717,15 +717,15 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
       isExplicitSendableConformance() ||
       hasExplicitSendableConformance(nominal);
 
-  // Determine whether this nominal type is visible via a @_predatesConcurrency
+  // Determine whether this nominal type is visible via a @preconcurrency
   // import.
   auto import = findImportFor(nominal, fromDC);
 
   // When the type is explicitly non-Sendable...
   if (isExplicitlyNonSendable) {
-    // @_predatesConcurrency imports downgrade the diagnostic to a warning.
-    if (import && import->options.contains(ImportFlags::PredatesConcurrency)) {
-      // FIXME: Note that this @_predatesConcurrency import was "used".
+    // @preconcurrency imports downgrade the diagnostic to a warning.
+    if (import && import->options.contains(ImportFlags::Preconcurrency)) {
+      // FIXME: Note that this @preconcurrency import was "used".
       return DiagnosticBehavior::Warning;
     }
 
@@ -734,10 +734,10 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 
   // When the type is implicitly non-Sendable...
 
-  // @_predatesConcurrency suppresses the diagnostic in Swift 5.x, and
+  // @preconcurrency suppresses the diagnostic in Swift 5.x, and
   // downgrades it to a warning in Swift 6 and later.
-  if (import && import->options.contains(ImportFlags::PredatesConcurrency)) {
-    // FIXME: Note that this @_predatesConcurrency import was "used".
+  if (import && import->options.contains(ImportFlags::Preconcurrency)) {
+    // FIXME: Note that this @preconcurrency import was "used".
     return nominalModule->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
         ? DiagnosticBehavior::Warning
         : DiagnosticBehavior::Ignore;
@@ -797,29 +797,29 @@ static bool diagnoseSingleNonSendableType(
         nominal->getName());
 
     // If we found the import that makes this nominal type visible, remark
-    // that it can be @_predatesConcurrency import.
+    // that it can be @preconcurrency import.
     // Only emit this remark once per source file, because it can happen a
     // lot.
-    if (import && !import->options.contains(ImportFlags::PredatesConcurrency) &&
+    if (import && !import->options.contains(ImportFlags::Preconcurrency) &&
         import->importLoc.isValid() && sourceFile &&
-        !sourceFile->hasImportUsedPredatesConcurrency(*import)) {
+        !sourceFile->hasImportUsedPreconcurrency(*import)) {
       SourceLoc importLoc = import->importLoc;
       ctx.Diags.diagnose(
           importLoc, diag::add_predates_concurrency_import,
           ctx.LangOpts.isSwiftVersionAtLeast(6),
           nominal->getParentModule()->getName())
-        .fixItInsert(importLoc, "@_predatesConcurrency ");
+        .fixItInsert(importLoc, "@preconcurrency ");
 
-      sourceFile->setImportUsedPredatesConcurrency(*import);
+      sourceFile->setImportUsedPreconcurrency(*import);
     }
   }
 
   // If we found an import that makes this nominal type visible, and that
-  // was a @_predatesConcurrency import, note that we have made use of the
+  // was a @preconcurrency import, note that we have made use of the
   // attribute.
-  if (import && import->options.contains(ImportFlags::PredatesConcurrency) &&
+  if (import && import->options.contains(ImportFlags::Preconcurrency) &&
       sourceFile) {
-    sourceFile->setImportUsedPredatesConcurrency(*import);
+    sourceFile->setImportUsedPreconcurrency(*import);
   }
 
   return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
@@ -2967,7 +2967,7 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
     }
 
     // If the declaration predates concurrency, it has unsafe actor isolation.
-    if (decl->predatesConcurrency())
+    if (decl->preconcurrency())
       isUnsafe = true;
 
     return ActorIsolation::forGlobalActor(
@@ -4217,7 +4217,7 @@ static bool hasKnownUnsafeSendableFunctionParams(AbstractFunctionDecl *func) {
 Type swift::adjustVarTypeForConcurrency(
     Type type, VarDecl *var, DeclContext *dc,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
-  if (!var->predatesConcurrency())
+  if (!var->preconcurrency())
     return type;
 
   if (contextRequiresStrictConcurrencyChecking(dc, getType))
@@ -4238,7 +4238,7 @@ Type swift::adjustVarTypeForConcurrency(
 }
 
 /// Adjust a function type for @_unsafeSendable, @_unsafeMainActor, and
-/// @_predatesConcurrency.
+/// @preconcurrency.
 static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     AnyFunctionType *fnType, ValueDecl *decl,
     bool inConcurrencyContext, unsigned numApplies, bool isMainDispatchQueue) {
@@ -4264,7 +4264,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   assert(typeParams.size() == paramDecls->size());
   bool knownUnsafeParams = func && hasKnownUnsafeSendableFunctionParams(func);
   bool stripConcurrency =
-      decl->predatesConcurrency() && !inConcurrencyContext;
+      decl->preconcurrency() && !inConcurrencyContext;
   for (unsigned index : indices(typeParams)) {
     auto param = typeParams[index];
 
