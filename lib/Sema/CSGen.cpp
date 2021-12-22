@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
+#include "TypeCheckRegex.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -1266,15 +1267,19 @@ namespace {
                            ctx.Id_Regex.str());
         return Type();
       }
-      auto dynCapturesType = ctx.getDynamicCapturesType();
-      if (!dynCapturesType) {
+      SmallVector<TupleTypeElt, 4> captureTypes;
+      if (decodeRegexCaptureTypes(ctx,
+                                  E->getSerializedCaptureStructure(),
+                                  /*atomType*/ ctx.getSubstringType(),
+                                  captureTypes)) {
         ctx.Diags.diagnose(E->getLoc(),
-                           diag::string_processing_lib_missing,
-                           "DynamicCaptures");
+                           diag::regex_capture_types_failed_to_decode);
         return Type();
       }
-      // TODO: Replace `DynamicCaptures` with type inferred from the regex.
-      return BoundGenericStructType::get(regexDecl, Type(), {dynCapturesType});
+      auto genericArg = captureTypes.size() == 1
+          ? captureTypes[0].getRawType()
+          : TupleType::get(captureTypes, ctx);
+      return BoundGenericStructType::get(regexDecl, Type(), {genericArg});
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
