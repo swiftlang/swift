@@ -2065,7 +2065,8 @@ void ::swift_distributed_execute_target(
     return;
 
   auto *asyncFnPtr = reinterpret_cast<
-      const AsyncFunctionPointer<DistributedAccessorSignature> *>(accessor);
+      const AsyncFunctionPointer<DistributedAccessorSignature> *>(
+      accessor->Function.get());
 
   DistributedAccessorSignature::FunctionType *accessorEntry =
       asyncFnPtr->Function.get();
