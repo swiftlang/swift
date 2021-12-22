@@ -1,0 +1,4 @@
+framework module EmitWhileBuilding {
+  header "EmitWhileBuilding.h"
+  export *
+}
