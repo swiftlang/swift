@@ -164,3 +164,24 @@ func testMetatypes() {
 }
 
 func generic<T: any P1>(_ t: T) {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'any P1'}}
+
+protocol RawRepresentable {
+  associatedtype RawValue
+  var rawValue: RawValue { get }
+}
+
+enum E1: RawRepresentable {
+  typealias RawValue = P1
+
+  var rawValue: P1 {
+    return ConcreteComposition()
+  }
+}
+
+enum E2: RawRepresentable {
+  typealias RawValue = any P1
+
+  var rawValue: any P1 {
+    return ConcreteComposition()
+  }
+}

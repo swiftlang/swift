@@ -4762,6 +4762,23 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     auto memberType = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
                                                            typeDecl, Adoptee);
 
+    // Type witnesses that resolve to constraint types are always
+    // existential types. This can only happen when the type witness
+    // is explicitly written with a type alias. The type alias itself
+    // is still a constraint type because it can be used as both a
+    // type witness and as a generic constraint.
+    //
+    // With SE-0335, using a type alias as both a type witness and a generic
+    // constraint will be disallowed in Swift 6, because existential types
+    // must be explicit, and a generic constraint isn't a valid type witness.
+    //
+    // Note that Any and AnyObject aren't yet resolved using ExistentialType.
+    if (getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+        memberType->isConstraintType() &&
+        !(memberType->isAny() || memberType->isAnyObject())) {
+      memberType = ExistentialType::get(memberType);
+    }
+
     if (!viableTypes.insert(memberType->getCanonicalType()).second)
       continue;
 

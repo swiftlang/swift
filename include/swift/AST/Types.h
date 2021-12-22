@@ -703,6 +703,9 @@ public:
     return getRecursiveProperties().hasDependentMember();
   }
 
+  /// Whether this type represents a generic constraint.
+  bool isConstraintType() const;
+
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
   /// some set of protocols. Protocol and protocol-conformance types are
@@ -6179,6 +6182,15 @@ inline GenericTypeParamType *TypeBase::getRootGenericParam() {
     t = memberTy->getBase();
 
   return t->castTo<GenericTypeParamType>();
+}
+
+inline bool TypeBase::isConstraintType() const {
+  return getCanonicalType().isConstraintType();
+}
+
+inline bool CanType::isConstraintTypeImpl(CanType type) {
+  return (isa<ProtocolType>(type) ||
+          isa<ProtocolCompositionType>(type));
 }
 
 inline bool TypeBase::isExistentialType() {
