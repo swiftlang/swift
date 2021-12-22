@@ -1051,6 +1051,10 @@ def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def print_ast_decl : Flag<["-"], "print-ast-decl">,
+  HelpText<"Parse and type-check input file(s) and pretty print declarations from AST(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_pcm : Flag<["-"], "dump-pcm">,
   HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
