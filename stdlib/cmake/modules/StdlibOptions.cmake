@@ -1,5 +1,43 @@
 include_guard(GLOBAL)
 
+precondition(SWIFT_HOST_VARIANT_SDK)
+
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "HAIKU")
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "WASI")
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
+else()
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default TRUE)
+endif()
+
+option(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
+       "Build stdlib assuming the runtime environment provides the backtrace(3) API."
+       "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default}")
+
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_HAS_ASL_default TRUE)
+else()
+  set(SWIFT_STDLIB_HAS_ASL_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_HAS_ASL
+       "Build stdlib assuming we can use the asl_log API."
+       "${SWIFT_STDLIB_HAS_ASL_default}")
+
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
+  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "HAIKU")
+  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
+else()
+  set(SWIFT_STDLIB_HAS_LOCALE_default TRUE)
+endif()
+
+option(SWIFT_STDLIB_HAS_LOCALE
+       "Build stdlib assuming the platform has locale support."
+       "${SWIFT_STDLIB_HAS_LOCALE_default}")
+
 option(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
        "Support back-deployment of built binaries to older OS versions."
        TRUE)
@@ -61,6 +99,16 @@ option(SWIFT_STDLIB_HAS_ENVIRON
 option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
+
+if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
+else()
+  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
+endif()
+
+set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
+    "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
+    "Build the concurrency library to use the given global executor (options: dispatch, singlethreaded, hooked)")
 
 option(SWIFT_STDLIB_OS_VERSIONING
        "Build stdlib with availability based on OS versions (Darwin only)."
