@@ -100,16 +100,20 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[NATIVE_VAL_LOC:%.*]] = getelementptr inbounds %TSi, %TSi* [[ELT_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[ARG_VAL:%.*]] = load i32, i32* [[NATIVE_VAL_LOC]]
 
-/// Retrieve an async pointer to the distributed thunk for `simple1`
+/// Setup task context for async call to `simple1` thunk
 
-// CHECK: [[THUNK_LOC:%.*]] = add i32 ptrtoint (void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)* @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTE" to i32), {{.*}}
-// CHECK-NEXT: [[OPAQUE_THUNK_PTR:%.*]] = inttoptr i32 [[THUNK_LOC]] to i8*
-// CHECK-NEXT: [[THUNK_PTR:%.*]] = bitcast i8* [[OPAQUE_THUNK_PTR]] to void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)*
+// CHECK: [[CONTEXT_SIZE:%.*]] = load i32, i32* getelementptr inbounds (%swift.async_func_pointer, %swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETu", i32 0, i32 1)
+// CHECK-NEXT: [[THUNK_ASYNC_CONTEXT:%.*]] = call swiftcc i8* @swift_task_alloc(i32 [[CONTEXT_SIZE]])
+// CHECK: [[THUNK_CONTEXT_PTR:%.*]] = bitcast i8* [[THUNK_ASYNC_CONTEXT]] to %swift.context*
 
 /// Call distributed thunk for `simple1` and `end` async context without results
 
-// CHECK: [[THUNK_PTR_REF:%.*]] = bitcast void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)* [[THUNK_PTR]] to i8*
-// CHECK-NEXT: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, i8* [[THUNK_PTR_REF]], %swift.context* {{.*}}, i32 [[ARG_VAL]], %T27distributed_actor_accessors7MyActorC* {{.*}})
+// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss(
+// CHECK-SAME: i8* bitcast (void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)* @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTE" to i8*)
+// CHECK-SAME: %swift.context* [[THUNK_CONTEXT_PTR]],
+// CHECK-SAME: i32 [[ARG_VAL]],
+// CHECK-SAME: %T27distributed_actor_accessors7MyActorC* %3)
+
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, %swift.error* } [[THUNK_RESULT]], 0
 // CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
 // CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
@@ -125,16 +129,20 @@ public distributed actor MyOtherActor {
 /// !!! - We are not going to double-check argument extraction here since it's the same as `simple1`.
 // CHECK: [[NATIVE_ARG_VAL:%.*]] = load i32, i32* {{.*}}
 
-/// Load async pointer to distributed thunk for `simple2`
+/// Setup task context for async call to `simple2` thunk
 
-// CHECK: [[THUNK_LOC:%.*]] = add i32 ptrtoint (void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)* @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTE" to i32), {{.*}}
-// CHECK-NEXT: [[OPAQUE_THUNK_PTR:%.*]] = inttoptr i32 [[THUNK_LOC]] to i8*
-// CHECK-NEXT: [[THUNK_PTR:%.*]] = bitcast i8* [[OPAQUE_THUNK_PTR]] to void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)*
+// CHECK: [[CONTEXT_SIZE:%.*]] = load i32, i32* getelementptr inbounds (%swift.async_func_pointer, %swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETu", i32 0, i32 1)
+// CHECK-NEXT: [[THUNK_ASYNC_CONTEXT:%.*]] = call swiftcc i8* @swift_task_alloc(i32 [[CONTEXT_SIZE]])
+// CHECK: [[THUNK_CONTEXT_PTR:%.*]] = bitcast i8* [[THUNK_ASYNC_CONTEXT]] to %swift.context*
 
 /// Call the thunk with extracted argument value
 
-// CHECK: [[THUNK_PTR_REF:%.*]] = bitcast void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)* [[THUNK_PTR]] to i8*
-// CHECK-NEXT: [[THUNK_RESULT:%.*]] = call { i8*, i32, i32, i32, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8i32i32i32p0s_swift.errorss({{.*}}, i8* [[THUNK_PTR_REF]], %swift.context* {{.*}}, i32 [[NATIVE_ARG_VAL]], %T27distributed_actor_accessors7MyActorC* {{.*}})
+// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, i32, i32, i32, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8i32i32i32p0s_swift.errorss(
+// CHECK-SAME: i8* bitcast (void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)* @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTE" to i8*)
+// CHECK-SAME: %swift.context* [[THUNK_CONTEXT_PTR]],
+// CHECK-SAME: i32 [[NATIVE_ARG_VAL]],
+// CHECK-SAME: %T27distributed_actor_accessors7MyActorC* %3)
+
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i32, i32, i32, %swift.error* } [[THUNK_RESULT]], 0
 // CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
 
@@ -164,17 +172,17 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[NATIVE_STR_VAL_PTR:%.*]] = bitcast %Ts13_StringObjectV7VariantO* %._guts._object._variant to i32*
 // CHECK-NEXT: [[STR_VAL:%.*]] = load i32, i32* [[NATIVE_STR_VAL_PTR]]
 
-/// Load pointer to a distributed thunk for `simple3`
+/// Setup task context for async call to `simple3` thunk
 
-// CHECK: [[THUNK_LOC:%.*]] = add i32 ptrtoint (void (%swift.context*, i32, i32, i32, %T27distributed_actor_accessors7MyActorC*)* @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTE" to i32)
-// CHECK-NEXT: [[OPAQUE_THUNK_PTR:%.*]] = inttoptr i32 [[THUNK_LOC]] to i8*
-// CHECK-NEXT: [[THUNK_PTR:%.*]] = bitcast i8* [[OPAQUE_THUNK_PTR]] to void (%swift.context*, i32, i32, i32, %T27distributed_actor_accessors7MyActorC*)*
+// CHECK: [[CONTEXT_SIZE:%.*]] = load i32, i32* getelementptr inbounds (%swift.async_func_pointer, %swift.async_func_pointer* @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETu", i32 0, i32 1)
+// CHECK-NEXT: [[THUNK_ASYNC_CONTEXT:%.*]] = call swiftcc i8* @swift_task_alloc(i32 [[CONTEXT_SIZE]])
 
 // CHECK: [[TMP_STR_ARG:%.*]] = bitcast { i32, i32, i32 }* %temp-coercion.coerced to %TSS*
 // CHECK-NEXT: %._guts1 = getelementptr inbounds %TSS, %TSS* [[TMP_STR_ARG]], i32 0, i32 0
 
 // CHECK: store i32 %10, i32* %._guts1._object._count._value, align 4
-// CHECK: store i32 %12, i32* %28, align 4
+// CHECK: [[VARIANT:%.*]] = bitcast %Ts13_StringObjectV7VariantO* %._guts1._object._variant to i32*
+// CHECK-NEXT: store i32 %12, i32* [[VARIANT]], align 4
 
 // CHECK: [[STR_ARG_SIZE_PTR:%.*]] = getelementptr inbounds { i32, i32, i32 }, { i32, i32, i32 }* %temp-coercion.coerced, i32 0, i32 0
 // CHECK: [[STR_ARG_SIZE:%.*]] = load i32, i32* [[STR_ARG_SIZE_PTR]]
@@ -187,8 +195,16 @@ public distributed actor MyOtherActor {
 
 /// Call distributed thunk with exploaded string value
 
-// CHECK: [[OPAQUE_THUNK_PTR:%.*]] = bitcast void (%swift.context*, i32, i32, i32, %T27distributed_actor_accessors7MyActorC*)* [[THUNK_PTR]] to i8*
-// CHECK-NEXT: [[THUNK_RESULT:%.*]] = call { i8*, i32, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8i32p0s_swift.errorss({{.*}}, i8* [[OPAQUE_THUNK_PTR]], %swift.context* {{.*}}, i32 [[STR_ARG_SIZE]], i32 [[STR_ARG_VAL]], i32 [[STR_ARG_FLAGS]], %T27distributed_actor_accessors7MyActorC* {{.*}})
+// CHECK: [[THUNK_CONTEXT_PTR:%.*]] = bitcast i8* [[THUNK_ASYNC_CONTEXT]] to %swift.context*
+
+// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, i32, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8i32p0s_swift.errorss(
+// CHECK-SAME: i8* bitcast (void (%swift.context*, i32, i32, i32, %T27distributed_actor_accessors7MyActorC*)* @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTE" to i8*),
+// CHECK-SAME: %swift.context* [[THUNK_CONTEXT_PTR]],
+// CHECK-SAME: i32 [[STR_ARG_SIZE]],
+// CHECK-SAME: i32 [[STR_ARG_VAL]],
+// CHECK_SAME: i32 [[STR_ARG_FLAGS]],
+// CHECK-SAME: %T27distributed_actor_accessors7MyActorC* %3)
+
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i32, %swift.error* } [[THUNK_RESULT]], 0
 // CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
 // CHECK: [[INT_RES:%.*]] = extractvalue { i8*, i32, %swift.error* } [[THUNK_RESULT]], 1
@@ -333,4 +349,4 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: store %swift.context* {{.*}}, %swift.context** {{.*}}
 // CHECK-NEXT: store %swift.error* null, %swift.error** %swifterror
 // CHECK-NEXT: {{.*}} = bitcast i8* [[RESULT_BUFF]] to %swift.opaque*
-// CHECK-NEXT: {{.*}} = load i32, i32* getelementptr inbounds (%swift.async_func_pointer, %swift.async_func_pointer* bitcast (void (%swift.context*, %T27distributed_actor_accessors12MyOtherActorC*)* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTE" to %swift.async_func_pointer*), i32 0, i32 0)
+// CHECK-NEXT: {{.*}} = load i32, i32* getelementptr inbounds (%swift.async_func_pointer, %swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETu", i32 0, i32 1)
