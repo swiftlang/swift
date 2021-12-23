@@ -4122,22 +4122,15 @@ void PrintAST::visitTryExpr(TryExpr *expr) {
 void PrintAST::visitCallExpr(CallExpr *expr) {
   visit(expr->getFn());
   Printer << "(";
-  auto argList = expr->getArgs();
+  auto args = expr->getArgs()->getOriginalArgs();
   bool isFirst = true;
   // FIXME: handle trailing closures.
-  if (argList) {
-    for (auto i = argList->begin(), iEnd = argList->end(); i != iEnd; ++i) {
-      auto arg = *i;
-      if (dyn_cast<DefaultArgumentExpr>(arg.getExpr())) {
-        // Don't print default arguments.
-        continue;
-      }
-      if (!isFirst) {
-        Printer << ", ";
-      }
-      printArgument(arg);
-      isFirst = false;
+  for (auto arg : *args) {
+    if (!isFirst) {
+      Printer << ", ";
     }
+    printArgument(arg);
+    isFirst = false;
   }
   Printer << ")";
 }
@@ -4181,23 +4174,13 @@ void PrintAST::visitDictionaryExpr(DictionaryExpr *expr) {
   bool isFirst = true;
   auto elements = expr->getElements();
   for (auto element : elements) {
-    auto *tupleExpr = dyn_cast<TupleExpr>(element);
+    auto *tupleExpr = cast<TupleExpr>(element);
     if (!isFirst) {
       Printer << ", ";
     }
-    bool isFirstTupleArg = true;
-    auto tupleElements = tupleExpr->getElements();
-    for (auto element : tupleElements) {
-      if (isFirstTupleArg) {
-        visit(element);
-        Printer << ": ";
-        isFirstTupleArg = false;
-      } else {
-        visit(element);
-        // Bail out if there's somehow more than 2.
-        break;
-      }
-    }
+    visit(tupleExpr->getElement(0));
+    Printer << ": ";
+    visit(tupleExpr->getElement(1));
     isFirst = false;
   }
   Printer << "]";
