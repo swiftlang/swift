@@ -232,8 +232,6 @@ ERROR(error_index_failed_status_check,none,
       "failed file status check: %0", (StringRef))
 ERROR(error_index_inputs_more_than_outputs,none,
       "index output filenames do not match input source files", ())
-WARNING(warn_index_unit_output_path_without_index_store,none,
-      "-index-unit-output-path is ignored without -index-store-path", ())
 
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",

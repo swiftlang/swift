@@ -50,12 +50,6 @@ bool ArgsToFrontendOutputsConverter::convert(
   Optional<std::vector<std::string>> indexMains;
   if (Args.hasArg(options::OPT_index_unit_output_path,
                   options::OPT_index_unit_output_path_filelist)) {
-
-    if (!Args.hasArg(options::OPT_index_store_path)) {
-      Diags.diagnose(SourceLoc(),
-                     diag::warn_index_unit_output_path_without_index_store);
-    }
-
     Optional<OutputFilesComputer> iuofc =
         OutputFilesComputer::create(Args, Diags, InputsAndOutputs, {
           "index unit output path", options::OPT_index_unit_output_path,
