@@ -1528,9 +1528,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // then we can permit implicit self (since it doesn't
       // introduce a new strong reference).
       if (auto *closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        // if the closure captured self weakly:
         if (closureExpr->getCapturedSelfDecl()->getType()->is<WeakStorageType>()) {
-          // TODO: how to check if `self` has been unwrapped or not?
           return false;
         }
       }
