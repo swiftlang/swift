@@ -351,11 +351,6 @@ public:
 
   // - Least significant 16 bits are the alignment.
   // - Bit 16 is 'bitwise takable'.
-  // - For Multi-payload enums:
-  //   = Bit 17 indicates this uses a separate tag field
-  //   = Bit 18 indicates this uses spare bits (TODO: store the spare bits somewhere)
-  //   = If neither is set, this is an old binary; the
-  //     reflection library will make an educated guess in that case
   // - Remaining bits are reserved.
   uint32_t AlignmentAndFlags;
 
@@ -364,14 +359,6 @@ public:
 
   bool isBitwiseTakable() const {
     return (AlignmentAndFlags >> 16) & 1;
-  }
-
-  bool mpeDoesNotUseSpareBits() const {
-    return (AlignmentAndFlags >> 17) & 1;
-  }
-
-  bool mpeUsesSpareBits() const {
-    return (AlignmentAndFlags >> 18) & 1;
   }
 
   uint32_t getAlignment() const {
@@ -384,6 +371,22 @@ public:
 
   StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(TypeName.get());
+  }
+};
+
+class MultiPayloadEnumDescriptor {
+public:
+  const RelativeDirectPointer<const char> TypeName;
+  uint32_t Flags;
+  uint32_t BitfieldBitCount; // Size of bitfield in bits
+  uint8_t  BitfieldBits[]; // Variably-sized bitmask field; always a multiple of 4 bytes
+
+  bool usesSpareBits() const {
+    return Flags & 1;
+  }
+
+  size_t getSize() const {
+    return sizeof(*this) + ((BitfieldBitCount + 31) / 32) * 4;
   }
 };
 

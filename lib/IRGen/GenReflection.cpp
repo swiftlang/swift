@@ -1012,6 +1012,65 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
   builder.emit();
 }
 
+class MultiPayloadEnumDescriptorBuilder : public ReflectionMetadataBuilder {
+  CanType type;
+  const FixedTypeInfo *ti;
+
+public:
+  MultiPayloadEnumDescriptorBuilder(IRGenModule &IGM,
+                                    const NominalTypeDecl *nominalDecl)
+    : ReflectionMetadataBuilder(IGM) {
+    type = nominalDecl->getDeclaredType()->getCanonicalType();
+    ti = &cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(
+        nominalDecl->getDeclaredTypeInContext()->getCanonicalType()));
+  }
+
+  void layout() override {
+    // TODO: Don't try to emit MPE descriptors for unbound generic enums
+    // Related: getEnumImplStrategy() below asserts that `type` is not an unbound generic
+    // if (type is generic) {
+    //   return;
+    // }
+
+    addTypeRef(type, CanGenericSignature());
+
+    auto &strategy = getEnumImplStrategy(IGM, type);
+    bool isMPE = strategy.getElementsWithPayload().size() > 1;
+    assert(isMPE && "");
+
+    const TypeInfo &TI = strategy.getTypeInfo();
+    auto bits1 = strategy.getTagBitsForPayloads();
+    auto bits2 = strategy.getBitMaskForNoPayloadElements();
+    // Look at EnumImplStrategy::emitGetEnumTag to see how it works
+
+    llvm::APInt bits = bits1.asAPInt();
+    auto bitCount = bits.getActiveBits();
+    auto usesSpareBitMask = bitCount > 0;
+    auto byteCount = (bitCount + 7) / 8;
+    auto payloadSize = ti->getFixedSize().getValue();
+    if (byteCount > payloadSize) {
+      byteCount = payloadSize;
+      bitCount = byteCount / 8;
+    }
+    auto wordCount = (byteCount + 3) / 4;
+    bits = bits.zextOrTrunc(wordCount * 32);
+
+    uint32_t flags = usesSpareBitMask ? 1 : 0;
+    B.addInt32(flags);
+    B.addInt32(bitCount);
+    for (unsigned i = 0; i < wordCount; ++i) {
+      uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
+      B.addInt32(nextWord);
+      bits.lshrInPlace(32);
+    }
+  }
+
+  llvm::GlobalVariable *emit() {
+    auto section = IGM.getMultiPayloadEnumDescriptorSectionName();
+    return ReflectionMetadataBuilder::emit(None, section);
+  }
+};
+
 /// Builds a constant LLVM struct describing the layout of a fixed-size
 /// SIL @box. These look like closure contexts, but without any necessary
 /// bindings or metadata sources, and only a single captured value.
@@ -1326,6 +1385,12 @@ const char *IRGenModule::getReflectionTypeRefSectionName() {
   return ReflectionTypeRefSection.c_str();
 }
 
+const char *IRGenModule::getMultiPayloadEnumDescriptorSectionName() {
+  if (MultiPayloadEnumDescriptorSection.empty())
+    MultiPayloadEnumDescriptorSection = getReflectionSectionName(*this, "mpenum", "mpen");
+  return MultiPayloadEnumDescriptorSection.c_str();
+}
+
 llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
   auto &entry = FieldNames[Name];
   if (entry.second)
@@ -1439,6 +1504,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   auto T = D->getDeclaredTypeInContext()->getCanonicalType();
 
   bool needsOpaqueDescriptor = false;
+  bool needsMPEDescriptor = false;
   bool needsFieldDescriptor = true;
 
   if (auto *ED = dyn_cast<EnumDecl>(D)) {
@@ -1457,6 +1523,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
     if (strategy.getElementsWithPayload().size() > 1 &&
         !strategy.needsPayloadSizeInMetadata()) {
       needsOpaqueDescriptor = true;
+      needsMPEDescriptor = true;
     }
   }
 
@@ -1493,6 +1560,11 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
     }
     
     FixedTypeMetadataBuilder builder(*this, D);
+    builder.emit();
+  }
+
+  if (needsMPEDescriptor) {
+    MultiPayloadEnumDescriptorBuilder builder(*this, D);
     builder.emit();
   }
 

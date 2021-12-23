@@ -309,6 +309,35 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   return nullptr;
 }
 
+RemoteRef<MultiPayloadEnumDescriptor>
+TypeRefBuilder::getMultiPayloadEnumInfo(const TypeRef *TR) {
+  std::string MangledName;
+  if (auto B = dyn_cast<BuiltinTypeRef>(TR))
+    MangledName = B->getMangledName();
+  else if (auto N = dyn_cast<NominalTypeRef>(TR))
+    MangledName = N->getMangledName();
+  else if (auto B = dyn_cast<BoundGenericTypeRef>(TR))
+    MangledName = B->getMangledName();
+  else
+    return nullptr;
+
+  for (auto Info : ReflectionInfos) {
+    for (auto MultiPayloadEnumDescriptor : Info.MultiPayloadEnum) {
+
+      // XXX Reject MPE descriptors that don't make sense
+      //  if (condition) { continue; }
+
+      auto CandidateMangledName =
+        readTypeRef(MultiPayloadEnumDescriptor, MultiPayloadEnumDescriptor->TypeName);
+      if (!reflectionNameMatches(CandidateMangledName, MangledName))
+        continue;
+      return MultiPayloadEnumDescriptor;
+    }
+  }
+
+  return nullptr;
+}
+
 RemoteRef<CaptureDescriptor>
 TypeRefBuilder::getCaptureDescriptor(uint64_t RemoteAddress) {
   for (auto Info : ReflectionInfos) {
@@ -492,6 +521,15 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
     for (const auto descriptor : sections.Capture) {
       auto info = getClosureContextInfo(descriptor);
       info.dump(stream);
+    }
+  }
+}
+
+void TypeRefBuilder::dumpMultiPayloadEnumSection(std::ostream &stream) {
+  for (const auto &sections : ReflectionInfos) {
+    for (const auto descriptor : sections.MultiPayloadEnum) {
+//      auto info = getXXXXX(descriptor);
+//      info.dump(stream);
     }
   }
 }

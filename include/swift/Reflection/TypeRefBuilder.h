@@ -193,6 +193,21 @@ public:
   }
 };
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
+
+class MultiPayloadEnumDescriptorIterator
+  : public ReflectionSectionIteratorBase<MultiPayloadEnumDescriptorIterator,
+                                         MultiPayloadEnumDescriptor> {
+public:
+  MultiPayloadEnumDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size)
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
+    return MPER->getSize();
+  }
+};
+using MultiPayloadEnumSection = ReflectionSection<MultiPayloadEnumDescriptorIterator>;
+
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
@@ -203,6 +218,7 @@ struct ReflectionInfo {
   GenericSection TypeReference;
   GenericSection ReflectionString;
   GenericSection Conformance;
+  MultiPayloadEnumSection MultiPayloadEnum;
 };
 
 struct ClosureContextInfo {
@@ -760,6 +776,9 @@ public:
   /// Get the unsubstituted capture types for a closure context.
   ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
 
+  /// Get the multipayload enum projection informaion for a given TR
+  RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR);
+
   ///
   /// Dumping typerefs, field declarations, associated types
   ///
@@ -770,6 +789,9 @@ public:
   void dumpAssociatedTypeSection(std::ostream &stream);
   void dumpBuiltinTypeSection(std::ostream &stream);
   void dumpCaptureSection(std::ostream &stream);
+  void dumpMultiPayloadEnumSection(std::ostream &stream);
+  void dumpAllSections(std::ostream &stream);
+};
 
   ///
   /// Extraction of protocol conformances

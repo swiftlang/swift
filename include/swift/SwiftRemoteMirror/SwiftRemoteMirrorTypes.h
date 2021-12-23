@@ -77,6 +77,7 @@ typedef struct swift_reflection_info {
   swift_reflection_section_pair_t capture;
   swift_reflection_section_pair_t type_references;
   swift_reflection_section_pair_t reflection_strings;
+  swift_reflection_section_pair_t multipayload_enums; // TODO: Is this okay?
 
   // Start address in local and remote address spaces.
   swift_reflection_ptr_t LocalStartAddress;
@@ -91,6 +92,7 @@ typedef struct swift_reflection_mapping_info {
   swift_reflection_section_mapping_t capture;
   swift_reflection_section_mapping_t type_references;
   swift_reflection_section_mapping_t reflection_strings;
+  swift_reflection_section_mapping_t multipayload_enums; // TODO: Is this okay?
 } swift_reflection_mapping_info_t;
 
 /// The layout kind of a Swift type.

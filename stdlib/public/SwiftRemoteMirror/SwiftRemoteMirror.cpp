@@ -232,7 +232,8 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
       || Info.builtin_types.offset != 0
       || Info.capture.offset != 0
       || Info.type_references.offset != 0
-      || Info.reflection_strings.offset != 0) {
+      || Info.reflection_strings.offset != 0
+      || Info.multipayload_enums.offset != 0) {
     std::cerr << "reserved field in swift_reflection_info_t is not zero\n";
     abort();
   }
@@ -244,7 +245,8 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
     sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
     sectionFromInfo<const void *>(Info, Info.type_references),
     sectionFromInfo<const void *>(Info, Info.reflection_strings),
-    ReflectionSection<const void *>(nullptr, 0)};
+    ReflectionSection<const void *>(nullptr, 0),
+    sectionFromInfo<MultiPayloadEnumDescriptorIterator>(Info, Info.multipayload_enums)};
   
   Context->addReflectionInfo(ContextInfo);
 }
@@ -264,7 +266,9 @@ void swift_reflection_addReflectionMappingInfo(
           Info.capture),
       reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
       reflectionSectionFromLocalAndRemote<const void *>(Info.reflection_strings),
-      ReflectionSection<const void *>(nullptr, 0)};
+      ReflectionSection<const void *>(nullptr, 0),
+      reflectionSectionFromLocalAndRemote<MultiPayloadEnumDescriptorIterator>(
+        Info.multipayload_enums)};
 
   Context->addReflectionInfo(ContextInfo);
 }

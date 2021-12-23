@@ -271,6 +271,8 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findMachOSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
+    auto MPEnumMdSec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -278,7 +280,8 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr)
+        ConformMdSec.first == nullptr &&
+        MPEnumMdSec.first == nullptr)
       return false;
 
     ReflectionInfo info = {
@@ -288,7 +291,8 @@ public:
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
         {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second}};
+        {ConformMdSec.first, ConformMdSec.second},
+        {MPEnumMdSec.first, MPEnumMdSec.second}};
 
     this->addReflectionInfo(info);
 
@@ -393,6 +397,8 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findCOFFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
+    auto MPEnumMdSec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -400,7 +406,8 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr)
+        ConformMdSec.first == nullptr &&
+        MPEnumMdSec.first == nullptr)
       return false;
 
     ReflectionInfo Info = {
@@ -410,7 +417,8 @@ public:
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
         {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second}};
+        {ConformMdSec.first, ConformMdSec.second},
+        {MPEnumMdSec.first, MPEnumMdSec.second}};
     this->addReflectionInfo(Info);
     return true;
   }
@@ -576,6 +584,8 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findELFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
+    auto MPEnumMdSec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (Error)
       return false;
@@ -588,7 +598,8 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr)
+        ConformMdSec.first == nullptr &&
+        MPEnumMdSec.first == nullptr)
       return false;
 
     ReflectionInfo info = {
@@ -598,7 +609,8 @@ public:
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
         {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second}};
+        {ConformMdSec.first, ConformMdSec.second},
+        {MPEnumMdSec.first, MPEnumMdSec.second}};
 
     this->addReflectionInfo(info);
     return true;
@@ -700,8 +712,7 @@ public:
         ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
         ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
         ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr,
-        ReflectionSectionKind::conform
-    };
+        ReflectionSectionKind::conform, ReflectionSectionKind::mpenum};
 
     llvm::SmallVector<std::pair<RemoteRef<void>, uint64_t>, 6> Pairs;
     for (auto Section : Sections) {

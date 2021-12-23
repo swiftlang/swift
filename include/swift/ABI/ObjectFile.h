@@ -21,7 +21,8 @@ enum ReflectionSectionKind : uint8_t {
   typeref,
   reflstr,
   conform,
-  protocs
+  protocs,
+  mpenum
 };
 
 /// Abstract base class responsible for providing the correct reflection section
@@ -58,6 +59,8 @@ public:
       return "__swift5_proto";
     case protocs:
       return "__swift5_protos";
+    case mpenum:
+      return "__swift5_mpenum";
     }
     llvm_unreachable("Section type not found.");
   }
@@ -96,6 +99,8 @@ public:
       return "swift5_protocol_conformances";
     case protocs:
       return "swift5_protocols";
+    case mpenum:
+      return "swift5_mpenum";
     }
     llvm_unreachable("Section type not found.");
   }
@@ -126,6 +131,8 @@ public:
       return ".sw5prtc$B";
     case protocs:
       return ".sw5prt$B";
+    case mpenum:
+      return ".sw5mpen";
     }
     llvm_unreachable("Section  not found.");
   }

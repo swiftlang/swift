@@ -27,6 +27,7 @@
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
 #include <iostream>
+#include <limits>
 
 #ifdef DEBUG_TYPE_LOWERING
   #define DEBUG_LOG(expr) expr;
@@ -643,18 +644,30 @@ public:
 // A variable-length bitmap used to track "spare bits" for general multi-payload
 // enums.
 class BitMask {
-  unsigned size;
+  unsigned size; // Size of mask in bytes
   uint8_t *mask;
 public:
-  BitMask(int sizeInBytes): size(sizeInBytes) {
-    mask = (uint8_t *)malloc(size);
-    memset(mask, 0xff, size);
-  }
   ~BitMask() {
     free(mask);
   }
+  // Construct a bitmask of the appropriate number of bytes
+  // initialized to all bits set
+  BitMask(unsigned sizeInBytes): size(sizeInBytes) {
+    assert(sizeInBytes < std::numeric_limits<uint32_t>::max());
+    mask = (uint8_t *)malloc(size);
+    memset(mask, 0xff, size);
+  }
+  // Construct a bitmask of the appropriate number of bytes
+  // initialized with bits from the specified buffer
+  BitMask(unsigned sizeInBytes, const uint8_t *initialValue, unsigned initialValueBytes)
+    : size(sizeInBytes)
+  {
+    assert(sizeInBytes < std::numeric_limits<uint32_t>::max());
+    mask = (uint8_t *)calloc(1, size);
+    memcpy(mask, initialValue, initialValueBytes);
+  }
   // Move constructor moves ownership and zeros the src
-  BitMask(BitMask&& src) noexcept: size(src.size), mask(src.mask) {
+  BitMask(BitMask&& src) noexcept: size(src.size), mask(std::move(src.mask)) {
     src.size = 0;
     src.mask = nullptr;
   }
@@ -662,6 +675,29 @@ public:
   BitMask(const BitMask& src) noexcept: size(src.size), mask(nullptr) {
     mask = (uint8_t *)malloc(size);
     memcpy(mask, src.mask, size);
+  }
+
+  bool operator==(const BitMask& rhs) const {
+    // The two masks may be of different sizes.
+    // The common prefix must be identical.
+    size_t common = std::min(size, rhs.size);
+    if (memcmp(mask, rhs.mask, common) != 0)
+      return false;
+    // The remainder of the longer mask must be
+    // all zero bits.
+    unsigned mustBeZeroSize = std::max(size, rhs.size) - common;
+    uint8_t *mustBeZero;
+    if (size < rhs.size) {
+      mustBeZero = rhs.mask + size;
+    } else if (size > rhs.size) {
+      mustBeZero = mask + rhs.size;
+    }
+    for (unsigned i = 0; i < mustBeZeroSize; ++i) {
+      if (mustBeZero[i] != 0) {
+        return false;
+      }
+    }
+    return true;
   }
 
   bool isNonZero() const { return !isZero(); }
@@ -709,21 +745,31 @@ public:
 
   template<typename IntegerType>
   void andMask(IntegerType value, unsigned byteOffset) {
-    andMask((void *)&value, sizeof(value), byteOffset);
+    if (byteOffset >= size) {
+      makeZero();
+    } else {
+      andMask((void *)&value, sizeof(value), byteOffset);
+    }
   }
 
   void andMask(BitMask mask, unsigned offset) {
-    andMask(mask.mask, mask.size, offset);
+    if (offset >= size) {
+      makeZero();
+    } else {
+      andMask(mask.mask, mask.size, offset);
+    }
   }
 
   void andNotMask(BitMask mask, unsigned offset) {
-    andNotMask(mask.mask, mask.size, offset);
+    if (offset < size) {
+      andNotMask(mask.mask, mask.size, offset);
+    }
   }
 
   // Zero all bits except for the `n` most significant ones.
   // XXX TODO: Big-endian support?
-  void keepOnlyMostSignificantBits(int n) {
-    int count = 0;
+  void keepOnlyMostSignificantBits(unsigned n) {
+    unsigned count = 0;
     if (size < 1) {
       return;
     }
@@ -744,15 +790,15 @@ public:
     }
   }
 
-  int numBits() const {
+  unsigned numBits() const {
     return size * 8;
   }
 
-  int numSetBits() const {
-    int count = 0;
+  unsigned numSetBits() const {
+    unsigned count = 0;
     for (unsigned i = 0; i < size; ++i) {
       if (mask[i] != 0) {
-        for (int b = 1; b < 256; b <<= 1) {
+        for (unsigned b = 1; b < 256; b <<= 1) {
           if ((mask[i] & b) != 0) {
             ++count;
           }
@@ -779,7 +825,7 @@ public:
     IntegerType resultBit = 1; // Start from least-significant bit
     auto bytes = static_cast<const uint8_t *>(data.get());
     for (unsigned i = 0; i < size; ++i) {
-      for (int b = 1; b < 256; b <<= 1) {
+      for (unsigned b = 1; b < 256; b <<= 1) {
         if ((mask[i] & b) != 0) {
           if ((bytes[i] & b) != 0) {
             result |= resultBit;
@@ -795,17 +841,20 @@ public:
 
 private:
   void andMask(void *maskData, unsigned len, unsigned offset) {
-    assert(offset + len <= size);
+    // Bits beyond the current size are implicitly zero
+    assert(offset < size);
+    unsigned common = std::min(len, size - offset);
     uint8_t *maskBytes = (uint8_t *)maskData;
-    for (unsigned i = 0; i < len; ++i) {
+    for (unsigned i = 0; i < common; ++i) {
       mask[i + offset] &= maskBytes[i];
     }
   }
 
   void andNotMask(void *maskData, unsigned len, unsigned offset) {
-    assert(offset + len <= size);
+    assert(offset < size);
+    unsigned common = std::min(len, size - offset);
     uint8_t *maskBytes = (uint8_t *)maskData;
-    for (unsigned i = 0; i < len; ++i) {
+    for (unsigned i = 0; i < common; ++i) {
       mask[i + offset] &= ~maskBytes[i];
     }
   }
@@ -1950,26 +1999,43 @@ public:
         unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
         if (Stride == 0)
           Stride = 1;
-
         auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
 
-        if (FixedDescriptor->mpeDoesNotUseSpareBits()) {
-          // If there are no spare bits, use the "simple" tag-only implementation.
-          return TC.makeTypeInfo<SimpleMultiPayloadEnumTypeInfo>(
-            Size, Alignment, Stride, NumExtraInhabitants,
-            BitwiseTakable, Cases);
-        } else if (FixedDescriptor->mpeUsesSpareBits()) {
-          // Compiler marked this as using spare bits
-          // TODO: Get the mask from wherever the compiler stashed it
-          BitMask spareBitsMask(PayloadSize);
-/*
-          if (readSpareBitsMask(XYZ, spareBitsMask) && !spareBitsMask.isZero()) {
-            // Use compiler-provided spare bit information
-            return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
+        // If there's a multi-payload enum descriptor, then we
+        // have detailed layout information from the compiler.
+        auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumInfo(TR);
+        if (MPEDescriptor) {
+          if (MPEDescriptor->usesSpareBits()) {
+            auto BitfieldBitCount = MPEDescriptor->BitfieldBitCount;
+            auto MaskBytes = std::min(PayloadSize, (BitfieldBitCount + 7) / 8);
+            auto SpareBitMask = MPEDescriptor->BitfieldBits;
+            BitMask spareBitsMask(PayloadSize, SpareBitMask, MaskBytes);
+
+            BitMask t(PayloadSize);
+            auto tValid = populateSpareBitsMask(Cases, t);
+            assert(tValid);
+
+            if (!spareBitsMask.isZero()) {
+              // TEMPORARY: compare our computed spare bit mask to the
+              // one we got from the compiler (to verify that the compiler
+              // is putting the right data in)
+              assert(t == spareBitsMask);
+
+              // Use compiler-provided spare bit information
+              return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
+                Size, Alignment, Stride, NumExtraInhabitants,
+                BitwiseTakable, Cases, spareBitsMask);
+            } else {
+              // The MPE descriptor doesn't make sense: It has a spare bit mask,
+              // but that mask is empty?  If this ever happens, fall through to
+              // the local calculation.
+            }
+          } else {
+            // If there are no spare bits, use the "simple" tag-only implementation.
+            return TC.makeTypeInfo<SimpleMultiPayloadEnumTypeInfo>(
               Size, Alignment, Stride, NumExtraInhabitants,
-              BitwiseTakable, Cases, spareBitsMask);
+              BitwiseTakable, Cases);
           }
-*/
         }
 
         // If there was no compiler data, try computing the mask ourselves
