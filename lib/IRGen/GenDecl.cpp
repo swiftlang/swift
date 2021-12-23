@@ -4150,7 +4150,7 @@ void IRGenModule::emitAccessibleFunctions() {
     llvm::Constant *funcAddr = nullptr;
     if (func->isDistributed()) {
       funcAddr = getAddrOfAsyncFunctionPointer(
-          LinkEntity::forDistributedMethodAccessor(func));
+          LinkEntity::forDistributedTargetAccessor(func));
     } else if (func->isAsync()) {
       funcAddr = getAddrOfAsyncFunctionPointer(func);
     } else {

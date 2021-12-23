@@ -421,5 +421,5 @@ $s13__lldb_expr_110$10016c2d8yXZ1B10$10016c2e0LLC ---> __lldb_expr_1.(unknown co
 $s__TJO ---> $s__TJO
 $s6Foobar7Vector2VAASdRszlE10simdMatrix5scale6rotate9translateSo0C10_double3x3aACySdG_SdAJtFZ0D4TypeL_aySd__GD ---> MatrixType #1 in static (extension in Foobar):Foobar.Vector2<Swift.Double><A where A == Swift.Double>.simdMatrix(scale: Foobar.Vector2<Swift.Double>, rotate: Swift.Double, translate: Foobar.Vector2<Swift.Double>) -> __C.simd_double3x3
 $s17distributed_thunk2DAC1fyyFTE ---> distributed thunk for distributed_thunk.DA.f() -> ()
-$s16distributed_test1XC7computeyS2iFTF ---> distributed method accessor for distributed_test.X.compute(Swift.Int) -> Swift.Int
-$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed method accessor for distributed thunk for distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String
+$s16distributed_test1XC7computeyS2iFTF ---> distributed accessor for distributed_test.X.compute(Swift.Int) -> Swift.Int
+$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed accessor for distributed thunk for distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String

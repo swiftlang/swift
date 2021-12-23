@@ -104,7 +104,7 @@ public:
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
     DistributedThunk,
-    DistributedMethodAccessor,
+    DistributedAccessor,
     AccessibleFunctionRecord
   };
 

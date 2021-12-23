@@ -1643,10 +1643,10 @@ public:
   Address getAddrOfObjCISAMask();
 
   llvm::Function *
-  getAddrOfDistributedMethodAccessor(SILFunction *F,
+  getAddrOfDistributedTargetAccessor(SILFunction *F,
                                      ForDefinition_t forDefinition);
 
-  void emitDistributedMethodAccessor(SILFunction *method);
+  void emitDistributedTargetAccessor(SILFunction *method);
 
   /// Retrieve the generic signature for the current generic context, or null if no
   /// generic environment is active.

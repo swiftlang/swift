@@ -133,7 +133,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::OutlinedBridgedMethod:
     case Node::Kind::MergedFunction:
     case Node::Kind::DistributedThunk:
-    case Node::Kind::DistributedMethodAccessor:
+    case Node::Kind::DistributedAccessor:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -2367,7 +2367,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'D': return createNode(Node::Kind::DynamicAttribute);
     case 'd': return createNode(Node::Kind::DirectMethodReferenceAttribute);
     case 'E': return createNode(Node::Kind::DistributedThunk);
-    case 'F': return createNode(Node::Kind::DistributedMethodAccessor);
+    case 'F': return createNode(Node::Kind::DistributedAccessor);
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
     case 'm': return createNode(Node::Kind::MergedFunction);
