@@ -659,13 +659,11 @@ do {
   func miscTests(_ arg: any MiscTestsProto) {
     var r: any Sequence & IteratorProtocol = arg.getR()
     r.makeIterator() // expected-warning {{result of call to 'makeIterator()' is unused}}
-    // FIXME: We are leaking an implementation detail in this warning.
-    r.next() // expected-warning {{expression of type '(IteratorProtocol & Sequence).Element' is unused}}
+    r.next() // expected-warning {{result of call to 'next()' is unused}}
     r.nonexistent() // expected-error {{value of type 'IteratorProtocol & Sequence' has no member 'nonexistent'}}
 
-    // FIXME: We are leaking an implementation detail in this warning.
-    arg[] // expected-warning {{expression of type '(MiscTestsProto).Assoc' is unused}}
-    arg.getAssoc // expected-warning {{expression of type '(MiscTestsProto).Assoc' is unused}}
+    arg[] // expected-warning {{expression of type 'Any' is unused}}
+    arg.getAssoc // expected-warning {{expression of type 'Any?' is unused}}
   }
 }
 
