@@ -1504,10 +1504,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (!DRE || !DRE->isImplicit())
         return false;
 
-      auto var = dyn_cast<VarDecl>(DRE->getDecl());
-      if (!var || !isEnclosingSelfReference(var, inClosure))
-        return false;
-
       // Defensive check for type. If the expression doesn't have type here, it
       // should have been diagnosed somewhere else.
       Type ty = DRE->getType();
@@ -1524,11 +1520,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (!ty->hasReferenceSemantics())
         return false;
       
-      // If self was captured weakly, but has since been unwrapped,
-      // then we can permit implicit self (since it doesn't
-      // introduce a new strong reference).
-      if (auto *closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        if (closureExpr->getCapturedSelfDecl()->getType()->is<WeakStorageType>()) {
+      // If `self` is explicitly captured, then implicit self is always allowed
+      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+        if (closureExpr->getCapturedSelfDecl()) {
           return false;
         }
       }
