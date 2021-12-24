@@ -1580,10 +1580,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // Until Swift 6, only emit a warning when we get this with an
       // explicit capture, since we used to not diagnose this at all.
       auto shouldOnlyWarn = [&](Expr *selfRef) {
-        // We know that isImplicitSelfParamUseLikelyToCauseCycle is true,
-        // which means all these casts are valid.
-        return !cast<VarDecl>(cast<DeclRefExpr>(selfRef)->getDecl())
-                  ->isSelfParameter();
+        if (auto declRef = dyn_cast<DeclRefExpr>(selfRef)) {
+          if (auto decl = declRef->getDecl()) {
+            if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+              return !varDecl->isSelfParameter();
+            }
+          }
+        }
+          
+        return false;
       };
       
       SourceLoc memberLoc = SourceLoc();
