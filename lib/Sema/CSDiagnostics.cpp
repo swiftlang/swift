@@ -1272,6 +1272,22 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
           .fixItInsert(sourceRange.End, "!.");
     }
   } else {
+    // Check whether or not the base of this optional unwrap is implicit self
+    //  - This can only happen with a [weak self] capture, and is not permitted.
+    if (auto dotExpr = getAsExpr<UnresolvedDotExpr>(locator->getAnchor())) {
+      if (auto base = dotExpr->getBase()) {
+        if (auto baseDeclRef = dyn_cast<DeclRefExpr>(base)) {
+          if (baseDeclRef->isImplicit() && baseDeclRef->getDecl()->getBaseIdentifier().is("self")) {
+            emitDiagnostic(diag::optional_self_not_unwrapped);
+            
+            emitDiagnostic(diag::optional_self_chain)
+                .fixItInsertAfter(sourceRange.End, "self?.");
+            return true;
+          }
+        }
+      }
+    }
+    
     emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
                    unwrappedBaseType);
 
