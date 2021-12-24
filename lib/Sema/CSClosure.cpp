@@ -919,6 +919,19 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
   return false;
 }
 
+bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
+  if (!closure->hasSingleExpressionBody()) {
+    auto *DC = closure->getParent();
+    do {
+      if (auto *parentClosure = dyn_cast<ClosureExpr>(DC)) {
+        if (resultBuilderTransformed.count(parentClosure))
+          return true;
+      }
+    } while ((DC = DC->getParent()));
+  }
+  return false;
+}
+
 bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
   auto last = locator.last();
   if (!(last && last->is<LocatorPathElt::Condition>()))
