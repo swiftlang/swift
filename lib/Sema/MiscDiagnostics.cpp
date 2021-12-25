@@ -1520,6 +1520,12 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (!ty->hasReferenceSemantics())
         return false;
       
+      // If this is a `ConstructorDecl`, like as a default @autoclosure in
+      // `@autoclosure @escaping () -> String = String()`, then the capture is fine
+      if (auto constructorDecl = dyn_cast<ConstructorDecl>(DRE->getDecl())) {
+        return false;
+      }
+      
       auto isExplicitWeakSelfCapture = false;
       if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
         if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
@@ -1582,9 +1588,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         }
       }
       
-      if (auto value = dyn_cast<ValueDecl>(DRE->getDecl()))
-        return false;
-
       return true;
     }
 
