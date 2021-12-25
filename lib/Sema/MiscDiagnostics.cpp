@@ -1527,6 +1527,21 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         }
       }
       
+      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+        // If this `self` decl was not captured explicitly by this closure,
+        // but is actually from an outer `weak` capture's `if let self = self`
+        // or `guard let self = self`, then we don't allow implicit self.
+        if (auto parentStmt = var->getParentPatternStmt()) {
+          if (isa<GuardStmt>(parentStmt) || isa<IfStmt>(parentStmt)) {
+            return true;
+          }
+        }
+        
+        if (!isEnclosingSelfReference(var, inClosure)) {
+          return false;
+        }
+      }
+
       return true;
     }
 
@@ -1619,7 +1634,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return { false, E };
       }
       
-      // Catch any other implicit uses of self with a generic diagnostic.
       if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
              .warnUntilSwiftVersionIf(shouldOnlyWarn(E), 6);
