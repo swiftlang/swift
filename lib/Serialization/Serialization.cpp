@@ -4485,7 +4485,8 @@ public:
     auto substMapID = S.addSubstitutionMapRef(archetypeTy->getSubstitutions());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
     OpaqueArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          declID, substMapID);
+                                          declID, archetypeTy->getOrdinal(),
+                                          substMapID);
   }
 
   void visitNestedArchetypeType(const NestedArchetypeType *archetypeTy) {

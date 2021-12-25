@@ -3447,58 +3447,50 @@ public:
     GenericSignatureID interfaceSigID;
     TypeID interfaceTypeID;
     GenericSignatureID genericSigID;
-    SubstitutionMapID underlyingTypeID;
+    SubstitutionMapID underlyingTypeSubsID;
     uint8_t rawAccessLevel;
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
                                               namingDeclID, interfaceSigID,
                                               interfaceTypeID, genericSigID,
-                                              underlyingTypeID, rawAccessLevel);
+                                              underlyingTypeSubsID,
+                                              rawAccessLevel);
     
     auto declContext = MF.getDeclContext(contextID);
     auto interfaceSig = MF.getGenericSignature(interfaceSigID);
-    auto interfaceType = MF.getType(interfaceTypeID)
-                            ->castTo<GenericTypeParamType>();
+    auto interfaceType = MF.getType(interfaceTypeID);
     
     // Check for reentrancy.
     if (declOrOffset.isComplete())
       return cast<OpaqueTypeDecl>(declOrOffset.get());
-      
+
+    auto genericParams = MF.maybeReadGenericParams(declContext);
+
     // Create the decl.
     auto opaqueDecl = OpaqueTypeDecl::get(
-        /*NamingDecl*/ nullptr, /*GenericParams*/ nullptr, declContext,
-        interfaceSig, /*OpaqueReturnTypeReprs*/ { }, interfaceType);
+        /*NamingDecl=*/ nullptr, genericParams, declContext,
+        interfaceSig, /*OpaqueReturnTypeReprs*/ { },
+        interfaceType->castTo<GenericTypeParamType>());
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     opaqueDecl->setNamingDecl(namingDecl);
+
+    opaqueDecl->setInterfaceType(MetatypeType::get(interfaceType));
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       opaqueDecl->setAccess(*accessLevel);
     else
       MF.fatal();
 
-    if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl)) {
-      ctx.evaluator.cacheOutput(GenericParamListRequest{opaqueDecl},
-                                std::move(genericParams));
-    }
-
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
       opaqueDecl->setGenericSignature(genericSig);
-    if (underlyingTypeID) {
-      auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeID);
+    if (underlyingTypeSubsID) {
+      auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError)
         return subMapOrError.takeError();
       opaqueDecl->setUnderlyingTypeSubstitutions(subMapOrError.get());
     }
-    SubstitutionMap subs;
-    if (genericSig) {
-      subs = genericSig->getIdentitySubstitutionMap();
-    }
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
-    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, 0, subs);
-    auto metatype = MetatypeType::get(opaqueTy);
-    opaqueDecl->setInterfaceType(metatype);
     return opaqueDecl;
   }
 
@@ -5522,9 +5514,10 @@ public:
   Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     DeclID opaqueDeclID;
+    unsigned ordinal;
     SubstitutionMapID subsID;
-    decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
-                                                       opaqueDeclID, subsID);
+    decls_block::OpaqueArchetypeTypeLayout::readRecord(
+        scratch, opaqueDeclID, ordinal, subsID);
 
     auto opaqueTypeOrError = MF.getDeclChecked(opaqueDeclID);
     if (!opaqueTypeOrError)
@@ -5535,9 +5528,7 @@ public:
     if (!subsOrError)
       return subsOrError.takeError();
 
-    // TODO [OPAQUE SUPPORT]: to support multiple opaque types we will probably
-    // have to serialize the ordinal, which is always 0 for now
-    return OpaqueTypeArchetypeType::get(opaqueDecl, 0, subsOrError.get());
+    return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subsOrError.get());
   }
       
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
