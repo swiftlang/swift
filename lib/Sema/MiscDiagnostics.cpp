@@ -1520,20 +1520,60 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (!ty->hasReferenceSemantics())
         return false;
       
-      // If `self` is explicitly captured, then implicit self is always allowed
+      auto isExplicitWeakSelfCapture = false;
       if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        if (closureExpr->getCapturedSelfDecl()) {
-          return false;
+        if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+          // If `weak self` captured explicitly, then implicit self
+          // is always allowed allowed once `self` is unwrapped.
+          //  - If `self` is still an Optional, compilation would have failed already.
+          if (selfDecl->getType()->is<WeakStorageType>()) {
+            isExplicitWeakSelfCapture = true;
+          }
+          
+          // If this capture is using the name `self` actually referring
+          // to some other variable (e.g. with `[self = "hello"]`)
+          // then implicit self is not allowed.
+          else if (!selfDecl->isSelfParamCapture()) {
+            return true;
+          }
         }
       }
       
       if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
-        // If this `self` decl was not captured explicitly by this closure,
-        // but is actually from an outer `weak` capture's `if let self = self`
-        // or `guard let self = self`, then we don't allow implicit self.
         if (auto parentStmt = var->getParentPatternStmt()) {
           if (isa<GuardStmt>(parentStmt) || isa<IfStmt>(parentStmt)) {
-            return true;
+            // If this `self` decl was not captured explicitly by this closure,
+            // but is actually from an outer `weak` capture's `if let self = self`
+            // or `guard let self = self`, then we don't allow implicit self.
+            if (!isExplicitWeakSelfCapture) {
+              return true;
+            }
+            
+            // If this is an explicit `weak self` capture, then we need
+            // to validate that the unwrapped `self` decl is actually
+            // referring to `self`, and not something else like in
+            // `guard let self = .someOptionalVariable else { return }`
+            auto hasCorrectSelfBindingCondition = false;
+            for (auto cond : dyn_cast<LabeledConditionalStmt>(parentStmt)->getCond()) {
+              if (cond.getKind() == StmtConditionElement::CK_PatternBinding) {
+                if (auto optionalPattern = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
+                  // if the lhs of the optional binding is `self`...
+                  if (optionalPattern->getSubPattern()->getBoundName().is("self")) {
+                    if (auto loadExpr = dyn_cast<LoadExpr>(cond.getInitializer())) {
+                      if (auto declRefExpr = dyn_cast<DeclRefExpr>(loadExpr->getSubExpr())) {
+                        // and the rhs of the optional binding is `self`...
+                        if (declRefExpr->getDecl()->getBaseIdentifier().is("self")) {
+                          // then we can permit implicit self in this closure
+                          hasCorrectSelfBindingCondition = true;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            
+            return !hasCorrectSelfBindingCondition;
           }
         }
         
@@ -1597,6 +1637,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       // Until Swift 6, only emit a warning when we get this with an
       // explicit capture, since we used to not diagnose this at all.
+      // FIXME: We should always emit an error here for weak captures,
+      // which don't have the same implicit self source compat requirements
+      // as strong captures.
       auto shouldOnlyWarn = [&](Expr *selfRef) {
         if (auto declRef = dyn_cast<DeclRefExpr>(selfRef)) {
           if (auto decl = declRef->getDecl()) {
@@ -1667,7 +1710,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           // capture 'self' explicitly will result in an error, and using
           // 'self.' explicitly will be accessing something other than the
           // self param.
-          // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
           return;
         }
         emitFixItsForExplicitClosure(Diags, memberLoc, CE);
@@ -1688,11 +1730,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // If we've already captured something with the name "self" other than
       // the actual self param, offer special diagnostics.
       if (auto *VD = closureExpr->getCapturedSelfDecl()) {
-        // Either this is a weak capture of self...
-        if (VD->getType()->is<WeakStorageType>()) {
-          Diags.diagnose(VD->getLoc(), diag::note_self_captured_weakly);
-        // ...or something completely different.
-        } else {
+        if (!VD->getType()->is<WeakStorageType>()) {
           Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
         }
         
