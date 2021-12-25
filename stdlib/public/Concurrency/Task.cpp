@@ -413,7 +413,7 @@ static void completeTaskWithClosure(SWIFT_ASYNC_CONTEXT AsyncContext *context,
       reinterpret_cast<char *>(context) - sizeof(AsyncContextPrefix));
 
   swift_release((HeapObject *)asyncContextPrefix->closureContext);
-  
+
   // Clean up the rest of the task.
   return completeTaskAndRelease(context, error);
 }
@@ -470,6 +470,13 @@ const void *AsyncTask::getResumeFunctionForLogging() {
   return reinterpret_cast<const void *>(ResumeTask);
 }
 
+JobPriority swift::swift_task_currentPriority(AsyncTask *task)
+{
+  // This is racey but this is to be used in an API is inherently racey anyways.
+  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
+  return oldStatus.getStoredPriority();
+}
+
 /// Implementation of task creation.
 SWIFT_CC(swift)
 static AsyncTaskAndContext swift_task_create_commonImpl(
@@ -520,7 +527,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       // of in a FutureFragment.
       hasAsyncLetResultBuffer = true;
       assert(asyncLet && "Missing async let storage");
-        
+
       jobFlags.task_setIsAsyncLetTask(true);
       jobFlags.task_setIsChildTask(true);
       break;
@@ -591,14 +598,14 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   void *allocation = nullptr;
   if (asyncLet) {
     assert(parent);
-    
+
     // If there isn't enough room in the fixed async let allocation to
     // set up the initial context, then we'll have to allocate more space
     // from the parent.
     if (asyncLet->getSizeOfPreallocatedSpace() < amountToAllocate) {
       hasAsyncLetResultBuffer = false;
     }
-    
+
     // DEPRECATED. This is separated from the above condition because we
     // also have to handle an older async let ABI that did not provide
     // space for the initial slab in the compiler-generated preallocation.
@@ -678,7 +685,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     auto groupChildFragment = task->groupChildFragment();
     new (groupChildFragment) AsyncTask::GroupChildFragment(group);
   }
-  
+
   // Initialize the future fragment if applicable.
   if (futureResultType) {
     assert(task->isFuture());
@@ -940,7 +947,7 @@ static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
   // must happen-after this call.
   context->AwaitSynchronization.store(flags.isPreawaited()
                                         ? ContinuationStatus::Awaited
-                                        : ContinuationStatus::Pending, 
+                                        : ContinuationStatus::Pending,
                                       std::memory_order_relaxed);
 
   AsyncTask *task;
