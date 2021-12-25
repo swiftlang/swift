@@ -1520,9 +1520,10 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (!ty->hasReferenceSemantics())
         return false;
       
-      // If this is a `ConstructorDecl`, like as a default @autoclosure in
-      // `@autoclosure @escaping () -> String = String()`, then the capture is fine
-      if (auto constructorDecl = dyn_cast<ConstructorDecl>(DRE->getDecl())) {
+      // If this is a `AbstractFunctionDecl` (`FuncDecl`, `ConstructorDecl`, or `DestructorDecl`.
+      // `@autoclosure @escaping () -> String = String()` as one example),
+      // then the capture is fine.
+      if (isa<AbstractFunctionDecl>(DRE->getDecl())) {
         return false;
       }
       
