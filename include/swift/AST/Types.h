@@ -5601,10 +5601,7 @@ public:
   ///   func foo() -> (some P, some Q)
   ///
   /// then the underlying type of `some P` would be ordinal 0, and `some Q` would be ordinal 1.
-  unsigned getOrdinal() const {
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
-    return 0;
-  }
+  unsigned getOrdinal() const;
   
   static void Profile(llvm::FoldingSetNodeID &ID,
                       OpaqueTypeDecl *OpaqueDecl,

@@ -3464,10 +3464,9 @@ public:
       return cast<OpaqueTypeDecl>(declOrOffset.get());
       
     // Create the decl.
-    auto opaqueDecl = new (ctx)
-        OpaqueTypeDecl(/*NamingDecl*/ nullptr,
-                       /*GenericParams*/ nullptr, declContext, interfaceSig,
-                       /*UnderlyingInterfaceTypeRepr*/ nullptr, interfaceType);
+    auto opaqueDecl = OpaqueTypeDecl::get(
+        /*NamingDecl*/ nullptr, /*GenericParams*/ nullptr, declContext,
+        interfaceSig, /*OpaqueReturnTypeReprs*/ { }, interfaceType);
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));

@@ -296,11 +296,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   // Create the OpaqueTypeDecl for the result type.
-  auto opaqueDecl = new (ctx)
-      OpaqueTypeDecl(originatingDecl, genericParams, parentDC,
-                     interfaceSignature,
-                     opaqueReprs.empty() ? 0 : opaqueReprs[0],
-                     underlyingGenericParamType);
+  auto opaqueDecl = OpaqueTypeDecl::get(
+      originatingDecl, genericParams, parentDC, interfaceSignature, opaqueReprs,
+      underlyingGenericParamType);
   opaqueDecl->copyFormalAccessFrom(originatingDecl);
   if (auto originatingSig = originatingDC->getGenericSignatureOfContext()) {
     opaqueDecl->setGenericSignature(originatingSig);

@@ -2699,21 +2699,25 @@ public:
 /// The declared type uses a special kind of archetype type to represent
 /// abstracted types, e.g. `(some P, some Q)` becomes `((opaque archetype 0),
 /// (opaque archetype 1))`.
-class OpaqueTypeDecl : public GenericTypeDecl {
+class OpaqueTypeDecl final :
+    public GenericTypeDecl,
+    private llvm::TrailingObjects<OpaqueTypeDecl, OpaqueReturnTypeRepr *> {
+  friend TrailingObjects;
+
   /// The original declaration that "names" the opaque type. Although a specific
   /// opaque type cannot be explicitly named, oapque types can propagate
   /// arbitrarily through expressions, so we need to know *which* opaque type is
   /// propagated.
-  ValueDecl *NamingDecl;
+  ///
+  /// The bit indicates whether there are any trailing
+  /// OpaqueReturnTypeReprs.
+  llvm::PointerIntPair<ValueDecl *, 1>
+      NamingDeclAndHasOpaqueReturnTypeRepr;
 
   /// The generic signature of the opaque interface to the type. This is the
   /// outer generic signature with added generic parameters representing the
   /// abstracted underlying types.
   GenericSignature OpaqueInterfaceGenericSignature;
-
-  /// The type repr of the underlying type. Might be null if no source location
-  /// is availble, e.g. if this decl was loaded from a serialized module.
-  OpaqueReturnTypeRepr *UnderlyingInterfaceRepr;
 
   /// The generic parameter that represents the underlying type.
   GenericTypeParamType *UnderlyingInterfaceType;
@@ -2725,19 +2729,47 @@ class OpaqueTypeDecl : public GenericTypeDecl {
   Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
   
   mutable Identifier OpaqueReturnTypeIdentifier;
-  
-public:
+
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
-                 OpaqueReturnTypeRepr *UnderlyingInterfaceRepr,
+                 ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs,
                  GenericTypeParamType *UnderlyingInterfaceType);
 
-  ValueDecl *getNamingDecl() const { return NamingDecl; }
+  unsigned getNumOpaqueReturnTypeReprs() const {
+    return NamingDeclAndHasOpaqueReturnTypeRepr.getInt()
+      ? getOpaqueGenericParams().size()
+      : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<OpaqueReturnTypeRepr *>) const {
+    return getNumOpaqueReturnTypeReprs();
+  }
+
+  /// Retrieve the buffer containing the opaque return type
+  /// representations that correspond to the opaque generic parameters.
+  ArrayRef<OpaqueReturnTypeRepr *> getOpaqueReturnTypeReprs() const {
+    return {
+      getTrailingObjects<OpaqueReturnTypeRepr *>(),
+      getNumOpaqueReturnTypeReprs()
+    };
+  }
+
+public:
+  static OpaqueTypeDecl *get(
+      ValueDecl *NamingDecl, GenericParamList *GenericParams,
+      DeclContext *DC,
+      GenericSignature OpaqueInterfaceGenericSignature,
+      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs,
+      GenericTypeParamType *UnderlyingInterfaceType);
+
+  ValueDecl *getNamingDecl() const {
+    return NamingDeclAndHasOpaqueReturnTypeRepr.getPointer();
+  }
   
   void setNamingDecl(ValueDecl *D) {
-    assert(!NamingDecl && "already have naming decl");
-    NamingDecl = D;
+    assert(!getNamingDecl() && "already have naming decl");
+    NamingDeclAndHasOpaqueReturnTypeRepr.setPointer(D);
   }
 
   /// Is this opaque type the opaque return type of the given function?
@@ -2754,7 +2786,17 @@ public:
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
   }
-  
+
+  /// Retrieve the generic parameters that represent the opaque types described by this opaque
+  /// type declaration.
+  TypeArrayView<GenericTypeParamType> getOpaqueGenericParams() const {
+    return OpaqueInterfaceGenericSignature.getInnermostGenericParams();
+  }
+
+  /// The underlying interface type describing the whole opaque type.
+  ///
+  /// FIXME: Structured opaque types will generalize this to an
+  /// arbitrary type.
   GenericTypeParamType *getUnderlyingInterfaceType() const {
     return UnderlyingInterfaceType;
   }
