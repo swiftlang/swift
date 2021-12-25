@@ -1541,6 +1541,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           return false;
         }
       }
+      
+      if (auto value = dyn_cast<ValueDecl>(DRE->getDecl()))
+        return false;
 
       return true;
     }
