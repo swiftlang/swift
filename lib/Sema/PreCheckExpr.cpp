@@ -744,13 +744,15 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       BaseExpr = TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), NTD, BaseDC,
           DC->mapTypeIntoContext(NTD->getInterfaceType()));
-    } else if (Base->getBaseIdentifier().is("self")) {
+    } else if (Base->getBaseIdentifier().is("self") && Base->getDeclContext()->getContextKind() == DeclContextKind::AbstractClosureExpr) {
       // If this is an implicit self call, we don't actually
       // know if self is Self or Optional<Self> (e.g. in a weak self
       // closure before self is unwrapped).
       //  - Since we don't know the correct type of self yet,
       //    we leave this as an UnresolvedDeclRefExpr that is
       //    populated with the actual type later.
+      //  - We only do this within a closure context, since that's
+      //    the only place where self can be rebound.
       auto selfNameRef = new DeclNameRef(Base->getBaseIdentifier());
       BaseExpr = new (Context) UnresolvedDeclRefExpr(*selfNameRef,
                                                      DeclRefKind::Ordinary,
