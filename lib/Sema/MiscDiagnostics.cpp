@@ -1548,10 +1548,10 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       
       if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
         if (auto parentStmt = var->getParentPatternStmt()) {
-          if (isa<GuardStmt>(parentStmt) || isa<IfStmt>(parentStmt)) {
+          if (isa<LabeledConditionalStmt>(parentStmt)) {
             // If this `self` decl was not captured explicitly by this closure,
             // but is actually from an outer `weak` capture's `if let self = self`
-            // or `guard let self = self`, then we don't allow implicit self.
+            // or `guard let self = self` etc, then we don't allow implicit self.
             if (!isExplicitWeakSelfCapture) {
               return true;
             }
@@ -1645,9 +1645,11 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         if (auto declRef = dyn_cast<DeclRefExpr>(selfRef)) {
           if (auto decl = declRef->getDecl()) {
             if (auto varDecl = dyn_cast<VarDecl>(decl)) {
-              // If the self decl was defined in an `if` or `guard` statement, we know this is an inner closure of some outer closure's `weak self` capture. Since this wasn't allowed in Swift 5.5, we should just always emit an error.
+              // If the self decl was defined in an conditional binding in an `if`/`guard`/`while`,
+              // then we know this is an inner closure of some outer closure's `weak self` capture.
+              // Since this wasn't allowed in Swift 5.5, we should just always emit an error.
               if (auto parentStmt = varDecl->getParentPatternStmt()) {
-                if (isa<GuardStmt>(parentStmt) || isa<IfStmt>(parentStmt)) {
+                if (isa<LabeledConditionalStmt>(parentStmt)) {
                   return false;
                 }
               }
