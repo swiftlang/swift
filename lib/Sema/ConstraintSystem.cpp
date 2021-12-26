@@ -5913,8 +5913,13 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
     return false;
 
   auto &ctx = closure->getASTContext();
-  return !closure->hasEmptyBody() &&
-         ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
+  if (closure->hasEmptyBody() ||
+      !ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
+    return false;
+
+  // If body is nested in a parent that has a function builder applied,
+  // let's prevent inference until result builders.
+  return !isInResultBuilderContext(closure);
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
