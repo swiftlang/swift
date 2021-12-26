@@ -1825,13 +1825,13 @@ bool ClangImporter::canImportModule(ImportPath::Element moduleID,
   clang::Module::UnresolvedHeaderDirective mh;
   clang::Module *m;
   auto &ctx = Impl.getClangASTContext();
-  auto available = clangModule->isAvailable(ctx.getLangOpts(), getTargetInfo(),
-                                            r, mh, m);
-  if (!available)
+  auto importable =
+      !clangModule->isUnimportable(ctx.getLangOpts(), getTargetInfo(), r, m);
+  if (!importable)
     return false;
   if (version.empty())
     return true;
-  assert(available);
+  assert(importable);
   assert(!version.empty());
   llvm::VersionTuple currentVersion;
   StringRef path = getClangASTContext().getSourceManager()

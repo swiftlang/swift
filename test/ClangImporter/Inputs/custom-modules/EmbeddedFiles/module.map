@@ -1,0 +1,4 @@
+module EmbeddedFiles {
+    header "types.h"
+    textual header "textual.inc"
+}
