@@ -3781,8 +3781,10 @@ std::string ArchetypeType::getFullName() const {
 void
 OpaqueTypeArchetypeType::Profile(llvm::FoldingSetNodeID &id,
                                  OpaqueTypeDecl *decl,
+                                 unsigned ordinal,
                                  SubstitutionMap subs) {
   id.AddPointer(decl);
+  id.AddInteger(ordinal);
   subs.profile(id);
 }
 

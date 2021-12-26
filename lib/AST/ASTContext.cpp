@@ -4283,7 +4283,7 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
   Substitutions = Substitutions.getCanonical();
 
   llvm::FoldingSetNodeID id;
-  Profile(id, Decl, Substitutions);
+  Profile(id, Decl, ordinal, Substitutions);
   
   auto &ctx = Decl->getASTContext();
 

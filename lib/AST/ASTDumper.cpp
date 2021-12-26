@@ -3776,6 +3776,7 @@ namespace {
                                       StringRef label) {
       printArchetypeCommon(T, "opaque_type", label);
       printField("decl", T->getDecl()->getNamingDecl()->printRef());
+      printField("ordinal", T->getOrdinal());
       if (!T->getSubstitutions().empty()) {
         OS << '\n';
         SmallPtrSet<const ProtocolConformance *, 4> Dumped;
