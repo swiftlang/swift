@@ -203,16 +203,23 @@ if(SWIFT_BUILD_STATIC_STDLIB)
                              PATTERN "*.h")
 endif()
 
+if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG)
+  # This will still link against the Swift-forked clang headers if the Swift
+  # toolchain was built with SWIFT_INCLUDE_TOOLS.
+  set(symlink_dir ${clang_headers_location})
+else()
+  set(symlink_dir "../clang/${CLANG_VERSION}")
+endif()
 
 swift_install_symlink_component(clang-resource-dir-symlink
   LINK_NAME clang
-  TARGET ../clang/${CLANG_VERSION}
+  TARGET ${symlink_dir}
   DESTINATION "lib/swift")
 
 if(SWIFT_BUILD_STATIC_STDLIB)
   swift_install_symlink_component(clang-resource-dir-symlink
     LINK_NAME clang
-    TARGET ../clang/${CLANG_VERSION}
+    TARGET ${symlink_dir}
     DESTINATION "lib/swift_static")
 endif()
 
