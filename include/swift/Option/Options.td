@@ -1477,4 +1477,8 @@ def use_interface_for_module: Separate<["-", "--"], "use-interface-for-module">,
   HelpText<"Prefer loading these modules via interface">,
   MetaVarName<"<name>">;
 
+def debug_compilation_dir : Separate<["-"], "fdebug-compilation-dir">,
+  Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
+  HelpText<"The compilation directory to embed in the debug info.">;
+
 include "FrontendOptions.td"
