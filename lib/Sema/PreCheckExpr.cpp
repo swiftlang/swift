@@ -744,23 +744,30 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       BaseExpr = TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), NTD, BaseDC,
           DC->mapTypeIntoContext(NTD->getInterfaceType()));
-    } else if (Base->getBaseIdentifier().is("self") && Base->getDeclContext()->getContextKind() == DeclContextKind::AbstractClosureExpr) {
-      // If this is an implicit self call, we don't actually
-      // know if self is Self or Optional<Self> (e.g. in a weak self
-      // closure before self is unwrapped).
+    } else {
+      // If this is an implicit self reference, the `VarDecl` will
+      // currently have a non-optional type. But at this point,
+      // we don't actually know if this is corret (it could be a
+      // weak self capture that hasn't been unwrapped yet).
       //  - Since we don't know the correct type of self yet,
       //    we leave this as an UnresolvedDeclRefExpr that is
       //    populated with the actual type later.
-      //  - We only do this within a closure context, since that's
-      //    the only place where self can be rebound.
-      auto selfNameRef = new DeclNameRef(Base->getBaseIdentifier());
-      BaseExpr = new (Context) UnresolvedDeclRefExpr(*selfNameRef,
-                                                     DeclRefKind::Ordinary,
-                                                     UDRE->getNameLoc());
-      BaseExpr->setImplicit();
-    } else {
-      BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
-                                           /*Implicit=*/true);
+      bool isClosureImplicitSelfParameter = false;
+      if (DC->getContextKind() == DeclContextKind::AbstractClosureExpr)
+        if (auto varDecl = dyn_cast<VarDecl>(Base))
+          if (varDecl->isSelfParameter())
+            isClosureImplicitSelfParameter = true;
+          
+      if (isClosureImplicitSelfParameter) {
+        auto selfNameRef = new DeclNameRef(Base->getBaseIdentifier());
+        BaseExpr = new (Context) UnresolvedDeclRefExpr(*selfNameRef,
+                                                       DeclRefKind::Ordinary,
+                                                       UDRE->getNameLoc());
+        BaseExpr->setImplicit();
+      } else {
+        BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
+                                             /*Implicit=*/true);
+      }
     }
 
     auto isInClosureContext = [&](ValueDecl *decl) -> bool {
