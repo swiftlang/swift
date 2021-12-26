@@ -747,7 +747,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     } else {
       // If this is an implicit self reference, the `VarDecl` will
       // currently have a non-optional type. But at this point,
-      // we don't actually know if this is corret (it could be a
+      // we don't actually know if this is correct (it could be a
       // weak self capture that hasn't been unwrapped yet).
       //  - Since we don't know the correct type of self yet,
       //    we leave this as an UnresolvedDeclRefExpr that is

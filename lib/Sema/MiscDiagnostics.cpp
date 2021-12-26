@@ -1530,9 +1530,10 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       auto isExplicitWeakSelfCapture = false;
       if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
         if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
-          // If `weak self` captured explicitly, then implicit self
+          // If `weak self` was captured explicitly, then implicit self
           // is always allowed allowed once `self` is unwrapped.
-          //  - If `self` is still an Optional, compilation would have failed already.
+          //  - If `self` is still an Optional, compilation would have failed already,
+          //    so we don't need to check for that here.
           if (selfDecl->getType()->is<WeakStorageType>()) {
             isExplicitWeakSelfCapture = true;
           }
