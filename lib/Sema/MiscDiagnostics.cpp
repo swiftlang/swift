@@ -1641,13 +1641,17 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       // Until Swift 6, only emit a warning when we get this with an
       // explicit capture, since we used to not diagnose this at all.
-      // FIXME: We should always emit an error here for weak captures,
-      // which don't have the same implicit self source compat requirements
-      // as strong captures.
       auto shouldOnlyWarn = [&](Expr *selfRef) {
         if (auto declRef = dyn_cast<DeclRefExpr>(selfRef)) {
           if (auto decl = declRef->getDecl()) {
             if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+              // If the self decl was defined in an `if` or `guard` statement, we know this is an inner closure of some outer closure's `weak self` capture. Since this wasn't allowed in Swift 5.5, we should just always emit an error.
+              if (auto parentStmt = varDecl->getParentPatternStmt()) {
+                if (isa<GuardStmt>(parentStmt) || isa<IfStmt>(parentStmt)) {
+                  return false;
+                }
+              }
+              
               return !varDecl->isSelfParameter();
             }
           }
