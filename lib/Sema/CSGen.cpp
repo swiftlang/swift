@@ -1766,16 +1766,12 @@ namespace {
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       auto joinElementTypes = [&](Optional<Type> elementType) {
-        auto openedElementType = elementType.map([&](Type type) {
-          return CS.openOpaqueType(type, contextualPurpose, locator);
-        });
-
         const auto elements = expr->getElements();
         unsigned index = 0;
 
         using Iterator = decltype(elements)::iterator;
         CS.addJoinConstraint<Iterator>(
-            locator, elements.begin(), elements.end(), openedElementType,
+            locator, elements.begin(), elements.end(), elementType,
             [&](const auto it) {
               auto *locator = CS.getConstraintLocator(
                   expr, LocatorPathElt::TupleElement(index++));
@@ -1788,6 +1784,8 @@ namespace {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        contextualType = CS.openOpaqueType(
+            contextualType, contextualPurpose, locator);
         Optional<Type> arrayElementType =
             ConstraintSystem::isArrayType(contextualType);
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
@@ -1901,8 +1899,6 @@ namespace {
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
         auto openedType =
             CS.openOpaqueType(contextualType, contextualPurpose, locator);
-        openedType = CS.replaceInferableTypesWithTypeVars(
-            openedType, CS.getConstraintLocator(expr));
         auto dictionaryKeyValue =
             ConstraintSystem::isDictionaryType(openedType);
         Type contextualDictionaryKeyType;
