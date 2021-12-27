@@ -78,10 +78,10 @@ ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
 static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
                                               CharSourceRange range,
                                               SourceLoc loc) {
-  if (const auto &replacedRange = sourceMgr.getReplacedRange()) {
-    if (sourceMgr.rangeContainsTokenLoc(replacedRange.New, loc) &&
-        !sourceMgr.rangeContainsTokenLoc(replacedRange.New, range.getStart())) {
-      return replacedRange.Original.Start;
+  for (const auto &pair : sourceMgr.getReplacedRanges()) {
+    if (sourceMgr.rangeContainsTokenLoc(pair.second, loc) &&
+        !sourceMgr.rangeContainsTokenLoc(pair.second, range.getStart())) {
+      return pair.first.Start;
     }
   }
   return loc;

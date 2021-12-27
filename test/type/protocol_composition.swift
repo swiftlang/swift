@@ -177,7 +177,7 @@ takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-error {{module 'Swift
 // expected-error@-1 {{binary operator '&' cannot be applied to operands of type 'UInt8' and 'P1.Protocol'}}
 // expected-error@-2 {{binary operator '&' cannot be applied to operands of type 'UInt8' and 'P2.Protocol'}}
 // expected-note@-3 2 {{overloads for '&' exist with these partially matching parameter lists}}
-
+// expected-error@-4 {{cannot call value of non-function type '[UInt8]'}}
 
 typealias T08 = P1 & inout P2 // expected-error {{'inout' may only be used on parameters}}
 typealias T09 = P1 & __shared P2 // expected-error {{'__shared' may only be used on parameters}}

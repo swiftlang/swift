@@ -75,9 +75,9 @@ void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
   auto &searchOpts = invocation.getSearchPathOptions();
   out << "  \"paths\": {\n";
 
-  if (!searchOpts.SDKPath.empty()) {
+  if (!searchOpts.getSDKPath().empty()) {
     out << "    \"sdkPath\": \"";
-    out.write_escaped(searchOpts.SDKPath);
+    out.write_escaped(searchOpts.getSDKPath());
     out << "\",\n";
   }
 
@@ -95,7 +95,7 @@ void targetinfo::printTargetInfo(const CompilerInvocation &invocation,
 
   outputPaths("runtimeLibraryPaths", searchOpts.RuntimeLibraryPaths);
   outputPaths("runtimeLibraryImportPaths",
-              searchOpts.RuntimeLibraryImportPaths);
+              searchOpts.getRuntimeLibraryImportPaths());
 
   out << "    \"runtimeResourcePath\": \"";
   out.write_escaped(searchOpts.RuntimeResourcePath);

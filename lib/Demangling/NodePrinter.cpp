@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/AST/Ownership.h"
@@ -3093,3 +3095,5 @@ std::string Demangle::nodeToString(NodePointer root,
 
   return NodePrinter(options).printRoot(root);
 }
+
+#endif

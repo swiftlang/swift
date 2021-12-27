@@ -363,6 +363,8 @@ public:
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
 
+  bool isTypeSequence() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -4069,6 +4071,8 @@ public:
   /// parameter types and dependent member types with fresh type variables.
   ///
   /// \param type The type to open.
+  /// \param replacements The mapping from generic type parameters to their
+  ///                     corresponding opened type variables.
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type, OpenedTypeMap &replacements);
@@ -4481,6 +4485,11 @@ public:
   bool repairFailures(Type lhs, Type rhs, ConstraintKind matchKind,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
+
+  TypeMatchResult
+  matchPackTypes(PackType *pack1, PackType *pack2,
+                 ConstraintKind kind, TypeMatchOptions flags,
+                 ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two tuple types.
   ///

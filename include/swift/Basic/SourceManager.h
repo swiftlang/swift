@@ -50,19 +50,10 @@ private:
   /// to speed up stats.
   mutable llvm::DenseMap<StringRef, llvm::vfs::Status> StatusCache;
 
-  struct ReplacedRangeType {
-    SourceRange Original;
-    SourceRange New;
-    ReplacedRangeType() {}
-    ReplacedRangeType(NoneType) {}
-    ReplacedRangeType(SourceRange Original, SourceRange New)
-        : Original(Original), New(New) {
-      assert(Original.isValid() && New.isValid());
-    }
-
-    explicit operator bool() const { return Original.isValid(); }
-  };
-  ReplacedRangeType ReplacedRange;
+  /// Holds replaced ranges. Keys are orignal ranges, and values are new ranges
+  /// in different buffers. This is used for code completion and ASTContext
+  /// reusing compilation.
+  llvm::DenseMap<SourceRange, SourceRange> ReplacedRanges;
 
   std::map<const char *, VirtualFile> VirtualFiles;
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
@@ -109,8 +100,12 @@ public:
 
   SourceLoc getCodeCompletionLoc() const;
 
-  const ReplacedRangeType &getReplacedRange() const { return ReplacedRange; }
-  void setReplacedRange(const ReplacedRangeType &val) { ReplacedRange = val; }
+  const llvm::DenseMap<SourceRange, SourceRange> &getReplacedRanges() const {
+    return ReplacedRanges;
+  }
+  void setReplacedRange(SourceRange Orig, SourceRange New) {
+    ReplacedRanges[Orig] = New;
+  }
 
   /// Returns true if \c LHS is before \c RHS in the source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {

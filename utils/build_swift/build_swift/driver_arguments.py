@@ -544,9 +544,9 @@ def create_argument_parser():
            default=defaults.llvm_install_components(),
            help='A semi-colon split list of llvm components to install')
 
-    option('--libswift', store('libswift_mode'),
+    option('--bootstrapping', store('bootstrapping_mode'),
            choices=['off', 'hosttools', 'bootstrapping', 'bootstrapping-with-hostlibs'],
-           help='The libswift build mode. For details see libswift/README.md')
+           help='The bootstrapping build mode for swift compiler modules')
 
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
@@ -1176,16 +1176,6 @@ def create_argument_parser():
            help='The Android API level to target when building for Android. '
                 'Currently only 21 or above is supported')
 
-    option('--android-icu-uc', store_path,
-           help='Path to libicuuc.so')
-    option('--android-icu-uc-include', store_path,
-           help='Path to a directory containing headers for libicuuc')
-    option('--android-icu-i18n', store_path,
-           help='Path to libicui18n.so')
-    option('--android-icu-i18n-include', store_path,
-           help='Path to a directory containing headers libicui18n')
-    option('--android-icu-data', store_path,
-           help='Path to libicudata.so')
     option('--android-deploy-device-path', store_path,
            default=android.adb.commands.DEVICE_TEMP_DIR,
            help='Path on an Android device to which built Swift stdlib '

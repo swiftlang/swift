@@ -3,7 +3,7 @@
 // RUN: %target-typecheck-verify-swift -I %t  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
-import OtherActors
+import OtherActors // expected-remark{{add '@_predatesConcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@_predatesConcurrency }}
 
 let immutableGlobal: String = "hello"
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}

@@ -705,7 +705,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
 
-static bool performCompileStepsPostSema(CompilerInstance &Instance,
+bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
                                         FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
@@ -1433,6 +1433,14 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // If the stats reporter is installed, we need the ASTContext to live through
   // the entire compilation process.
   if (Instance.getASTContext().Stats) {
+    return;
+  }
+
+  // If this instance is used for multiple compilations, we need the ASTContext
+  // to live.
+  if (Instance.getInvocation()
+          .getFrontendOptions()
+          .ReuseFrontendForMutipleCompilations) {
     return;
   }
 

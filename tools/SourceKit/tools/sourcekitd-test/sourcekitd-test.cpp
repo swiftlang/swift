@@ -1087,6 +1087,16 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::Diagnostics:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestDiagnostics);
     break;
+
+  case SourceKitRequest::Compile:
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCompile);
+    break;
+
+  case SourceKitRequest::CompileClose:
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCompileClose);
+    break;
   }
 
   if (!SourceFile.empty()) {
@@ -1321,6 +1331,12 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::DependencyUpdated:
     case SourceKitRequest::Diagnostics:
       printRawResponse(Resp);
+      break;
+    case SourceKitRequest::Compile:
+      sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+      break;
+    case SourceKitRequest::CompileClose:
+      sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       break;
 
     case SourceKitRequest::RelatedIdents:

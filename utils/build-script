@@ -225,18 +225,10 @@ def validate_arguments(toolchain, args):
 
     if args.android:
         if args.android_ndk is None or \
-                args.android_api_level is None or \
-                args.android_icu_uc is None or \
-                args.android_icu_uc_include is None or \
-                args.android_icu_i18n is None or \
-                args.android_icu_i18n_include is None or \
-                args.android_icu_data is None:
+                args.android_api_level is None:
             fatal_error(
-                "when building for Android, --android-ndk, "
-                "--android-api-level, --android-icu-uc, "
-                "--android-icu-uc-include, --android-icu-i18n, "
-                "--android-icu-i18n-include, and --android-icu-data "
-                "must be specified")
+                "when building for Android, --android-ndk "
+                "and --android-api-level must be specified")
 
     targets_needing_toolchain = [
         'build_indexstoredb',

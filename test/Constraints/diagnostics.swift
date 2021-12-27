@@ -1484,3 +1484,8 @@ func testUnwrapFixIts(x: Int?) throws {
   // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{42-42=!}}
   let _: Int = try! .optionalThrowsMember ?? 0
 }
+
+func rdar86611718(list: [Int]) {
+  String(list.count())
+  // expected-error@-1 {{cannot call value of non-function type 'Int'}}
+}

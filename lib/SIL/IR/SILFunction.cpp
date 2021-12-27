@@ -281,6 +281,10 @@ OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
   return getModule().getOptions().OptMode;
 }
 
+bool SILFunction::preserveDebugInfo() const {
+  return getEffectiveOptimizationMode() <= OptimizationMode::NoOptimization;
+}
+
 bool SILFunction::shouldOptimize() const {
   return getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
 }
