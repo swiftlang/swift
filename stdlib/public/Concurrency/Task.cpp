@@ -488,7 +488,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   TaskCreateFlags taskCreateFlags(rawTaskCreateFlags);
 
   // Propagate task-creation flags to job flags as appropriate.
-  JobFlags jobFlags(JobKind::Task, taskCreateFlags.getPriority());
+  JobFlags jobFlags(JobKind::Task, taskCreateFlags.getCreationPriority());
   jobFlags.task_setIsChildTask(taskCreateFlags.isChildTask());
   if (futureResultType) {
     jobFlags.task_setIsFuture(true);
