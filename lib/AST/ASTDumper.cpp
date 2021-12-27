@@ -367,6 +367,13 @@ namespace {
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+    void visitMappingPattern(MappingPattern *P) {
+      printCommon(P, "pattern_mapping");
+      printRec(P->getSourceValue());
+      printRec(P->getMappingExpr());
+      printRec(P->getSubPattern());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
     void visitNamedPattern(NamedPattern *P) {
       printCommon(P, "pattern_named");
       PrintWithColorRAII(OS, IdentifierColor) << " '" << P->getNameStr() << "'";

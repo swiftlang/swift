@@ -1278,6 +1278,10 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
   }
 
+  case PatternKind::Mapping:
+    printPattern(cast<MappingPattern>(pattern)->getSubPattern());
+    break;
+
   case PatternKind::Typed:
     printTypedPattern(cast<TypedPattern>(pattern));
     break;

@@ -2770,6 +2770,8 @@ void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
     for (auto &field : cast<TuplePattern>(Pat)->getElements())
       checkPattern(field.getPattern(), Reason);
     return;
+  case PatternKind::Mapping:
+    return checkPattern(cast<MappingPattern>(Pat)->getSubPattern(), Reason);
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:

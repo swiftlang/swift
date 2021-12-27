@@ -79,6 +79,13 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
     }
     return;
   }
+  case PatternKind::Mapping:
+    os << "/* mapped from ";
+    cast<MappingPattern>(p)->getSourceValue()->getType()->print(os);
+    os << " */ ";
+    dumpPattern(cast<MappingPattern>(p)->getSubPattern(), os);
+    break;
+    
   case PatternKind::Is:
     os << "is ";
     cast<IsPattern>(p)->getCastType()->print(os);
@@ -117,6 +124,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   
   // Tuple and nominal-type patterns are not themselves directly refutable.
   case PatternKind::Tuple:
+  case PatternKind::Mapping:
     return false;
 
   // isa and enum-element patterns are refutable, at least in theory.
@@ -163,6 +171,11 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
     for (auto &elt : tuple->getElements())
       n = getNumSpecializationsRecursive(elt.getPattern(), n);
     return n;
+  }
+
+  case PatternKind::Mapping: {
+    auto mapping = cast<MappingPattern>(p);
+    return getNumSpecializationsRecursive(mapping->getSubPattern(), n);
   }
   
   // isa and enum-element patterns are refutable, at least in theory.
@@ -222,6 +235,7 @@ static bool isWildcardPattern(const Pattern *p) {
   
   // Non-wildcards.
   case PatternKind::Tuple:
+  case PatternKind::Mapping:
   case PatternKind::Is:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
@@ -279,6 +293,19 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   case PatternKind::Expr: {
     // These kinds are only similar to the same kind.
     if (p->getKind() == first->getKind())
+      return p;
+    return nullptr;
+  }
+  case PatternKind::Mapping: {
+    auto pMap = cast<MappingPattern>(p);
+    auto firstMap = dyn_cast<MappingPattern>(first);
+    auto getSubType = [](MappingPattern *P) -> Type {
+      return P->getSubPattern()->getType();
+    };
+    // Only if they're extracting the same properties. We can tell that they are
+    // if the subpattern types match, since the types contain the tuple labels
+    // (i.e. property names).
+    if (firstMap && getSubType(pMap)->isEqual(getSubType(firstMap)))
       return p;
     return nullptr;
   }
@@ -478,6 +505,10 @@ private:
                          ConsumableManagedValue src,
                          const SpecializationHandler &handleSpec,
                          const FailureHandler &failure);
+  void emitMappingDispatch(ArrayRef<RowToSpecialize> rows,
+                           ConsumableManagedValue src,
+                           const SpecializationHandler &handleSpec,
+                           const FailureHandler &failure);
   void emitIsDispatch(ArrayRef<RowToSpecialize> rows,
                       ConsumableManagedValue src,
                       const SpecializationHandler &handleSpec,
@@ -1368,6 +1399,8 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   
   case PatternKind::Tuple:
     return emitTupleDispatch(rowsToSpecialize, arg, handler, failure);
+  case PatternKind::Mapping:
+    return emitMappingDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::Is:
     return emitIsDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::EnumElement:
@@ -1622,6 +1655,36 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 
   // Recurse.
   handleCase(subPatternArgs, specializedRows, *innerFailure);
+}
+
+/// Perform specialized dispatch for mappings.
+void PatternMatchEmission::
+emitMappingDispatch(ArrayRef<RowToSpecialize> rows,
+                    ConsumableManagedValue src,
+                    const SpecializationHandler &handleCase,
+                    const FailureHandler &failure) {
+  auto firstPat = cast<MappingPattern>(rows[0].Pattern);
+  SILLocation loc = firstPat;
+
+  // FIXME: Implementation is naive.
+  auto copy = src.copy(SGF, loc);
+  SILGenFunction::OpaqueValueRAII srcOpaqueValue(SGF,
+                                                 firstPat->getSourceValue(),
+                                                 copy.getFinalManagedValue());
+  auto newSrc = ConsumableManagedValue::forOwned(
+                    SGF.emitRValueAsSingleValue(firstPat->getMappingExpr()));
+
+  SmallVector<SpecializedRow, 4> specializedRows;
+  for (const auto &row : rows) {
+    auto pat = cast<MappingPattern>(rows[0].Pattern);
+
+    SpecializedRow specRow;
+    specRow.Patterns.push_back(pat->getSubPattern());
+    specRow.RowIndex = row.RowIndex;
+    specializedRows.push_back(specRow);
+  }
+
+  handleCase({newSrc}, specializedRows, failure);
 }
 
 static CanType getTargetType(const RowToSpecialize &row) {

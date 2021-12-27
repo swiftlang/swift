@@ -2397,6 +2397,9 @@ namespace {
         return setType(TupleType::get(tupleTypeElts, CS.getASTContext()));
       }
 
+      case PatternKind::Mapping:
+        llvm_unreachable("MappingPattern should only be added after typechecking");
+
       case PatternKind::OptionalSome: {
         // Remove an optional from the object type.
         if (externalPatternType) {

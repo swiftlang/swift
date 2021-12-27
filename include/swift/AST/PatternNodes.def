@@ -35,6 +35,7 @@
 // Metavars: x (variable binding), pat (pattern), e (expression)
 PATTERN(Paren, Pattern)   // (pat)
 PATTERN(Tuple, Pattern)   // (pat1, ..., patN), N >= 1
+PATTERN(Mapping, Pattern) // Wraps a TuplePattern on a non-tuple
 PATTERN(Named, Pattern)   // let pat, var pat
 PATTERN(Any, Pattern)     // _
 PATTERN(Typed, Pattern)   // pat : type

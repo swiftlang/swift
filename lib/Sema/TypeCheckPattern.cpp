@@ -304,6 +304,10 @@ public:
   ALWAYS_RESOLVED_PATTERN(Bool)
 #undef ALWAYS_RESOLVED_PATTERN
 
+  Pattern *visitMappingPattern(MappingPattern *P) {
+    llvm_unreachable("MappingPattern only added after type checking");
+  }
+
   Pattern *visitBindingPattern(BindingPattern *P) {
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
@@ -876,6 +880,10 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
 
     return TupleType::get(typeElts, Context);
   }
+
+  // A MappingPattern has the type of its source, not its subpattern.
+  case PatternKind::Mapping:
+    return cast<MappingPattern>(P)->getSourceValue()->getType();
       
   //--- Refutable patterns.
   //
@@ -1188,11 +1196,11 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     // Sometimes a paren is just a paren. If the tuple pattern has a single
     // element, we can reduce it to a paren pattern.
     bool canDecayToParen = TP->getNumElements() == 1;
-    auto decayToParen = [&]() -> Pattern * {
+    auto decayToParen = [&](Type subtype) -> Pattern * {
       assert(canDecayToParen);
       Pattern *sub = TP->getElement(0).getPattern();
       sub = TypeChecker::coercePatternToType(
-          pattern.forSubPattern(sub, /*retainTopLevel=*/false), type,
+          pattern.forSubPattern(sub, /*retainTopLevel=*/false), subtype,
           subOptions);
       if (!sub)
         return nullptr;
@@ -1206,29 +1214,111 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       }
       return P;
     };
+    auto canMapToTuple =
+        [&](SmallVectorImpl<SourceLoc> &unlabeledElemSourceLocs) -> bool {
+      if (TP->getNumElements() == 0 || !type->mayHaveMembers())
+        return false;
 
-    // The context type must be a tuple.
+      for (auto &elt : TP->getElements())
+        if (elt.getLabel().empty())
+          unlabeledElemSourceLocs.push_back(elt.getLoc());
+
+      return unlabeledElemSourceLocs.empty();
+    };
+
+    // The context is a tuple in the simple case.
     TupleType *tupleTy = type->getAs<TupleType>();
+
+    // No? Try making this a ParenPattern or, if it has members, wrapping it in
+    // a MappingPattern that will map it to a tuple.
     if (!tupleTy && !hadError) {
-      if (canDecayToParen)
-        return decayToParen();
-      diags.diagnose(TP->getStartLoc(),
-                     diag::tuple_pattern_in_non_tuple_context, type);
-      hadError = true;
+      if (canDecayToParen && TP->getElement(0).getLabel().empty())
+        return decayToParen(type);
+
+      SmallVector<SourceLoc, 4> unlabeledElemSourceLocs;
+      if (!canMapToTuple(unlabeledElemSourceLocs)) {
+        // Diagnose this impossible destructuring.
+        diags.diagnose(TP->getStartLoc(),
+                       diag::tuple_pattern_in_non_tuple_context, type);
+
+        if (!unlabeledElemSourceLocs.empty()) {
+          auto note = diags.diagnose(TP->getStartLoc(),
+                                     diag::property_destructure_requires_names);
+          for (auto loc : unlabeledElemSourceLocs)
+            note.fixItInsert(loc, "<#property name#>: ");
+        }
+        hadError = true;
+      } else { // canMapToTuple()
+        // Reverse-engineer from `TP` an expression that will look up each
+        // element as a property in `sourceExpr` and construct a tuple from
+        // them.
+        OpaqueValueExpr *sourceExpr =
+            new (Context) OpaqueValueExpr(TP->getSourceRange(), type,
+                                          /*isPlaceholder=*/true);
+
+        SmallVector<Expr *, 16> elemExprs;
+        SmallVector<Identifier, 16> elemNames;
+        SmallVector<SourceLoc, 16> elemNameLocs;
+
+        for (auto &elt : TP->getElements()) {
+          assert(!elt.getLabel().empty());
+
+          elemNames.push_back(elt.getLabel());
+          elemNameLocs.push_back(elt.getLabelLoc());
+          elemExprs.push_back(new (Context) UnresolvedDotExpr(
+                                  sourceExpr, SourceLoc(),
+                                  DeclNameRef(elt.getLabel()),
+                                  DeclNameLoc(elt.getLabelLoc()),
+                                  /*Implicit=*/true));
+        }
+
+        // If we would form a single-element tuple by doing this, use the single
+        // element as the `mappingExpr`. We will later decay `TP` to a
+        // `ParenPattern`.
+        Expr *mappingExpr;
+        if (canDecayToParen) {
+          assert(elemExprs.size() == 1);
+          mappingExpr = elemExprs.front();
+        } else {
+          assert(elemExprs.size() != 1);
+          mappingExpr = TupleExpr::create(
+              Context, TP->getLParenLoc(), elemExprs, elemNames, elemNameLocs,
+              TP->getRParenLoc(), /*TrailingClosure=*/false, /*Implicit=*/true);
+        }
+
+        // Type-check this whole mess.
+        Type mappingTy = TypeChecker::typeCheckExpression(mappingExpr, dc);
+        if (mappingTy.isNull() || mappingTy->hasError())
+          hadError = true;
+        else
+          tupleTy = mappingTy->getAs<TupleType>();
+
+        assert(tupleTy || canDecayToParen);
+
+        // The rest of this code will examine/mutate `TP` and `tupleTy`, but
+        // return `P`.
+        P = new (Context) MappingPattern(
+                              canDecayToParen ? decayToParen(mappingTy) : TP,
+                              sourceExpr, mappingExpr);
+        P->setType(type);
+
+        if (canDecayToParen)
+          return hadError ? nullptr : P;
+      }
     }
 
     // The number of elements must match exactly.
     if (!hadError && tupleTy->getNumElements() != TP->getNumElements()) {
       if (canDecayToParen)
-        return decayToParen();
+        return decayToParen(type);
       
       diags.diagnose(TP->getStartLoc(), diag::tuple_pattern_length_mismatch,
-                     type);
+                     tupleTy);
       hadError = true;
     }
 
     // Coerce each tuple element to the respective type.
-    P->setType(type);
+    TP->setType(tupleTy);
 
     for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = TP->getElement(i);
@@ -1238,7 +1328,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         CoercionType = ErrorType::get(Context);
       else
         CoercionType = tupleTy->getElement(i).getType();
-      
+
       // If the tuple pattern had a label for the tuple element, it must match
       // the label for the tuple type being matched.
       if (!hadError && !elt.getLabel().empty() &&
@@ -1263,6 +1353,9 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
     return P;
   }
+
+  case PatternKind::Mapping:
+    llvm_unreachable("Cannot exist before coercePatternToType()");
 
   // Coerce expressions by finding a '~=' operator that can compare the
   // expression to a value of the coerced type.

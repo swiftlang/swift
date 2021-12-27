@@ -4181,6 +4181,9 @@ WARNING(converting_tuple_into_several_associated_values,none,
 WARNING(converting_several_associated_values_into_tuple,none,
         "enum case '%0' has one associated value that is a tuple of %1 "
         "elements",(StringRef, unsigned))
+NOTE(property_destructure_requires_names,none,
+     "label elements with property names to destructure by property",
+     ())
 ERROR(closure_argument_list_tuple,none,
       "contextual closure type %0 expects %1 argument%s1, "
       "but %2 %select{were|was}3 used in closure body", (Type, unsigned, unsigned, bool))

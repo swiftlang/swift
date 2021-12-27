@@ -148,6 +148,9 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
     for (auto &elt : P->getElements())
       visit(elt.getPattern());
   }
+  void visitMappingPattern(MappingPattern *P) {
+    return visit(P->getSubPattern());
+  }
   void visitAnyPattern(AnyPattern *P) {}
 
   // When we see a variable binding, emit its global accessor.

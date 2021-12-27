@@ -1217,6 +1217,10 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
     return result;
   }
 
+  case PatternKind::Mapping:
+    return buildDefaultInitializerString(
+        dc, cast<MappingPattern>(pattern)->getSubPattern());
+
   case PatternKind::Typed:
     return buildDefaultInitializerString(
         dc, cast<TypedPattern>(pattern)->getSubPattern());

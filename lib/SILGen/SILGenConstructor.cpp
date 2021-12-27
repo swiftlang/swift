@@ -991,6 +991,10 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
     return InitializationPtr(init);
   }
 
+  case PatternKind::Mapping:
+    return emitMemberInit(SGF, selfDecl,
+                          cast<MappingPattern>(pattern)->getSubPattern());
+
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
 

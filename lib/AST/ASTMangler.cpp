@@ -2033,6 +2033,9 @@ namespace {
     VarDecl *visitParenPattern(ParenPattern *P) {
       return visit(P->getSubPattern());
     }
+    VarDecl *visitMappingPattern(MappingPattern *P) {
+      return visit(P->getSubPattern());
+    }
     VarDecl *visitBindingPattern(BindingPattern *P) {
       return visit(P->getSubPattern());
     }

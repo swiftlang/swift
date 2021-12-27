@@ -1676,6 +1676,14 @@ Pattern *Traversal::visitTuplePattern(TuplePattern *P) {
   }
   return P;
 }
+Pattern *Traversal::visitMappingPattern(MappingPattern *P) {
+  if (Pattern *newSub = doIt(P->getSubPattern()))
+    P->setSubPattern(newSub);
+  else
+    return nullptr;
+  return P;
+}
+
 
 Pattern *Traversal::visitNamedPattern(NamedPattern *P) {
   if (doIt(P->getDecl()))

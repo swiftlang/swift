@@ -34,6 +34,7 @@
 namespace swift {
   class ASTContext;
   class Expr;
+  class OpaqueValueExpr;
   enum class CheckedCastKind : unsigned;
   class TypeExpr;
 
@@ -284,6 +285,17 @@ public:
   }
 
   void setPattern(Pattern *p) { ThePattern = p; }
+
+  SourceRange getSourceRange() const {
+    SourceRange range;
+    if (auto sub = getPattern())
+      range = sub->getSourceRange();
+    if (range.isValid() && LabelLoc.isValid())
+      range = SourceRange(LabelLoc, range.End);
+    return range;
+  }
+
+  SourceLoc getLoc() const { return getSourceRange().Start; }
 };
 
 /// A pattern consisting of a tuple of patterns.
@@ -336,6 +348,35 @@ public:
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Tuple;
+  }
+};
+
+/// A pattern which makes its sub-pattern match against a value computed from
+/// the current value. Currently added when a TuplePattern is matched against a
+/// non-tuple.
+class MappingPattern : public Pattern {
+  Pattern *SubPattern;
+  OpaqueValueExpr *SourceValue;
+  Expr *MappingExpr;
+
+public:
+  MappingPattern(Pattern *SubPattern, OpaqueValueExpr *SourceValue,
+                 Expr *MappingExpr)
+      : Pattern(PatternKind::Mapping), SubPattern(SubPattern),
+        SourceValue(SourceValue), MappingExpr(MappingExpr) { }
+
+  Pattern *getSubPattern() const { return SubPattern; }
+
+  void setSubPattern(Pattern *P) { SubPattern = P; }
+
+  OpaqueValueExpr *getSourceValue() const { return SourceValue; }
+
+  Expr *getMappingExpr() const { return MappingExpr; }
+
+  SourceRange getSourceRange() const { return SubPattern->getSourceRange(); }
+
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Mapping;
   }
 };
 

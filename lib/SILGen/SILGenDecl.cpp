@@ -1064,6 +1064,9 @@ struct InitializationForPattern
   InitializationPtr visitBindingPattern(BindingPattern *P) {
     return visit(P->getSubPattern());
   }
+  InitializationPtr visitMappingPattern(MappingPattern *P) {
+    return visit(P->getSubPattern());
+  }
 
   // AnyPatterns (i.e, _) don't require any storage. Any value bound here will
   // just be dropped.
