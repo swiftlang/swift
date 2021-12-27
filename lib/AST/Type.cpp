@@ -3562,7 +3562,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
       partialSubstRef.subst(partialSubstTy, opaqueRoot->getSubstitutions());
 
   // If the type still contains opaque types, recur.
-  if (substTy->hasOpaqueArchetype()) {
+  if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
     return ::substOpaqueTypesWithUnderlyingTypes(
         substRef, substTy, inContext, contextExpansion, isContextWholeModule);
   }
