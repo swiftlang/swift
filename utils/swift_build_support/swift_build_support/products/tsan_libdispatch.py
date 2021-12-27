@@ -12,17 +12,12 @@
 
 import os
 
-from . import cmark
+from . import cmake_product
 from . import foundation
 from . import libcxx
 from . import libdispatch
 from . import libicu
-from . import llbuild
 from . import llvm
-from . import product
-from . import swift
-from . import swiftpm
-from . import xctest
 from .. import shell
 
 
@@ -30,7 +25,7 @@ def join_path(*paths):
     return os.path.abspath(os.path.join(*paths))
 
 
-class TSanLibDispatch(product.Product):
+class TSanLibDispatch(cmake_product.CMakeProduct):
     @classmethod
     def product_source_name(cls):
         return "tsan-libdispatch-test"
@@ -48,33 +43,25 @@ class TSanLibDispatch(product.Product):
 
     def build(self, host_target):
         """Build TSan runtime (compiler-rt)."""
-        rt_source_dir = join_path(self.source_dir, os.pardir, 'compiler-rt')
+        # Fixup source dir for CMake: <root>/tsan-libdispatch-test -> <root>/llvm-project/compiler-rt
+        self.source_dir = join_path(self.source_dir, os.pardir, 'llvm-project', 'compiler-rt')
+
         toolchain_path = join_path(self.args.install_destdir, 'usr')
         clang = join_path(toolchain_path, 'bin', 'clang')
         clangxx = join_path(toolchain_path, 'bin', 'clang++')
 
-        config_cmd = [
-            'cmake',
-            '-GNinja',
-            '-DCMAKE_PREFIX_PATH=%s' % toolchain_path,
-            '-DCMAKE_C_COMPILER=%s' % clang,
-            '-DCMAKE_CXX_COMPILER=%s' % clangxx,
-            '-DCMAKE_BUILD_TYPE=Release',
-            '-DLLVM_ENABLE_ASSERTIONS=ON',
-            '-DCOMPILER_RT_INCLUDE_TESTS=ON',
-            '-DCOMPILER_RT_BUILD_XRAY=OFF',
-            '-DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON',
-            '-DCOMPILER_RT_LIBDISPATCH_INSTALL_PATH=%s' % toolchain_path,
-            rt_source_dir]
-        build_cmd = ['ninja', 'tsan']
+        self.cmake_options.define('CMAKE_PREFIX_PATH', toolchain_path)
+        self.cmake_options.define('CMAKE_C_COMPILER', clang)
+        self.cmake_options.define('CMAKE_CXX_COMPILER', clangxx)
+        self.cmake_options.define('CMAKE_BUILD_TYPE', 'Release')
+        self.cmake_options.define('LLVM_ENABLE_ASSERTIONS', 'ON')
+        self.cmake_options.define('COMPILER_RT_DEBUG', 'ON')
+        self.cmake_options.define('COMPILER_RT_INCLUDE_TESTS', 'ON')
+        self.cmake_options.define('COMPILER_RT_BUILD_XRAY', 'OFF')
+        self.cmake_options.define('COMPILER_RT_INTERCEPT_LIBDISPATCH', 'ON')
+        self.cmake_options.define('COMPILER_RT_LIBDISPATCH_INSTALL_PATH', toolchain_path)
 
-        # Always rebuild TSan runtime
-        shell.rmtree(self.build_dir)
-        shell.makedirs(self.build_dir)
-
-        with shell.pushd(self.build_dir):
-            shell.call(config_cmd)
-            shell.call(build_cmd)
+        self.build_with_cmake(['tsan'], 'Release', [])
 
     def should_test(self, host_target):
         return True
@@ -95,13 +82,8 @@ class TSanLibDispatch(product.Product):
 
     @classmethod
     def get_dependencies(cls):
-        return [cmark.CMark,
-                llvm.LLVM,
+        return [llvm.LLVM,
                 libcxx.LibCXX,
                 libicu.LibICU,
-                swift.Swift,
                 libdispatch.LibDispatch,
-                foundation.Foundation,
-                xctest.XCTest,
-                llbuild.LLBuild,
-                swiftpm.SwiftPM]
+                foundation.Foundation]
