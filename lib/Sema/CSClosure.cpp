@@ -512,28 +512,28 @@ private:
   }
 
   void visitBreakStmt(BreakStmt *breakStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Break");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Break");
   }
 
   void visitContinueStmt(ContinueStmt *continueStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Continue");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Continue");
   }
 
   void visitDeferStmt(DeferStmt *deferStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Defer");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Defer");
   }
 
   void visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Fallthrough");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Fallthrough");
   }
 
   void visitIfStmt(IfStmt *ifStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: If");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: If");
 
     SmallVector<ElementInfo, 4> elements;
 
@@ -562,8 +562,8 @@ private:
   }
 
   void visitGuardStmt(GuardStmt *guardStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Guard");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Guard");
 
     createConjunction(cs,
                       {makeElement(guardStmt->getCondPointer(),
@@ -574,8 +574,8 @@ private:
   }
 
   void visitWhileStmt(WhileStmt *whileStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Guard");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: While");
 
     createConjunction(cs,
                       {makeElement(whileStmt->getCondPointer(),
@@ -586,15 +586,15 @@ private:
   }
 
   void visitDoStmt(DoStmt *doStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Do");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Do");
 
     visitBraceStmt(doStmt->getBody());
   }
 
   void visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: RepeatWhile");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: RepeatWhile");
 
     createConjunction(cs,
                       {makeElement(repeatWhileStmt->getCond(),
@@ -606,8 +606,8 @@ private:
   }
 
   void visitPoundAssertStmt(PoundAssertStmt *poundAssertStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: PoundAssert");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: PoundAssert");
 
     createConjunction(cs,
                       {makeElement(poundAssertStmt->getCondition(),
@@ -618,8 +618,8 @@ private:
   }
 
   void visitThrowStmt(ThrowStmt *throwStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Throw");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Throw");
 
     Type errType =
         cs.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
@@ -641,8 +641,8 @@ private:
   }
 
   void visitForEachStmt(ForEachStmt *forEachStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: ForEach");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: ForEach");
 
     auto *stmtLoc = cs.getConstraintLocator(locator);
 
@@ -679,8 +679,8 @@ private:
   }
 
   void visitSwitchStmt(SwitchStmt *switchStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Switch");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Switch");
 
     auto *switchLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::ClosureBodyElement(switchStmt));
@@ -705,8 +705,8 @@ private:
   }
 
   void visitDoCatchStmt(DoCatchStmt *doStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: DoCatch");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: DoCatch");
 
     auto *doLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::ClosureBodyElement(doStmt));
@@ -725,8 +725,8 @@ private:
   }
 
   void visitCaseStmt(CaseStmt *caseStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Case");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Case");
 
     Type contextualTy;
 
