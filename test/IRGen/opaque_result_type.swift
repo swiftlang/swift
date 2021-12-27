@@ -28,6 +28,9 @@ extension Int: O, O2 {
   public func baz() {}
 }
 
+@_marker protocol Marker { }
+extension Int: Marker { }
+
 extension String: P {
   // CHECK-LABEL: @"$sSS18opaque_result_typeE3pooQryFQOMQ" = {{.*}}constant <{ {{.*}} }> <{
   // -- header: opaque type context (0x4), generic (0x80), unique (0x40), two entries (0x2_0000)
@@ -132,6 +135,22 @@ func bar(y: C) -> some Q {
 // CHECK-SAME:         @"get_witness_table 18opaque_result_type1PRzAA1QRzlxAaC
 // CHECK-SAME:  }>
 func baz<T: P & Q>(z: T) -> some P & Q {
+  return z
+}
+
+// CHECK-LABEL: @"$s18opaque_result_type4fizz1zQrx_tAA6MarkerRzAA1PRzAA1QRzlFQOMQ" = {{.*}} constant <{ {{.*}} }> <{
+// -- header: opaque type context (0x4), generic (0x80), unique (0x40), three entries (0x3_0000)
+// CHECK-SAME:         <i32 0x3_00c4>
+// -- parent context: anon context for function
+// CHECK-SAME:         @"$s18opaque_result_type4fizz1zQrx_tAA6MarkerRzAA1PRzAA1QRzlFMXX"
+// -- mangled underlying type
+// CHECK-SAME:         @"symbolic x"
+// -- conformance to P
+// CHECK-SAME:         @"get_witness_table 18opaque_result_type6MarkerRzAA1PRzAA1QRzlxAaCHD2_
+// -- conformance to Q
+// CHECK-SAME:         @"get_witness_table 18opaque_result_type6MarkerRzAA1PRzAA1QRzlxAaDHD3_
+// CHECK-SAME:  }>
+func fizz<T: P & Q & Marker>(z: T) -> some P & Q & Marker {
   return z
 }
 
