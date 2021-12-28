@@ -567,7 +567,7 @@ namespace {
       OS << " naming_decl=";
       printDeclName(OTD->getNamingDecl());
       PrintWithColorRAII(OS, TypeColor) << " opaque_interface="
-        << Type(OTD->getUnderlyingInterfaceType()).getString();
+        << OTD->getUnderlyingInterfaceType().getString();
       OS << " in "
          << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
       if (auto underlyingSubs = OTD->getUnderlyingTypeSubstitutions()) {

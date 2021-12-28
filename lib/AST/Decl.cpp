@@ -7782,7 +7782,7 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                                GenericSignature OpaqueInterfaceGenericSignature,
                                ArrayRef<OpaqueReturnTypeRepr *>
                                    OpaqueReturnTypeReprs,
-                               GenericTypeParamType *UnderlyingInterfaceType)
+                               Type UnderlyingInterfaceType)
     : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
                       GenericParams),
       NamingDeclAndHasOpaqueReturnTypeRepr(
@@ -7807,7 +7807,7 @@ OpaqueTypeDecl *OpaqueTypeDecl::get(
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
       ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs,
-      GenericTypeParamType *UnderlyingInterfaceType) {
+      Type UnderlyingInterfaceType) {
   ASTContext &ctx = DC->getASTContext();
   auto size = totalSizeToAlloc<OpaqueReturnTypeRepr *>(
       OpaqueReturnTypeReprs.size());

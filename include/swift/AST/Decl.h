@@ -2719,8 +2719,8 @@ class OpaqueTypeDecl final :
   /// abstracted underlying types.
   GenericSignature OpaqueInterfaceGenericSignature;
 
-  /// The generic parameter that represents the underlying type.
-  GenericTypeParamType *UnderlyingInterfaceType;
+  /// The underlying type, which will involve the opaque generic parameters.
+  Type UnderlyingInterfaceType;
   
   /// If known, the underlying type and conformances of the opaque type,
   /// expressed as a SubstitutionMap for the opaque interface generic signature.
@@ -2734,7 +2734,7 @@ class OpaqueTypeDecl final :
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
                  ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs,
-                 GenericTypeParamType *UnderlyingInterfaceType);
+                 Type UnderlyingInterfaceType);
 
   unsigned getNumOpaqueReturnTypeReprs() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getInt()
@@ -2752,7 +2752,7 @@ public:
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
       ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs,
-      GenericTypeParamType *UnderlyingInterfaceType);
+      Type UnderlyingInterfaceType);
 
   ValueDecl *getNamingDecl() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getPointer();
@@ -2794,10 +2794,7 @@ public:
   }
 
   /// The underlying interface type describing the whole opaque type.
-  ///
-  /// FIXME: Structured opaque types will generalize this to an
-  /// arbitrary type.
-  GenericTypeParamType *getUnderlyingInterfaceType() const {
+  Type getUnderlyingInterfaceType() const {
     return UnderlyingInterfaceType;
   }
   

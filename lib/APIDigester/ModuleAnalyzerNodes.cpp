@@ -1518,7 +1518,7 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
     if (auto OTA = T->getAs<OpaqueTypeArchetypeType>()) {
       if (auto *D = OTA->getDecl()) {
         if (auto SubMap = D->getUnderlyingTypeSubstitutions()) {
-          T = Type(D->getUnderlyingInterfaceType()).
+          T = D->getUnderlyingInterfaceType().
             subst(*SubMap)->getCanonicalType();
         }
       }
