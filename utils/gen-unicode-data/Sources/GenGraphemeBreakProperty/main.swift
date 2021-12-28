@@ -150,7 +150,9 @@ func emit(
   into result: inout String
 ) {
   result += """
-  static __swift_uint32_t _swift_stdlib_graphemeBreakProperties[\(data.count)] = {
+  #define GRAPHEME_BREAK_DATA_COUNT \(data.count)
+
+  static const __swift_uint32_t _swift_stdlib_graphemeBreakProperties[\(data.count)] = {
 
   """
 
@@ -181,69 +183,21 @@ func emit(
       value |= 1 << 31
     }
 
-    return "0x\(String(value, radix: 16))"
+    return "0x\(String(value, radix: 16, uppercase: true))"
   }
 
-  result += "\n};\n\n"
-}
-
-// Writes the stdlib internal routine for binary searching the grapheme array.
-func emitAccessor(
-  _ dataCount: Int,
-  into result: inout String
-) {
   result += """
-  SWIFT_RUNTIME_STDLIB_INTERNAL
-  __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar) {
-    auto low = 0;
-    auto high = \(dataCount) - 1;
 
-    while (high >= low) {
-      auto idx = low + (high - low) / 2;
+  };
 
-      auto entry = _swift_stdlib_graphemeBreakProperties[idx];
-
-      // Shift the enum and range count out of the value.
-      auto lower = (entry << 11) >> 11;
-
-      // Shift the enum out first, then shift out the scalar value.
-      auto upper = lower + ((entry << 3) >> 24);
-
-      // Shift everything out.
-      auto enumValue = (__swift_uint8_t)(entry >> 29);
-
-      // Special case: extendedPictographic who used an extra bit for the range.
-      if (enumValue == 5) {
-        upper = lower + ((entry << 2) >> 23);
-      }
-
-      if (scalar >= lower && scalar <= upper) {
-        return enumValue;
-      }
-
-      if (scalar > upper) {
-        low = idx + 1;
-        continue;
-      }
-
-      if (scalar < lower) {
-        high = idx - 1;
-        continue;
-      }
-    }
-
-    // If we made it out here, then our scalar was not found in the grapheme
-    // array (this occurs when a scalar doesn't map to any grapheme break
-    // property). Return the max value here to indicate .any.
-    return 0xFF;
-  }
+  #endif // #ifndef GRAPHEME_DATA_H
 
   """
 }
 
 // Main entry point into the grapheme break property generator.
 func generateGraphemeBreakProperty() {
-  var result = readFile("Input/UnicodeGrapheme.cpp")
+  var result = readFile("Input/GraphemeData.h")
 
   let baseData = getGraphemeBreakPropertyData(
     for: "Data/GraphemeBreakProperty.txt"
@@ -268,9 +222,7 @@ func generateGraphemeBreakProperty() {
 
   emit(data, into: &result)
 
-  emitAccessor(data.count, into: &result)
-
-  write(result, to: "Output/UnicodeGrapheme.cpp")
+  write(result, to: "../../stdlib/public/stubs/Unicode/Common/GraphemeData.h")
 }
 
 generateGraphemeBreakProperty()
