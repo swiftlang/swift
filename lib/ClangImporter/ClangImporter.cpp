@@ -481,10 +481,11 @@ getWasiLibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
                          SmallVectorImpl<char> &buffer) {
   StringRef platform = swift::getPlatformNameForTriple(triple);
   StringRef arch = swift::getMajorArchitectureName(triple);
+  StringRef SDKPath = Opts.getSDKPath();
 
-  if (!Opts.SDKPath.empty()) {
+  if (!SDKPath.empty()) {
     buffer.clear();
-    buffer.append(Opts.SDKPath.begin(), Opts.SDKPath.end());
+    buffer.append(SDKPath.begin(), SDKPath.end());
     llvm::sys::path::append(buffer, "usr", "lib", "swift");
     llvm::sys::path::append(buffer, platform, arch, "wasi.modulemap");
 
