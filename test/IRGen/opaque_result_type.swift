@@ -62,7 +62,7 @@ public var globalProp: some O {
   return 0
 }
 
-public class C: P, Q {
+public class C: P, Q, Marker {
   // CHECK-LABEL: @"$s18opaque_result_type1CC3pooQryFQOMQ" = {{.*}} constant <{ {{.*}} }> <{
   // -- header: opaque type context (0x4), generic (0x80), unique (0x40), two entries (0x2_0000)
   // CHECK-SAME:         <i32 0x2_00c4>
@@ -154,6 +154,10 @@ func fizz<T: P & Q & Marker>(z: T) -> some P & Q & Marker {
   return z
 }
 
+func bauble<T: P & Q & Marker, U: Q>(z: T, u: U) -> [(some P & Q & Marker, (some Q)?)] {
+  return [(z, u)]
+}
+
 // Ensure the local type's opaque descriptor gets emitted.
 // CHECK-LABEL: @"$s18opaque_result_type11localOpaqueQryF0D0L_QryFQOMQ" = 
 func localOpaque() -> some P {
@@ -180,7 +184,11 @@ public func useFoo(x: String, y: C) {
   let pqb = pq.qoo()
   pqb.bar()
   pqb.baz()
+
+  let _ = bauble(z: y, u: y)
 }
+
+// CHECK-LABEL: define {{.*}} @"$s18opaque_result_type6bauble1z1uSayQr_QrSgtGx_q_tAA6MarkerRzAA1PRzAA1QRzAaIR_r0_lF"
 
 // CHECK-LABEL: define {{.*}} @"$s18opaque_result_type6useFoo1x1yySS_AA1CCtF"
 // CHECK: [[OPAQUE:%.*]] = call {{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMg"
