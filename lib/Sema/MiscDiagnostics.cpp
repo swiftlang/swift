@@ -2651,12 +2651,36 @@ public:
                       return canonicalUnderlyingSubs != otherCandidate.second.getCanonical();
                     });
     if (mismatch) {
+      unsigned mismatchIndex = OpaqueDecl->getOpaqueGenericParams().size();
+      for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
+        unsigned index = genericParam->getIndex();
+        Type underlyingType = Candidates[0].second.getReplacementTypes()[index];
+        bool found = false;
+        for (const auto &candidate : Candidates) {
+          Type otherType = candidate.second.getReplacementTypes()[index];
+          if (!underlyingType->isEqual(otherType)) {
+            mismatchIndex = index;
+            found = true;
+            break;
+          }
+        }
+
+        if (found)
+          break;
+      }
+      assert(mismatchIndex < OpaqueDecl->getOpaqueGenericParams().size());
+      TypeRepr *opaqueRepr =
+          OpaqueDecl->getOpaqueReturnTypeReprs()[mismatchIndex];
       Implementation->diagnose(
-          diag::opaque_type_mismatched_underlying_type_candidates);
+          diag::opaque_type_mismatched_underlying_type_candidates,
+          opaqueRepr)
+        .highlight(opaqueRepr->getSourceRange());
+
       for (auto candidate : Candidates) {
-        Ctx.Diags.diagnose(candidate.first->getLoc(),
-                           diag::opaque_type_underlying_type_candidate_here,
-                           candidate.second.getReplacementTypes()[0]);
+        Ctx.Diags.diagnose(
+           candidate.first->getLoc(),
+           diag::opaque_type_underlying_type_candidate_here,
+           candidate.second.getReplacementTypes()[mismatchIndex]);
       }
       return;
     }
@@ -2672,9 +2696,10 @@ public:
       });
 
       if (isSelfReferencing) {
+        unsigned index = genericParam->getIndex();
         Ctx.Diags.diagnose(Candidates.front().first->getLoc(),
                            diag::opaque_type_self_referential_underlying_type,
-                           underlyingSubs.getReplacementTypes()[0]);
+                           underlyingSubs.getReplacementTypes()[index]);
         return;
       }
     }

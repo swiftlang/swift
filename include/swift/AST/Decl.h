@@ -2746,15 +2746,6 @@ class OpaqueTypeDecl final :
     return getNumOpaqueReturnTypeReprs();
   }
 
-  /// Retrieve the buffer containing the opaque return type
-  /// representations that correspond to the opaque generic parameters.
-  ArrayRef<OpaqueReturnTypeRepr *> getOpaqueReturnTypeReprs() const {
-    return {
-      getTrailingObjects<OpaqueReturnTypeRepr *>(),
-      getNumOpaqueReturnTypeReprs()
-    };
-  }
-
 public:
   static OpaqueTypeDecl *get(
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
@@ -2791,6 +2782,15 @@ public:
   /// type declaration.
   TypeArrayView<GenericTypeParamType> getOpaqueGenericParams() const {
     return OpaqueInterfaceGenericSignature.getInnermostGenericParams();
+  }
+
+  /// Retrieve the buffer containing the opaque return type
+  /// representations that correspond to the opaque generic parameters.
+  ArrayRef<OpaqueReturnTypeRepr *> getOpaqueReturnTypeReprs() const {
+    return {
+      getTrailingObjects<OpaqueReturnTypeRepr *>(),
+      getNumOpaqueReturnTypeReprs()
+    };
   }
 
   /// The underlying interface type describing the whole opaque type.
