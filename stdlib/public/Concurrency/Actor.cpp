@@ -36,9 +36,7 @@
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
 #include "swift/Basic/ListMerger.h"
-#ifndef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
-#include "llvm/Config/config.h"
-#else
+#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
 // All platforms where we care about back deployment have a known
 // configurations.
 #define HAVE_PTHREAD_H 1
@@ -72,7 +70,7 @@
 #include <sys/syscall.h>
 #endif
 
-#if HAVE_PTHREAD_H
+#if defined(_POSIX_THREADS)
 #include <pthread.h>
 
 // Only use __has_include since HAVE_PTHREAD_NP_H is not provided.
