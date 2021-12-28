@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/OpaqueTypeStructured.swift
-// RUN: %target-swift-frontend -emit-sil -I %t %s | %FileCheck -check-prefix=SIL %s
+// RUN: %target-swift-frontend -emit-module -disable-availability-checking -o %t -enable-library-evolution %S/Inputs/OpaqueTypeStructured.swift
+// RUN: %target-swift-frontend -emit-sil -disable-availability-checking -I %t %s | %FileCheck -check-prefix=SIL %s
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print OpaqueTypeStructured -I %t | %FileCheck -check-prefix=AST %s
 import OpaqueTypeStructured
 
