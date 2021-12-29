@@ -27,6 +27,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IRGen/IRGenPublic.h"
+#include "swift/Runtime/Config.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
