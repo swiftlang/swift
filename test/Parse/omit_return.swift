@@ -545,10 +545,10 @@ func ff_implicitMemberAccessEnumCase() -> Unit {
 
 
 var fv_nop: () {
-} // expected-error {{computed property must have accessors specified}}
+} // expected-error {{missing return in accessor expected to return '()'}}
 
 var fv_missing: String {
-} // expected-error {{computed property must have accessors specified}}
+} // expected-error {{missing return in accessor expected to return 'String'}}
 
 var fv_implicit: String {
     "hello"
@@ -1054,12 +1054,12 @@ var fvs_optionalTryImplicit: String? {
 
 enum S_nop {
     subscript() -> () {
-    } // expected-error {{subscript must have accessors specified}}
+    } // expected-error {{missing return in subscript expected to return '()'}}
 }
 
 enum S_missing {
     subscript() -> String {
-    } // expected-error {{subscript must have accessors specified}}
+    } // expected-error {{missing return in subscript expected to return 'String'}}
 }
 
 enum S_implicit {

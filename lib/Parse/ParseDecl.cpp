@@ -6226,7 +6226,7 @@ ParserStatus Parser::parseGetEffectSpecifier(ParsedAccessors &accessors,
 
 ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
                                  GenericParamList *GenericParams,
-                                 ParameterList *Indices,
+                                 ParameterList *Indices, TypeRepr *ResultType,
                                  ParsedAccessors &accessors,
                                  AbstractStorageDecl *storage,
                                  SourceLoc StaticLoc) {
@@ -6258,8 +6258,22 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     if (parsingLimitedSyntax)
       return makeParserSuccess();
 
-    diagnose(accessors.RBLoc, diag::computed_property_no_accessors,
-             /*subscript*/ Indices != nullptr);
+    if (ResultType != nullptr) {
+      // An error type at this point means we couldn't parse
+      // the result type for subscript correctly which will be
+      // already diagnosed as missing result type in declaration.
+      if (ResultType->getKind() == TypeReprKind::Error)
+        return makeParserError();
+
+      diagnose(accessors.RBLoc, diag::missing_accessor_return_decl,
+               /*subscript*/ Indices != nullptr, ResultType);
+    } else {
+      // This is supposed to be a computed property, but we don't
+      // have a result type representation which indicates this is probably not
+      // a well-formed computed property. So we can assume that empty braces
+      // are unexpected at this position for this declaration.
+      diagnose(accessors.LBLoc, diag::unexpected_curly_braces_in_decl);
+    }
     return makeParserError();
   }
 
@@ -6488,9 +6502,11 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
 
   // Parse getter and setter.
   ParsedAccessors accessors;
+  auto typedPattern = dyn_cast<TypedPattern>(pattern);
+  auto *resultTypeRepr = typedPattern ? typedPattern->getTypeRepr() : nullptr;
   auto AccessorStatus = parseGetSet(Flags, /*GenericParams=*/nullptr,
-                                    /*Indices=*/nullptr, accessors,
-                                    storage, StaticLoc);
+                                    /*Indices=*/nullptr, resultTypeRepr,
+                                    accessors, storage, StaticLoc);
   if (AccessorStatus.hasCodeCompletion())
     return makeParserCodeCompletionStatus();
   if (AccessorStatus.isErrorOrHasCompletion())
@@ -6500,7 +6516,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
   if (!PrimaryVar)
     return nullptr;
 
-  if (!isa<TypedPattern>(pattern)) {
+  if (!typedPattern) {
     if (accessors.Get || accessors.Set || accessors.Address ||
         accessors.MutableAddress) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
@@ -8030,7 +8046,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       Status.setIsParseError();
     }
   } else if (!Status.hasCodeCompletion()) {
-    Status |= parseGetSet(Flags, GenericParams, Indices.get(),
+    Status |= parseGetSet(Flags, GenericParams, Indices.get(), ElementTy.get(),
                           accessors, Subscript, StaticLoc);
   }
 
