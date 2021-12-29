@@ -42,7 +42,7 @@ set(swiftDarwin_common_options
       DEPENDS ${darwin_depends})
 
 
-if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" AND
+if(${BOOTSTRAPPING_MODE} STREQUAL "BOOTSTRAPPING" AND
    ${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
 
   set(swiftDarwin_common_bootstrapping_options

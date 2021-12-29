@@ -309,7 +309,10 @@ void PropertyMap::clear() {
 
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
-bool PropertyMap::addProperty(
+///
+/// If there was a conflict, returns the conflicting rule ID; otherwise
+/// returns None.
+Optional<unsigned> PropertyMap::addProperty(
     Term key, Symbol property, unsigned ruleID,
     SmallVectorImpl<InducedRule> &inducedRules) {
   assert(property.isProperty());
@@ -376,10 +379,22 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   for (const auto &bucket : properties) {
     for (auto property : bucket) {
-      bool conflict = addProperty(property.key, property.symbol,
-                                  property.ruleID, inducedRules);
-      if (conflict)
-        System.getRule(property.ruleID).markConflicting();
+      auto existingRuleID = addProperty(property.key, property.symbol,
+                                        property.ruleID, inducedRules);
+      if (existingRuleID) {
+        // The GSB only dropped the new rule in the case of a conflicting
+        // superclass requirement, so maintain that behavior here.
+        auto &existingRule = System.getRule(*existingRuleID);
+        if (existingRule.isPropertyRule()->getKind() !=
+            Symbol::Kind::Superclass) {
+          if (existingRule.getRHS().size() == property.key.size())
+            existingRule.markConflicting();
+        }
+
+        auto &newRule = System.getRule(property.ruleID);
+        assert(newRule.getRHS().size() == property.key.size());
+        newRule.markConflicting();
+      }
     }
   }
 

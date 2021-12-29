@@ -641,6 +641,32 @@ public:
   }
 };
 
+class LocatorPathElt::PackType : public StoredPointerElement<TypeBase> {
+public:
+  PackType(Type type)
+      : StoredPointerElement(PathElementKind::PackType, type.getPointer()) {
+    assert(type->getDesugaredType()->is<swift::PackType>());
+  }
+
+  Type getType() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::PackType;
+  }
+};
+
+class LocatorPathElt::PackElement final : public StoredIntegerElement<1> {
+public:
+  PackElement(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::PackElement, index) {}
+
+  unsigned getIndex() const { return getValue<0>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PackElement;
+  }
+};
+
 class LocatorPathElt::KeyPathComponent final : public StoredIntegerElement<1> {
 public:
   KeyPathComponent(unsigned index)
@@ -757,6 +783,10 @@ public:
 
   GenericTypeParamType *getType() const {
     return getStoredPointer();
+  }
+    
+  bool isTypeSequence() const {
+    return getType()->isTypeSequence();
   }
 
   static bool classof(const LocatorPathElt *elt) {

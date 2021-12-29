@@ -81,7 +81,7 @@ void swift::initializeAccessibleFunctionsLookup() {
                              MachOAccessibleFunctionsSection);
   if (start == nullptr || size == 0)
     return;
-  addImageAccessibleFunctionBlockCallbackUnsafe(start, size);
+  addImageAccessibleFunctionsBlockCallbackUnsafe(start, size);
 }
 
 #endif // defined(__MACH__) && defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)

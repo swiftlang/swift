@@ -53,6 +53,7 @@
 
 namespace swift {
 
+class FrontendObserver;
 class SerializedModuleLoaderBase;
 class MemoryBufferSerializedModuleLoader;
 class SILModule;
@@ -170,20 +171,20 @@ public:
   }
 
   void setImportSearchPaths(const std::vector<std::string> &Paths) {
-    SearchPathOpts.ImportSearchPaths = Paths;
+    SearchPathOpts.setImportSearchPaths(Paths);
   }
 
   ArrayRef<std::string> getImportSearchPaths() const {
-    return SearchPathOpts.ImportSearchPaths;
+    return SearchPathOpts.getImportSearchPaths();
   }
 
   void setFrameworkSearchPaths(
              const std::vector<SearchPathOptions::FrameworkSearchPath> &Paths) {
-    SearchPathOpts.FrameworkSearchPaths = Paths;
+    SearchPathOpts.setFrameworkSearchPaths(Paths);
   }
 
   ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
-    return SearchPathOpts.FrameworkSearchPaths;
+    return SearchPathOpts.getFrameworkSearchPaths();
   }
 
   void setExtraClangArgs(const std::vector<std::string> &Args) {
@@ -229,9 +230,7 @@ public:
 
   void setSDKPath(const std::string &Path);
 
-  StringRef getSDKPath() const {
-    return SearchPathOpts.SDKPath;
-  }
+  StringRef getSDKPath() const { return SearchPathOpts.getSDKPath(); }
 
   LangOptions &getLangOptions() {
     return LangOpts;
@@ -668,6 +667,9 @@ public:
   /// library, returning \c false if we should continue, i.e. no error.
   bool loadStdlibIfNeeded();
 
+  /// If \p fn returns true, exits early and returns true.
+  bool forEachFileToTypeCheck(llvm::function_ref<bool(SourceFile &)> fn);
+
 private:
   /// Compute the parsing options for a source file in the main module.
   SourceFile::ParsingOptions getSourceFileParsingOptions(bool forPrimary) const;
@@ -680,8 +682,6 @@ private:
   /// \c true.
   bool loadPartialModulesAndImplicitImports(
       ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const;
-
-  void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
   void finishTypeChecking();
 

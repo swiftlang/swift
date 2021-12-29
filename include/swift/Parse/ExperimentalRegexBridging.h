@@ -1,6 +1,8 @@
 #ifndef EXPERIMENTAL_REGEX_BRIDGING
 #define EXPERIMENTAL_REGEX_BRIDGING
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -19,9 +21,9 @@ extern "C" {
 /// Returns: A bool indicating whether lexing was completely erroneous, and
 ///          cannot be recovered from, or false if there either was no error,
 ///          or there was a recoverable error.
-typedef bool(* RegexLiteralLexingFn)(/*CurPtrPtr*/ const char **,
-                                     /*BufferEnd*/ const char *,
-                                     /*ErrorOut*/ const char **);
+typedef bool (* RegexLiteralLexingFn)(/*CurPtrPtr*/ const char **,
+                                      /*BufferEnd*/ const char *,
+                                      /*ErrorOut*/ const char **);
 void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn);
 
 /// Parse a regex literal string. Takes the following arguments:
@@ -32,11 +34,11 @@ void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn);
 /// - CaptureStructureOut: A buffer accepting a byte sequence representing the
 ///                        capture structure of the literal.
 /// - CaptureStructureSize: The size of the capture structure buffer. Must be
-///                         greater than or equal to `strlen(InputPtr)`.
+///                         greater than or equal to `strlen(InputPtr) + 3`.
 typedef void(* RegexLiteralParsingFn)(/*InputPtr*/ const char *,
                                       /*ErrorOut*/ const char **,
                                       /*VersionOut*/ unsigned *,
-                                      /*CaptureStructureOut*/ char *,
+                                      /*CaptureStructureOut*/ void *,
                                       /*CaptureStructureSize*/ unsigned);
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn);
 

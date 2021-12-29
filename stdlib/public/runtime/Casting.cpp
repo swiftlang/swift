@@ -76,6 +76,8 @@ extern "C" const void *swift_dynamicCastObjCProtocolConditional(
                          Protocol * const *protocols);
 #endif
 
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+
 // Build a user-comprehensible name for a type.
 static void _buildNameForMetadata(const Metadata *type,
                                   bool qualified,
@@ -124,6 +126,13 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
+#else // SWIFT_STDLIB_HAS_TYPE_PRINTING
+
+std::string swift::nameForMetadata(const Metadata *type, bool qualified) {
+  return "<<< type printer not available >>>";
+}
+
+#endif // SWIFT_STDLIB_HAS_TYPE_PRINTING
 
 /// Used as part of cache key for `TypeNameCache`.
 enum class TypeNameKind {

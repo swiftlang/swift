@@ -21,13 +21,12 @@ namespace {
 
 bool nodeMetatypesInitialized = false;
 
-// Filled in by class registration in initializeLibSwift().
+// Filled in by class registration in initializeSwiftModules().
 SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
 
 }
 
-// Does return null, if libswift is not used, i.e. initializeLibSwift() is
-// never called.
+// Does return null if initializeSwiftModules() is never called.
 SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
   SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];
   assert((!nodeMetatypesInitialized || metatype) &&
@@ -71,8 +70,8 @@ static void setUnimplementedRange(SwiftMetatype metatype,
   }
 }
 
-/// Registers the metatype of a libswift class.
-/// Called by initializeLibSwift().
+/// Registers the metatype of a swift SIL class.
+/// Called by initializeSwiftModules().
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   nodeMetatypesInitialized = true;
 
@@ -94,10 +93,10 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   }
 
   // Pre-populate the "unimplemented" ranges of metatypes.
-  // If a specifc class is not implemented yet in libswift, it bridges to an
+  // If a specifc class is not implemented in Swift yet, it bridges to an
   // "unimplemented" class. This ensures that optimizations handle _all_ kind of
   // instructions gracefully, without the need to define the not-yet-used
-  // classes in libswift.
+  // classes in Swift.
 #define VALUE_RANGE(ID) SILNodeKind::First_##ID, SILNodeKind::Last_##ID
   if (clName == "UnimplementedRefCountingInst")
     return setUnimplementedRange(metatype, VALUE_RANGE(RefCountingInst));

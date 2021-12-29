@@ -98,7 +98,8 @@ bool Rule::isProtocolRefinementRule() const {
       RHS.size() == 1 &&
       LHS[0] == RHS[0] &&
       LHS[0].getKind() == Symbol::Kind::Protocol &&
-      LHS[1].getKind() == Symbol::Kind::Protocol &&
+      (LHS[1].getKind() == Symbol::Kind::Protocol ||
+       LHS[1].getKind() == Symbol::Kind::ConcreteConformance) &&
       LHS[0] != LHS[1]) {
 
     // A protocol refinement rule must be from a directly-stated

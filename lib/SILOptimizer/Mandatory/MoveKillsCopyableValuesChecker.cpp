@@ -430,7 +430,6 @@ namespace {
 class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
-    auto &astContext = fn->getASTContext();
 
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())

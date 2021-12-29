@@ -17,8 +17,8 @@
 /// The C++ version of SwiftObject.
 ///
 /// It is used for bridging the SIL core classes (e.g. SILFunction, SILNode,
-/// etc.) with libswift.
-/// For details see libswift/README.md.
+/// etc.) with Swift.
+/// For details see SwiftCompilerSources/README.md.
 ///
 /// In C++ code, never use BridgedSwiftObject directly. SwiftObjectHeader has
 /// the proper constructor, which avoids the header to be uninitialized.

@@ -2,7 +2,7 @@
 // Note: Intentionally not using %target-sil-opt, because we need at least a
 //       swift 5.1 deployment target.
 
-// REQUIRES: libswift
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

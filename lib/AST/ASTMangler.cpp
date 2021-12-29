@@ -1171,6 +1171,13 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendAnyGenericType(decl);
     }
 
+    case TypeKind::Pack:
+    case TypeKind::PackExpansion:
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      appendOperator("XSP");
+      llvm_unreachable("Unimplemented");
+      return;
+
     case TypeKind::Paren:
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       appendType(cast<ParenType>(tybase)->getUnderlyingType(), sig, forDecl);

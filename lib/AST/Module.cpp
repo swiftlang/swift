@@ -2240,6 +2240,16 @@ SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   Imports = getASTContext().AllocateCopy(imports);
 }
 
+bool SourceFile::hasImportUsedPredatesConcurrency(
+    AttributedImport<ImportedModule> import) const {
+  return PredatesConcurrencyImportsUsed.count(import) != 0;
+}
+
+void SourceFile::setImportUsedPredatesConcurrency(
+    AttributedImport<ImportedModule> import) {
+  PredatesConcurrencyImportsUsed.insert(import);
+}
+
 bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
                                                    SourceFile *SF) const {
   return llvm::any_of(SF->getImports(),
@@ -2520,7 +2530,7 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 
     namespace path = llvm::sys::path;
     SmallString<128> scratch;
-    scratch = ctx.SearchPathOpts.SDKPath;
+    scratch = ctx.SearchPathOpts.getSDKPath();
     path::append(scratch, "System", "Library", "PrivateFrameworks");
     return hasPrefix(path::begin(modulePath), path::end(modulePath),
                      path::begin(scratch), path::end(scratch));
