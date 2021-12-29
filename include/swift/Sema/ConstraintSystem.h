@@ -2251,6 +2251,7 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class DisjunctionStep;
   friend class ConjunctionStep;
   friend class ConjunctionElement;
   friend class RequirementFailure;
@@ -2401,6 +2402,10 @@ private:
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
   llvm::MapVector<ConstraintLocator *, unsigned> DisjunctionChoices;
+
+  /// The stack of all disjunctions selected during current path in order.
+  /// This stack is managed by the \c DisjunctionStep.
+  llvm::SmallVector<Constraint *, 4> SelectedDisjunctions;
 
   /// A map from applied disjunction constraints to the corresponding
   /// argument function type.

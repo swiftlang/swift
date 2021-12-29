@@ -653,6 +653,7 @@ public:
     assert(Disjunction->getKind() == ConstraintKind::Disjunction);
     pruneOverloadSet(Disjunction);
     ++cs.solverState->NumDisjunctions;
+    cs.SelectedDisjunctions.push_back(Disjunction);
   }
 
   ~DisjunctionStep() override {
@@ -663,6 +664,8 @@ public:
     // Re-enable previously disabled overload choices.
     for (auto *choice : DisabledChoices)
       choice->setEnabled();
+
+    CS.SelectedDisjunctions.pop_back();
   }
 
   StepResult resume(bool prevFailed) override;
