@@ -5028,6 +5028,9 @@ private:
   ///
   /// \returns The selected disjunction.
   Constraint *selectDisjunction();
+  /// Select the best possible disjunction for solver to attempt
+  /// based on the given list.
+  Constraint *selectBestDisjunction(ArrayRef<Constraint *> disjunctions);
 
   /// Pick a conjunction from the InactiveConstraints list.
   ///
