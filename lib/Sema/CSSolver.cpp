@@ -1662,8 +1662,9 @@ ConstraintSystem::filterDisjunction(
 // right-hand side of a conversion constraint, since having a concrete
 // type that we're converting to can make it possible to split the
 // constraint system into multiple ones.
-static Constraint *selectBestBindingDisjunction(
-    ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions) {
+static Constraint *
+selectBestBindingDisjunction(ConstraintSystem &cs,
+                             ArrayRef<Constraint *> disjunctions) {
 
   if (disjunctions.empty())
     return nullptr;
@@ -2169,6 +2170,13 @@ Constraint *ConstraintSystem::selectDisjunction() {
   collectDisjunctions(disjunctions);
   if (disjunctions.empty())
     return nullptr;
+
+  return selectBestDisjunction(disjunctions);
+}
+
+Constraint *
+ConstraintSystem::selectBestDisjunction(ArrayRef<Constraint *> disjunctions) {
+  assert(!disjunctions.empty());
 
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;
