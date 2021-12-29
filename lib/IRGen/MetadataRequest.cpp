@@ -1733,10 +1733,16 @@ namespace {
                                        DynamicMetadataRequest request) {
       return emitExistentialTypeMetadata(type, request);
     }
-      
+
     MetadataResponse
     visitProtocolCompositionType(CanProtocolCompositionType type,
                                  DynamicMetadataRequest request) {
+      return emitExistentialTypeMetadata(type, request);
+    }
+
+    MetadataResponse
+    visitParametrizedProtocolType(CanParametrizedProtocolType type,
+                                  DynamicMetadataRequest request) {
       return emitExistentialTypeMetadata(type, request);
     }
 

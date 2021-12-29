@@ -5243,6 +5243,65 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
+/// ParametrizedProtocolType - A type that constrains the primary associated
+/// type of a protocol to an argument type.
+///
+/// Written like a bound generic type, eg Sequence<Int>.
+///
+/// For now, these are only supported in generic requirement-like contexts:
+/// - Inheritance clauses of protocols, generic parameters, associated types
+/// - Conformance requirements in where clauses
+/// - Extensions
+///
+/// Assuming that the primary associated type of Sequence is Element, the
+/// desugaring is that T : Sequence<Int> is equivalent to
+///
+/// \code
+/// T : Sequence where T.Element == Int.
+/// \endcode
+class ParametrizedProtocolType final : public TypeBase,
+    public llvm::FoldingSetNode {
+  ProtocolType *Base;
+  Type Arg;
+
+public:
+  /// Retrieve an instance of a protocol composition type with the
+  /// given set of members.
+  static Type get(const ASTContext &C, ProtocolType *base,
+                  Type arg);
+
+  ProtocolType *getBaseType() const {
+    return Base;
+  }
+
+  Type getArgumentType() const {
+    return Arg;
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, Base, Arg);
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ProtocolType *base,
+                      Type arg);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ParametrizedProtocol;
+  }
+  
+private:
+  ParametrizedProtocolType(const ASTContext *ctx,
+                           ProtocolType *base, Type arg,
+                           RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::ParametrizedProtocol, /*Context=*/ctx, properties),
+      Base(base), Arg(arg) { }
+};
+BEGIN_CAN_TYPE_WRAPPER(ParametrizedProtocolType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getArgumentType)
+END_CAN_TYPE_WRAPPER(ParametrizedProtocolType, Type)
+
 /// An existential type, spelled with \c any .
 ///
 /// In Swift 5 mode, a plain protocol name in type
