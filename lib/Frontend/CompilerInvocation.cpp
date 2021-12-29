@@ -1101,6 +1101,12 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + A);
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_debug_compilation_dir)) {
+    StringRef path = A->getValue();
+    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(),
+                          {"-fdebug-compilation-dir", path.str()});
+  }
+
   if (!workingDirectory.empty()) {
     // Provide a working directory to Clang as well if there are any -Xcc
     // options, in case some of them are search-related. But do it at the
@@ -1818,7 +1824,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
     // TODO: Should we support -fdebug-compilation-dir?
     if (const Arg *A = Args.getLastArg(OPT_debug_compilation_dir))
-      Opts.DebugCompilationDir = A->getValue();
+      Opts.DebugCompilationDir = std::string(A->getValue());
     else {
       llvm::SmallString<256> cwd;
       llvm::sys::fs::current_path(cwd);
