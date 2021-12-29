@@ -168,6 +168,8 @@ if (NOT BOOTSTRAPPING_MODE)
 
   add_library(swiftCompilerModules ALIAS swiftCompilerStub)
 
+  set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS swiftCompilerModules)
+
 else()
   # Note: "Swift" is not added intentinally here, because it would break
   # the bootstrapping build in case no swift toolchain is installed on the host.
