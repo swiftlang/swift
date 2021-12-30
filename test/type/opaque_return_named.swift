@@ -106,9 +106,13 @@ struct Generic<T: P1 & Equatable> {
   func f() -> <U: Q1, V: P1 where U: Equatable, V: Equatable> (U, V) {
     return ("hello", value)
   }
+
+  subscript(index: Int) -> <U: Q1, V: P1 where U: Equatable, V: Equatable> (U, V) {
+    return ("hello", value)
+  }
 }
 
-func testGeneric(gs: Generic<String>, gi: Generic<Int>) {
+func testGeneric(i: Int, gs: Generic<String>, gi: Generic<Int>) {
   let gs1 = gs.f()
   let gs2 = gs.f()
   _ = (gs1 == gs2)
@@ -116,4 +120,6 @@ func testGeneric(gs: Generic<String>, gi: Generic<Int>) {
   let gi1 = gi.f()
   // FIXME: Diagnostic below is correct, but a bit misleading because these are different Us and Vs.
   _ = (gs1 == gi1) // expected-error{{binary operator '==' cannot be applied to operands of type '(U, V)' and '(U, V)'}}
+
+  _ = gs[i]
 }

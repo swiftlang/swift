@@ -849,6 +849,20 @@ TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
 
 // Create child scopes for every declaration in a body.
 
+namespace {
+  /// Retrieve the opaque generic parameter list if present, otherwise the normal generic parameter list.
+  template<typename T>
+  GenericParamList *getPotentiallyOpaqueGenericParams(T *decl) {
+    if (auto opaqueRepr = decl->getOpaqueResultTypeRepr()) {
+      if (auto namedOpaque = dyn_cast<NamedOpaqueReturnTypeRepr>(opaqueRepr)) {
+        return namedOpaque->getGenericParams();
+      }
+    }
+
+    return decl->getGenericParams();
+  }
+}
+
 void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addChildrenForKnownAttributes(decl, this);
@@ -859,15 +873,8 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   ASTScopeImpl *leaf = this;
 
   if (!isa<AccessorDecl>(decl)) {
-    if (auto opaqueRepr = decl->getOpaqueResultTypeRepr()) {
-      if (auto namedOpaque = dyn_cast<NamedOpaqueReturnTypeRepr>(opaqueRepr)) {
-        leaf = scopeCreator.addNestedGenericParamScopesToTree(
-            decl, namedOpaque->getGenericParams(), leaf);
-      }
-    }
-
     leaf = scopeCreator.addNestedGenericParamScopesToTree(
-        decl, decl->getGenericParams(), leaf);
+        decl, getPotentiallyOpaqueGenericParams(decl), leaf);
 
     auto *params = decl->getParameters();
     if (params->size() > 0) {
@@ -1015,7 +1022,7 @@ void SubscriptDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addChildrenForKnownAttributes(decl, this);
   auto *leaf = scopeCreator.addNestedGenericParamScopesToTree(
-      decl, decl->getGenericParams(), this);
+      decl, getPotentiallyOpaqueGenericParams(decl), this);
   scopeCreator.constructExpandAndInsert<ParameterListScope>(
       leaf, decl->getIndices(), decl->getAccessor(AccessorKind::Get));
   scopeCreator.addChildrenForParsedAccessors(decl, leaf);
