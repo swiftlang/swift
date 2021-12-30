@@ -5261,7 +5261,10 @@ END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 /// \endcode
 class ParametrizedProtocolType final : public TypeBase,
     public llvm::FoldingSetNode {
+  friend struct ExistentialLayout;
+
   ProtocolType *Base;
+  AssociatedTypeDecl *AssocType;
   Type Arg;
 
 public:
@@ -5272,6 +5275,10 @@ public:
 
   ProtocolType *getBaseType() const {
     return Base;
+  }
+
+  AssociatedTypeDecl *getAssocType() const {
+    return AssocType;
   }
 
   Type getArgumentType() const {
@@ -5293,9 +5300,7 @@ public:
 private:
   ParametrizedProtocolType(const ASTContext *ctx,
                            ProtocolType *base, Type arg,
-                           RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::ParametrizedProtocol, /*Context=*/ctx, properties),
-      Base(base), Arg(arg) { }
+                           RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ParametrizedProtocolType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)

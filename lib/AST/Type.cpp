@@ -295,6 +295,15 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   protocols = { members.data(), members.size() };
 }
 
+ExistentialLayout::ExistentialLayout(ParametrizedProtocolType *type) {
+  assert(type->isCanonical());
+
+  *this = ExistentialLayout(type->getBaseType());
+  sameTypeRequirements = {
+      reinterpret_cast<PrimaryAssociatedTypeRequirement *>(&type->AssocType),
+      1
+  };
+}
 
 ExistentialLayout TypeBase::getExistentialLayout() {
   return getCanonicalType().getExistentialLayout();
@@ -309,6 +318,9 @@ ExistentialLayout CanType::getExistentialLayout() {
 
   if (auto proto = dyn_cast<ProtocolType>(*this))
     return ExistentialLayout(proto);
+
+  if (auto param = dyn_cast<ParametrizedProtocolType>(*this))
+    return ExistentialLayout(param);
 
   auto comp = cast<ProtocolCompositionType>(*this);
   return ExistentialLayout(comp);
@@ -3806,6 +3818,17 @@ void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddInteger(HasExplicitAnyObject);
   for (auto T : Members)
     ID.AddPointer(T.getPointer());
+}
+
+ParametrizedProtocolType::ParametrizedProtocolType(
+    const ASTContext *ctx,
+    ProtocolType *base, Type arg,
+    RecursiveTypeProperties properties)
+  : TypeBase(TypeKind::ParametrizedProtocol, /*Context=*/ctx, properties),
+    Base(base), AssocType(base->getDecl()->getPrimaryAssociatedType()),
+    Arg(arg) {
+  assert(AssocType != nullptr &&
+         "Protocol doesn't have a primary associated type");
 }
 
 void ParametrizedProtocolType::Profile(llvm::FoldingSetNodeID &ID,
