@@ -1558,7 +1558,17 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
 
     // If we are generic at this level, emit all of the replacements at
     // this level.
-    if (genericContext->isGeneric()) {
+    bool treatAsGeneric;
+    if (auto opaque = dyn_cast<OpaqueTypeDecl>(decl)) {
+      // For opaque type declarations, the generic parameters of the opaque
+      // type declaration are not part of the mangling, so check whether the
+      // naming declaration has generic parameters.
+      auto namedGenericContext = opaque->getNamingDecl()->getAsGenericContext();
+      treatAsGeneric = namedGenericContext && namedGenericContext->isGeneric();
+    } else {
+      treatAsGeneric = genericContext->isGeneric();
+    }
+    if (treatAsGeneric) {
       auto genericParams = subs.getGenericSignature().getGenericParams();
       unsigned depth = genericParams[currentGenericParamIdx]->getDepth();
       auto replacements = subs.getReplacementTypes();
