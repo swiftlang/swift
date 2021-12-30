@@ -106,6 +106,7 @@ namespace swift {
 
   namespace ast_scope {
   class AbstractPatternEntryScope;
+  class GenericParamScope;
   class PatternEntryDeclScope;
   class PatternEntryInitializerScope;
   } // namespace ast_scope
@@ -1565,6 +1566,7 @@ class PatternBindingEntry {
   friend class PatternBindingInitializer;
   friend class PatternBindingDecl;
   friend class ast_scope::AbstractPatternEntryScope;
+  friend class ast_scope::GenericParamScope;
   friend class ast_scope::PatternEntryDeclScope;
   friend class ast_scope::PatternEntryInitializerScope;
 

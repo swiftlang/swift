@@ -100,7 +100,14 @@ func f4(cond: Bool) -> <T: P1, U where U: Q1> (T, U) {
 func f5(cond: Bool) -> <T: P1, U where U: Q1> (T, U) { }
 // expected-error@-1{{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
 
-struct Generic<T: P1 & Equatable> {
+protocol DefaultInitializable {
+  init()
+}
+
+extension String: DefaultInitializable { }
+extension Int: DefaultInitializable { }
+
+struct Generic<T: P1 & Equatable & DefaultInitializable> {
   var value: T
 
   func f() -> <U: Q1, V: P1 where U: Equatable, V: Equatable> (U, V) {
@@ -109,6 +116,20 @@ struct Generic<T: P1 & Equatable> {
 
   subscript(index: Int) -> <U: Q1, V: P1 where U: Equatable, V: Equatable> (U, V) {
     return ("hello", value)
+  }
+
+  var property: <U: Q1, V: P1 where U: Equatable, V: Equatable> (U, V) {
+    return ("hello", value)
+  }
+
+  var property2: <U: Q1, V: P1 where U: Equatable, V: Equatable> (U, V) =
+    ("hello", T())
+
+  var property3: <U: Q1, V: P1 where U: Equatable, V: Equatable> (U, V) =
+    ("hello", T()) {
+    didSet {
+      print("here")
+    }
   }
 }
 
