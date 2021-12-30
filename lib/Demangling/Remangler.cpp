@@ -1407,6 +1407,9 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
     case FunctionSigSpecializationParamKind::BoxToStack:
       Buffer << 's';
       break;
+    case FunctionSigSpecializationParamKind::InOutToOut:
+      Buffer << 'r';
+      break;
     case FunctionSigSpecializationParamKind::SROA:
       Buffer << 'x';
       break;
