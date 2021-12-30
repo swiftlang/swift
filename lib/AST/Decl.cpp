@@ -5284,6 +5284,12 @@ bool ProtocolDecl::existentialRequiresAny() const {
     ExistentialRequiresAnyRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
+AssociatedTypeDecl *ProtocolDecl::getPrimaryAssociatedType() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    PrimaryAssociatedTypeRequest{const_cast<ProtocolDecl *>(this)},
+    nullptr);
+}
+
 StringRef ProtocolDecl::getObjCRuntimeName(
                           llvm::SmallVectorImpl<char> &buffer) const {
   // If there is an 'objc' attribute with a name, use that name.

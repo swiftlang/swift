@@ -694,6 +694,17 @@ ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
+AssociatedTypeDecl *
+PrimaryAssociatedTypeRequest::evaluate(Evaluator &evaluator,
+                                       ProtocolDecl *decl) const {
+  for (auto *assocType : decl->getAssociatedTypeMembers()) {
+    if (assocType->getAttrs().hasAttribute<PrimaryAssociatedTypeAttr>())
+      return assocType;
+  }
+
+  return nullptr;
+}
+
 bool
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<ClassDecl>(decl))
