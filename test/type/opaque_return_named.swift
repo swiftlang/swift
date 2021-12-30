@@ -44,3 +44,76 @@ func test_h0() {
   // Make sure we can treat h0 as a P
   let _: P = h0()
 }
+
+protocol P1 {
+  associatedtype A
+}
+
+protocol Q1 {
+  associatedtype B
+}
+
+extension Int: P1 {
+  typealias A = String
+}
+
+extension String: P1 {
+  typealias A = String
+}
+
+extension Double: Q1 {
+  typealias B = String
+}
+
+extension String: Q1 {
+  typealias B = Int
+}
+
+func f1() -> <T: P1, U where U: Q1> (T, U) {
+  return (3, 3.14159)
+}
+
+func f2(cond: Bool) -> <T: P1, U where U: Q1> (T, U) {
+  if cond {
+    return (3, 3.14159)
+  } else {
+    return (3, 2.71828)
+  }
+}
+
+func f3(cond: Bool) -> <T: P1, U where U: Q1> (T, U) {
+  // expected-error@-1{{function declares an opaque return type 'U', but the return statements in its body do not have matching underlying types}}
+  if cond {
+    return (3, 3.14159) // expected-note{{return statement has underlying type 'Double'}}
+  } else {
+    return (3, "hello") // expected-note{{return statement has underlying type 'String'}}
+  }
+}
+
+func f4(cond: Bool) -> <T: P1, U where U: Q1> (T, U) {
+  if cond {
+    return (3, 3.14159)
+  } else {
+  }
+}
+
+func f5(cond: Bool) -> <T: P1, U where U: Q1> (T, U) { }
+// expected-error@-1{{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+
+struct Generic<T: P1 & Equatable> {
+  var value: T
+
+  func f() -> <U: Q1, V: P1 where U: Equatable, V: Equatable> (U, V) {
+    return ("hello", value)
+  }
+}
+
+func testGeneric(gs: Generic<String>, gi: Generic<Int>) {
+  let gs1 = gs.f()
+  let gs2 = gs.f()
+  _ = (gs1 == gs2)
+
+  let gi1 = gi.f()
+  // FIXME: Diagnostic below is correct, but a bit misleading because these are different Us and Vs.
+  _ = (gs1 == gi1) // expected-error{{binary operator '==' cannot be applied to operands of type '(U, V)' and '(U, V)'}}
+}

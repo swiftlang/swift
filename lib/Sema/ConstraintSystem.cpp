@@ -846,7 +846,7 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
   if (knownReplacements != OpenedTypes.end()) {
     auto param = opaque->getInterfaceType()->castTo<GenericTypeParamType>();
     for (const auto &replacement : knownReplacements->second) {
-      if (replacement.first == param)
+      if (replacement.first->isEqual(param))
         return replacement.second;
     }
 

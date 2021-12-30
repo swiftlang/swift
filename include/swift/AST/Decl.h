@@ -2779,6 +2779,16 @@ public:
     return OpaqueInterfaceGenericSignature.getInnermostGenericParams();
   }
 
+  /// Whether the generic parameters of this opaque type declaration were
+  /// explicit, i.e., for named opaque result types.
+  bool hasExplicitGenericParams() const;
+
+  /// When the generic parameters were explicit, returns the generic parameter
+  /// corresponding to the given ordinal.
+  ///
+  /// Otherwise, returns \c nullptr.
+  GenericTypeParamDecl *getExplicitGenericParam(unsigned ordinal) const;
+
   /// Retrieve the buffer containing the opaque return type
   /// representations that correspond to the opaque generic parameters.
   ArrayRef<OpaqueReturnTypeRepr *> getOpaqueReturnTypeReprs() const {

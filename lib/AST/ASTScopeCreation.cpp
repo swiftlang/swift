@@ -859,6 +859,13 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   ASTScopeImpl *leaf = this;
 
   if (!isa<AccessorDecl>(decl)) {
+    if (auto opaqueRepr = decl->getOpaqueResultTypeRepr()) {
+      if (auto namedOpaque = dyn_cast<NamedOpaqueReturnTypeRepr>(opaqueRepr)) {
+        leaf = scopeCreator.addNestedGenericParamScopesToTree(
+            decl, namedOpaque->getGenericParams(), leaf);
+      }
+    }
+
     leaf = scopeCreator.addNestedGenericParamScopesToTree(
         decl, decl->getGenericParams(), leaf);
 
