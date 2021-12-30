@@ -3712,6 +3712,10 @@ ERROR(not_a_generic_definition,none,
       "cannot specialize a non-generic definition", ())
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
+ERROR(protocol_does_not_have_primary_assoc_type,none,
+      "cannot specialize protocol type %0", (Type))
+ERROR(protocol_cannot_have_multiple_generic_arguments,none,
+      "protocol type %0 can only be specialized with exactly one argument", (Type))
 ERROR(cannot_specialize_self,none,
       "cannot specialize 'Self'", ())
 NOTE(specialize_explicit_type_instead,none,

@@ -624,6 +624,38 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
 
+  if (ctx.LangOpts.EnableParametrizedProtocolTypes) {
+    // Build ParametrizedProtocolType if the protocol has a primary associated
+    // type.
+    if (auto *protoType = type->getAs<ProtocolType>()) {
+      auto *protoDecl = protoType->getDecl();
+      if (protoDecl->getPrimaryAssociatedType() == nullptr) {
+        diags.diagnose(loc, diag::protocol_does_not_have_primary_assoc_type,
+                       protoType);
+
+        return ErrorType::get(ctx);
+      }
+
+      auto genericArgs = generic->getGenericArgs();
+
+      if (genericArgs.size() != 1) {
+        diags.diagnose(loc, diag::protocol_cannot_have_multiple_generic_arguments,
+                       protoType);
+
+        return ErrorType::get(ctx);
+      }
+
+      auto genericResolution =
+        resolution.withOptions(adjustOptionsForGenericArgs(options));
+
+      Type argTy = genericResolution.resolveType(genericArgs[0], silParams);
+      if (!argTy || argTy->hasError())
+        return ErrorType::get(ctx);
+
+      return ParametrizedProtocolType::get(ctx, protoType, argTy);
+    }
+  }
+
   // We must either have an unbound generic type, or a generic type alias.
   if (!type->is<UnboundGenericType>()) {
      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
