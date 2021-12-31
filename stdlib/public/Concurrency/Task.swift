@@ -297,6 +297,20 @@ extension Task where Success == Never, Failure == Never {
       return TaskPriority(rawValue: UInt8(_getCurrentThreadPriority()))
     }
   }
+
+  /// The current task's base priority.
+  ///
+  /// If you access this property outside of any task, this returns nil
+  @available(SwiftStdlib 9999, *)
+  public static var basePriority: TaskPriority? {
+    withUnsafeCurrentTask { task in
+      // If we are running on behalf of a task, use that task's priority.
+      if let unsafeTask = task {
+         return TaskPriority(rawValue: _taskBasePriority(unsafeTask._task))
+      }
+      return nil
+    }
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -851,6 +865,9 @@ func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
 @_silgen_name("swift_task_currentPriority")
 internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8
+
+@_silgen_name("swift_task_basePriority")
+internal func _taskBasePriority(_ task: Builtin.NativeObject) -> UInt8
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_createNullaryContinuationJob")

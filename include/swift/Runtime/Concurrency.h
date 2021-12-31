@@ -488,6 +488,12 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority
 swift_task_currentPriority(AsyncTask *task);
 
+/// Returns the base priority of the task. This function does not exist in the
+/// base ABI of this library and must be deployment limited.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+JobPriority
+swift_task_basePriority(AsyncTask *task);
+
 /// Create and add an cancellation record to the task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 CancellationNotificationStatusRecord*

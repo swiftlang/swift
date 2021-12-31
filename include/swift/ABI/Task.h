@@ -222,9 +222,9 @@ public:
     void *Storage[14];
 
     /// Initialize this storage during the creation of a task.
-    void initialize(AsyncTask *task);
-    void initializeWithSlab(AsyncTask *task,
-                            void *slab, size_t slabCapacity);
+    void initialize(JobPriority basePri);
+    void initializeWithSlab(JobPriority basePri, void *slab,
+                            size_t slabCapacity);
 
     /// React to the completion of the enclosing task's execution.
     void complete(AsyncTask *task);

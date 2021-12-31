@@ -477,6 +477,13 @@ JobPriority swift::swift_task_currentPriority(AsyncTask *task)
   return oldStatus.getStoredPriority();
 }
 
+JobPriority swift::swift_task_basePriority(AsyncTask *task)
+{
+  JobPriority pri = task->_private().BasePriority;
+  SWIFT_TASK_DEBUG_LOG("Task %p has base priority = %zu", task, pri);
+  return pri;
+}
+
 /// Implementation of task creation.
 SWIFT_CC(swift)
 static AsyncTaskAndContext swift_task_create_commonImpl(
@@ -567,6 +574,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // If there is still no job priority, use the default priority.
   if (jobFlags.getPriority() == JobPriority::Unspecified)
     jobFlags.setPriority(JobPriority::Default);
+
+  JobPriority basePriority = jobFlags.getPriority();
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
@@ -711,9 +720,10 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   if (asyncLet && initialSlabSize > 0) {
     assert(parent);
     void *initialSlab = (char*)allocation + amountToAllocate;
-    task->Private.initializeWithSlab(task, initialSlab, initialSlabSize);
+    task->Private.initializeWithSlab(basePriority, initialSlab,
+                                     initialSlabSize);
   } else {
-    task->Private.initialize(task);
+    task->Private.initialize(basePriority);
   }
 
   // Perform additional linking between parent and child task.
