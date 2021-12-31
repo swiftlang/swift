@@ -484,6 +484,18 @@ JobPriority swift::swift_task_basePriority(AsyncTask *task)
   return pri;
 }
 
+static inline bool isUnspecified(JobPriority priority) {
+  return priority == JobPriority::Unspecified;
+}
+
+static inline bool taskIsUnstructured(JobFlags jobFlags) {
+  return !jobFlags.task_isAsyncLetTask() && !jobFlags.task_isGroupChildTask();
+}
+
+static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags) {
+  return taskIsUnstructured(jobFlags) && !createFlags.copyTaskLocals();
+}
+
 /// Implementation of task creation.
 SWIFT_CC(swift)
 static AsyncTaskAndContext swift_task_create_commonImpl(
@@ -492,10 +504,11 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     const Metadata *futureResultType,
     TaskContinuationFunction *function, void *closureContext,
     size_t initialContextSize) {
+
   TaskCreateFlags taskCreateFlags(rawTaskCreateFlags);
+  JobFlags jobFlags(JobKind::Task, JobPriority::Unspecified);
 
   // Propagate task-creation flags to job flags as appropriate.
-  JobFlags jobFlags(JobKind::Task, taskCreateFlags.getCreationPriority());
   jobFlags.task_setIsChildTask(taskCreateFlags.isChildTask());
   if (futureResultType) {
     jobFlags.task_setIsFuture(true);
@@ -548,34 +561,85 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   }
 
   AsyncTask *parent = nullptr;
+  AsyncTask *currentTask = swift_task_getCurrent();
   if (jobFlags.task_isChildTask()) {
-    parent = swift_task_getCurrent();
+    parent = currentTask;
     assert(parent != nullptr && "creating a child task with no active task");
   }
 
-  // Inherit the priority of the currently-executing task if unspecified and
-  // we want to inherit.
-  if (jobFlags.getPriority() == JobPriority::Unspecified &&
-      (jobFlags.task_isChildTask() || taskCreateFlags.inheritContext())) {
-    AsyncTask *currentTask = parent;
-    if (!currentTask)
-      currentTask = swift_task_getCurrent();
+  // Start with user specified priority at creation time (if any)
+  JobPriority basePriority = (taskCreateFlags.getRequestedPriority());
 
-    if (currentTask)
-      jobFlags.setPriority(currentTask->getPriority());
-    else if (taskCreateFlags.inheritContext())
-      jobFlags.setPriority(swift_task_getCurrentThreadPriority());
+  if (taskIsDetached(taskCreateFlags, jobFlags)) {
+     SWIFT_TASK_DEBUG_LOG("Creating a detached task from %p", currentTask);
+    // Case 1: No priority specified
+    //    Base priority = UN
+    //    Escalated priority = UN
+    // Case 2: Priority specified
+    //    Base priority = user specified priority
+    //    Escalated priority = UN
+    //
+    // Task will be created with max priority = max(base priority, UN) = base
+    // priority. We shouldn't need to do any additional manipulations here since
+    // basePriority should already be the right value
+
+  } else if (taskIsUnstructured(jobFlags)) {
+     SWIFT_TASK_DEBUG_LOG("Creating an unstructured task from %p", currentTask);
+
+    if (isUnspecified(basePriority)) {
+      // Case 1: No priority specified
+      //    Base priority = Base priority of parent with a UI -> IN downgrade
+      //    Escalated priority = UN
+      if (currentTask) {
+        basePriority = currentTask->_private().BasePriority;
+      } else {
+        basePriority = swift_task_getCurrentThreadPriority();
+      }
+      basePriority = withUserInteractivePriorityDowngrade(basePriority);
+    } else {
+      // Case 2: User specified a priority
+      //    Base priority = user specified priority
+      //    Escalated priority = UN
+    }
+
+    // Task will be created with max priority = max(base priority, UN) = base
+    // priority
+  } else {
+    // Is a structured concurrency child task. Must have a parent.
+    assert((asyncLet || group) && parent);
+    SWIFT_TASK_DEBUG_LOG("Creating an structured concurrency task from %p", currentTask);
+
+    if (isUnspecified(basePriority)) {
+      // Case 1: No priority specified
+      //    Base priority = Base priority of parent with a UI -> IN downgrade
+      //    Escalated priority = Escalated priority of parent with a UI -> IN
+      //    downgrade
+      JobPriority parentBasePri = parent->_private().BasePriority;
+      basePriority = withUserInteractivePriorityDowngrade(parentBasePri);
+    } else {
+      // Case 2: User priority specified
+      //    Base priority = User specified priority
+      //    Escalated priority = Escalated priority of parent with a UI -> IN
+      //    downgrade
+    }
+
+    // Task will be created with escalated priority = base priority. We will
+    // update the escalated priority with the right rules in
+    // updateNewChildWithParentAndGroupState when we link the child into
+    // the parent task/task group since we'll have the right
+    // synchronization then.
   }
 
-  // Adjust user-interactive priorities down to user-initiated.
-  if (jobFlags.getPriority() == JobPriority::UserInteractive)
-    jobFlags.setPriority(JobPriority::UserInitiated);
+  if (isUnspecified(basePriority)) {
+     basePriority = JobPriority::Default;
+  }
 
-  // If there is still no job priority, use the default priority.
-  if (jobFlags.getPriority() == JobPriority::Unspecified)
-    jobFlags.setPriority(JobPriority::Default);
+  SWIFT_TASK_DEBUG_LOG("Task's base priority = %d", basePriority);
 
-  JobPriority basePriority = jobFlags.getPriority();
+  // TODO (rokhinip): Figure out the semantics of the job priority and where
+  // it ought to be set conclusively - seems like it ought to be at enqueue
+  // time. For now, maintain current semantics of setting jobPriority as well.
+  jobFlags.setPriority(basePriority);
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
@@ -669,7 +733,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Initialize the task so that resuming it will run the given
   // function on the initial context.
   AsyncTask *task = nullptr;
-  bool captureCurrentVoucher = taskCreateFlags.copyTaskLocals() || jobFlags.task_isChildTask();
+  bool captureCurrentVoucher = !taskIsDetached(taskCreateFlags, jobFlags);
   if (asyncLet) {
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
@@ -710,7 +774,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     futureAsyncContextPrefix->indirectResult = futureFragment->getStoragePtr();
   }
 
-  SWIFT_TASK_DEBUG_LOG("creating task %p with parent %p", task, parent);
+  SWIFT_TASK_DEBUG_LOG("creating task %p with parent %p at base pri %zu", task, parent, basePriority);
 
   // Initialize the task-local allocator.
   initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
