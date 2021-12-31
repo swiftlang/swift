@@ -4772,6 +4772,9 @@ ERROR(string_processing_lib_missing,none,
 ERROR(regex_capture_types_failed_to_decode,none,
       "failed to decode capture types for regular expression literal; this may "
       "be a compiler bug", ())
+ERROR(regex_too_many_captures,none,
+      "too many captures in regular expression literal; the current limit is "
+      "%0", (unsigned))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types

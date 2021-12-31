@@ -368,6 +368,12 @@ private:
   /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
   mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
 
+  /// The maximum arity of `_StringProcessing.Tuple{n}`.
+  static constexpr unsigned StringProcessingTupleDeclMaxArity = 8;
+  /// Cached `_StringProcessing.Tuple{n}` declarations.
+  mutable SmallVector<StructDecl *, StringProcessingTupleDeclMaxArity - 2>
+      StringProcessingTupleDecls;
+
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
@@ -623,7 +629,15 @@ public:
 
   /// Retrieve _StringProcessing.Regex.init(_regexString: String, version: Int).
   ConcreteDeclRef getRegexInitDecl(Type regexType) const;
-  
+
+  /// Retrieve the max arity that `_StringProcessing.Tuple{arity}` was
+  /// instantiated for.
+  unsigned getStringProcessingTupleDeclMaxArity() const;
+
+  /// Retrieve the `_StringProcessing.Tuple{arity}` declaration for the given
+  /// arity.
+  StructDecl *getStringProcessingTupleDecl(unsigned arity) const;
+
   /// Retrieve the declaration of Swift.<(Int, Int) -> Bool.
   FuncDecl *getLessThanIntDecl() const;
 

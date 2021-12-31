@@ -1234,7 +1234,30 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   return ConcreteDeclRef(foundDecl, subs);
 }
 
-static 
+unsigned ASTContext::getStringProcessingTupleDeclMaxArity() const {
+  return StringProcessingTupleDeclMaxArity;
+}
+
+StructDecl *ASTContext::getStringProcessingTupleDecl(unsigned arity) const {
+  assert(arity >= 2);
+  if (arity > StringProcessingTupleDeclMaxArity)
+    return nullptr;
+  if (StringProcessingTupleDecls.empty())
+    StringProcessingTupleDecls.append(
+      StringProcessingTupleDeclMaxArity - 1, nullptr);
+  auto &decl = StringProcessingTupleDecls[arity - 2];
+  if (decl)
+    return decl;
+  SmallVector<ValueDecl *, 1> results;
+  auto *spModule = getLoadedModule(Id_StringProcessing);
+  auto typeName = getIdentifier("Tuple" + llvm::utostr(arity));
+  spModule->lookupQualified(
+      spModule, DeclNameRef(typeName), NL_OnlyTypes, results);
+  assert(results.size() == 1);
+  return (decl = cast<StructDecl>(results[0]));
+}
+
+static
 FuncDecl *getBinaryComparisonOperatorIntDecl(const ASTContext &C, StringRef op,
                                              FuncDecl *&cached) {
   if (cached)
