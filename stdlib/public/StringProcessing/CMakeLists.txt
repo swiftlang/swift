@@ -14,9 +14,17 @@ set(swift_string_processing_link_libraries
   swiftCore
   swift_MatchingEngine)
 
+file(GLOB_RECURSE _STRING_PROCESSING_SOURCES
+  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_StringProcessing/*.swift")
+set(STRING_PROCESSING_SOURCES)
+foreach(source ${_STRING_PROCESSING_SOURCES})
+  file(TO_CMAKE_PATH "${source}" source)
+  list(APPEND STRING_PROCESSING_SOURCES ${source})
+endforeach()
+message(STATUS "Using Experimental String Processing library for _StringProcessing (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
 
 add_swift_target_library(swift_StringProcessing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-  Regex.swift
+  "${STRING_PROCESSING_SOURCES}"
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
@@ -31,8 +39,6 @@ add_swift_target_library(swift_StringProcessing ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
     -Dswift_StringProcessing_EXPORTS
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    -parse-stdlib
-    -Xfrontend -enable-experimental-string-processing
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS _MatchingEngine

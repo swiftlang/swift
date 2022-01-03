@@ -1611,15 +1611,17 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
       break;
 
     case RequirementKind::SameType: {
-      auto isCanonicalAnchor = [&](Type type) {
-        if (auto *dmt = type->getAs<DependentMemberType>())
-          return canSig->isCanonicalTypeInContext(dmt->getBase());
+      auto hasCanonicalOrConcreteParent = [&](Type type) {
+        if (auto *dmt = type->getAs<DependentMemberType>()) {
+          return (canSig->isCanonicalTypeInContext(dmt->getBase()) ||
+                  canSig->isConcreteType(dmt->getBase()));
+        }
         return type->is<GenericTypeParamType>();
       };
 
       auto firstType = reqt.getFirstType();
       auto secondType = reqt.getSecondType();
-      if (!isCanonicalAnchor(firstType)) {
+      if (!hasCanonicalOrConcreteParent(firstType)) {
         llvm::errs() << "Left hand side does not have a canonical parent: ";
         reqt.dump(llvm::errs());
         llvm::errs() << "\n";
@@ -1627,7 +1629,7 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
       }
 
       if (reqt.getSecondType()->isTypeParameter()) {
-        if (!isCanonicalAnchor(secondType)) {
+        if (!hasCanonicalOrConcreteParent(secondType)) {
           llvm::errs() << "Right hand side does not have a canonical parent: ";
           reqt.dump(llvm::errs());
           llvm::errs() << "\n";

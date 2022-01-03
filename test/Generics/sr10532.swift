@@ -15,7 +15,7 @@ public protocol ScalarMultiplicative {
 public protocol MapReduceArithmetic : ScalarMultiplicative, Collection where Element : ScalarMultiplicative, Scalar == Element.Scalar { }
 
 // CHECK: sr10532.(file).Tensor@
-// CHECK-NEXT: Requirement signature: <Self where Self : MapReduceArithmetic, Self.Element : BinaryFloatingPoint, Self.Element : ScalarProtocol>
+// CHECK-NEXT: Requirement signature: <Self where Self : MapReduceArithmetic, Self.Element : BinaryFloatingPoint, Self.Element == Self.Scalar>
 public protocol Tensor : MapReduceArithmetic where Scalar : BinaryFloatingPoint, Element == Scalar {
   var magnitude: Scalar { get set }
 }

@@ -35,6 +35,7 @@ namespace llvm {
 
 namespace swift {
 
+class ProtocolConformance;
 class ProtocolDecl;
 enum class RequirementKind : unsigned;
 
@@ -100,11 +101,11 @@ class PropertyBag {
 
   explicit PropertyBag(Term key) : Key(key) {}
 
-  bool addProperty(Symbol property,
-                   unsigned ruleID,
-                   RewriteContext &ctx,
-                   SmallVectorImpl<InducedRule> &inducedRules,
-                   bool debug);
+  Optional<unsigned> addProperty(Symbol property,
+                                 unsigned ruleID,
+                                 RewriteContext &ctx,
+                                 SmallVectorImpl<InducedRule> &inducedRules,
+                                 bool debug);
   void copyPropertiesFrom(const PropertyBag *next,
                           RewriteContext &ctx);
 
@@ -172,7 +173,8 @@ class PropertyMap {
   using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
   llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
 
-  llvm::DenseSet<std::pair<unsigned, unsigned>> ConcreteConformanceRules;
+  llvm::DenseMap<std::pair<unsigned, unsigned>, ProtocolConformance *>
+      ConcreteConformances;
 
   DebugOptions Debug;
 
@@ -202,8 +204,9 @@ public:
 
 private:
   void clear();
-  bool addProperty(Term key, Symbol property, unsigned ruleID,
-                   SmallVectorImpl<InducedRule> &inducedRules);
+  Optional<unsigned>
+  addProperty(Term key, Symbol property, unsigned ruleID,
+              SmallVectorImpl<InducedRule> &inducedRules);
 
   void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(

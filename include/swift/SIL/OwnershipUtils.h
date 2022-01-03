@@ -104,12 +104,9 @@ inline bool isForwardingConsume(SILValue value) {
 bool findInnerTransitiveGuaranteedUses(
     SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints = nullptr);
 
-/// Like findInnerTransitiveGuaranteedUses except that rather than it being a
-/// precondition that the provided value not be a BorrowedValue, it is a [type-
-/// system-enforced] precondition that the provided value be a BorrowedValue.
-///
-/// TODO: Merge with findInnerTransitiveGuaranteedUses.
-bool findInnerTransitiveGuaranteedUsesOfBorrowedValue(
+/// Find all uses in the extended lifetime (i.e. including copies) of a simple
+/// (i.e. not reborrowed) borrow scope and its transitive uses.
+bool findExtendedUsesOfSimpleBorrowedValue(
     BorrowedValue borrowedValue,
     SmallVectorImpl<Operand *> *usePoints = nullptr);
 

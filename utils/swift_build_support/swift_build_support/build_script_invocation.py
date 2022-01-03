@@ -311,11 +311,6 @@ class BuildScriptInvocation(object):
                 "--android-arch", args.android_arch,
                 "--android-ndk", args.android_ndk,
                 "--android-api-level", args.android_api_level,
-                "--android-icu-uc", args.android_icu_uc,
-                "--android-icu-uc-include", args.android_icu_uc_include,
-                "--android-icu-i18n", args.android_icu_i18n,
-                "--android-icu-i18n-include", args.android_icu_i18n_include,
-                "--android-icu-data", args.android_icu_data,
             ]
         # If building natively on an Android host, only pass the API level.
         if StdlibDeploymentTarget.Android.contains(StdlibDeploymentTarget
@@ -399,9 +394,9 @@ class BuildScriptInvocation(object):
                         args.build_jobs)
                 ]
 
-        if args.libswift_mode is not None:
+        if args.bootstrapping_mode is not None:
             impl_args += [
-                "--libswift=%s" % args.libswift_mode,
+                "--bootstrapping=%s" % args.bootstrapping_mode,
             ]
 
         impl_args += args.build_script_impl_args

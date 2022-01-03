@@ -214,7 +214,7 @@ struct AsyncContinuationTypeImpl<
   AsyncSignature<void(ArgTys...), /*throws=*/true>> {
 
   using type = SWIFT_CC(swiftasync) void(SWIFT_ASYNC_CONTEXT AsyncContext *,
-                                         SWIFT_CONTEXT void *);
+                                         SWIFT_CONTEXT SwiftError *);
 };
 
 template <class... ArgTys>

@@ -20,15 +20,11 @@
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxKind.h"
 
-// Regex parser delivered via libSwift
+// Regex parser delivered via Swift modules.
 #include "swift/Parse/ExperimentalRegexBridging.h"
-static ParseRegexStrawperson parseRegexStrawperson = nullptr;
-void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn) {
-  parseRegexStrawperson = fn;
-}
-// Exposes the presence of the regex parsing function to the lexer.
-bool Parser_hasParseRegexStrawperson() {
-  return parseRegexStrawperson != nullptr;
+static RegexLiteralParsingFn regexLiteralParsingFn = nullptr;
+void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
+  regexLiteralParsingFn = fn;
 }
 
 using namespace swift;
@@ -36,24 +32,31 @@ using namespace swift::syntax;
 
 ParserResult<Expr> Parser::parseExprRegexLiteral() {
   assert(Tok.is(tok::regex_literal));
-  assert(parseRegexStrawperson);
+  assert(regexLiteralParsingFn);
 
   SyntaxParsingContext LocalContext(SyntaxContext,
                                     SyntaxKind::RegexLiteralExpr);
-  // Strip off delimiters.
-  auto rawText = Tok.getText();
-  assert(rawText.front() == '\'' && rawText.back() == '\'');
-  auto regexText = rawText.slice(1, rawText.size() - 1);
+
+  auto regexText = Tok.getText();
 
   // Let the Swift library parse the contents, returning an error, or null if
   // successful.
   // TODO: We need to be able to pass back a source location to emit the error
   // at.
-  auto *errorStr = parseRegexStrawperson(regexText.str().c_str());
-  if (errorStr)
+  const char *errorStr = nullptr;
+  unsigned version;
+  auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
+      RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
+          regexText.size()));
+  regexLiteralParsingFn(regexText.str().c_str(), &errorStr, &version,
+                        /*captureStructureOut*/ capturesBuf.data(),
+                        /*captureStructureSize*/ capturesBuf.size());
+  if (errorStr) {
     diagnose(Tok, diag::regex_literal_parsing_error, errorStr);
+    return makeParserError();
+  }
 
   auto loc = consumeToken();
-  return makeParserResult(
-      RegexLiteralExpr::createParsed(Context, loc, regexText));
+  return makeParserResult(RegexLiteralExpr::createParsed(
+      Context, loc, regexText, version, capturesBuf));
 }

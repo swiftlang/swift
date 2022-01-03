@@ -59,6 +59,10 @@ enum IsExactSelfClass_t {
   IsNotExactSelfClass,
   IsExactSelfClass,
 };
+enum IsDistributed_t {
+  IsNotDistributed,
+  IsDistributed,
+};
 
 enum class PerformanceConstraints : uint8_t {
   None = 0,
@@ -294,6 +298,9 @@ private:
   /// invoked with a `self` argument of the exact base class type.
   unsigned ExactSelfClass : 1;
 
+  /// Check whether this is a distributed method.
+  unsigned IsDistributed : 1;
+
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
   unsigned Inlined : 1;
@@ -373,7 +380,8 @@ private:
               SubclassScope classSubclassScope, Inline_t inlineStrategy,
               EffectsKind E, const SILDebugScope *debugScope,
               IsDynamicallyReplaceable_t isDynamic,
-              IsExactSelfClass_t isExactSelfClass);
+              IsExactSelfClass_t isExactSelfClass,
+              IsDistributed_t isDistributed);
 
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
@@ -381,6 +389,7 @@ private:
          Optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
          ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
+         IsDistributed_t isDistributed,
          IsExactSelfClass_t isExactSelfClass,
          IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
@@ -399,7 +408,8 @@ private:
                          Inline_t inlineStrategy, EffectsKind E,
                          const SILDebugScope *DebugScope,
                          IsDynamicallyReplaceable_t isDynamic,
-                         IsExactSelfClass_t isExactSelfClass);
+                         IsExactSelfClass_t isExactSelfClass,
+                         IsDistributed_t isDistributed);
 
   /// Set has ownership to the given value. True means that the function has
   /// ownership, false means it does not.
@@ -747,6 +757,14 @@ public:
     ExactSelfClass = t;
   }
 
+  IsDistributed_t isDistributed() const {
+    return IsDistributed_t(IsDistributed);
+  }
+  void
+  setIsDistributed(IsDistributed_t value = IsDistributed_t::IsDistributed) {
+    IsDistributed = value;
+  }
+
   /// Get the DeclContext of this function.
   DeclContext *getDeclContext() const { return DeclCtxt; }
 
@@ -820,6 +838,15 @@ public:
   void setOptimizationMode(OptimizationMode mode) {
     OptMode = unsigned(mode);
   }
+
+  /// True if debug information must be preserved (-Onone).
+  ///
+  /// If this is false (-O), then the presence of debug info must not affect the
+  /// outcome of any transformations.
+  ///
+  /// Typically used to determine whether a debug_value is a normal SSA use or
+  /// incidental use.
+  bool preserveDebugInfo() const;
 
   PerformanceConstraints getPerfConstraints() const { return perfConstraints; }
 

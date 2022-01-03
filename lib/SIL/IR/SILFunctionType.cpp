@@ -1928,6 +1928,9 @@ static CanSILFunctionType getSILFunctionType(
   }
 
   bool shouldBuildSubstFunctionType = [&]{
+    if (TC.Context.LangOpts.DisableSubstSILFunctionTypes)
+      return false;
+
     // If there is no genericity in the abstraction pattern we're lowering
     // against, we don't need to introduce substitutions into the lowered
     // type.
@@ -3788,6 +3791,23 @@ public:
   SILParameterInfo substInterface(SILParameterInfo orig) {
     return SILParameterInfo(visit(orig.getInterfaceType()),
                             orig.getConvention(), orig.getDifferentiability());
+  }
+
+  CanType visitPackType(CanPackType origType) {
+    // Fast-path the empty pack.
+    if (origType->getNumElements() == 0) return origType;
+
+    SmallVector<Type, 8> substElts;
+    substElts.reserve(origType->getNumElements());
+    for (Type origTy : origType->getElementTypes()) {
+      auto substEltType = visit(CanType(origTy));
+      substElts.push_back(substEltType);
+    }
+    return CanType(PackType::get(TC.Context, substElts));
+  }
+
+  CanType visitPackExpansionType(CanPackExpansionType origType) {
+    llvm_unreachable("Unimplemented!");
   }
 
   /// Tuples need to have their component types substituted by these

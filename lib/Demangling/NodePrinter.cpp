@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/AST/Ownership.h"
@@ -559,6 +561,7 @@ private:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
     case Node::Kind::DistributedThunk:
+    case Node::Kind::DistributedMethodAccessor:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -585,6 +588,7 @@ private:
     case Node::Kind::IndexSubset:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
+    case Node::Kind::AccessibleFunctionRecord:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1997,6 +2001,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "distributed thunk for ";
     }
     return nullptr;
+  case Node::Kind::DistributedMethodAccessor:
+    if (!Options.ShortenThunk) {
+      Printer << "distributed method accessor for ";
+    }
+    return nullptr;
+  case Node::Kind::AccessibleFunctionRecord:
+    if (!Options.ShortenThunk) {
+      Printer << "accessible function runtime record for ";
+    }
+    return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable key for ";
@@ -3081,3 +3095,5 @@ std::string Demangle::nodeToString(NodePointer root,
 
   return NodePrinter(options).printRoot(root);
 }
+
+#endif

@@ -41,8 +41,8 @@ enum class DebugFlags : unsigned {
   /// Print debug output from the homotopy reduction algorithm.
   HomotopyReduction = (1<<6),
 
-  /// Print debug output from the generating conformances algorithm.
-  GeneratingConformances = (1<<7),
+  /// Print debug output from the minimal conformances algorithm.
+  MinimalConformances = (1<<7),
 
   /// Print debug output from the protocol dependency graph.
   ProtocolDependencies = (1<<8),

@@ -147,7 +147,9 @@ protected:
   bool consolidateBorrowScope();
 };
 
-bool shrinkBorrowScope(BeginBorrowInst *bbi, InstructionDeleter &deleter);
+bool shrinkBorrowScope(
+    BeginBorrowInst *bbi, InstructionDeleter &deleter,
+    SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts);
 
 } // namespace swift
 

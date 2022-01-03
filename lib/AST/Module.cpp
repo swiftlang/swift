@@ -2240,6 +2240,16 @@ SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   Imports = getASTContext().AllocateCopy(imports);
 }
 
+bool SourceFile::hasImportUsedPredatesConcurrency(
+    AttributedImport<ImportedModule> import) const {
+  return PredatesConcurrencyImportsUsed.count(import) != 0;
+}
+
+void SourceFile::setImportUsedPredatesConcurrency(
+    AttributedImport<ImportedModule> import) {
+  PredatesConcurrencyImportsUsed.insert(import);
+}
+
 bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
                                                    SourceFile *SF) const {
   return llvm::any_of(SF->getImports(),
@@ -2374,17 +2384,18 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
   // See if context is imported in a "regular" way, i.e. not with
   // @_implementationOnly or @_spi.
   ModuleDecl::ImportFilter filter = {
-    ModuleDecl::ImportFilterKind::Exported,
-    ModuleDecl::ImportFilterKind::Default};
+    ModuleDecl::ImportFilterKind::ImplementationOnly,
+    ModuleDecl::ImportFilterKind::SPIAccessControl
+  };
   SmallVector<ImportedModule, 4> results;
   getImportedModules(results, filter);
 
   auto &imports = getASTContext().getImportCache();
   for (auto &desc : results) {
     if (imports.isImportedBy(moduleOfCtxt, desc.importedModule))
-      return true;
+      return false;
   }
-  return false;
+  return true;
 }
 
 void SourceFile::lookupImportedSPIGroups(
@@ -2519,7 +2530,7 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 
     namespace path = llvm::sys::path;
     SmallString<128> scratch;
-    scratch = ctx.SearchPathOpts.SDKPath;
+    scratch = ctx.SearchPathOpts.getSDKPath();
     path::append(scratch, "System", "Library", "PrivateFrameworks");
     return hasPrefix(path::begin(modulePath), path::end(modulePath),
                      path::begin(scratch), path::end(scratch));

@@ -6,6 +6,7 @@
 // We then check stderr for the expected error message using filecheck as usual.
 
 // UNSUPPORTED: back_deploy_concurrency
+// UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed

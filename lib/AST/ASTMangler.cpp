@@ -849,6 +849,8 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
     case SymbolKind::DistributedThunk: return appendOperator("TE");
+    case SymbolKind::DistributedMethodAccessor: return appendOperator("TF");
+    case SymbolKind::AccessibleFunctionRecord: return appendOperator("HF");
   }
 }
 
@@ -1168,6 +1170,13 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       return appendAnyGenericType(decl);
     }
+
+    case TypeKind::Pack:
+    case TypeKind::PackExpansion:
+      assert(DWARFMangling && "sugared types are only legal for the debugger");
+      appendOperator("XSP");
+      llvm_unreachable("Unimplemented");
+      return;
 
     case TypeKind::Paren:
       assert(DWARFMangling && "sugared types are only legal for the debugger");

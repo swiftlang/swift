@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_ENABLE_REFLECTION
+
 #include "swift/Reflection/TypeRefBuilder.h"
 
 #include "swift/Demangling/Demangle.h"
@@ -510,3 +512,5 @@ void TypeRefBuilder::dumpAllSections(std::ostream &stream) {
   dumpCaptureSection(stream);
   stream << "\n";
 }
+
+#endif

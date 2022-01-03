@@ -310,8 +310,8 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=0")
   endif()
 
-  if(NOT SWIFT_ENABLE_COMPATIBILITY_OVERRIDES)
-    list(APPEND result "-DSWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES")
+  if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+    list(APPEND result "-DSWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT")
   endif()
 
   if(SWIFT_ENABLE_REFLECTION)
@@ -344,6 +344,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_HAS_ENVIRON")
   endif()
 
+  if(SWIFT_STDLIB_HAS_LOCALE)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_LOCALE")
+  endif()
+
   if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
     list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
   endif()
@@ -358,6 +362,10 @@ function(_add_target_variant_c_compile_flags)
 
   if(SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS)
     list(APPEND result "-DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS")
+  endif()
+
+  if(SWIFT_STDLIB_HAS_TYPE_PRINTING)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_TYPE_PRINTING")
   endif()
 
   if(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING)

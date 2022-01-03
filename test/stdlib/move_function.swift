@@ -5,6 +5,7 @@
 // test to fail only when optimizations are enabled.
 
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 
 import Swift
 import StdlibUnittest

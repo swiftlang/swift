@@ -8,6 +8,7 @@
 // CHECK: the flag -check-api-availability-only does not support emitting IR
 
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 @available(macOS 11.0, *)
 public protocol NewProto {}

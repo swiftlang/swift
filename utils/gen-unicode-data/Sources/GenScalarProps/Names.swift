@@ -159,6 +159,12 @@ func emitScalarNames(
     }
   }
   
+  result += """
+  #define NAMES_LAST_SCALAR_OFFSET \(nameBytes.count)
+  
+  
+  """
+  
   emitCollection(nameBytes, name: "_swift_stdlib_names", into: &result)
   
   return scalarNameIndices
@@ -197,6 +203,12 @@ func emitScalars(
       scalarSetIndices[UInt32(i)] = UInt16.max
     }
   }
+  
+  result += """
+  #define NAMES_SCALARS_MAX_INDEX \(scalars.count - 1)
+  
+  
+  """
   
   emitCollection(scalars, name: "_swift_stdlib_names_scalars", into: &result)
   

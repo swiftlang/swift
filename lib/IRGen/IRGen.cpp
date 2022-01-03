@@ -1032,6 +1032,7 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
       irEntitiesToEmit.push_back(source->getIRLinkEntity());
       break;
     case SymbolSource::Kind::LinkerDirective:
+    case SymbolSource::Kind::CrossModuleOptimization:
     case SymbolSource::Kind::Unknown:
       llvm_unreachable("Not supported");
     }
@@ -1118,6 +1119,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       IGM.emitSwiftProtocols(/*asContiguousArray*/ false);
       IGM.emitProtocolConformances(/*asContiguousArray*/ false);
       IGM.emitTypeMetadataRecords(/*asContiguousArray*/ false);
+      IGM.emitAccessibleFunctions();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
       irgen.emitEagerClassInitialization();
@@ -1360,6 +1362,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   irgen.emitProtocolConformances();
 
   irgen.emitTypeMetadataRecords();
+
+  irgen.emitAccessibleFunctions();
 
   irgen.emitReflectionMetadataVersion();
 

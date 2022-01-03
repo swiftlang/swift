@@ -51,10 +51,7 @@ Tests.test("Basic") {
   expectEqual(3, collection.count)
 }
 
-// FIXME: Teach the devirtualizer how to handle calls to requirements with covariant `Self` nested
-// inside known-covariant stdlib types such as an array or dictionary.
-@_optimize(none)
-func convariantSelfErasureTest() {
+Tests.test("Covariant 'Self' erasure") {
   struct S: P {
     static let str = "Success"
     func getString() -> String { Self.str }
@@ -109,8 +106,5 @@ func convariantSelfErasureTest() {
   expectEqual(true, p is P)
   expectEqual(true, S() is P)
 }
-
-
-Tests.test("Covariant 'Self' erasure", convariantSelfErasureTest)
 
 runAllTests()

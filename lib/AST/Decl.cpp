@@ -4107,7 +4107,10 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
   Bits.GenericTypeParamDecl.TypeSequence = isTypeSequence;
   auto &ctx = dc->getASTContext();
-  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
+  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
+  if (this->isTypeSequence())
+    props |= RecursiveTypeProperties::HasTypeSequence;
+  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this, props);
   setInterfaceType(MetatypeType::get(type, ctx));
 }
 
@@ -7429,8 +7432,8 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           ParseAbstractFunctionBodyRequest{mutableThis},
-                           nullptr);
+                           ParseAbstractFunctionBodyRequest{mutableThis}, {})
+      .getBody();
 }
 
 BraceStmt *AbstractFunctionDecl::getTypecheckedBody() const {
@@ -7444,7 +7447,12 @@ void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
   assert(getBodyKind() != BodyKind::Skipped &&
          "cannot set a body if it was skipped");
 
-  Body = S;
+  Optional<Fingerprint> fp = None;
+  if (getBodyKind() == BodyKind::TypeChecked ||
+      getBodyKind() == BodyKind::Parsed) {
+    fp = BodyAndFP.getFingerprint();
+  }
+  BodyAndFP = BodyAndFingerprint(S, fp);
   setBodyKind(NewBodyKind);
 
   // Need to recompute init body kind.
@@ -7459,13 +7467,18 @@ void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
   assert(getBodyKind() == BodyKind::Unparsed ||
          getBodyKind() == BodyKind::Parsed ||
          getBodyKind() == BodyKind::TypeChecked);
-  assert(getASTContext().SourceMgr.rangeContainsTokenLoc(
-             bodyRange, getASTContext().SourceMgr.getCodeCompletionLoc()) &&
-         "This function is only intended to be used for code completion");
 
   keepOriginalBodySourceRange();
   BodyRange = bodyRange;
   setBodyKind(BodyKind::Unparsed);
+
+  // Remove local type decls from the source file.
+  if (auto SF = getParentSourceFile()) {
+    SF->LocalTypeDecls.remove_if([&](TypeDecl *TD) {
+      auto dc = TD->getDeclContext();
+      return dc == this || dc->isChildContextOf(this);
+    });
+  }
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -7501,6 +7514,54 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
     return SourceRange(getNameLoc(), endLoc);
 
   return getNameLoc();
+}
+
+Optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
+  ASTContext &ctx = getASTContext();
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ParseAbstractFunctionBodyRequest{mutableThis}, {})
+      .getFingerprint();
+}
+
+Optional<Fingerprint>
+AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
+
+  class HashCombiner : public ASTWalker {
+    StableHasher &hasher;
+
+  public:
+    HashCombiner(StableHasher &hasher) : hasher(hasher) {}
+
+    bool walkToDeclPre(Decl *D) override {
+      if (D->isImplicit())
+        return false;
+
+      if (auto *idc = dyn_cast<IterableDeclContext>(D)) {
+        if (auto fp = idc->getBodyFingerprint())
+          hasher.combine(*fp);
+
+        // Since ASTWalker calls 'getMembers()' which might tries to synthesize
+        // members etc., manually recurse into `getParsedMembers()`.
+        for (auto *d : idc->getParsedMembers())
+          const_cast<Decl *>(d)->walk(*this);
+
+        return false;
+      }
+
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+        if (auto fp = afd->getBodyFingerprint())
+          hasher.combine(*fp);
+      }
+
+      return true;
+    }
+  };
+
+  StableHasher hasher = StableHasher::defaultHasher();
+  HashCombiner combiner(hasher);
+  const_cast<AbstractFunctionDecl *>(this)->walk(combiner);
+  return Fingerprint(std::move(hasher));
 }
 
 ObjCSelector
@@ -8609,7 +8670,8 @@ bool ClassDecl::isNSObject() const {
   if (!getName().is("NSObject")) return false;
   ASTContext &ctx = getASTContext();
   return (getModuleContext()->getName() == ctx.Id_Foundation ||
-          getModuleContext()->getName() == ctx.Id_ObjectiveC);
+          getModuleContext()->getName() == ctx.Id_ObjectiveC ||
+          getModuleContext()->getName().is("SwiftFoundation"));
 }
 
 Type ClassDecl::getSuperclass() const {
@@ -8849,7 +8911,7 @@ SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
   return extractNearestSourceLoc(decl->getDeclContext());
 }
 
-Optional<BraceStmt *>
+Optional<BodyAndFingerprint>
 ParseAbstractFunctionBodyRequest::getCachedResult() const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
   auto afd = std::get<0>(getStorage());
@@ -8858,11 +8920,11 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
-    return nullptr;
+    return BodyAndFingerprint{};
 
   case BodyKind::TypeChecked:
   case BodyKind::Parsed:
-    return afd->Body;
+    return afd->BodyAndFP;
 
   case BodyKind::Synthesize:
   case BodyKind::Unparsed:
@@ -8871,7 +8933,8 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   llvm_unreachable("Unhandled BodyKing in switch");
 }
 
-void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
+void ParseAbstractFunctionBodyRequest::cacheResult(
+    BodyAndFingerprint value) const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
   auto afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
@@ -8880,12 +8943,12 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
   case BodyKind::None:
   case BodyKind::Skipped:
     // The body is always empty, so don't cache anything.
-    assert(value == nullptr);
+    assert(!value.getFingerprint().hasValue() && value.getBody() == nullptr);
     return;
 
   case BodyKind::Parsed:
   case BodyKind::TypeChecked:
-    afd->Body = value;
+    afd->BodyAndFP = value;
     return;
 
   case BodyKind::Synthesize:
@@ -8893,7 +8956,14 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
     llvm_unreachable("evaluate() did not set the body kind");
     return;
   }
+}
 
+void swift::simple_display(llvm::raw_ostream &out, BodyAndFingerprint value) {
+  out << "(";
+  simple_display(out, value.getBody());
+  out << ", ";
+  simple_display(out, value.getFingerprint());
+  out << ")";
 }
 
 void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {

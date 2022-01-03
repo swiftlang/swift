@@ -2865,6 +2865,31 @@ static void emitDeclaredHereIfNeeded(DiagnosticEngine &diags,
   diags.diagnose(value, diag::decl_declared_here, value->getName());
 }
 
+/// Determine if the witness can be made implicitly async.
+static bool isValidImplicitAsync(ValueDecl *witness, ValueDecl *requirement) {
+  if (auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness)) {
+    if (auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement)) {
+      return requirementFunc->hasAsync() &&
+          !(witnessFunc->hasThrows() && !requirementFunc->hasThrows());
+    }
+
+    return false;
+  }
+
+  if (auto witnessStorage = dyn_cast<AbstractStorageDecl>(witness)) {
+    if (auto requirementStorage = dyn_cast<AbstractStorageDecl>(requirement)) {
+      auto requirementAccessor = requirementStorage->getEffectfulGetAccessor();
+      if (!requirementAccessor || !requirementAccessor->hasAsync())
+        return false;
+
+      return witnessStorage->isLessEffectfulThan(
+          requirementStorage, EffectKind::Throws);
+    }
+  }
+
+  return false;
+}
+
 bool ConformanceChecker::checkActorIsolation(
     ValueDecl *requirement, ValueDecl *witness) {
   /// Retrieve a concrete witness for Sendable checking.
@@ -2991,9 +3016,15 @@ bool ConformanceChecker::checkActorIsolation(
     // A synchronous actor function can witness an asynchronous protocol
     // requirement, since calls "through" the protocol are always cross-actor,
     // in which case the function becomes implicitly async.
+    //
+    // In this case, we're crossing actor boundaries so we need to
+    // perform Sendable checking.
     if (witnessClass && witnessClass->isActor()) {
-      if (requirementFunc && requirementFunc->hasAsync() &&
-          (requirementFunc->hasThrows() == witnessFunc->hasThrows())) {
+      if (isValidImplicitAsync(witness, requirement)) {
+        diagnoseNonSendableTypesInReference(
+            getConcreteWitness(), DC, witness->getLoc(),
+            SendableCheckReason::Conformance);
+
         return false;
       }
     }
@@ -3031,7 +3062,7 @@ bool ConformanceChecker::checkActorIsolation(
   case ActorIsolationRestriction::CrossActorSelf: {
     if (diagnoseNonSendableTypesInReference(
             getConcreteWitness(), DC, witness->getLoc(),
-            ConcurrentReferenceKind::CrossActor)) {
+            SendableCheckReason::Conformance)) {
       return true;
     }
 
@@ -3162,7 +3193,7 @@ bool ConformanceChecker::checkActorIsolation(
 
     return diagnoseNonSendableTypesInReference(
         getConcreteWitness(), DC, witness->getLoc(),
-        ConcurrentReferenceKind::CrossActor);
+        SendableCheckReason::Conformance);
   }
 
   // If the witness has a global actor but the requirement does not, we have
@@ -4914,19 +4945,6 @@ void ConformanceChecker::resolveValueWitnesses() {
       auto &C = witness->getASTContext();
 
       if (checkActorIsolation(requirement, witness)) {
-        return;
-      }
-
-      // Ensure that Actor.unownedExecutor is implemented within the
-      // actor class itself.  But if this somehow resolves to the
-      // requirement, ignore it.
-      if (requirement->getName().isSimpleName(C.Id_unownedExecutor) &&
-          Proto->isSpecificProtocol(KnownProtocolKind::Actor) &&
-          DC != witness->getDeclContext() &&
-          !isa<ProtocolDecl>(witness->getDeclContext()) &&
-          Adoptee->getClassOrBoundGenericClass() &&
-          Adoptee->getClassOrBoundGenericClass()->isActor()) {
-        witness->diagnose(diag::unowned_executor_outside_actor);
         return;
       }
 

@@ -2891,6 +2891,10 @@ static bool usesFeatureBuiltinStackAlloc(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinAssumeAlignment(Decl *decl) {
+  return false;
+}
+
 /// Determine the set of "new" features used on a given declaration.
 ///
 /// Note: right now, all features we check for are "new". At some point, we'll
@@ -4624,6 +4628,25 @@ public:
                         /*escaping*/ false);
     visit(T->getUnderlyingType()->getInOutObjectType());
     Printer << ")";
+  }
+
+  void visitPackType(PackType *T) {
+    Printer << "(";
+
+    auto Fields = T->getElementTypes();
+    for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
+      if (i)
+        Printer << ", ";
+      Type EltType = Fields[i];
+      visit(EltType);
+    }
+    Printer << ")";
+  }
+
+  void visitPackExpansionType(PackExpansionType *T) {
+    Printer << "(";
+    visit(T->getPatternType());
+    Printer << "..." << ")";
   }
 
   void visitTupleType(TupleType *T) {

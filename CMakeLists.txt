@@ -187,18 +187,19 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
     option only affects the tools that run on the host (the compiler), and has
     no effect on the target libraries (the standard library and the runtime).")
 
-# NOTE: We do not currently support building libswift with the Xcode generator.
-cmake_dependent_option(LIBSWIFT_BUILD_MODE "How to build libswift. Possible values are
-    OFF:           the compiler is built without libswift
-    HOSTTOOLS:     libswift is built with a pre-installed toolchain
-    BOOTSTRAPPING: libswift is built with a 2-stage bootstrapping process
-    BOOTSTRAPPING-WITH-HOSTLIBS:   libswift is built with a 2-stage bootstrapping process,
+# NOTE: We do not currently support building the swift compiler modules with the Xcode generator.
+cmake_dependent_option(BOOTSTRAPPING_MODE [=[
+How to build the swift compiler modules. Possible values are
+    OFF:           build without swift modules
+    HOSTTOOLS:     build with a pre-installed toolchain
+    BOOTSTRAPPING: build with a 2-stage bootstrapping process
+    BOOTSTRAPPING-WITH-HOSTLIBS:   build with a 2-stage bootstrapping process,
                    but the compiler links against the host system swift libs (macOS only)
-    CROSSCOMPILE:  libswift is cross-compiled with a native host compiler, provided in
+    CROSSCOMPILE:  cross-compiledwith a native host compiler, provided in
                    `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
-    CROSSCOMPILE-WITH-HOSTLIBS:    libswift is built with a bootstrapping-with-hostlibs compiled
-                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`"
-  OFF "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" OFF)
+    CROSSCOMPILE-WITH-HOSTLIBS:    build with a bootstrapping-with-hostlibs compiled
+                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
+]=]  OFF "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" OFF)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
@@ -614,24 +615,24 @@ set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-  set(SWIFT_EXEC_FOR_LIBSWIFT "${CMAKE_Swift_COMPILER}")
-elseif(LIBSWIFT_BUILD_MODE MATCHES "BOOTSTRAPPING.*")
-  # If cross-compiling we don't have to bootstrap. We can just use the previously
-  # built native swiftc to build libswift.
-  message(STATUS "Building libswift with previously built tools instead of bootstrapping")
-  set(SWIFT_EXEC_FOR_LIBSWIFT "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
-  if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-    set(LIBSWIFT_BUILD_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
-  elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
-    set(LIBSWIFT_BUILD_MODE "CROSSCOMPILE")
+  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
+elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+  # If cross-compiling, we don't have to bootstrap. We can just use the previously
+  # built native swiftc to build the swift compiler modules.
+  message(STATUS "Building swift modules with previously built tools instead of bootstrapping")
+  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
+  if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+    set(BOOTSTRAPPING_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
+  elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
+    set(BOOTSTRAPPING_MODE "CROSSCOMPILE")
   else()
-    set(LIBSWIFT_BUILD_MODE "HOSTTOOLS")
+    set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
 endif()
 
-if(LIBSWIFT_BUILD_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
+if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
   if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
-    message(STATUS "array COW checks disabled when building libswift with host libraries")
+    message(STATUS "array COW checks disabled when building the swift modules with host libraries")
     set(SWIFT_ENABLE_ARRAY_COW_CHECKS FALSE)
   endif()
 endif()
@@ -998,7 +999,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
-  message(STATUS "  libswift:       ${LIBSWIFT_BUILD_MODE}")
+  message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
@@ -1117,12 +1118,12 @@ add_subdirectory(include)
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(lib)
 
-  # "libswift" must come before "tools".
-  # It adds libswift module names to the global property "libswift_modules"
+  # SwiftCompilerSources must come before "tools".
+  # It adds swift module names to the global property "swift_compiler_modules"
   # which is used in add_swift_host_tool for the lldb workaround.
   #
-  # NOTE: We do not currently support libswift with the Xcode generator.
-  add_subdirectory(libswift)
+  # NOTE: We do not currently support SwiftCompilerSources with the Xcode generator.
+  add_subdirectory(SwiftCompilerSources)
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.

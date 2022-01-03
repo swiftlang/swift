@@ -1862,7 +1862,20 @@ GenericFuncSpecializer::GenericFuncSpecializer(
 
 /// Return an existing specialization if one exists.
 SILFunction *GenericFuncSpecializer::lookupSpecialization() {
-  if (SILFunction *SpecializedF = M.lookUpFunction(ClonedName)) {
+  SILFunction *SpecializedF = M.lookUpFunction(ClonedName);
+  if (!SpecializedF) {
+    // In case the specialized function is already serialized in an imported
+    // module, we need to take that. This can happen in case of cross-module-
+    // optimization.
+    // Otherwise we could end up that another de-serialized function from the
+    // same module would reference the new (non-external) specialization we
+    // would create here.
+    SpecializedF = M.findFunction(ClonedName, SILLinkage::SharedExternal);
+    if (SpecializedF) {
+      M.linkFunction(SpecializedF, SILModule::LinkingMode::LinkAll);
+    }
+  }
+  if (SpecializedF) {
     if (ReInfo.getSpecializedType() != SpecializedF->getLoweredFunctionType()) {
       llvm::dbgs() << "Looking for a function: " << ClonedName << "\n"
                    << "Expected type: " << ReInfo.getSpecializedType() << "\n"
@@ -2201,7 +2214,8 @@ protected:
 SILFunction *ReabstractionThunkGenerator::createThunk() {
   SILFunction *Thunk = FunctionBuilder.getOrCreateSharedFunction(
       Loc, ThunkName, ReInfo.getSubstitutedType(), IsBare, IsTransparent,
-      ReInfo.isSerialized(), ProfileCounter(), IsThunk, IsNotDynamic);
+      ReInfo.isSerialized(), ProfileCounter(), IsThunk, IsNotDynamic,
+      IsNotDistributed);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
@@ -2468,6 +2482,8 @@ lookupOrCreatePrespecialization(SILOptFunctionBuilder &funcBuilder,
   auto *declaration =
       GenericCloner::createDeclaration(funcBuilder, origF, reInfo, clonedName);
   declaration->setLinkage(SILLinkage::PublicExternal);
+
+  ScopeCloner scopeCloner(*declaration);
 
   return declaration;
 }

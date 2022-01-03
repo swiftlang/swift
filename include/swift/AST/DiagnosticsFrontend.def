@@ -102,6 +102,8 @@ ERROR(error_immediate_mode_primary_file,none,
       "immediate mode is incompatible with -primary-file", ())
 ERROR(error_missing_frontend_action,none,
       "no frontend action was selected", ())
+ERROR(error_unsupported_frontend_action, none,
+      "unsupported action: %0", (StringRef))
 ERROR(error_invalid_source_location_str,none,
       "invalid source location string '%0'", (StringRef))
 ERROR(error_no_source_location_scope_map,none,

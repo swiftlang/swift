@@ -621,7 +621,7 @@ public:
                                      KnownProtocolKind builtinProtocol,
                 llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
 
-  /// Retrieve _StringProcessing.Regex.init(_regexString: String).
+  /// Retrieve _StringProcessing.Regex.init(_regexString: String, version: Int).
   ConcreteDeclRef getRegexInitDecl(Type regexType) const;
   
   /// Retrieve the declaration of Swift.<(Int, Int) -> Bool.
@@ -848,6 +848,7 @@ public:
   const CanType TheErrorType;             /// This is the ErrorType singleton.
   const CanType TheUnresolvedType;        /// This is the UnresolvedType singleton.
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
+  const CanType TheEmptyPackType;
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
 #define SINGLETON_TYPE(SHORT_ID, ID) \
   const CanType The##SHORT_ID##Type;

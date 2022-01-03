@@ -160,38 +160,40 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (Triple.isOSDarwin())
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 
+  // If this is set, we don't want any runtime import paths.
+  if (SearchPathOpts.SkipRuntimeLibraryImportPaths) {
+    SearchPathOpts.setRuntimeLibraryImportPaths({});
+    return;
+  }
+
   // Set up the import paths containing the swiftmodules for the libraries in
   // RuntimeLibraryPath.
-  SearchPathOpts.RuntimeLibraryImportPaths.clear();
-
-  // If this is set, we don't want any runtime import paths.
-  if (SearchPathOpts.SkipRuntimeLibraryImportPaths)
-    return;
-
-  SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+  std::vector<std::string> RuntimeLibraryImportPaths;
+  RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
 
   // This is compatibility for <=5.3
   if (!Triple.isOSDarwin()) {
     llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
-    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+    RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
 
-  if (!SearchPathOpts.SDKPath.empty()) {
+  if (!SearchPathOpts.getSDKPath().empty()) {
     if (tripleIsMacCatalystEnvironment(Triple)) {
-      LibPath = SearchPathOpts.SDKPath;
+      LibPath = SearchPathOpts.getSDKPath();
       llvm::sys::path::append(LibPath, "System", "iOSSupport");
       llvm::sys::path::append(LibPath, "usr", "lib", "swift");
-      SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+      RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
     }
 
-    LibPath = SearchPathOpts.SDKPath;
+    LibPath = SearchPathOpts.getSDKPath();
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
     if (!Triple.isOSDarwin()) {
       llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
       llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
     }
-    SearchPathOpts.RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
+    RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
+  SearchPathOpts.setRuntimeLibraryImportPaths(RuntimeLibraryImportPaths);
 }
 
 static void
@@ -259,7 +261,7 @@ void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
 }
 
 void CompilerInvocation::setSDKPath(const std::string &Path) {
-  SearchPathOpts.SDKPath = Path;
+  SearchPathOpts.setSDKPath(Path);
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
@@ -843,6 +845,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.DisableSubstSILFunctionTypes =
+      Args.hasArg(OPT_disable_subst_sil_function_types);
+
   if (auto A = Args.getLastArg(OPT_requirement_machine_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
         .Case("off", RequirementMachineMode::Disabled)
@@ -1188,14 +1193,20 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     return std::string(fullPath.str());
   };
 
+  std::vector<std::string> ImportSearchPaths(Opts.getImportSearchPaths());
   for (const Arg *A : Args.filtered(OPT_I)) {
-    Opts.ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
+    ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
+  Opts.setImportSearchPaths(ImportSearchPaths);
 
+  std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths(
+      Opts.getFrameworkSearchPaths());
   for (const Arg *A : Args.filtered(OPT_F, OPT_Fsystem)) {
-    Opts.FrameworkSearchPaths.push_back({resolveSearchPath(A->getValue()),
-                           /*isSystem=*/A->getOption().getID() == OPT_Fsystem});
+    FrameworkSearchPaths.push_back(
+        {resolveSearchPath(A->getValue()),
+         /*isSystem=*/A->getOption().getID() == OPT_Fsystem});
   }
+  Opts.setFrameworkSearchPaths(FrameworkSearchPaths);
 
   for (const Arg *A : Args.filtered(OPT_L)) {
     Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
@@ -1206,7 +1217,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   }
 
   if (const Arg *A = Args.getLastArg(OPT_sdk))
-    Opts.SDKPath = A->getValue();
+    Opts.setSDKPath(A->getValue());
 
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
@@ -1463,6 +1474,42 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
+  Optional<CopyPropagationOption> specifiedCopyPropagationOption;
+  if (Arg *A = Args.getLastArg(OPT_copy_propagation_state_EQ)) {
+    specifiedCopyPropagationOption =
+        llvm::StringSwitch<Optional<CopyPropagationOption>>(A->getValue())
+            .Case("true", CopyPropagationOption::On)
+            .Case("false", CopyPropagationOption::Off)
+            .Case("requested-passes-only",
+                  CopyPropagationOption::RequestedPassesOnly)
+            .Default(None);
+  }
+  if (Args.hasArg(OPT_enable_copy_propagation)) {
+    if (specifiedCopyPropagationOption) {
+      if (*specifiedCopyPropagationOption == CopyPropagationOption::Off) {
+        // Error if copy propagation has been set to ::Off via the meta-var form
+        // and enabled via the flag.
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
+                       "enable-copy-propagation",
+                       "enable-copy-propagation=false");
+        return true;
+      } else if (*specifiedCopyPropagationOption ==
+                 CopyPropagationOption::RequestedPassesOnly) {
+        // Error if copy propagation has been set to ::RequestedPassesOnly via
+        // the meta-var form and enabled via the flag.
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
+                       "enable-copy-propagation",
+                       "enable-copy-propagation=requested-passes-only");
+        return true;
+      }
+    } else {
+      specifiedCopyPropagationOption = CopyPropagationOption::On;
+    }
+  }
+  if (specifiedCopyPropagationOption) {
+    Opts.CopyPropagation = *specifiedCopyPropagationOption;
+  }
+
   Optional<bool> enableLexicalBorrowScopesFlag;
   if (Arg *A = Args.getLastArg(OPT_enable_lexical_borrow_scopes)) {
     enableLexicalBorrowScopesFlag =
@@ -1522,13 +1569,14 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     return true;
   }
 
-  // -enable-copy-propagation implies -enable-lexical-lifetimes unless
-  // otherwise specified.
-  if (Args.hasArg(OPT_enable_copy_propagation))
+  // Unless overridden below, enabling copy propagation means enabling lexical
+  // lifetimes.
+  if (Opts.CopyPropagation == CopyPropagationOption::On)
     Opts.LexicalLifetimes = LexicalLifetimesOption::On;
 
-  // -disable-copy-propagation implies -enable-lexical-lifetimes=false
-  if (Args.hasArg(OPT_disable_copy_propagation))
+  // Unless overridden below, disable copy propagation means disabling lexical
+  // lifetimes.
+  if (Opts.CopyPropagation == CopyPropagationOption::Off)
     Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
 
   // If move-only is enabled, always enable lexical lifetime as well.  Move-only
@@ -1549,24 +1597,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     } else {
       Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
     }
-  }
-
-  if (Args.hasArg(OPT_enable_copy_propagation) &&
-      Args.hasArg(OPT_disable_copy_propagation)) {
-    // Error if copy propagation is enabled and copy propagation is disabled.
-    Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
-                   "enable-copy-propagation", "disable-copy-propagation");
-    return true;
-  } else if (Args.hasArg(OPT_enable_copy_propagation) &&
-             !Args.hasArg(OPT_disable_copy_propagation)) {
-    Opts.CopyPropagation = CopyPropagationOption::On;
-  } else if (!Args.hasArg(OPT_enable_copy_propagation) &&
-             Args.hasArg(OPT_disable_copy_propagation)) {
-    Opts.CopyPropagation = CopyPropagationOption::Off;
-  } else /*if (!Args.hasArg(OPT_enable_copy_propagation) &&
-            !Args.hasArg(OPT_disable_copy_propagation))*/
-  {
-    Opts.CopyPropagation = CopyPropagationOption::RequestedPassesOnly;
   }
 
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);

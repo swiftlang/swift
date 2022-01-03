@@ -4,6 +4,7 @@
 // REQUIRES: concurrency
 import Foundation
 import ObjCConcurrency
+// expected-remark@-1{{add '@_predatesConcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
 
 if #available(SwiftStdlib 5.5, *) {
 

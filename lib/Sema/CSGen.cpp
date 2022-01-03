@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
+#include "TypeCheckRegex.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -1266,18 +1267,19 @@ namespace {
                            ctx.Id_Regex.str());
         return Type();
       }
-      auto substringType = ctx.getSubstringType();
-      auto dynCapturesType = ctx.getDynamicCapturesType();
-      if (!dynCapturesType) {
+      SmallVector<TupleTypeElt, 4> captureTypes;
+      if (decodeRegexCaptureTypes(ctx,
+                                  E->getSerializedCaptureStructure(),
+                                  /*atomType*/ ctx.getSubstringType(),
+                                  captureTypes)) {
         ctx.Diags.diagnose(E->getLoc(),
-                           diag::string_processing_lib_missing,
-                           "DynamicCaptures");
+                           diag::regex_capture_types_failed_to_decode);
         return Type();
       }
-      // TODO: Replace `(Substring, DynamicCaptures)` with type inferred from
-      // the regex.
-      auto matchType = TupleType::get({substringType, dynCapturesType}, ctx);
-      return BoundGenericStructType::get(regexDecl, Type(), {matchType});
+      auto genericArg = captureTypes.size() == 1
+          ? captureTypes[0].getRawType()
+          : TupleType::get(captureTypes, ctx);
+      return BoundGenericStructType::get(regexDecl, Type(), {genericArg});
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
@@ -1605,11 +1607,12 @@ namespace {
           if (specializations.size() > typeVars.size()) {
             de.diagnose(expr->getSubExpr()->getLoc(),
                         diag::type_parameter_count_mismatch,
-                        bgt->getDecl()->getName(),
-                        typeVars.size(), specializations.size(),
-                        false)
-              .highlight(SourceRange(expr->getLAngleLoc(),
-                                     expr->getRAngleLoc()));
+                        bgt->getDecl()->getName(), typeVars.size(),
+                        specializations.size(),
+                        /*too many arguments*/ false,
+                        /*type sequence?*/ false)
+                .highlight(
+                    SourceRange(expr->getLAngleLoc(), expr->getRAngleLoc()));
             de.diagnose(bgt->getDecl(), diag::kind_declname_declared_here,
                         DescriptiveDeclKind::GenericType,
                         bgt->getDecl()->getName());
@@ -1718,6 +1721,18 @@ namespace {
       }
 
       return TupleType::get(elements, CS.getASTContext());
+    }
+
+    Type visitPackExpr(PackExpr *expr) {
+      // The type of a pack expression is simply a pack of the types of
+      // its subexpressions.
+      SmallVector<Type, 4> elements;
+      elements.reserve(expr->getNumElements());
+      for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
+        elements.emplace_back(CS.getType(expr->getElement(i)));
+      }
+
+      return PackType::get(CS.getASTContext(), elements);
     }
 
     Type visitSubscriptExpr(SubscriptExpr *expr) {
@@ -2767,7 +2782,7 @@ namespace {
 
       CS.addConstraint(ConstraintKind::ApplicableFunction,
                        FunctionType::get(params, resultType, extInfo),
-                       CS.getType(expr->getFn()),
+                       CS.getType(fnExpr),
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       // If we ended up resolving the result type variable to a concrete type,

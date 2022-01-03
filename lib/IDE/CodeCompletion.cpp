@@ -218,6 +218,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::DeclResultTypeClauseBegin:
     case ChunkKind::ParameterDeclTypeBegin:
     case ChunkKind::AttributeAndModifierListBegin:
+    case ChunkKind::CallArgumentDefaultBegin:
       assert(I->getNestingLevel() == PrevNestingLevel + 1);
       closeTags.emplace_back("");
       break;
@@ -293,6 +294,7 @@ void CodeCompletionString::dump() const {
     CASE(DeclAttrParamColon)
     CASE(CallArgumentType)
     CASE(CallArgumentTypeBegin)
+    CASE(CallArgumentDefaultBegin)
     CASE(TypeIdSystem)
     CASE(TypeIdUser)
     CASE(CallArgumentClosureType)
@@ -590,7 +592,7 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     PRINT_FLAIR(ExpressionAtNonScriptOrMainFileScope, "ExprAtFileScope")
     Prefix.append("]");
   }
-  if (NotRecommended)
+  if (NotRecommended != NotRecommendedReason::None)
     Prefix.append("/NotRecommended");
   if (IsSystem)
     Prefix.append("/IsSystem");
@@ -910,8 +912,8 @@ public:
 
 void CodeCompletionResultBuilder::addCallArgument(
     Identifier Name, Identifier LocalName, Type Ty, Type ContextTy,
-    bool IsVarArg, bool IsInOut, bool IsIUO, bool isAutoClosure,
-    bool useUnderscoreLabel, bool isLabeledTrailingClosure) {
+    bool IsVarArg, bool IsInOut, bool IsIUO, bool IsAutoClosure,
+    bool UseUnderscoreLabel, bool IsLabeledTrailingClosure, bool HasDefault) {
   ++CurrentNestingLevel;
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
@@ -952,7 +954,7 @@ void CodeCompletionResultBuilder::addCallArgument(
           escapeKeyword(Name.str(), false, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallArgumentColon, ": ");
-    } else if (useUnderscoreLabel) {
+    } else if (UseUnderscoreLabel) {
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallArgumentName, "_");
       addChunkWithTextNoCopy(
@@ -978,7 +980,7 @@ void CodeCompletionResultBuilder::addCallArgument(
   // If the parameter is of the type @autoclosure ()->output, then the
   // code completion should show the parameter of the output type
   // instead of the function type ()->output.
-  if (isAutoClosure) {
+  if (IsAutoClosure) {
     // 'Ty' may be ErrorType.
     if (auto funcTy = Ty->getAs<FunctionType>())
       Ty = funcTy->getResult();
@@ -1004,6 +1006,12 @@ void CodeCompletionResultBuilder::addCallArgument(
     addChunkWithText(ChunkKind::CallArgumentType, TypeName);
   }
 
+  if (HasDefault) {
+    withNestedGroup(ChunkKind::CallArgumentDefaultBegin, []() {
+      // Possibly add the actual value in the future
+    });
+  }
+
   // Look through optional types and type aliases to find out if we have
   // function type.
   Ty = Ty->lookThroughAllOptionalTypes();
@@ -1020,7 +1028,7 @@ void CodeCompletionResultBuilder::addCallArgument(
     if (ContextTy)
       PO.setBaseType(ContextTy);
 
-    if (isLabeledTrailingClosure) {
+    if (IsLabeledTrailingClosure) {
       // Expand the closure body.
       SmallString<32> buffer;
       llvm::raw_svector_ostream OS(buffer);
@@ -1062,6 +1070,7 @@ void CodeCompletionResultBuilder::addCallArgument(
 
   if (IsVarArg)
     addEllipsis();
+
   --CurrentNestingLevel;
 }
 
@@ -1414,6 +1423,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::CallArgumentColon:
     case ChunkKind::CallArgumentTypeBegin:
     case ChunkKind::CallArgumentType:
+    case ChunkKind::CallArgumentDefaultBegin:
     case ChunkKind::CallArgumentClosureType:
     case ChunkKind::CallArgumentClosureExpr:
     case ChunkKind::ParameterDeclTypeBegin:
@@ -2746,25 +2756,33 @@ public:
       Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
   }
 
-  static bool hasInterestingDefaultValues(const AbstractFunctionDecl *func) {
-    if (!func) return false;
+  static bool hasInterestingDefaultValue(const ParamDecl *param) {
+    if (!param)
+      return false;
 
-    for (auto param : *func->getParameters()) {
-      switch (param->getDefaultArgumentKind()) {
-      case DefaultArgumentKind::Normal:
-      case DefaultArgumentKind::NilLiteral:
-      case DefaultArgumentKind::EmptyArray:
-      case DefaultArgumentKind::EmptyDictionary:
-      case DefaultArgumentKind::StoredProperty:
-      case DefaultArgumentKind::Inherited: // FIXME: include this?
-        return true;
+    switch (param->getDefaultArgumentKind()) {
+    case DefaultArgumentKind::Normal:
+    case DefaultArgumentKind::NilLiteral:
+    case DefaultArgumentKind::EmptyArray:
+    case DefaultArgumentKind::EmptyDictionary:
+    case DefaultArgumentKind::StoredProperty:
+    case DefaultArgumentKind::Inherited:
+      return true;
 
-      case DefaultArgumentKind::None:
+    case DefaultArgumentKind::None:
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
-      case DefaultArgumentKind::NAME:
+    case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
-        break;
-      }
+      return false;
+    }
+  }
+
+  bool addItemWithoutDefaultArgs(const AbstractFunctionDecl *func) {
+    if (!func || !Sink.addCallWithNoDefaultArgs)
+      return false;
+    for (auto param : *func->getParameters()) {
+      if (hasInterestingDefaultValue(param))
+        return true;
     }
     return false;
   }
@@ -2780,52 +2798,27 @@ public:
     assert(declParams.empty() || typeParams.size() == declParams.size());
 
     bool modifiedBuilder = false;
-
-    // Determine whether we should skip this argument because it is defaulted.
-    auto shouldSkipArg = [&](const ParamDecl *PD) -> bool {
-      switch (PD->getDefaultArgumentKind()) {
-      case DefaultArgumentKind::None:
-        return false;
-
-      case DefaultArgumentKind::Normal:
-      case DefaultArgumentKind::StoredProperty:
-      case DefaultArgumentKind::Inherited:
-      case DefaultArgumentKind::NilLiteral:
-      case DefaultArgumentKind::EmptyArray:
-      case DefaultArgumentKind::EmptyDictionary:
-        return !includeDefaultArgs;
-
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case DefaultArgumentKind::NAME:
-#include "swift/AST/MagicIdentifierKinds.def"
-        // Skip parameters that are defaulted to source location or other
-        // caller context information.  Users typically don't want to specify
-        // these parameters.
-        return true;
-      }
-
-      llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
-    };
-
-    bool NeedComma = false;
+    bool needComma = false;
     // Iterate over each parameter.
     for (unsigned i = 0; i != typeParams.size(); ++i) {
       auto &typeParam = typeParams[i];
 
-      Identifier argName;
+      Identifier argName = typeParam.getLabel();
       Identifier bodyName;
       bool isIUO = false;
-
+      bool hasDefault = false;
       if (!declParams.empty()) {
-        auto *PD = declParams[i];
-        if (shouldSkipArg(PD))
+        const ParamDecl *PD = declParams[i];
+        hasDefault = PD->isDefaultArgument();
+        // Skip default arguments if we're either not including them or they
+        // aren't interesting
+        if (hasDefault &&
+            (!includeDefaultArgs || !hasInterestingDefaultValue(PD)))
           continue;
+
         argName = PD->getArgumentName();
         bodyName = PD->getParameterName();
         isIUO = PD->isImplicitlyUnwrappedOptional();
-      } else {
-        isIUO = false;
-        argName = typeParam.getLabel();
       }
 
       bool isVariadic = typeParam.isVariadic();
@@ -2835,21 +2828,22 @@ public:
       if (isVariadic)
         paramTy = ParamDecl::getVarargBaseTy(paramTy);
 
-      if (NeedComma)
-        Builder.addComma();
       Type contextTy;
       if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
         contextTy = typeContext->getDeclaredTypeInContext();
 
+      if (needComma)
+        Builder.addComma();
       Builder.addCallArgument(argName, bodyName,
                               eraseArchetypes(paramTy, genericSig), contextTy,
                               isVariadic, isInOut, isIUO, isAutoclosure,
-                              /*useUnderscoreLabel=*/false,
-                              /*isLabeledTrailingClosure=*/false);
+                              /*UseUnderscoreLabel=*/false,
+                              /*IsLabeledTrailingClosure=*/false, hasDefault);
 
       modifiedBuilder = true;
-      NeedComma = true;
+      needComma = true;
     }
+
     return modifiedBuilder;
   }
 
@@ -3085,7 +3079,7 @@ public:
       if (isImplicitlyCurriedInstanceMethod) {
         addPattern({AFD->getImplicitSelfDecl()}, /*includeDefaultArgs=*/true);
       } else {
-        if (hasInterestingDefaultValues(AFD))
+        if (addItemWithoutDefaultArgs(AFD))
           addPattern(AFD->getParameters()->getArray(),
                      /*includeDefaultArgs=*/false);
         addPattern(AFD->getParameters()->getArray(),
@@ -3289,7 +3283,7 @@ public:
       if (trivialTrailingClosure)
         addMethodImpl(/*includeDefaultArgs=*/false,
                       /*trivialTrailingClosure=*/true);
-      if (hasInterestingDefaultValues(FD))
+      if (addItemWithoutDefaultArgs(FD))
         addMethodImpl(/*includeDefaultArgs=*/false);
       addMethodImpl(/*includeDefaultArgs=*/true);
     }
@@ -3379,8 +3373,8 @@ public:
       }
     };
 
-    if (ConstructorType && hasInterestingDefaultValues(CD))
-      addConstructorImpl(/*includeDefaultArgs*/ false);
+    if (ConstructorType && addItemWithoutDefaultArgs(CD))
+      addConstructorImpl(/*includeDefaultArgs=*/false);
     addConstructorImpl();
   }
 
@@ -4732,9 +4726,9 @@ public:
       Builder.addCallArgument(Arg->getLabel(), Identifier(),
                               Arg->getPlainType(), ContextType,
                               Arg->isVariadic(), Arg->isInOut(),
-                              /*isIUO=*/false, Arg->isAutoClosure(),
-                              /*useUnderscoreLabel=*/true,
-                              isLabeledTrailingClosure);
+                              /*IsIUO=*/false, Arg->isAutoClosure(),
+                              /*UseUnderscoreLabel=*/true,
+                              isLabeledTrailingClosure, /*HasDefault=*/false);
       Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
       auto Ty = Arg->getPlainType();
       if (Arg->isInOut()) {
@@ -6660,8 +6654,8 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                 AccessLevel::Internal, TheModule,
                 SourceFile::ImportQueryKind::PrivateOnly),
             CompletionContext.getAddInitsToTopLevel(),
-            CompletionContext.getAnnotateResult(),
-        };
+            CompletionContext.addCallWithNoDefaultArgs(),
+            CompletionContext.getAnnotateResult()};
 
         using PairType = llvm::DenseSet<swift::ide::CodeCompletionCache::Key,
             llvm::DenseMapInfo<CodeCompletionCache::Key>>::iterator;
@@ -7555,6 +7549,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       Sink.addInitsToTopLevel = context.getAddInitsToTopLevel();
       Sink.enableCallPatternHeuristics = context.getCallPatternHeuristics();
       Sink.includeObjectLiterals = context.includeObjectLiterals();
+      Sink.addCallWithNoDefaultArgs = context.addCallWithNoDefaultArgs();
       lookupCodeCompletionResultsFromModule(
           (*V)->Sink, R.TheModule, R.Key.AccessPath,
           R.Key.ResultsHaveLeadingDot, SF);

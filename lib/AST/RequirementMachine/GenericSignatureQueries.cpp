@@ -260,26 +260,38 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
 /// concrete type).
 bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
   // Look for non-canonical type parameters.
-  return !type.findIf([&](Type component) -> bool {
-    if (!component->isTypeParameter())
-      return false;
+  class Walker : public TypeWalker {
+    const RequirementMachine &Self;
 
-    auto term = Context.getMutableTermForType(component->getCanonicalType(),
-                                              /*proto=*/nullptr);
+  public:
+    explicit Walker(const RequirementMachine &self) : Self(self) {}
 
-    System.simplify(term);
-    verify(term);
+    Action walkToTypePre(Type component) override {
+      if (!component->isTypeParameter())
+        return Action::Continue;
 
-    auto *props = Map.lookUpProperties(term);
-    if (!props)
-      return false;
+      auto term = Self.Context.getMutableTermForType(
+          component->getCanonicalType(),
+          /*proto=*/nullptr);
 
-    if (props->isConcreteType())
-      return true;
+      Self.System.simplify(term);
+      Self.verify(term);
 
-    auto anchor = Context.getTypeForTerm(term, {});
-    return CanType(anchor) != CanType(component);
-  });
+      auto anchor = Self.Context.getTypeForTerm(term, {});
+      if (CanType(anchor) != CanType(component))
+        return Action::Stop;
+
+      auto *props = Self.Map.lookUpProperties(term);
+      if (props && props->isConcreteType())
+        return Action::Stop;
+
+      // The parent of a canonical type parameter might be non-canonical
+      // because it is concrete.
+      return Action::SkipChildren;
+    }
+  };
+
+  return !type.walk(Walker(*this));
 }
 
 /// Unlike most other queries, the input type can be any type, not just a

@@ -25,16 +25,18 @@
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
 #define NOMINMAX
 #include <windows.h>
-#else
-#if !defined(__HAIKU__) && !defined(__wasi__)
+#else // defined(_WIN32)
+#if __has_include(<sys/errno.h>)
 #include <sys/errno.h>
 #else
 #include <errno.h>
 #endif
+#if __has_include(<sys/resource.h>)
 #include <sys/resource.h>
 #endif
+#endif // else defined(_WIN32)
+
 #include <climits>
-#include <clocale>
 #include <cmath>
 #include <cstdarg>
 #include <cstdint>
@@ -44,14 +46,17 @@
 #if defined(__CYGWIN__) || defined(__HAIKU__)
 #include <sstream>
 #endif
-#if defined(__OpenBSD__) || defined(__ANDROID__) || defined(__linux__) || defined(__wasi__) || defined(_WIN32)
-#include <locale.h>
+
+#if SWIFT_STDLIB_HAS_LOCALE
+#include <clocale>
+#if __has_include(<xlocale.h>)
+#include <xlocale.h>
+#endif
 #if defined(_WIN32)
 #define locale_t _locale_t
 #endif
-#else
-#include <xlocale.h>
-#endif
+#endif // SWIFT_STDLIB_HAS_LOCALE
+
 #include <limits>
 #include <thread>
 
@@ -138,14 +143,13 @@ uint64_t swift_uint64ToString(char *Buffer, intptr_t BufferLength,
                             /*Negative=*/false);
 }
 
+#if SWIFT_STDLIB_HAS_LOCALE
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__ANDROID__)
 static inline locale_t getCLocale() {
   // On these platforms convenience functions from xlocale.h interpret nullptr
   // as C locale.
   return nullptr;
 }
-#elif defined(__CYGWIN__) || defined(__HAIKU__)
-// In Cygwin, getCLocale() is not used.
 #elif defined(_WIN32)
 static _locale_t makeCLocale() {
   _locale_t CLocale = _create_locale(LC_ALL, "C");
@@ -171,6 +175,7 @@ static locale_t getCLocale() {
   return SWIFT_LAZY_CONSTANT(makeCLocale());
 }
 #endif
+#endif // SWIFT_STDLIB_HAS_LOCALE
 
 // TODO: replace this with a float16 implementation instead of calling _float.
 // Argument type will have to stay float, though; only the formatting changes.
@@ -312,6 +317,8 @@ T _swift_strto(const char *nptr, char **endptr) {
 }
 #endif
 
+#if SWIFT_STDLIB_HAS_LOCALE
+
 #if defined(__OpenBSD__) || defined(_WIN32) || defined(__CYGWIN__) || defined(__HAIKU__)
 #define NEED_SWIFT_STRTOD_L
 #define strtod_l swift_strtod_l
@@ -332,6 +339,8 @@ T _swift_strto(const char *nptr, char **endptr) {
 #define strtof_l swift_strtof_l
 #endif
 #endif
+
+#endif // SWIFT_STDLIB_HAS_LOCALE
 
 #if defined(NEED_SWIFT_STRTOD_L)
 static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
@@ -387,44 +396,63 @@ static inline void _swift_set_errno(int to) {
 // We can't return Float80, but we can receive a pointer to one, so
 // switch the return type and the out parameter on strtold.
 template <typename T>
+#if SWIFT_STDLIB_HAS_LOCALE
 static const char *_swift_stdlib_strtoX_clocale_impl(
-    const char * nptr, T* outResult, T huge,
-    T (*posixImpl)(const char *, char **, locale_t)
-) {
+    const char *nptr, T *outResult, T huge,
+    T (*posixImpl)(const char *, char **, locale_t))
+#else
+static const char *_swift_stdlib_strtoX_impl(
+    const char *nptr, T *outResult,
+    T (*posixImpl)(const char *, char **))
+#endif
+{
   if (swift_stringIsSignalingNaN(nptr)) {
     // TODO: ensure that the returned sNaN bit pattern matches that of sNaNs
     // produced by Swift.
     *outResult = std::numeric_limits<T>::signaling_NaN();
     return nptr + std::strlen(nptr);
   }
-  
+
   char *EndPtr;
   _swift_set_errno(0);
+#if SWIFT_STDLIB_HAS_LOCALE
   const auto result = posixImpl(nptr, &EndPtr, getCLocale());
+#else
+  const auto result = posixImpl(nptr, &EndPtr);
+#endif
   *outResult = result;
   return EndPtr;
 }
-    
-const char *_swift_stdlib_strtold_clocale(
-  const char * nptr, void *outResult) {
+
+const char *_swift_stdlib_strtold_clocale(const char *nptr, void *outResult) {
+#if SWIFT_STDLIB_HAS_LOCALE
   return _swift_stdlib_strtoX_clocale_impl(
-    nptr, static_cast<long double*>(outResult), HUGE_VALL, strtold_l);
+      nptr, static_cast<long double *>(outResult), HUGE_VALL, strtold_l);
+#else
+  return _swift_stdlib_strtoX_impl(
+      nptr, static_cast<long double *>(outResult), strtold);
+#endif
 }
 
-const char *_swift_stdlib_strtod_clocale(
-    const char * nptr, double *outResult) {
-  return _swift_stdlib_strtoX_clocale_impl(
-    nptr, outResult, HUGE_VAL, strtod_l);
+const char *_swift_stdlib_strtod_clocale(const char *nptr, double *outResult) {
+#if SWIFT_STDLIB_HAS_LOCALE
+  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult, HUGE_VAL, strtod_l);
+#else
+  return _swift_stdlib_strtoX_impl(nptr, outResult, strtod);
+#endif
 }
 
-const char *_swift_stdlib_strtof_clocale(
-    const char * nptr, float *outResult) {
-  return _swift_stdlib_strtoX_clocale_impl(
-    nptr, outResult, HUGE_VALF, strtof_l);
+const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult) {
+#if SWIFT_STDLIB_HAS_LOCALE
+  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult, HUGE_VALF,
+                                           strtof_l);
+#else
+  return _swift_stdlib_strtoX_impl(nptr, outResult, strtof);
+#endif
 }
 
-const char *_swift_stdlib_strtof16_clocale(
-    const char * nptr, __fp16 *outResult) {
+const char *_swift_stdlib_strtof16_clocale(const char *nptr,
+                                           __fp16 *outResult) {
   float tmp;
   const char *result = _swift_stdlib_strtof_clocale(nptr, &tmp);
   *outResult = tmp;

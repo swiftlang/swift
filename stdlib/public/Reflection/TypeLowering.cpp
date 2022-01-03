@@ -18,6 +18,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_ENABLE_REFLECTION
+
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Reflection/TypeLowering.h"
@@ -2300,3 +2302,5 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(
 
 } // namespace reflection
 } // namespace swift
+
+#endif

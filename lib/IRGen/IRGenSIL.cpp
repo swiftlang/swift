@@ -2199,6 +2199,13 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.noteSwiftAsyncFunctionDef();
   }
 
+  // Emit distributed accessor, and mark the thunk as accessible
+  // by name at runtime through it.
+  if (CurSILFn->isDistributed() && CurSILFn->isThunk()) {
+    IGM.emitDistributedMethodAccessor(CurSILFn);
+    IGM.addAccessibleFunction(CurSILFn);
+  }
+
   // Configure the dominance resolver.
   // TODO: consider re-using a dom analysis from the PassManager
   // TODO: consider using a cheaper analysis at -O0

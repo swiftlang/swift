@@ -38,6 +38,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -58,8 +59,8 @@ class Output;
 namespace swift {
 
 /// The payload for the FixedSizeSlab.
-/// This is a super-class rather than a member of FixedSizeSlab to make bridging
-/// with libswift easier.
+/// This is a super-class rather than a member of FixedSizeSlab to make swift
+/// bridging easier.
 class FixedSizeSlabPayload {
 public:
   /// The capacity of the payload.
@@ -367,6 +368,10 @@ private:
 
   /// Folding set for key path patterns.
   llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
+  
+  /// Symbols (e.g. function names) which are made public by the
+  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
+  TBDSymbolSetPtr publicCMOSymbols;
 
 public:
   ~SILModule();
@@ -505,6 +510,12 @@ public:
   bool isOptimizedOnoneSupportModule() const;
 
   const SILOptions &getOptions() const { return Options; }
+
+  /// Return the symbols (e.g. function names) which are made public by the
+  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
+  TBDSymbolSetPtr getPublicCMOSymbols() { return publicCMOSymbols; }
+
+  void addPublicCMOSymbol(StringRef symbol);
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;

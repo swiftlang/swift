@@ -220,50 +220,6 @@ Type TypeResolution::resolveDependentMemberType(
                                               baseTy);
 }
 
-Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
-                                               DeclContext *DC,
-                                               Identifier name) const {
-  switch (stage) {
-  case TypeResolutionStage::Structural:
-    return DependentMemberType::get(baseTy, name);
-
-  case TypeResolutionStage::Interface:
-    // Handled below.
-    break;
-  }
-
-  assert(stage == TypeResolutionStage::Interface);
-  auto genericSig = getGenericSignature();
-  if (!genericSig)
-    return ErrorType::get(baseTy);
-
-  // Look for a nested type with the given name.
-  auto nestedType = genericSig->lookupNestedType(baseTy, name);
-  assert(nestedType);
-
-  // If the nested type has been resolved to an associated type, use it.
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(nestedType)) {
-    return DependentMemberType::get(baseTy, assocType);
-  }
-
-  if (nestedType->getDeclContext()->getSelfClassDecl()) {
-    // We found a member of a class from a protocol or protocol
-    // extension.
-    //
-    // Get the superclass of the 'Self' type parameter.
-    if (auto concreteTy = genericSig->getConcreteType(baseTy))
-      baseTy = concreteTy;
-    else {
-      baseTy = genericSig->getSuperclassBound(baseTy);
-      assert(baseTy);
-    }
-    assert(baseTy);
-  }
-
-  return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), nestedType,
-                                              baseTy);
-}
-
 bool TypeResolution::areSameType(Type type1, Type type2) const {
   if (type1->isEqual(type2))
     return true;
@@ -450,23 +406,14 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
     if (selfType->is<GenericTypeParamType>()) {
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-        if (isa<AssociatedTypeDecl>(typeDecl) ||
-            (isa<TypeAliasDecl>(typeDecl) &&
-             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
-          // FIXME: We should use this lookup method for the Interface
-          // stage too, but right now that causes problems with
-          // Sequence.SubSequence vs Collection.SubSequence; the former
-          // is more canonical, but if we return that instead of the
-          // latter, we infer the wrong associated type in some cases,
-          // because we use the Sequence.SubSequence default instead of
-          // the Collection.SubSequence default, even when the conforming
-          // type wants to conform to Collection.
-          if (getStage() == TypeResolutionStage::Structural) {
-            return resolveSelfAssociatedType(selfType, foundDC,
-                                             typeDecl->getName());
-          } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-            typeDecl = assocType->getAssociatedTypeAnchor();
-          }
+        auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl);
+        if (getStage() == TypeResolutionStage::Structural &&
+            aliasDecl && !aliasDecl->isGeneric()) {
+          return aliasDecl->getStructuralType();
+        }
+
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+          typeDecl = assocType->getAssociatedTypeAnchor();
         }
       }
 
@@ -543,10 +490,6 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
       noteLoc = loc;
   }
 
-  if (contextSig) {
-    parentTy = contextSig.getGenericEnvironment()->mapTypeIntoContext(parentTy);
-  }
-
   const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
   const auto genericSig = decl->getGenericSignature();
 
@@ -556,7 +499,16 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
         decl->getDeclaredInterfaceType(),
         genericSig.getGenericParams(),
         genericSig.getRequirements(),
-        QueryTypeSubstitutionMap{subMap});
+        [&](SubstitutableType *type) -> Type {
+          auto result = QueryTypeSubstitutionMap{subMap}(type);
+          if (result->hasTypeParameter()) {
+            if (contextSig) {
+              auto *genericEnv = contextSig.getGenericEnvironment();
+              return genericEnv->mapTypeIntoContext(result);
+            }
+          }
+          return result;
+        });
 
   switch (result) {
   case RequirementCheckResult::Failure:
@@ -671,15 +623,41 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto *decl = unboundType->getDecl();
 
   // Make sure we have the right number of generic arguments.
+  //
+  // For generic types without type sequence parameters, we require
+  // the number of declared generic parameters match the number of
+  // arguments.
+  //
+  // For generic types with type sequence parameters, we only require
+  // that the number of arguments is enough to saturate the number of
+  // regular generic parameters. The type sequence parameter will absorb
+  // any excess parameters, or will have a substitution of `Void` if there
+  // is nothing to bind. This Void-binding behavior of type sequences
+  // also explains the offset of one that isn't otherwise present in
+  // the plain generic parameter case.
+  //
+  // struct Foo<Prefix, T..., Suffix> {}
+  // typealias X = Foo<String, Int, Float, Double> // Prefix -> String, Suffix
+  // -> Double, T... -> (Int, Float) typealias X = Foo<String, Int> // Prefix ->
+  // String, Suffix -> Int, T... -> Void typealias Y = Foo<String> // error: Not
+  // enough arguments to bind Suffix.
+  //
   // FIXME: If we have fewer arguments than we need, that might be okay, if
-  // we're allowed to deduce the remaining arguments from context.
+  // we're allowed to deduce the remaining arguments from context. The
+  // expression checker certainly only cares about the case where too many
+  // arguments are given.
   auto genericArgs = generic->getGenericArgs();
   auto genericParams = decl->getGenericParams();
-  if (genericParams->size() != genericArgs.size()) {
+  auto hasTypeSequence = llvm::any_of(
+      *genericParams, [](const auto *GPT) { return GPT->isTypeSequence(); });
+  if ((!hasTypeSequence && genericArgs.size() != genericParams->size()) ||
+      (hasTypeSequence && genericArgs.size() < genericParams->size() - 1)) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      diags.diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
-                     genericParams->size(), genericArgs.size(),
-                     genericArgs.size() < genericParams->size())
+      diags
+          .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
+                    genericParams->size() - (hasTypeSequence ? 1 : 0),
+                    genericArgs.size(),
+                    genericArgs.size() < genericParams->size(), hasTypeSequence)
           .highlight(generic->getAngleBrackets());
       decl->diagnose(diag::kind_declname_declared_here,
                      DescriptiveDeclKind::GenericType, decl->getName());
@@ -776,8 +754,15 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 Type TypeResolution::applyUnboundGenericArguments(
     GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
     ArrayRef<Type> genericArgs) const {
-  assert(genericArgs.size() == decl->getGenericParams()->size() &&
-         "invalid arguments, use applyGenericArguments for diagnostic emitting");
+  const bool hasTypeSequence =
+      llvm::any_of(*decl->getGenericParams(),
+                   [](const auto *GPT) { return GPT->isTypeSequence(); });
+  assert(
+      ((!hasTypeSequence &&
+        genericArgs.size() == decl->getGenericParams()->size()) ||
+       (hasTypeSequence &&
+        genericArgs.size() >= decl->getGenericParams()->size() - 1)) &&
+      "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   auto genericSig = decl->getGenericSignature();
   assert(!genericSig.isNull());
@@ -825,16 +810,62 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // Realize the types of the generic arguments and add them to the
   // substitution map.
-  for (const unsigned i : indices(genericArgs)) {
-    auto origTy = genericSig.getInnermostGenericParams()[i];
-    auto substTy = genericArgs[i];
+  auto innerParams = genericSig.getInnermostGenericParams();
+  for (unsigned i = 0; i < innerParams.size(); ++i) {
+    auto origTy = innerParams[i];
+    auto origGP = origTy->getCanonicalType()->castTo<GenericTypeParamType>();
 
-    // Enter a substitution.
-    subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
-      substTy;
+    if (!origGP->isTypeSequence()) {
+      auto substTy = genericArgs[i];
 
-    skipRequirementsCheck |=
-        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+      // Enter a substitution.
+      subs[origGP] = substTy;
+
+      skipRequirementsCheck |=
+          substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+
+      continue;
+    }
+
+    // Scan backwards to find the bounds of the longest run of
+    // types we can bind to this type sequence parameter.
+    unsigned tail;
+    for (tail = 1; tail <= innerParams.size(); ++tail) {
+      auto tailTy = innerParams[innerParams.size() - tail];
+      auto tailGP = tailTy->getCanonicalType()->castTo<GenericTypeParamType>();
+      if (tailGP->isTypeSequence()) {
+        assert(tailGP->isEqual(origGP) &&
+               "Found multiple type sequence parameters!");
+
+        // Saturate the type sequence. Take care that if the prefix and suffix
+        // have bound all available arguments that we bind the type sequence
+        // parameter to `Void`.
+        const size_t sequenceLength = tail + i <= genericArgs.size()
+                                          ? genericArgs.size() - tail - i + 1
+                                          : 0;
+
+        auto substTy = PackType::get(getASTContext(),
+                                     genericArgs.slice(i, sequenceLength));
+
+        // Enter a substitution.
+        subs[origGP] = substTy;
+
+        skipRequirementsCheck |=
+            substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+
+        break;
+      }
+
+      auto substTy = genericArgs[genericArgs.size() - tail];
+
+      // Enter a substitution.
+      subs[tailGP] = substTy;
+
+      skipRequirementsCheck |=
+          substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
+    }
+
+    break;
   }
 
   // Check the generic arguments against the requirements of the declaration's
@@ -845,15 +876,6 @@ Type TypeResolution::applyUnboundGenericArguments(
     // Check the generic arguments against the requirements of the declaration's
     // generic signature.
 
-    // First, map substitutions into context.
-    TypeSubstitutionMap contextualSubs = subs;
-    if (const auto contextSig = getGenericSignature()) {
-      auto *genericEnv = contextSig.getGenericEnvironment();
-      for (auto &pair : contextualSubs) {
-        pair.second = genericEnv->mapTypeIntoContext(pair.second);
-      }
-    }
-
     SourceLoc noteLoc = decl->getLoc();
     if (noteLoc.isInvalid())
       noteLoc = loc;
@@ -862,7 +884,16 @@ Type TypeResolution::applyUnboundGenericArguments(
         module, loc, noteLoc,
         UnboundGenericType::get(decl, parentTy, getASTContext()),
         genericSig.getGenericParams(), genericSig.getRequirements(),
-        QueryTypeSubstitutionMap{contextualSubs});
+        [&](SubstitutableType *type) -> Type {
+          auto result = QueryTypeSubstitutionMap{subs}(type);
+          if (result->hasTypeParameter()) {
+            if (const auto contextSig = getGenericSignature()) {
+              auto *genericEnv = contextSig.getGenericEnvironment();
+              return genericEnv->mapTypeIntoContext(result);
+            }
+          }
+          return result;
+        });
 
     switch (result) {
     case RequirementCheckResult::Failure:
@@ -2478,14 +2509,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // context, and then set isNoEscape if @escaping is not present.
   if (!ty) ty = resolveType(repr, instanceOptions);
   if (!ty || ty->hasError()) return ty;
-
-  // Type aliases inside protocols are not yet resolved in the structural
-  // stage of type resolution
-  if (ty->is<DependentMemberType>() &&
-      resolution.getStage() == TypeResolutionStage::Structural) {
-    return ty;
-  }
-
+  
   // Handle @escaping
   if (ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
@@ -3463,7 +3487,7 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  ASTContext &ctx = baseTy->getASTContext();
+  ASTContext &ctx = getASTContext();
   // If the standard library isn't loaded, we ought to let the user know
   // something has gone terribly wrong, since the rest of the compiler is going
   // to assume it can canonicalize [T] to Array<T>.
@@ -3614,12 +3638,31 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     elementOptions = elementOptions.withoutContext(true);
   }
 
-  // Variadic tuples are not permitted.
   bool complained = false;
   if (repr->hasEllipsis()) {
-    diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
-    repr->removeEllipsis();
-    complained = true;
+    if (repr->getNumElements() == 1 && !repr->hasElementNames()) {
+      // This is probably a pack expansion. Try to resolve the pattern type.
+      auto patternTy = resolveType(repr->getElementType(0), elementOptions);
+      if (patternTy->hasError())
+        complained = true;
+
+      // If there's no reference to a variadic generic parameter, complain
+      // - the pack won't actually expand to anything meaningful.
+      if (!patternTy->hasTypeSequence())
+        diagnose(repr->getLoc(), diag::expansion_not_variadic, patternTy)
+          .highlight(repr->getParens());
+
+      return PackExpansionType::get(patternTy);
+    } else {
+      // Variadic tuples are not permitted.
+      //
+      // FIXME: We could probably make this work.
+      // (T, U, V...) is a reasonable pack expansion to support with a kind of
+      // "guaranteed bound" of at least two elements.
+      diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
+      repr->removeEllipsis();
+      complained = true;
+    }
   }
 
   bool hadError = false;

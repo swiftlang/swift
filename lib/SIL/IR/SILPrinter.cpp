@@ -2884,6 +2884,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isDynamicallyReplaceable()) {
     OS << "[dynamically_replacable] ";
   }
+  if (isDistributed()) {
+    OS << "[distributed] ";
+  }
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";
   }

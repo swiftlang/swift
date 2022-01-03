@@ -165,7 +165,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
     return error(status);
   }
 
-  StringRef SDKPath = ctx.SearchPathOpts.SDKPath;
+  StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
   if (SDKPath.empty() ||
       !Core->ModuleInputBuffer->getBufferIdentifier().startswith(SDKPath)) {
     for (const auto &searchPath : Core->SearchPaths) {

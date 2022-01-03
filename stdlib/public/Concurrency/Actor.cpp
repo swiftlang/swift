@@ -27,6 +27,7 @@
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Mutex.h"
@@ -435,7 +436,7 @@ public:
 };
 
 /// A job to process a default actor that's allocated separately from
-/// the actor but doesn't need the override mechanics.
+/// the actor.
 class ProcessOutOfLineJob : public Job {
   DefaultActorImpl *Actor;
 public:
@@ -451,30 +452,24 @@ public:
   }
 };
 
-/// A job to process a default actor with a new priority; allocated
-/// separately from the actor.
-class ProcessOverrideJob;
-
 /// Information about the currently-running processing job.
 struct RunningJobInfo {
   enum KindType : uint8_t {
-    Inline, Override, Other
+    Inline, Other
   };
   KindType Kind;
   JobPriority Priority;
-  ProcessOverrideJob *OverrideJob;
 
   bool wasInlineJob() const {
     return Kind == Inline;
   }
 
   static RunningJobInfo forOther(JobPriority priority) {
-    return {Other, priority, nullptr};
+    return {Other, priority};
   }
   static RunningJobInfo forInline(JobPriority priority) {
-    return {Inline, priority, nullptr};
+    return {Inline, priority};
   }
-  static RunningJobInfo forOverride(ProcessOverrideJob *job);
 
   void setAbandoned();
   void setRunning();
@@ -484,8 +479,7 @@ struct RunningJobInfo {
 class JobRef {
   enum : uintptr_t {
     NeedsPreprocessing = 0x1,
-    IsOverride = 0x2,
-    JobMask = ~uintptr_t(NeedsPreprocessing | IsOverride)
+    JobMask = ~uintptr_t(NeedsPreprocessing)
   };
 
   /// A Job* that may have one of the two bits above mangled into it.
@@ -508,10 +502,6 @@ public:
     return { job, NeedsPreprocessing };
   }
 
-  /// Return a reference to an override job, which needs special
-  /// treatment during preprocessing.
-  static JobRef getOverride(ProcessOverrideJob *job);
-
   /// Is this a null reference?
   operator bool() const { return Value != 0; }
 
@@ -521,24 +511,17 @@ public:
     return Value & NeedsPreprocessing;
   }
 
-  /// Is this an unpreprocessed override job?
-  bool isOverride() const {
-    return Value & IsOverride;
+  /// Is this an unprocessed message to the actor, rather than a job?
+  bool isMessage() const {
+    return false; // For now, we have no messages
   }
-
-  /// Given that this is an override job, return it.
-  ProcessOverrideJob *getAsOverride() const {
-    assert(isOverride());
-    return reinterpret_cast<ProcessOverrideJob*>(Value & JobMask);
-  }
-  ProcessOverrideJob *getAsPreprocessedOverride() const;
 
   Job *getAsJob() const {
-    assert(!isOverride());
+    assert(!isMessage());
     return reinterpret_cast<Job*>(Value & JobMask);
   }
   Job *getAsPreprocessedJob() const {
-    assert(!isOverride() && !needsPreprocessing());
+    assert(!isMessage() && !needsPreprocessing());
     return reinterpret_cast<Job*>(Value);
   }
 
@@ -750,25 +733,6 @@ private:
       reinterpret_cast<char*>(job) - offsetof(DefaultActorImpl, JobStorage));
 #pragma clang diagnostic pop
   }
-
-  class OverrideJobCache {
-    ProcessOverrideJob *Job = nullptr;
-    bool IsNeeded = false;
-#ifndef NDEBUG
-    bool WasCommitted = false;
-#endif
-  public:
-    OverrideJobCache() = default;
-    OverrideJobCache(const OverrideJobCache &) = delete;
-    OverrideJobCache &operator=(const OverrideJobCache &) = delete;
-    ~OverrideJobCache() {
-      assert(WasCommitted && "didn't commit override job!");
-    }
-
-    void addToState(DefaultActorImpl *actor, State &newState);
-    void setNotNeeded() { IsNeeded = false; }
-    void commit();
-  };
 };
 
 } /// end anonymous namespace
@@ -841,7 +805,7 @@ void DefaultActorImpl::deallocateUnconditional() {
 /// Given that a job is enqueued normally on a default actor, get/set
 /// the next job in the actor's queue.
 ///
-/// Note that this must not be used on the override jobs that can appear
+/// Note that this must not be used on the message jobs that can appear
 /// in the queue; those jobs are not actually in the actor's queue (they're
 /// on the global execution queues).  So the actor's actual queue flows
 /// through the NextJob field on those objects rather than through
@@ -876,243 +840,13 @@ void DefaultActorImpl::scheduleNonOverrideProcessJob(JobPriority priority,
   swift_task_enqueueGlobal(job);
 }
 
-
-namespace {
-
-/// A job to process a specific default actor at a higher priority than
-/// it was previously running at.
-///
-/// When an override job is successfully registered with an actor
-/// (not enqueued there), the thread processing the actor and the
-/// thread processing the override job coordinate by each calling
-/// one of a set of methods on the object.
-class ProcessOverrideJob : public Job {
-  DefaultActorImpl *Actor;
-
-  ConditionVariable::Mutex Lock;
-  ConditionVariable Queue;
-
-  /// Has the actor made a decision about this job yet?
-  bool IsResolvedByActor = false;
-
-  /// Has the job made a decision about itself yet?
-  bool IsResolvedByJob = false;
-
-  /// Has this job been abandoned?
-  bool IsAbandoned = false;
-
-public:
-  /// SchedulerPrivate in an override job is used for actually scheduling
-  /// the job, so the actor queue goes through this instead.
-  ///
-  /// We also use this temporarily for the list of override jobs on
-  /// the actor that we need to wake up.
-  JobRef NextJob;
-
-public:
-  ProcessOverrideJob(DefaultActorImpl *actor, JobPriority priority,
-                     JobRef nextJob)
-    : Job({JobKind::DefaultActorOverride, priority}, &process),
-      Actor(actor), NextJob(nextJob) {}
-
-  DefaultActorImpl *getActor() const { return Actor; }
-
-  /// Called by the job to notify the actor that the job has chosen
-  /// to abandon its work.  This is irrevocable: the job is not going
-  /// to have a thread behind it.
-  ///
-  /// This may delete the job or cause it to be deleted on another thread.
-  void setAbandoned() {
-    bool shouldDelete = false;
-    Lock.withLock([&] {
-      assert(!IsResolvedByJob && "job already resolved itself");
-      IsResolvedByJob = true;
-      IsAbandoned = true;
-      shouldDelete = IsResolvedByJob && IsResolvedByActor;
-    });
-    if (shouldDelete) delete this;
-  }
-
-  /// Called by the job to notify the actor that the job has successfully
-  /// taken over the actor and is now running it.
-  ///
-  /// This may delete the job object or cause it to be deleted on
-  /// another thread.
-  void setRunning() {
-    bool shouldDelete = false;
-    Lock.withLock([&] {
-      assert(!IsResolvedByJob && "job already resolved itself");
-      IsResolvedByJob = true;
-      shouldDelete = IsResolvedByJob && IsResolvedByActor;
-    });
-    if (shouldDelete) delete this;
-  }
-
-  /// Called by the job to wait for the actor to resolve what the job
-  /// should do.
-  bool waitForActivation() {
-    bool isActivated = false;
-    Lock.withLockOrWait(Queue, [&] {
-      assert(!IsResolvedByJob && "job already resolved itself");
-      if (IsResolvedByActor) {
-        isActivated = !IsAbandoned;
-        IsResolvedByJob = true;
-        return true;
-      }
-      return false;
-    });
-    delete this;
-    return isActivated;
-  }
-
-  /// Called by the actor to notify this job that the actor thinks it
-  /// should try to take over the actor.  It's okay if that doesn't
-  /// succeed (as long as that's because some other job is going to
-  /// take over).
-  ///
-  /// This may delete the job or cause it to be deleted on another
-  /// thread.
-  bool wakeAndActivate() {
-    bool shouldDelete = false;
-    bool mayHaveBeenActivated = false;
-    Lock.withLockThenNotifyAll(Queue, [&] {
-      assert(!IsResolvedByActor && "actor already resolved this sjob");
-      IsResolvedByActor = true;
-      mayHaveBeenActivated = IsResolvedByJob && !IsAbandoned;
-      shouldDelete = IsResolvedByJob && IsResolvedByActor;
-    });
-    if (shouldDelete) delete this;
-    return mayHaveBeenActivated;
-  }
-
-  /// Called by the actor to notify this job that the actor does not
-  /// think it should try to take over the actor.  It's okay if the
-  /// job successfully takes over the actor anyway.
-  ///
-  /// This may delete the job or cause it to be deleted on another
-  /// thread.
-  void wakeAndAbandon() {
-    bool shouldDelete = false;
-    Lock.withLockThenNotifyAll(Queue, [&] {
-      assert(!IsResolvedByActor && "actor already resolved this job");
-      IsResolvedByActor = true;
-      IsAbandoned = true;
-      shouldDelete = IsResolvedByJob && IsResolvedByActor;
-    });
-    if (shouldDelete) delete this;
-  }
-
-  SWIFT_CC(swiftasync)
-  static void process(Job *job);
-
-  static bool classof(const Job *job) {
-    return job->Flags.getKind() == JobKind::DefaultActorOverride;
-  }
-};
-
-} /// end anonymous namespace
-
-JobRef JobRef::getOverride(ProcessOverrideJob *job) {
-  return JobRef(job, NeedsPreprocessing | IsOverride);
-}
-ProcessOverrideJob *JobRef::getAsPreprocessedOverride() const {
-  return cast_or_null<ProcessOverrideJob>(getAsPreprocessedJob());
-}
-RunningJobInfo RunningJobInfo::forOverride(ProcessOverrideJob *job) {
-  return {Override, job->getPriority(), job};
-}
-
 /// Flag that the current processing job has been abandoned
 /// and will not be running the actor.
 void RunningJobInfo::setAbandoned() {
-  if (OverrideJob) {
-    OverrideJob->setAbandoned();
-    OverrideJob = nullptr;
-  }
 }
 
 /// Flag that the current processing job is now running the actor.
 void RunningJobInfo::setRunning() {
-  if (OverrideJob) {
-    OverrideJob->setRunning();
-    OverrideJob = nullptr;
-  }
-}
-
-/// Try to wait for the current processing job to be activated,
-/// if that's possible.  It's okay to call this multiple times
-/// (or to call setAbandoned/setRunning after it) as long as
-/// it's all on a single value.
-bool RunningJobInfo::waitForActivation() {
-  if (Kind == Override) {
-    // If we don't have an override job, it's because we've already
-    // waited for activation successfully.
-    if (!OverrideJob) return true;
-
-    bool result = OverrideJob->waitForActivation();
-    OverrideJob = nullptr;
-    return result;
-  }
-  return false;
-}
-
-/// Wake all the overrides in the given list, activating the first
-/// that exactly matches the target priority, if any.
-static void wakeOverrides(ProcessOverrideJob *nextOverride,
-                          Optional<JobPriority> targetPriority) {
-  bool hasAlreadyActivated = false;
-  while (nextOverride) {
-    // We have to advance to the next override before we call one of
-    // the wake methods because they can delete the job immediately
-    // (and even if they don't, we'd still be racing with deletion).
-    auto cur = nextOverride;
-    nextOverride = cur->NextJob.getAsPreprocessedOverride();
-
-    if (hasAlreadyActivated ||
-        !targetPriority)
-      cur->wakeAndAbandon();
-    else
-      hasAlreadyActivated = cur->wakeAndActivate();
-  }
-}
-
-/// Flag that an override job is needed and create it.
-void DefaultActorImpl::OverrideJobCache::addToState(DefaultActorImpl *actor,
-                                                    State &newState) {
-  IsNeeded = true;
-  auto newPriority = newState.Flags.getMaxPriority();
-  auto nextJob = newState.FirstJob;
-  if (Job) {
-    Job->Flags.setPriority(newPriority);
-    Job->NextJob = nextJob;
-  } else {
-    // Override jobs are always "extra" from the perspective of our
-    // ownership rules and so require a retain of the actor.  We must
-    // do this before changing the actor state because other jobs may
-    // race to release the actor as soon as we change the actor state.
-    swift_retain(actor);
-    Job = new ProcessOverrideJob(actor, newPriority, nextJob);
-  }
-  newState.FirstJob = JobRef::getOverride(Job);
-}
-
-/// Schedule the override job if we created one and still need it.
-/// If we created one but didn't end up needing it (which can happen
-/// with a race to override), destroy it.
-void DefaultActorImpl::OverrideJobCache::commit() {
-#ifndef NDEBUG
-  assert(!WasCommitted && "committing override job multiple timee");
-  WasCommitted = true;
-#endif
-
-  if (Job) {
-    if (IsNeeded) {
-      swift_task_enqueueGlobal(Job);
-    } else {
-      swift_release(Job->getActor());
-      delete Job;
-    }
-  }
 }
 
 namespace {
@@ -1134,16 +868,14 @@ struct JobQueueTraits {
 /// Preprocess the prefix of the actor's queue that hasn't already
 /// been preprocessed:
 ///
-/// - Split the jobs into registered overrides and actual jobs.
+/// - Split the jobs into messages and actual jobs.
 /// - Append the actual jobs to any already-preprocessed job list.
 ///
 /// The returned job should become the new root of the job queue
 /// (or may be immediately dequeued, in which its successor should).
-/// All of the jobs in this list are guaranteed to be non-override jobs.
 static Job *preprocessQueue(JobRef first,
                             JobRef previousFirst,
-                            Job *previousFirstNewJob,
-                            ProcessOverrideJob *&overridesToWake) {
+                            Job *previousFirstNewJob) {
   assert(previousFirst || previousFirstNewJob == nullptr);
 
   if (!first.needsPreprocessing())
@@ -1164,20 +896,13 @@ static Job *preprocessQueue(JobRef first,
       break;
     }
 
-    // If the job is an override, add it to the list of override jobs
-    // that we need to wake up.  Note that the list of override jobs
-    // flows through NextJob; we must not use getNextJobInQueue because
-    // that touches queue-private state, and the override job is
-    // not enqueued on the actor, merely registered with it.
-    if (first.isOverride()) {
-      auto overrideJob = first.getAsOverride();
-      first = overrideJob->NextJob;
-      overrideJob->NextJob = JobRef::getPreprocessed(overridesToWake);
-      overridesToWake = overrideJob;
-      continue;
+    // If the job is a message, add it to the list of messages we need
+    // to process.
+    if (first.isMessage()) {
+      swift_unreachable("no messages currently supported");
     }
 
-    // If the job isn't an override, add it to the front of the list of
+    // If the job isn't a message, add it to the front of the list of
     // jobs we're building up.  Note that this reverses the order of
     // jobs; since enqueue() always adds jobs to the front, reversing
     // the order effectively makes the actor queue FIFO, which is what
@@ -1206,16 +931,13 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
   auto oldState = CurrentState.load(std::memory_order_acquire);
   assert(oldState.Flags.isAnyRunningStatus());
 
-  ProcessOverrideJob *overridesToWake = nullptr;
-  auto firstNewJob = preprocessQueue(oldState.FirstJob, JobRef(), nullptr,
-                                     overridesToWake);
+  auto firstNewJob = preprocessQueue(oldState.FirstJob, JobRef(), nullptr);
 
   _swift_tsan_release(this);
   while (true) {
     // In Zombie_ReadyForDeallocation state, nothing else should
     // be touching the atomic, and there's no point updating it.
     if (oldState.Flags.getStatus() == Status::Zombie_ReadyForDeallocation) {
-      wakeOverrides(overridesToWake, oldState.Flags.getMaxPriority());
       deallocateUnconditional();
       return;
     }
@@ -1239,9 +961,8 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
     }
 
     bool hasMoreJobs = (bool) newState.FirstJob;
-    bool hasOverrideAtNewPriority = false;
     bool hasActiveInlineJob = newState.Flags.hasActiveInlineJob();
-    bool needsNewProcessJob = hasMoreJobs && !hasOverrideAtNewPriority;
+    bool needsNewProcessJob = hasMoreJobs;
 
     // If we want to create a new inline job below, be sure to claim that
     // in the new state.
@@ -1256,8 +977,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
       // Preprocess any new queue items.
       firstNewJob = preprocessQueue(oldState.FirstJob,
                                     firstPreprocessed,
-                                    firstNewJob,
-                                    overridesToWake);
+                                    firstNewJob);
 
       // Try again.
       continue;
@@ -1272,26 +992,16 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
     // The priority of the remaining work.
     auto newPriority = newState.Flags.getMaxPriority();
 
-    // Process the override commands we found.
-    wakeOverrides(overridesToWake, newPriority);
-
     // This is the actor's owning job; per the ownership rules (see
     // the comment on DefaultActorImpl), if there are remaining
     // jobs, we need to balance out our ownership one way or another.
     // We also, of course, need to ensure that there's a thread that's
     // actually going to process the actor.
     if (hasMoreJobs) {
-      // If we know that there's an override job at the new priority,
-      // we can let it become the owning job.  We just need to release.
-      if (hasOverrideAtNewPriority) {
-        swift_release(this);
-
-      // Otherwies, enqueue a job that will try to take over running
-      // with the new priority.  This also ensures that there's a job
-      // at that priority which will actually take over the actor.
-      } else {
-        scheduleNonOverrideProcessJob(newPriority, hasActiveInlineJob);
-      }
+      // Enqueue a job that will try to take over running with the
+      // new priority.  This also ensures that there's a job at that
+      // priority which will actually take over the actor.
+      scheduleNonOverrideProcessJob(newPriority, hasActiveInlineJob);
     }
 
     return;
@@ -1349,21 +1059,14 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
       }
 
       // If the actor is currently running, we'd need to wait for
-      // it to stop.  We can do this if we're an override job;
-      // otherwise we need to exit.
+      // it to stop; just exit.
       if (oldState.Flags.getStatus() == Status::Running) {
-        if (!runner.waitForActivation()) {
-          // The only change we need here is inline-runner bookkeeping.
-          if (!tryUpdateForInlineRunner())
-            continue;
+        // The only change we need here is inline-runner bookkeeping.
+        if (!tryUpdateForInlineRunner())
+          continue;
 
-          swift_release(this);
-          return nullptr;
-        }
-
-        // Fall through into the compare-exchange below, but anticipate
-        // that the actor is now Scheduled instead of Running.
-        oldState.Flags.setStatus(Status::Scheduled);
+        swift_release(this);
+        return nullptr;
       }
 
       // Try to set the state as Running.
@@ -1396,17 +1099,13 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
 
   // Okay, now it's safe to look at queue state.
   // Preprocess any queue items at the front of the queue.
-  ProcessOverrideJob *overridesToWake = nullptr;
-  auto newFirstJob = preprocessQueue(oldState.FirstJob, JobRef(),
-                                     nullptr, overridesToWake);
+  auto newFirstJob = preprocessQueue(oldState.FirstJob, JobRef(), nullptr);
 
-  Optional<JobPriority> remainingJobPriority;
   _swift_tsan_release(this);
   while (true) {
     // In Zombie_ReadyForDeallocation state, nothing else should
     // be touching the atomic, and there's no point updating it.
     if (oldState.Flags.getStatus() == Status::Zombie_ReadyForDeallocation) {
-      wakeOverrides(overridesToWake, oldState.Flags.getMaxPriority());
       deallocateUnconditional();
       return nullptr;
     }
@@ -1444,8 +1143,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
       // matter; we're looking for an exact match with that.)
       newFirstJob = preprocessQueue(oldState.FirstJob,
                                     firstPreprocessed,
-                                    newFirstJob,
-                                    overridesToWake);
+                                    newFirstJob);
 
       // Loop to retry updating the state.
       continue;
@@ -1455,20 +1153,15 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
     // We successfully updated the state.
 
     // If we're giving up the thread with jobs remaining, we need
-    // to release the actor, and we should wake overrides with the
-    // right priority.
+    // to release the actor.
     Optional<JobPriority> remainingJobPriority;
     if (!jobToRun && newFirstJob) {
       remainingJobPriority = newState.Flags.getMaxPriority();
     }
 
-    // Wake the overrides.
-    wakeOverrides(overridesToWake, remainingJobPriority);
-
     // Per the ownership rules (see the comment on DefaultActorImpl),
     // release the actor if we're giving up the thread with jobs
-    // remaining.  We intentionally do this after wakeOverrides to
-    // try to get the overrides running a little faster.
+    // remaining.
     if (remainingJobPriority)
       swift_release(this);
 
@@ -1615,22 +1308,8 @@ void ProcessOutOfLineJob::process(Job *job) {
   return processDefaultActor(actor, runner); // 'return' forces tail call
 }
 
-SWIFT_CC(swiftasync)
-void ProcessOverrideJob::process(Job *job) {
-  auto self = cast<ProcessOverrideJob>(job);
-
-  // Pull the actor and priority out of the job.
-  auto actor = self->Actor;
-  auto runner = RunningJobInfo::forOverride(self);
-
-  swift_retain(actor);
-  return processDefaultActor(actor, runner); // 'return' forces tail call
-}
-
 void DefaultActorImpl::enqueue(Job *job) {
   auto oldState = CurrentState.load(std::memory_order_relaxed);
-
-  OverrideJobCache overrideJob;
 
   while (true) {
     assert(!oldState.Flags.isAnyZombieStatus() &&
@@ -1656,17 +1335,7 @@ void DefaultActorImpl::enqueue(Job *job) {
               : std::max(oldPriority, job->getPriority());
     newState.Flags.setMaxPriority(newPriority);
 
-    // If we need an override job, create it (if necessary) and
-    // register it with the queue.
-    bool needsOverride = false;
-    if (needsOverride) {
-      overrideJob.addToState(this, newState);
-    } else {
-      overrideJob.setNotNeeded();
-    }
-
-    // If we don't need an override job, then we might be able to
-    // create an inline job; flag that.
+    // We might be able to create an inline job; flag that.
     bool hasActiveInlineJob = newState.Flags.hasActiveInlineJob();
     if (wasIdle && !hasActiveInlineJob)
       newState.Flags.setHasActiveInlineJob(true);
@@ -1687,13 +1356,9 @@ void DefaultActorImpl::enqueue(Job *job) {
     // Okay, we successfully updated the status.  Schedule a job to
     // process the actor if necessary.
 
-    // Commit the override job if we created one.
-    overrideJob.commit();
-
     // If the actor is currently idle, schedule it using the
     // invasive job.
     if (wasIdle) {
-      assert(!needsOverride);
       scheduleNonOverrideProcessJob(newPriority, hasActiveInlineJob);
     }
 
@@ -2003,4 +1668,80 @@ bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
 bool DefaultActorImpl::isDistributedRemote() {
   auto state = CurrentState.load(std::memory_order_relaxed);
   return state.Flags.isDistributedRemote();
+}
+
+static const AccessibleFunctionRecord *
+findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
+  if (auto *func = runtime::swift_findAccessibleFunction(targetNameStart,
+                                                         targetNameLength)) {
+    assert(func->Flags.isDistributed());
+    return func;
+  }
+  return nullptr;
+}
+
+/// func _executeDistributedTarget(
+///    on: AnyObject,
+///    _ targetName: UnsafePointer<UInt8>,
+///    _ targetNameLength: UInt,
+///    argumentBuffer: Builtin.RawPointer,
+///    resultBuffer: Builtin.RawPointer) async throws
+using TargetExecutorSignature =
+    AsyncSignature<void(DefaultActor *, const char *, size_t, void *, void *),
+                   /*throws=*/true>;
+
+SWIFT_CC(swiftasync)
+SWIFT_RUNTIME_STDLIB_SPI
+TargetExecutorSignature::FunctionType swift_distributed_execute_target;
+
+/// Accessor takes:
+///   - an async context
+///   - an argument buffer as a raw pointer
+///   - a result buffer as a raw pointer
+///   - a reference to an actor to execute method on.
+using DistributedAccessorSignature =
+    AsyncSignature<void(void *, void *, HeapObject *),
+                   /*throws=*/true>;
+
+SWIFT_CC(swiftasync)
+static DistributedAccessorSignature::ContinuationType
+    swift_distributed_execute_target_resume;
+
+SWIFT_CC(swiftasync)
+static void ::swift_distributed_execute_target_resume(
+    SWIFT_ASYNC_CONTEXT AsyncContext *context,
+    SWIFT_CONTEXT SwiftError *error) {
+  auto parentCtx = context->Parent;
+  auto resumeInParent =
+      reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
+          parentCtx->ResumeParent);
+  swift_task_dealloc(context);
+  return resumeInParent(parentCtx, error);
+}
+
+SWIFT_CC(swiftasync)
+void ::swift_distributed_execute_target(
+    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext, DefaultActor *actor,
+    const char *targetNameStart, size_t targetNameLength, void *argumentBuffer,
+    void *resultBuffer) {
+  auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
+
+  if (!accessor)
+    return;
+
+  auto *asyncFnPtr = reinterpret_cast<
+      const AsyncFunctionPointer<DistributedAccessorSignature> *>(
+      accessor->Function.get());
+
+  DistributedAccessorSignature::FunctionType *accessorEntry =
+      asyncFnPtr->Function.get();
+
+  AsyncContext *calleeContext = reinterpret_cast<AsyncContext *>(
+      swift_task_alloc(asyncFnPtr->ExpectedContextSize));
+
+  calleeContext->Parent = callerContext;
+  calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+      swift_distributed_execute_target_resume);
+
+  accessorEntry(calleeContext, argumentBuffer, resultBuffer, actor);
 }

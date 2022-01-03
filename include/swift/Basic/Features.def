@@ -58,5 +58,6 @@ LANGUAGE_FEATURE(BuiltinMove, 0, "Builtin.move()", true)
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
 LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
 LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
+LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
 
 #undef LANGUAGE_FEATURE

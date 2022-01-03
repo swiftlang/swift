@@ -14,7 +14,7 @@
 // signatures using the requirement machine via the request evaluator.
 //
 // The actual logic for finding a minimal set of rewrite rules is implemented in
-// HomotopyReduction.cpp and GeneratingConformances.cpp.
+// HomotopyReduction.cpp and MinimalConformances.cpp.
 //
 //===----------------------------------------------------------------------===//
 
