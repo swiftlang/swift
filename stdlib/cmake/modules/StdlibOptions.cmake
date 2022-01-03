@@ -1,5 +1,6 @@
 include_guard(GLOBAL)
 
+include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/SwiftUtils.cmake)
 precondition(SWIFT_HOST_VARIANT_SDK)
 
 if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
