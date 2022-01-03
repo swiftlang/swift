@@ -2190,8 +2190,15 @@ ConstraintSystem::selectBestDisjunction(ArrayRef<Constraint *> disjunctions) {
         unsigned firstFavored = first->countFavoredNestedConstraints();
         unsigned secondFavored = second->countFavoredNestedConstraints();
 
-        if (!isOperatorDisjunction(first) || !isOperatorDisjunction(second))
+        if (!isOperatorDisjunction(first) || !isOperatorDisjunction(second)) {
+          // If one of the sides has favored overloads, let's prefer it
+          // since it's a strong enough signal that there is something
+          // known about the arguments associated with the call.
+          if (firstFavored == 0 || secondFavored == 0)
+            return firstFavored > secondFavored;
+
           return firstActive < secondActive;
+        }
 
         if (firstFavored == secondFavored) {
           // Look for additional choices that are "favored"
