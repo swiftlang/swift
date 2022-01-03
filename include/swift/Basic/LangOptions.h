@@ -679,7 +679,7 @@ namespace swift {
     unsigned SolverShrinkUnsolvedThreshold = 10;
 
     /// Disable the shrink phase of the expression type checker.
-    bool SolverDisableShrink = false;
+    bool SolverDisableShrink = true;
 
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
