@@ -168,7 +168,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(ImportPath::Element named,
+  virtual bool canImportModule(ImportPath::Module named,
                                llvm::VersionTuple version,
                                bool underlyingVersion) override;
 
@@ -287,7 +287,7 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
-  bool canImportModule(ImportPath::Element named, llvm::VersionTuple version,
+  bool canImportModule(ImportPath::Module named, llvm::VersionTuple version,
                        bool underlyingVersion) override;
   ModuleDecl *
   loadModule(SourceLoc importLoc,
