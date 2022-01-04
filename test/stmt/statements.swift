@@ -357,7 +357,7 @@ func testMyEnumWithCaseLabels(_ a : MyEnumWithCaseLabels) {
 }
 
 
-func test_guard(_ x : Int, y : Int??, cond : Bool) {
+func test_guard(_ x : Int, y : Int??, z: Int?, cond : Bool) {
   
   // These are all ok.
   guard let a = y else {}
@@ -366,9 +366,9 @@ func test_guard(_ x : Int, y : Int??, cond : Bool) {
   guard case let c = x, cond else {}
   guard case let Optional.some(d) = y else {}
   guard x != 4, case _ = x else { }
-
-
-  guard let e, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
+  guard let z, cond else {}
+  
+  
   guard case let f? : Int?, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
 
   // FIXME: Bring back the tailored diagnostic
