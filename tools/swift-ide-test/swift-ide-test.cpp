@@ -1056,7 +1056,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
 }
 
 static void
-printCodeCompletionResultsImpl(MutableArrayRef<CodeCompletionResult *> Results,
+printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
                                llvm::raw_ostream &OS, bool IncludeKeywords,
                                bool IncludeComments, bool IncludeSourceText,
                                bool PrintAnnotatedDescription) {
@@ -1137,8 +1137,8 @@ static int printCodeCompletionResults(
   return printResult<CodeCompleteResult>(
       CancellableResult, [&](CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
-            Result.Results, llvm::outs(), IncludeKeywords, IncludeComments,
-            IncludeSourceText, PrintAnnotatedDescription);
+            Result.ResultSink.Results, llvm::outs(), IncludeKeywords,
+            IncludeComments, IncludeSourceText, PrintAnnotatedDescription);
         return 0;
       });
 }
@@ -1514,8 +1514,9 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           case CancellableResultKind::Success: {
             wasASTContextReused =
                 Result->Info.completionContext->ReusingASTContext;
-            printCodeCompletionResultsImpl(Result->Results, OS, IncludeKeywords,
-                                           IncludeComments, IncludeSourceText,
+            printCodeCompletionResultsImpl(Result->ResultSink.Results, OS,
+                                           IncludeKeywords, IncludeComments,
+                                           IncludeSourceText,
                                            CodeCompletionAnnotateResults);
             break;
           }

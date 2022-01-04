@@ -144,11 +144,18 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
 
     bool hasRequiredType = Result->Info.completionContext->typeContextKind ==
                            TypeContextKind::Required;
-    if (CCOpts.sortByName)
-      CodeCompletionContext::sortCompletionResults(Result->Results);
+    ArrayRef<CodeCompletionResult *> Results = Result->ResultSink.Results;
+    // If the results are sorted by name, this stores the sorted results, which
+    // will be referenced by `Results`.
+    std::vector<CodeCompletionResult *> SortedResultsStorage;
+    if (CCOpts.sortByName) {
+      SortedResultsStorage =
+          CodeCompletionContext::sortCompletionResults(Results);
+      Results = SortedResultsStorage;
+    }
     // FIXME: this adhoc filtering should be configurable like it is in the
     // codeCompleteOpen path.
-    for (auto *Result : Result->Results) {
+    for (auto *Result : Results) {
       if (Result->getKind() == CodeCompletionResult::ResultKind::Literal) {
         switch (Result->getLiteralKind()) {
         case CodeCompletionLiteralKind::NilLiteral:
@@ -1028,8 +1035,9 @@ static void transformAndForwardResults(
               return;
             }
             auto topResults = filterInnerResults(
-                Result->Results, options.addInnerResults,
-                options.addInnerOperators, hasDot, hasQDot, hasInit, rules);
+                ArrayRef<CodeCompletionResult *>(Result->ResultSink.Results),
+                options.addInnerResults, options.addInnerOperators, hasDot,
+                hasQDot, hasInit, rules);
             // FIXME: Clearing the flair (and semantic context) is a hack so
             // that they won't overwhelm other results that also match the
             // filter text.
@@ -1037,6 +1045,7 @@ static void transformAndForwardResults(
                 extendCompletions(topResults, innerSink, Result->Info,
                                   nameToPopularity, options, exactMatch,
                                   /*clearFlair=*/true);
+            innerSink.adoptSwiftSink(Result->ResultSink);
             break;
           }
           case CancellableResultKind::Failure:
@@ -1145,8 +1154,10 @@ void SwiftLangSupport::codeCompleteOpen(
           mayUseImplicitMemberExpr = completionCtx.MayUseImplicitMemberExpr;
           consumer.setReusingASTContext(completionCtx.ReusingASTContext);
           consumer.setAnnotatedTypename(completionCtx.getAnnotateResult());
-          completions = extendCompletions(Result->Results, sink, Result->Info,
-                                          nameToPopularity, CCOpts);
+          completions =
+              extendCompletions(Result->ResultSink.Results, sink, Result->Info,
+                                nameToPopularity, CCOpts);
+          sink.adoptSwiftSink(Result->ResultSink);
           break;
         }
         case CancellableResultKind::Failure:

@@ -709,9 +709,8 @@ void swift::ide::CompletionInstance::codeComplete(
           CancellationFlag->load(std::memory_order_relaxed)) {
         Callback(ResultType::cancelled());
       } else {
-        MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
         assert(SwiftContext.swiftASTContext);
-        Callback(ResultType::success({Results, SwiftContext}));
+        Callback(ResultType::success({context.getResultSink(), SwiftContext}));
       }
     }
   };
