@@ -68,6 +68,22 @@ actor A {
   return await enterMainActor(0) + 1
 }
 
+@MainActor func mainActorFn() -> Int {
+  checkIfMainQueue(expectedAnswer: true)
+  return 10
+}
+
+@MainActor
+struct S {
+  static var bacteria: Int = mainActorFn()
+}
+
+@MainActor
+class C {
+  static var bacteria: Int = mainActorFn()
+  lazy var amoeba: Int = mainActorFn()
+  nonisolated init() {}
+}
 
 // CHECK: starting
 // CHECK-NOT: ERROR
@@ -115,5 +131,15 @@ actor A {
       }
     }
     _ = await task.value
+
+    // Check that initializers for stored properties are on the right actor
+    let t1 = Task.detached { () -> Int in
+      let c = C()
+      return await c.amoeba
+    }
+    let t2 = Task.detached { () -> Int in
+      return await S.bacteria + C.bacteria
+    }
+    _ = await t1.value + t2.value
   }
 }
