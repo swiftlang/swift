@@ -556,6 +556,39 @@ bb0(%0 : $*T):
 }
 // CHECK: } // end sil function 'callWithAutoclosure_2'
 
+// CHECK-LABEL: sil [ossa] @callWithAutoclosure_3 : $@convention(thin) <T where T : P> (@in T) -> () {
+sil [ossa] @callWithAutoclosure_3 : $@convention(thin) <T where T : P> (@in T) -> () {
+// CHECK: bb0
+bb0(%0 : $*T):
+  // CHECK: debug_value {{.*}} expr op_deref
+  debug_value %0 : $*T, expr op_deref
+  // CHECK: function_ref @mightApply
+  %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
+  %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  // CHECK-NOT: alloc_box
+  // CHECK: [[STACK_UNMARKED:%[0-9a-zA-Z_]+]] = alloc_stack $T
+  // CHECK: [[STACK:%.*]] = mark_uninitialized [var] [[STACK_UNMARKED]]
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %4c = mark_uninitialized [var] %4 : $<τ_0_0> { var τ_0_0 } <T>
+  %4a = project_box %4c : $<τ_0_0> { var τ_0_0 } <T>, 0
+  %4copy = copy_value %4c : $<τ_0_0> { var τ_0_0 } <T>
+  // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
+  copy_addr %0 to [initialization] %4a : $*T
+  // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @$s21closure_to_specializeTf0ns_n
+  // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]])
+  %6 = partial_apply %3<T>(%4copy) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
+  // CHECK: destroy_addr [[STACK]] : $*T
+  // CHECK: dealloc_stack [[STACK_UNMARKED]] : $*T
+  destroy_addr %0 : $*T
+  destroy_value %4c : $<τ_0_0> { var τ_0_0 } <T>
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}
+// CHECK: } // end sil function 'callWithAutoclosure_3'
+
+
 // CHECK-LABEL: sil shared [ossa] @$s21closure_to_specializeTf0ns_n : $@convention(thin) <T where T : P> (@inout_aliasable T) -> @out T
 sil shared [ossa] @closure_to_specialize : $@convention(thin) <T where T : P> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
 // CHECK: bb0
