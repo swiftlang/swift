@@ -2225,10 +2225,6 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
   if (macro->tokens_empty())
     return true;
 
-  // Currently we only convert non-function-like macros.
-  if (macro->isFunctionLike())
-    return true;
-
   // Consult the list of macros to suppress.
   auto suppressMacro = llvm::StringSwitch<bool>(name)
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)

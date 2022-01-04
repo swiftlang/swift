@@ -693,6 +693,9 @@ public:
   virtual void loadAllMembers(Decl *D,
                               uint64_t contextData) override;
 
+  virtual void diagnoseMissingNamedMember(const IterableDeclContext *IDC,
+                                          DeclName name) override;
+
   virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;

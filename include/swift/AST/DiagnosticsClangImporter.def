@@ -100,5 +100,30 @@ WARNING(import_multiple_mainactor_attr,none,
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
+NOTE(macro_not_imported_unsupported_operator, none, "operator not supported in macro arithmetic", ())
+NOTE(macro_not_imported_unsupported_named_operator, none, "operator '%0' not supported in macro arithmetic", (StringRef))
+NOTE(macro_not_imported_invalid_string_literal, none, "invalid string literal", ())
+NOTE(macro_not_imported_invalid_numeric_literal, none, "invalid numeric literal", ())
+NOTE(macro_not_imported_unsupported_literal, none, "only numeric and string macro literals supported", ())
+NOTE(macro_not_imported_nested_cast, none, "non-null nested casts not supported", ())
+
+ERROR(macro_not_imported_function_like, none, "macro '%0' not imported: function like macros not supported", (StringRef))
+ERROR(macro_not_imported_unsupported_structure, none, "macro '%0' not imported: structure not supported", (StringRef))
+ERROR(macro_not_imported, none, "macro '%0' not imported", (StringRef))
+
+NOTE(return_type_not_imported, none, "return type not imported", ())
+NOTE(parameter_type_not_imported, none, "parameter %0 not imported", (const clang::NamedDecl*))
+NOTE(incomplete_interface, none, "interface %0 is incomplete", (const clang::NamedDecl*))
+NOTE(incomplete_protocol, none, "protocol %0 is incomplete", (const clang::NamedDecl*))
+NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
+
+WARNING(record_field_not_imported, none, "field %0 not imported", (const clang::NamedDecl*))
+WARNING(invoked_func_not_imported, none, "function %0 not imported", (const clang::NamedDecl*))
+WARNING(record_method_not_imported, none, "method %0 not imported", (const clang::NamedDecl*))
+WARNING(objc_property_not_imported, none, "property %0 not imported", (const clang::NamedDecl*))
+
+NOTE(forward_declared_interface_label, none, "interface %0 forward declared here", (const clang::NamedDecl*))
+NOTE(forward_declared_protocol_label, none, "protocol %0 forward declared here", (const clang::NamedDecl*))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
