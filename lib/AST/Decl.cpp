@@ -7781,14 +7781,12 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                                GenericParamList *GenericParams, DeclContext *DC,
                                GenericSignature OpaqueInterfaceGenericSignature,
                                ArrayRef<OpaqueReturnTypeRepr *>
-                                   OpaqueReturnTypeReprs,
-                               Type UnderlyingInterfaceType)
+                                   OpaqueReturnTypeReprs)
     : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
                       GenericParams),
       NamingDeclAndHasOpaqueReturnTypeRepr(
         NamingDecl, !OpaqueReturnTypeReprs.empty()),
-      OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature),
-      UnderlyingInterfaceType(UnderlyingInterfaceType) {
+      OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature) {
   // Always implicit.
   setImplicit();
 
@@ -7806,15 +7804,14 @@ OpaqueTypeDecl *OpaqueTypeDecl::get(
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
-      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs,
-      Type UnderlyingInterfaceType) {
+      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs) {
   ASTContext &ctx = DC->getASTContext();
   auto size = totalSizeToAlloc<OpaqueReturnTypeRepr *>(
       OpaqueReturnTypeReprs.size());
   auto mem = ctx.Allocate(size, alignof(OpaqueTypeDecl));
   return new (mem) OpaqueTypeDecl(
       NamingDecl, GenericParams, DC, OpaqueInterfaceGenericSignature,
-      OpaqueReturnTypeReprs, UnderlyingInterfaceType);
+      OpaqueReturnTypeReprs);
 }
 
 bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(

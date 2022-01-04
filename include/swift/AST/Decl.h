@@ -2719,9 +2719,6 @@ class OpaqueTypeDecl final :
   /// abstracted underlying types.
   GenericSignature OpaqueInterfaceGenericSignature;
 
-  /// The underlying type, which will involve the opaque generic parameters.
-  Type UnderlyingInterfaceType;
-  
   /// If known, the underlying type and conformances of the opaque type,
   /// expressed as a SubstitutionMap for the opaque interface generic signature.
   /// This maps types in the interface generic signature to the outer generic
@@ -2733,8 +2730,7 @@ class OpaqueTypeDecl final :
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
-                 ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs,
-                 Type UnderlyingInterfaceType);
+                 ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs);
 
   unsigned getNumOpaqueReturnTypeReprs() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getInt()
@@ -2751,8 +2747,7 @@ public:
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
-      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs,
-      Type UnderlyingInterfaceType);
+      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs);
 
   ValueDecl *getNamingDecl() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getPointer();
@@ -2793,11 +2788,8 @@ public:
     };
   }
 
-  /// The underlying interface type describing the whole opaque type.
-  Type getUnderlyingInterfaceType() const {
-    return UnderlyingInterfaceType;
-  }
-  
+  /// The substitutions that map the generic parameters of the opaque type to
+  /// their underlying types, when that information is known.
   Optional<SubstitutionMap> getUnderlyingTypeSubstitutions() const {
     return UnderlyingTypeSubstitutions;
   }

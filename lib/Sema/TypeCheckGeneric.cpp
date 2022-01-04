@@ -183,12 +183,6 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   auto originatingGenericContext = originatingDecl->getAsGenericContext();
   GenericParamList *genericParams;
   GenericSignature interfaceSignature;
-
-  // FIXME: The generic parameter that serves as the underlying type of the
-  // opaque result type. This should become unnecessary, once we have fully
-  // implemented structural opaque result types.
-  GenericTypeParamType *underlyingGenericParamType;
-
   CollectedOpaqueReprs opaqueReprs;
   if (auto namedOpaque = dyn_cast<NamedOpaqueReturnTypeRepr>(repr)) {
     // Produce the generic signature for the opaque type.
@@ -211,8 +205,6 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       // Already produced an error.
       return nullptr;
     }
-
-    underlyingGenericParamType = interfaceSignature.getGenericParams()[0];
   } else {
     opaqueReprs = collectOpaqueReturnTypeReprs(repr);
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
@@ -285,13 +277,12 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     genericParams = originatingGenericContext
         ? originatingGenericContext->getGenericParams()
         : nullptr;
-    underlyingGenericParamType = genericParamTypes[0];
   }
 
   // Create the OpaqueTypeDecl for the result type.
   auto opaqueDecl = OpaqueTypeDecl::get(
-      originatingDecl, genericParams, parentDC, interfaceSignature, opaqueReprs,
-      underlyingGenericParamType);
+      originatingDecl, genericParams, parentDC, interfaceSignature,
+      opaqueReprs);
   opaqueDecl->copyFormalAccessFrom(originatingDecl);
   if (auto originatingSig = originatingDC->getGenericSignatureOfContext()) {
     opaqueDecl->setGenericSignature(originatingSig);

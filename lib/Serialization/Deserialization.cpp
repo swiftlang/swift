@@ -3457,7 +3457,6 @@ public:
     
     auto declContext = MF.getDeclContext(contextID);
     auto interfaceSig = MF.getGenericSignature(interfaceSigID);
-    auto interfaceType = MF.getType(interfaceTypeID);
 
     // Check for reentrancy.
     if (declOrOffset.isComplete())
@@ -3468,13 +3467,13 @@ public:
     // Create the decl.
     auto opaqueDecl = OpaqueTypeDecl::get(
         /*NamingDecl=*/ nullptr, genericParams, declContext,
-        interfaceSig, /*OpaqueReturnTypeReprs*/ { },
-        interfaceType);
+        interfaceSig, /*OpaqueReturnTypeReprs*/ { });
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     opaqueDecl->setNamingDecl(namingDecl);
 
+    auto interfaceType = MF.getType(interfaceTypeID);
     opaqueDecl->setInterfaceType(MetatypeType::get(interfaceType));
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
