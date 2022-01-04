@@ -36,6 +36,11 @@ struct PassContext {
     return CalleeAnalysis(bridged: bridgeCA)
   }
 
+  var deadEndBlocks: DeadEndBlocksAnalysis {
+    let bridgeDEA = PassContext_getDeadEndBlocksAnalysis(_bridged)
+    return DeadEndBlocksAnalysis(bridged: bridgeDEA)
+  }
+
   func notifyInstructionsChanged() {
     PassContext_notifyChanges(_bridged, instructionsChanged)
   }

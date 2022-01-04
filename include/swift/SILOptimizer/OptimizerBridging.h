@@ -40,6 +40,10 @@ typedef struct {
 } BridgedCalleeAnalysis;
 
 typedef struct {
+  void * _Nullable dea;
+} BridgedDeadEndBlocksAnalysis;
+
+typedef struct {
   void * _Nonnull opaquePtr;
   unsigned char kind;
   unsigned char incomplete;
@@ -81,6 +85,12 @@ BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis
 SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees);
 BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
                                          SwiftInt index);
+
+BridgedDeadEndBlocksAnalysis
+PassContext_getDeadEndBlocksAnalysis(BridgedPassContext context);
+
+SwiftInt DeadEndBlocksAnalysis_isDeadEnd(BridgedDeadEndBlocksAnalysis debAnalysis,
+                                         BridgedBasicBlock);
 
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
 BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab);

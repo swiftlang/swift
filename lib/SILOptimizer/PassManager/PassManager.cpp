@@ -21,6 +21,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
@@ -1239,6 +1240,13 @@ BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
 BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context) {
   SILPassManager *pm = castToPassInvocation(context)->getPassManager();
   return {pm->getAnalysis<BasicCalleeAnalysis>()};
+}
+
+BridgedDeadEndBlocksAnalysis
+PassContext_getDeadEndBlocksAnalysis(BridgedPassContext context) {
+  SwiftPassInvocation *invocation = castToPassInvocation(context);
+  SILPassManager *pm = invocation->getPassManager();
+  return {pm->getAnalysis<DeadEndBlocksAnalysis>(invocation->getFunction())};
 }
 
 BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context) {
