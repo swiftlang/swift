@@ -419,8 +419,16 @@ BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi) {
   return getBridgedStringRef(castToInst<CondFailInst>(cfi)->getMessage());
 }
 
+BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi) {
+  return (BridgedBuiltinID)castToInst<BuiltinInst>(bi)->getBuiltinInfo().ID;
+}
+
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst) {
   return {castToInst<GlobalAccessInst>(globalInst)->getReferencedGlobal()};
+}
+
+BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri) {
+  return {castToInst<FunctionRefInst>(fri)->getReferencedFunction()};
 }
 
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei) {
@@ -457,6 +465,14 @@ SwiftInt PartialApplyInst_numArguments(BridgedInstruction pai) {
 
 SwiftInt ApplyInst_numArguments(BridgedInstruction ai) {
   return castToInst<ApplyInst>(ai)->getNumArguments();
+}
+
+SwiftInt AllocRefInstBase_isObjc(BridgedInstruction arb) {
+  return castToInst<AllocRefInstBase>(arb)->isObjC();
+}
+
+SwiftInt AllocRefInstBase_canAllocOnStack(BridgedInstruction arb) {
+  return castToInst<AllocRefInstBase>(arb)->canAllocOnStack();
 }
 
 SwiftInt BeginApplyInst_numArguments(BridgedInstruction tai) {
@@ -519,3 +535,9 @@ BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionP
                                        getSILType(type), value)};
 }
 
+BridgedInstruction SILBuilder_createDeallocStackRef(BridgedInstruction insertionPoint,
+          BridgedLocation loc, BridgedValue operand) {
+  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+  return {builder.createDeallocStackRef(getRegularLocation(loc),
+                                        castToSILValue(operand))};
+}

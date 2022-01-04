@@ -457,7 +457,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   // Literals
   ABSTRACT_SINGLE_VALUE_INST(LiteralInst, SingleValueInstruction)
-    SINGLE_VALUE_INST(FunctionRefInst, function_ref,
+    BRIDGED_SINGLE_VALUE_INST(FunctionRefInst, function_ref,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(DynamicFunctionRefInst, dynamic_function_ref,
                       LiteralInst, None, DoesNotRelease)
@@ -566,7 +566,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   BRIDGED_SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
+  BRIDGED_SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(CopyBlockInst, copy_block,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)

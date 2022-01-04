@@ -54,6 +54,9 @@ final public class Function : CustomStringConvertible {
   public var bridged: BridgedFunction { BridgedFunction(obj: SwiftObject(self)) }
 }
 
+public func == (lhs: Function, rhs: Function) -> Bool { lhs === rhs }
+public func != (lhs: Function, rhs: Function) -> Bool { lhs !== rhs }
+
 // Bridging utilities
 
 extension BridgedFunction {

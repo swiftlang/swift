@@ -144,6 +144,11 @@ typedef enum {
   MayHaveSideEffectsBehavior
 } BridgedMemoryBehavior;
 
+typedef enum {
+  UnknownBuiltin = 0,
+#define BUILTIN(Id, Name, Attrs) Id##Builtin,
+#include "swift/AST/Builtins.def"
+} BridgedBuiltinID;
 
 typedef intptr_t SwiftInt;
 
@@ -217,7 +222,9 @@ BridgedMultiValueResult
 BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term);
 
 BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi);
+BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
+BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri);
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei);
 SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai);
 SwiftInt StructExtractInst_fieldIndex(BridgedInstruction sei);
@@ -227,6 +234,8 @@ SwiftInt UncheckedEnumDataInst_caseIndex(BridgedInstruction uedi);
 SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai);
 SwiftInt PartialApplyInst_numArguments(BridgedInstruction ai);
 SwiftInt ApplyInst_numArguments(BridgedInstruction ai);
+SwiftInt AllocRefInstBase_isObjc(BridgedInstruction arb);
+SwiftInt AllocRefInstBase_canAllocOnStack(BridgedInstruction arb);
 SwiftInt BeginApplyInst_numArguments(BridgedInstruction ai);
 SwiftInt TryApplyInst_numArguments(BridgedInstruction ai);
 BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi);
@@ -243,6 +252,8 @@ BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
           BridgedLocation loc, BridgedValue condition, BridgedStringRef messge);
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
           BridgedLocation loc, BridgedType type, SwiftInt value);
+BridgedInstruction SILBuilder_createDeallocStackRef(BridgedInstruction insertionPoint,
+          BridgedLocation loc, BridgedValue operand);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

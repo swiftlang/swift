@@ -37,6 +37,8 @@ public struct List<NodeType: ListNode> :
     return nil
   }
 
+  public var first: NodeType? { currentNode }
+
   public var customMirror: Mirror {
     let c: [Mirror.Child] = map { (label: nil, value: $0) }
     return Mirror(self, children: c)
@@ -57,6 +59,8 @@ public struct ReverseList<NodeType: ListNode> :
     }
     return nil
   }
+
+  public var first: NodeType? { currentNode }
 
   public var customMirror: Mirror {
     let c: [Mirror.Child] = map { (label: nil, value: $0) }

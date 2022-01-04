@@ -36,6 +36,12 @@ extension ApplySite {
     return nil
   }
 
+  public var referencedFunction: Function? {
+    if let fri = callee as? FunctionRefInst {
+      return fri.referencedFunction
+    }
+    return nil
+  }
 }
 
 public protocol FullApplySite : ApplySite {
