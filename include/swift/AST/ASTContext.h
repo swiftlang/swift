@@ -1160,6 +1160,9 @@ public:
   InheritedProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
+  /// Check if \p decl is included in LazyContexts.
+  bool isLazyContext(const DeclContext *decl);
+
   /// Get the lazy data for the given declaration.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the

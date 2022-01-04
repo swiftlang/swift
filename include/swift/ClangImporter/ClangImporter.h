@@ -40,6 +40,7 @@ namespace clang {
   class EnumDecl;
   class MacroInfo;
   class Module;
+  class ModuleMacro;
   class NamedDecl;
   class Sema;
   class TargetInfo;
@@ -108,6 +109,11 @@ public:
   /// vtable anchor.
   virtual void anchor();
 };
+
+typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
+                           const clang::ModuleMacro *, const clang::Type *,
+                           const clang::Token *>
+    ImportDiagnosticTarget;
 
 /// Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
@@ -509,6 +515,9 @@ public:
 
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
+
+  /// Emits any pending diagnostics associated with the provided decl.
+  void diagnoseDeclDirectly(const clang::NamedDecl *decl) override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

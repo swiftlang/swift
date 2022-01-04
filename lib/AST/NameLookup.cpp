@@ -1494,12 +1494,22 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
       populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
     }
 
-    Table.markLazilyComplete(name.getBaseName());
+    Table.markLazilyComplete(baseName);
   }
 
   // Look for a declaration with this name.
   auto known = Table.find(name);
   if (known == Table.end()) {
+    // Diagnose the missing member if:
+    // - The flag enabling ClangImporter diagnostics is passed.
+    // - The containing decl is a ClangDecl.
+    // - The containing decl (and DeclContext) is lazy.
+    if (ctx.LangOpts.EnableExperimentalClangImporterDiagnostics &&
+        ctx.isLazyContext(decl) && decl->getDecl()->getClangDecl()) {
+      auto ci =
+          ctx.getOrCreateLazyIterableContextData(decl, /*lazyLoader=*/nullptr);
+      ci->loader->diagnoseMissingNamedMember(decl, name);
+    }
     return TinyPtrVector<ValueDecl *>();
   }
 

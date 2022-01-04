@@ -85,6 +85,9 @@ public:
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) = 0;
 
+  virtual void diagnoseMissingNamedMember(const IterableDeclContext *IDC,
+                                          DeclName name) = 0;
+
   /// Populates the given vector with all conformances for \p D.
   ///
   /// The implementation should \em not call setConformances on \p D.

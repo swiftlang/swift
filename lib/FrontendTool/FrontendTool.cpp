@@ -992,6 +992,30 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     }
   }
 
+  if (Invocation.getLangOptions()
+          .EnableExperimentalEagerClangModuleDiagnostics) {
+
+    // A consumer meant to import all visible declarations.
+    class EagerConsumer : public VisibleDeclConsumer {
+    public:
+      virtual void
+      foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                DynamicLookupInfo dynamicLookupInfo = {}) override {
+        if (auto *IDC = dyn_cast<IterableDeclContext>(VD)) {
+          (void)IDC->getMembers();
+        }
+      }
+    };
+
+    EagerConsumer consumer;
+    for (auto module : ctx.getLoadedModules()) {
+      // None of the passed parameter have an effect, we just need to trigger
+      // imports.
+      module.second->lookupVisibleDecls(/*Access Path*/ {}, consumer,
+                                        NLKind::QualifiedLookup);
+    }
+  }
+
   // FIXME: This predicate matches the status quo, but there's no reason
   // indexing cannot run for actions that do not require stdlib e.g. to better
   // facilitate tests.
