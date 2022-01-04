@@ -90,6 +90,8 @@ BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context);
 
 BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
                                             BridgedValue callee);
+BridgedCalleeList CalleeAnalysis_getInstCallees(BridgedCalleeAnalysis calleeAnalysis,
+                                                BridgedInstruction inst);
 SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees);
 BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
                                          SwiftInt index);

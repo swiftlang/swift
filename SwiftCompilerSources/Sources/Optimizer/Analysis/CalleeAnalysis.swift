@@ -19,6 +19,11 @@ public struct CalleeAnalysis {
   public func getCallees(callee: Value) -> FunctionArray {
     return FunctionArray(bridged: CalleeAnalysis_getCallees(bridged, callee.bridged))
   }
+
+  public func getDestructors(destroyInst: Instruction) -> FunctionArray {
+    return FunctionArray(bridged:
+      CalleeAnalysis_getInstCallees(bridged, destroyInst.bridged))
+  }
 }
 
 public struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
