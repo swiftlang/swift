@@ -38,7 +38,7 @@ struct RewriteStep {
     /// *** Rewrite step kinds introduced by Knuth-Bendix completion ***
     ///
 
-    /// Apply a rewrite rule to the term at the top of the A stack.
+    /// Apply a rewrite rule to the term at the top of the primary stack.
     ///
     /// Formally, this is a whiskered, oriented rewrite rule. For example,
     /// given a rule (X => Y) and the term A.X.B, the application at
@@ -54,7 +54,7 @@ struct RewriteStep {
     /// The RuleID field encodes the rule to apply.
     ApplyRewriteRule,
 
-    /// The term at the top of the A stack must be a term ending with a
+    /// The term at the top of the primary stack must be a term ending with a
     /// superclass or concrete type symbol.
     ///
     /// If not inverted: prepend the prefix to each substitution.
@@ -68,17 +68,17 @@ struct RewriteStep {
     /// *** Rewrite step kinds introduced by simplifySubstitutions() ***
     ///
 
-    /// Move a term from the A stack to the B stack (if not inverted) or
-    /// B stack to A stack (if inverted).
+    /// Move a term from the primary stack to the secondary stack (if not
+    /// inverted) or the secondary stack to primary stack (if inverted).
     Shift,
 
-    /// If not inverted: the top of the A stack must be a term ending with a
-    /// superclass or concrete type symbol. Each concrete substitution in the
-    /// term is pushed onto the A stack.
+    /// If not inverted: the top of the primary stack must be a term ending
+    /// with a superclass or concrete type symbol. Each concrete substitution
+    /// in the term is pushed onto the primary stack.
     ///
-    /// If inverted: pop concrete substitutions from the A stack, which must
-    /// follow a term ending with a superclass or concrete type symbol. The
-    /// new substitutions replace the substitutions in that symbol.
+    /// If inverted: pop concrete substitutions from the primary stack, which
+    /// must follow a term ending with a superclass or concrete type symbol.
+    /// The new substitutions replace the substitutions in that symbol.
     ///
     /// The RuleID field encodes the number of substitutions.
     Decompose,
@@ -87,29 +87,29 @@ struct RewriteStep {
     /// *** Rewrite step kinds introduced by the property map ***
     ///
 
-    /// If not inverted: the top of the A stack must be a term ending in a
-    /// concrete type symbol [concrete: C] followed by a protocol symbol [P].
+    /// If not inverted: the top of the primary stack must be a term ending in
+    /// a concrete type symbol [concrete: C] followed by a protocol symbol [P].
     /// These two symbols are combined into a single concrete conformance
     /// symbol [concrete: C : P].
     ///
-    /// If inverted: the top of the A stack must be a term ending in a
+    /// If inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
     /// with the concrete type symbol [concrete: C] followed by the protocol
     /// symbol [P].
     ConcreteConformance,
 
-    /// If not inverted: the top of the A stack must be a term ending in a
-    /// superclass symbol [superclass: C] followed by a protocol symbol [P].
+    /// If not inverted: the top of the primary stack must be a term ending in
+    /// a superclass symbol [superclass: C] followed by a protocol symbol [P].
     /// These two symbols are combined into a single concrete conformance
     /// symbol [concrete: C : P].
     ///
-    /// If inverted: the top of the A stack must be a term ending in a
+    /// If inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
     /// with the superclass symbol [superclass: C] followed by the protocol
     /// symbol [P].
     SuperclassConformance,
 
-    /// If not inverted: the top of the A stack must be a term ending in a
+    /// If not inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P] followed by an associated
     /// type symbol [P:X], and the concrete type symbol [concrete: C.X] for the
     /// type witness of 'X' in the conformance 'C : P'. The concrete type symbol
@@ -123,7 +123,7 @@ struct RewriteStep {
     /// the step.
     ConcreteTypeWitness,
 
-    /// If not inverted: the top of the A stack must be a term ending in a
+    /// If not inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P] followed by an associated
     /// type symbol [P:X]. The associated type symbol is eliminated.
     ///
@@ -361,32 +361,36 @@ struct AppliedRewriteStep {
 /// A rewrite path is a list of instructions for a two-stack interpreter.
 ///
 /// - ApplyRewriteRule and AdjustConcreteType manipulate the term at the top of
-///   the A stack.
+///   the primary stack.
 ///
 /// - Shift moves a term from A to B (if not inverted) or B to A (if inverted).
 ///
 /// - Decompose splits off the substitutions from a superclass or concrete type
-///   symbol at the top of the A stack (if not inverted) or assembles a new
-///   superclass or concrete type symbol at the top of the A stack
+///   symbol at the top of the primary stack (if not inverted) or assembles a
+///   new superclass or concrete type symbol at the top of the primary stack
 ///   (if inverted).
 struct RewritePathEvaluator {
-  SmallVector<MutableTerm, 2> A;
-  SmallVector<MutableTerm, 2> B;
+  /// The primary stack. Most rewrite steps operate on the top of this stack.
+  SmallVector<MutableTerm, 2> Primary;
+
+  /// The secondary stack. The 'Shift' rewrite step moves terms between the
+  /// primary and secondary stacks.
+  SmallVector<MutableTerm, 2> Secondary;
 
   explicit RewritePathEvaluator(const MutableTerm &term) {
-    A.push_back(term);
+    Primary.push_back(term);
   }
 
-  void checkA() const;
-  void checkB() const;
+  void checkPrimary() const;
+  void checkSecondary() const;
 
   MutableTerm &getCurrentTerm();
 
   /// We're "in context" if we're in the middle of rewriting concrete
   /// substitutions.
   bool isInContext() const {
-    assert(A.size() > 0);
-    return (A.size() > 1 || B.size() > 0);
+    assert(Primary.size() > 0);
+    return (Primary.size() > 1 || Secondary.size() > 0);
   }
 
   void apply(const RewriteStep &step,
