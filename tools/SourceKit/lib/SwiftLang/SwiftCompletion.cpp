@@ -223,16 +223,16 @@ void SwiftLangSupport::codeComplete(
 }
 
 static void getResultStructure(
-    CodeCompletion::SwiftResult *result, bool leadingPunctuation,
+    const CodeCompletion::SwiftResult &result, bool leadingPunctuation,
     CodeCompletionInfo::DescriptionStructure &structure,
     std::vector<CodeCompletionInfo::ParameterStructure> &parameters) {
-  auto *CCStr = result->getCompletionString();
+  auto *CCStr = result.getCompletionString();
   auto FirstTextChunk = CCStr->getFirstTextChunkIndex(leadingPunctuation);
 
   if (!FirstTextChunk.hasValue())
     return;
 
-  bool isOperator = result->isOperator();
+  bool isOperator = result.isOperator();
 
   auto chunks = CCStr->getChunks();
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
@@ -448,7 +448,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
 
       LogMessageOs << "Code completion result with empty description "
                       "was ignored: \n";
-      Result->printPrefix(LogMessageOs);
+      Result->getSwiftResult().printPrefix(LogMessageOs);
       Result->getCompletionString()->print(LogMessageOs);
 
       *Log << LogMessage;
@@ -555,7 +555,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   // Description structure.
   std::vector<CodeCompletionInfo::ParameterStructure> parameters;
   CodeCompletionInfo::DescriptionStructure structure;
-  getResultStructure(Result, leadingPunctuation, structure, parameters);
+  getResultStructure(*Result, leadingPunctuation, structure, parameters);
   Info.descriptionStructure = structure;
   if (!parameters.empty())
     Info.parametersStructure = parameters;
@@ -850,9 +850,9 @@ static void translateFilterRules(ArrayRef<FilterRule> rawFilterRules,
   }
 }
 
-static bool checkInnerResult(CodeCompletionResult *result, bool &hasDot,
+static bool checkInnerResult(const CodeCompletionResult &result, bool &hasDot,
                              bool &hasQDot, bool &hasInit) {
-  auto chunks = result->getCompletionString()->getChunks();
+  auto chunks = result.getCompletionString()->getChunks();
   if (!chunks.empty() &&
       chunks[0].is(CodeCompletionString::Chunk::ChunkKind::Dot)) {
     hasDot = true;
@@ -863,9 +863,9 @@ static bool checkInnerResult(CodeCompletionResult *result, bool &hasDot,
              chunks[1].is(CodeCompletionString::Chunk::ChunkKind::Dot)) {
     hasQDot = true;
     return true;
-  } else if (result->getKind() ==
+  } else if (result.getKind() ==
                  CodeCompletion::SwiftResult::ResultKind::Declaration &&
-             result->getAssociatedDeclKind() ==
+             result.getAssociatedDeclKind() ==
                  CodeCompletionDeclKind::Constructor) {
     hasInit = true;
     return true;
@@ -881,7 +881,7 @@ filterInnerResults(ArrayRef<Result *> results, bool includeInner,
                    bool &hasDot, bool &hasQDot, bool &hasInit,
                    const CodeCompletion::FilterRules &rules) {
   std::vector<Result *> topResults;
-  for (auto *result : results) {
+  for (Result *result : results) {
     if (!includeInnerOperators && result->isOperator())
       continue;
 
@@ -896,10 +896,10 @@ filterInnerResults(ArrayRef<Result *> results, bool includeInner,
       ide::printCodeCompletionResultDescription(*result, OSS,
                                                 /*leadingPunctuation=*/false);
     }
-    if (rules.hideCompletion(result, filterName, description))
+    if (rules.hideCompletion(*result, filterName, description))
       continue;
 
-    bool inner = checkInnerResult(result, hasDot, hasQDot, hasInit);
+    bool inner = checkInnerResult(*result, hasDot, hasQDot, hasInit);
 
     if (!inner ||
         (includeInner &&
@@ -922,7 +922,7 @@ static void transformAndForwardResults(
   auto buildInnerResult = [&](ArrayRef<CodeCompletionString::Chunk> chunks) {
     auto *completionString =
         CodeCompletionString::create(innerSink.allocator, chunks);
-    CodeCompletion::SwiftResult paren(
+    auto *paren = new (innerSink.allocator) CodeCompletion::SwiftResult(
         CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
         SemanticContextKind::CurrentNominal,
         CodeCompletionFlairBit::ExpressionSpecific,
@@ -930,9 +930,8 @@ static void transformAndForwardResults(
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
 
     SwiftCompletionInfo info;
-    std::vector<Completion *> extended =
-        extendCompletions(&paren, innerSink, info, nameToPopularity, options,
-                          exactMatch);
+    std::vector<Completion *> extended = extendCompletions(
+        paren, innerSink, info, nameToPopularity, options, exactMatch);
     assert(extended.size() == 1);
     return extended.front();
   };
@@ -999,7 +998,7 @@ static void transformAndForwardResults(
   organizer.groupAndSort(options);
 
   if ((options.addInnerResults || options.addInnerOperators) && exactMatch &&
-      exactMatch->getKind() == Completion::ResultKind::Declaration) {
+      exactMatch->getKind() == CodeCompletionResult::ResultKind::Declaration) {
     std::vector<Completion *> innerResults;
     bool hasDot = false;
     bool hasQDot = false;
