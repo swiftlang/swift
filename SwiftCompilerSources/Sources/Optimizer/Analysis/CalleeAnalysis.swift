@@ -16,13 +16,32 @@ import SIL
 public struct CalleeAnalysis {
   let bridged: BridgedCalleeAnalysis
 
-  public func getCallees(callee: Value) -> FunctionArray {
+  public func getCallees(callee: Value) -> FunctionArray? {
+    let bridgedFuncs = CalleeAnalysis_getCallees(bridged, callee.bridged)
+    if bridgedFuncs.incomplete != 0 {
+      return nil
+    }
+    return FunctionArray(bridged: bridgedFuncs)
+  }
+
+  public func getIncompleteCallees(callee: Value) -> FunctionArray {
     return FunctionArray(bridged: CalleeAnalysis_getCallees(bridged, callee.bridged))
   }
 
-  public func getDestructors(destroyInst: Instruction) -> FunctionArray {
-    return FunctionArray(bridged:
-      CalleeAnalysis_getInstCallees(bridged, destroyInst.bridged))
+  public func getDestructor(ofExactType type: Type) -> Function? {
+    let destructors = FunctionArray(bridged: CalleeAnalysis_getDestructors(bridged, type.bridged, /*isExactType*/ 1))
+    if destructors.count == 1 {
+      return destructors[0]
+    }
+    return nil
+  }
+
+  public func getDestructors(of type: Type) -> FunctionArray? {
+    let bridgedDtors = CalleeAnalysis_getDestructors(bridged, type.bridged, /*isExactType*/ 0)
+    if bridgedDtors.incomplete != 0 {
+      return nil
+    }
+    return FunctionArray(bridged: bridgedDtors)
   }
 }
 
@@ -35,6 +54,4 @@ public struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
   public subscript(_ index: Int) -> Function {
     return BridgedFunctionArray_get(bridged, index).function
   }
-
-  public var allCalleesKnown: Bool { bridged.incomplete == 0 }
 }
