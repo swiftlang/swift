@@ -64,7 +64,7 @@ final public class BasicBlock : ListNode, CustomStringConvertible, HasName {
  
   public var name: String { "bb\(index)" }
 
-  var bridged: BridgedBasicBlock { BridgedBasicBlock(obj: SwiftObject(self)) }
+  public var bridged: BridgedBasicBlock { BridgedBasicBlock(obj: SwiftObject(self)) }
 }
 
 public func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }

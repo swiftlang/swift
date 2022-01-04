@@ -45,6 +45,18 @@ typedef struct {
   unsigned char incomplete;
 } BridgedCalleeList;
 
+typedef struct {
+  void * _Nullable bbs;
+} BridgedBasicBlockSet;
+
+typedef struct {
+  void * _Nullable data;
+} BridgedSlab;
+
+enum {
+  BridgedSlabCapacity = 64 * sizeof(uintptr_t)
+};
+
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
 typedef void (* _Nonnull BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
 
@@ -69,6 +81,21 @@ BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis
 SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees);
 BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
                                          SwiftInt index);
+
+BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
+BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab);
+BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
+                                  BridgedSlab afterSlab);
+BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
+                                 BridgedSlab slab);
+
+BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context);
+void PassContext_freeBasicBlockSet(BridgedPassContext context,
+                                   BridgedBasicBlockSet set);
+SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock block);
+void BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block);
+void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block);
+BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set);
 
 #ifdef __cplusplus
 } // extern "C"

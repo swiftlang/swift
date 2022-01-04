@@ -1105,6 +1105,30 @@ FixedSizeSlab *SwiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
   return prev;
 }
 
+BasicBlockSet *SwiftPassInvocation::allocBlockSet() {
+  assert(numBlockSetsAllocated < BlockSetCapacity - 1 &&
+         "too many BasicBlockSets allocated");
+
+  auto *storage = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated;
+  BasicBlockSet *set = new (storage) BasicBlockSet(function);
+  aliveBlockSets[numBlockSetsAllocated] = true;
+  ++numBlockSetsAllocated;
+  return set;
+}
+
+void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
+  int idx = set - (BasicBlockSet *)blockSetStorage;
+  assert(idx >= 0 && idx < numBlockSetsAllocated);
+  assert(aliveBlockSets[idx] && "double free of BasicBlockSet");
+  aliveBlockSets[idx] = false;
+
+  while (numBlockSetsAllocated > 0 && !aliveBlockSets[numBlockSetsAllocated - 1]) {
+    auto *set = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated - 1;
+    set->~BasicBlockSet();
+    --numBlockSetsAllocated;
+  }
+}
+
 void SwiftPassInvocation::startFunctionPassRun(SILFunction *function) {
   assert(!this->function && "a pass is already running");
   this->function = function;
@@ -1127,6 +1151,7 @@ void SwiftPassInvocation::finishedInstructionPassRun() {
 
 void SwiftPassInvocation::endPassRunChecks() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
+  assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1153,9 +1178,16 @@ inline BridgedSlab toBridgedSlab(FixedSizeSlab *slab) {
   return {nullptr};
 }
 
+inline BasicBlockSet *castToBlockSet(BridgedBasicBlockSet blockSet) {
+  return static_cast<BasicBlockSet *>(blockSet.bbs);
+}
 
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab) {
   return toBridgedSlab(&*std::next(castToSlab(slab)->getIterator()));
+}
+
+BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab) {
+  return toBridgedSlab(&*std::prev(castToSlab(slab)->getIterator()));
 }
 
 BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
@@ -1207,4 +1239,29 @@ BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
 BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context) {
   SILPassManager *pm = castToPassInvocation(context)->getPassManager();
   return {pm->getAnalysis<BasicCalleeAnalysis>()};
+}
+
+BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context) {
+  return {castToPassInvocation(context)->allocBlockSet()};
+}
+
+void PassContext_freeBasicBlockSet(BridgedPassContext context,
+                                   BridgedBasicBlockSet set) {
+  castToPassInvocation(context)->freeBlockSet(castToBlockSet(set));
+}
+
+SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock block) {
+  return castToBlockSet(set)->contains(castToBasicBlock(block)) ? 1 : 0;
+}
+
+void BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block) {
+  castToBlockSet(set)->insert(castToBasicBlock(block));
+}
+
+void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block) {
+  castToBlockSet(set)->erase(castToBasicBlock(block));
+}
+
+BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
+  return {castToBlockSet(set)->getFunction()};
 }
