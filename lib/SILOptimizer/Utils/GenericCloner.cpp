@@ -52,6 +52,7 @@ SILFunction *GenericCloner::createDeclaration(
   if (!Orig->hasOwnership()) {
     NewF->setOwnershipEliminated();
   }
+  NewF->copyEffects(Orig);
   return NewF;
 }
 
