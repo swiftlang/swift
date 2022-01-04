@@ -1315,3 +1315,7 @@ void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block) {
 BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
   return {castToBlockSet(set)->getFunction()};
 }
+
+void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
+  castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
+}

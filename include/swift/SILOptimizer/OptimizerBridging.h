@@ -130,6 +130,8 @@ void BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block);
 void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block);
 BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set);
 
+void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

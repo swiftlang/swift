@@ -165,3 +165,10 @@ extension Builder {
               passContext: context._bridged)
   }
 }
+
+extension AllocRefInstBase {
+  func setIsStackAllocatable(_ context: PassContext) {
+    AllocRefInstBase_setIsStackAllocatable(bridged)
+    context.notifyInstructionsChanged()
+  }
+}
