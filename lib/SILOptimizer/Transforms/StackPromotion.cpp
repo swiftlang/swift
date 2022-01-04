@@ -158,6 +158,6 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInstBase *ARI, EscapeAnalysis *EA,
 
 } // end anonymous namespace
 
-SILTransform *swift::createStackPromotion() {
+SILTransform *swift::createLegacyStackPromotion() {
   return new StackPromotion();
 }
