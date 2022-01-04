@@ -52,6 +52,8 @@ final public class BasicBlock : ListNode, CustomStringConvertible, HasName {
     }
     return nil
   }
+  
+  public var hasSinglePredecessor: Bool { singlePredecessor != nil }
 
   /// The index of the basic block in its function.
   /// This has O(n) complexity. Only use it for debugging

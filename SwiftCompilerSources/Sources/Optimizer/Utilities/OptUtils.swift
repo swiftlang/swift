@@ -17,3 +17,21 @@ extension Value {
     uses.lazy.filter { !($0.instruction is DebugValueInst) }
   }
 }
+
+extension Builder {
+  static func insert(after inst: Instruction, location: Location,
+                     _ context: PassContext, insertFunc: (Builder) -> ()) {
+    if inst is TermInst {
+      for succ in inst.block.successors {
+        assert(succ.hasSinglePredecessor,
+               "the terminator instruction must not have critical successors")
+        let builder = Builder(at: succ.instructions.first!, location: location,
+                              context)
+        insertFunc(builder)
+      }
+    } else {
+      let builder = Builder(at: inst.next!, location: location, context)
+      insertFunc(builder)
+    }
+  }
+}
