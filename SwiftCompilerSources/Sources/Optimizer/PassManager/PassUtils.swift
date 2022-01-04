@@ -111,6 +111,10 @@ struct PassContext {
 
     RefCountingInst_setIsAtomic(instruction.bridged, isAtomic)
   }
+  
+  func fixStackNesting(function: Function) {
+    PassContext_fixStackNesting(_bridged, function.bridged)
+  }
 }
 
 struct FunctionPass {

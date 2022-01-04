@@ -28,6 +28,7 @@
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1223,6 +1224,20 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
 void PassContext_eraseInstruction(BridgedPassContext passContext,
                                    BridgedInstruction inst) {
   castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
+}
+
+void PassContext_fixStackNesting(BridgedPassContext passContext,
+                                 BridgedFunction function) {
+  switch (StackNesting::fixNesting(castToFunction(function))) {
+    case StackNesting::Changes::None:
+      break;
+    case StackNesting::Changes::Instructions:
+      PassContext_notifyChanges(passContext, instructionsChanged);
+      break;
+    case StackNesting::Changes::CFG:
+      PassContext_notifyChanges(passContext, branchesChanged);
+      break;
+  }
 }
 
 SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context) {

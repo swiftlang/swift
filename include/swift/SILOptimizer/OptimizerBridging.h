@@ -119,6 +119,9 @@ BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
 BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
                                  BridgedSlab slab);
 
+void PassContext_fixStackNesting(BridgedPassContext context,
+                                 BridgedFunction function);
+
 BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context);
 void PassContext_freeBasicBlockSet(BridgedPassContext context,
                                    BridgedBasicBlockSet set);
