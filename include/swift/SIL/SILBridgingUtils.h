@@ -34,10 +34,10 @@ inline StringRef getStringRef(BridgedStringRef str) {
 /// freeing it.
 inline BridgedStringRef getCopiedBridgedStringRef(std::string str,
                                            bool removeTrailingNewline = false) {
-  // A couple of mallocs are needed for passing a std::string to libswift. But
+  // A couple of mallocs are needed for passing a std::string to Swift. But
   // it's currently only used or debug descriptions. So, its' maybe not so bad -
   // for now.
-  // TODO: find a better way to pass std::strings to libswift.
+  // TODO: find a better way to pass std::strings to Swift.
   StringRef strRef(str);
   if (removeTrailingNewline)
     strRef.consume_back("\n");

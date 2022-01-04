@@ -1,0 +1,50 @@
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=on 2>&1 | %FileCheck %s
+
+// CHECK-LABEL: redundant_parent_path_in_protocol.(file).P1@
+// CHECK-NEXT: Requirement signature: <Self>
+
+protocol P1 {}
+
+// CHECK-LABEL: redundant_parent_path_in_protocol.(file).P2@
+// CHECK-NEXT: Requirement signature: <Self where Self.A : P1, Self.B : P2>
+
+protocol P2 {
+  associatedtype A: P1
+  associatedtype B: P2
+}
+
+struct Concrete: P1, P2 {
+  typealias A = Concrete
+  typealias B = Concrete
+}
+
+// CHECK-LABEL: redundant_parent_path_in_protocol.(file).P3a@
+// CHECK-NEXT: Requirement signature: <Self where Self.T : P2>
+
+protocol P3a {
+  associatedtype T : P2
+}
+
+// CHECK-LABEL: redundant_parent_path_in_protocol.(file).P3b@
+// CHECK-NEXT: Requirement signature: <Self where Self.T : P2, Self.T.A == Self.T.B>
+
+protocol P3b {
+  associatedtype T : P2 where T.A == T.B
+}
+
+// CHECK-LABEL: redundant_parent_path_in_protocol.(file).P4a@
+// CHECK-NEXT: Requirement signature: <Self where Self : P3a, Self.T == Concrete>
+
+protocol P4a : P3a where T.A == T.B, T == Concrete {}
+
+// CHECK-LABEL: redundant_parent_path_in_protocol.(file).P4b@
+// CHECK-NEXT: Requirement signature: <Self where Self : P3b, Self.T == Concrete>
+
+protocol P4b : P3b where T == Concrete {}
+
+// CHECK-LABEL: redundant_parent_path_in_protocol.(file).P5@
+// CHECK-NEXT: Requirement signature: <Self where Self.T == Concrete>
+
+protocol P5 {
+  associatedtype T : P2 where T.A == T.B, T == Concrete
+}

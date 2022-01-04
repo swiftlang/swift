@@ -44,7 +44,7 @@ void executePassPipelinePlan(SILModule *SM, const SILPassPipelinePlan &plan,
                              bool isMandatory = false,
                              irgen::IRGenModule *IRMod = nullptr);
 
-/// Utility class to invoke passes in libswift.
+/// Utility class to invoke Swift passes.
 class LibswiftPassInvocation {
   /// Backlink to the pass manager.
   SILPassManager *passManager;
@@ -125,7 +125,7 @@ class SILPassManager {
   /// The number of passes run so far.
   unsigned NumPassesRun = 0;
 
-  /// For invoking Swift passes in libswift.
+  /// For invoking Swift passes.
   LibswiftPassInvocation libswiftPassInvocation;
 
   /// Change notifications, collected during a bridged pass run.

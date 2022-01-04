@@ -101,11 +101,11 @@ class PropertyBag {
 
   explicit PropertyBag(Term key) : Key(key) {}
 
-  bool addProperty(Symbol property,
-                   unsigned ruleID,
-                   RewriteContext &ctx,
-                   SmallVectorImpl<InducedRule> &inducedRules,
-                   bool debug);
+  Optional<unsigned> addProperty(Symbol property,
+                                 unsigned ruleID,
+                                 RewriteContext &ctx,
+                                 SmallVectorImpl<InducedRule> &inducedRules,
+                                 bool debug);
   void copyPropertiesFrom(const PropertyBag *next,
                           RewriteContext &ctx);
 
@@ -204,8 +204,9 @@ public:
 
 private:
   void clear();
-  bool addProperty(Term key, Symbol property, unsigned ruleID,
-                   SmallVectorImpl<InducedRule> &inducedRules);
+  Optional<unsigned>
+  addProperty(Term key, Symbol property, unsigned ruleID,
+              SmallVectorImpl<InducedRule> &inducedRules);
 
   void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(

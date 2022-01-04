@@ -5,6 +5,7 @@ add_swift_host_library(swiftIDE STATIC
   CodeCompletionDiagnostics.cpp
   CodeCompletionResultPrinter.cpp
   CommentConversion.cpp
+  CompileInstance.cpp
   CompletionInstance.cpp
   ConformingMethodList.cpp
   ExprContextAnalysis.cpp
@@ -26,6 +27,7 @@ target_link_libraries(swiftIDE PRIVATE
   swiftClangImporter
   swiftDriver
   swiftFrontend
+  swiftFrontendTool
   swiftIndex
   swiftParse
   swiftSema)

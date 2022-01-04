@@ -592,7 +592,7 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     PRINT_FLAIR(ExpressionAtNonScriptOrMainFileScope, "ExprAtFileScope")
     Prefix.append("]");
   }
-  if (NotRecommended)
+  if (NotRecommended != NotRecommendedReason::None)
     Prefix.append("/NotRecommended");
   if (IsSystem)
     Prefix.append("/IsSystem");

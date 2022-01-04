@@ -109,7 +109,7 @@ class SILCombiner :
   /// External context struct used by \see ownershipRAUWHelper.
   OwnershipFixupContext ownershipFixupContext;
   
-  /// For invoking Swift instruction passes in libswift.
+  /// For invoking Swift instruction passes.
   LibswiftPassInvocation libswiftPassInvocation;
 
 public:

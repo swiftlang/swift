@@ -173,9 +173,9 @@ if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
-if (LIBSWIFT_BUILD_MODE)
+if (BOOTSTRAPPING_MODE)
   list(APPEND SWIFT_LIT_ARGS
-       "--param" "libswift_build_mode=${LIBSWIFT_BUILD_MODE}")
+       "--param" "bootstrapping_mode=${BOOTSTRAPPING_MODE}")
 endif()
 
 if (LLVM_USE_SANITIZER STREQUAL "Address")
@@ -341,13 +341,7 @@ foreach(SDK ${SWIFT_SDKS})
                 --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
                 --destination-arch "${ARCH}"
                 # Build products like libswiftCore.so.
-                "${SWIFTLIB_DIR}/android"
-                # These two directories may contain the same libraries,
-                # but upload both to device just in case. Duplicates will be
-                # overwritten, and uploading doesn't take very long anyway.
-                "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
-                "${SWIFT_ANDROID_${ARCH}_ICU_I18N}"
-                "${SWIFT_ANDROID_${ARCH}_ICU_DATA}")
+                "${SWIFTLIB_DIR}/android")
       endif()
       add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
           ${command_upload_stdlib}

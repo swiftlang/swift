@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library)
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test

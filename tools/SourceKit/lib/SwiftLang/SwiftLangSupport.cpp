@@ -273,7 +273,8 @@ configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
-      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache) {
+      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache),
+      CompileManager(RuntimeResourcePath, DiagnosticDocumentationPath) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
@@ -286,6 +287,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
       RuntimeResourcePath, DiagnosticDocumentationPath);
 
   CompletionInst = std::make_shared<CompletionInstance>();
+
   configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
 
   // By default, just use the in-memory cache.

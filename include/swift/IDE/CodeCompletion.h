@@ -422,7 +422,7 @@ public:
 ///
 /// This enum is ordered from the contexts that are "nearest" to the code
 /// completion point to "outside" contexts.
-enum class SemanticContextKind {
+enum class SemanticContextKind : uint8_t {
   /// Used in cases when the concept of semantic context is not applicable.
   None,
 
@@ -456,6 +456,8 @@ enum class SemanticContextKind {
 
   /// A declaration imported from other module.
   OtherModule,
+
+  MAX_VALUE = OtherModule
 };
 
 enum class CodeCompletionFlairBit: uint8_t {
@@ -486,7 +488,7 @@ enum class CodeCompletionFlairBit: uint8_t {
 using CodeCompletionFlair = OptionSet<CodeCompletionFlairBit>;
 
 /// The declaration kind of a code completion result, if it is a declaration.
-enum class CodeCompletionDeclKind {
+enum class CodeCompletionDeclKind : uint8_t {
   Module,
   Class,
   Struct,
@@ -512,7 +514,7 @@ enum class CodeCompletionDeclKind {
   PrecedenceGroup,
 };
 
-enum class CodeCompletionLiteralKind {
+enum class CodeCompletionLiteralKind : uint8_t {
   ArrayLiteral,
   BooleanLiteral,
   ColorLiteral,
@@ -524,7 +526,7 @@ enum class CodeCompletionLiteralKind {
   Tuple,
 };
 
-enum class CodeCompletionOperatorKind {
+enum class CodeCompletionOperatorKind : uint8_t {
   None,
   Unknown,
   Bang,       // !
@@ -568,16 +570,18 @@ enum class CodeCompletionOperatorKind {
   PipeEq,           // |=
   PipePipe,         // ||
   TildeEq,          // ~=
+
+  MAX_VALUE = TildeEq
 };
 
-enum class CodeCompletionKeywordKind {
+enum class CodeCompletionKeywordKind : uint8_t {
   None,
 #define KEYWORD(X) kw_##X,
 #define POUND_KEYWORD(X) pound_##X,
 #include "swift/Syntax/TokenKinds.def"
 };
 
-enum class CompletionKind {
+enum class CompletionKind : uint8_t {
   None,
   Import,
   UnresolvedMember,
@@ -616,12 +620,14 @@ enum class CompletionKind {
   TypeAttrBeginning,
 };
 
-enum class CodeCompletionDiagnosticSeverity: uint8_t {
+enum class CodeCompletionDiagnosticSeverity : uint8_t {
   None,
   Error,
   Warning,
   Remark,
   Note,
+
+  MAX_VALUE = Note
 };
 
 /// A single code completion result.
@@ -629,17 +635,19 @@ class CodeCompletionResult {
   friend class CodeCompletionResultBuilder;
 
 public:
-  enum class ResultKind {
+  enum class ResultKind : uint8_t {
     Declaration,
     Keyword,
     Pattern,
     Literal,
     BuiltinOperator,
+
+    MAX_VALUE = BuiltinOperator
   };
 
   /// Describes the relationship between the type of the completion results and
   /// the expected type at the code completion position.
-  enum class ExpectedTypeRelation {
+  enum class ExpectedTypeRelation : uint8_t {
     /// The result does not have a type (e.g. keyword).
     NotApplicable,
 
@@ -658,9 +666,11 @@ public:
 
     /// The result's type is identical to the type of the expected.
     Identical,
+
+    MAX_VALUE = Identical
   };
 
-  enum class NotRecommendedReason {
+  enum class NotRecommendedReason : uint8_t {
     None = 0,
     RedundantImport,
     RedundantImportIndirect,
@@ -669,16 +679,18 @@ public:
     InvalidAsyncContext,
     CrossActorReference,
     VariableUsedInOwnDefinition,
+
+    MAX_VALUE = VariableUsedInOwnDefinition
   };
 
 private:
-  unsigned Kind : 3;
+  ResultKind Kind : 3;
   unsigned AssociatedKind : 8;
-  unsigned KnownOperatorKind : 6;
-  unsigned SemanticContext : 3;
-  unsigned Flair: 8;
-  unsigned NotRecommended : 4;
-  unsigned IsSystem : 1;
+  CodeCompletionOperatorKind KnownOperatorKind : 6;
+  SemanticContextKind SemanticContext : 3;
+  unsigned char Flair : 8;
+  NotRecommendedReason NotRecommended : 4;
+  bool IsSystem : 1;
 
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
@@ -693,9 +705,17 @@ private:
   StringRef ModuleName;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
-  unsigned TypeDistance : 3;
-  unsigned DiagnosticSeverity: 3;
+  ExpectedTypeRelation TypeDistance : 3;
+  CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
   StringRef DiagnosticMessage;
+
+  // Assertions for limiting max values of enums.
+  static_assert(int(ResultKind::MAX_VALUE) < 1 << 3, "");
+  static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
+  static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
+  static_assert(int(NotRecommendedReason::MAX_VALUE) < 1 << 4, "");
+  static_assert(int(ExpectedTypeRelation::MAX_VALUE) < 1 << 3, "");
+  static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
 
 public:
   /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
@@ -708,22 +728,20 @@ public:
                        CodeCompletionOperatorKind KnownOperatorKind =
                            CodeCompletionOperatorKind::None,
                        StringRef BriefDocComment = StringRef())
-      : Kind(unsigned(Kind)), KnownOperatorKind(unsigned(KnownOperatorKind)),
-        SemanticContext(unsigned(SemanticContext)),
-        Flair(unsigned(Flair.toRaw())),
-        NotRecommended(unsigned(NotRecommendedReason::None)),
+      : Kind(Kind), KnownOperatorKind(KnownOperatorKind),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecommendedReason::None),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        BriefDocComment(BriefDocComment), TypeDistance(unsigned(TypeDistance)) {
+        BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
     assert(Kind != ResultKind::Declaration && "use the other constructor");
     assert(CompletionString);
     if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None)
-      this->KnownOperatorKind =
-          (unsigned)getCodeCompletionOperatorKind(CompletionString);
+      this->KnownOperatorKind = getCodeCompletionOperatorKind(CompletionString);
     assert(!isOperator() ||
            getOperatorKind() != CodeCompletionOperatorKind::None);
     AssociatedKind = 0;
-    IsSystem = 0;
-    DiagnosticSeverity = 0;
+    IsSystem = false;
+    DiagnosticSeverity = CodeCompletionDiagnosticSeverity::None;
   }
 
   /// Constructs a \c Keyword result.
@@ -735,16 +753,16 @@ public:
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
                        StringRef BriefDocComment = StringRef())
-      : Kind(unsigned(ResultKind::Keyword)), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)),
-        Flair(unsigned(Flair.toRaw())),
-        NotRecommended(unsigned(NotRecommendedReason::None)),
+      : Kind(ResultKind::Keyword),
+        KnownOperatorKind(CodeCompletionOperatorKind::None),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecommendedReason::None),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        BriefDocComment(BriefDocComment), TypeDistance(unsigned(TypeDistance)) {
+        BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
     assert(CompletionString);
     AssociatedKind = static_cast<unsigned>(Kind);
-    IsSystem = 0;
-    DiagnosticSeverity = 0;
+    IsSystem = false;
+    DiagnosticSeverity = CodeCompletionDiagnosticSeverity::None;
   }
 
   /// Constructs a \c Literal result.
@@ -755,15 +773,15 @@ public:
                        CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance)
-      : Kind(unsigned(ResultKind::Literal)), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)),
-        Flair(unsigned(Flair.toRaw())),
-        NotRecommended(unsigned(NotRecommendedReason::None)),
+      : Kind(ResultKind::Literal),
+        KnownOperatorKind(CodeCompletionOperatorKind::None),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecommendedReason::None),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        TypeDistance(unsigned(TypeDistance)) {
+        TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(LiteralKind);
-    IsSystem = 0;
-    DiagnosticSeverity = 0;
+    IsSystem = false;
+    DiagnosticSeverity = CodeCompletionDiagnosticSeverity::None;
     assert(CompletionString);
   }
 
@@ -780,20 +798,20 @@ public:
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ExpectedTypeRelation TypeDistance)
-      : Kind(unsigned(ResultKind::Declaration)), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)),
-        Flair(unsigned(Flair.toRaw())), NotRecommended(unsigned(NotRecReason)),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), TypeDistance(unsigned(TypeDistance)) {
+      : Kind(ResultKind::Declaration),
+        KnownOperatorKind(CodeCompletionOperatorKind::None),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecReason), NumBytesToErase(NumBytesToErase),
+        CompletionString(CompletionString), ModuleName(ModuleName),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
+        TypeDistance(TypeDistance) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     IsSystem = getDeclIsSystem(AssociatedDecl);
-    DiagnosticSeverity = 0;
+    DiagnosticSeverity = CodeCompletionDiagnosticSeverity::None;
     assert(CompletionString);
     if (isOperator())
-      KnownOperatorKind =
-          (unsigned)getCodeCompletionOperatorKind(CompletionString);
+      KnownOperatorKind = getCodeCompletionOperatorKind(CompletionString);
     assert(!isOperator() ||
            getOperatorKind() != CodeCompletionOperatorKind::None);
   }
@@ -810,16 +828,13 @@ public:
                        ArrayRef<StringRef> AssociatedUSRs,
                        ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind)
-      : Kind(unsigned(ResultKind::Declaration)),
-        KnownOperatorKind(unsigned(KnownOperatorKind)),
-        SemanticContext(unsigned(SemanticContext)),
-        Flair(unsigned(Flair.toRaw())), NotRecommended(unsigned(NotRecReason)),
-        IsSystem(IsSystem), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), ModuleName(ModuleName),
-        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        TypeDistance(unsigned(TypeDistance)),
-        DiagnosticSeverity(unsigned(diagSeverity)),
-        DiagnosticMessage(DiagnosticMessage) {
+      : Kind(ResultKind::Declaration), KnownOperatorKind(KnownOperatorKind),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecReason), IsSystem(IsSystem),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
+        AssociatedUSRs(AssociatedUSRs), TypeDistance(TypeDistance),
+        DiagnosticSeverity(diagSeverity), DiagnosticMessage(DiagnosticMessage) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
     assert(!isOperator() ||
@@ -832,7 +847,7 @@ public:
   CodeCompletionResult *withFlair(CodeCompletionFlair newFlair,
                                   CodeCompletionResultSink &Sink);
 
-  ResultKind getKind() const { return static_cast<ResultKind>(Kind); }
+  ResultKind getKind() const { return Kind; }
 
   CodeCompletionDeclKind getAssociatedDeclKind() const {
     assert(getKind() == ResultKind::Declaration);
@@ -864,33 +879,23 @@ public:
 
   CodeCompletionOperatorKind getOperatorKind() const {
     assert(isOperator());
-    return static_cast<CodeCompletionOperatorKind>(KnownOperatorKind);
+    return KnownOperatorKind;
   }
 
-  bool isSystem() const {
-    return static_cast<bool>(IsSystem);
-  }
+  bool isSystem() const { return IsSystem; }
 
-  ExpectedTypeRelation getExpectedTypeRelation() const {
-    return static_cast<ExpectedTypeRelation>(TypeDistance);
-  }
+  ExpectedTypeRelation getExpectedTypeRelation() const { return TypeDistance; }
 
   NotRecommendedReason getNotRecommendedReason() const {
-    return static_cast<NotRecommendedReason>(NotRecommended);
+    return NotRecommended;
   }
 
-  SemanticContextKind getSemanticContext() const {
-    return static_cast<SemanticContextKind>(SemanticContext);
-  }
+  SemanticContextKind getSemanticContext() const { return SemanticContext; }
 
-  CodeCompletionFlair getFlair() const {
-    return static_cast<CodeCompletionFlair>(Flair);
-  }
+  CodeCompletionFlair getFlair() const { return CodeCompletionFlair(Flair); }
 
   /// Modify "flair" of this result *in place*.
-  void setFlair(CodeCompletionFlair flair) {
-    Flair = unsigned(flair.toRaw());
-  }
+  void setFlair(CodeCompletionFlair flair) { Flair = flair.toRaw(); }
 
   bool isNotRecommended() const {
     return getNotRecommendedReason() != NotRecommendedReason::None;
@@ -915,12 +920,12 @@ public:
   }
 
   void setDiagnostics(CodeCompletionDiagnosticSeverity severity, StringRef message) {
-    DiagnosticSeverity = static_cast<unsigned>(severity);
+    DiagnosticSeverity = severity;
     DiagnosticMessage = message;
   }
 
   CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
-    return static_cast<CodeCompletionDiagnosticSeverity>(DiagnosticSeverity);
+    return DiagnosticSeverity;
   }
 
   StringRef getDiagnosticMessage() const {

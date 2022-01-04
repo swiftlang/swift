@@ -1228,6 +1228,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   Ctx.addLoadedModule(M);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
+  llvm::sys::path::native(moduleInterfacePath);
   auto *file =
       loadAST(*M, moduleID.Loc, moduleInterfacePath,
               std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),

@@ -459,6 +459,14 @@ public:
     locationStorage = loc.storage;
   }
 
+  /// Return the next instruction or nullptr if this is the last instruction in
+  /// its block.
+  SILInstruction *getPreviousInstruction();
+
+  /// Return the previous instruction or nullptr if this is the first
+  /// instruction in its block.
+  SILInstruction *getNextInstruction();
+
   /// This method unlinks 'self' from the containing basic block and deletes it.
   void eraseFromParent();
 
@@ -1013,6 +1021,14 @@ public:
   /// If this is an instruction which "defines" an opened archetype, it is
   /// returned.
   CanArchetypeType getOpenedArchetype() const;
+
+  SILInstruction *getPreviousInstruction() {
+    return SILInstruction::getPreviousInstruction();
+  }
+
+  SILInstruction *getNextInstruction() {
+    return SILInstruction::getNextInstruction();
+  }
 };
 
 struct SILNodeOffsetChecker {

@@ -1994,6 +1994,70 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
   return std::make_pair(body, /*typechecked=*/false);
 }
 
+static FuncDecl *resolveMainFunctionDecl(DeclContext *declContext,
+                                         ResolvedMemberResult &resolution,
+                                         ASTContext &ctx) {
+  // The normal resolution mechanism won't choose the asynchronous main function
+  // unless no other options are available because extensions and generic types
+  // (structs/classes) are not considered asynchronous contexts.
+  // We want them to be promoted to a viable entrypoint if the deployment target
+  // is high enough.
+  SmallVector<FuncDecl *, 4> viableCandidates;
+  for (ValueDecl *candidate : resolution.getMemberDecls(Viable)) {
+    if (FuncDecl *function = dyn_cast<FuncDecl>(candidate)) {
+      if (function->isMainTypeMainMethod())
+        viableCandidates.push_back(function);
+    }
+  }
+  if (viableCandidates.empty()) {
+    return nullptr;
+  }
+
+  AvailabilityContext contextAvailability =
+      AvailabilityContext::forDeploymentTarget(ctx);
+  const bool hasAsyncSupport = contextAvailability.isContainedIn(
+      ctx.getBackDeployedConcurrencyAvailability());
+
+  FuncDecl *best = nullptr;
+  for (FuncDecl *candidate : viableCandidates) {
+    // The candidate will work if it's synchronous, or if we support concurrency
+    // and it is async, or if we are in YOLO mode
+    const bool candidateWorks = !candidate->hasAsync() ||
+                                (hasAsyncSupport && candidate->hasAsync()) ||
+                                ctx.LangOpts.DisableAvailabilityChecking;
+
+    // Skip it if it won't work
+    if (!candidateWorks)
+      continue;
+
+    // If we don't have a best, the candidate is the best so far
+    if (!best) {
+      best = candidate;
+      continue;
+    }
+
+    // If the candidate is better and it's synchronous, just swap it right in.
+    // If the candidate is better and it's async, make sure we support async
+    // before selecting it.
+    //
+    // If it's unordered (equally bestest), use the async version if we support
+    // it or use the sync version if we don't.
+    const Comparison rank =
+        TypeChecker::compareDeclarations(declContext, candidate, best);
+    const bool isBetter = rank == Comparison::Better;
+    const bool isUnordered = rank == Comparison::Unordered;
+    const bool swapForAsync =
+        hasAsyncSupport && candidate->hasAsync() && !best->hasAsync();
+    const bool swapForSync =
+        !hasAsyncSupport && !candidate->hasAsync() && best->hasAsync();
+    const bool selectCandidate =
+        isBetter || (isUnordered && (swapForAsync || swapForSync));
+    if (selectCandidate)
+      best = candidate;
+  }
+  return best;
+}
+
 FuncDecl *
 SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                                         Decl *D) const {
@@ -2049,37 +2113,17 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
 
   auto resolution = resolveValueMember(
       *declContext, nominal->getInterfaceType(), context.Id_main);
-
-  FuncDecl *mainFunction = nullptr;
-
-  if (resolution.hasBestOverload()) {
-    auto best = resolution.getBestOverload();
-    if (auto function = dyn_cast<FuncDecl>(best)) {
-      if (function->isMainTypeMainMethod()) {
-        mainFunction = function;
-      }
-    }
-  }
-
-  if (mainFunction == nullptr) {
-    SmallVector<FuncDecl *, 4> viableCandidates;
-
-    for (auto *candidate : resolution.getMemberDecls(Viable)) {
-      if (auto func = dyn_cast<FuncDecl>(candidate)) {
-        if (func->isMainTypeMainMethod()) {
-          viableCandidates.push_back(func);
-        }
-      }
-    }
-
-    if (viableCandidates.size() != 1) {
-      context.Diags.diagnose(attr->getLocation(),
-                             diag::attr_MainType_without_main,
-                             nominal->getBaseName());
-      attr->setInvalid();
-      return nullptr;
-    }
-    mainFunction = viableCandidates[0];
+  FuncDecl *mainFunction =
+      resolveMainFunctionDecl(declContext, resolution, context);
+  if (!mainFunction) {
+    const bool hasAsyncSupport =
+        AvailabilityContext::forDeploymentTarget(context).isContainedIn(
+            context.getBackDeployedConcurrencyAvailability());
+    context.Diags.diagnose(attr->getLocation(),
+                           diag::attr_MainType_without_main,
+                           nominal->getBaseName(), hasAsyncSupport);
+    attr->setInvalid();
+    return nullptr;
   }
 
   auto where = ExportContext::forDeclSignature(D);

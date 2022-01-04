@@ -34,11 +34,11 @@ void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn);
 /// - CaptureStructureOut: A buffer accepting a byte sequence representing the
 ///                        capture structure of the literal.
 /// - CaptureStructureSize: The size of the capture structure buffer. Must be
-///                         greater than or equal to `strlen(InputPtr)`.
+///                         greater than or equal to `strlen(InputPtr) + 3`.
 typedef void(* RegexLiteralParsingFn)(/*InputPtr*/ const char *,
                                       /*ErrorOut*/ const char **,
                                       /*VersionOut*/ unsigned *,
-                                      /*CaptureStructureOut*/ char *,
+                                      /*CaptureStructureOut*/ void *,
                                       /*CaptureStructureSize*/ unsigned);
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn);
 

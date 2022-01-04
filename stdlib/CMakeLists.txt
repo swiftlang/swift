@@ -62,6 +62,14 @@ else()
   set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default TRUE)
 endif()
 
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
+  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "HAIKU")
+  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
+else()
+  set(SWIFT_STDLIB_HAS_LOCALE_default TRUE)
+endif()
+
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(SWIFT_STDLIB_HAS_ASL_default TRUE)
 else()
@@ -80,12 +88,6 @@ endif()
 
 # TODO: migrate this section to StdlibOptions.cmake to reduce duplication
 
-set(SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS "" CACHE STRING
-    "Extra flags to pass when compiling swift stdlib files")
-
-set(SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS "" CACHE STRING
-    "Extra flags to pass when compiling C/C++ stdlib files")
-
 option(SWIFT_STDLIB_STABLE_ABI
        "Should stdlib be built with stable ABI (library evolution, resilience)."
        "${SWIFT_STDLIB_STABLE_ABI_default}")
@@ -94,76 +96,29 @@ option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
 
-option(SWIFT_STDLIB_HAS_DLADDR
-       "Build stdlib assuming the runtime environment runtime environment provides dladdr API."
-       TRUE)
-
 option(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
        "Build stdlib assuming the runtime environment provides the backtrace(3) API."
        "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default}")
-
-option(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION
-       "Build stdlib assuming the runtime environment runtime environment only supports a single runtime image with Swift code."
-       FALSE)
-
-option(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
-       "Build stdlib assuming the Darwin build of stdlib can use extended libmalloc APIs"
-       TRUE)
 
 option(SWIFT_STDLIB_HAS_ASL
        "Build stdlib assuming we can use the asl_log API."
        "${SWIFT_STDLIB_HAS_ASL_default}")
 
-option(SWIFT_STDLIB_HAS_STDIN
-       "Build stdlib assuming the platform supports stdin and getline API."
-       TRUE)
-
-option(SWIFT_STDLIB_HAS_ENVIRON
-       "Build stdlib assuming the platform supports environment variables."
-       TRUE)
-
-option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-       "Build the standard libraries assuming that they will be used in an environment with only a single thread."
-       FALSE)
-
-option(SWIFT_STDLIB_OS_VERSIONING
-       "Build stdlib with availability based on OS versions (Darwin only)."
-       TRUE)
-
-option(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
-       "Build stdlib without a custom implementation of MetadataAllocator, relying on malloc+free instead."
-       FALSE)
-
-option(SWIFT_STDLIB_HAS_COMMANDLINE
-       "Build stdlib with the CommandLine enum and support for argv/argc."
-       TRUE)
+option(SWIFT_STDLIB_HAS_LOCALE
+       "Build stdlib assuming the platform has locale support."
+       "${SWIFT_STDLIB_HAS_LOCALE_default}")
 
 option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
 
-option(SWIFT_FREESTANDING_FLAVOR
-       "When building the FREESTANDING stdlib, which build style to use (options: apple, linux)")
-
 option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
        "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on Linux."
        "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
-
-option(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK
-       "Should stdlib be built with -experimental-hermetic-seal-at-link"
-       FALSE)
        
 option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
        "Should stdlib be built with full unicode support"
        TRUE)
-
-set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
-    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
-    option only affects the standard library and runtime, not tools.")
-
-option(SWIFT_ENABLE_REFLECTION
-  "Build stdlib with support for runtime reflection and mirrors."
-  TRUE)
 
 if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
   set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")

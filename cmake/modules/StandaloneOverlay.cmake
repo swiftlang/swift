@@ -92,6 +92,10 @@ set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
 targets on Darwin platforms. These targets are in addition to the full \
 library targets.")
 
+option(SWIFT_STDLIB_HAS_LOCALE
+       "Build stdlib assuming the platform has locale support."
+       TRUE)
+
 # -----------------------------------------------------------------------------
 # Constants
 
