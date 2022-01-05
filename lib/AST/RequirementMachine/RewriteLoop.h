@@ -87,6 +87,19 @@ struct RewriteStep {
     /// *** Rewrite step kinds introduced by the property map ***
     ///
 
+    /// If not inverted: the top of the primary stack must be a term T.[p1].[p2]
+    /// ending in a pair of property symbols [p1] and [p2], where [p1] < [p2].
+    /// The symbol [p2] is dropped, leaving behind the term T.[p1].
+    ///
+    /// If inverted: the top of the primary stack must be a term T.[p1]
+    /// ending in a property symbol [p1]. The rewrite system must have a
+    /// recorded relation for the pair ([p1], [p2]). The symbol [p2] is added
+    /// to the end of the term, leaving behind the term T.[p1].[p2].
+    ///
+    /// The Arg field stores the result of calling
+    /// RewriteSystem::recordRelation().
+    Relation,
+
     /// If not inverted: the top of the primary stack must be a term ending in
     /// a concrete type symbol [concrete: C] followed by a protocol symbol [P].
     /// These two symbols are combined into a single concrete conformance
@@ -194,6 +207,11 @@ struct RewriteStep {
   static RewriteStep forDecompose(unsigned numSubstitutions, bool inverse) {
     return RewriteStep(Decompose, /*startOffset=*/0, /*endOffset=*/0,
                        /*arg=*/numSubstitutions, inverse);
+  }
+
+  static RewriteStep forRelation(unsigned relationID, bool inverse) {
+    return RewriteStep(Relation, /*startOffset=*/0, /*endOffset=*/0,
+                       /*arg=*/relationID, inverse);
   }
 
   static RewriteStep forConcreteConformance(bool inverse) {
@@ -401,6 +419,9 @@ struct RewritePathEvaluator {
 
   void applyShift(const RewriteStep &step,
                   const RewriteSystem &system);
+
+  void applyRelation(const RewriteStep &step,
+                     const RewriteSystem &system);
 
   void applyDecompose(const RewriteStep &step,
                       const RewriteSystem &system);

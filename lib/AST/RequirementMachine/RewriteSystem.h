@@ -325,6 +325,17 @@ private:
   //////////////////////////////////////////////////////////////////////////////
 
 public:
+  /// The left hand side is known to be smaller than the right hand side.
+  using Relation = std::pair<Symbol, Symbol>;
+
+private:
+  llvm::DenseMap<Relation, unsigned> RelationMap;
+  std::vector<Relation> Relations;
+
+public:
+  unsigned recordRelation(Symbol lhs, Symbol rhs);
+  Relation getRelation(unsigned index) const;
+
   /// A type witness has a subject type, stored in LHS, which takes the form:
   ///
   /// T.[concrete: C : P].[P:X]

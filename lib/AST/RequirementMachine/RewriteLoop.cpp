@@ -64,6 +64,19 @@ void RewriteStep::dump(llvm::raw_ostream &out,
     out << Arg << ")";
     break;
   }
+  case Relation: {
+    evaluator.applyRelation(*this, system);
+
+    auto relation = system.getRelation(Arg);
+    out << "Relation(";
+    if (Inverse) {
+      out << relation.second << " > " << relation.first;
+    } else {
+      out << relation.first << " < " << relation.second;
+    }
+    out << ")";
+    break;
+  }
   case ConcreteConformance: {
     evaluator.applyConcreteConformance(*this, system);
 
@@ -277,6 +290,41 @@ void RewritePathEvaluator::applyShift(const RewriteStep &step,
     checkSecondary();
     Primary.push_back(Secondary.back());
     Secondary.pop_back();
+  }
+}
+
+void RewritePathEvaluator::applyRelation(const RewriteStep &step,
+                                         const RewriteSystem &system) {
+  assert(step.Kind == RewriteStep::Relation);
+
+  auto relation = system.getRelation(step.Arg);
+  auto &term = getCurrentTerm();
+
+  if (!step.Inverse) {
+    // Given a term T.[p1].[p2].U where |U| == EndOffset, build the
+    // term T.[p1].U.
+
+    auto lhsProperty = *(term.end() - step.EndOffset - 2);
+    auto rhsProperty = *(term.end() - step.EndOffset - 1);
+    assert(lhsProperty == relation.first);
+    assert(rhsProperty == relation.second);
+
+    MutableTerm result(term.begin(), term.end() - step.EndOffset - 1);
+    result.append(term.end() - step.EndOffset, term.end());
+
+    term = result;
+  } else {
+    // Given a term T.[p1].U where |U| == EndOffset, build the
+    // term T.[p1].[p2].U.
+
+    auto lhsProperty = *(term.end() - step.EndOffset - 1);
+    assert(lhsProperty == relation.first);
+
+    MutableTerm result(term.begin(), term.end() - step.EndOffset);
+    result.add(relation.second);
+    result.append(term.end() - step.EndOffset, term.end());
+
+    term = result;
   }
 }
 
@@ -621,6 +669,10 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
 
   case RewriteStep::Decompose:
     applyDecompose(step, system);
+    break;
+
+  case RewriteStep::Relation:
+    applyRelation(step, system);
     break;
 
   case RewriteStep::ConcreteConformance:

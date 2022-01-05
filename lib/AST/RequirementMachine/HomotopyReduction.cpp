@@ -97,6 +97,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     case RewriteStep::AdjustConcreteType:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
+    case RewriteStep::Relation:
     case RewriteStep::ConcreteConformance:
     case RewriteStep::SuperclassConformance:
     case RewriteStep::ConcreteTypeWitness:
@@ -220,6 +221,7 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
     case RewriteStep::AdjustConcreteType:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
+    case RewriteStep::Relation:
     case RewriteStep::ConcreteConformance:
     case RewriteStep::SuperclassConformance:
     case RewriteStep::ConcreteTypeWitness:
@@ -321,6 +323,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
     case RewriteStep::AdjustConcreteType:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
+    case RewriteStep::Relation:
     case RewriteStep::ConcreteConformance:
     case RewriteStep::SuperclassConformance:
     case RewriteStep::ConcreteTypeWitness:
