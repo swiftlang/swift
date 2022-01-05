@@ -83,11 +83,12 @@ static void recordRelation(Term key,
 
   assert(key.size() >= lhsRule.getRHS().size());
 
-  assert(lhsProperty.isProperty());
-  assert(rhsProperty.isProperty());
-  assert(lhsProperty.getKind() == rhsProperty.getKind() ||
+  assert((lhsProperty.getKind() == Symbol::Kind::Layout &&
+          rhsProperty.getKind() == Symbol::Kind::Layout) ||
          (lhsProperty.getKind() == Symbol::Kind::Superclass &&
-          rhsProperty.getKind() == Symbol::Kind::Layout));
+          rhsProperty.getKind() == Symbol::Kind::Layout) ||
+         (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
+          rhsProperty.getKind() == Symbol::Kind::Superclass));
 
   if (debug) {
     llvm::dbgs() << "%% Recording relation: ";
@@ -132,16 +133,20 @@ static void recordConflict(Term key,
                            unsigned existingRuleID,
                            unsigned newRuleID,
                            RewriteSystem &system) {
+  auto &existingRule = system.getRule(existingRuleID);
+  auto &newRule = system.getRule(newRuleID);
+
+  auto existingKind = existingRule.isPropertyRule()->getKind();
+  auto newKind = newRule.isPropertyRule()->getKind();
+
   // The GSB only dropped the new rule in the case of a conflicting
   // superclass requirement, so maintain that behavior here.
-  auto &existingRule = system.getRule(existingRuleID);
-  if (existingRule.isPropertyRule()->getKind() !=
-      Symbol::Kind::Superclass) {
+  if (existingKind != Symbol::Kind::Superclass &&
+      existingKind == newKind) {
     if (existingRule.getRHS().size() == key.size())
       existingRule.markConflicting();
   }
 
-  auto &newRule = system.getRule(newRuleID);
   assert(newRule.getRHS().size() == key.size());
   newRule.markConflicting();
 }
@@ -546,10 +551,39 @@ void PropertyMap::addProperty(
   llvm_unreachable("Bad symbol kind");
 }
 
+void PropertyMap::checkConcreteTypeRequirements(
+    SmallVectorImpl<InducedRule> &inducedRules) {
+  bool debug = Debug.contains(DebugFlags::ConcreteUnification);
+
+  for (auto *props : Entries) {
+    if (props->ConcreteTypeRule && props->SuperclassRule) {
+      auto concreteType = props->ConcreteType->getConcreteType();
+
+      // A rule (T.[concrete: C] => T) where C is a class type induces a rule
+      // (T.[superclass: C] => T).
+      if (concreteType->getClassOrBoundGenericClass()) {
+        auto superclassSymbol = Symbol::forSuperclass(
+            concreteType, props->ConcreteType->getSubstitutions(),
+            Context);
+
+        recordRelation(props->getKey(), *props->ConcreteTypeRule,
+                       superclassSymbol, System,
+                       inducedRules, debug);
+
+      // Otherwise, we have a concrete vs superclass conflict.
+      } else {
+        recordConflict(props->getKey(),
+                       *props->ConcreteTypeRule,
+                       *props->SuperclassRule, System);
+      }
+    }
+  }
+}
+
 /// For each fully-concrete type, find the shortest term having that concrete type.
 /// This is later used by computeConstraintTermForTypeWitness().
 void PropertyMap::computeConcreteTypeInDomainMap() {
-  for (const auto &props : Entries) {
+  for (auto *props : Entries) {
     if (!props->isConcreteType())
       continue;
 
@@ -575,7 +609,7 @@ void PropertyMap::computeConcreteTypeInDomainMap() {
 
 void PropertyMap::concretizeNestedTypesFromConcreteParents(
     SmallVectorImpl<InducedRule> &inducedRules) {
-  for (const auto &props : Entries) {
+  for (auto *props : Entries) {
     if (props->getConformsTo().empty())
       continue;
 

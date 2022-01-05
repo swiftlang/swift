@@ -368,6 +368,9 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
     }
   }
 
+  // Now, check for conflicts between superclass and concrete type rules.
+  checkConcreteTypeRequirements(inducedRules);
+
   // We collect terms with fully concrete types so that we can re-use them
   // to tie off recursion in the next step.
   computeConcreteTypeInDomainMap();

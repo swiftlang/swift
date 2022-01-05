@@ -232,6 +232,9 @@ private:
   void addProperty(Term key, Symbol property, unsigned ruleID,
                    SmallVectorImpl<InducedRule> &inducedRules);
 
+  void checkConcreteTypeRequirements(
+                   SmallVectorImpl<InducedRule> &inducedRules);
+
   void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(
                    SmallVectorImpl<InducedRule> &inducedRules);
