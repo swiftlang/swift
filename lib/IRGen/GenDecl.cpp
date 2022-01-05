@@ -3777,9 +3777,7 @@ void IRGenModule::appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
                             llvm::ConstantAsMetadata::get(dependsOn),
                         }),
   };
-  auto *usedConditional =
-      Module.getOrInsertNamedMetadata("llvm.used.conditional");
-  usedConditional->addOperand(llvm::MDNode::get(Module.getContext(), metadata));
+  UsedConditionals.push_back(llvm::MDNode::get(Module.getContext(), metadata));
 }
 
 /// Expresses that `var` is removable (dead-strippable) when either the protocol
@@ -3806,9 +3804,32 @@ void IRGenModule::appendLLVMUsedConditionalEntry(
                             llvm::ConstantAsMetadata::get(type),
                         }),
   };
+  UsedConditionals.push_back(llvm::MDNode::get(Module.getContext(), metadata));
+}
+
+void IRGenModule::emitUsedConditionals() {
+  if (UsedConditionals.empty())
+    return;
+
   auto *usedConditional =
       Module.getOrInsertNamedMetadata("llvm.used.conditional");
-  usedConditional->addOperand(llvm::MDNode::get(Module.getContext(), metadata));
+
+  for (auto *M : UsedConditionals) {
+    // Process the dependencies ("edges") and strip any pointer casts on them.
+    // Those might appear when a dependency is originally added against a
+    // declaration only, and later the declaration is RAUW'd with a definition
+    // causing a bitcast to get added to the metadata entry in the dependency.
+    auto *DependenciesMD =
+        dyn_cast_or_null<llvm::MDNode>(M->getOperand(2).get());
+    for (unsigned int I = 0; I < DependenciesMD->getNumOperands(); I++) {
+      auto *Dependency = DependenciesMD->getOperand(I).get();
+      auto *C = llvm::mdconst::extract_or_null<llvm::Constant>(Dependency)
+                    ->stripPointerCasts();
+      DependenciesMD->replaceOperandWith(I, llvm::ConstantAsMetadata::get(C));
+    }
+
+    usedConditional->addOperand(M);
+  }
 }
 
 /// Emit the protocol descriptors list and return it (if asContiguousArray is

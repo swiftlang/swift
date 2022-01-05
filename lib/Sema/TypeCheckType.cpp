@@ -2084,9 +2084,47 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveExistentialType(existential, options);
   }
 
-  case TypeReprKind::NamedOpaqueReturn:
-    return resolveType(cast<NamedOpaqueReturnTypeRepr>(repr)->getBase(),
-                       options);
+  case TypeReprKind::NamedOpaqueReturn: {
+    // If the named opaque result type is in a valid position, resolution
+    // should happen in the context of an `OpaqueTypeDecl`. This decl is
+    // implicit in the source and is created in such contexts by evaluation of
+    // an `OpaqueResultTypeRequest`.
+    auto opaqueRepr = cast<NamedOpaqueReturnTypeRepr>(repr);
+    if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(getDeclContext())) {
+      // Resolve the base type within this context.
+
+      // FIXME: Temporary hack to resolve an identifier type to one of the
+      // generic parameters of the opaque return type. This should be subsumed
+      // be proper name lookup, OF COURSE.
+      if (auto simpleIdent = dyn_cast<SimpleIdentTypeRepr>(
+              opaqueRepr->getBase())) {
+        Identifier name = simpleIdent->getComponentRange().front()
+            ->getNameRef().getBaseIdentifier();
+        if (auto gpDecl = opaqueRepr->getGenericParams()
+                ->lookUpGenericParam(name)) {
+          auto outerGenericSignature = opaqueDecl->getNamingDecl()
+                                           ->getInnermostDeclContext()
+                                           ->getGenericSignatureOfContext();
+
+          SubstitutionMap subs;
+          if (outerGenericSignature)
+            subs = outerGenericSignature->getIdentitySubstitutionMap();
+
+          return OpaqueTypeArchetypeType::get(
+                            opaqueDecl, gpDecl->getIndex(), subs);
+        }
+      }
+
+      return resolveType(opaqueRepr->getBase(), options);
+    }
+
+    // We are not inside an `OpaqueTypeDecl`, so diagnose an error.
+    if (!(options & TypeResolutionFlags::SilenceErrors)) {
+      diagnose(repr->getStartLoc(), diag::unsupported_opaque_type);
+    }
+
+    return ErrorType::get(getASTContext());
+  }
 
   case TypeReprKind::Placeholder: {
     auto &ctx = getASTContext();

@@ -3289,6 +3289,10 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
 {
 }
 
+unsigned OpaqueTypeArchetypeType::getOrdinal() const {
+  return getInterfaceType()->castTo<GenericTypeParamType>()->getIndex();
+}
+
 SequenceArchetypeType::SequenceArchetypeType(
     const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
@@ -3319,8 +3323,9 @@ getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
 OpaqueSubstitutionKind
 ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
-  return shouldPerformSubstitution(opaque, inContext->getParentModule(),
-                                   contextExpansion);
+  auto inModule = inContext ? inContext->getParentModule()
+                            : opaque->getParentModule();
+  return shouldPerformSubstitution(opaque, inModule, contextExpansion);
 }
 OpaqueSubstitutionKind
 ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
@@ -3455,7 +3460,8 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // context.
   auto inContext = this->inContext;
   auto isContextWholeModule = this->isContextWholeModule;
-  if (partialSubstTy.findIf(
+  if (inContext &&
+      partialSubstTy.findIf(
           [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
                                        isContextWholeModule))
@@ -3511,6 +3517,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
     // SIL type lowering may have already substituted away the opaque type, in
     // which case we'll end up "substituting" the same type.
     if (maybeOpaqueType->isEqual(replacementType)) {
+      assert(inContext && "Need context for already-substituted opaque types");
       return inContext->getParentModule()
                       ->lookupConformance(replacementType, protocol);
     }
@@ -3777,8 +3784,10 @@ std::string ArchetypeType::getFullName() const {
 void
 OpaqueTypeArchetypeType::Profile(llvm::FoldingSetNodeID &id,
                                  OpaqueTypeDecl *decl,
+                                 unsigned ordinal,
                                  SubstitutionMap subs) {
   id.AddPointer(decl);
+  id.AddInteger(ordinal);
   subs.profile(id);
 }
 

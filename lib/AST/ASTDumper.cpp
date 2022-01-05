@@ -567,7 +567,7 @@ namespace {
       OS << " naming_decl=";
       printDeclName(OTD->getNamingDecl());
       PrintWithColorRAII(OS, TypeColor) << " opaque_interface="
-        << Type(OTD->getUnderlyingInterfaceType()).getString();
+        << OTD->getDeclaredInterfaceType().getString();
       OS << " in "
          << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
       if (auto underlyingSubs = OTD->getUnderlyingTypeSubstitutions()) {
@@ -3776,6 +3776,7 @@ namespace {
                                       StringRef label) {
       printArchetypeCommon(T, "opaque_type", label);
       printField("decl", T->getDecl()->getNamingDecl()->printRef());
+      printField("ordinal", T->getOrdinal());
       if (!T->getSubstitutions().empty()) {
         OS << '\n';
         SmallPtrSet<const ProtocolConformance *, 4> Dumped;

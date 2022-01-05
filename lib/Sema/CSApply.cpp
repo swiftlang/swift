@@ -7095,8 +7095,29 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // below is just an approximate check since the above would be expensive to
   // verify and still relies on the type checker ensuing `fromType` is
   // compatible with any opaque archetypes.
-  if (toType->hasOpaqueArchetype())
-    return cs.cacheType(new (ctx) UnderlyingToOpaqueExpr(expr, toType));
+  if (toType->hasOpaqueArchetype()) {
+    // Find the opaque type declaration. We need its generic signature.
+    OpaqueTypeDecl *opaqueDecl = nullptr;
+    bool found = toType.findIf([&](Type type) {
+      if (auto opaqueType = type->getAs<OpaqueTypeArchetypeType>()) {
+        opaqueDecl = opaqueType->getDecl();
+        return true;
+      }
+
+      return false;
+    });
+    (void)found;
+    assert(found && "No opaque type archetype?");
+
+    // Compute the substitutions for the opaque type declaration.
+    auto opaqueLocator = solution.getConstraintSystem().getOpenOpaqueLocator(
+        locator, opaqueDecl);
+    SubstitutionMap substitutions = solution.computeSubstitutions(
+        opaqueDecl->getOpaqueInterfaceGenericSignature(), opaqueLocator);
+    assert(!substitutions.empty() && "Missing substitutions for opaque type");
+    return cs.cacheType(
+        new (ctx) UnderlyingToOpaqueExpr(expr, toType, substitutions));
+  }
 
   llvm_unreachable("Unhandled coercion");
 }

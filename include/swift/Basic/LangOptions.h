@@ -320,6 +320,12 @@ namespace swift {
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
+    /// Enable experimental ClangImporter diagnostics.
+    bool EnableExperimentalClangImporterDiagnostics = false;
+
+    /// Enable experimental eager Clang module diagnostics.
+    bool EnableExperimentalEagerClangModuleDiagnostics = false;
+
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 

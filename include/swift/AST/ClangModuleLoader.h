@@ -182,6 +182,9 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Emits any import diagnostics associated with the provided decl.
+  virtual void diagnoseDeclDirectly(const clang::NamedDecl *decl) = 0;
+
   /// Instantiate and import class template using given arguments.
   ///
   /// This method will find the clang::ClassTemplateSpecialization decl if

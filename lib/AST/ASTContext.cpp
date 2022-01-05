@@ -2168,17 +2168,21 @@ bool ASTContext::shouldPerformTypoCorrection() {
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
-bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName,
+bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
                                      llvm::VersionTuple version,
                                      bool underlyingVersion,
                                      bool updateFailingList) const {
+  SmallString<64> FullModuleName;
+  ModuleName.getString(FullModuleName);
+  auto ModuleNameStr = FullModuleName.str();
+
   // If we've failed loading this module before, don't look for it again.
-  if (FailedModuleImportNames.count(ModuleName.Item))
+  if (FailedModuleImportNames.count(ModuleNameStr))
     return false;
   // If no specific version, the module is importable if it has already been imported.
   if (version.empty()) {
     // If this module has already been successfully imported, it is importable.
-    if (getLoadedModule(ImportPath::Module::Builder(ModuleName).get()) != nullptr)
+    if (getLoadedModule(ModuleName) != nullptr)
       return true;
   }
   // Otherwise, ask the module loaders.
@@ -2188,18 +2192,18 @@ bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName,
     }
   }
   if (updateFailingList && version.empty()) {
-    FailedModuleImportNames.insert(ModuleName.Item);
+    FailedModuleImportNames.insert(ModuleNameStr);
   }
   return false;
 }
 
-bool ASTContext::canImportModule(ImportPath::Element ModuleName,
+bool ASTContext::canImportModule(ImportPath::Module ModuleName,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) {
   return canImportModuleImpl(ModuleName, version, underlyingVersion, true);
 }
 
-bool ASTContext::canImportModule(ImportPath::Element ModuleName,
+bool ASTContext::canImportModule(ImportPath::Module ModuleName,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) const {
   return canImportModuleImpl(ModuleName, version, underlyingVersion, false);
@@ -2460,6 +2464,10 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   auto result = new (*this, arena) InheritedProtocolConformance(type, inherited);
   inheritedConformances.InsertNode(result, insertPos);
   return result;
+}
+
+bool ASTContext::isLazyContext(const DeclContext *dc) {
+  return getImpl().LazyContexts.count(dc) != 0;
 }
 
 LazyContextData *ASTContext::getOrCreateLazyContextData(
@@ -4275,9 +4283,7 @@ DependentMemberType *DependentMemberType::get(Type base,
 OpaqueTypeArchetypeType *
 OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
                              SubstitutionMap Substitutions) {
-  // TODO [OPAQUE SUPPORT]: multiple opaque types
-  assert(ordinal == 0 && "we only support one 'some' type per composite type");
-  auto opaqueParamType = Decl->getUnderlyingInterfaceType();
+  auto opaqueParamType = Decl->getOpaqueGenericParams()[ordinal];
 
   // TODO: We could attempt to preserve type sugar in the substitution map.
   // Currently archetypes are assumed to be always canonical in many places,
@@ -4285,7 +4291,7 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
   Substitutions = Substitutions.getCanonical();
 
   llvm::FoldingSetNodeID id;
-  Profile(id, Decl, Substitutions);
+  Profile(id, Decl, ordinal, Substitutions);
   
   auto &ctx = Decl->getASTContext();
 

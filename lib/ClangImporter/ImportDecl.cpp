@@ -4114,8 +4114,12 @@ namespace {
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }
 
-      if (!bodyParams)
+      if (!bodyParams) {
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(diag::invoked_func_not_imported, decl),
+            decl->getSourceRange().getBegin());
         return nullptr;
+      }
 
       if (name && name.getArgumentNames().size() != bodyParams->size()) {
         // We synthesized additional parameters so rebuild the DeclName.
@@ -4277,8 +4281,12 @@ namespace {
       auto importedType =
           Impl.importType(decl->getType(), ImportTypeKind::RecordField,
                           isInSystemModule(dc), Bridgeability::None);
-      if (!importedType)
+      if (!importedType) {
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(diag::record_field_not_imported, decl),
+            decl->getSourceRange().getBegin());
         return nullptr;
+      }
 
       auto type = importedType.getType();
 
@@ -4927,6 +4935,12 @@ namespace {
             dc, decl, decl->parameters(), decl->isVariadic(),
             isInSystemModule(dc), &bodyParams, importedName,
             asyncConvention, errorConvention, kind);
+
+        if (!importedType) {
+          Impl.addImportDiagnostic(
+              decl, Diagnostic(diag::record_method_not_imported, decl),
+              decl->getSourceRange().getBegin());
+        }
       }
       if (!importedType)
         return nullptr;
@@ -5390,6 +5404,10 @@ namespace {
                                                            clangModule))
             return native;
 
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(diag::forward_declared_protocol_label, decl),
+            decl->getSourceRange().getBegin());
+
         forwardDeclaration = true;
         return nullptr;
       }
@@ -5520,6 +5538,10 @@ namespace {
           result->getAttrs().add(
               new (Impl.SwiftContext) ForbidSerializingReferenceAttr(true));
           return result;
+        } else {
+          Impl.addImportDiagnostic(
+              decl, Diagnostic(diag::forward_declared_interface_label, decl),
+              decl->getSourceRange().getBegin());
         }
 
         forwardDeclaration = true;
@@ -5739,8 +5761,12 @@ namespace {
       }
 
       auto importedType = Impl.importPropertyType(decl, isInSystemModule(dc));
-      if (!importedType)
+      if (!importedType) {
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(diag::objc_property_not_imported, decl),
+            decl->getSourceRange().getBegin());
         return nullptr;
+      }
 
       // Check whether the property already got imported.
       if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
@@ -6515,7 +6541,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
 
   // Update the failability appropriately based on the imported method type.
   bool failable = false, isIUO = false;
-  if (importedType.isImplicitlyUnwrapped()) {
+  if (!importedType.getType().isNull() &&
+      importedType.isImplicitlyUnwrapped()) {
     assert(importedType.getType()->getOptionalObjectType());
     failable = true;
     isIUO = true;
@@ -9162,10 +9189,8 @@ void ClangImporter::Implementation::finishNormalConformance(
 }
 
 Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
-    const clang::NamedDecl *ClangDecl,
-    ImportNameVersion version,
-    bool SuperfluousTypedefsAreTransparent,
-    bool UseCanonicalDecl) {
+    const clang::NamedDecl *ClangDecl, ImportNameVersion version,
+    bool SuperfluousTypedefsAreTransparent, bool UseCanonicalDecl) {
   if (!ClangDecl)
     return nullptr;
 
@@ -10043,8 +10068,12 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
   forEachDistinctName(
       nd, [&](ImportedName name, ImportNameVersion nameVersion) -> bool {
     auto member = importDecl(nd, nameVersion);
-    if (!member)
+    if (!member) {
+      if (SwiftContext.LangOpts.EnableExperimentalEagerClangModuleDiagnostics) {
+        diagnoseTargetDirectly(nd);
+      }
       return false;
+    }
 
     // If there are alternate declarations for this member, add them.
     for (auto alternate : getAlternateDecls(member)) {
