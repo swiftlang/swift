@@ -2603,7 +2603,7 @@ public:
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
-  using Candidate = std::pair<Expr *, Type>;
+  using Candidate = std::pair<Expr *, SubstitutionMap>;
 
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
@@ -2642,20 +2642,45 @@ public:
     }
 
     // Check whether all of the underlying type candidates match up.
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
-    Type underlyingType = Candidates.front().second;
+    // TODO [OPAQUE SUPPORT]: diagnose multiple opaque types
+    SubstitutionMap underlyingSubs = Candidates.front().second;
+    SubstitutionMap canonicalUnderlyingSubs = underlyingSubs.getCanonical();
     bool mismatch =
         std::any_of(Candidates.begin() + 1, Candidates.end(),
                     [&](Candidate &otherCandidate) {
-                      return !underlyingType->isEqual(otherCandidate.second);
+                      return canonicalUnderlyingSubs != otherCandidate.second.getCanonical();
                     });
     if (mismatch) {
+      unsigned mismatchIndex = OpaqueDecl->getOpaqueGenericParams().size();
+      for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
+        unsigned index = genericParam->getIndex();
+        Type underlyingType = Candidates[0].second.getReplacementTypes()[index];
+        bool found = false;
+        for (const auto &candidate : Candidates) {
+          Type otherType = candidate.second.getReplacementTypes()[index];
+          if (!underlyingType->isEqual(otherType)) {
+            mismatchIndex = index;
+            found = true;
+            break;
+          }
+        }
+
+        if (found)
+          break;
+      }
+      assert(mismatchIndex < OpaqueDecl->getOpaqueGenericParams().size());
+      TypeRepr *opaqueRepr =
+          OpaqueDecl->getOpaqueReturnTypeReprs()[mismatchIndex];
       Implementation->diagnose(
-          diag::opaque_type_mismatched_underlying_type_candidates);
+          diag::opaque_type_mismatched_underlying_type_candidates,
+          opaqueRepr)
+        .highlight(opaqueRepr->getSourceRange());
+
       for (auto candidate : Candidates) {
-        Ctx.Diags.diagnose(candidate.first->getLoc(),
-                           diag::opaque_type_underlying_type_candidate_here,
-                           candidate.second);
+        Ctx.Diags.diagnose(
+           candidate.first->getLoc(),
+           diag::opaque_type_underlying_type_candidate_here,
+           candidate.second.getReplacementTypes()[mismatchIndex]);
       }
       return;
     }
@@ -2664,39 +2689,31 @@ public:
     // in terms of the opaque type itself.
     auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
         OpaqueDecl->getDeclaredInterfaceType());
-    auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
-      return t->isEqual(opaqueTypeInContext);
-    });
-    
-    if (isSelfReferencing) {
-      Ctx.Diags.diagnose(Candidates.front().first->getLoc(),
-                         diag::opaque_type_self_referential_underlying_type,
-                         underlyingType);
-      return;
+    for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
+      auto underlyingType = Type(genericParam).subst(underlyingSubs);
+      auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
+        return t->isEqual(opaqueTypeInContext);
+      });
+
+      if (isSelfReferencing) {
+        unsigned index = genericParam->getIndex();
+        Ctx.Diags.diagnose(Candidates.front().first->getLoc(),
+                           diag::opaque_type_self_referential_underlying_type,
+                           underlyingSubs.getReplacementTypes()[index]);
+        return;
+      }
     }
-    
-    // If we have one successful candidate, then save it as the underlying type
-    // of the opaque decl.
-    // Form a substitution map that defines it in terms of the other context
-    // generic parameters.
-    underlyingType = underlyingType->mapTypeOutOfContext();
-    auto underlyingSubs = SubstitutionMap::get(
-      OpaqueDecl->getOpaqueInterfaceGenericSignature(),
-      [&](SubstitutableType *t) -> Type {
-        if (t->isEqual(OpaqueDecl->getUnderlyingInterfaceType())) {
-          return underlyingType;
-        }
-        return Type(t);
-      },
-      LookUpConformanceInModule(OpaqueDecl->getModuleContext()));
-    
-    OpaqueDecl->setUnderlyingTypeSubstitutions(underlyingSubs);
+
+    // If we have one successful candidate, then save it as the underlying
+    // substitutions of the opaque decl.
+    OpaqueDecl->setUnderlyingTypeSubstitutions(
+        underlyingSubs.mapReplacementTypesOutOfContext());
   }
   
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
       Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
-                                  underlyingToOpaque->getSubExpr()->getType()));
+                                          underlyingToOpaque->substitutions));
       return {false, E};
     }
     return {true, E};

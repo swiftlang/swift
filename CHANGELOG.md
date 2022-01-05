@@ -3,6 +3,19 @@ CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
+## Swift Next
+
+* [SE-0328][]:
+
+  Opaque types (expressed with 'some') can now be used in structural positions
+  within a result type, including having multiple opaque types in the same
+  result. For example:
+
+  ```
+  func getSomeDictionary() -> [some Hashable: some Codable] {
+    return [ 1: "One", 2: "Two" ]
+  }
+  ```
 Swift 5.6
 ---------
 
@@ -8761,6 +8774,7 @@ Swift 1.0
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
 [SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
+[SE-0328]: <https://github.com/apple/swift-evolution/blob/main/proposals/0328-structural-opaque-result-types.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
