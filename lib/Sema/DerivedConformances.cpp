@@ -590,17 +590,14 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   return false;
 }
 
-/// Returns a generated guard statement that checks whether the given lhs and
-/// rhs expressions are equal. If not equal, the else block for the guard
-/// returns `guardReturnValue`.
-/// \p C The AST context.
-/// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality.
-/// \p guardReturnValue The expression to return if the two sides are not equal 
 GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
-                                        Expr *lhsExpr,
-                                        Expr *rhsExpr, 
-                                        Expr *guardReturnValue) {
+                                                     const DeclContext *DC,
+                                                     Expr *lhsExpr,
+                                                     Expr *rhsExpr,
+                                                     Expr *guardReturnValue) {
+  assert(lhsExpr->getType() && "Untyped AST in synthesized guard");
+  assert(rhsExpr->getType() && "Untyped AST in synthesized guard");
+
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
   
@@ -609,9 +606,15 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
 
   // Next, generate the condition being checked.
   // lhs == rhs
-  auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
-    DeclNameLoc());
+  auto type = lhsExpr->getType();
+  auto *proto = C.getProtocol(KnownProtocolKind::Equatable);
+  auto conf = TypeChecker::conformsToProtocol(type, proto, DC->getParentModule());
+  assert(conf && "Conformance validity should be checked by now!");
+  ConcreteDeclRef witness =
+      conf.getWitnessByName(type->getRValueType(),
+                            DeclName(C.Id_EqualsOperator));
+  auto cmpFuncExpr = new (C) DeclRefExpr(witness, DeclNameLoc(),
+                                         /*implicit*/true);
   auto *cmpExpr = BinaryExpr::create(C, lhsExpr, cmpFuncExpr, rhsExpr,
                                      /*implicit*/ true);
   conditions.emplace_back(cmpExpr);
@@ -621,35 +624,36 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
   return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
 }
-/// Returns a generated guard statement that checks whether the given lhs and
-/// rhs expressions are equal. If not equal, the else block for the guard
-/// returns `false`.
-/// \p C The AST context.
-/// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality. 
+
 GuardStmt *DerivedConformance::returnFalseIfNotEqualGuard(ASTContext &C,
-                                        Expr *lhsExpr,
-                                        Expr *rhsExpr) {
+                                                          const DeclContext *DC,
+                                                          Expr *lhsExpr,
+                                                          Expr *rhsExpr) {
   // return false
   auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(), true);
-  return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, falseExpr);
+  return returnIfNotEqualGuard(C, DC, lhsExpr, rhsExpr, falseExpr);
 }
-/// Returns a generated guard statement that checks whether the given lhs and
-/// rhs expressions are equal. If not equal, the else block for the guard
-/// returns lhs < rhs.
-/// \p C The AST context.
-/// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality. 
+
 GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
-                                        Expr *lhsExpr,
-                                        Expr *rhsExpr) {
+                                                               const DeclContext *DC,
+                                                               Expr *lhsExpr,
+                                                               Expr *rhsExpr) {
+  assert(lhsExpr->getType() && "Untyped AST in synthesized guard");
+  assert(rhsExpr->getType() && "Untyped AST in synthesized guard");
+
   // return lhs < rhs
-  auto ltFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclNameRef(C.Id_LessThanOperator), DeclRefKind::BinaryOperator,
-    DeclNameLoc());
+  auto type = lhsExpr->getType();
+  auto *proto = C.getProtocol(KnownProtocolKind::Comparable);
+  auto conf = TypeChecker::conformsToProtocol(type, proto, DC->getParentModule());
+  assert(conf && "Conformance validity should be checked by now!");
+  ConcreteDeclRef witness =
+      conf.getWitnessByName(type->getRValueType(),
+                            DeclName(C.Id_LessThanOperator));
+  auto ltFuncExpr = new (C) DeclRefExpr(witness, DeclNameLoc(),
+                                        /*implicit*/true);
   auto *ltExpr = BinaryExpr::create(C, lhsExpr, ltFuncExpr, rhsExpr,
                                     /*implicit*/ true);
-  return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, ltExpr);
+  return returnIfNotEqualGuard(C, DC, lhsExpr, rhsExpr, ltExpr);
 }
 
 /// Build a type-checked integer literal.

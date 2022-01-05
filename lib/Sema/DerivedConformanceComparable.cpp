@@ -160,12 +160,18 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     SmallVector<ASTNode, 8> statementsInCase;
     for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); ++varIdx) {
       auto lhsVar = lhsPayloadVars[varIdx];
+      auto lhsTy = ltDecl->mapTypeIntoContext(lhsVar->getInterfaceType());
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
-                                         /*implicit*/true);
+                                         /*implicit*/true,
+                                         AccessSemantics::Ordinary,
+                                         lhsTy);
       auto rhsVar = rhsPayloadVars[varIdx];
+      auto rhsTy = ltDecl->mapTypeIntoContext(rhsVar->getInterfaceType());
       auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
-                                         /*Implicit*/true);
-      auto guardStmt = DerivedConformance::returnComparisonIfNotEqualGuard(C, 
+                                         /*Implicit*/true,
+                                         AccessSemantics::Ordinary,
+                                         rhsTy);
+      auto guardStmt = DerivedConformance::returnComparisonIfNotEqualGuard(C, ltDecl,
           lhsExpr, rhsExpr);
       statementsInCase.emplace_back(guardStmt);
     }

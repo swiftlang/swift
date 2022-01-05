@@ -219,12 +219,18 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     SmallVector<ASTNode, 6> statementsInCase;
     for (size_t varIdx = 0; varIdx < lhsPayloadVars.size(); ++varIdx) {
       auto lhsVar = lhsPayloadVars[varIdx];
+      auto lhsTy = eqDecl->mapTypeIntoContext(lhsVar->getInterfaceType());
       auto lhsExpr = new (C) DeclRefExpr(lhsVar, DeclNameLoc(),
-                                         /*implicit*/true);
+                                         /*implicit*/true,
+                                         AccessSemantics::Ordinary,
+                                         lhsTy);
       auto rhsVar = rhsPayloadVars[varIdx];
+      auto rhsTy = eqDecl->mapTypeIntoContext(rhsVar->getInterfaceType());
       auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
-                                         /*Implicit*/true);
-      auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C, 
+                                         /*Implicit*/true,
+                                         AccessSemantics::Ordinary,
+                                         rhsTy);
+      auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C, eqDecl,
           lhsExpr, rhsExpr);
       statementsInCase.emplace_back(guardStmt);
     }
@@ -296,19 +302,23 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
+    auto propTy = eqDecl->mapTypeIntoContext(propertyDecl->getInterfaceType());
+
     auto aParamRef = new (C) DeclRefExpr(aParam, DeclNameLoc(),
                                          /*implicit*/ true);
     auto aPropertyExpr = new (C) MemberRefExpr(aParamRef, SourceLoc(),
                                                propertyDecl, DeclNameLoc(),
                                                /*implicit*/ true);
+    aPropertyExpr->setType(propTy);
 
     auto bParamRef = new (C) DeclRefExpr(bParam, DeclNameLoc(),
                                          /*implicit*/ true);
     auto bPropertyExpr = new (C) MemberRefExpr(bParamRef, SourceLoc(),
                                                propertyDecl, DeclNameLoc(),
                                                /*implicit*/ true);
+    bPropertyExpr->setType(propTy);
 
-    auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C,
+    auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C, eqDecl,
       aPropertyExpr, bPropertyExpr);
     statements.emplace_back(guardStmt);
   }

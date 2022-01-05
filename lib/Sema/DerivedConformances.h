@@ -368,19 +368,42 @@ public:
   /// rhs expressions are equal. If not equal, the else block for the guard
   /// returns `guardReturnValue`.
   /// \p C The AST context.
+  /// \p DC The decl context into which these expressions are being emitted
+  ///    e.g. the \c ==(_:_:) FuncDecl.
   /// \p lhsExpr The first expression to compare for equality.
   /// \p rhsExpr The second expression to compare for equality.
   /// \p guardReturnValue The expression to return if the two sides are not
   /// equal
-  static GuardStmt *returnIfNotEqualGuard(ASTContext &C, Expr *lhsExpr,
+  static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
+                                          const DeclContext *DC,
+                                          Expr *lhsExpr,
                                           Expr *rhsExpr,
                                           Expr *guardReturnValue);
-  // return false
-  static GuardStmt *returnFalseIfNotEqualGuard(ASTContext &C, Expr *lhsExpr,
+
+  /// Returns a generated guard statement that checks whether the given lhs and
+  /// rhs expressions are equal. If not equal, the else block for the guard
+  /// returns lhs < rhs.
+  /// \p C The AST context.
+  /// \p DC The decl context into which these expressions are being emitted
+  ///    e.g. the \c ==(_:_:) FuncDecl.
+  /// \p lhsExpr The first expression to compare for equality.
+  /// \p rhsExpr The second expression to compare for equality.
+  static GuardStmt *returnFalseIfNotEqualGuard(ASTContext &C,
+                                               const DeclContext *DC,
+                                               Expr *lhsExpr,
                                                Expr *rhsExpr);
-  // return lhs < rhs
+  /// Returns a generated guard statement that checks whether the given lhs and
+  /// rhs expressions are equal. If not equal, the else block for the guard
+  /// returns lhs < rhs.
+  /// \p C The AST context.
+  /// \p DC The decl context into which these expressions are being emitted
+  ///    e.g. the \c ==(_:_:) FuncDecl.
+  /// \p lhsExpr The first expression to compare for equality.
+  /// \p rhsExpr The second expression to compare for equality.
   static GuardStmt *
-  returnComparisonIfNotEqualGuard(ASTContext &C, Expr *lhsExpr, Expr *rhsExpr);
+  returnComparisonIfNotEqualGuard(ASTContext &C,
+                                  const DeclContext *DC,
+                                  Expr *lhsExpr, Expr *rhsExpr);
 
   /// Returns the ParamDecl for each associated value of the given enum whose
   /// type does not conform to a protocol \p theEnum The enum whose elements and

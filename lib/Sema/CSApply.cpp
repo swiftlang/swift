@@ -701,7 +701,10 @@ namespace {
       // If this is a member of a nominal type, build a reference to the
       // member with an implied base type.
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
-        assert(cast<FuncDecl>(decl)->isOperator() && "Must be an operator");
+        assert((cast<FuncDecl>(decl)->isOperator() ||
+               (cast<FuncDecl>(decl)->getAttrs().hasAttribute<ImplementsAttr>() &&
+                cast<FuncDecl>(decl)->getAttrs().getAttribute<ImplementsAttr>()->getMemberName().isOperator()))
+               && "Lookup should only find operators");
 
         auto baseTy = getBaseType(fullType->castTo<FunctionType>());
 

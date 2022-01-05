@@ -1330,7 +1330,10 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
-    assert(func->isOperator() && "Lookup should only find operators");
+    assert((func->isOperator() ||
+           (func->getAttrs().hasAttribute<ImplementsAttr>() &&
+            func->getAttrs().getAttribute<ImplementsAttr>()->getMemberName().isOperator()))
+           && "Lookup should only find operators");
 
     OpenedTypeMap replacements;
 

@@ -1,0 +1,8 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name B -swift-version 5 -enable-library-evolution
+import Swift
+import A
+
+extension A.Value.State: Swift.Equatable {
+  public static func ==(a: A.Value.State, b: A.Value.State) -> Swift.Bool
+}
