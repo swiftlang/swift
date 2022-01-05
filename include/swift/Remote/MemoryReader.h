@@ -40,6 +40,10 @@ public:
   using ReadBytesResult =
       std::unique_ptr<const void, std::function<void(const void *)>>;
 
+  template <typename T>
+  using ReadObjResult =
+      std::unique_ptr<const T, std::function<void(const void *)>>;
+
   virtual bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                                void *outBuffer) = 0;
 
@@ -88,6 +92,15 @@ public:
     }
 #endif
     return true;
+  }
+
+  template <typename T>
+  ReadObjResult<T> readObj(RemoteAddress address) {
+    auto bytes = readBytes(address, sizeof(T));
+    auto deleter = bytes.get_deleter();
+    auto ptr = bytes.get();
+    bytes.release();
+    return ReadObjResult<T>(reinterpret_cast<const T *>(ptr), deleter);
   }
 
   /// Attempts to read 'size' bytes from the given address in the remote process.
