@@ -37,6 +37,82 @@
 using namespace swift;
 using namespace rewriting;
 
+unsigned RewriteSystem::recordRelation(Symbol lhs, Symbol rhs) {
+  auto key = std::make_pair(lhs, rhs);
+  auto found = RelationMap.find(key);
+  if (found != RelationMap.end())
+    return found->second;
+
+  unsigned index = Relations.size();
+  Relations.push_back(key);
+  auto inserted = RelationMap.insert(std::make_pair(key, index));
+  assert(inserted.second);
+  (void) inserted;
+
+  return index;
+}
+
+RewriteSystem::Relation
+RewriteSystem::getRelation(unsigned index) const {
+  return Relations[index];
+}
+
+/// Given two property rules (T.[p1] => T) and (T.[p2] => T) where [p1] < [p2],
+/// record a rewrite loop that makes the second rule redundant from the first.
+static void recordRelation(unsigned lhsRuleID, unsigned rhsRuleID,
+                           RewriteSystem &system,
+                           SmallVectorImpl<InducedRule> &inducedRules,
+                           bool debug) {
+  const auto &lhsRule = system.getRule(lhsRuleID);
+  const auto &rhsRule = system.getRule(rhsRuleID);
+
+  auto lhsProperty = lhsRule.getLHS().back();
+  auto rhsProperty = rhsRule.getLHS().back();
+
+  assert(lhsProperty.isProperty());
+  assert(rhsProperty.isProperty());
+  assert(lhsProperty.getKind() == rhsProperty.getKind());
+
+  if (debug) {
+    llvm::dbgs() << "%% Recording relation: ";
+    llvm::dbgs() << lhsRule.getLHS() << " < " << rhsProperty << "\n";
+  }
+
+  unsigned relationID = system.recordRelation(lhsProperty, rhsProperty);
+
+  /// Build the following rewrite path:
+  ///
+  ///   (T => T.[p1]).[p2] ⊗ T.Relation([p1].[p2] => [p1]) ⊗ (T.[p1] => T).
+  ///
+  RewritePath path;
+
+  /// Starting from T.[p2], the LHS rule in reverse to get T.[p1].[p2].
+  path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
+                                       /*endOffset=*/1,
+                                       /*ruleID=*/lhsRuleID,
+                                       /*inverse=*/true));
+
+  /// T.Relation([p1].[p2] => [p1]).
+  path.add(RewriteStep::forRelation(relationID, /*inverse=*/false));
+
+  /// (T.[p1] => T).
+  path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
+                                       /*endOffset=*/0,
+                                       /*ruleID=*/lhsRuleID,
+                                       /*inverse=*/false));
+
+  /// Add the rule (T.[p2] => T) with the above rewrite path.
+  ///
+  /// Since a rule (T.[p2] => T) *already exists*, both sides of the new
+  /// rule will simplify down to T, and the rewrite path will become a loop.
+  ///
+  /// This loop encodes the fact that (T.[p1] => T) makes (T.[p2] => T)
+  /// redundant.
+  inducedRules.emplace_back(MutableTerm(rhsRule.getLHS()),
+                            MutableTerm(rhsRule.getRHS()),
+                            path);
+}
+
 /// This method takes a concrete type that was derived from a concrete type
 /// produced by RewriteSystemBuilder::getConcreteSubstitutionSchema(),
 /// either by extracting a structural sub-component or performing a (Swift AST)
@@ -310,7 +386,7 @@ static std::pair<Symbol, bool> unifySuperclasses(
 /// Returns the old conflicting rule ID if there was a conflict,
 /// otherwise returns None.
 Optional<unsigned> PropertyBag::addProperty(
-    Symbol property, unsigned ruleID, RewriteContext &ctx,
+    Symbol property, unsigned ruleID, RewriteSystem &system,
     SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
 
@@ -320,18 +396,41 @@ Optional<unsigned> PropertyBag::addProperty(
     ConformsToRules.push_back(ruleID);
     return None;
 
-  case Symbol::Kind::Layout:
+  case Symbol::Kind::Layout: {
+    auto newLayout = property.getLayoutConstraint();
+
     if (!Layout) {
-      Layout = property.getLayoutConstraint();
+      // If we haven't seen a layout requirement before, just record it.
+      Layout = newLayout;
       LayoutRule = ruleID;
     } else {
+      // Otherwise, compute the intersection.
       assert(LayoutRule.hasValue());
-      Layout = Layout.merge(property.getLayoutConstraint());
-      if (!Layout->isKnownLayout())
+      auto mergedLayout = Layout.merge(property.getLayoutConstraint());
+
+      // If the intersection is invalid, we have a conflict.
+      if (!mergedLayout->isKnownLayout())
         return LayoutRule;
+
+      // If the intersection is equal to the existing layout requirement,
+      // the new layout requirement is redundant.
+      if (mergedLayout == Layout) {
+        recordRelation(*LayoutRule, ruleID, system, inducedRules, debug);
+
+      // If the intersection is equal to the new layout requirement, the
+      // existing layout requirement is redundant.
+      } else if (mergedLayout == newLayout) {
+        recordRelation(ruleID, *LayoutRule, system, inducedRules, debug);
+        LayoutRule = ruleID;
+      } else {
+        llvm::errs() << "Arbitrary intersection of layout requirements is "
+                     << "supported yet\n";
+        abort();
+      }
     }
 
     return None;
+  }
 
   case Symbol::Kind::Superclass: {
     // FIXME: Also handle superclass vs concrete
@@ -342,7 +441,8 @@ Optional<unsigned> PropertyBag::addProperty(
     } else {
       assert(SuperclassRule.hasValue());
       auto pair = unifySuperclasses(*Superclass, property,
-                                    ctx, inducedRules, debug);
+                                    system.getRewriteContext(),
+                                    inducedRules, debug);
       Superclass = pair.first;
       bool conflict = pair.second;
       if (conflict)
@@ -359,7 +459,8 @@ Optional<unsigned> PropertyBag::addProperty(
     } else {
       assert(ConcreteTypeRule.hasValue());
       bool conflict = unifyConcreteTypes(*ConcreteType, property,
-                                         ctx, inducedRules, debug);
+                                         system.getRewriteContext(),
+                                         inducedRules, debug);
       if (conflict)
         return ConcreteTypeRule;
     }
