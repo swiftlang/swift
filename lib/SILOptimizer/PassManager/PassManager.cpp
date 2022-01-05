@@ -322,7 +322,7 @@ void swift::executePassPipelinePlan(SILModule *SM,
 SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
                                irgen::IRGenModule *IRMod)
     : Mod(M), IRMod(IRMod),
-      libswiftPassInvocation(this),
+      swiftPassInvocation(this),
       isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
 #define ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
@@ -469,7 +469,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
          && "change notifications not cleared");
 
-  libswiftPassInvocation.startPassRun(F);
+  swiftPassInvocation.startFunctionPassRun(F);
 
   // Run it!
   SFT->run();
@@ -478,7 +478,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     invalidateAnalysis(F, changeNotifications);
     changeNotifications = SILAnalysis::InvalidationKind::Nothing;
   }
-  libswiftPassInvocation.finishedPassRun();
+  swiftPassInvocation.finishedFunctionPassRun();
 
   if (SILForceVerifyAll ||
       SILForceVerifyAroundPass.end() !=
@@ -1078,13 +1078,13 @@ void SILPassManager::viewCallGraph() {
 }
 
 //===----------------------------------------------------------------------===//
-//                           LibswiftPassInvocation
+//                           SwiftPassInvocation
 //===----------------------------------------------------------------------===//
 
 static_assert(BridgedSlabCapacity == FixedSizeSlab::capacity,
               "wrong bridged slab capacity");
 
-FixedSizeSlab *LibswiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
+FixedSizeSlab *SwiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
   FixedSizeSlab *slab = passManager->getModule()->allocSlab();
   if (afterSlab) {
     allocatedSlabs.insert(std::next(afterSlab->getIterator()), *slab);
@@ -1094,7 +1094,7 @@ FixedSizeSlab *LibswiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
   return slab;
 }
 
-FixedSizeSlab *LibswiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
+FixedSizeSlab *SwiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
   FixedSizeSlab *prev = nullptr;
   assert(!allocatedSlabs.empty());
   if (&allocatedSlabs.front() != slab)
@@ -1105,23 +1105,37 @@ FixedSizeSlab *LibswiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
   return prev;
 }
 
-void LibswiftPassInvocation::startPassRun(SILFunction *function) {
+void SwiftPassInvocation::startFunctionPassRun(SILFunction *function) {
   assert(!this->function && "a pass is already running");
   this->function = function;
 }
 
-void LibswiftPassInvocation::finishedPassRun() {
-  assert(allocatedSlabs.empty() && "StackList is leaking slabs");
+void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
+  assert(inst->getFunction() == function &&
+         "running instruction pass on wrong function");
+}
+
+void SwiftPassInvocation::finishedFunctionPassRun() {
+  endPassRunChecks();
+  assert(function && "not running a pass");
   function = nullptr;
+}
+
+void SwiftPassInvocation::finishedInstructionPassRun() {
+  endPassRunChecks();
+}
+
+void SwiftPassInvocation::endPassRunChecks() {
+  assert(allocatedSlabs.empty() && "StackList is leaking slabs");
 }
 
 //===----------------------------------------------------------------------===//
 //                            Swift Bridging
 //===----------------------------------------------------------------------===//
 
-inline LibswiftPassInvocation *castToPassInvocation(BridgedPassContext ctxt) {
-  return const_cast<LibswiftPassInvocation *>(
-    static_cast<const LibswiftPassInvocation *>(ctxt.opaqueCtxt));
+inline SwiftPassInvocation *castToPassInvocation(BridgedPassContext ctxt) {
+  return const_cast<SwiftPassInvocation *>(
+    static_cast<const SwiftPassInvocation *>(ctxt.opaqueCtxt));
 }
 
 inline FixedSizeSlab *castToSlab(BridgedSlab slab) {
@@ -1158,7 +1172,7 @@ BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
 
 void PassContext_notifyChanges(BridgedPassContext passContext,
                                enum ChangeNotificationKind changeKind) {
-  LibswiftPassInvocation *inv = castToPassInvocation(passContext);
+  SwiftPassInvocation *inv = castToPassInvocation(passContext);
   switch (changeKind) {
   case instructionsChanged:
     inv->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
@@ -1185,7 +1199,7 @@ SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context) {
 }
 
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
-  LibswiftPassInvocation *invocation = castToPassInvocation(context);
+  SwiftPassInvocation *invocation = castToPassInvocation(context);
   SILPassManager *pm = invocation->getPassManager();
   return {pm->getAnalysis<AliasAnalysis>(invocation->getFunction())};
 }

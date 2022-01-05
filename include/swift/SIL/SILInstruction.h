@@ -368,7 +368,7 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   SILInstructionResultArray getResultsImpl() const;
 
 protected:
-  friend class LibswiftPassInvocation;
+  friend class SwiftPassInvocation;
 
   SILInstruction() {
     NumCreatedInstructions++;
