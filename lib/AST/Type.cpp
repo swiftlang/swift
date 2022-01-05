@@ -379,10 +379,12 @@ bool TypeBase::isActorType() {
     if (!actorProto)
       return false;
 
-    auto interfaceType = archetype->getInterfaceType();
-    auto genericEnv = archetype->getGenericEnvironment();
-    return genericEnv->getGenericSignature()->requiresProtocol(
-        interfaceType, actorProto);
+    for (auto proto : archetype->getConformsTo()) {
+      if (proto == actorProto || proto->inheritsFrom(actorProto))
+        return true;
+    }
+
+    return false;
   }
 
   // Existential types: check for Actor protocol.
