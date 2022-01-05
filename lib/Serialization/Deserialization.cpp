@@ -6379,6 +6379,13 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   }
 }
 
+void ModuleFile::diagnoseMissingNamedMember(const IterableDeclContext *IDC,
+                                            DeclName name) {
+  // TODO: Implement diagnostics for failed member lookups from module files.
+  llvm_unreachable(
+      "Missing member diangosis is not implemented for module files.");
+}
+
 static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error) {
     // Missing module errors are most likely caused by an
     // implementation-only import hiding types and decls.
