@@ -62,7 +62,7 @@ class SwiftTestCase(unittest.TestCase):
             enable_experimental_concurrency=False,
             enable_experimental_distributed=False,
             build_swift_stdlib_static_print=False,
-            stdlib_unicode_data=True,
+            build_swift_stdlib_unicode_data=True,
             swift_freestanding_is_darwin=False,
             build_swift_private_stdlib=True)
 
@@ -101,6 +101,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
+            '-DSWIFT_STDLIB_ENABLE_UNICODE_DATA=TRUE',
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -122,6 +123,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
+            '-DSWIFT_STDLIB_ENABLE_UNICODE_DATA=TRUE',
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 

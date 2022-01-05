@@ -84,6 +84,7 @@ EXPECTED_DEFAULTS = {
     'build_swift_static_stdlib': False,
     'build_swift_stdlib_unittest_extra': False,
     'build_swift_stdlib_static_print': False,
+    'build_swift_stdlib_unicode_data': True,
     'build_swiftpm': False,
     'build_swift_driver': False,
     'build_early_swift_driver': True,

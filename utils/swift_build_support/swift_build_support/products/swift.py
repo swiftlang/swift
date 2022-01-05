@@ -63,7 +63,7 @@ class Swift(product.Product):
         self.cmake_options.extend(self._freestanding_is_darwin)
 
         self.cmake_options.extend(self._build_swift_private_stdlib)
-        
+
         self.cmake_options.extend(self._enable_stdlib_unicode_data)
 
     @classmethod
@@ -169,7 +169,7 @@ updated without updating swift.py?")
     def _enable_stdlib_static_vprintf(self):
         return [('SWIFT_STDLIB_STATIC_PRINT',
                  self.args.build_swift_stdlib_static_print)]
-                 
+
     @property
     def _enable_stdlib_unicode_data(self):
         return [('SWIFT_STDLIB_ENABLE_UNICODE_DATA',
