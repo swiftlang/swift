@@ -4318,74 +4318,8 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
     }
   }
   
-  // Create a new opaque archetype.
-  // It lives in an environment in which the interface generic arguments of the
-  // decl have all been same-type-bound to the arguments from our substitution
-  // map.
-  SmallVector<Requirement, 2> newRequirements;
-
-  // TODO: The proper thing to do to build the environment in which the opaque
-  // type's archetype exists would be to take the generic signature of the
-  // decl, feed it into a GenericSignatureBuilder, then add same-type
-  // constraints into the builder to bind the outer generic parameters
-  // to their substituted types provided by \c Substitutions. However,
-  // this is problematic for interface types. In a situation like this:
-  //
-  // __opaque_type Foo<t_0_0: P>: Q // internal signature <t_0_0: P, t_1_0: Q>
-  //
-  // func bar<t_0_0, t_0_1, t_0_2: P>() -> Foo<t_0_2>
-  //
-  // we'd want to feed the GSB constraints to form:
-  //
-  // <t_0_0: P, t_1_0: Q where t_0_0 == t_0_2>
-  //
-  // even though t_0_2 isn't *in* the generic signature being built; it
-  // represents a type
-  // bound elsewhere from some other generic context. If we knew the generic
-  // environment `t_0_2` came from, then maybe we could map it into that context,
-  // but currently we have no way to know that with certainty.
-  //
-  // Because opaque types are currently limited so that they only have immediate
-  // protocol constraints, and therefore don't interact with the outer generic
-  // parameters at all, we can get away without adding these constraints for now.
-  // Adding where clauses would break this hack.
-#if DO_IT_CORRECTLY
-  // Same-type-constrain the arguments in the outer signature to their
-  // replacements in the substitution map.
-  if (auto outerSig = Decl->getGenericSignature()) {
-    for (auto outerParam : outerSig.getGenericParams()) {
-      auto boundType = Type(outerParam).subst(Substitutions);
-      newRequirements.push_back(
-          Requirement(RequirementKind::SameType, Type(outerParam), boundType));
-    }
-  }
-#else
-  // Assert that there are no same type constraints on the opaque type or its
-  // associated types.
-  //
-  // This should not be possible until we add where clause support, with the
-  // exception of generic base class constraints (handled below).
-  (void)newRequirements;
-# ifndef NDEBUG
-  for (auto req :
-                Decl->getOpaqueInterfaceGenericSignature().getRequirements()) {
-    auto reqBase = req.getFirstType()->getRootGenericParam();
-    if (reqBase->isEqual(opaqueParamType)) {
-      assert(req.getKind() != RequirementKind::SameType
-             && "supporting where clauses on opaque types requires correctly "
-                "setting up the generic environment for "
-                "OpaqueTypeArchetypeTypes; see comment above");
-    }
-  }
-# endif
-#endif
-  auto signature = buildGenericSignature(
-        ctx,
-        Decl->getOpaqueInterfaceGenericSignature(),
-        /*genericParams=*/{ },
-        std::move(newRequirements));
-
-  auto reqs = signature->getLocalRequirements(opaqueParamType);
+  auto reqs = Decl->getOpaqueInterfaceGenericSignature()
+      ->getLocalRequirements(opaqueParamType);
   auto superclass = reqs.superclass;
   #if !DO_IT_CORRECTLY
     // Ad-hoc substitute the generic parameters of the superclass.
@@ -4405,12 +4339,6 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
   auto newOpaque = ::new (mem)
       OpaqueTypeArchetypeType(Decl, Substitutions, properties, opaqueParamType,
                               reqs.protos, superclass, reqs.layout);
-
-  // Create a generic environment and bind the opaque archetype to the
-  // opaque interface type from the decl's signature.
-  auto *env = GenericEnvironment::getIncomplete(signature);
-  env->addMapping(GenericParamKey(opaqueParamType), newOpaque);
-  newOpaque->Environment = env;
 
   // Look up the insertion point in the folding set again in case something
   // invalidated it above.

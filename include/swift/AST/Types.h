@@ -5562,7 +5562,7 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   
   /// A GenericEnvironment with this opaque archetype bound to the interface
   /// type of the output type from the OpaqueDecl.
-  GenericEnvironment *Environment;
+  mutable GenericEnvironment *Environment = nullptr;
   
 public:
   /// Get an opaque archetype representing the underlying type of the given
@@ -5586,9 +5586,7 @@ public:
   GenericSignature getBoundSignature() const;
   
   /// Get a generic environment that has this opaque archetype bound within it.
-  GenericEnvironment *getGenericEnvironment() const {
-    return Environment;
-  }
+  GenericEnvironment *getGenericEnvironment() const;
   
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpaqueTypeArchetype;
