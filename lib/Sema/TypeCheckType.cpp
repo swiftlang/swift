@@ -284,6 +284,20 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
   return dc->getASTContext().getBridgedToObjC(dc, valueType);
 }
 
+/// Retrieve the identity form of the opaque type archetype type.
+static OpaqueTypeArchetypeType *getIdentityOpaqueTypeArchetypeType(
+    OpaqueTypeDecl *opaqueDecl, unsigned ordinal) {
+  auto outerGenericSignature = opaqueDecl->getNamingDecl()
+                                   ->getInnermostDeclContext()
+                                   ->getGenericSignatureOfContext();
+
+  SubstitutionMap subs;
+  if (outerGenericSignature)
+    subs = outerGenericSignature->getIdentitySubstitutionMap();
+
+  return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+}
+
 Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
                                           DeclContext *foundDC,
                                           bool isSpecialized) const {
@@ -292,6 +306,16 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
+    // If this generic parameter is for an opaque type, map to the opened
+    // archetype.
+    if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(getDeclContext())) {
+      if (genericParam->getDepth() ==
+              opaqueDecl->getOpaqueGenericParams().front()->getDepth()) {
+        return getIdentityOpaqueTypeArchetypeType(
+            opaqueDecl, genericParam->getIndex());
+      }
+    }
+
     return genericParam->getDeclaredInterfaceType();
   }
 
@@ -2047,16 +2071,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     auto *DC = getDeclContext();
     if (isa<OpaqueTypeDecl>(DC)) {
       auto opaqueDecl = cast<OpaqueTypeDecl>(DC);
-      auto outerGenericSignature = opaqueDecl->getNamingDecl()
-                                       ->getInnermostDeclContext()
-                                       ->getGenericSignatureOfContext();
-
-      SubstitutionMap subs;
-      if (outerGenericSignature)
-        subs = outerGenericSignature->getIdentitySubstitutionMap();
-
       unsigned ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr);
-      return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+      return getIdentityOpaqueTypeArchetypeType(opaqueDecl, ordinal);
     }
 
     // We are not inside an `OpaqueTypeDecl`, so diagnose an error.

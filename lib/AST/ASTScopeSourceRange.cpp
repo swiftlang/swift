@@ -161,6 +161,15 @@ SourceRange GenericParamScope::getSourceRangeOfThisASTNode(
     return SourceRange(getLocAfterExtendedNominal(ext), ext->getEndLoc());
   }
 
+  // For a variable, the generic parameter is visible throughout the pattern
+  // binding entry.
+  if (auto var = dyn_cast<VarDecl>(holder)) {
+    if (auto patternBinding = var->getParentPatternBinding()) {
+      unsigned index = patternBinding->getPatternEntryIndexForVarDecl(var);
+      return patternBinding->getPatternList()[index].getSourceRange();
+    }
+  }
+
   // For all other declarations, generic parameters are visible everywhere.
   return holder->getSourceRange();
 }
