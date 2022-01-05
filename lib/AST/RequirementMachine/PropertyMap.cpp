@@ -319,7 +319,7 @@ Optional<unsigned> PropertyMap::addProperty(
   assert(*System.getRule(ruleID).isPropertyRule() == property);
   auto *props = getOrCreateProperties(key);
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
-  return props->addProperty(property, ruleID, Context,
+  return props->addProperty(property, ruleID, System,
                             inducedRules, debug);
 }
 
