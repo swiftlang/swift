@@ -37,6 +37,13 @@
 using namespace swift;
 using namespace rewriting;
 
+/// Returns true if we have not processed this pair of rules before.
+bool PropertyMap::checkRulePairOnce(unsigned firstRuleID,
+                                    unsigned secondRuleID) {
+  return CheckedRulePairs.insert(
+      std::make_pair(firstRuleID, secondRuleID)).second;
+}
+
 unsigned RewriteSystem::recordRelation(Symbol lhs, Symbol rhs) {
   auto key = std::make_pair(lhs, rhs);
   auto found = RelationMap.find(key);
@@ -111,6 +118,24 @@ static void recordRelation(unsigned lhsRuleID, unsigned rhsRuleID,
   inducedRules.emplace_back(MutableTerm(rhsRule.getLHS()),
                             MutableTerm(rhsRule.getRHS()),
                             path);
+}
+
+static void recordConflict(Term key,
+                           unsigned existingRuleID,
+                           unsigned newRuleID,
+                           RewriteSystem &system) {
+  // The GSB only dropped the new rule in the case of a conflicting
+  // superclass requirement, so maintain that behavior here.
+  auto &existingRule = system.getRule(existingRuleID);
+  if (existingRule.isPropertyRule()->getKind() !=
+      Symbol::Kind::Superclass) {
+    if (existingRule.getRHS().size() == key.size())
+      existingRule.markConflicting();
+  }
+
+  auto &newRule = system.getRule(newRuleID);
+  assert(newRule.getRHS().size() == key.size());
+  newRule.markConflicting();
 }
 
 /// This method takes a concrete type that was derived from a concrete type
@@ -385,10 +410,7 @@ static std::pair<Symbol, bool> unifySuperclasses(
 
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
-///
-/// If there was a conflict, returns the conflicting rule ID; otherwise
-/// returns None.
-Optional<unsigned> PropertyMap::addProperty(
+void PropertyMap::addProperty(
     Term key, Symbol property, unsigned ruleID,
     SmallVectorImpl<InducedRule> &inducedRules) {
   assert(property.isProperty());
@@ -400,7 +422,7 @@ Optional<unsigned> PropertyMap::addProperty(
   case Symbol::Kind::Protocol:
     props->ConformsTo.push_back(property.getProtocol());
     props->ConformsToRules.push_back(ruleID);
-    return None;
+    return;
 
   case Symbol::Kind::Layout: {
     auto newLayout = property.getLayoutConstraint();
@@ -415,18 +437,27 @@ Optional<unsigned> PropertyMap::addProperty(
       auto mergedLayout = props->Layout.merge(property.getLayoutConstraint());
 
       // If the intersection is invalid, we have a conflict.
-      if (!mergedLayout->isKnownLayout())
-        return props->LayoutRule;
+      if (!mergedLayout->isKnownLayout()) {
+        recordConflict(key, *props->LayoutRule, ruleID, System);
+        return;
+      }
 
       // If the intersection is equal to the existing layout requirement,
       // the new layout requirement is redundant.
       if (mergedLayout == props->Layout) {
-        recordRelation(*props->LayoutRule, ruleID, System, inducedRules, debug);
+        if (checkRulePairOnce(*props->LayoutRule, ruleID)) {
+          recordRelation(*props->LayoutRule, ruleID, System,
+                         inducedRules, debug);
+        }
 
       // If the intersection is equal to the new layout requirement, the
       // existing layout requirement is redundant.
       } else if (mergedLayout == newLayout) {
-        recordRelation(ruleID, *props->LayoutRule, System, inducedRules, debug);
+        if (checkRulePairOnce(*props->LayoutRule, ruleID)) {
+          recordRelation(ruleID, *props->LayoutRule, System,
+                         inducedRules, debug);
+        }
+
         props->LayoutRule = ruleID;
       } else {
         llvm::errs() << "Arbitrary intersection of layout requirements is "
@@ -435,7 +466,7 @@ Optional<unsigned> PropertyMap::addProperty(
       }
     }
 
-    return None;
+    return;
   }
 
   case Symbol::Kind::Superclass: {
@@ -451,11 +482,13 @@ Optional<unsigned> PropertyMap::addProperty(
                                     inducedRules, debug);
       props->Superclass = pair.first;
       bool conflict = pair.second;
-      if (conflict)
-        return props->SuperclassRule;
+      if (conflict) {
+        recordConflict(key, *props->SuperclassRule, ruleID, System);
+        return;
+      }
     }
 
-    return None;
+    return;
   }
 
   case Symbol::Kind::ConcreteType: {
@@ -467,16 +500,18 @@ Optional<unsigned> PropertyMap::addProperty(
       bool conflict = unifyConcreteTypes(*props->ConcreteType, property,
                                          System.getRewriteContext(),
                                          inducedRules, debug);
-      if (conflict)
-        return props->ConcreteTypeRule;
+      if (conflict) {
+        recordConflict(key, *props->ConcreteTypeRule, ruleID, System);
+        return;
+      }
     }
 
-    return None;
+    return;
   }
 
   case Symbol::Kind::ConcreteConformance:
     // FIXME
-    return None;
+    return;
 
   case Symbol::Kind::Name:
   case Symbol::Kind::GenericParam:

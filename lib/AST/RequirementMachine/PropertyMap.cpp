@@ -363,22 +363,8 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   for (const auto &bucket : properties) {
     for (auto property : bucket) {
-      auto existingRuleID = addProperty(property.key, property.symbol,
-                                        property.ruleID, inducedRules);
-      if (existingRuleID) {
-        // The GSB only dropped the new rule in the case of a conflicting
-        // superclass requirement, so maintain that behavior here.
-        auto &existingRule = System.getRule(*existingRuleID);
-        if (existingRule.isPropertyRule()->getKind() !=
-            Symbol::Kind::Superclass) {
-          if (existingRule.getRHS().size() == property.key.size())
-            existingRule.markConflicting();
-        }
-
-        auto &newRule = System.getRule(property.ruleID);
-        assert(newRule.getRHS().size() == property.key.size());
-        newRule.markConflicting();
-      }
+      addProperty(property.key, property.symbol,
+                  property.ruleID, inducedRules);
     }
   }
 
