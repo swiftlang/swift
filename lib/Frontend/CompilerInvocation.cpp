@@ -1824,7 +1824,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
 
     if (const Arg *A = Args.getLastArg(OPT_debug_compilation_dir))
-      Opts.DebugCompilationDir = std::string(A->getValue());
+      Opts.DebugCompilationDir = A->getValue();
     else {
       llvm::SmallString<256> cwd;
       llvm::sys::fs::current_path(cwd);

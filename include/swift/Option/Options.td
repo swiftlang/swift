@@ -841,7 +841,7 @@ def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
 
 def debug_compilation_dir : Separate<["-"], "debug-compilation-dir">,
-  Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
+  Flags<[FrontendOption]>, MetaVarName<"<path>">,
   HelpText<"The compilation directory to embed in the debug info.">;
 
 def debug_info_format : Joined<["-"], "debug-info-format=">,
