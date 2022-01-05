@@ -4134,6 +4134,9 @@ ERROR(opaque_type_no_underlying_type_candidates,none,
 ERROR(opaque_type_mismatched_underlying_type_candidates,none,
       "function declares an opaque return type %0, but the return statements "
       "in its body do not have matching underlying types", (TypeRepr *))
+ERROR(opaque_type_mismatched_underlying_type_candidates_named,none,
+      "function declares an opaque return type %0, but the return statements "
+      "in its body do not have matching underlying types", (Identifier))
 NOTE(opaque_type_underlying_type_candidate_here,none,
      "return statement has underlying type %0", (Type))
 ERROR(opaque_type_self_referential_underlying_type,none,
