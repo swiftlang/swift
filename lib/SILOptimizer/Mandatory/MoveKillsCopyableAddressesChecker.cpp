@@ -136,8 +136,10 @@
 #define DEBUG_TYPE "sil-move-kills-copyable-addresses-checker"
 
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Consumption.h"
@@ -147,12 +149,19 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerSumType.h"
 
@@ -232,7 +241,9 @@ struct UseState {
   llvm::SmallDenseMap<SILInstruction *, unsigned, 4> destroyToIndexMap;
   SmallBlotSetVector<SILInstruction *, 4> reinits;
   llvm::SmallDenseMap<SILInstruction *, unsigned, 4> reinitToIndexMap;
-  SmallBlotSetVector<Operand *, 2> partialApplyOperands;
+  llvm::SmallMapVector<Operand *, ClosureOperandState, 1>
+      consumingClosureOperands;
+  llvm::SmallDenseMap<Operand *, unsigned, 1> consumingClosureOperandToIndexMap;
 
   void insertMarkUnresolvedMoveAddr(MarkUnresolvedMoveAddrInst *inst) {
     if (!seenMarkMoves.insert(inst).second)
@@ -250,6 +261,11 @@ struct UseState {
     reinits.insert(inst);
   }
 
+  void insertConsumingClosureOperand(Operand *op) {
+    consumingClosureOperandToIndexMap[op] = consumingClosureOperands.size();
+    consumingClosureOperands[op] = {};
+  }
+
   void clear() {
     address = SILValue();
     markMoves.clear();
@@ -260,6 +276,8 @@ struct UseState {
     destroyToIndexMap.clear();
     reinits.clear();
     reinitToIndexMap.clear();
+    consumingClosureOperands.clear();
+    consumingClosureOperandToIndexMap.clear();
   }
 
   SILFunction *getFunction() const { return address->getFunction(); }
@@ -368,6 +386,21 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
     return true;
   }
 
+  // Then see if we have a inout_aliasable full apply site use. In that case, we
+  // are going to try and extend move checking into the partial apply using
+  // cloning to eliminate destroys or reinits.
+  if (auto fas = FullApplySite::isa(op->getUser())) {
+    if (fas.getArgumentOperandConvention(*op) ==
+        SILArgumentConvention::Indirect_InoutAliasable) {
+      // If we don't find the function, we can't handle this, so bail.
+      auto *func = fas.getCalleeFunction();
+      if (!func || !func->isDefer())
+        return false;
+      useState.insertConsumingClosureOperand(op);
+      return true;
+    }
+  }
+
   // Ignore dealloc_stack.
   if (isa<DeallocStackInst>(op->getUser()))
     return true;
@@ -386,7 +419,7 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
 /// inst, we return it in foundInst. If no inst is returned, one must continue.
 static DownwardScanResult
 downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
-                       SILInstruction **foundInst) {
+                       TinyPtrVector<SILInstruction *> &foundInsts) {
   // Forward scan looking for uses or reinits.
   for (auto &next : llvm::make_range(std::next(mvi->getIterator()),
                                      mvi->getParent()->end())) {
@@ -398,7 +431,7 @@ downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
         useState.seenMarkMoves.count(&next) || useState.inits.count(&next)) {
       // Emit a diagnostic error and process the next mark_unresolved_move_addr.
       LLVM_DEBUG(llvm::dbgs() << "SingleBlock liveness user: " << next);
-      *foundInst = &next;
+      foundInsts.push_back(&next);
       return DownwardScanResult::UseForDiagnostic;
     }
 
@@ -406,7 +439,7 @@ downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
       auto iter = useState.reinitToIndexMap.find(&next);
       if (iter != useState.reinitToIndexMap.end()) {
         LLVM_DEBUG(llvm::dbgs() << "DownwardScan: reinit: " << next);
-        *foundInst = &next;
+        foundInsts.push_back(&next);
         return DownwardScanResult::Reinit;
       }
     }
@@ -418,8 +451,34 @@ downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
       if (iter != useState.destroyToIndexMap.end()) {
         auto *dai = cast<DestroyAddrInst>(iter->first);
         LLVM_DEBUG(llvm::dbgs() << "DownwardScan: Destroy: " << *dai);
-        *foundInst = dai;
+        foundInsts.push_back(dai);
         return DownwardScanResult::Destroy;
+      }
+    }
+
+    // Finally check if we have a closure user that we were able to handle.
+    if (auto fas = FullApplySite::isa(&next)) {
+      for (auto &op : fas.getArgumentOperands()) {
+        auto iter = useState.consumingClosureOperands.find(&op);
+        if (iter != useState.consumingClosureOperands.end()) {
+          switch (iter->second.result) {
+          case DownwardScanResult::Invalid:
+          case DownwardScanResult::Destroy:
+          case DownwardScanResult::Reinit:
+          case DownwardScanResult::UseForDiagnostic:
+          case DownwardScanResult::MoveOut:
+            llvm_unreachable("unhandled");
+          case DownwardScanResult::ClosureConsume:
+            llvm::copy(iter->second.pairedConsumingInsts,
+                       std::back_inserter(foundInsts));
+            break;
+          case DownwardScanResult::ClosureUse:
+            llvm::copy(iter->second.pairedUseInsts,
+                       std::back_inserter(foundInsts));
+            break;
+          }
+          return iter->second.result;
+        }
       }
     }
   }
@@ -458,6 +517,13 @@ static bool upwardScanForUseOut(SILInstruction *inst, UseState &useState) {
       return false;
     if (useState.reinitToIndexMap.count(&iter))
       return false;
+    if (auto fas = FullApplySite::isa(&iter)) {
+      for (auto &op : fas.getArgumentOperands()) {
+        if (useState.consumingClosureOperands.find(&op) !=
+            useState.consumingClosureOperands.end())
+          return false;
+      }
+    }
   }
   return true;
 }
@@ -481,6 +547,13 @@ static bool upwardScanForDestroys(SILInstruction *inst, UseState &useState) {
     // destroy_addr up since it is balanced by the init.
     if (useState.inits.contains(&iter))
       return false;
+    if (auto fas = FullApplySite::isa(&iter)) {
+      for (auto &op : fas.getArgumentOperands()) {
+        if (useState.consumingClosureOperands.find(&op) !=
+            useState.consumingClosureOperands.end())
+          return false;
+      }
+    }
 
     // Otherwise, we have a normal use, just ignore it.
   }
@@ -498,6 +571,13 @@ static bool upwardScanForInit(SILInstruction *inst, UseState &useState) {
                                      inst->getParent()->rend())) {
     if (useState.inits.contains(&iter))
       return false;
+    if (auto fas = FullApplySite::isa(&iter)) {
+      for (auto &op : fas.getArgumentOperands()) {
+        if (useState.consumingClosureOperands.find(&op) !=
+            useState.consumingClosureOperands.end())
+          return false;
+      }
+    }
   }
   return true;
 }
@@ -799,6 +879,75 @@ bool ConsumingClosureArgDataflowState::process(SILArgument *address,
 
   return true;
 }
+
+//===----------------------------------------------------------------------===//
+//                            Closure Use Gatherer
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Visit all of the uses of a closure argument, initializing useState as we go.
+struct GatherClosureUseVisitor : public AccessUseVisitor {
+  UseState &useState;
+
+  GatherClosureUseVisitor(UseState &useState)
+      : AccessUseVisitor(AccessUseType::Overlapping,
+                         NestedAccessType::IgnoreAccessBegin),
+        useState(useState) {}
+
+  bool visitUse(Operand *op, AccessUseType useTy) override;
+  void reset(SILValue address) { useState.address = address; }
+  void clear() { useState.clear(); }
+};
+
+} // end anonymous namespace
+
+// Filter out recognized uses that do not write to memory.
+//
+// TODO: Ensure that all of the conditional-write logic below is encapsulated in
+// mayWriteToMemory and just call that instead. Possibly add additional
+// verification that visitAccessPathUses recognizes all instructions that may
+// propagate pointers (even though they don't write).
+bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
+  // If this operand is for a dependent type, then it does not actually access
+  // the operand's address value. It only uses the metatype defined by the
+  // operation (e.g. open_existential).
+  if (op->isTypeDependent()) {
+    return true;
+  }
+
+  if (memInstMustInitialize(op)) {
+    LLVM_DEBUG(llvm::dbgs() << "Found init: " << *op->getUser());
+    useState.inits.insert(op->getUser());
+    return true;
+  }
+
+  if (memInstMustReinitialize(op)) {
+    LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *op->getUser());
+    useState.insertReinit(op->getUser());
+    return true;
+  }
+
+  if (auto *dvi = dyn_cast<DestroyAddrInst>(op->getUser())) {
+    // If we see a destroy_addr not on our base address, bail! Just error and
+    // say that we do not understand the code.
+    if (dvi->getOperand() != useState.address) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "!!! Error! Found destroy_addr no on base address: "
+                 << *dvi);
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "Found destroy_addr: " << *dvi);
+    useState.insertDestroy(dvi);
+    return true;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *op->getUser());
+  useState.livenessUses.insert(op->getUser());
+
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                              Global Dataflow
 //===----------------------------------------------------------------------===//
@@ -810,28 +959,32 @@ struct DataflowState {
   llvm::DenseSet<SILBasicBlock *> initBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> destroyBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> reinitBlocks;
+  llvm::DenseMap<SILBasicBlock *, Operand *> consumingClosureBlocks;
   SmallVector<MarkUnresolvedMoveAddrInst *, 8> markMovesToDataflow;
   UseState &useState;
 
   DataflowState(UseState &useState) : useState(useState) {}
   void init();
   bool process(SILValue address);
+  bool handleSingleBlockClosure(SILArgument *address,
+                                ClosureOperandState &state);
   void clear() {
     useBlocks.clear();
     initBlocks.clear();
     destroyBlocks.clear();
     reinitBlocks.clear();
     markMovesToDataflow.clear();
+    consumingClosureBlocks.clear();
   }
 };
 
 } // namespace
 
-static bool
-cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
-                      SmallBitVector &reinitIndices, UseState &useState,
-                      BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
-                      BasicBlockSet &blocksWithMovesThatAreNowTakes) {
+static bool cleanupAllDestroyAddr(
+    SILFunction *fn, SmallBitVector &destroyIndices,
+    SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
+    UseState &useState, BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
+    BasicBlockSet &blocksWithMovesThatAreNowTakes) {
   bool madeChange = false;
   BasicBlockWorklist worklist(fn);
   SILValue daiOperand;
@@ -852,6 +1005,7 @@ cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
       worklist.pushIfNotVisited(predBlock);
     }
   }
+
   LLVM_DEBUG(llvm::dbgs() << "    Visiting reinit!\n");
   for (int index = reinitIndices.find_first(); index != -1;
        index = reinitIndices.find_next(index)) {
@@ -860,6 +1014,17 @@ cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
       continue;
     LLVM_DEBUG(llvm::dbgs() << "  Reinit: " << *reinit);
     for (auto *predBlock : (*reinit)->getParent()->getPredecessorBlocks()) {
+      worklist.pushIfNotVisited(predBlock);
+    }
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "    Visiting consuming closures!\n");
+  for (int index = consumingClosureIndices.find_first(); index != -1;
+       index = consumingClosureIndices.find_next(index)) {
+    auto &pair = *std::next(useState.consumingClosureOperands.begin(), index);
+    auto *op = pair.first;
+    LLVM_DEBUG(llvm::dbgs() << "  Consuming closure: " << *op->getUser());
+    for (auto *predBlock : op->getUser()->getParent()->getPredecessorBlocks()) {
       worklist.pushIfNotVisited(predBlock);
     }
   }
@@ -891,10 +1056,10 @@ cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
 
   for (int index = destroyIndices.find_first(); index != -1;
        index = destroyIndices.find_next(index)) {
-    auto dvi = useState.destroys[index];
-    if (!dvi)
+    auto destroy = useState.destroys[index];
+    if (!destroy)
       continue;
-    (*dvi)->eraseFromParent();
+    (*destroy)->eraseFromParent();
     madeChange = true;
   }
 
@@ -905,6 +1070,27 @@ cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
       continue;
     convertMemoryReinitToInitForm(*reinit);
     madeChange = true;
+  }
+
+  // Check for consuming closures. The closure can have either destroy uses or
+  // reinit uses. We need to handle both.
+  for (int index = consumingClosureIndices.find_first(); index != -1;
+       index = consumingClosureIndices.find_next(index)) {
+    auto &pair = *std::next(useState.consumingClosureOperands.begin(), index);
+    auto *closureUse = pair.first;
+    if (!closureUse)
+      continue;
+    for (auto *pairedInst : pair.second.pairedConsumingInsts) {
+      if (auto *dvi = dyn_cast<DestroyValueInst>(pairedInst)) {
+        dvi->eraseFromParent();
+        madeChange = true;
+        continue;
+      }
+
+      convertMemoryReinitToInitForm(pairedInst);
+      madeChange = true;
+      continue;
+    }
   }
 
   return madeChange;
@@ -926,6 +1112,14 @@ bool DataflowState::process(SILValue address) {
     if (indicesOfPairedReinits.size() != useState.reinits.size())
       indicesOfPairedReinits.resize(useState.reinits.size());
     return indicesOfPairedReinits;
+  };
+  SmallBitVector indicesOfPairedConsumingClosureUses;
+  auto getIndicesOfPairedConsumingClosureUses = [&]() -> SmallBitVector & {
+    if (indicesOfPairedConsumingClosureUses.size() !=
+        useState.consumingClosureOperands.size())
+      indicesOfPairedConsumingClosureUses.resize(
+          useState.consumingClosureOperands.size());
+    return indicesOfPairedConsumingClosureUses;
   };
 
   BasicBlockSet visitedByNewMove(fn);
@@ -1007,6 +1201,19 @@ bool DataflowState::process(SILValue address) {
         }
       }
 
+      {
+        auto iter = consumingClosureBlocks.find(next);
+        if (iter != consumingClosureBlocks.end()) {
+          LLVM_DEBUG(llvm::dbgs() << "    Is reinit Block! Setting up for "
+                                     "later deletion if possible!\n");
+          auto indexIter =
+              useState.consumingClosureOperandToIndexMap.find(iter->second);
+          assert(indexIter != useState.consumingClosureOperandToIndexMap.end());
+          getIndicesOfPairedConsumingClosureUses().set(indexIter->second);
+          continue;
+        }
+      }
+
       // Then see if this is an init block. If so, do not add successors and
       // continue. We already checked that we are not destroy up in this block
       // by the check a few lines up. So we know that we are in one of the
@@ -1017,7 +1224,7 @@ bool DataflowState::process(SILValue address) {
       //    such a case, we need to just stop processing since we are re-initing
       //    memory for a var.
       //
-      // 2. There is a consuming use that is treated as a liveness use before
+      // 2. There is a consuming use that is treated as a consuming use before
       //    us. In that case, we will have already errored upon it.
       if (initBlocks.count(next)) {
         LLVM_DEBUG(llvm::dbgs() << "    Is Init Block!\n");
@@ -1062,8 +1269,9 @@ bool DataflowState::process(SILValue address) {
   // Now that we have processed all of our mark_moves, eliminate all of the
   // destroy_addr.
   madeChange |= cleanupAllDestroyAddr(
-      fn, getIndicesOfPairedDestroys(), getIndicesOfPairedReinits(), useState,
-      visitedByNewMove, blocksWithMovesThatAreNowTakes);
+      fn, getIndicesOfPairedDestroys(), getIndicesOfPairedReinits(),
+      getIndicesOfPairedConsumingClosureUses(), useState, visitedByNewMove,
+      blocksWithMovesThatAreNowTakes);
 
   return madeChange;
 }
@@ -1128,18 +1336,16 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
                                             MarkUnresolvedMoveAddrInst *mvi) {
   // First scan downwards to make sure we are move out of this block.
   auto &useState = dataflowState.useState;
-  SILInstruction *interestingUser = nullptr;
-  switch (downwardScanForMoveOut(mvi, useState, &interestingUser)) {
-  case DownwardScanResult::ClosureConsume:
-  case DownwardScanResult::ClosureUse:
-    llvm_unreachable("unhandled");
+  TinyPtrVector<SILInstruction *> interestingUsers;
+  switch (downwardScanForMoveOut(mvi, useState, interestingUsers)) {
   case DownwardScanResult::Invalid:
     llvm_unreachable("invalid");
   case DownwardScanResult::Destroy: {
     // If we found a destroy, then we found a single block case that we can
     // handle. Remove the destroy and convert the mark_unresolved_move_addr
     // into a true move.
-    auto *dvi = cast<DestroyAddrInst>(interestingUser);
+    assert(interestingUsers.size() == 1);
+    auto *dvi = cast<DestroyAddrInst>(interestingUsers[0]);
     SILBuilderWithScope builder(mvi);
     builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
                            IsInitialization);
@@ -1148,7 +1354,10 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
     dvi->eraseFromParent();
     return false;
   }
-  case DownwardScanResult::UseForDiagnostic: {
+  case DownwardScanResult::UseForDiagnostic:
+    assert(interestingUsers.size() == 1);
+    [[fallthrough]];
+  case DownwardScanResult::ClosureUse: {
     // Then check if we found a user that violated our dataflow rules. In such
     // a case, emit an error, cleanup our mark_unresolved_move_addr, and
     // finally continue.
@@ -1167,7 +1376,7 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
 
     {
       auto diag = diag::sil_movekillscopyablevalue_use_here;
-      diagnose(astCtx, interestingUser->getLoc().getSourceLoc(), diag);
+      diagnose(astCtx, interestingUsers[0]->getLoc().getSourceLoc(), diag);
     }
 
     // We purposely continue to see if at least in simple cases, we can flag
@@ -1187,11 +1396,30 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
     return true;
   }
   case DownwardScanResult::Reinit: {
-    convertMemoryReinitToInitForm(interestingUser);
-    useState.reinits.erase(interestingUser);
+    assert(interestingUsers.size() == 1);
+    convertMemoryReinitToInitForm(interestingUsers[0]);
+    useState.reinits.erase(interestingUsers[0]);
     SILBuilderWithScope builder(mvi);
     builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
                            IsInitialization);
+    mvi->eraseFromParent();
+    return false;
+  }
+  case DownwardScanResult::ClosureConsume: {
+    // If we found a closure consume, then we found a single block case that we
+    // can handle. Remove the destroys/reinit and make our move a true move.
+    SILBuilderWithScope builder(mvi);
+    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
+                           IsInitialization);
+
+    for (auto *user : interestingUsers) {
+      if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
+        dvi->eraseFromParent();
+        continue;
+      }
+      convertMemoryReinitToInitForm(user);
+    }
+    // TODO: Should we erase the operand from useState.consumingClosureOperands?
     mvi->eraseFromParent();
     return false;
   }
@@ -1224,11 +1452,16 @@ struct MoveKillsCopyableAddressesObjectChecker {
   SILFunction *fn;
   UseState useState;
   DataflowState dataflowState;
+  UseState closureUseState;
+  ConsumingClosureArgDataflowState closureUseDataflowState;
 
   MoveKillsCopyableAddressesObjectChecker(SILFunction *fn)
-      : fn(fn), useState(), dataflowState(useState) {}
+      : fn(fn), useState(), dataflowState(useState), closureUseState(),
+        closureUseDataflowState(closureUseState) {}
 
   bool check(SILValue address);
+  bool performClosureDataflow(Operand *callerOperand,
+                              ClosureOperandState &calleeOperandState);
 
   void emitDiagnosticForMove(SILValue borrowedValue,
                              StringRef borrowedValueName, MoveValueInst *mvi);
@@ -1237,6 +1470,43 @@ struct MoveKillsCopyableAddressesObjectChecker {
 };
 
 } // namespace
+
+bool MoveKillsCopyableAddressesObjectChecker::performClosureDataflow(
+    Operand *callerOperand, ClosureOperandState &calleeOperandState) {
+  auto fas = FullApplySite::isa(callerOperand->getUser());
+  auto *func = fas.getCalleeFunction();
+  auto *address =
+      func->begin()->getArgument(fas.getCalleeArgIndex(*callerOperand));
+
+  LLVM_DEBUG(llvm::dbgs() << "Performing closure dataflow on: "
+                          << *callerOperand->getUser());
+  LLVM_DEBUG(llvm::dbgs() << "    Argument: " << *address);
+
+  auto accessPathWithBase = AccessPathWithBase::compute(address);
+  auto accessPath = accessPathWithBase.accessPath;
+
+  // Bail on an invalid AccessPath.
+  //
+  // AccessPath completeness is verified independently--it may be invalid in
+  // extraordinary situations. When AccessPath is valid, we know all its uses
+  // are recognizable.
+  //
+  // NOTE: If due to an invalid access path we fail here, we will just error
+  // on the _move since the _move would not have been handled.
+  if (!accessPath.isValid())
+    return false;
+
+  // TODO: Hoist this useState into an ivar that we can reuse in between closure
+  // operands?
+  GatherClosureUseVisitor visitor(closureUseState);
+  SWIFT_DEFER { visitor.clear(); };
+  visitor.reset(address);
+  if (!visitAccessPathUses(visitor, accessPath, fn))
+    return false;
+
+  SWIFT_DEFER { closureUseDataflowState.clear(); };
+  return closureUseDataflowState.process(address, calleeOperandState);
+}
 
 bool MoveKillsCopyableAddressesObjectChecker::check(SILValue address) {
   auto accessPathWithBase = AccessPathWithBase::compute(address);
@@ -1275,6 +1545,21 @@ bool MoveKillsCopyableAddressesObjectChecker::check(SILValue address) {
 
   // Now initialize our data structures.
   SWIFT_DEFER { dataflowState.clear(); };
+
+  // First go through and perform dataflow on each of the closures our address
+  // depends on. We do not have to worry about other unrelated addresses from
+  // being passed to the defer in our argument slot since address phis are
+  // banned in canonical SIL.
+  //
+  // This summary will let us treat the whole closure's effect on the closure
+  // operand as if it was a single instruction.
+  for (auto &pair : useState.consumingClosureOperands) {
+    auto *operand = pair.first;
+    auto &closureState = pair.second;
+
+    if (!performClosureDataflow(operand, closureState))
+      return false;
+  }
 
   // Perform the single basic block analysis emitting a diagnostic/pairing
   // mark_unresolved_move_addr and destroys if needed. If we discover a
