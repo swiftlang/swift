@@ -269,12 +269,13 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
-  
+
   FirstSIL = 8,
   Method = FirstSIL,
   ObjCMethod,
   WitnessMethod,
   Closure,
+  CXXMethod,
 };
 using SILFunctionTypeRepresentationField = BCFixed<4>;
 
