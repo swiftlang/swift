@@ -189,6 +189,34 @@ static SourceLoc getSourceLocFromValue(SILValue value) {
 }
 
 //===----------------------------------------------------------------------===//
+//                            Forward Declarations
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+enum class DownwardScanResult {
+  Invalid,
+  Destroy,
+  Reinit,
+  // NOTE: We use UseForDiagnostic both for defer uses and normal uses.
+  UseForDiagnostic,
+  MoveOut,
+  ClosureConsume,
+  ClosureUse,
+};
+
+struct ClosureOperandState {
+  DownwardScanResult result = DownwardScanResult::Invalid;
+  TinyPtrVector<SILInstruction *> pairedConsumingInsts;
+  TinyPtrVector<SILInstruction *> pairedUseInsts;
+  bool isUpwardsUse = false;
+  bool isUpwardsConsume = false;
+  bool isUpwardsInit = false;
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
 //                               Use Gathering
 //===----------------------------------------------------------------------===//
 
@@ -233,6 +261,8 @@ struct UseState {
     reinits.clear();
     reinitToIndexMap.clear();
   }
+
+  SILFunction *getFunction() const { return address->getFunction(); }
 };
 
 /// Visit all of the uses of a lexical lifetime, initializing useState as we go.
@@ -351,18 +381,6 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
 //===----------------------------------------------------------------------===//
 //                                  Dataflow
 //===----------------------------------------------------------------------===//
-
-namespace {
-
-enum class DownwardScanResult {
-  Invalid,
-  Destroy,
-  Reinit,
-  UseForDiagnostic,
-  MoveOut
-};
-
-}
 
 /// Returns true if we are move out, false otherwise. If we find an interesting
 /// inst, we return it in foundInst. If no inst is returned, one must continue.
@@ -484,6 +502,303 @@ static bool upwardScanForInit(SILInstruction *inst, UseState &useState) {
   return true;
 }
 
+//===----------------------------------------------------------------------===//
+//                      Closure Argument Global Dataflow
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// A utility class that analyzes a closure that captures a moved value. It is
+/// used to perform move checking within the closure as well as to determine a
+/// set of reinit/destroys that we will need to convert to init and or eliminate
+/// while cloning the closure.
+///
+/// NOTE: We do not need to consider if the closure reinitializes the memory
+/// since there must be some sort of use for the closure to even reference it
+/// and the compiler emits assigns when it reinitializes vars this early in the
+/// pipeline.
+struct ConsumingClosureArgDataflowState {
+  SmallVector<SILInstruction *, 32> livenessWorklist;
+  SmallVector<SILInstruction *, 32> consumingWorklist;
+  SmallBlotSetVector<SILInstruction *, 8> postDominatingConsumingUsers;
+  PrunedLiveness livenessForConsumes;
+  UseState &useState;
+
+public:
+  ConsumingClosureArgDataflowState(UseState &useState) : useState(useState) {}
+
+  bool isPostDominatingConsumingUser(SILInstruction *inst) const {
+    return postDominatingConsumingUsers.count(inst);
+  }
+
+  bool process(SILArgument *arg, ClosureOperandState &state);
+
+  void clear() {
+    postDominatingConsumingUsers.clear();
+    livenessForConsumes.clear();
+  }
+
+private:
+  /// Perform our liveness dataflow. Returns true if we found any liveness uses
+  /// at all. These we will need to error upon.
+  bool performLivenessDataflow(const BasicBlockSet &initBlocks,
+                               const BasicBlockSet &livenessBlocks,
+                               const BasicBlockSet &consumingBlocks);
+
+  /// Perform our consuming dataflow. Returns true if we found an earliest set
+  /// of consuming uses that we can handle that post-dominate the argument.
+  /// Returns false otherwise.
+  bool performConsumingDataflow(const BasicBlockSet &initBlocks,
+                                const BasicBlockSet &consumingBlocks);
+
+  void classifyUses(BasicBlockSet &initBlocks, BasicBlockSet &livenessBlocks,
+                    BasicBlockSet &consumingBlocks);
+
+  bool handleSingleBlockCase(SILArgument *address, ClosureOperandState &state);
+};
+
+} // namespace
+
+bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
+    SILArgument *address, ClosureOperandState &state) {
+  // Walk the instructions from the beginning of the block to the end.
+  for (auto &inst : *address->getParent()) {
+    assert(!useState.inits.count(&inst) &&
+           "Shouldn't see an init before a destroy or reinit");
+
+    // If we see a destroy, then we know we are upwards consume... stash it so
+    // that we can destroy it
+    if (auto *dvi = dyn_cast<DestroyValueInst>(&inst)) {
+      if (useState.destroyToIndexMap.count(dvi)) {
+        state.pairedConsumingInsts.push_back(dvi);
+        state.isUpwardsConsume = true;
+        state.result = DownwardScanResult::ClosureConsume;
+        return true;
+      }
+    }
+
+    // Same for reinits.
+    if (useState.reinits.count(&inst)) {
+      state.pairedConsumingInsts.push_back(&inst);
+      state.isUpwardsConsume = true;
+      state.result = DownwardScanResult::ClosureConsume;
+      return true;
+    }
+
+    // Finally, if we have a liveness use, report it for a diagnostic.
+    if (useState.livenessUses.count(&inst)) {
+      state.pairedUseInsts.push_back(&inst);
+      state.isUpwardsUse = true;
+      state.result = DownwardScanResult::ClosureUse;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool ConsumingClosureArgDataflowState::performLivenessDataflow(
+    const BasicBlockSet &initBlocks, const BasicBlockSet &livenessBlocks,
+    const BasicBlockSet &consumingBlocks) {
+  bool foundSingleLivenessUse = false;
+  auto *fn = useState.getFunction();
+  auto *frontBlock = &*fn->begin();
+  BasicBlockWorklist worklist(fn);
+  for (unsigned i : indices(livenessWorklist)) {
+    auto *&user = livenessWorklist[i];
+
+    if (frontBlock == user->getParent())
+      continue;
+
+    bool success = false;
+    for (auto *predBlock : user->getParent()->getPredecessorBlocks()) {
+      worklist.pushIfNotVisited(predBlock);
+    }
+    while (auto *next = worklist.pop()) {
+      if (livenessBlocks.contains(next) || initBlocks.contains(next) ||
+          consumingBlocks.contains(next)) {
+        continue;
+      }
+
+      if (frontBlock == next) {
+        success = true;
+        foundSingleLivenessUse = true;
+        break;
+      }
+
+      for (auto *predBlock : next->getPredecessorBlocks()) {
+        worklist.pushIfNotVisited(predBlock);
+      }
+    }
+    if (!success) {
+      user = nullptr;
+    }
+  }
+  return foundSingleLivenessUse;
+}
+
+bool ConsumingClosureArgDataflowState::performConsumingDataflow(
+    const BasicBlockSet &initBlocks, const BasicBlockSet &consumingBlocks) {
+  auto *fn = useState.getFunction();
+  auto *frontBlock = &*fn->begin();
+
+  bool foundSingleConsumingUse = false;
+  BasicBlockWorklist worklist(fn);
+  for (unsigned i : indices(consumingWorklist)) {
+    auto *&user = consumingWorklist[i];
+
+    if (frontBlock == user->getParent())
+      continue;
+
+    bool success = false;
+    for (auto *predBlock : user->getParent()->getPredecessorBlocks()) {
+      worklist.pushIfNotVisited(predBlock);
+    }
+    while (auto *next = worklist.pop()) {
+      if (initBlocks.contains(next) || consumingBlocks.contains(next)) {
+        continue;
+      }
+
+      if (frontBlock == next) {
+        success = true;
+        foundSingleConsumingUse = true;
+        break;
+      }
+
+      for (auto *predBlock : next->getPredecessorBlocks()) {
+        worklist.pushIfNotVisited(predBlock);
+      }
+    }
+    if (!success) {
+      user = nullptr;
+    }
+  }
+  return foundSingleConsumingUse;
+}
+
+void ConsumingClosureArgDataflowState::classifyUses(
+    BasicBlockSet &initBlocks, BasicBlockSet &livenessBlocks,
+    BasicBlockSet &consumingBlocks) {
+
+  for (auto *user : useState.inits) {
+    if (upwardScanForInit(user, useState)) {
+      initBlocks.insert(user->getParent());
+    }
+  }
+
+  for (auto *user : useState.livenessUses) {
+    if (upwardScanForUseOut(user, useState)) {
+      livenessBlocks.insert(user->getParent());
+      livenessWorklist.push_back(user);
+    }
+  }
+
+  for (auto destroyOpt : useState.destroys) {
+    assert(destroyOpt);
+
+    auto *destroy = *destroyOpt;
+
+    auto iter = useState.destroyToIndexMap.find(destroy);
+    assert(iter != useState.destroyToIndexMap.end());
+
+    if (upwardScanForDestroys(destroy, useState)) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found destroy block at: " << *destroy);
+      consumingBlocks.insert(destroy->getParent());
+      consumingWorklist.push_back(destroy);
+    }
+  }
+
+  for (auto reinitOpt : useState.reinits) {
+    assert(reinitOpt);
+
+    auto *reinit = *reinitOpt;
+    auto iter = useState.reinitToIndexMap.find(reinit);
+    assert(iter != useState.reinitToIndexMap.end());
+
+    if (upwardScanForDestroys(reinit, useState)) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found reinit block at: " << *reinit);
+      consumingBlocks.insert(reinit->getParent());
+      consumingWorklist.push_back(reinit);
+    }
+  }
+}
+
+bool ConsumingClosureArgDataflowState::process(SILArgument *address,
+                                               ClosureOperandState &state) {
+  clear();
+
+  SILFunction *fn = address->getFunction();
+  assert(fn);
+
+  // First see if our function only has a single block. In such a case,
+  // summarize using the single processing routine.
+  if (address->getParent()->getTerminator()->isFunctionExiting())
+    return handleSingleBlockCase(address, state);
+
+  // At this point, we begin by classifying the uses of our address into init
+  // blocks, liveness blocks, consuming blocks. We also seed the worklist for
+  // our two dataflows.
+  BasicBlockSet initBlocks(fn);
+  BasicBlockSet livenessBlocks(fn);
+  BasicBlockSet consumingBlocks(fn);
+  classifyUses(initBlocks, livenessBlocks, consumingBlocks);
+
+  // Liveness Dataflow:
+  //
+  // The way that we do this is that for each such instruction:
+  //
+  // 1. If the instruction is in the entrance block, then it is our only answer.
+  //
+  // 2. If the user is not in the entrance block, visit recursively its
+  //    predecessor blocks until one either hits the entrance block (in which
+  //    case this is the result) /or/ one hits a block in one of our basic block
+  //    sets which means there is an earlier use. Consuming blocks only stop for
+  //    consuming blocks and init blocks. Liveness blocks stop for all other
+  //    blocks.
+  //
+  // The result is what remains in our set. Thus we start by processing
+  // liveness.
+  if (performLivenessDataflow(initBlocks, livenessBlocks, consumingBlocks)) {
+    for (unsigned i : indices(livenessWorklist)) {
+      if (auto *ptr = livenessWorklist[i]) {
+        state.pairedUseInsts.push_back(ptr);
+      }
+    }
+    state.isUpwardsUse = true;
+    state.result = DownwardScanResult::ClosureUse;
+    return true;
+  }
+
+  // Then perform the consuming use dataflow. In this case, we think we may have
+  // found a set of post-dominating consuming uses for our inout_aliasable
+  // parameter. We are going to change it to be an out parameter and eliminate
+  // these when we clone the closure.
+  if (performConsumingDataflow(initBlocks, consumingBlocks)) {
+    SWIFT_DEFER { livenessForConsumes.clear(); };
+    auto *frontBlock = &*fn->begin();
+    livenessForConsumes.initializeDefBlock(frontBlock);
+
+    for (unsigned i : indices(livenessWorklist)) {
+      if (auto *ptr = livenessWorklist[i]) {
+        state.pairedConsumingInsts.push_back(ptr);
+        livenessForConsumes.updateForUse(ptr, true /*is lifetime ending*/);
+      }
+    }
+
+    // If our consumes do not have a linear lifetime, bail. We will error on the
+    // move being unknown.
+    for (auto *ptr : state.pairedConsumingInsts) {
+      if (livenessForConsumes.isWithinBoundary(ptr))
+        return false;
+      postDominatingConsumingUsers.insert(ptr);
+    }
+    state.isUpwardsConsume = true;
+    state.result = DownwardScanResult::ClosureConsume;
+    return true;
+  }
+
+  return true;
+}
 //===----------------------------------------------------------------------===//
 //                              Global Dataflow
 //===----------------------------------------------------------------------===//
@@ -815,6 +1130,9 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
   auto &useState = dataflowState.useState;
   SILInstruction *interestingUser = nullptr;
   switch (downwardScanForMoveOut(mvi, useState, &interestingUser)) {
+  case DownwardScanResult::ClosureConsume:
+  case DownwardScanResult::ClosureUse:
+    llvm_unreachable("unhandled");
   case DownwardScanResult::Invalid:
     llvm_unreachable("invalid");
   case DownwardScanResult::Destroy: {
