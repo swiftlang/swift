@@ -64,17 +64,19 @@ RewriteSystem::getRelation(unsigned index) const {
   return Relations[index];
 }
 
-/// Given two property rules (T.[p1] => T) and (T.[p2] => T) where [p1] < [p2],
-/// record a rewrite loop that makes the second rule redundant from the first.
-static void recordRelation(unsigned lhsRuleID, unsigned rhsRuleID,
+/// Given a key T, a rule (V.[p1] => V) where T == U.V, and a property [p2]
+/// where [p1] < [p2], record a rule (T.[p2] => T) that is implied by
+/// the original rule (V.[p1] => V).
+static void recordRelation(Term key,
+                           unsigned lhsRuleID,
+                           Symbol rhsProperty,
                            RewriteSystem &system,
                            SmallVectorImpl<InducedRule> &inducedRules,
                            bool debug) {
   const auto &lhsRule = system.getRule(lhsRuleID);
-  const auto &rhsRule = system.getRule(rhsRuleID);
-
   auto lhsProperty = lhsRule.getLHS().back();
-  auto rhsProperty = rhsRule.getLHS().back();
+
+  assert(key.size() >= lhsRule.getRHS().size());
 
   assert(lhsProperty.isProperty());
   assert(rhsProperty.isProperty());
@@ -89,35 +91,34 @@ static void recordRelation(unsigned lhsRuleID, unsigned rhsRuleID,
 
   /// Build the following rewrite path:
   ///
-  ///   (T => T.[p1]).[p2] ⊗ T.Relation([p1].[p2] => [p1]) ⊗ (T.[p1] => T).
+  ///   U.(V => V.[p1]).[p2] ⊗ U.V.Relation([p1].[p2] => [p1]) ⊗ U.(V.[p1] => V).
   ///
   RewritePath path;
 
-  /// Starting from T.[p2], the LHS rule in reverse to get T.[p1].[p2].
-  path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
-                                       /*endOffset=*/1,
-                                       /*ruleID=*/lhsRuleID,
-                                       /*inverse=*/true));
+  /// Starting from U.V.[p2], apply the rule in reverse to get U.V.[p1].[p2].
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/key.size() - lhsRule.getRHS().size(),
+      /*endOffset=*/1,
+      /*ruleID=*/lhsRuleID,
+      /*inverse=*/true));
 
-  /// T.Relation([p1].[p2] => [p1]).
+  /// U.V.Relation([p1].[p2] => [p1]).
   path.add(RewriteStep::forRelation(relationID, /*inverse=*/false));
 
-  /// (T.[p1] => T).
-  path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
-                                       /*endOffset=*/0,
-                                       /*ruleID=*/lhsRuleID,
-                                       /*inverse=*/false));
+  /// U.(V.[p1] => V).
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/key.size() - lhsRule.getRHS().size(),
+      /*endOffset=*/0,
+      /*ruleID=*/lhsRuleID,
+      /*inverse=*/false));
 
   /// Add the rule (T.[p2] => T) with the above rewrite path.
-  ///
-  /// Since a rule (T.[p2] => T) *already exists*, both sides of the new
-  /// rule will simplify down to T, and the rewrite path will become a loop.
-  ///
-  /// This loop encodes the fact that (T.[p1] => T) makes (T.[p2] => T)
-  /// redundant.
-  inducedRules.emplace_back(MutableTerm(rhsRule.getLHS()),
-                            MutableTerm(rhsRule.getRHS()),
-                            path);
+  MutableTerm lhs(key);
+  lhs.add(rhsProperty);
+
+  MutableTerm rhs(key);
+
+  inducedRules.emplace_back(lhs, rhs, path);
 }
 
 static void recordConflict(Term key,
@@ -446,15 +447,16 @@ void PropertyMap::addProperty(
       // the new layout requirement is redundant.
       if (mergedLayout == props->Layout) {
         if (checkRulePairOnce(*props->LayoutRule, ruleID)) {
-          recordRelation(*props->LayoutRule, ruleID, System,
+          recordRelation(key, *props->LayoutRule, property, System,
                          inducedRules, debug);
         }
 
       // If the intersection is equal to the new layout requirement, the
       // existing layout requirement is redundant.
       } else if (mergedLayout == newLayout) {
-        if (checkRulePairOnce(*props->LayoutRule, ruleID)) {
-          recordRelation(ruleID, *props->LayoutRule, System,
+        if (checkRulePairOnce(ruleID, *props->LayoutRule)) {
+          auto oldProperty = System.getRule(*props->LayoutRule).getLHS().back();
+          recordRelation(key, ruleID, oldProperty, System,
                          inducedRules, debug);
         }
 
