@@ -471,20 +471,19 @@ void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
 /// Runs a Swift instruction pass.
 void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
                               void (*runFunction)(BridgedInstructionPassCtxt)) {
-  Worklist.setLibswiftPassInvocation(&libswiftPassInvocation);
-  runFunction({ {inst->asSILNode()}, {&libswiftPassInvocation} });
-  Worklist.setLibswiftPassInvocation(nullptr);
-  libswiftPassInvocation.finishedPassRun();
+  swiftPassInvocation.startInstructionPassRun(inst);
+  runFunction({ {inst->asSILNode()}, {&swiftPassInvocation} });
+  swiftPassInvocation.finishedInstructionPassRun();
 }
 
 /// Registered briged instruction pass run functions.
-static llvm::StringMap<BridgedInstructionPassRunFn> libswiftInstPasses;
+static llvm::StringMap<BridgedInstructionPassRunFn> swiftInstPasses;
 static bool passesRegistered = false;
 
 // Called from initializeSwiftModules().
 void SILCombine_registerInstructionPass(BridgedStringRef name,
                                         BridgedInstructionPassRunFn runFn) {
-  libswiftInstPasses[getStringRef(name)] = runFn;
+  swiftInstPasses[getStringRef(name)] = runFn;
   passesRegistered = true;
 }
 
@@ -493,7 +492,7 @@ SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   static BridgedInstructionPassRunFn runFunction = nullptr;                \
   static bool runFunctionSet = false;                                      \
   if (!runFunctionSet) {                                                   \
-    runFunction = libswiftInstPasses[TAG];                                 \
+    runFunction = swiftInstPasses[TAG];                                    \
     if (!runFunction && passesRegistered) {                                \
       llvm::errs() << "Swift pass " << TAG << " is not registered\n";      \
       abort();                                                             \
@@ -572,7 +571,7 @@ SILTransform *swift::createSILCombine() {
 //                          SwiftFunctionPassContext
 //===----------------------------------------------------------------------===//
 
-void LibswiftPassInvocation::eraseInstruction(SILInstruction *inst) {
+void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
   if (silCombiner) {
     silCombiner->eraseInstFromFunction(*inst);
   } else {
