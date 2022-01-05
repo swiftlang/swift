@@ -5587,7 +5587,11 @@ public:
   
   /// Get a generic environment that has this opaque archetype bound within it.
   GenericEnvironment *getGenericEnvironment() const;
-  
+
+  /// Compute the canonical interface type within the environment of this
+  /// opaque type archetype.
+  CanType getCanonicalInterfaceType(Type interfaceType);
+
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpaqueTypeArchetype;
   }

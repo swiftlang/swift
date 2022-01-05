@@ -3304,6 +3304,63 @@ SequenceArchetypeType::SequenceArchetypeType(
   assert(cast<GenericTypeParamType>(InterfaceType.getPointer())->isTypeSequence());
 }
 
+namespace {
+
+/// Substitute the outer generic parameters from a substitution map, ignoring
+/// innter generic parameters with a given depth.
+struct SubstituteOuterFromSubstitutionMap {
+  SubstitutionMap subs;
+  unsigned depth;
+
+  /// Whether this is a type parameter that should not be substituted.
+  bool isUnsubstitutedTypeParameter(Type type) const {
+    if (!type->isTypeParameter())
+      return false;
+
+    if (auto depMemTy = type->getAs<DependentMemberType>())
+      return isUnsubstitutedTypeParameter(depMemTy->getBase());
+
+    if (auto genericParam = type->getAs<GenericTypeParamType>())
+      return genericParam->getDepth() >= depth;
+
+    return false;
+  }
+
+  Type operator()(SubstitutableType *type) const {
+    if (isUnsubstitutedTypeParameter(type))
+      return Type(type);
+
+    return QuerySubstitutionMap{subs}(type);
+  }
+
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const {
+    if (isUnsubstitutedTypeParameter(dependentType))
+      return ProtocolConformanceRef(conformedProtocol);
+
+    return LookUpConformanceInSubstitutionMap(subs)(
+        dependentType, conformingReplacementType, conformedProtocol);
+  }
+};
+
+}
+
+CanType OpaqueTypeArchetypeType::getCanonicalInterfaceType(Type interfaceType) {
+  // Compute the canonical type within the generic signature of the opaque
+  // type declaration.
+  auto sig = getDecl()->getOpaqueInterfaceGenericSignature();
+  CanType canonicalType = interfaceType->getCanonicalType(sig);
+  if (!interfaceType->hasTypeParameter())
+    return canonicalType;
+
+  // Substitute outer generic parameters only.
+  unsigned opaqueDepth =
+    getDecl()->getOpaqueGenericParams().front()->getDepth();
+  SubstituteOuterFromSubstitutionMap replacer{Substitutions, opaqueDepth};
+  return canonicalType.subst(replacer, replacer)->getCanonicalType();
+}
+
 GenericEnvironment *OpaqueTypeArchetypeType::getGenericEnvironment() const {
   if (Environment)
     return Environment;
