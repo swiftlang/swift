@@ -61,7 +61,20 @@ void RewriteStep::dump(llvm::raw_ostream &out,
     evaluator.applyDecompose(*this, system);
 
     out << (Inverse ? "Compose(" : "Decompose(");
-    out << RuleID << ")";
+    out << Arg << ")";
+    break;
+  }
+  case Relation: {
+    evaluator.applyRelation(*this, system);
+
+    auto relation = system.getRelation(Arg);
+    out << "Relation(";
+    if (Inverse) {
+      out << relation.second << " > " << relation.first;
+    } else {
+      out << relation.first << " < " << relation.second;
+    }
+    out << ")";
     break;
   }
   case ConcreteConformance: {
@@ -139,35 +152,35 @@ void RewriteLoop::dump(llvm::raw_ostream &out,
 }
 
 void RewritePathEvaluator::dump(llvm::raw_ostream &out) const {
-  out << "A stack:\n";
-  for (const auto &term : A) {
+  out << "Primary stack:\n";
+  for (const auto &term : Primary) {
     out << term << "\n";
   }
-  out << "\nB stack:\n";
-  for (const auto &term : B) {
+  out << "\nSecondary stack:\n";
+  for (const auto &term : Secondary) {
     out << term << "\n";
   }
 }
 
-void RewritePathEvaluator::checkA() const {
-  if (A.empty()) {
-    llvm::errs() << "Empty A stack\n";
+void RewritePathEvaluator::checkPrimary() const {
+  if (Primary.empty()) {
+    llvm::errs() << "Empty primary stack\n";
     dump(llvm::errs());
     abort();
   }
 }
 
-void RewritePathEvaluator::checkB() const {
-  if (B.empty()) {
-    llvm::errs() << "Empty B stack\n";
+void RewritePathEvaluator::checkSecondary() const {
+  if (Secondary.empty()) {
+    llvm::errs() << "Empty secondary stack\n";
     dump(llvm::errs());
     abort();
   }
 }
 
 MutableTerm &RewritePathEvaluator::getCurrentTerm() {
-  checkA();
-  return A.back();
+  checkPrimary();
+  return Primary.back();
 }
 
 AppliedRewriteStep
@@ -177,7 +190,7 @@ RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
 
   assert(step.Kind == RewriteStep::ApplyRewriteRule);
 
-  const auto &rule = system.getRule(step.RuleID);
+  const auto &rule = system.getRule(step.getRuleID());
 
   auto lhs = (step.Inverse ? rule.getRHS() : rule.getLHS());
   auto rhs = (step.Inverse ? rule.getLHS() : rule.getRHS());
@@ -220,7 +233,7 @@ RewritePathEvaluator::applyAdjustment(const RewriteStep &step,
 
   auto &ctx = system.getRewriteContext();
   MutableTerm prefix(term.begin() + step.StartOffset,
-                     term.begin() + step.StartOffset + step.RuleID);
+                     term.begin() + step.StartOffset + step.Arg);
   MutableTerm suffix(term.end() - step.EndOffset - 1, term.end());
 
   // We're either adding or removing the prefix to each concrete substitution.
@@ -237,7 +250,7 @@ RewritePathEvaluator::applyAdjustment(const RewriteStep &step,
     [&](Term t) -> Term {
       if (step.Inverse) {
         if (!std::equal(t.begin(),
-                        t.begin() + step.RuleID,
+                        t.begin() + step.Arg,
                         prefix.begin())) {
           llvm::errs() << "Invalid rewrite path\n";
           llvm::errs() << "- Term: " << term << "\n";
@@ -248,7 +261,7 @@ RewritePathEvaluator::applyAdjustment(const RewriteStep &step,
           abort();
         }
 
-        MutableTerm mutTerm(t.begin() + step.RuleID, t.end());
+        MutableTerm mutTerm(t.begin() + step.Arg, t.end());
         return Term::get(mutTerm, ctx);
       } else {
         MutableTerm mutTerm(prefix);
@@ -265,18 +278,53 @@ void RewritePathEvaluator::applyShift(const RewriteStep &step,
   assert(step.Kind == RewriteStep::Shift);
   assert(step.StartOffset == 0);
   assert(step.EndOffset == 0);
-  assert(step.RuleID == 0);
+  assert(step.Arg == 0);
 
   if (!step.Inverse) {
-    // Move top of A stack to B stack.
-    checkA();
-    B.push_back(A.back());
-    A.pop_back();
+    // Move top of primary stack to secondary stack.
+    checkPrimary();
+    Secondary.push_back(Primary.back());
+    Primary.pop_back();
   } else {
-    // Move top of B stack to A stack.
-    checkB();
-    A.push_back(B.back());
-    B.pop_back();
+    // Move top of secondary stack to primary stack.
+    checkSecondary();
+    Primary.push_back(Secondary.back());
+    Secondary.pop_back();
+  }
+}
+
+void RewritePathEvaluator::applyRelation(const RewriteStep &step,
+                                         const RewriteSystem &system) {
+  assert(step.Kind == RewriteStep::Relation);
+
+  auto relation = system.getRelation(step.Arg);
+  auto &term = getCurrentTerm();
+
+  if (!step.Inverse) {
+    // Given a term T.[p1].[p2].U where |U| == EndOffset, build the
+    // term T.[p1].U.
+
+    auto lhsProperty = *(term.end() - step.EndOffset - 2);
+    auto rhsProperty = *(term.end() - step.EndOffset - 1);
+    assert(lhsProperty == relation.first);
+    assert(rhsProperty == relation.second);
+
+    MutableTerm result(term.begin(), term.end() - step.EndOffset - 1);
+    result.append(term.end() - step.EndOffset, term.end());
+
+    term = result;
+  } else {
+    // Given a term T.[p1].U where |U| == EndOffset, build the
+    // term T.[p1].[p2].U.
+
+    auto lhsProperty = *(term.end() - step.EndOffset - 1);
+    assert(lhsProperty == relation.first);
+
+    MutableTerm result(term.begin(), term.end() - step.EndOffset);
+    result.add(relation.second);
+    result.append(term.end() - step.EndOffset, term.end());
+
+    term = result;
   }
 }
 
@@ -285,7 +333,7 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
   assert(step.Kind == RewriteStep::Decompose);
 
   auto &ctx = system.getRewriteContext();
-  unsigned numSubstitutions = step.RuleID;
+  unsigned numSubstitutions = step.Arg;
 
   if (!step.Inverse) {
     // The input term takes the form U.[concrete: C].V or U.[superclass: C].V,
@@ -294,7 +342,7 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
     auto symbol = *(term.end() - step.EndOffset - 1);
     if (!symbol.hasSubstitutions()) {
       llvm::errs() << "Expected term with superclass or concrete type symbol"
-                   << " on A stack\n";
+                   << " on primary stack\n";
       dump(llvm::errs());
       abort();
     }
@@ -306,28 +354,28 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
       abort();
     }
 
-    // Push each substitution on the A stack.
+    // Push each substitution on the primary stack.
     for (auto substitution : symbol.getSubstitutions()) {
-      A.push_back(MutableTerm(substitution));
+      Primary.push_back(MutableTerm(substitution));
     }
   } else {
-    // The A stack must store the number of substitutions, together with a
-    // term that takes the form U.[concrete: C].V or U.[superclass: C].V,
+    // The primary stack must store the number of substitutions, together with
+    // a term that takes the form U.[concrete: C].V or U.[superclass: C].V,
     // where |V| == EndOffset.
-    if (A.size() < numSubstitutions + 1) {
-      llvm::errs() << "Not enough terms on A stack\n";
+    if (Primary.size() < numSubstitutions + 1) {
+      llvm::errs() << "Not enough terms on primary stack\n";
       dump(llvm::errs());
       abort();
     }
 
     // The term immediately underneath the substitutions is the one we're
     // updating with new substitutions.
-    auto &term = *(A.end() - numSubstitutions - 1);
+    auto &term = *(Primary.end() - numSubstitutions - 1);
 
     auto &symbol = *(term.end() - step.EndOffset - 1);
     if (!symbol.hasSubstitutions()) {
       llvm::errs() << "Expected term with superclass or concrete type symbol"
-                   << " on A stack\n";
+                   << " on primary stack\n";
       dump(llvm::errs());
       abort();
     }
@@ -340,27 +388,27 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
       abort();
     }
 
-    // Collect the substitutions from the A stack.
+    // Collect the substitutions from the primary stack.
     SmallVector<Term, 2> substitutions;
     substitutions.reserve(numSubstitutions);
     for (unsigned i = 0; i < numSubstitutions; ++i) {
-      const auto &substitution = *(A.end() - numSubstitutions + i);
+      const auto &substitution = *(Primary.end() - numSubstitutions + i);
       substitutions.push_back(Term::get(substitution, ctx));
     }
 
     // Build the new symbol with the new substitutions.
     symbol = symbol.withConcreteSubstitutions(substitutions, ctx);
 
-    // Pop the substitutions from the A stack.
-    A.resize(A.size() - numSubstitutions);
+    // Pop the substitutions from the primary stack.
+    Primary.resize(Primary.size() - numSubstitutions);
   }
 }
 
 void
 RewritePathEvaluator::applyConcreteConformance(const RewriteStep &step,
                                                const RewriteSystem &system) {
-  checkA();
-  auto &term = A.back();
+  checkPrimary();
+  auto &term = Primary.back();
   Symbol *last = term.end() - step.EndOffset;
 
   auto &ctx = system.getRewriteContext();
@@ -440,10 +488,10 @@ RewritePathEvaluator::applyConcreteConformance(const RewriteStep &step,
 
 void RewritePathEvaluator::applyConcreteTypeWitness(const RewriteStep &step,
                                                   const RewriteSystem &system) {
-  checkA();
-  auto &term = A.back();
+  checkPrimary();
+  auto &term = Primary.back();
 
-  const auto &witness = system.getTypeWitness(step.RuleID);
+  const auto &witness = system.getTypeWitness(step.Arg);
   auto fail = [&]() {
     llvm::errs() << "Bad concrete type witness term:\n";
     llvm::errs() << term << "\n\n";
@@ -498,10 +546,10 @@ void RewritePathEvaluator::applyConcreteTypeWitness(const RewriteStep &step,
 
 void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
                                                 const RewriteSystem &system) {
-  checkA();
-  auto &term = A.back();
+  checkPrimary();
+  auto &term = Primary.back();
 
-  const auto &witness = system.getTypeWitness(step.RuleID);
+  const auto &witness = system.getTypeWitness(step.Arg);
   auto fail = [&]() {
     llvm::errs() << "Bad same-type witness term:\n";
     llvm::errs() << term << "\n\n";
@@ -571,10 +619,10 @@ void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
 void
 RewritePathEvaluator::applyAbstractTypeWitness(const RewriteStep &step,
                                                const RewriteSystem &system) {
-  checkA();
-  auto &term = A.back();
+  checkPrimary();
+  auto &term = Primary.back();
 
-  const auto &witness = system.getTypeWitness(step.RuleID);
+  const auto &witness = system.getTypeWitness(step.Arg);
   auto fail = [&]() {
     llvm::errs() << "Bad abstract type witness term:\n";
     llvm::errs() << term << "\n\n";
@@ -621,6 +669,10 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
 
   case RewriteStep::Decompose:
     applyDecompose(step, system);
+    break;
+
+  case RewriteStep::Relation:
+    applyRelation(step, system);
     break;
 
   case RewriteStep::ConcreteConformance:
