@@ -924,25 +924,6 @@ void RuleBuilder::addRequirement(const Requirement &req,
     auto superclassSymbol = Symbol::forSuperclass(otherType, substitutions,
                                                   Context);
 
-    {
-      // Build the symbol [layout: L].
-      auto layout =
-        LayoutConstraint::getLayoutConstraint(
-          otherType->getClassOrBoundGenericClass()->getLayoutConstraintKind(),
-          Context.getASTContext());
-      auto layoutSymbol = Symbol::forLayout(layout, Context);
-
-      MutableTerm layoutSubjectTerm;
-      layoutSubjectTerm.add(superclassSymbol);
-
-      MutableTerm layoutConstraintTerm = layoutSubjectTerm;
-      layoutConstraintTerm.add(layoutSymbol);
-
-      // Add the rule [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>].
-      PermanentRules.emplace_back(layoutConstraintTerm,
-                                  layoutSubjectTerm);
-    }
-
     // Build the term T.[superclass: C<X, Y>].
     constraintTerm = subjectTerm;
     constraintTerm.add(superclassSymbol);

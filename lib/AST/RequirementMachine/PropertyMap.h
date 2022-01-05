@@ -181,6 +181,14 @@ class PropertyMap {
   llvm::DenseMap<std::pair<unsigned, unsigned>, ProtocolConformance *>
       ConcreteConformances;
 
+  /// Superclass requirements always imply a layout requirement, and
+  /// concrete type requirements where the type is a class imply a
+  /// superclass requirement.
+  ///
+  /// Keep track of such rules to avoid wasted work from recording the
+  /// same rewrite loop more than once.
+  llvm::DenseSet<unsigned> CheckedRules;
+
   /// When a type parameter is subject to two requirements of the same
   /// kind, we have a pair of rewrite rules T.[p1] => T and T.[p2] => T.
   ///
@@ -218,6 +226,7 @@ public:
 private:
   void clear();
 
+  bool checkRuleOnce(unsigned ruleID);
   bool checkRulePairOnce(unsigned firstRuleID, unsigned secondRuleID);
 
   void addProperty(Term key, Symbol property, unsigned ruleID,

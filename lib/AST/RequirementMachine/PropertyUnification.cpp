@@ -37,6 +37,11 @@
 using namespace swift;
 using namespace rewriting;
 
+/// Returns true if we have not processed this rule before.
+bool PropertyMap::checkRuleOnce(unsigned ruleID) {
+  return CheckedRules.insert(ruleID).second;
+}
+
 /// Returns true if we have not processed this pair of rules before.
 bool PropertyMap::checkRulePairOnce(unsigned firstRuleID,
                                     unsigned secondRuleID) {
@@ -65,7 +70,7 @@ RewriteSystem::getRelation(unsigned index) const {
 }
 
 /// Given a key T, a rule (V.[p1] => V) where T == U.V, and a property [p2]
-/// where [p1] < [p2], record a rule (T.[p2] => T) that is implied by
+/// where [p1] < [p2], record a rule (T.[p2] => T) that is induced by
 /// the original rule (V.[p1] => V).
 static void recordRelation(Term key,
                            unsigned lhsRuleID,
@@ -80,7 +85,9 @@ static void recordRelation(Term key,
 
   assert(lhsProperty.isProperty());
   assert(rhsProperty.isProperty());
-  assert(lhsProperty.getKind() == rhsProperty.getKind());
+  assert(lhsProperty.getKind() == rhsProperty.getKind() ||
+         (lhsProperty.getKind() == Symbol::Kind::Superclass &&
+          rhsProperty.getKind() == Symbol::Kind::Layout));
 
   if (debug) {
     llvm::dbgs() << "%% Recording relation: ";
@@ -473,6 +480,21 @@ void PropertyMap::addProperty(
 
   case Symbol::Kind::Superclass: {
     // FIXME: Also handle superclass vs concrete
+
+    if (checkRuleOnce(ruleID)) {
+      // A rule (T.[superclass: C] => T) induces a rule (T.[layout: L] => T),
+      // where L is either AnyObject or _NativeObject.
+      auto superclass =
+          property.getSuperclass()->getClassOrBoundGenericClass();
+      auto layout =
+          LayoutConstraint::getLayoutConstraint(
+            superclass->getLayoutConstraintKind(),
+            Context.getASTContext());
+      auto layoutSymbol = Symbol::forLayout(layout, Context);
+
+      recordRelation(key, ruleID, layoutSymbol, System,
+                     inducedRules, debug);
+    }
 
     if (!props->Superclass) {
       props->Superclass = property;
