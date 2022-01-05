@@ -142,6 +142,31 @@ func test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction() {
   test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction_doit("blue")
 }
 
+func do_foo(_ work: () -> ()) {
+  work()
+}
+class Fooer {
+  __consuming func foo() {
+    weak var weakSelf = self
+    do_foo {
+      weakSelf?.foo1()
+      weakSelf?.foo2()
+    }
+  }
+  func foo1() {
+    // CHECK: Fooer foo1
+    print(type(of: self), #function)
+  }
+  func foo2() {
+    // CHECK: Fooer foo2
+    print(type(of: self), #function)
+  }
+}
+
+func test_self_keepsObjectAliveBeyond_callTo_functionTakingClosureCapturingWeakVar() {
+  Fooer().foo()
+}
+
 // =============================================================================
 // = Tests                                                                  }} =
 // =============================================================================
@@ -154,6 +179,8 @@ func run() {
   test_localVar_keepsObjectAliveBeyondCallToClassWithPointer()
   test_localLet_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
   test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
+
+  test_self_keepsObjectAliveBeyond_callTo_functionTakingClosureCapturingWeakVar()
 }
 
 run()
