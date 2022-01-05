@@ -4283,9 +4283,7 @@ DependentMemberType *DependentMemberType::get(Type base,
 OpaqueTypeArchetypeType *
 OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
                              SubstitutionMap Substitutions) {
-  // TODO [OPAQUE SUPPORT]: multiple opaque types
-  assert(ordinal == 0 && "we only support one 'some' type per composite type");
-  auto opaqueParamType = Decl->getUnderlyingInterfaceType();
+  auto opaqueParamType = Decl->getOpaqueGenericParams()[ordinal];
 
   // TODO: We could attempt to preserve type sugar in the substitution map.
   // Currently archetypes are assumed to be always canonical in many places,
@@ -4293,7 +4291,7 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
   Substitutions = Substitutions.getCanonical();
 
   llvm::FoldingSetNodeID id;
-  Profile(id, Decl, Substitutions);
+  Profile(id, Decl, ordinal, Substitutions);
   
   auto &ctx = Decl->getASTContext();
 

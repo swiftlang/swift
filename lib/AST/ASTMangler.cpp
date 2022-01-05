@@ -1161,7 +1161,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
         appendAnyGenericType(decl);
         bool isFirstArgList = true;
-        appendBoundGenericArgs(type, sig, isFirstArgList);
+        appendBoundGenericArgs(type, sig, isFirstArgList, forDecl);
         appendRetroactiveConformances(type, sig);
         appendOperator("G");
         addTypeSubstitution(type, sig);
@@ -1290,7 +1290,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         } else {
           appendAnyGenericType(Decl);
           bool isFirstArgList = true;
-          appendBoundGenericArgs(type, sig, isFirstArgList);
+          appendBoundGenericArgs(type, sig, isFirstArgList, forDecl);
           appendRetroactiveConformances(type, sig);
           appendOperator("G");
         }
@@ -1302,7 +1302,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     }
 
     case TypeKind::SILFunction:
-      return appendImplFunctionType(cast<SILFunctionType>(tybase), sig);
+      return appendImplFunctionType(cast<SILFunctionType>(tybase), sig,
+                                    forDecl);
 
       // type ::= archetype
     case TypeKind::PrimaryArchetype:
@@ -1329,13 +1330,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       bool isFirstArgList = true;
       appendBoundGenericArgs(opaqueDecl, sig,
                              opaqueType->getSubstitutions(),
-                             isFirstArgList);
+                             isFirstArgList, forDecl);
       appendRetroactiveConformances(opaqueType->getSubstitutions(), sig,
                                     opaqueDecl->getParentModule());
       
-      // TODO: If we support multiple opaque types in a return, put the
-      // ordinal for this archetype here.
-      appendOperator("Qo", Index(0));
+      appendOperator("Qo", Index(opaqueType->getOrdinal()));
 
       addTypeSubstitution(type, sig);
       return;
@@ -1351,7 +1350,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         if (tryMangleTypeSubstitution(nestedType, sig))
           return;
         
-        appendType(opaque, sig);
+        appendType(opaque, sig, forDecl);
         bool isAssocTypeAtDepth = false;
         appendAssocType(nestedType->getInterfaceType(),
                         sig, isAssocTypeAtDepth);
@@ -1360,7 +1359,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         return;
       }
       
-      appendType(nestedType->getParent(), sig);
+      appendType(nestedType->getParent(), sig, forDecl);
       appendIdentifier(nestedType->getName().str());
       appendOperator("Qa");
       return;
@@ -1516,20 +1515,22 @@ void ASTMangler::appendOpWithGenericParamIndex(StringRef Op,
 }
 
 void ASTMangler::appendFlatGenericArgs(SubstitutionMap subs,
-                                       GenericSignature sig) {
+                                       GenericSignature sig,
+                                       const ValueDecl *forDecl) {
   appendOperator("y");
 
   for (auto replacement : subs.getReplacementTypes()) {
     if (replacement->hasArchetype())
       replacement = replacement->mapTypeOutOfContext();
-    appendType(replacement, sig);
+    appendType(replacement, sig, forDecl);
   }
 }
 
 unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
                                             GenericSignature sig,
                                             SubstitutionMap subs,
-                                            bool &isFirstArgList) {
+                                            bool &isFirstArgList,
+                                            const ValueDecl *forDecl) {
   auto decl = dc->getInnermostDeclarationDeclContext();
   if (!decl) return 0;
 
@@ -1543,7 +1544,8 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
 
   // Handle the generic arguments of the parent.
   unsigned currentGenericParamIdx =
-    appendBoundGenericArgs(decl->getDeclContext(), sig, subs, isFirstArgList);
+    appendBoundGenericArgs(decl->getDeclContext(), sig, subs, isFirstArgList,
+                           forDecl);
 
   // If this is potentially a generic context, emit a generic argument list.
   if (auto genericContext = decl->getAsGenericContext()) {
@@ -1568,7 +1570,7 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
         if (replacementType->hasArchetype())
           replacementType = replacementType->mapTypeOutOfContext();
 
-        appendType(replacementType, sig);
+        appendType(replacementType, sig, forDecl);
       }
     }
   }
@@ -1577,29 +1579,33 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
 }
 
 void ASTMangler::appendBoundGenericArgs(Type type, GenericSignature sig,
-                                        bool &isFirstArgList) {
+                                        bool &isFirstArgList,
+                                        const ValueDecl *forDecl) {
   TypeBase *typePtr = type.getPointer();
   ArrayRef<Type> genericArgs;
   if (auto *typeAlias = dyn_cast<TypeAliasType>(typePtr)) {
     appendBoundGenericArgs(typeAlias->getDecl(), sig,
                            typeAlias->getSubstitutionMap(),
-                           isFirstArgList);
+                           isFirstArgList, forDecl);
     return;
   }
 
   if (auto *unboundType = dyn_cast<UnboundGenericType>(typePtr)) {
     if (Type parent = unboundType->getParent())
-      appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
+                             forDecl);
   } else if (auto *nominalType = dyn_cast<NominalType>(typePtr)) {
     if (Type parent = nominalType->getParent())
-      appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
+                             forDecl);
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
     if (Type parent = boundType->getParent()) {
       GenericTypeDecl *decl = boundType->getAnyGeneric();
       if (!getSpecialManglingContext(decl, UseObjCRuntimeNames))
-        appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList);
+        appendBoundGenericArgs(parent->getDesugaredType(), sig, isFirstArgList,
+                               forDecl);
     }
   }
   if (isFirstArgList) {
@@ -1609,7 +1615,7 @@ void ASTMangler::appendBoundGenericArgs(Type type, GenericSignature sig,
     appendOperator("_");
   }
   for (Type arg : genericArgs) {
-    appendType(arg, sig);
+    appendType(arg, sig, forDecl);
   }
 }
 
@@ -1777,7 +1783,8 @@ getResultDifferentiability(SILResultDifferentiability diffKind) {
 }
 
 void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
-                                        GenericSignature outerGenericSig) {
+                                        GenericSignature outerGenericSig,
+                                        const ValueDecl *forDecl) {
 
   llvm::SmallVector<char, 32> OpArgs;
 
@@ -1880,7 +1887,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     OpArgs.push_back(getParamConvention(param.getConvention()));
     if (auto diffKind = getParamDifferentiability(param.getDifferentiability()))
       OpArgs.push_back(*diffKind);
-    appendType(param.getInterfaceType(), sig);
+    appendType(param.getInterfaceType(), sig, forDecl);
   }
 
   // Mangle the results.
@@ -1889,14 +1896,14 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     if (auto diffKind =
             getResultDifferentiability(result.getDifferentiability()))
       OpArgs.push_back(*diffKind);
-    appendType(result.getInterfaceType(), sig);
+    appendType(result.getInterfaceType(), sig, forDecl);
   }
 
   // Mangle the yields.
   for (auto yield : fn->getYields()) {
     OpArgs.push_back('Y');
     OpArgs.push_back(getParamConvention(yield.getConvention()));
-    appendType(yield.getInterfaceType(), sig);
+    appendType(yield.getInterfaceType(), sig, forDecl);
   }
 
   // Mangle the error result if present.
@@ -1904,7 +1911,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     auto error = fn->getErrorResult();
     OpArgs.push_back('z');
     OpArgs.push_back(getResultConvention(error.getConvention()));
-    appendType(error.getInterfaceType(), sig);
+    appendType(error.getInterfaceType(), sig, forDecl);
   }
 
   if (auto invocationSig = fn->getInvocationGenericSignature()) {
@@ -1912,7 +1919,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     sig = outerGenericSig;
   }
   if (auto subs = fn->getInvocationSubstitutions()) {
-    appendFlatGenericArgs(subs, sig);
+    appendFlatGenericArgs(subs, sig, forDecl);
     appendRetroactiveConformances(subs, sig, Mod);
   }
   if (auto subs = fn->getPatternSubstitutions()) {
@@ -1921,7 +1928,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
       fn->getInvocationGenericSignature()
         ? fn->getInvocationGenericSignature()
         : outerGenericSig;
-    appendFlatGenericArgs(subs, sig);
+    appendFlatGenericArgs(subs, sig, forDecl);
     appendRetroactiveConformances(subs, sig, Mod);
   }
 

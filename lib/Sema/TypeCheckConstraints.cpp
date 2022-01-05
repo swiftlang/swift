@@ -544,19 +544,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     if (auto opaque = var->getOpaqueResultTypeDecl()) {
       init->forEachChildExpr([&](Expr *expr) -> Expr * {
         if (auto coercionExpr = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
-          auto underlyingType =
-              coercionExpr->getSubExpr()->getType()->mapTypeOutOfContext();
-          auto underlyingSubs = SubstitutionMap::get(
-              opaque->getOpaqueInterfaceGenericSignature(),
-              [&](SubstitutableType *t) -> Type {
-                if (t->isEqual(opaque->getUnderlyingInterfaceType())) {
-                  return underlyingType;
-                }
-                return Type(t);
-              },
-              LookUpConformanceInModule(opaque->getModuleContext()));
-
-          opaque->setUnderlyingTypeSubstitutions(underlyingSubs);
+          opaque->setUnderlyingTypeSubstitutions(
+              coercionExpr->substitutions.mapReplacementTypesOutOfContext());
         }
         return expr;
       });

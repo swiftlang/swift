@@ -2001,6 +2001,37 @@ namespace {
     using super = ContextDescriptorBuilderBase;
 
     OpaqueTypeDecl *O;
+
+    /// Whether the given requirement is a conformance requirement that
+    /// requires a witness table in the opaque type descriptor.
+    ///
+    /// When it does, returns the protocol.
+    ProtocolDecl *requiresWitnessTable(const Requirement &req) const {
+      // We only care about conformance requirements.
+      if (req.getKind() != RequirementKind::Conformance)
+        return nullptr;
+
+      // The protocol must require a witness table.
+      auto proto = req.getProtocolDecl();
+      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+        return nullptr;
+
+      // The type itself must be anchored on one of the generic parameters of
+      // the opaque type (not an outer context).
+      Type subject = req.getFirstType();
+      while (auto depMember = subject->getAs<DependentMemberType>()) {
+        subject = depMember->getBase();
+      }
+
+      if (auto genericParam = subject->getAs<GenericTypeParamType>()) {
+        unsigned opaqueDepth = O->getOpaqueGenericParams().front()->getDepth();
+        if (genericParam->getDepth() == opaqueDepth)
+          return proto;
+      }
+
+      return nullptr;
+    }
+
   public:
     
     OpaqueTypeDescriptorBuilder(IRGenModule &IGM, OpaqueTypeDecl *O)
@@ -2015,29 +2046,28 @@ namespace {
     
     void addUnderlyingTypeAndConformances() {
       auto sig = O->getOpaqueInterfaceGenericSignature();
-      auto underlyingType = Type(O->getUnderlyingInterfaceType())
-        .subst(*O->getUnderlyingTypeSubstitutions())
-        ->getCanonicalType(sig);
-
       auto contextSig = O->getGenericSignature().getCanonicalSignature();
+      auto subs = *O->getUnderlyingTypeSubstitutions();
 
-      B.addRelativeAddress(IGM.getTypeRef(underlyingType, contextSig,
-                                          MangledTypeRefRole::Metadata).first);
-      
-      auto opaqueType = O->getDeclaredInterfaceType()
-                         ->castTo<OpaqueTypeArchetypeType>();
-      
-      for (auto proto : opaqueType->getConformsTo()) {
-        auto conformance = ProtocolConformanceRef(proto);
-        auto underlyingConformance = conformance
-          .subst(O->getUnderlyingInterfaceType(),
-                 *O->getUnderlyingTypeSubstitutions());
+      // Add the underlying types for each generic parameter.
+      for (auto genericParam : O->getOpaqueGenericParams()) {
+        auto underlyingType = Type(genericParam).subst(subs)->getCanonicalType(sig);
+        B.addRelativeAddress(
+            IGM.getTypeRef(underlyingType, contextSig,
+            MangledTypeRefRole::Metadata).first);
+      }
 
-        // Skip protocols without Witness tables, e.g. @objc protocols.
-        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
-                underlyingConformance.getRequirement()))
+      // Add witness tables for each of the conformance requirements.
+      for (const auto &req : sig.getRequirements()) {
+        auto proto = requiresWitnessTable(req);
+        if (!proto)
           continue;
 
+        auto underlyingDependentType = req.getFirstType()->getCanonicalType();
+        auto underlyingType = underlyingDependentType.subst(subs)
+            ->getCanonicalType();
+        auto underlyingConformance =
+            subs.lookupConformance(underlyingDependentType, proto);
         auto witnessTableRef = IGM.emitWitnessTableRefString(
                                           underlyingType, underlyingConformance,
                                           contextSig,
@@ -2113,11 +2143,14 @@ namespace {
     }
     
     uint16_t getKindSpecificFlags() {
-      // Store the size of the type and conformances vector in the flags.
-      auto opaqueType = O->getDeclaredInterfaceType()
-        ->castTo<OpaqueTypeArchetypeType>();
+      // Store the number of types and witness tables in the flags.
+      unsigned numWitnessTables = llvm::count_if(
+          O->getOpaqueInterfaceGenericSignature().getRequirements(),
+          [&](const Requirement &req) {
+            return requiresWitnessTable(req) != nullptr;
+          });
 
-      return 1 + opaqueType->getConformsTo().size();
+      return O->getOpaqueGenericParams().size() + numWitnessTables;
     }
   };
 } // end anonymous namespace
