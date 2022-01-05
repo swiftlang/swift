@@ -76,7 +76,7 @@ struct Test {
 let zingle = {() -> some P in 1 } // expected-error{{'some' types are only implemented}}
 
 
-func twoOpaqueTypes() -> (some P, some P) { return (1, 2) } // expected-error{{'(some P, some P)' contains multiple 'opaque' types, but only one 'opaque' type is supported}}
+func twoOpaqueTypes() -> (some P, some P) { return (1, 2) }
 func asArrayElem() -> [some P] { return [1] }
 
 // Invalid positions

@@ -3316,6 +3316,11 @@ public:
                        ArrayRef<ConstraintLocator::PathElement> path,
                        unsigned summaryFlags);
 
+  /// Retrieve a locator for opening the opaque archetype for the given
+  /// opaque type.
+  ConstraintLocator *getOpenOpaqueLocator(
+      ConstraintLocatorBuilder locator, OpaqueTypeDecl *opaqueDecl);
+
   /// Retrive the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags
   ConstraintLocator *
