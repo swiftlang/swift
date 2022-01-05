@@ -307,22 +307,6 @@ void PropertyMap::clear() {
   ConcreteTypeInDomainMap.clear();
 }
 
-/// Record a protocol conformance, layout or superclass constraint on the given
-/// key. Must be called in monotonically non-decreasing key order.
-///
-/// If there was a conflict, returns the conflicting rule ID; otherwise
-/// returns None.
-Optional<unsigned> PropertyMap::addProperty(
-    Term key, Symbol property, unsigned ruleID,
-    SmallVectorImpl<InducedRule> &inducedRules) {
-  assert(property.isProperty());
-  assert(*System.getRule(ruleID).isPropertyRule() == property);
-  auto *props = getOrCreateProperties(key);
-  bool debug = Debug.contains(DebugFlags::ConcreteUnification);
-  return props->addProperty(property, ruleID, System,
-                            inducedRules, debug);
-}
-
 /// Build the property map from all rules of the form T.[p] => T, where
 /// [p] is a property symbol.
 ///

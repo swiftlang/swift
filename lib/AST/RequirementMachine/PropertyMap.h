@@ -101,11 +101,6 @@ class PropertyBag {
 
   explicit PropertyBag(Term key) : Key(key) {}
 
-  Optional<unsigned> addProperty(Symbol property,
-                                 unsigned ruleID,
-                                 RewriteSystem &system,
-                                 SmallVectorImpl<InducedRule> &inducedRules,
-                                 bool debug);
   void copyPropertiesFrom(const PropertyBag *next,
                           RewriteContext &ctx);
 

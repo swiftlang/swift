@@ -383,45 +383,51 @@ static std::pair<Symbol, bool> unifySuperclasses(
   return std::make_pair(rhs, false);
 }
 
-/// Returns the old conflicting rule ID if there was a conflict,
-/// otherwise returns None.
-Optional<unsigned> PropertyBag::addProperty(
-    Symbol property, unsigned ruleID, RewriteSystem &system,
-    SmallVectorImpl<InducedRule> &inducedRules,
-    bool debug) {
+/// Record a protocol conformance, layout or superclass constraint on the given
+/// key. Must be called in monotonically non-decreasing key order.
+///
+/// If there was a conflict, returns the conflicting rule ID; otherwise
+/// returns None.
+Optional<unsigned> PropertyMap::addProperty(
+    Term key, Symbol property, unsigned ruleID,
+    SmallVectorImpl<InducedRule> &inducedRules) {
+  assert(property.isProperty());
+  assert(*System.getRule(ruleID).isPropertyRule() == property);
+  auto *props = getOrCreateProperties(key);
+  bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   switch (property.getKind()) {
   case Symbol::Kind::Protocol:
-    ConformsTo.push_back(property.getProtocol());
-    ConformsToRules.push_back(ruleID);
+    props->ConformsTo.push_back(property.getProtocol());
+    props->ConformsToRules.push_back(ruleID);
     return None;
 
   case Symbol::Kind::Layout: {
     auto newLayout = property.getLayoutConstraint();
 
-    if (!Layout) {
+    if (!props->Layout) {
       // If we haven't seen a layout requirement before, just record it.
-      Layout = newLayout;
-      LayoutRule = ruleID;
+      props->Layout = newLayout;
+      props->LayoutRule = ruleID;
     } else {
       // Otherwise, compute the intersection.
-      assert(LayoutRule.hasValue());
-      auto mergedLayout = Layout.merge(property.getLayoutConstraint());
+      assert(props->LayoutRule.hasValue());
+      auto mergedLayout = props->Layout.merge(property.getLayoutConstraint());
 
       // If the intersection is invalid, we have a conflict.
       if (!mergedLayout->isKnownLayout())
-        return LayoutRule;
+        return props->LayoutRule;
 
       // If the intersection is equal to the existing layout requirement,
       // the new layout requirement is redundant.
-      if (mergedLayout == Layout) {
-        recordRelation(*LayoutRule, ruleID, system, inducedRules, debug);
+      if (mergedLayout == props->Layout) {
+        recordRelation(*props->LayoutRule, ruleID, System, inducedRules, debug);
 
       // If the intersection is equal to the new layout requirement, the
       // existing layout requirement is redundant.
       } else if (mergedLayout == newLayout) {
-        recordRelation(ruleID, *LayoutRule, system, inducedRules, debug);
-        LayoutRule = ruleID;
+        recordRelation(ruleID, *props->LayoutRule, System, inducedRules, debug);
+        props->LayoutRule = ruleID;
       } else {
         llvm::errs() << "Arbitrary intersection of layout requirements is "
                      << "supported yet\n";
@@ -435,34 +441,34 @@ Optional<unsigned> PropertyBag::addProperty(
   case Symbol::Kind::Superclass: {
     // FIXME: Also handle superclass vs concrete
 
-    if (!Superclass) {
-      Superclass = property;
-      SuperclassRule = ruleID;
+    if (!props->Superclass) {
+      props->Superclass = property;
+      props->SuperclassRule = ruleID;
     } else {
-      assert(SuperclassRule.hasValue());
-      auto pair = unifySuperclasses(*Superclass, property,
-                                    system.getRewriteContext(),
+      assert(props->SuperclassRule.hasValue());
+      auto pair = unifySuperclasses(*props->Superclass, property,
+                                    System.getRewriteContext(),
                                     inducedRules, debug);
-      Superclass = pair.first;
+      props->Superclass = pair.first;
       bool conflict = pair.second;
       if (conflict)
-        return SuperclassRule;
+        return props->SuperclassRule;
     }
 
     return None;
   }
 
   case Symbol::Kind::ConcreteType: {
-    if (!ConcreteType) {
-      ConcreteType = property;
-      ConcreteTypeRule = ruleID;
+    if (!props->ConcreteType) {
+      props->ConcreteType = property;
+      props->ConcreteTypeRule = ruleID;
     } else {
-      assert(ConcreteTypeRule.hasValue());
-      bool conflict = unifyConcreteTypes(*ConcreteType, property,
-                                         system.getRewriteContext(),
+      assert(props->ConcreteTypeRule.hasValue());
+      bool conflict = unifyConcreteTypes(*props->ConcreteType, property,
+                                         System.getRewriteContext(),
                                          inducedRules, debug);
       if (conflict)
-        return ConcreteTypeRule;
+        return props->ConcreteTypeRule;
     }
 
     return None;
