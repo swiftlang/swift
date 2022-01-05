@@ -334,6 +334,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     auto OptArg = inputArgs.getLastArgNoClaim(options::OPT_O_Group);
     if (!OptArg || OptArg->getOption().matches(options::OPT_Onone))
       arguments.push_back("-enable-anonymous-context-mangled-names");
+
+    inputArgs.AddAllArgs(arguments, options::OPT_debug_compilation_dir);
   }
 
   // Pass through any subsystem flags.
