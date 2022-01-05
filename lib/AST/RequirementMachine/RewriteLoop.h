@@ -51,7 +51,7 @@ struct RewriteStep {
     ///
     /// The StartOffset field encodes the offset where to apply the rule.
     ///
-    /// The RuleID field encodes the rule to apply.
+    /// The Arg field encodes the rule to apply.
     ApplyRewriteRule,
 
     /// The term at the top of the primary stack must be a term ending with a
@@ -80,7 +80,7 @@ struct RewriteStep {
     /// must follow a term ending with a superclass or concrete type symbol.
     /// The new substitutions replace the substitutions in that symbol.
     ///
-    /// The RuleID field encodes the number of substitutions.
+    /// The Arg field encodes the number of substitutions.
     Decompose,
 
     ///
@@ -117,10 +117,7 @@ struct RewriteStep {
     ///
     /// If inverted: the concrete type symbol [concrete: C.X] is introduced.
     ///
-    /// The RuleID field is repurposed to store the result of calling
-    /// RewriteSystem::recordTypeWitness(). This index is then passed in
-    /// to RewriteSystem::getTypeWitness() when applying
-    /// the step.
+    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
     ConcreteTypeWitness,
 
     /// If not inverted: the top of the primary stack must be a term ending in a
@@ -129,8 +126,7 @@ struct RewriteStep {
     ///
     /// If inverted: the associated type symbol [P:X] is introduced.
     ///
-    /// The RuleID field is a TypeWitness ID as above.
-    /// the step.
+    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
     SameTypeWitness,
 
     /// If not inverted: replaces the abstract type witness term with the
@@ -139,7 +135,7 @@ struct RewriteStep {
     /// If inverted: replaces the subject type term with the abstract type
     /// term.
     ///
-    /// The RuleID field is a TypeWitness ID as above.
+    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
     AbstractTypeWitness,
   };
 
@@ -164,18 +160,18 @@ struct RewriteStep {
   /// at the beginning of each concrete substitution.
   ///
   /// If Kind is Concrete, the number of substitutions to push or pop.
-  unsigned RuleID : 16;
+  unsigned Arg : 16;
 
   RewriteStep(StepKind kind, unsigned startOffset, unsigned endOffset,
-              unsigned ruleID, bool inverse) {
+              unsigned arg, bool inverse) {
     Kind = kind;
 
     StartOffset = startOffset;
     assert(StartOffset == startOffset && "Overflow");
     EndOffset = endOffset;
     assert(EndOffset == endOffset && "Overflow");
-    RuleID = ruleID;
-    assert(RuleID == ruleID && "Overflow");
+    Arg = arg;
+    assert(Arg == arg && "Overflow");
     Inverse = inverse;
   }
 
@@ -187,42 +183,42 @@ struct RewriteStep {
   static RewriteStep forAdjustment(unsigned offset, unsigned endOffset,
                                    bool inverse) {
     return RewriteStep(AdjustConcreteType, /*startOffset=*/0, endOffset,
-                       /*ruleID=*/offset, inverse);
+                       /*arg=*/offset, inverse);
   }
 
   static RewriteStep forShift(bool inverse) {
     return RewriteStep(Shift, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+                       /*arg=*/0, inverse);
   }
 
   static RewriteStep forDecompose(unsigned numSubstitutions, bool inverse) {
     return RewriteStep(Decompose, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/numSubstitutions, inverse);
+                       /*arg=*/numSubstitutions, inverse);
   }
 
   static RewriteStep forConcreteConformance(bool inverse) {
     return RewriteStep(ConcreteConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+                       /*arg=*/0, inverse);
   }
 
   static RewriteStep forSuperclassConformance(bool inverse) {
     return RewriteStep(SuperclassConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+                       /*arg=*/0, inverse);
   }
 
   static RewriteStep forConcreteTypeWitness(unsigned witnessID, bool inverse) {
     return RewriteStep(ConcreteTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/witnessID, inverse);
+                       /*arg=*/witnessID, inverse);
   }
 
   static RewriteStep forSameTypeWitness(unsigned witnessID, bool inverse) {
     return RewriteStep(SameTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/witnessID, inverse);
+                       /*arg=*/witnessID, inverse);
   }
 
   static RewriteStep forAbstractTypeWitness(unsigned witnessID, bool inverse) {
     return RewriteStep(AbstractTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/witnessID, inverse);
+                       /*arg=*/witnessID, inverse);
   }
 
   bool isInContext() const {
@@ -233,10 +229,10 @@ struct RewriteStep {
     Inverse = !Inverse;
   }
 
-  bool isInverseOf(const RewriteStep &other) const;
-
-  bool maybeSwapRewriteSteps(RewriteStep &other,
-                             const RewriteSystem &system);
+  unsigned getRuleID() const {
+    assert(Kind == RewriteStep::ApplyRewriteRule);
+    return Arg;
+  }
 
   void dump(llvm::raw_ostream &out,
             RewritePathEvaluator &evaluator,

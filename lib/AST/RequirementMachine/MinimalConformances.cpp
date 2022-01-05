@@ -113,7 +113,7 @@ void RewriteLoop::findProtocolConformanceRules(
     if (!evaluator.isInContext()) {
       switch (step.Kind) {
       case RewriteStep::ApplyRewriteRule: {
-        const auto &rule = system.getRule(step.RuleID);
+        const auto &rule = system.getRule(step.getRuleID());
 
         if (rule.isIdentityConformanceRule())
           break;
@@ -127,7 +127,7 @@ void RewriteLoop::findProtocolConformanceRules(
             // the prefix term is 'X'.
             const auto &term = evaluator.getCurrentTerm();
             MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
-            result[proto].RulesInContext.emplace_back(prefix, step.RuleID);
+            result[proto].RulesInContext.emplace_back(prefix, step.getRuleID());
           }
         }
 
@@ -262,7 +262,7 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
   const auto &step = *steps.begin();
 
 #ifndef NDEBUG
-  const auto &rule = System.getRule(step.RuleID);
+  const auto &rule = System.getRule(step.getRuleID());
   assert(rule.isAnyConformanceRule());
   assert(!rule.isIdentityConformanceRule());
 #endif
@@ -277,9 +277,10 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
     // Build the term U.
     MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
 
-    decomposeTermIntoConformanceRuleLeftHandSides(prefix, step.RuleID, result);
+    decomposeTermIntoConformanceRuleLeftHandSides(
+        prefix, step.getRuleID(), result);
   } else {
-    result.push_back(step.RuleID);
+    result.push_back(step.getRuleID());
   }
 }
 
