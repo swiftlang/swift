@@ -1,5 +1,6 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-copy-propagation) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library -Xfrontend -enable-copy-propagation) | %FileCheck %s
 
+// REQUIRES: concurrency
 // REQUIRES: executable_test
 
 // =============================================================================
@@ -167,21 +168,54 @@ func test_self_keepsObjectAliveBeyond_callTo_functionTakingClosureCapturingWeakV
   Fooer().foo()
 }
 
+func do_foo_async(_ work: @escaping () -> ()) -> Task<Void, Never> {
+  Task {
+    work()
+  }
+}
+class FooerAsync {
+  var strongSelf: FooerAsync?
+  __consuming func foo() -> Task<Void, Never> {
+    weak var weakSelf = self
+    strongSelf = self
+    return do_foo_async {
+      // At this point, strongSelf is keeping the object alive.
+      weakSelf?.foo1()
+      // By this point, strongSelf has been nil'd, dropping the object's retain
+      // count to 0, deallocating the object, so weakSelf is nil.
+      weakSelf?.foo2()
+    }
+  }
+  func foo1() {
+    // CHECK: FooerAsync foo1
+    print(type(of: self), #function)
+    strongSelf = nil
+  }
+  func foo2() {
+    // CHECK-NOT: FooerAsync foo2
+    print(type(of: self), #function)
+  }
+}
+
+func test_repeatedLoadWeakSelf() -> Task<Void, Never> {
+  FooerAsync().foo()
+}
+
 // =============================================================================
 // = Tests                                                                  }} =
 // =============================================================================
 
-func run() {
-  test_localLet_keepsObjectAliveBeyondCallToClassWithWeakReference()
-  // Reenable with rdar://86271875
-  // test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference()
-  test_localLet_keepsObjectAliveBeyondCallToClassWithPointer()
-  test_localVar_keepsObjectAliveBeyondCallToClassWithPointer()
-  test_localLet_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
-  test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
+@main struct Main {
+  static func main() async {
+    test_localLet_keepsObjectAliveBeyondCallToClassWithWeakReference()
+    // Reenable with rdar://86271875
+    // test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference()
+    test_localLet_keepsObjectAliveBeyondCallToClassWithPointer()
+    test_localVar_keepsObjectAliveBeyondCallToClassWithPointer()
+    test_localLet_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
+    test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
 
-  test_self_keepsObjectAliveBeyond_callTo_functionTakingClosureCapturingWeakVar()
+    test_self_keepsObjectAliveBeyond_callTo_functionTakingClosureCapturingWeakVar()
+    await test_repeatedLoadWeakSelf().value
+  }
 }
-
-run()
-
