@@ -593,7 +593,7 @@ entry(%instance : @guaranteed $C):
 // Hoist over an apply that uses a copy of the borrow.
 // CHECK-LABEL: sil [ossa] @hoist_over_apply_at_copy : {{.*}} {
 // CHECK-NOT:     copy_value
-// CHECK-LABEL: // end sil function 'hoist_over_apply_at_copy'
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_at_copy'
 sil [ossa] @hoist_over_apply_at_copy : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
   %synchronization_point = function_ref @synchronization_point : $@convention(thin) () -> ()
@@ -618,7 +618,7 @@ entry(%instance : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         apply {{%[^,]+}}([[INSTANCE]])
-// CHECK-LABEL: // end sil function 'hoist_over_apply_at_borrow'
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_at_borrow'
 sil [ossa] @hoist_over_apply_at_borrow : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
   %lifetime = begin_borrow %instance : $C
@@ -645,7 +645,7 @@ entry(%instance : @owned $C):
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         begin_borrow [[COPY]]
-// CHECK-LABEL: // end sil function 'hoist_over_borrow_of_copy'
+// CHECK-LABEL: } // end sil function 'hoist_over_borrow_of_copy'
 sil [ossa] @hoist_over_borrow_of_copy : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
   %lifetime_1 = begin_borrow %instance : $C
