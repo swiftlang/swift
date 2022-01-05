@@ -33,8 +33,8 @@ namespace {
 /// Promotes heap allocated objects to the stack.
 ///
 /// It handles alloc_ref instructions of native swift classes: if promoted,
-/// the [stack] attribute is set in the alloc_ref and a dealloc_ref [stack] is
-/// inserted at the end of the object's lifetime.
+/// the [stack] attribute is set in the alloc_ref and a dealloc_stack_ref
+/// is inserted at the end of the object's lifetime.
 class StackPromotion : public SILFunctionTransform {
 
 public:
@@ -144,10 +144,10 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
   // We set the [stack] attribute in the alloc_ref.
   ARI->setStackAllocatable();
 
-  /// And create dealloc_ref [stack] at the end of the object's lifetime.
+  /// And create dealloc_stack_ref at the end of the object's lifetime.
   for (SILInstruction *FrontierInst : Frontier) {
     SILBuilder B(FrontierInst);
-    B.createDeallocRef(ARI->getLoc(), ARI, true);
+    B.createDeallocStackRef(ARI->getLoc(), ARI);
   }
   return true;
 }

@@ -123,13 +123,11 @@ findDeallocStackInst(AllocStackInst *ASI) {
 /// Return the deallocate ref instructions corresponding to the given
 /// AllocRefInst.
 static llvm::SmallVector<SILInstruction *, 1>
-findDeallocRefInst(AllocRefInst *ARI) {
+findDeallocStackRefInst(AllocRefInst *ARI) {
   llvm::SmallVector<SILInstruction *, 1> DSIs;
   for (auto UI = ARI->use_begin(), E = ARI->use_end(); UI != E; ++UI) {
-    if (auto *D = dyn_cast<DeallocRefInst>(UI->getUser())) {
-      if (D->isDeallocatingStack())
-        DSIs.push_back(D);
-    }
+    if (auto *D = dyn_cast<DeallocStackRefInst>(UI->getUser()))
+      DSIs.push_back(D);
   }
   return DSIs;
 }
@@ -160,6 +158,7 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::FixLifetimeInst:
@@ -705,7 +704,7 @@ void BlockState::initStoreSetAtEndOfBlock(DSEContext &Ctx) {
     if (auto *ARI = dyn_cast<AllocRefInst>(LocationVault[i].getBase())) {
       if (!ARI->isAllocatingStack())
         continue;
-      for (auto X : findDeallocRefInst(ARI)) {
+      for (auto X : findDeallocStackRefInst(ARI)) {
         SILBasicBlock *DSIBB = X->getParent();
         if (DSIBB != BB)
           continue;

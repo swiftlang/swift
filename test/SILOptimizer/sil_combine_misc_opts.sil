@@ -96,7 +96,7 @@ sil @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_ref [stack] $Klass
   set_deallocating %1 : $Klass
-  dealloc_ref [stack] %1 : $Klass
+  dealloc_stack_ref %1 : $Klass
   %3 = tuple ()
   return %3 : $()
 }
@@ -110,7 +110,8 @@ sil [ossa] @remove_unused_alloc_ref_stack_ossa : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_ref [stack] $Klass
   set_deallocating %1 : $Klass
-  dealloc_ref [stack] %1 : $Klass
+  dealloc_ref %1 : $Klass
+  dealloc_stack_ref %1 : $Klass
   %3 = tuple ()
   return %3 : $()
 }
@@ -126,7 +127,7 @@ bb0:
   %1 = alloc_ref [stack] $Klass
   set_deallocating %1 : $Klass
   fix_lifetime %1 : $Klass
-  dealloc_ref [stack] %1 : $Klass
+  dealloc_stack_ref %1 : $Klass
   %3 = tuple ()
   return %3 : $()
 }
@@ -142,7 +143,8 @@ bb0:
   %1 = alloc_ref [stack] $Klass
   set_deallocating %1 : $Klass
   fix_lifetime %1 : $Klass
-  dealloc_ref [stack] %1 : $Klass
+  dealloc_ref %1 : $Klass
+  dealloc_stack_ref %1 : $Klass
   %3 = tuple ()
   return %3 : $()
 }

@@ -2163,6 +2163,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::InitExistentialMetatypeInst:
     case SILInstructionKind::OpenExistentialMetatypeInst:
     case SILInstructionKind::ExistentialMetatypeInst:
+    case SILInstructionKind::DeallocStackRefInst:
     case SILInstructionKind::DeallocRefInst:
     case SILInstructionKind::SetDeallocatingInst:
     case SILInstructionKind::FixLifetimeInst:
