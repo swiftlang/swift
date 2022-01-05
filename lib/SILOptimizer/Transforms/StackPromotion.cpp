@@ -55,9 +55,6 @@ private:
 
 void StackPromotion::run() {
   SILFunction *F = getFunction();
-  // FIXME: We should be able to support ownership.
-  if (F->hasOwnership())
-    return;
 
   LLVM_DEBUG(llvm::dbgs() << "** StackPromotion in " << F->getName() << " **\n");
 
