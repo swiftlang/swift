@@ -298,7 +298,13 @@ void ShrinkBorrowScope::findBarriers() {
       // At that time, it was checked that this block (along with all that
       // successor's other predecessors) had a terminator over which the borrow
       // scope could be shrunk.  Shrink it now.
-      assert(tryHoistOverInstruction(block->getTerminator()));
+#ifndef NDEBUG
+      bool hoisted = 
+#endif
+      tryHoistOverInstruction(block->getTerminator());
+#ifndef NDEBUG
+      assert(hoisted);
+#endif
     }
     SILInstruction *barrier = nullptr;
     while ((instruction = instruction->getPreviousInstruction())) {
