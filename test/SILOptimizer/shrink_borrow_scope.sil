@@ -716,6 +716,35 @@ bad(%15 : @owned $Error):
   throw %15 : $Error
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_try_apply_barrier : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         try_apply undef() : {{.*}}, normal [[GOOD:bb[0-9]+]], error [[BAD:bb[0-9]+]]
+// CHECK:       [[GOOD]]([[REGISTER_3:%[^,]+]] : $()):
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:       [[BAD]]([[ERROR:%[^,]+]] : @owned $Error):
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         throw [[ERROR]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_try_apply_barrier'
+sil [ossa] @dont_hoist_over_try_apply_barrier : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
+  %lifetime = begin_borrow %instance : $C
+  try_apply undef() : $@convention(thin) () -> @error Error, normal good, error bad
+
+good(%8 : $()):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  %13 = tuple ()
+  return %13 : $()
+
+bad(%15 : @owned $Error):
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  throw %15 : $Error
+}
+
 // Hoist up to two parallel barrier applies from a block with two predecessors.
 //
 // CHECK-LABEL: sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
