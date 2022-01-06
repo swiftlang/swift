@@ -933,6 +933,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     SILValue Box = O.get();
     assert((isa<SingleValueInstruction>(Box) && isa<AllocBoxInst>(Box) ||
             isa<CopyValueInst>(Box) ||
+            isa<MarkUninitializedInst>(Box) ||
             isa<SILFunctionArgument>(Box)) &&
            "Expected either an alloc box or a copy of an alloc box or a "
            "function argument");
