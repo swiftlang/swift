@@ -2,6 +2,7 @@ include_guard(GLOBAL)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/SwiftUtils.cmake)
 precondition(SWIFT_HOST_VARIANT_SDK)
+precondition(SWIFT_DARWIN_PLATFORMS)
 
 if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
   set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
