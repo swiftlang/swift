@@ -137,6 +137,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/GraphNodeWorklist.h"
@@ -197,6 +198,24 @@ static SourceLoc getSourceLocFromValue(SILValue value) {
   llvm_unreachable("Do not know how to get source loc for value?!");
 }
 
+#ifndef NDEBUG
+static void dumpBitVector(llvm::raw_ostream &os, const SmallBitVector &bv) {
+  for (unsigned i = 0; i < bv.size(); ++i) {
+    os << (bv[i] ? '1' : '0');
+  }
+}
+#endif
+
+/// Returns true if a value has one or zero debug uses.
+static bool hasMoreThanOneDebugUse(SILValue v) {
+  auto Range = getDebugUses(v);
+  auto i = Range.begin(), e = Range.end();
+  if (i == e)
+    return false;
+  ++i;
+  return i != e;
+}
+
 //===----------------------------------------------------------------------===//
 //                            Forward Declarations
 //===----------------------------------------------------------------------===//
@@ -215,11 +234,36 @@ enum class DownwardScanResult {
 };
 
 struct ClosureOperandState {
+  /// This is the downward scan result that visiting a full applysite of this
+  /// closure will effect on the address being analyzed.
   DownwardScanResult result = DownwardScanResult::Invalid;
+
+  /// Instructions that act as consumes in the closure callee. This is the set
+  /// of earliest post dominating consumes that should be eliminated in the
+  /// cloned callee. Only set if state is upwards consume.
   TinyPtrVector<SILInstruction *> pairedConsumingInsts;
+
+  /// The set of instructions in the callee that are uses that require the move
+  /// to be alive. Only set if state is upwards use.
   TinyPtrVector<SILInstruction *> pairedUseInsts;
+
+  /// The single debug value in the closure callee that we sink to the reinit
+  /// points.
+  DebugValueInst *singleDebugValue = nullptr;
+
+  /// If set to true, this closure invocation propagates a use upwards that will
+  /// result in an error.
   bool isUpwardsUse = false;
+
+  /// If set to true, then the var in the callee is reinited and or destroyed
+  /// with a destroy_addr. We can convert the inout_aliasable to an out
+  /// parameter.
   bool isUpwardsConsume = false;
+
+  /// We do not propagate inits towards function exits, we just use them to stop
+  /// propagating uses or consumes. This is because we only care about analyzing
+  /// the address while the parameter value has not be reinited over. We can
+  /// rely on SILGen when working with vars (the only way this can happen).
   bool isUpwardsInit = false;
 };
 
@@ -419,7 +463,8 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
 /// inst, we return it in foundInst. If no inst is returned, one must continue.
 static DownwardScanResult
 downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
-                       TinyPtrVector<SILInstruction *> &foundInsts) {
+                       SILInstruction **foundInst, Operand **foundOperand,
+                       TinyPtrVector<SILInstruction *> &foundClosureInsts) {
   // Forward scan looking for uses or reinits.
   for (auto &next : llvm::make_range(std::next(mvi->getIterator()),
                                      mvi->getParent()->end())) {
@@ -431,7 +476,7 @@ downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
         useState.seenMarkMoves.count(&next) || useState.inits.count(&next)) {
       // Emit a diagnostic error and process the next mark_unresolved_move_addr.
       LLVM_DEBUG(llvm::dbgs() << "SingleBlock liveness user: " << next);
-      foundInsts.push_back(&next);
+      *foundInst = &next;
       return DownwardScanResult::UseForDiagnostic;
     }
 
@@ -439,7 +484,7 @@ downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
       auto iter = useState.reinitToIndexMap.find(&next);
       if (iter != useState.reinitToIndexMap.end()) {
         LLVM_DEBUG(llvm::dbgs() << "DownwardScan: reinit: " << next);
-        foundInsts.push_back(&next);
+        *foundInst = &next;
         return DownwardScanResult::Reinit;
       }
     }
@@ -451,34 +496,42 @@ downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
       if (iter != useState.destroyToIndexMap.end()) {
         auto *dai = cast<DestroyAddrInst>(iter->first);
         LLVM_DEBUG(llvm::dbgs() << "DownwardScan: Destroy: " << *dai);
-        foundInsts.push_back(dai);
+        *foundInst = dai;
         return DownwardScanResult::Destroy;
       }
     }
 
     // Finally check if we have a closure user that we were able to handle.
     if (auto fas = FullApplySite::isa(&next)) {
+      LLVM_DEBUG(llvm::dbgs() << "DownwardScan: ClosureCheck: " << **fas);
       for (auto &op : fas.getArgumentOperands()) {
         auto iter = useState.consumingClosureOperands.find(&op);
-        if (iter != useState.consumingClosureOperands.end()) {
-          switch (iter->second.result) {
-          case DownwardScanResult::Invalid:
-          case DownwardScanResult::Destroy:
-          case DownwardScanResult::Reinit:
-          case DownwardScanResult::UseForDiagnostic:
-          case DownwardScanResult::MoveOut:
-            llvm_unreachable("unhandled");
-          case DownwardScanResult::ClosureConsume:
-            llvm::copy(iter->second.pairedConsumingInsts,
-                       std::back_inserter(foundInsts));
-            break;
-          case DownwardScanResult::ClosureUse:
-            llvm::copy(iter->second.pairedUseInsts,
-                       std::back_inserter(foundInsts));
-            break;
-          }
-          return iter->second.result;
+        if (iter == useState.consumingClosureOperands.end()) {
+          continue;
         }
+
+        LLVM_DEBUG(llvm::dbgs()
+                   << "DownwardScan: ClosureCheck: Matching Operand: "
+                   << fas.getAppliedArgIndex(op) << '\n');
+        *foundInst = &next;
+        *foundOperand = &op;
+        switch (iter->second.result) {
+        case DownwardScanResult::Invalid:
+        case DownwardScanResult::Destroy:
+        case DownwardScanResult::Reinit:
+        case DownwardScanResult::UseForDiagnostic:
+        case DownwardScanResult::MoveOut:
+          llvm_unreachable("unhandled");
+        case DownwardScanResult::ClosureConsume:
+          llvm::copy(iter->second.pairedConsumingInsts,
+                     std::back_inserter(foundClosureInsts));
+          break;
+        case DownwardScanResult::ClosureUse:
+          llvm::copy(iter->second.pairedUseInsts,
+                     std::back_inserter(foundClosureInsts));
+          break;
+        }
+        return iter->second.result;
       }
     }
   }
@@ -600,21 +653,17 @@ namespace {
 struct ConsumingClosureArgDataflowState {
   SmallVector<SILInstruction *, 32> livenessWorklist;
   SmallVector<SILInstruction *, 32> consumingWorklist;
-  SmallBlotSetVector<SILInstruction *, 8> postDominatingConsumingUsers;
   PrunedLiveness livenessForConsumes;
   UseState &useState;
 
 public:
   ConsumingClosureArgDataflowState(UseState &useState) : useState(useState) {}
 
-  bool isPostDominatingConsumingUser(SILInstruction *inst) const {
-    return postDominatingConsumingUsers.count(inst);
-  }
-
-  bool process(SILArgument *arg, ClosureOperandState &state);
+  bool process(
+      SILArgument *arg, ClosureOperandState &state,
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
 
   void clear() {
-    postDominatingConsumingUsers.clear();
     livenessForConsumes.clear();
   }
 
@@ -650,6 +699,12 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
     // that we can destroy it
     if (auto *dvi = dyn_cast<DestroyValueInst>(&inst)) {
       if (useState.destroyToIndexMap.count(dvi)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "ClosureArgDataflow: Found Consume: " << *dvi);
+
+        if (hasMoreThanOneDebugUse(address))
+          return false;
+
         state.pairedConsumingInsts.push_back(dvi);
         state.isUpwardsConsume = true;
         state.result = DownwardScanResult::ClosureConsume;
@@ -659,6 +714,11 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
 
     // Same for reinits.
     if (useState.reinits.count(&inst)) {
+      LLVM_DEBUG(llvm::dbgs() << "ClosureArgDataflow: Found Reinit: " << inst);
+
+      if (hasMoreThanOneDebugUse(address))
+        return false;
+
       state.pairedConsumingInsts.push_back(&inst);
       state.isUpwardsConsume = true;
       state.result = DownwardScanResult::ClosureConsume;
@@ -667,6 +727,8 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
 
     // Finally, if we have a liveness use, report it for a diagnostic.
     if (useState.livenessUses.count(&inst)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "ClosureArgDataflow: Found liveness use: " << inst);
       state.pairedUseInsts.push_back(&inst);
       state.isUpwardsUse = true;
       state.result = DownwardScanResult::ClosureUse;
@@ -674,6 +736,8 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
     }
   }
 
+  LLVM_DEBUG(
+      llvm::dbgs() << "ClosureArgDataflow: Did not find interesting uses.\n");
   return false;
 }
 
@@ -684,6 +748,7 @@ bool ConsumingClosureArgDataflowState::performLivenessDataflow(
   auto *fn = useState.getFunction();
   auto *frontBlock = &*fn->begin();
   BasicBlockWorklist worklist(fn);
+
   for (unsigned i : indices(livenessWorklist)) {
     auto *&user = livenessWorklist[i];
 
@@ -803,8 +868,9 @@ void ConsumingClosureArgDataflowState::classifyUses(
   }
 }
 
-bool ConsumingClosureArgDataflowState::process(SILArgument *address,
-                                               ClosureOperandState &state) {
+bool ConsumingClosureArgDataflowState::process(
+    SILArgument *address, ClosureOperandState &state,
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
   clear();
 
   SILFunction *fn = address->getFunction();
@@ -812,12 +878,20 @@ bool ConsumingClosureArgDataflowState::process(SILArgument *address,
 
   // First see if our function only has a single block. In such a case,
   // summarize using the single processing routine.
-  if (address->getParent()->getTerminator()->isFunctionExiting())
+  if (address->getParent()->getTerminator()->isFunctionExiting()) {
+    LLVM_DEBUG(llvm::dbgs() << "ClosureArgDataflow: Single Block Case.\n");
     return handleSingleBlockCase(address, state);
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "ClosureArgDataflow: Multiple Block Case.\n");
 
   // At this point, we begin by classifying the uses of our address into init
   // blocks, liveness blocks, consuming blocks. We also seed the worklist for
   // our two dataflows.
+  SWIFT_DEFER {
+    livenessWorklist.clear();
+    consumingWorklist.clear();
+  };
   BasicBlockSet initBlocks(fn);
   BasicBlockSet livenessBlocks(fn);
   BasicBlockSet consumingBlocks(fn);
@@ -854,6 +928,13 @@ bool ConsumingClosureArgDataflowState::process(SILArgument *address,
   // parameter. We are going to change it to be an out parameter and eliminate
   // these when we clone the closure.
   if (performConsumingDataflow(initBlocks, consumingBlocks)) {
+    // Before we do anything, make sure our argument has at least one single
+    // debug_value user. If we have many we can't handle it since something in
+    // SILGen is emitting weird code. Our tests will ensure that SILGen does not
+    // diverge by mistake. So we are really just being careful.
+    if (hasMoreThanOneDebugUse(address))
+      return false;
+
     SWIFT_DEFER { livenessForConsumes.clear(); };
     auto *frontBlock = &*fn->begin();
     livenessForConsumes.initializeDefBlock(frontBlock);
@@ -916,14 +997,25 @@ bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return true;
   }
 
+  // Ignore debug_values. We should leave them on the argument so that later in
+  // the function the user can still access the out parameter once it is
+  // updated.
+  if (isa<DebugValueInst>(op->getUser()))
+    return true;
+
+  // Ignore end_access. For our purposes, they are irrelevent and we do not want
+  // to treat them like liveness uses.
+  if (isa<EndAccessInst>(op->getUser()))
+    return true;
+
   if (memInstMustInitialize(op)) {
-    LLVM_DEBUG(llvm::dbgs() << "Found init: " << *op->getUser());
+    LLVM_DEBUG(llvm::dbgs() << "ClosureUse: Found init: " << *op->getUser());
     useState.inits.insert(op->getUser());
     return true;
   }
 
   if (memInstMustReinitialize(op)) {
-    LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *op->getUser());
+    LLVM_DEBUG(llvm::dbgs() << "ClosureUse: Found reinit: " << *op->getUser());
     useState.insertReinit(op->getUser());
     return true;
   }
@@ -937,12 +1029,13 @@ bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
                  << *dvi);
       return false;
     }
-    LLVM_DEBUG(llvm::dbgs() << "Found destroy_addr: " << *dvi);
+    LLVM_DEBUG(llvm::dbgs() << "ClosureUse: Found destroy_addr: " << *dvi);
     useState.insertDestroy(dvi);
     return true;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *op->getUser());
+  LLVM_DEBUG(llvm::dbgs() << "ClosureUse: Found liveness use: "
+                          << *op->getUser());
   useState.livenessUses.insert(op->getUser());
 
   return true;
@@ -959,28 +1052,41 @@ struct ClosureArgumentInOutToOutCloner
   friend class SILInstructionVisitor<ClosureArgumentInOutToOutCloner>;
   friend class SILCloner<ClosureArgumentInOutToOutCloner>;
 
-  ConsumingClosureArgDataflowState &argDataflowState;
+  SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers;
   SILFunction *orig;
-  SmallBitVector &argsToConvertIndices;
-  SmallVector<SILValue, 4> newConvertedArgs;
+  const SmallBitVector &argsToConvertIndices;
+  SmallPtrSet<SILValue, 8> oldArgSet;
 
-  // The values in the original function that are promoted to stack
-  // references.
-  SmallPtrSet<SILValue, 4> origFunctionValues;
+  // Map from clonedArg -> oldArg.
+  llvm::SmallMapVector<SILValue, SILValue, 4> clonedArgToOldArgMap;
 
 public:
   ClosureArgumentInOutToOutCloner(
       SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
       IsSerialized_t isSerialized,
-      ConsumingClosureArgDataflowState &argDataflowState,
-      SmallBitVector &argsToConvertIndices);
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
+      const SmallBitVector &argsToConvertIndices, StringRef name);
 
   void populateCloned();
 
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
+  void visitDebugValueInst(DebugValueInst *inst) {
+    // Do not clone if our inst argument is one of our cloned arguments. In such
+    // a case, we are going to handle the debug_value when we visit a post
+    // dominating consuming reinit.
+    if (oldArgSet.count(inst->getOperand())) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "    Visiting debug value that is in the old arg set!\n");
+      return;
+    }
+    LLVM_DEBUG(llvm::dbgs()
+               << "    Visiting debug value that we will clone!\n");
+    SILCloner<ClosureArgumentInOutToOutCloner>::visitDebugValueInst(inst);
+  }
+
   void visitDestroyValueInst(DestroyValueInst *inst) {
-    if (!argDataflowState.postDominatingConsumingUsers.erase(inst)) {
+    if (!postDominatingConsumingUsers.count(inst)) {
       SILCloner<ClosureArgumentInOutToOutCloner>::visitDestroyValueInst(inst);
     }
 
@@ -988,13 +1094,13 @@ public:
   }
 
   void visitCopyAddrInst(CopyAddrInst *inst) {
-    if (!argDataflowState.postDominatingConsumingUsers.erase(inst)) {
+    if (!postDominatingConsumingUsers.count(inst)) {
       return SILCloner<ClosureArgumentInOutToOutCloner>::visitCopyAddrInst(
           inst);
     }
 
     // If this copy_addr is one of the copies that we need to fixup, convert it
-    // to an init from a reinit.
+    // to an init from a reinit. We also insert a debug_value
     assert(!inst->isInitializationOfDest() && "Should be a reinit");
     getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
     recordClonedInstruction(
@@ -1002,10 +1108,20 @@ public:
                   getOpLocation(inst->getLoc()), getOpValue(inst->getSrc()),
                   getOpValue(inst->getDest()), inst->isTakeOfSrc(),
                   IsInitialization_t::IsInitialization));
+
+    // Then if in our caller we had a debug_value on our dest, add it here.
+    auto base = AccessPathWithBase::compute(inst->getDest()).base;
+    if (oldArgSet.count(base)) {
+      if (auto *op = getSingleDebugUse(base)) {
+        if (auto *dvi = dyn_cast<DebugValueInst>(op->getUser())) {
+          SILCloner<ClosureArgumentInOutToOutCloner>::visitDebugValueInst(dvi);
+        }
+      }
+    }
   }
 
   void visitStoreInst(StoreInst *inst) {
-    if (!argDataflowState.postDominatingConsumingUsers.erase(inst)) {
+    if (!postDominatingConsumingUsers.count(inst)) {
       return SILCloner<ClosureArgumentInOutToOutCloner>::visitStoreInst(inst);
     }
 
@@ -1017,20 +1133,29 @@ public:
         inst, getBuilder().createStore(
                   getOpLocation(inst->getLoc()), getOpValue(inst->getSrc()),
                   getOpValue(inst->getDest()), StoreOwnershipQualifier::Init));
+
+    auto base = AccessPathWithBase::compute(inst->getDest()).base;
+    if (oldArgSet.count(base)) {
+      if (auto *op = getSingleDebugUse(base)) {
+        if (auto *dvi = dyn_cast<DebugValueInst>(op->getUser())) {
+          SILCloner<ClosureArgumentInOutToOutCloner>::visitDebugValueInst(dvi);
+        }
+      }
+    }
   }
 
 private:
-  static SILFunction *
-  initCloned(SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-             IsSerialized_t isSerialized,
-             ConsumingClosureArgDataflowState &argDataflowState,
-             SmallBitVector &argsToConvertIndices, StringRef cloneName);
+  static SILFunction *initCloned(
+      SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
+      IsSerialized_t isSerialized,
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
+      const SmallBitVector &argsToConvertIndices, StringRef cloneName);
 };
 
 } // namespace
 
 static std::string getClonedName(SILFunction *func, IsSerialized_t serialized,
-                                 SmallBitVector &argsToConvertIndices) {
+                                 const SmallBitVector &argsToConvertIndices) {
   auto kind = Demangle::SpecializationPass::MoveDiagnosticInOutToOut;
   Mangle::FunctionSignatureSpecializationMangler Mangler(kind, serialized,
                                                          func);
@@ -1044,15 +1169,13 @@ static std::string getClonedName(SILFunction *func, IsSerialized_t serialized,
 ClosureArgumentInOutToOutCloner::ClosureArgumentInOutToOutCloner(
     SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
     IsSerialized_t isSerialized,
-    ConsumingClosureArgDataflowState &argDataflowState,
-    SmallBitVector &argsToConvertIndices)
-    : SILClonerWithScopes<ClosureArgumentInOutToOutCloner>(
-          *initCloned(funcBuilder, orig, isSerialized, argDataflowState,
-                      argsToConvertIndices,
-                      getClonedName(orig, isSerialized, argsToConvertIndices))),
-      argDataflowState(argDataflowState), orig(orig),
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
+    const SmallBitVector &argsToConvertIndices, StringRef name)
+    : SILClonerWithScopes<ClosureArgumentInOutToOutCloner>(*initCloned(
+          funcBuilder, orig, isSerialized, postDominatingConsumingUsers,
+          argsToConvertIndices, name)),
+      postDominatingConsumingUsers(postDominatingConsumingUsers), orig(orig),
       argsToConvertIndices(argsToConvertIndices) {
-  newConvertedArgs.reserve(argsToConvertIndices.size());
   assert(orig->getDebugScope()->getParentFunction() !=
          getCloned()->getDebugScope()->getParentFunction());
 }
@@ -1063,8 +1186,8 @@ ClosureArgumentInOutToOutCloner::ClosureArgumentInOutToOutCloner(
 SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
     SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
     IsSerialized_t serialized,
-    ConsumingClosureArgDataflowState &argDataflowState,
-    SmallBitVector &argsToConvertIndices, StringRef clonedName) {
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
+    const SmallBitVector &argsToConvertIndices, StringRef clonedName) {
   SILModule &mod = orig->getModule();
   SmallVector<SILParameterInfo, 4> clonedInterfaceArgTys;
   SmallVector<SILResultInfo, 4> clonedResultInfos;
@@ -1076,6 +1199,7 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
 
   // Generate a new parameter list with deleted parameters removed...
   unsigned initArgIndex = orig->getConventions().getSILArgIndexOfFirstParam();
+  LLVM_DEBUG(llvm::dbgs() << "CLONER: initArgIndex: " << initArgIndex << '\n');
   for (auto state :
        llvm::enumerate(origFTI->getParameters().drop_front(initArgIndex))) {
     unsigned index = state.index();
@@ -1083,11 +1207,13 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
 
     // If we are supposed to convert this, add the parameter to the result list.
     if (argsToConvertIndices.test(index)) {
+      LLVM_DEBUG(llvm::dbgs() << "CLONER: Converting: " << index << "\n");
       clonedResultInfos.emplace_back(paramInfo.getInterfaceType(),
                                      ResultConvention::Indirect);
       continue;
     }
 
+    LLVM_DEBUG(llvm::dbgs() << "CLONER: Letting through: " << index << "\n");
     // Otherwise, just let it through.
     clonedInterfaceArgTys.push_back(paramInfo);
     ++index;
@@ -1102,7 +1228,7 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
       origFTI->getOptionalErrorResult(), origFTI->getPatternSubstitutions(),
       origFTI->getInvocationSubstitutions(), mod.getASTContext(),
       origFTI->getWitnessMethodConformanceOrInvalid());
-
+  LLVM_DEBUG(llvm::dbgs() << "CLONER: clonedTy: " << clonedTy << "\n");
   assert((orig->isTransparent() || orig->isBare() || orig->getLocation()) &&
          "SILFunction missing location");
   assert((orig->isTransparent() || orig->isBare() || orig->getDebugScope()) &&
@@ -1118,9 +1244,7 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
   for (auto &Attr : orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
-  if (!orig->hasOwnership()) {
-    Fn->setOwnershipEliminated();
-  }
+
   return Fn;
 }
 
@@ -1136,35 +1260,41 @@ void ClosureArgumentInOutToOutCloner::populateCloned() {
   SmallVector<SILValue, 4> entryArgs;
   entryArgs.reserve(origEntryBlock->getArguments().size());
 
-  // Initialize all new arg slots to an invalid value.
-  newConvertedArgs.resize(origEntryBlock->getArguments().size());
-
   // First process all of the indirect results and add our new results after
   // them.
   auto oldArgs = origEntryBlock->getArguments();
   auto origConventions = orig->getConventions();
   for (unsigned i : range(origConventions.getSILArgIndexOfFirstIndirectResult(),
                           origConventions.getSILArgIndexOfFirstParam())) {
-    auto *a = oldArgs[i];
+    LLVM_DEBUG(llvm::dbgs() << "Have indirect result\n");
+    auto *arg = oldArgs[i];
     // Create a new argument which copies the original argument.
-    entryArgs.push_back(
-        clonedEntryBlock->createFunctionArgument(a->getType(), a->getDecl()));
+    auto *newArg = clonedEntryBlock->createFunctionArgument(arg->getType(),
+                                                            arg->getDecl());
+    clonedArgToOldArgMap[newArg] = arg;
+    entryArgs.push_back(newArg);
   }
 
   // To avoid needing to mess with types, just go through our original arguments
   // in the entry block to get the right types.
-  llvm::SmallMapVector<SILValue, SILValue, 4> movedArgs;
-  SmallBitVector newResults(origEntryBlock->getNumArguments());
   for (auto state : llvm::enumerate(origEntryBlock->getArguments())) {
     unsigned argNo = state.index();
+    LLVM_DEBUG(llvm::dbgs() << "Testing Old Arg Number: " << argNo << "\n");
     if (!argsToConvertIndices.test(argNo))
       continue;
 
     auto *arg = state.value();
     auto *newArg = clonedEntryBlock->createFunctionArgument(arg->getType(),
                                                             arg->getDecl());
-    movedArgs[arg] = newArg;
+    clonedArgToOldArgMap[newArg] = arg;
+    oldArgSet.insert(arg);
     entryArgs.push_back(newArg);
+    LLVM_DEBUG(llvm::dbgs() << "Mapping From: " << *arg);
+    LLVM_DEBUG(llvm::dbgs()
+               << "   of function: " << arg->getFunction()->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "Mapping To: " << *newArg);
+    LLVM_DEBUG(llvm::dbgs() << "   of function: "
+                            << newArg->getFunction()->getName() << '\n');
   }
 
   // Finally, recreate the rest of the arguments which we did not specialize.
@@ -1174,28 +1304,24 @@ void ClosureArgumentInOutToOutCloner::populateCloned() {
       continue;
 
     auto *arg = state.value();
-    entryArgs.push_back(clonedEntryBlock->createFunctionArgument(
-        arg->getType(), arg->getDecl()));
+    auto *newArg = clonedEntryBlock->createFunctionArgument(arg->getType(),
+                                                            arg->getDecl());
+
+    clonedArgToOldArgMap[newArg] = arg;
+    entryArgs.push_back(newArg);
   }
 
   // Visit original BBs in depth-first preorder, starting with the
   // entry block, cloning all instructions and terminators.
-  cloneFunctionBody(orig, clonedEntryBlock, entryArgs,
-                    [&](SILValue clonedArg) -> SILValue {
-                      auto iter = movedArgs.find(clonedArg);
-                      if (iter == movedArgs.end())
-                        return clonedArg;
-                      return iter->second;
-                    });
-
-  // As we clone instructions, any that we handled specially will have been
-  // erased from postDominatingConsumingUsers. If we didn't erase all of them,
-  // then there is a bug in the implementation.
-  assert(llvm::all_of(argDataflowState.postDominatingConsumingUsers,
-                      [&](Optional<SILInstruction *> user) {
-                        return user.hasValue();
-                      }) &&
-         "Did not handle a post dominating consuming user?!");
+  cloneFunctionBody(
+      orig, clonedEntryBlock, entryArgs, [&](SILValue clonedArg) -> SILValue {
+        LLVM_DEBUG(llvm::dbgs() << "Searching for: " << *clonedArg);
+        auto iter = clonedArgToOldArgMap.find(clonedArg);
+        assert(iter != clonedArgToOldArgMap.end() &&
+               "Should map all cloned args to an old arg");
+        LLVM_DEBUG(llvm::dbgs() << "Found it! Mapping to : " << *iter->second);
+        return iter->second;
+      });
 }
 
 //===----------------------------------------------------------------------===//
@@ -1210,31 +1336,51 @@ struct DataflowState {
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> destroyBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> reinitBlocks;
   llvm::DenseMap<SILBasicBlock *, Operand *> consumingClosureBlocks;
-  SmallVector<MarkUnresolvedMoveAddrInst *, 8> markMovesToDataflow;
-  UseState &useState;
+  SmallVector<MarkUnresolvedMoveAddrInst *, 8> markMovesThatPropagateDownwards;
 
-  DataflowState(UseState &useState) : useState(useState) {}
+  SILOptFunctionBuilder &funcBuilder;
+  UseState &useState;
+  llvm::SmallMapVector<FullApplySite, SmallBitVector, 8>
+      &applySiteToPromotedArgIndices;
+  SmallBlotSetVector<SILInstruction *, 8> &closureConsumes;
+
+  DataflowState(SILOptFunctionBuilder &funcBuilder, UseState &useState,
+                llvm::SmallMapVector<FullApplySite, SmallBitVector, 8>
+                    &applySiteToPromotedArgIndices,
+                SmallBlotSetVector<SILInstruction *, 8> &closureConsumes)
+      : funcBuilder(funcBuilder), useState(useState),
+        applySiteToPromotedArgIndices(applySiteToPromotedArgIndices),
+        closureConsumes(closureConsumes) {}
   void init();
-  bool process(SILValue address);
+  bool process(
+      SILValue address,
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
   bool handleSingleBlockClosure(SILArgument *address,
                                 ClosureOperandState &state);
+  bool cleanupAllDestroyAddr(
+      SILFunction *fn, SmallBitVector &destroyIndices,
+      SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
+      BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
+      BasicBlockSet &blocksWithMovesThatAreNowTakes,
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
   void clear() {
     useBlocks.clear();
     initBlocks.clear();
     destroyBlocks.clear();
     reinitBlocks.clear();
-    markMovesToDataflow.clear();
+    markMovesThatPropagateDownwards.clear();
     consumingClosureBlocks.clear();
   }
 };
 
 } // namespace
 
-static bool cleanupAllDestroyAddr(
+bool DataflowState::cleanupAllDestroyAddr(
     SILFunction *fn, SmallBitVector &destroyIndices,
     SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
-    UseState &useState, BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
-    BasicBlockSet &blocksWithMovesThatAreNowTakes) {
+    BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
+    BasicBlockSet &blocksWithMovesThatAreNowTakes,
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
   bool madeChange = false;
   BasicBlockWorklist worklist(fn);
   SILValue daiOperand;
@@ -1309,6 +1455,7 @@ static bool cleanupAllDestroyAddr(
     auto destroy = useState.destroys[index];
     if (!destroy)
       continue;
+    LLVM_DEBUG(llvm::dbgs() << "Erasing destroy_addr: " << *destroy);
     (*destroy)->eraseFromParent();
     madeChange = true;
   }
@@ -1318,35 +1465,48 @@ static bool cleanupAllDestroyAddr(
     auto reinit = useState.reinits[index];
     if (!reinit)
       continue;
+    LLVM_DEBUG(llvm::dbgs() << "Converting reinit to init: " << *reinit);
     convertMemoryReinitToInitForm(*reinit);
     madeChange = true;
   }
 
-  // Check for consuming closures. The closure can have either destroy uses or
-  // reinit uses. We need to handle both.
+  // Check for consuming closures. If we find such a consuming closure, track
+  // that this full apply site needs to have some parameters converted when we
+  // are done processing.
+  //
+  // NOTE: We do this late to ensure that we only clone a defer exactly once
+  // rather than multiple times for multiple vars.
   for (int index = consumingClosureIndices.find_first(); index != -1;
        index = consumingClosureIndices.find_next(index)) {
     auto &pair = *std::next(useState.consumingClosureOperands.begin(), index);
     auto *closureUse = pair.first;
     if (!closureUse)
       continue;
-    for (auto *pairedInst : pair.second.pairedConsumingInsts) {
-      if (auto *dvi = dyn_cast<DestroyValueInst>(pairedInst)) {
-        dvi->eraseFromParent();
-        madeChange = true;
-        continue;
-      }
 
-      convertMemoryReinitToInitForm(pairedInst);
-      madeChange = true;
-      continue;
+    // This is correct today due to us only supporting defer. When we handle
+    // partial apply, we will need to do more work ehre.
+    FullApplySite fas(closureUse->getUser());
+    assert(fas);
+    unsigned appliedArgIndex = fas.getAppliedArgIndex(*closureUse);
+    LLVM_DEBUG(llvm::dbgs() << "Processing closure use: " << **fas);
+    LLVM_DEBUG(llvm::dbgs() << "AppliedArgIndex: " << appliedArgIndex << '\n');
+    auto &bitVector = applySiteToPromotedArgIndices[fas];
+    auto conventions = fas.getSubstCalleeConv();
+    unsigned numNonResultArgs = conventions.getNumSILArguments();
+    if (bitVector.size() < numNonResultArgs)
+      bitVector.resize(numNonResultArgs);
+    bitVector.set(appliedArgIndex);
+    for (auto *user : pair.second.pairedConsumingInsts) {
+      closureConsumes.insert(user);
     }
   }
 
   return madeChange;
 }
 
-bool DataflowState::process(SILValue address) {
+bool DataflowState::process(
+    SILValue address,
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
   SILFunction *fn = address->getFunction();
   assert(fn);
 
@@ -1375,7 +1535,7 @@ bool DataflowState::process(SILValue address) {
   BasicBlockSet visitedByNewMove(fn);
   BasicBlockSet blocksWithMovesThatAreNowTakes(fn);
   bool convertedMarkMoveToTake = false;
-  for (auto *mvi : markMovesToDataflow) {
+  for (auto *mvi : markMovesThatPropagateDownwards) {
     bool emittedSingleDiagnostic = false;
 
     LLVM_DEBUG(llvm::dbgs() << "Checking Multi Block Dataflow for: " << *mvi);
@@ -1520,8 +1680,8 @@ bool DataflowState::process(SILValue address) {
   // destroy_addr.
   madeChange |= cleanupAllDestroyAddr(
       fn, getIndicesOfPairedDestroys(), getIndicesOfPairedReinits(),
-      getIndicesOfPairedConsumingClosureUses(), useState, visitedByNewMove,
-      blocksWithMovesThatAreNowTakes);
+      getIndicesOfPairedConsumingClosureUses(), visitedByNewMove,
+      blocksWithMovesThatAreNowTakes, postDominatingConsumingUsers);
 
   return madeChange;
 }
@@ -1586,16 +1746,25 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
                                             MarkUnresolvedMoveAddrInst *mvi) {
   // First scan downwards to make sure we are move out of this block.
   auto &useState = dataflowState.useState;
-  TinyPtrVector<SILInstruction *> interestingUsers;
-  switch (downwardScanForMoveOut(mvi, useState, interestingUsers)) {
+  auto &applySiteToPromotedArgIndices =
+      dataflowState.applySiteToPromotedArgIndices;
+  auto &closureConsumes = dataflowState.closureConsumes;
+
+  SILInstruction *interestingUser = nullptr;
+  Operand *interestingUse = nullptr;
+  TinyPtrVector<SILInstruction *> interestingClosureUsers;
+  switch (downwardScanForMoveOut(mvi, useState, &interestingUser,
+                                 &interestingUse, interestingClosureUsers)) {
   case DownwardScanResult::Invalid:
     llvm_unreachable("invalid");
   case DownwardScanResult::Destroy: {
+    assert(!interestingUse);
+    assert(interestingUser);
+
     // If we found a destroy, then we found a single block case that we can
     // handle. Remove the destroy and convert the mark_unresolved_move_addr
     // into a true move.
-    assert(interestingUsers.size() == 1);
-    auto *dvi = cast<DestroyAddrInst>(interestingUsers[0]);
+    auto *dvi = cast<DestroyAddrInst>(interestingUser);
     SILBuilderWithScope builder(mvi);
     builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
                            IsInitialization);
@@ -1604,10 +1773,51 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
     dvi->eraseFromParent();
     return false;
   }
-  case DownwardScanResult::UseForDiagnostic:
-    assert(interestingUsers.size() == 1);
-    [[fallthrough]];
   case DownwardScanResult::ClosureUse: {
+    assert(interestingUse);
+    assert(interestingUser);
+
+    // Then check if we found a user that violated our dataflow rules. In such
+    // a case, emit an error, cleanup our mark_unresolved_move_addr, and
+    // finally continue.
+    auto &astCtx = mvi->getFunction()->getASTContext();
+    {
+      auto diag =
+          diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+      StringRef name = getDebugVarName(address);
+      diagnose(astCtx, getSourceLocFromValue(address), diag, name);
+    }
+
+    auto diag = diag::sil_movekillscopyablevalue_move_here;
+    diagnose(astCtx, mvi->getLoc().getSourceLoc(), diag);
+
+    {
+      auto diag = diag::sil_movekillscopyablevalue_use_here;
+      for (auto *user : interestingClosureUsers) {
+        diagnose(astCtx, user->getLoc().getSourceLoc(), diag);
+      }
+    }
+
+    // We purposely continue to see if at least in simple cases, we can flag
+    // mistakes from other moves. Since we are setting emittedDiagnostic to
+    // true, we will not perform the actual dataflow due to a check after
+    // the loop.
+    //
+    // We also clean up mvi by converting it to a copy_addr init so we do not
+    // emit fail errors later.
+    //
+    // TODO: Can we handle multiple errors in the same block for a single
+    // move?
+    SILBuilderWithScope builder(mvi);
+    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
+                           IsNotTake, IsInitialization);
+    mvi->eraseFromParent();
+    return true;
+  }
+  case DownwardScanResult::UseForDiagnostic: {
+    assert(!interestingUse);
+    assert(interestingUser);
+
     // Then check if we found a user that violated our dataflow rules. In such
     // a case, emit an error, cleanup our mark_unresolved_move_addr, and
     // finally continue.
@@ -1626,7 +1836,7 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
 
     {
       auto diag = diag::sil_movekillscopyablevalue_use_here;
-      diagnose(astCtx, interestingUsers[0]->getLoc().getSourceLoc(), diag);
+      diagnose(astCtx, interestingUser->getLoc().getSourceLoc(), diag);
     }
 
     // We purposely continue to see if at least in simple cases, we can flag
@@ -1646,9 +1856,11 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
     return true;
   }
   case DownwardScanResult::Reinit: {
-    assert(interestingUsers.size() == 1);
-    convertMemoryReinitToInitForm(interestingUsers[0]);
-    useState.reinits.erase(interestingUsers[0]);
+    assert(!interestingUse);
+    assert(interestingUser);
+
+    convertMemoryReinitToInitForm(interestingUser);
+    useState.reinits.erase(interestingUser);
     SILBuilderWithScope builder(mvi);
     builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
                            IsInitialization);
@@ -1656,24 +1868,37 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
     return false;
   }
   case DownwardScanResult::ClosureConsume: {
+    assert(interestingUse);
+    assert(interestingUser);
+
     // If we found a closure consume, then we found a single block case that we
-    // can handle. Remove the destroys/reinit and make our move a true move.
+    // can handle. Remove the destroys/reinit, register the specific.
     SILBuilderWithScope builder(mvi);
     builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(), IsTake,
                            IsInitialization);
 
-    for (auto *user : interestingUsers) {
-      if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
-        dvi->eraseFromParent();
-        continue;
-      }
-      convertMemoryReinitToInitForm(user);
+    // This is correct today due to us only supporting defer. When we handle
+    // partial apply, we will need to do more work ehre.
+    FullApplySite fas(interestingUser);
+    assert(fas);
+    auto &bitVector = applySiteToPromotedArgIndices[fas];
+    auto conventions = fas.getSubstCalleeConv();
+    unsigned numNonResultArgs = conventions.getNumSILArguments();
+    if (bitVector.size() < numNonResultArgs)
+      bitVector.resize(numNonResultArgs);
+    bitVector.set(fas.getAppliedArgIndex(*interestingUse));
+    for (auto *user : interestingClosureUsers) {
+      closureConsumes.insert(user);
     }
-    // TODO: Should we erase the operand from useState.consumingClosureOperands?
+    LLVM_DEBUG(llvm::dbgs() << "Found apply site to clone: " << **fas);
+    LLVM_DEBUG(llvm::dbgs() << "BitVector: ";
+               dumpBitVector(llvm::dbgs(), bitVector); llvm::dbgs() << '\n');
     mvi->eraseFromParent();
     return false;
   }
   case DownwardScanResult::MoveOut:
+    assert(!interestingUse);
+    assert(!interestingUser);
     break;
   }
 
@@ -1681,7 +1906,7 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
   // use, we need to perform dataflow.
   LLVM_DEBUG(llvm::dbgs() << "Our move is live out, so we need to process "
                              "it with the dataflow.\n");
-  dataflowState.markMovesToDataflow.emplace_back(mvi);
+  dataflowState.markMovesThatPropagateDownwards.emplace_back(mvi);
 
   // Now scan up to see if mvi is also a use to seed the dataflow. This could
   // happen if we have an earlier move.
@@ -1698,16 +1923,29 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
 
 namespace {
 
-struct MoveKillsCopyableAddressesObjectChecker {
+struct MoveKillsCopyableAddressesChecker {
   SILFunction *fn;
   UseState useState;
   DataflowState dataflowState;
   UseState closureUseState;
   ConsumingClosureArgDataflowState closureUseDataflowState;
+  SILOptFunctionBuilder &funcBuilder;
+  llvm::SmallMapVector<FullApplySite, SmallBitVector, 8>
+      applySiteToPromotedArgIndices;
+  SmallBlotSetVector<SILInstruction *, 8> closureConsumes;
 
-  MoveKillsCopyableAddressesObjectChecker(SILFunction *fn)
-      : fn(fn), useState(), dataflowState(useState), closureUseState(),
-        closureUseDataflowState(closureUseState) {}
+  MoveKillsCopyableAddressesChecker(SILFunction *fn,
+                                    SILOptFunctionBuilder &funcBuilder)
+      : fn(fn), useState(),
+        dataflowState(funcBuilder, useState, applySiteToPromotedArgIndices,
+                      closureConsumes),
+        closureUseState(), closureUseDataflowState(closureUseState),
+        funcBuilder(funcBuilder) {}
+
+  void cloneDeferCalleeAndRewriteUses(
+      SmallVectorImpl<SILValue> &temporaryStorage,
+      const SmallBitVector &bitVector, FullApplySite oldApplySite,
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
 
   bool check(SILValue address);
   bool performClosureDataflow(Operand *callerOperand,
@@ -1721,17 +1959,85 @@ struct MoveKillsCopyableAddressesObjectChecker {
 
 } // namespace
 
-bool MoveKillsCopyableAddressesObjectChecker::performClosureDataflow(
+void MoveKillsCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
+    SmallVectorImpl<SILValue> &newArgs, const SmallBitVector &bitVector,
+    FullApplySite oldApplySite,
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
+  auto *origCallee = oldApplySite.getReferencedFunctionOrNull();
+  assert(origCallee);
+
+  auto name = getClonedName(origCallee, origCallee->isSerialized(), bitVector);
+
+  SILFunction *newCallee = nullptr;
+  if (auto *fn = origCallee->getModule().lookUpFunction(name)) {
+    newCallee = fn;
+  } else {
+    ClosureArgumentInOutToOutCloner cloner(
+        funcBuilder, origCallee, origCallee->isSerialized(),
+        postDominatingConsumingUsers, bitVector, name);
+    cloner.populateCloned();
+    newCallee = cloner.getCloned();
+  }
+  assert(newCallee);
+
+  // Ok, we now have populated our new callee. We need to create a new full
+  // apply site that calls the new function appropriately.
+  SWIFT_DEFER { newArgs.clear(); };
+
+  // First add all of our old results to newArgs.
+  auto oldConv = oldApplySite.getSubstCalleeConv();
+  for (unsigned i : range(oldConv.getSILArgIndexOfFirstIndirectResult(),
+                          oldConv.getSILArgIndexOfFirstParam())) {
+    newArgs.push_back(oldApplySite->getOperand(i));
+  }
+
+  // Now add all of our new out params.
+  for (int i = bitVector.find_first(); i != -1; i = bitVector.find_next(i)) {
+    unsigned appliedArgIndex =
+        oldApplySite.getOperandIndexOfFirstArgument() + i;
+    newArgs.push_back(oldApplySite->getOperand(appliedArgIndex));
+  }
+
+  // Finally, add all of the rest of our arguments, skipping our new out
+  // parameters.
+  for (unsigned i : range(oldConv.getSILArgIndexOfFirstParam(),
+                          oldConv.getNumSILArguments())) {
+    if (bitVector.test(i))
+      continue;
+    unsigned appliedArgIndex =
+        oldApplySite.getOperandIndexOfFirstArgument() + i;
+    newArgs.push_back(oldApplySite->getOperand(appliedArgIndex));
+  }
+
+  // Then create our new apply.
+  SILBuilderWithScope builder(*oldApplySite);
+  auto *newCalleeRef =
+      builder.createFunctionRef(oldApplySite->getLoc(), newCallee);
+  auto *newApply =
+      builder.createApply(oldApplySite->getLoc(), newCalleeRef,
+                          oldApplySite.getSubstitutionMap(), newArgs);
+  oldApplySite->replaceAllUsesPairwiseWith(newApply);
+  oldApplySite->eraseFromParent();
+}
+
+bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
     Operand *callerOperand, ClosureOperandState &calleeOperandState) {
   auto fas = FullApplySite::isa(callerOperand->getUser());
   auto *func = fas.getCalleeFunction();
   auto *address =
       func->begin()->getArgument(fas.getCalleeArgIndex(*callerOperand));
 
-  LLVM_DEBUG(llvm::dbgs() << "Performing closure dataflow on: "
+  LLVM_DEBUG(llvm::dbgs() << "Performing closure dataflow on caller use: "
                           << *callerOperand->getUser());
-  LLVM_DEBUG(llvm::dbgs() << "    Argument: " << *address);
-
+  LLVM_DEBUG(llvm::dbgs() << "    Callee: " << func->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "    Callee Argument: " << *address);
+  // We emit an end closure dataflow to make it easier when reading debug output
+  // to make it easy to see when we have returned to analyzing the caller.
+  SWIFT_DEFER {
+    LLVM_DEBUG(llvm::dbgs()
+                   << "Finished performing closure dataflow on Callee: "
+                   << func->getName() << '\n';);
+  };
   auto accessPathWithBase = AccessPathWithBase::compute(address);
   auto accessPath = accessPathWithBase.accessPath;
 
@@ -1755,10 +2061,11 @@ bool MoveKillsCopyableAddressesObjectChecker::performClosureDataflow(
     return false;
 
   SWIFT_DEFER { closureUseDataflowState.clear(); };
-  return closureUseDataflowState.process(address, calleeOperandState);
+  return closureUseDataflowState.process(address, calleeOperandState,
+                                         closureConsumes);
 }
 
-bool MoveKillsCopyableAddressesObjectChecker::check(SILValue address) {
+bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   auto accessPathWithBase = AccessPathWithBase::compute(address);
   auto accessPath = accessPathWithBase.accessPath;
 
@@ -1807,8 +2114,12 @@ bool MoveKillsCopyableAddressesObjectChecker::check(SILValue address) {
     auto *operand = pair.first;
     auto &closureState = pair.second;
 
-    if (!performClosureDataflow(operand, closureState))
+    if (!performClosureDataflow(operand, closureState)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "!! Early exit due to failing to analyze closure operand: "
+                 << *operand->getUser());
       return false;
+    }
   }
 
   // Perform the single basic block analysis emitting a diagnostic/pairing
@@ -1821,15 +2132,26 @@ bool MoveKillsCopyableAddressesObjectChecker::check(SILValue address) {
     emittedSingleBBDiagnostic |=
         performSingleBasicBlockAnalysis(dataflowState, address, mvi);
   }
+
   if (emittedSingleBBDiagnostic) {
-    LLVM_DEBUG(llvm::dbgs() << "Performed single block analysis!\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Performed single block analysis and found error!\n");
     return true;
   }
 
-  // Ok, we need to perform global dataflow. Initialize our dataflow state
-  // engine and then run the dataflow itself.
+  // Then check if we do not need to propagate down any mark moves. In that
+  // case, since we did not emit an error but we did not have any
+  if (dataflowState.markMovesThatPropagateDownwards.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "Single block analysis handled all cases "
+                               "without finding an error!\n");
+    return true;
+  }
+
+  // Ok, we need to perform global dataflow for one of our moves. Initialize our
+  // dataflow state engine and then run the dataflow itself.
   dataflowState.init();
-  return dataflowState.process(address);
+  bool result = dataflowState.process(address, closureConsumes);
+  return result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1879,7 +2201,8 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
     auto addressToProcess =
         llvm::makeArrayRef(addressesToCheck.begin(), addressesToCheck.end());
 
-    MoveKillsCopyableAddressesObjectChecker checker(getFunction());
+    SILOptFunctionBuilder funcBuilder(*this);
+    MoveKillsCopyableAddressesChecker checker(getFunction(), funcBuilder);
     bool madeChange = false;
 
     while (!addressToProcess.empty()) {
@@ -1893,6 +2216,23 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
 
+    // Now go through and clone any apply sites that we need to clone.
+    SmallVector<SILValue, 8> newArgs;
+    bool rewroteCallee = false;
+    for (auto &pair : checker.applySiteToPromotedArgIndices) {
+      SWIFT_DEFER { newArgs.clear(); };
+      auto fas = pair.first;
+      auto &bitVector = pair.second;
+      LLVM_DEBUG(llvm::dbgs() << "CLONING APPLYSITE: " << **fas);
+      LLVM_DEBUG(llvm::dbgs() << "BitVector: ";
+                 dumpBitVector(llvm::dbgs(), bitVector); llvm::dbgs() << '\n');
+      checker.cloneDeferCalleeAndRewriteUses(newArgs, bitVector, fas,
+                                             checker.closureConsumes);
+      rewroteCallee = true;
+    }
+    if (rewroteCallee)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
+
     // Now search through our function one last time and any move_value
     // [allows_diagnostics] that remain are ones that we did not know how to
     // check so emit a diagnostic so the user doesn't assume that they have
@@ -1903,6 +2243,8 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
     // TODO: Emit specific diagnostics here (e.x.: _move of global).
     if (DisableUnhandledMoveDiagnostic)
       return;
+
+    bool lateMadeChange = false;
     for (auto &block : *fn) {
       for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
         auto *inst = &*ii;
@@ -1920,9 +2262,12 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
           builder.createCopyAddr(mai->getLoc(), mai->getSrc(), mai->getDest(),
                                  IsNotTake, IsInitialization);
           mai->eraseFromParent();
+          lateMadeChange = true;
         }
       }
     }
+    if (lateMadeChange)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

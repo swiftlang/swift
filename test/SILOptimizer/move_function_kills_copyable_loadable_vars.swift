@@ -4,11 +4,15 @@
 
 import Swift
 
-public class Klass {}
-
 //////////////////
 // Declarations //
 //////////////////
+
+public class Klass {}
+
+struct KlassWrapper {
+    var k: Klass
+}
 
 func consumingUse(_ k: __owned Klass) {}
 var booleanValue: Bool { false }
@@ -17,7 +21,7 @@ func nonConsumingUse(_ k: Klass) {}
 func exchangeUse(_ k: Klass) -> Klass { k }
 
 ///////////
-// Klassests //
+// Tests //
 ///////////
 
 public func performMoveOnVarSingleBlock(_ p: Klass) {
@@ -269,4 +273,120 @@ struct S {
         } catch {
         }
     } // expected-note {{use here}}
+}
+
+/////////////////
+// Defer Tests //
+/////////////////
+
+extension KlassWrapper {
+    mutating func deferTestSuccess1() {
+        let _ = _move(self)
+        defer {
+            self = KlassWrapper(k: Klass())
+        }
+        print("123")
+    }
+
+    // Make sure we can init/reinit self multiple times without error.
+    mutating func deferTestSuccess2() {
+        let _ = _move(self)
+        self = KlassWrapper(k: Klass())
+        let _ = _move(self)
+        defer {
+            self = KlassWrapper(k: Klass())
+        }
+        print("123")
+    }
+
+    mutating func deferTestSuccess3() {
+        let _ = _move(self)
+        defer {
+            self = KlassWrapper(k: Klass())
+        }
+        defer {
+            self = KlassWrapper(k: Klass())
+        }
+        print("123")
+    }
+
+    // We do not support moving within a defer right now.
+    mutating func deferTestFail1() {
+        let _ = _move(self)
+        defer {
+            self = KlassWrapper(k: Klass())
+            let _ = _move(self) // expected-error {{_move applied to value that the compiler does not support checking}}
+        }
+        print("123")
+    }
+
+    // We do not support moving within a defer right now.
+    mutating func deferTestFail2() { // expected-error {{'self' used after being moved}}
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            nonConsumingUse(k) // expected-note {{use here}}
+            self = KlassWrapper(k: Klass())
+        }
+        print("123")
+    }
+
+
+    mutating func deferTestFail3() { // expected-error {{'self' used after being moved}}
+        let _ = _move(self) // expected-note {{move here}}
+        nonConsumingUse(k) // expected-note {{use here}}
+        defer {
+            nonConsumingUse(k)
+            self = KlassWrapper(k: Klass())
+        }
+        print("123")
+    }
+
+    mutating func deferTestFail4() { // expected-error {{'self' used after being moved}}
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            consumingUse(k) // expected-note {{use here}}
+            self = KlassWrapper(k: Klass())
+        }
+        print("123")
+    }
+
+    // TODO: We should definitely be erroring on consuming use I think.
+    mutating func deferTestFail5() { // expected-error {{'self' used after being moved}}
+        let _ = _move(self) // expected-note {{move here}}
+        for _ in 0..<1024 {
+            defer {
+                consumingUse(k)
+                self = KlassWrapper(k: Klass())
+            }
+            print("foo bar")
+        }
+        print("123")
+    }  // expected-note {{use here}}
+
+    // TODO: We should be erroring on nonConsumingUse rather than the end of
+    // scope use.
+    //
+    mutating func deferTestFail6() { // expected-error {{'self' used after being moved}}
+        let _ = _move(self) // expected-note {{move here}}
+        for _ in 0..<1024 {
+            defer {
+                nonConsumingUse(k)
+                self = KlassWrapper(k: Klass())
+            }
+            print("foo bar")
+        }
+        print("123")
+    }  // expected-note {{use here}}
+
+    mutating func deferTestFail7() { // expected-error {{'self' used after being moved}}
+        for _ in 0..<1024 {
+            let _ = _move(self) // expected-note {{move here}}
+            defer {
+                nonConsumingUse(k) // expected-note {{use here}}
+                self = KlassWrapper(k: Klass())
+            }
+            print("foo bar")
+        }
+        print("123")
+    }
 }
