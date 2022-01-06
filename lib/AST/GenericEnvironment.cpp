@@ -50,58 +50,6 @@ size_t GenericEnvironment::numTrailingObjects(OverloadToken<Type>) const {
   return getGenericParams().size();
 }
 
-GenericSignature GenericEnvironment::getRawGenericSignature() const {
-  switch (getKind()) {
-  case Kind::Normal:
-  case Kind::OpenedExistential:
-    return SignatureAndKind.getPointer();
-
-  case Kind::Opaque:
-    return getOpaqueTypeDecl()->getOpaqueInterfaceGenericSignature();
-  }
-}
-
-GenericSignature GenericEnvironment::getGenericSignature() const {
-  switch (getKind()) {
-  case Kind::Normal:
-  case Kind::OpenedExistential:
-    return SignatureAndKind.getPointer();
-
-  case Kind::Opaque:
-    if (auto sig = SignatureAndKind.getPointer())
-      return sig;
-
-    // Build signature below.
-    break;
-  }
-
-  // Create a new opaque archetype.
-  // It lives in an environment in which the interface generic arguments of the
-  // decl have all been same-type-bound to the arguments from our substitution
-  // map.
-  SmallVector<Requirement, 2> newRequirements;
-
-  // Same-type-constrain the arguments in the outer signature to their
-  // replacements in the substitution map.
-  auto opaqueDecl = getOpaqueTypeDecl();
-  auto subs = getOpaqueSubstitutions();
-  if (auto outerSig = opaqueDecl->getGenericSignature()) {
-    for (auto outerParam : outerSig.getGenericParams()) {
-      auto boundType = Type(outerParam).subst(subs);
-      newRequirements.push_back(
-          Requirement(RequirementKind::SameType, Type(outerParam), boundType));
-    }
-  }
-
-  auto signature = buildGenericSignature(
-        opaqueDecl->getASTContext(),
-        opaqueDecl->getOpaqueInterfaceGenericSignature(),
-        /*genericParams=*/{ },
-        std::move(newRequirements));
-  SignatureAndKind.setPointer(signature);
-  return signature;
-}
-
 /// Retrieve the array containing the context types associated with the
 /// generic parameters, stored in parallel with the generic parameters of the
 /// generic signature.
@@ -120,7 +68,7 @@ ArrayRef<Type> GenericEnvironment::getContextTypes() const {
 
 TypeArrayView<GenericTypeParamType>
 GenericEnvironment::getGenericParams() const {
-  return getRawGenericSignature().getGenericParams();
+  return getGenericSignature().getGenericParams();
 }
 
 OpaqueTypeDecl *GenericEnvironment::getOpaqueTypeDecl() const {
@@ -272,7 +220,7 @@ Type TypeBase::mapTypeOutOfContext() {
 
 Type
 GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
-  auto genericSig = getRawGenericSignature();
+  auto genericSig = getGenericSignature();
   LookUpConformanceInSignature conformanceLookupFn(genericSig.getPointer());
 
   auto requirements = genericSig->getLocalRequirements(depType);
@@ -425,7 +373,7 @@ Type GenericEnvironment::mapTypeIntoContext(
 }
 
 Type GenericEnvironment::mapTypeIntoContext(Type type) const {
-  auto sig = getRawGenericSignature();
+  auto sig = getGenericSignature();
   return mapTypeIntoContext(type, LookUpConformanceInSignature(sig.getPointer()));
 }
 
