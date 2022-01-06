@@ -213,7 +213,9 @@ RequirementMachine::buildRequirementsFromRules(
 /// connected component.
 llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
 RequirementMachine::computeMinimalProtocolRequirements() {
-  assert(Protos.size() > 0 &&
+  auto protos = System.getProtocols();
+
+  assert(protos.size() > 0 &&
          "Not a protocol connected component rewrite system");
   assert(Params.empty() &&
          "Not a protocol connected component rewrite system");
@@ -225,13 +227,13 @@ RequirementMachine::computeMinimalProtocolRequirements() {
     dump(llvm::dbgs());
   }
 
-  auto rules = System.getMinimizedProtocolRules(Protos);
+  auto rules = System.getMinimizedProtocolRules();
 
-  // Note that we build 'result' by iterating over 'Protos' rather than
+  // Note that we build 'result' by iterating over 'protos' rather than
   // 'rules'; this is intentional, so that even if a protocol has no
   // rules, we still end up creating an entry for it in 'result'.
   llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>> result;
-  for (const auto *proto : Protos) {
+  for (const auto *proto : protos) {
     auto genericParams = proto->getGenericSignature().getGenericParams();
     result[proto] = buildRequirementsFromRules(rules[proto], genericParams);
   }
@@ -320,7 +322,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 /// Builds the top-level generic signature requirements for this rewrite system.
 std::vector<Requirement>
 RequirementMachine::computeMinimalGenericSignatureRequirements() {
-  assert(Protos.empty() &&
+  assert(System.getProtocols().empty() &&
          "Not a top-level generic signature rewrite system");
   assert(!Params.empty() &&
          "Not a from-source top-level generic signature rewrite system");

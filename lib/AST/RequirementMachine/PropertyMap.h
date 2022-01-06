@@ -101,11 +101,6 @@ class PropertyBag {
 
   explicit PropertyBag(Term key) : Key(key) {}
 
-  Optional<unsigned> addProperty(Symbol property,
-                                 unsigned ruleID,
-                                 RewriteSystem &system,
-                                 SmallVectorImpl<InducedRule> &inducedRules,
-                                 bool debug);
   void copyPropertiesFrom(const PropertyBag *next,
                           RewriteContext &ctx);
 
@@ -173,8 +168,34 @@ class PropertyMap {
   using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
   llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
 
+  // Building the property map introduces new induced rules, which
+  // runs another round of Knuth-Bendix completion, which rebuilds the
+  // property map again.
+  //
+  // To avoid wasted work from re-introducing the same induced rules,
+  // we track the rules we've seen already on previous builds.
+
+  /// Maps a pair of rules where the first is a conformance rule and the
+  /// second is a superclass or concrete type rule, to a concrete
+  /// conformance.
   llvm::DenseMap<std::pair<unsigned, unsigned>, ProtocolConformance *>
       ConcreteConformances;
+
+  /// Superclass requirements always imply a layout requirement, and
+  /// concrete type requirements where the type is a class imply a
+  /// superclass requirement.
+  ///
+  /// Keep track of such rules to avoid wasted work from recording the
+  /// same rewrite loop more than once.
+  llvm::DenseSet<unsigned> CheckedRules;
+
+  /// When a type parameter is subject to two requirements of the same
+  /// kind, we have a pair of rewrite rules T.[p1] => T and T.[p2] => T.
+  ///
+  /// One of these rules might imply the other. Keep track of these pairs
+  /// to avoid wasted work from recording the same rewrite loop more than
+  /// once.
+  llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedRulePairs;
 
   DebugOptions Debug;
 
@@ -204,9 +225,15 @@ public:
 
 private:
   void clear();
-  Optional<unsigned>
-  addProperty(Term key, Symbol property, unsigned ruleID,
-              SmallVectorImpl<InducedRule> &inducedRules);
+
+  bool checkRuleOnce(unsigned ruleID);
+  bool checkRulePairOnce(unsigned firstRuleID, unsigned secondRuleID);
+
+  void addProperty(Term key, Symbol property, unsigned ruleID,
+                   SmallVectorImpl<InducedRule> &inducedRules);
+
+  void checkConcreteTypeRequirements(
+                   SmallVectorImpl<InducedRule> &inducedRules);
 
   void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(

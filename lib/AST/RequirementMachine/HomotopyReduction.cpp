@@ -367,6 +367,8 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
       foundAny = true;
     }
 
+    // Delete loops that don't contain any rewrite rules in empty context,
+    // since such loops do not give us useful information.
     if (!foundAny)
       loop.markDeleted();
   }
@@ -566,15 +568,14 @@ bool RewriteSystem::hadError() const {
 }
 
 /// Collect all non-permanent, non-redundant rules whose domain is equal to
-/// one of the protocols in \p proto. In other words, the first symbol of the
-/// left hand side term is either a protocol symbol or associated type symbol
-/// whose protocol is in \p proto.
+/// one of the protocols in the connected component represented by this
+/// rewrite system.
 ///
 /// These rules form the requirement signatures of these protocols.
 llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
-RewriteSystem::getMinimizedProtocolRules(
-    ArrayRef<const ProtocolDecl *> protos) const {
+RewriteSystem::getMinimizedProtocolRules() const {
   assert(Minimized);
+  assert(!Protos.empty());
 
   llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>> rules;
   for (unsigned ruleID : indices(Rules)) {
@@ -591,7 +592,7 @@ RewriteSystem::getMinimizedProtocolRules(
     assert(domain.size() == 1);
 
     const auto *proto = domain[0];
-    if (std::find(protos.begin(), protos.end(), proto) != protos.end())
+    if (std::find(Protos.begin(), Protos.end(), proto) != Protos.end())
       rules[proto].push_back(ruleID);
   }
 
@@ -605,6 +606,7 @@ RewriteSystem::getMinimizedProtocolRules(
 std::vector<unsigned>
 RewriteSystem::getMinimizedGenericSignatureRules() const {
   assert(Minimized);
+  assert(Protos.empty());
 
   std::vector<unsigned> rules;
   for (unsigned ruleID : indices(Rules)) {
@@ -684,6 +686,10 @@ void RewriteSystem::verifyMinimizedRules(
 #ifndef NDEBUG
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
+
+    // Ignore the rewrite rule if it is not part of our minimization domain.
+    if (!isInMinimizationDomain(rule.getLHS().getRootProtocols()))
+      continue;
 
     // Note that sometimes permanent rules can be simplified, but they can never
     // be redundant.
