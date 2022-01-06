@@ -949,6 +949,256 @@ bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
 }
 
 //===----------------------------------------------------------------------===//
+//                          Closure Argument Cloner
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct ClosureArgumentInOutToOutCloner
+    : SILClonerWithScopes<ClosureArgumentInOutToOutCloner> {
+  friend class SILInstructionVisitor<ClosureArgumentInOutToOutCloner>;
+  friend class SILCloner<ClosureArgumentInOutToOutCloner>;
+
+  ConsumingClosureArgDataflowState &argDataflowState;
+  SILFunction *orig;
+  SmallBitVector &argsToConvertIndices;
+  SmallVector<SILValue, 4> newConvertedArgs;
+
+  // The values in the original function that are promoted to stack
+  // references.
+  SmallPtrSet<SILValue, 4> origFunctionValues;
+
+public:
+  ClosureArgumentInOutToOutCloner(
+      SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
+      IsSerialized_t isSerialized,
+      ConsumingClosureArgDataflowState &argDataflowState,
+      SmallBitVector &argsToConvertIndices);
+
+  void populateCloned();
+
+  SILFunction *getCloned() { return &getBuilder().getFunction(); }
+
+  void visitDestroyValueInst(DestroyValueInst *inst) {
+    if (!argDataflowState.postDominatingConsumingUsers.erase(inst)) {
+      SILCloner<ClosureArgumentInOutToOutCloner>::visitDestroyValueInst(inst);
+    }
+
+    // Don't do anything if we have a destroy.
+  }
+
+  void visitCopyAddrInst(CopyAddrInst *inst) {
+    if (!argDataflowState.postDominatingConsumingUsers.erase(inst)) {
+      return SILCloner<ClosureArgumentInOutToOutCloner>::visitCopyAddrInst(
+          inst);
+    }
+
+    // If this copy_addr is one of the copies that we need to fixup, convert it
+    // to an init from a reinit.
+    assert(!inst->isInitializationOfDest() && "Should be a reinit");
+    getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
+    recordClonedInstruction(
+        inst, getBuilder().createCopyAddr(
+                  getOpLocation(inst->getLoc()), getOpValue(inst->getSrc()),
+                  getOpValue(inst->getDest()), inst->isTakeOfSrc(),
+                  IsInitialization_t::IsInitialization));
+  }
+
+  void visitStoreInst(StoreInst *inst) {
+    if (!argDataflowState.postDominatingConsumingUsers.erase(inst)) {
+      return SILCloner<ClosureArgumentInOutToOutCloner>::visitStoreInst(inst);
+    }
+
+    // If this store is one of the copies that we need to fixup, convert it
+    // to an init from being an assign.
+    assert(inst->getOwnershipQualifier() == StoreOwnershipQualifier::Assign);
+    getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
+    recordClonedInstruction(
+        inst, getBuilder().createStore(
+                  getOpLocation(inst->getLoc()), getOpValue(inst->getSrc()),
+                  getOpValue(inst->getDest()), StoreOwnershipQualifier::Init));
+  }
+
+private:
+  static SILFunction *
+  initCloned(SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
+             IsSerialized_t isSerialized,
+             ConsumingClosureArgDataflowState &argDataflowState,
+             SmallBitVector &argsToConvertIndices, StringRef cloneName);
+};
+
+} // namespace
+
+static std::string getClonedName(SILFunction *func, IsSerialized_t serialized,
+                                 SmallBitVector &argsToConvertIndices) {
+  auto kind = Demangle::SpecializationPass::MoveDiagnosticInOutToOut;
+  Mangle::FunctionSignatureSpecializationMangler Mangler(kind, serialized,
+                                                         func);
+  for (int i = argsToConvertIndices.find_first(); i != -1;
+       i = argsToConvertIndices.find_next(i)) {
+    Mangler.setArgumentInOutToOut(i);
+  }
+  return Mangler.mangle();
+}
+
+ClosureArgumentInOutToOutCloner::ClosureArgumentInOutToOutCloner(
+    SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
+    IsSerialized_t isSerialized,
+    ConsumingClosureArgDataflowState &argDataflowState,
+    SmallBitVector &argsToConvertIndices)
+    : SILClonerWithScopes<ClosureArgumentInOutToOutCloner>(
+          *initCloned(funcBuilder, orig, isSerialized, argDataflowState,
+                      argsToConvertIndices,
+                      getClonedName(orig, isSerialized, argsToConvertIndices))),
+      argDataflowState(argDataflowState), orig(orig),
+      argsToConvertIndices(argsToConvertIndices) {
+  newConvertedArgs.reserve(argsToConvertIndices.size());
+  assert(orig->getDebugScope()->getParentFunction() !=
+         getCloned()->getDebugScope()->getParentFunction());
+}
+
+/// Create the function corresponding to the clone of the
+/// original closure with the signature modified to reflect promoted
+/// parameters (which are specified by PromotedArgIndices).
+SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
+    SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
+    IsSerialized_t serialized,
+    ConsumingClosureArgDataflowState &argDataflowState,
+    SmallBitVector &argsToConvertIndices, StringRef clonedName) {
+  SILModule &mod = orig->getModule();
+  SmallVector<SILParameterInfo, 4> clonedInterfaceArgTys;
+  SmallVector<SILResultInfo, 4> clonedResultInfos;
+  SILFunctionType *origFTI = orig->getLoweredFunctionType();
+
+  // First initialized cloned result infos with the old results.
+  for (auto result : origFTI->getResults())
+    clonedResultInfos.push_back(result);
+
+  // Generate a new parameter list with deleted parameters removed...
+  unsigned initArgIndex = orig->getConventions().getSILArgIndexOfFirstParam();
+  for (auto state :
+       llvm::enumerate(origFTI->getParameters().drop_front(initArgIndex))) {
+    unsigned index = state.index();
+    auto paramInfo = state.value();
+
+    // If we are supposed to convert this, add the parameter to the result list.
+    if (argsToConvertIndices.test(index)) {
+      clonedResultInfos.emplace_back(paramInfo.getInterfaceType(),
+                                     ResultConvention::Indirect);
+      continue;
+    }
+
+    // Otherwise, just let it through.
+    clonedInterfaceArgTys.push_back(paramInfo);
+    ++index;
+  }
+
+  // Create the new function type for the cloned function with some of
+  // the parameters moved to be results.
+  auto clonedTy = SILFunctionType::get(
+      origFTI->getInvocationGenericSignature(), origFTI->getExtInfo(),
+      origFTI->getCoroutineKind(), origFTI->getCalleeConvention(),
+      clonedInterfaceArgTys, origFTI->getYields(), clonedResultInfos,
+      origFTI->getOptionalErrorResult(), origFTI->getPatternSubstitutions(),
+      origFTI->getInvocationSubstitutions(), mod.getASTContext(),
+      origFTI->getWitnessMethodConformanceOrInvalid());
+
+  assert((orig->isTransparent() || orig->isBare() || orig->getLocation()) &&
+         "SILFunction missing location");
+  assert((orig->isTransparent() || orig->isBare() || orig->getDebugScope()) &&
+         "SILFunction missing DebugScope");
+  assert(!orig->isGlobalInit() && "Global initializer cannot be cloned");
+  auto *Fn = funcBuilder.createFunction(
+      swift::getSpecializedLinkage(orig, orig->getLinkage()), clonedName,
+      clonedTy, orig->getGenericEnvironment(), orig->getLocation(),
+      orig->isBare(), orig->isTransparent(), serialized, IsNotDynamic,
+      IsNotDistributed, orig->getEntryCount(), orig->isThunk(),
+      orig->getClassSubclassScope(), orig->getInlineStrategy(),
+      orig->getEffectsKind(), orig, orig->getDebugScope());
+  for (auto &Attr : orig->getSemanticsAttrs()) {
+    Fn->addSemanticsAttr(Attr);
+  }
+  if (!orig->hasOwnership()) {
+    Fn->setOwnershipEliminated();
+  }
+  return Fn;
+}
+
+/// Populate the body of the cloned closure, modifying instructions as
+/// necessary to take into consideration the removed parameters.
+void ClosureArgumentInOutToOutCloner::populateCloned() {
+  SILFunction *cloned = getCloned();
+
+  // Create arguments for the entry block
+  SILBasicBlock *origEntryBlock = &*orig->begin();
+  SILBasicBlock *clonedEntryBlock = cloned->createBasicBlock();
+
+  SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(origEntryBlock->getArguments().size());
+
+  // Initialize all new arg slots to an invalid value.
+  newConvertedArgs.resize(origEntryBlock->getArguments().size());
+
+  // First process all of the indirect results and add our new results after
+  // them.
+  auto oldArgs = origEntryBlock->getArguments();
+  auto origConventions = orig->getConventions();
+  for (unsigned i : range(origConventions.getSILArgIndexOfFirstIndirectResult(),
+                          origConventions.getSILArgIndexOfFirstParam())) {
+    auto *a = oldArgs[i];
+    // Create a new argument which copies the original argument.
+    entryArgs.push_back(
+        clonedEntryBlock->createFunctionArgument(a->getType(), a->getDecl()));
+  }
+
+  // To avoid needing to mess with types, just go through our original arguments
+  // in the entry block to get the right types.
+  llvm::SmallMapVector<SILValue, SILValue, 4> movedArgs;
+  SmallBitVector newResults(origEntryBlock->getNumArguments());
+  for (auto state : llvm::enumerate(origEntryBlock->getArguments())) {
+    unsigned argNo = state.index();
+    if (!argsToConvertIndices.test(argNo))
+      continue;
+
+    auto *arg = state.value();
+    auto *newArg = clonedEntryBlock->createFunctionArgument(arg->getType(),
+                                                            arg->getDecl());
+    movedArgs[arg] = newArg;
+    entryArgs.push_back(newArg);
+  }
+
+  // Finally, recreate the rest of the arguments which we did not specialize.
+  for (auto state : llvm::enumerate(origEntryBlock->getArguments())) {
+    unsigned argNo = state.index();
+    if (argsToConvertIndices.test(argNo))
+      continue;
+
+    auto *arg = state.value();
+    entryArgs.push_back(clonedEntryBlock->createFunctionArgument(
+        arg->getType(), arg->getDecl()));
+  }
+
+  // Visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions and terminators.
+  cloneFunctionBody(orig, clonedEntryBlock, entryArgs,
+                    [&](SILValue clonedArg) -> SILValue {
+                      auto iter = movedArgs.find(clonedArg);
+                      if (iter == movedArgs.end())
+                        return clonedArg;
+                      return iter->second;
+                    });
+
+  // As we clone instructions, any that we handled specially will have been
+  // erased from postDominatingConsumingUsers. If we didn't erase all of them,
+  // then there is a bug in the implementation.
+  assert(llvm::all_of(argDataflowState.postDominatingConsumingUsers,
+                      [&](Optional<SILInstruction *> user) {
+                        return user.hasValue();
+                      }) &&
+         "Did not handle a post dominating consuming user?!");
+}
+
+//===----------------------------------------------------------------------===//
 //                              Global Dataflow
 //===----------------------------------------------------------------------===//
 
