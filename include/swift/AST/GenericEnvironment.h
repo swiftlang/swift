@@ -33,6 +33,8 @@ namespace swift {
 class ArchetypeType;
 class ASTContext;
 class GenericTypeParamType;
+class OpaqueTypeDecl;
+class OpenedArchetypeType;
 class SILModule;
 class SILType;
 
@@ -57,11 +59,28 @@ public:
 /// TypeBase::mapTypeOutOfContext().
 ///
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
-        : private llvm::TrailingObjects<GenericEnvironment, Type> {
-  GenericSignature Signature = GenericSignature();
+    : private llvm::TrailingObjects<
+        GenericEnvironment, OpaqueTypeDecl *, SubstitutionMap, Type> {
+public:
+  enum class Kind {
+    /// A normal generic environment, determined only by its generic
+    /// signature.
+    Normal,
+    /// A generic environment describing an opened existential archetype.
+    OpenedExistential,
+    /// A generic environment describing an opaque type archetype.
+    Opaque,
+  };
+
+private:
+  mutable llvm::PointerIntPair<GenericSignature, 2, Kind> SignatureAndKind{
+      GenericSignature(), Kind::Normal};
 
   friend TrailingObjects;
+  friend OpaqueTypeArchetypeType;
 
+  size_t numTrailingObjects(OverloadToken<OpaqueTypeDecl *>) const;
+  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const;
   size_t numTrailingObjects(OverloadToken<Type>) const;
 
   /// Retrieve the array containing the context types associated with the
@@ -74,7 +93,9 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   /// generic signature.
   ArrayRef<Type> getContextTypes() const;
 
-  explicit GenericEnvironment(GenericSignature signature);
+  explicit GenericEnvironment(GenericSignature signature, Kind kind);
+  explicit GenericEnvironment(
+      GenericSignature signature, OpaqueTypeDecl *opaque, SubstitutionMap subs);
 
   friend ArchetypeType;
   friend QueryInterfaceTypeSubstitutions;
@@ -86,17 +107,38 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   /// This is only useful when lazily populating a generic environment.
   Optional<Type> getMappingIfPresent(GenericParamKey key) const;
 
+  /// Get the "raw" generic signature, without substituting into opaque
+  /// type's signature.
+  GenericSignature getRawGenericSignature() const;
+
 public:
-  GenericSignature getGenericSignature() const {
-    return Signature;
-  }
+  GenericSignature getGenericSignature() const;
+
+  Kind getKind() const { return SignatureAndKind.getInt(); }
 
   TypeArrayView<GenericTypeParamType> getGenericParams() const;
+
+  /// Retrieve the opaque type declaration for a generic environment describing
+  /// opaque types.
+  OpaqueTypeDecl *getOpaqueTypeDecl() const;
+
+  /// Retrieve the substitutions applied to an opaque type declaration to
+  /// create a generic environment.
+  SubstitutionMap getOpaqueSubstitutions() const;
 
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
   static
   GenericEnvironment *getIncomplete(GenericSignature signature);
+
+  /// Create a new generic environment for an opened existential.
+  static GenericEnvironment *forOpenedExistential(
+      GenericSignature signature, const OpenedArchetypeType *type);
+
+  /// Create a new generic environment for an opaque type with the given set of
+  /// outer substitutions.
+  static GenericEnvironment *forOpaqueType(
+      OpaqueTypeDecl *opaque, SubstitutionMap subs, AllocationArena arena);
 
   /// Add a mapping of a generic parameter to a specific type (which may be
   /// an archetype)
@@ -111,6 +153,12 @@ public:
     assert(Mem); 
     return Mem; 
   }
+
+  /// For an opaque archetype environment, apply the substitutions.
+  Type maybeApplyOpaqueTypeSubstitutions(Type type) const;
+
+  /// Compute the canonical interface type within this environment.
+  Type getCanonicalInterfaceType(Type interfaceType);
 
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(GenericEnvironment *genericEnv,
