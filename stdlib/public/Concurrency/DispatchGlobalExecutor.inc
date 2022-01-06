@@ -291,8 +291,8 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
     }
     case swift_clock_id_realtime: {
       const struct timespec ts = {
-        .tv_sec = sec,
-        .tv_nsec = nsec
+        .tv_sec = static_cast<long>(sec),
+        .tv_nsec = static_cast<long>(nsec)
       };
       when = dispatch_walltime(&ts, 0);
       break;
