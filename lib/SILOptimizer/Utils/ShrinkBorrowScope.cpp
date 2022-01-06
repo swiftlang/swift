@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "llvm/ADT/SmallSet.h"
 
 #define DEBUG_TYPE "copy-propagation"
 
@@ -54,10 +55,13 @@ class ShrinkBorrowScope {
   llvm::SmallDenseMap<ApplySite, size_t> transitiveUsesPerApplySite;
 
   // The list of blocks to look for new points at which to insert end_borrows
-  // in.  A block must not be processed if all of its successors have not yet
-  // been.  For that reason, it is necessary to allow the same block to be
-  // visited multiple times, at most once for each successor.
-  SmallVector<SILBasicBlock *, 8> worklist;
+  // in, along with the running nested lexical borrow scopes if any.
+  //
+  // A block must not be processed if all of its successors have not yet been.
+  // For that reason, it is necessary to allow the same block to be visited
+  // multiple times, at most once for each successor.
+  SmallVector<std::pair<SILBasicBlock *, llvm::SmallSet<SILValue, 4>>, 8>
+      worklist;
   // The instructions from which the shrinking starts, the scope ending
   // instructions, keyed off the block in which they appear.
   llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *> startingInstructions;
@@ -142,11 +146,95 @@ public:
     return 0;
   }
 
-  bool canHoistOverInstruction(SILInstruction *instruction) {
-    return tryHoistOverInstruction(instruction, /*rewrite=*/false);
+  /// Whether the instruction ends a nested, lexical borrow scope which is
+  /// guarding the lifetime of the same object as that introduced by introducer.
+  ///
+  /// For this to be true, both the borrow scope we are shrinking and the nested
+  /// borrow scope must be lexical, and the inner scope must be borrowing the
+  /// value produced by the outer begin_borrow.
+  SILValue endsNestedLexicalBorrow(SILInstruction *instruction) {
+    EndBorrowInst *ebi = dyn_cast<EndBorrowInst>(instruction);
+    if (!ebi) {
+      return SILValue();
+    }
+    SILInstruction *beginner = ebi->getOperand()->getDefiningInstruction();
+    if (!beginner) {
+      return SILValue();
+    }
+    return beginsNestedLexicalBorrow(beginner);
   }
 
-  bool tryHoistOverInstruction(SILInstruction *instruction, bool rewrite = true) {
+  /// Whether the instruction begins a nested, lexical borrow scope which is
+  /// guarding the lifetime of the same object as that introduced by introducer.
+  ///
+  /// For this to be true, both the borrow scope we are shrinking and the nested
+  /// borrow scope must be lexical, and the inner scope must be borrowing the
+  /// value produced by the outer begin_borrow.
+  BeginBorrowInst *beginsNestedLexicalBorrow(SILInstruction *instruction) {
+    BeginBorrowInst *bbi = dyn_cast<BeginBorrowInst>(instruction);
+    if (!introducer->isLexical()) {
+      return nullptr;
+    }
+    if (!bbi) {
+      return nullptr;
+    }
+    if (!bbi->isLexical()) {
+      return nullptr;
+    }
+    if (bbi->getOperand() != introducer) {
+      return nullptr;
+    }
+    return bbi;
+  }
+
+  bool
+  canHoistOverInstruction(SILInstruction *instruction,
+                          llvm::SmallSet<SILValue, 4> &nestedLexicalScopes) {
+    return tryHoistOverInstruction(instruction, nestedLexicalScopes,
+                                   /*rewrite=*/false);
+  }
+
+  bool tryHoistOverInstruction(SILInstruction *instruction,
+                               llvm::SmallSet<SILValue, 4> &nestedLexicalScopes,
+                               bool rewrite = true) {
+    // Never hoist over the instruction that introduces the borrow scope.
+    if (instruction == introducer) {
+      assert(nestedLexicalScopes.size() == 0);
+      return false;
+    }
+    // If this is the begin_borrow [lexical] for a nested lexical scope, remove
+    // it from the set of nested lexical scopes and hoist.
+    if (auto *bbi = beginsNestedLexicalBorrow(instruction)) {
+#ifndef NDEBUG
+      bool erased =
+#endif
+          nestedLexicalScopes.erase(bbi);
+#ifndef NDEBUG
+      assert(erased);
+#endif
+      if (rewrite) {
+        bbi->setOperand(introducer->getOperand());
+        madeChange = true;
+      }
+      return true;
+    }
+    // If this is an end_borrow for a nested lexical scope, hoist and add the
+    // value produced by the corresponding begin_borrow to the set of nested
+    // lexical scopes.
+    if (auto inner = endsNestedLexicalBorrow(instruction)) {
+#ifndef NDEBUG
+      auto inserted =
+#endif
+          nestedLexicalScopes.insert(inner);
+#ifndef NDEBUG
+      assert(inserted.second);
+#endif
+      return true;
+    }
+    // If the instruction appears within any nested lexical scopes, hoist.
+    if (nestedLexicalScopes.size() > 0) {
+      return true;
+    }
     if (users.contains(instruction)) {
       if (auto apply = ApplySite::isa(instruction)) {
         SmallVector<int, 2> rewritableArgumentIndices;
@@ -251,7 +339,7 @@ bool ShrinkBorrowScope::initializeWorklist() {
     if (!isa<EndBorrowInst>(instruction))
       return false;
     auto *block = instruction->getParent();
-    worklist.push_back(block);
+    worklist.push_back({block, {}});
     startingInstructions[block] = instruction;
   }
 
@@ -276,7 +364,9 @@ void ShrinkBorrowScope::findBarriers() {
   };
 
   while (!worklist.empty()) {
-    auto *block = worklist.pop_back_val();
+    SILBasicBlock *block = nullptr;
+    llvm::SmallSet<SILValue, 4> nestedLexicalScopes;
+    std::tie(block, nestedLexicalScopes) = worklist.pop_back_val();
     auto *startingInstruction = startingInstructions.lookup(block);
     if (!startingInstruction && !hasOnlyDeadSuccessors(block)) {
       continue;
@@ -299,20 +389,16 @@ void ShrinkBorrowScope::findBarriers() {
       // successor's other predecessors) had a terminator over which the borrow
       // scope could be shrunk.  Shrink it now.
 #ifndef NDEBUG
-      bool hoisted = 
+      bool hoisted =
 #endif
-      tryHoistOverInstruction(block->getTerminator());
+          tryHoistOverInstruction(block->getTerminator(), nestedLexicalScopes);
 #ifndef NDEBUG
       assert(hoisted);
 #endif
     }
     SILInstruction *barrier = nullptr;
     while ((instruction = instruction->getPreviousInstruction())) {
-      if (instruction == introducer) {
-        barrier = instruction;
-        break;
-      }
-      if (!tryHoistOverInstruction(instruction)) {
+      if (!tryHoistOverInstruction(instruction, nestedLexicalScopes)) {
         barrier = instruction;
         break;
       }
@@ -326,12 +412,13 @@ void ShrinkBorrowScope::findBarriers() {
       // If any of block's predecessor has a terminator over which the scope 
       // can't be shrunk, the scope is barred from shrinking out of this block.
       if (llvm::all_of(block->getPredecessorBlocks(), [&](auto *block) {
-            return canHoistOverInstruction(block->getTerminator());
-            })) {
+            return canHoistOverInstruction(block->getTerminator(),
+                                           nestedLexicalScopes);
+          })) {
         // Otherwise, add all predecessors to the worklist and attempt to shrink
         // the borrow scope through them.
         for (auto *predecessor : block->getPredecessorBlocks()) {
-          worklist.push_back(predecessor);
+          worklist.push_back({predecessor, nestedLexicalScopes});
         }
       }
     }

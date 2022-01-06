@@ -785,3 +785,297 @@ exit:
 // =============================================================================
 // instruction tests                                                          }}
 // =============================================================================
+
+
+// =============================================================================
+// nested scope tests                                                         {{
+// =============================================================================
+
+// The (lexical, lexical) version of hoisting an outer end_borrow of an inner
+// end_borrow.  The only case where hoisting should occur.
+//
+// CHECK-LABEL: sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME_OUTER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         end_borrow [[LIFETIME_OUTER]]
+// CHECK:         [[LIFETIME_INNER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME_INNER]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_outer_lexical_over_inner_lexical_with_barrier'
+sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_outer = begin_borrow [lexical] %instance : $C
+  %lifetime_inner = begin_borrow [lexical] %lifetime_outer : $C
+  %result = apply undef() : $@convention(thin) () -> ()
+  end_borrow %lifetime_inner : $C
+  end_borrow %lifetime_outer : $C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// The (non-lexical, lexical) version of hoisting an outer end_borrow of an
+// inner end_borrow.  Hoisting should NOT occur in this case.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_outer_nonlexical_over_inner_lexical_with_barrier : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME_OUTER:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[LIFETIME_INNER:%[^,]+]] = begin_borrow [lexical] [[LIFETIME_OUTER]]
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME_INNER]]
+// CHECK:         end_borrow [[LIFETIME_OUTER]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_outer_nonlexical_over_inner_lexical_with_barrier'
+sil [ossa] @dont_hoist_outer_nonlexical_over_inner_lexical_with_barrier : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_outer = begin_borrow %instance : $C
+  %lifetime_inner = begin_borrow [lexical] %lifetime_outer : $C
+  %result = apply undef() : $@convention(thin) () -> ()
+  end_borrow %lifetime_inner : $C
+  end_borrow %lifetime_outer : $C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// The (lexical, non-lexical) version of hoisting an outer end_borrow of an
+// inner end_borrow.  Hoisting should NOT occur in this case.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_outer_lexical_over_inner_nonlexical_with_barrier : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME_OUTER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME_INNER:%[^,]+]] = begin_borrow [[LIFETIME_OUTER]]
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME_INNER]]
+// CHECK:         end_borrow [[LIFETIME_OUTER]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_outer_lexical_over_inner_nonlexical_with_barrier'
+sil [ossa] @dont_hoist_outer_lexical_over_inner_nonlexical_with_barrier : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_outer = begin_borrow [lexical] %instance : $C
+  %lifetime_inner = begin_borrow %lifetime_outer : $C
+  %result = apply undef() : $@convention(thin) () -> ()
+  end_borrow %lifetime_inner : $C
+  end_borrow %lifetime_outer : $C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// The (non-lexical, non-lexical) version of hoisting an outer end_borrow of an
+// inner end_borrow.  Hoisting should NOT occur in this case.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_outer_nonlexical_over_inner_nonlexical_with_barrier : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME_OUTER:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[LIFETIME_INNER:%[^,]+]] = begin_borrow [[LIFETIME_OUTER]]
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME_INNER]]
+// CHECK:         end_borrow [[LIFETIME_OUTER]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_outer_nonlexical_over_inner_nonlexical_with_barrier'
+sil [ossa] @dont_hoist_outer_nonlexical_over_inner_nonlexical_with_barrier : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_outer = begin_borrow %instance : $C
+  %lifetime_inner = begin_borrow %lifetime_outer : $C
+  %result = apply undef() : $@convention(thin) () -> ()
+  end_borrow %lifetime_inner : $C
+  end_borrow %lifetime_outer : $C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Check that the inner scope to be hoisted over is tracked from successor to
+// predecessor.
+//
+// CHECK-LABEL: sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier_split : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME_OUTER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         end_borrow [[LIFETIME_OUTER]]
+// CHECK:         [[LIFETIME_INNER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         apply undef()
+// CHECK:         br [[MIDDLE:bb[0-9]+]]
+// CHECK:       [[MIDDLE]]:
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME_INNER]]
+// CHECK:         br [[END:bb[0-9]+]]
+// CHECK:       [[END]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_outer_lexical_over_inner_lexical_with_barrier_split'
+sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier_split : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_outer = begin_borrow [lexical] %instance : $C
+  %lifetime_inner = begin_borrow [lexical] %lifetime_outer : $C
+  %result1 = apply undef() : $@convention(thin) () -> ()
+  br middle
+
+middle:
+  %result2 = apply undef() : $@convention(thin) () -> ()
+  end_borrow %lifetime_inner : $C
+  br exit
+
+exit:
+  end_borrow %lifetime_outer : $C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Start from one end_borrow and hoist over an inner scope separately ended
+// twice.
+//
+// CHECK-LABEL: sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier_diamond : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME_OUTER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         end_borrow [[LIFETIME_OUTER]]
+// CHECK:         [[LIFETIME_INNER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         apply undef()
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME_INNER]]
+// CHECK:         br [[END:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME_INNER]]
+// CHECK:         br [[END]]
+// CHECK:       [[END]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_outer_lexical_over_inner_lexical_with_barrier_diamond'
+sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier_diamond : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_outer = begin_borrow [lexical] %instance : $C
+  %lifetime_inner = begin_borrow [lexical] %lifetime_outer : $C
+  %result1 = apply undef() : $@convention(thin) () -> ()
+  cond_br undef, left, right
+
+left:
+  %result2_left = apply undef() : $@convention(thin) () -> ()
+  end_borrow %lifetime_inner : $C
+  br exit
+
+right:
+  %result2_right = apply undef() : $@convention(thin) () -> ()
+  end_borrow %lifetime_inner : $C
+  br exit
+
+exit:
+  end_borrow %lifetime_outer : $C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Start from two end_borrows and hoist over an inner scope separately ended
+// twice.
+//
+// CHECK-LABEL: sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier_diamond2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME_OUTER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         end_borrow [[LIFETIME_OUTER]]
+// CHECK:         [[LIFETIME_INNER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         apply undef()
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME_INNER]]
+// CHECK:         br [[END:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[LIFETIME_INNER]]
+// CHECK:         br [[END]]
+// CHECK:       [[END]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_outer_lexical_over_inner_lexical_with_barrier_diamond2'
+sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier_diamond2 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_outer = begin_borrow [lexical] %instance : $C
+  %lifetime_inner = begin_borrow [lexical] %lifetime_outer : $C
+  %result1 = apply undef() : $@convention(thin) () -> ()
+  cond_br undef, left, right
+
+left:
+  %result2_left = apply undef() : $@convention(thin) () -> ()
+  end_borrow %lifetime_inner : $C
+  end_borrow %lifetime_outer : $C
+  br exit
+
+right:
+  %result2_right = apply undef() : $@convention(thin) () -> ()
+  end_borrow %lifetime_inner : $C
+  end_borrow %lifetime_outer : $C
+  br exit
+
+exit:
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_outer_lexical_over_first_overlapping_lexical_with_barrier : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[OUTER:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         end_borrow [[OUTER]]
+// CHECK:         [[INNER_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         apply undef()
+// CHECK:         [[INNER_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         apply undef()
+// CHECK:         end_borrow [[INNER_1]]
+// CHECK:         end_borrow [[INNER_2]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_outer_lexical_over_first_overlapping_lexical_with_barrier'
+sil [ossa] @hoist_outer_lexical_over_first_overlapping_lexical_with_barrier : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %outer = begin_borrow [lexical] %instance : $C
+  %inner_1 = begin_borrow [lexical] %outer : $C
+  %barrier_result_1 = apply undef() : $@convention(thin) () -> ()
+  %inner_2 = begin_borrow [lexical] %outer : $C
+  %barrier_result_2 = apply undef() : $@convention(thin) () -> ()
+  end_borrow %inner_1 : $C
+  end_borrow %inner_2 : $C
+  end_borrow %outer : $C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier_try_apply : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[OUTER:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[INNER:%[^,]+]] = begin_borrow [[OUTER]]
+// CHECK:         try_apply undef() : {{.*}}, normal [[GOOD:bb[0-9]+]], error [[BAD:bb[0-9]+]]
+// CHECK:       [[GOOD]]([[REGISTER_4:%[^,]+]] : $()):
+// CHECK:         end_borrow [[INNER]]
+// CHECK:         end_borrow [[OUTER]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:       [[BAD]]([[REGISTER_10:%[^,]+]] : @owned $Error):
+// CHECK:         end_borrow [[INNER]]
+// CHECK:         end_borrow [[OUTER]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         throw [[REGISTER_10]]
+// CHECK-LABEL: } // end sil function 'hoist_outer_lexical_over_inner_lexical_with_barrier_try_apply'
+sil [ossa] @hoist_outer_lexical_over_inner_lexical_with_barrier_try_apply : $@convention(thin) (@owned C) -> @error Error {
+bb0(%instance : @owned $C):
+  %outer = begin_borrow %instance : $C
+  %inner = begin_borrow %outer : $C
+  try_apply undef() : $@convention(thin) () -> @error Error, normal good, error bad
+
+good(%8 : $()):
+  end_borrow %inner : $C
+  end_borrow %outer : $C
+  destroy_value %instance : $C
+  %13 = tuple ()
+  return %13 : $()
+
+bad(%15 : @owned $Error):
+  end_borrow %inner : $C
+  end_borrow %outer : $C
+  destroy_value %instance : $C
+  throw %15 : $Error
+}
+
+// =============================================================================
+// nested scope tests                                                         }}
+// =============================================================================
