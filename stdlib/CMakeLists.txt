@@ -52,30 +52,6 @@ else()
   set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default FALSE)
 endif()
 
-if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
-  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "HAIKU")
-  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "WASI")
-  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
-else()
-  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default TRUE)
-endif()
-
-if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
-  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "HAIKU")
-  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
-else()
-  set(SWIFT_STDLIB_HAS_LOCALE_default TRUE)
-endif()
-
-if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
-  set(SWIFT_STDLIB_HAS_ASL_default TRUE)
-else()
-  set(SWIFT_STDLIB_HAS_ASL_default FALSE)
-endif()
-
 #
 # User-configurable options for the standard library.
 #
@@ -96,18 +72,6 @@ option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
 
-option(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
-       "Build stdlib assuming the runtime environment provides the backtrace(3) API."
-       "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default}")
-
-option(SWIFT_STDLIB_HAS_ASL
-       "Build stdlib assuming we can use the asl_log API."
-       "${SWIFT_STDLIB_HAS_ASL_default}")
-
-option(SWIFT_STDLIB_HAS_LOCALE
-       "Build stdlib assuming the platform has locale support."
-       "${SWIFT_STDLIB_HAS_LOCALE_default}")
-
 option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
@@ -115,16 +79,6 @@ option(SWIFT_BUILD_TEST_SUPPORT_MODULES
 option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
        "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on Linux."
        "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
-
-if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
-else()
-  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
-endif()
-
-set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
-    "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
-    "Build the concurrency library to use the given global executor (options: dispatch, singlethreaded, hooked)")
 
 # New options should be added to stdlib/cmake/modules/StdlibOptions.cmake,
 # so that they are considered in configurations using StandaloneOverlay.cmake
