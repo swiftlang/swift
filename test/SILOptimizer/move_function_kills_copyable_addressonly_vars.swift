@@ -4,11 +4,15 @@
 
 import Swift
 
-public class Klass {}
-
 //////////////////
 // Declarations //
 //////////////////
+
+public class Klass {}
+
+struct KlassWrapper {
+    var k: Klass
+}
 
 func consumingUse<T>(_ k: __owned T) {}
 var booleanValue: Bool { false }
@@ -196,4 +200,146 @@ struct S<T> {
         } catch {
         }
     } // expected-note {{use here}}
+}
+
+/////////////////
+// Defer Tests //
+/////////////////
+
+protocol P {
+    var k: Klass { get }
+
+    static func getP() -> Self
+    mutating func deferTestSuccess1()
+    mutating func deferTestSuccess2()
+    mutating func deferTestSuccess3()
+    mutating func deferTestFail1()
+    mutating func deferTestFail2()
+    mutating func deferTestFail3()
+    mutating func deferTestFail4()
+    mutating func deferTestFail5()
+    mutating func deferTestFail6()
+    mutating func deferTestFail7()
+}
+
+extension P {
+    mutating func deferTestSuccess1() {
+        let selfType = type(of: self)
+        let _ = _move(self)
+        defer {
+            self = selfType.getP()
+        }
+        print("123")
+    }
+
+    // Make sure we can init/reinit self multiple times without error.
+    mutating func deferTestSuccess2() {
+        let selfType = type(of: self)
+        let _ = _move(self)
+        self = selfType.getP()
+        let _ = _move(self)
+        defer {
+            self = selfType.getP()
+        }
+        print("123")
+    }
+
+    mutating func deferTestSuccess3() {
+        let selfType = type(of: self)
+        let _ = _move(self)
+        defer {
+            self = selfType.getP()
+        }
+        defer {
+            self = selfType.getP()
+        }
+        print("123")
+    }
+
+    // We do not support moving within a defer right now.
+    mutating func deferTestFail1() {
+        let selfType = type(of: self)
+        let _ = _move(self)
+        defer {
+            self = selfType.getP()
+            let _ = _move(self) // expected-error {{_move applied to value that the compiler does not support checking}}
+        }
+        print("123")
+    }
+
+    // We do not support moving within a defer right now.
+    mutating func deferTestFail2() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            nonConsumingUse(k) // expected-note {{use here}}
+            self = selfType.getP()
+        }
+        print("123")
+    }
+
+
+    mutating func deferTestFail3() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        nonConsumingUse(k) // expected-note {{use here}}
+        defer {
+            nonConsumingUse(k)
+            self = selfType.getP()
+        }
+        print("123")
+    }
+
+    mutating func deferTestFail4() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            consumingUse(k) // expected-note {{use here}}
+            self = selfType.getP()
+        }
+        print("123")
+    }
+
+    // TODO: We should definitely be erroring on consuming use I think.
+    mutating func deferTestFail5() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        for _ in 0..<1024 {
+            defer {
+                consumingUse(k)
+                self = selfType.getP()
+            }
+            print("foo bar")
+        }
+        print("123")
+    }  // expected-note {{use here}}
+
+    // TODO: We should be erroring on nonConsumingUse rather than the end of
+    // scope use.
+    //
+    mutating func deferTestFail6() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        for _ in 0..<1024 {
+            defer {
+                nonConsumingUse(k)
+                self = selfType.getP()
+            }
+            print("foo bar")
+        }
+        print("123")
+    }  // expected-note {{use here}}
+
+    mutating func deferTestFail7() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        for _ in 0..<1024 {
+            let _ = _move(self) // expected-note {{move here}}
+            defer {
+                nonConsumingUse(k) // expected-note {{use here}}
+                self = selfType.getP()
+            }
+            print("foo bar")
+        }
+        print("123")
+    }
 }
