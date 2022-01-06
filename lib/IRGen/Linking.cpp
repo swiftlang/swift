@@ -470,7 +470,7 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
-  case Kind::DistributedMethodAccessorAsyncPointer: {
+  case Kind::DistributedAccessorAsyncPointer: {
     std::string Result(getUnderlyingEntityForAsyncFunctionPointer()
         .mangleAsString());
     Result.append("Tu");
@@ -499,7 +499,7 @@ std::string LinkEntity::mangleAsString() const {
     return Result;
   }
 
-  case Kind::DistributedMethodAccessor: {
+  case Kind::DistributedAccessor: {
     std::string Result(getSILFunction()->getName());
     Result.append("TF");
     return Result;
@@ -804,13 +804,13 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
-  case Kind::DistributedMethodAccessorAsyncPointer:
+  case Kind::DistributedAccessorAsyncPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getLinkage(forDefinition);
   case Kind::KnownAsyncFunctionPointer:
     return SILLinkage::PublicExternal;
   case Kind::PartialApplyForwarder:
-  case Kind::DistributedMethodAccessor:
+  case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord:
     return SILLinkage::Private;
   }
@@ -838,7 +838,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
-  case Kind::DistributedMethodAccessorAsyncPointer:
+  case Kind::DistributedAccessorAsyncPointer:
   case Kind::MethodDescriptor:
   case Kind::MethodDescriptorDerivative:
   case Kind::MethodDescriptorInitializer:
@@ -903,7 +903,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
   case Kind::PartialApplyForwarder:
   case Kind::KnownAsyncFunctionPointer:
-  case Kind::DistributedMethodAccessor:
+  case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord:
     return false;
   }
@@ -1025,7 +1025,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
-  case Kind::DistributedMethodAccessorAsyncPointer:
+  case Kind::DistributedAccessorAsyncPointer:
   case Kind::AsyncFunctionPointerAST:
   case Kind::KnownAsyncFunctionPointer:
     return IGM.AsyncFunctionPointerTy;
@@ -1070,7 +1070,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
-  case Kind::DistributedMethodAccessorAsyncPointer:
+  case Kind::DistributedAccessorAsyncPointer:
   case Kind::KnownAsyncFunctionPointer:
   case Kind::ObjCClassRef:
   case Kind::ObjCClass:
@@ -1118,7 +1118,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::SILFunction:
-  case Kind::DistributedMethodAccessor: {
+  case Kind::DistributedAccessor: {
     return getSILFunction()->isWeakImported();
   }
 
@@ -1227,7 +1227,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
-  case Kind::DistributedMethodAccessorAsyncPointer:
+  case Kind::DistributedAccessorAsyncPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .isWeakImported(module);
   case Kind::KnownAsyncFunctionPointer:
@@ -1356,11 +1356,11 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
-  case Kind::DistributedMethodAccessorAsyncPointer:
+  case Kind::DistributedAccessorAsyncPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getDeclContextForEmission();
 
-  case Kind::DistributedMethodAccessor:
+  case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord: {
     auto *funcDC = getSILFunction()->getDeclContext();
     return funcDC->getParentModule();
