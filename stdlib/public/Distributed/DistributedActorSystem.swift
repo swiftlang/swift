@@ -248,7 +248,6 @@ extension DistributedActorSystem {
 
     do {
       // Execute the target!
-      print("EXECUTE the target: \(mangledTargetName)")
       try await _executeDistributedTarget(
           on: actor,
           mangledTargetName, UInt(mangledTargetName.count),

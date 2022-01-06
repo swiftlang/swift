@@ -1727,12 +1727,10 @@ void ::swift_distributed_execute_target(
     void *argumentBuffer,
     void *resultBuffer) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
-
   if (!accessor) {
     assert(false && "no distributed accessor accessor");
     return; // FIXME(distributed): return -1 here so the lib can fail the call
   }
-  fprintf(stderr, "[%s:%d] (%s) found accessor\n", __FILE__, __LINE__, __FUNCTION__);
 
   auto *asyncFnPtr = reinterpret_cast<
       const AsyncFunctionPointer<DistributedAccessorSignature> *>(

@@ -116,7 +116,8 @@ func test() async throws {
       handler: FakeResultHandler()
   )
 
-  // CHECK: RETURN
+  // CHECK: done
+  print("done")
 }
 
 @main struct Main {
