@@ -233,18 +233,27 @@ __swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
   auto scalarIndex = (setOffset << 7) + (scalar & ((1 << 7) - 1));
   auto scalarOffset = _swift_stdlib_names_scalars[scalarIndex];
 
-  if (scalarOffset == 0) {
+  // U+20 is the first scalar that Unicode defines a name for, so their offset
+  // will the only valid 0.
+  if (scalarOffset == 0 && scalar != 0x20) {
     return 0;
   }
 
   __swift_uint32_t nextScalarOffset = 0;
-  int i = 1;
 
-  // Look for the next scalar who has a name and their position in the names
-  // array. This tells us exactly how many bytes our name takes up.
-  while (nextScalarOffset == 0) {
-    nextScalarOffset = _swift_stdlib_names_scalars[scalarIndex + i];
-    i += 1;
+  if (scalarIndex != NAMES_SCALARS_MAX_INDEX) {
+    int i = 1;
+
+    // Look for the next scalar who has a name and their position in the names
+    // array. This tells us exactly how many bytes our name takes up.
+    while (nextScalarOffset == 0) {
+      nextScalarOffset = _swift_stdlib_names_scalars[scalarIndex + i];
+      i += 1;
+    }
+  } else {
+    // This is the last element in the array which represents the last scalar
+    // name that Unicode defines (excluding variation selectors).
+    nextScalarOffset = NAMES_LAST_SCALAR_OFFSET;
   }
 
   auto nameSize = nextScalarOffset - scalarOffset;

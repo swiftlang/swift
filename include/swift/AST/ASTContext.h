@@ -357,8 +357,8 @@ private:
     DelayedPatternContexts;
 
   /// Cache of module names that fail the 'canImport' test in this context.
-  mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
-  
+  mutable llvm::StringSet<> FailedModuleImportNames;
+
   /// Set if a `-module-alias` was passed. Used to store mapping between module aliases and
   /// their corresponding real names, and vice versa for a reverse lookup, which is needed to check
   /// if the module names appearing in source files are aliases or real names.
@@ -980,10 +980,10 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModuleImpl(ImportPath::Element ModulePath,
-                           llvm::VersionTuple version,
-                           bool underlyingVersion,
+  bool canImportModuleImpl(ImportPath::Module ModulePath,
+                           llvm::VersionTuple version, bool underlyingVersion,
                            bool updateFailingList) const;
+
 public:
   namelookup::ImportCache &getImportCache() const;
 
@@ -1012,10 +1012,10 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(ImportPath::Element ModulePath,
+  bool canImportModule(ImportPath::Module ModulePath,
                        llvm::VersionTuple version = llvm::VersionTuple(),
                        bool underlyingVersion = false);
-  bool canImportModule(ImportPath::Element ModulePath,
+  bool canImportModule(ImportPath::Module ModulePath,
                        llvm::VersionTuple version = llvm::VersionTuple(),
                        bool underlyingVersion = false) const;
 
@@ -1159,6 +1159,9 @@ public:
   /// \param inherited The inherited conformance.
   InheritedProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
+
+  /// Check if \p decl is included in LazyContexts.
+  bool isLazyContext(const DeclContext *decl);
 
   /// Get the lazy data for the given declaration.
   ///

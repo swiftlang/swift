@@ -2813,7 +2813,7 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
 
       // The only other case that should get here is a global variable.
       if (!address) {
-        address = SGF.emitGlobalVariableRef(Loc, Storage);
+        address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
       } else {
         assert(!ActorIso && "local var should not be actor isolated!");
       }

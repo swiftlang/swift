@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
+#include "TypeCheckRegex.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -1266,15 +1267,19 @@ namespace {
                            ctx.Id_Regex.str());
         return Type();
       }
-      auto dynCapturesType = ctx.getDynamicCapturesType();
-      if (!dynCapturesType) {
+      SmallVector<TupleTypeElt, 4> captureTypes;
+      if (decodeRegexCaptureTypes(ctx,
+                                  E->getSerializedCaptureStructure(),
+                                  /*atomType*/ ctx.getSubstringType(),
+                                  captureTypes)) {
         ctx.Diags.diagnose(E->getLoc(),
-                           diag::string_processing_lib_missing,
-                           "DynamicCaptures");
+                           diag::regex_capture_types_failed_to_decode);
         return Type();
       }
-      // TODO: Replace `DynamicCaptures` with type inferred from the regex.
-      return BoundGenericStructType::get(regexDecl, Type(), {dynCapturesType});
+      auto genericArg = captureTypes.size() == 1
+          ? captureTypes[0].getRawType()
+          : TupleType::get(captureTypes, ctx);
+      return BoundGenericStructType::get(regexDecl, Type(), {genericArg});
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
@@ -1766,16 +1771,12 @@ namespace {
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       auto joinElementTypes = [&](Optional<Type> elementType) {
-        auto openedElementType = elementType.map([&](Type type) {
-          return CS.openOpaqueType(type, contextualPurpose, locator);
-        });
-
         const auto elements = expr->getElements();
         unsigned index = 0;
 
         using Iterator = decltype(elements)::iterator;
         CS.addJoinConstraint<Iterator>(
-            locator, elements.begin(), elements.end(), openedElementType,
+            locator, elements.begin(), elements.end(), elementType,
             [&](const auto it) {
               auto *locator = CS.getConstraintLocator(
                   expr, LocatorPathElt::TupleElement(index++));
@@ -1788,6 +1789,8 @@ namespace {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        contextualType = CS.openOpaqueType(
+            contextualType, contextualPurpose, locator);
         Optional<Type> arrayElementType =
             ConstraintSystem::isArrayType(contextualType);
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
@@ -1901,8 +1904,6 @@ namespace {
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
         auto openedType =
             CS.openOpaqueType(contextualType, contextualPurpose, locator);
-        openedType = CS.replaceInferableTypesWithTypeVars(
-            openedType, CS.getConstraintLocator(expr));
         auto dictionaryKeyValue =
             ConstraintSystem::isDictionaryType(openedType);
         Type contextualDictionaryKeyType;

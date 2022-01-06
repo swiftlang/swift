@@ -1876,9 +1876,6 @@ ERROR(opaque_type_invalid_constraint,none,
       "and/or a base class", ())
 NOTE(opaque_of_optional_rewrite,none,
       "did you mean to write an optional of an 'opaque' type?", ())
-ERROR(more_than_one_opaque_type,none,
-      "%0 contains multiple 'opaque' types, but only one 'opaque' type is "
-      "supported", (TypeRepr*))
 ERROR(inferred_opaque_type,none,
       "property definition has inferred type %0, involving the 'some' "
       "return type of another declaration", (Type))
@@ -1952,6 +1949,12 @@ NOTE(non_sendable_nominal,none,
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
+REMARK(add_predates_concurrency_import,none,
+     "add '@_predatesConcurrency' to %select{suppress|treat}0 "
+     "'Sendable'-related %select{warnings|errors}0 from module %1"
+     "%select{| as warnings}0", (bool, Identifier))
+REMARK(remove_predates_concurrency_import,none,
+     "'@_predatesConcurrency' attribute on module %0 is unused", (Identifier))
 WARNING(public_decl_needs_sendable,none,
         "public %0 %1 does not specify whether it is 'Sendable' or not",
         (DescriptiveDeclKind, DeclName))
@@ -3185,6 +3188,7 @@ ERROR(nscopying_doesnt_conform,none,
 #define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
 #define SELECT_APPLICATION_TYPE "select{class|class|type}"
 #define SELECT_APPLICATION_TYPES "select{classes|classes|types}"
+#define SELECT_APPLICATION_MAIN_TYPES "select{() -> Void or () throws -> Void|() -> Void, () throws -> Void, () async -> Void, or () async throws -> Void}"
 
 ERROR(attr_ApplicationMain_not_ApplicationDelegate,none,
       "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
@@ -3204,9 +3208,11 @@ NOTE(attr_ApplicationMain_script_here,none,
      ())
 
 ERROR(attr_MainType_without_main,none,
-      "%0 is annotated with @main and must provide a main static function of type () -> Void or () throws -> Void.",
-      (DeclName))
+      "%0 is annotated with @main and must provide a main static function of type %"
+      SELECT_APPLICATION_MAIN_TYPES "1",
+      (DeclName, bool))
 
+#undef SELECT_APPLICATION_MAIN_TYPES
 #undef SELECT_APPLICATION_MAIN
 #undef SELECT_APPLICATION_DELEGATE
 
@@ -4126,8 +4132,11 @@ ERROR(opaque_type_no_underlying_type_candidates,none,
       "function declares an opaque return type, but has no return statements "
       "in its body from which to infer an underlying type", ())
 ERROR(opaque_type_mismatched_underlying_type_candidates,none,
-      "function declares an opaque return type, but the return statements "
-      "in its body do not have matching underlying types", ())
+      "function declares an opaque return type %0, but the return statements "
+      "in its body do not have matching underlying types", (TypeRepr *))
+ERROR(opaque_type_mismatched_underlying_type_candidates_named,none,
+      "function declares an opaque return type %0, but the return statements "
+      "in its body do not have matching underlying types", (Identifier))
 NOTE(opaque_type_underlying_type_candidate_here,none,
      "return statement has underlying type %0", (Type))
 ERROR(opaque_type_self_referential_underlying_type,none,
@@ -4430,9 +4439,6 @@ ERROR(distributed_actor_protocol_illegal_inheritance,none,
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
 
-ERROR(unowned_executor_outside_actor,none,
-      "'unownedExecutor' can only be implemented within the main "
-      "definition of an actor", ())
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
@@ -4763,6 +4769,9 @@ ERROR(async_unavailable_decl,none,
 ERROR(string_processing_lib_missing,none,
       "missing '%0' declaration, probably because the '_StringProcessing' "
       "module was not imported properly", (StringRef))
+ERROR(regex_capture_types_failed_to_decode,none,
+      "failed to decode capture types for regular expression literal; this may "
+      "be a compiler bug", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types

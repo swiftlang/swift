@@ -7432,8 +7432,8 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           ParseAbstractFunctionBodyRequest{mutableThis},
-                           nullptr);
+                           ParseAbstractFunctionBodyRequest{mutableThis}, {})
+      .getBody();
 }
 
 BraceStmt *AbstractFunctionDecl::getTypecheckedBody() const {
@@ -7447,7 +7447,12 @@ void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
   assert(getBodyKind() != BodyKind::Skipped &&
          "cannot set a body if it was skipped");
 
-  Body = S;
+  Optional<Fingerprint> fp = None;
+  if (getBodyKind() == BodyKind::TypeChecked ||
+      getBodyKind() == BodyKind::Parsed) {
+    fp = BodyAndFP.getFingerprint();
+  }
+  BodyAndFP = BodyAndFingerprint(S, fp);
   setBodyKind(NewBodyKind);
 
   // Need to recompute init body kind.
@@ -7462,13 +7467,18 @@ void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
   assert(getBodyKind() == BodyKind::Unparsed ||
          getBodyKind() == BodyKind::Parsed ||
          getBodyKind() == BodyKind::TypeChecked);
-  assert(getASTContext().SourceMgr.rangeContainsTokenLoc(
-             bodyRange, getASTContext().SourceMgr.getCodeCompletionLoc()) &&
-         "This function is only intended to be used for code completion");
 
   keepOriginalBodySourceRange();
   BodyRange = bodyRange;
   setBodyKind(BodyKind::Unparsed);
+
+  // Remove local type decls from the source file.
+  if (auto SF = getParentSourceFile()) {
+    SF->LocalTypeDecls.remove_if([&](TypeDecl *TD) {
+      auto dc = TD->getDeclContext();
+      return dc == this || dc->isChildContextOf(this);
+    });
+  }
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -7504,6 +7514,54 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
     return SourceRange(getNameLoc(), endLoc);
 
   return getNameLoc();
+}
+
+Optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
+  ASTContext &ctx = getASTContext();
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ParseAbstractFunctionBodyRequest{mutableThis}, {})
+      .getFingerprint();
+}
+
+Optional<Fingerprint>
+AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
+
+  class HashCombiner : public ASTWalker {
+    StableHasher &hasher;
+
+  public:
+    HashCombiner(StableHasher &hasher) : hasher(hasher) {}
+
+    bool walkToDeclPre(Decl *D) override {
+      if (D->isImplicit())
+        return false;
+
+      if (auto *idc = dyn_cast<IterableDeclContext>(D)) {
+        if (auto fp = idc->getBodyFingerprint())
+          hasher.combine(*fp);
+
+        // Since ASTWalker calls 'getMembers()' which might tries to synthesize
+        // members etc., manually recurse into `getParsedMembers()`.
+        for (auto *d : idc->getParsedMembers())
+          const_cast<Decl *>(d)->walk(*this);
+
+        return false;
+      }
+
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+        if (auto fp = afd->getBodyFingerprint())
+          hasher.combine(*fp);
+      }
+
+      return true;
+    }
+  };
+
+  StableHasher hasher = StableHasher::defaultHasher();
+  HashCombiner combiner(hasher);
+  const_cast<AbstractFunctionDecl *>(this)->walk(combiner);
+  return Fingerprint(std::move(hasher));
 }
 
 ObjCSelector
@@ -7722,16 +7780,38 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                                GenericParamList *GenericParams, DeclContext *DC,
                                GenericSignature OpaqueInterfaceGenericSignature,
-                               OpaqueReturnTypeRepr *UnderlyingInterfaceRepr,
-                               GenericTypeParamType *UnderlyingInterfaceType)
+                               ArrayRef<OpaqueReturnTypeRepr *>
+                                   OpaqueReturnTypeReprs)
     : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
                       GenericParams),
-      NamingDecl(NamingDecl),
-      OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature),
-      UnderlyingInterfaceRepr(UnderlyingInterfaceRepr),
-      UnderlyingInterfaceType(UnderlyingInterfaceType) {
+      NamingDeclAndHasOpaqueReturnTypeRepr(
+        NamingDecl, !OpaqueReturnTypeReprs.empty()),
+      OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature) {
   // Always implicit.
   setImplicit();
+
+  /// We either have no opaque return type representations ('some P'), or we
+  /// have one for each opaque generic parameter.
+  assert(OpaqueReturnTypeReprs.empty() ||
+         OpaqueReturnTypeReprs.size() ==
+            OpaqueInterfaceGenericSignature.getInnermostGenericParams().size());
+  std::uninitialized_copy(
+      OpaqueReturnTypeReprs.begin(), OpaqueReturnTypeReprs.end(),
+      getTrailingObjects<OpaqueReturnTypeRepr *>());
+}
+
+OpaqueTypeDecl *OpaqueTypeDecl::get(
+      ValueDecl *NamingDecl, GenericParamList *GenericParams,
+      DeclContext *DC,
+      GenericSignature OpaqueInterfaceGenericSignature,
+      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs) {
+  ASTContext &ctx = DC->getASTContext();
+  auto size = totalSizeToAlloc<OpaqueReturnTypeRepr *>(
+      OpaqueReturnTypeReprs.size());
+  auto mem = ctx.Allocate(size, alignof(OpaqueTypeDecl));
+  return new (mem) OpaqueTypeDecl(
+      NamingDecl, GenericParams, DC, OpaqueInterfaceGenericSignature,
+      OpaqueReturnTypeReprs);
 }
 
 bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
@@ -7749,13 +7829,28 @@ bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
   return false;
 }
 
+bool OpaqueTypeDecl::hasExplicitGenericParams() const {
+  return getExplicitGenericParam(0) != nullptr;
+}
+
+GenericTypeParamDecl *OpaqueTypeDecl::getExplicitGenericParam(
+    unsigned ordinal) const {
+  if (ordinal >= getOpaqueGenericParams().size())
+    return nullptr;
+
+  auto genericParamType = getOpaqueGenericParams()[ordinal];
+  return genericParamType->getDecl();
+}
+
 unsigned OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
     OpaqueReturnTypeRepr *repr) const {
-  // TODO [OPAQUE SUPPORT]: we will need to generalize here when we allow
-  // multiple "some" types.
-  assert(UnderlyingInterfaceRepr &&
+  assert(NamingDeclAndHasOpaqueReturnTypeRepr.getInt() &&
          "can't do opaque param lookup without underlying interface repr");
-  return repr == UnderlyingInterfaceRepr ? 0 : -1;
+  auto opaqueReprs = getOpaqueReturnTypeReprs();
+  auto found = std::find(opaqueReprs.begin(), opaqueReprs.end(), repr);
+  if (found != opaqueReprs.end())
+    return found - opaqueReprs.begin();
+  return -1;
 }
 
 Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
@@ -8685,10 +8780,23 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dc->getAsDecl()))
     return getActorIsolation(vd);
 
+  // In the context of the initializing or default-value expression of a
+  // stored property, the isolation varies between global and type members:
+  //   - For a static stored property, the isolation matches the VarDecl.
+  //   - For a field of a nominal type, the expression is not isolated.
+  // Without this distinction, a nominal can have non-async initializers
+  // with various kinds of isolation, so an impossible constraint can be
+  // created. See SE-0327 for details.
   if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
-    if (auto *var = init->getBinding()->getAnchoringVarDecl(
-            init->getBindingIndex()))
+    if (auto *var =
+          init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
+
+      if (var->isInstanceMember() &&
+          !var->getAttrs().hasAttribute<LazyAttr>())
+        return ActorIsolation::forUnspecified();
+
       return getActorIsolation(var);
+    }
   }
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
@@ -8853,7 +8961,7 @@ SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
   return extractNearestSourceLoc(decl->getDeclContext());
 }
 
-Optional<BraceStmt *>
+Optional<BodyAndFingerprint>
 ParseAbstractFunctionBodyRequest::getCachedResult() const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
   auto afd = std::get<0>(getStorage());
@@ -8862,11 +8970,11 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
-    return nullptr;
+    return BodyAndFingerprint{};
 
   case BodyKind::TypeChecked:
   case BodyKind::Parsed:
-    return afd->Body;
+    return afd->BodyAndFP;
 
   case BodyKind::Synthesize:
   case BodyKind::Unparsed:
@@ -8875,7 +8983,8 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   llvm_unreachable("Unhandled BodyKing in switch");
 }
 
-void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
+void ParseAbstractFunctionBodyRequest::cacheResult(
+    BodyAndFingerprint value) const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
   auto afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
@@ -8884,12 +8993,12 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
   case BodyKind::None:
   case BodyKind::Skipped:
     // The body is always empty, so don't cache anything.
-    assert(value == nullptr);
+    assert(!value.getFingerprint().hasValue() && value.getBody() == nullptr);
     return;
 
   case BodyKind::Parsed:
   case BodyKind::TypeChecked:
-    afd->Body = value;
+    afd->BodyAndFP = value;
     return;
 
   case BodyKind::Synthesize:
@@ -8897,7 +9006,14 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
     llvm_unreachable("evaluate() did not set the body kind");
     return;
   }
+}
 
+void swift::simple_display(llvm::raw_ostream &out, BodyAndFingerprint value) {
+  out << "(";
+  simple_display(out, value.getBody());
+  out << ", ";
+  simple_display(out, value.getFingerprint());
+  out << ")";
 }
 
 void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {

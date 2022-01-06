@@ -352,6 +352,12 @@ public:
         llvm::inconvertibleErrorCode()));
   }
 
+  [[noreturn]] void fatal(StringRef msg) const {
+    fatal(llvm::make_error<llvm::StringError>(
+          msg,
+          llvm::inconvertibleErrorCode()));
+  }
+
   /// Outputs information useful for diagnostics to \p out
   void outputDiagnosticInfo(llvm::raw_ostream &os) const;
 
@@ -692,6 +698,9 @@ public:
 
   virtual void loadAllMembers(Decl *D,
                               uint64_t contextData) override;
+
+  virtual void diagnoseMissingNamedMember(const IterableDeclContext *IDC,
+                                          DeclName name) override;
 
   virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,

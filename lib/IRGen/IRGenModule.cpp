@@ -1690,6 +1690,7 @@ bool IRGenModule::finalize() {
   emitSwiftAsyncExtendedFrameInfoWeakRef();
   emitAutolinkInfo();
   emitGlobalLists();
+  emitUsedConditionals();
   if (DebugInfo)
     DebugInfo->finalize();
   cleanupClangCodeGenMetadata();

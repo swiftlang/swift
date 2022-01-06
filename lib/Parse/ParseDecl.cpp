@@ -6777,8 +6777,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     
     bool hasOpaqueReturnTy = false;
     if (auto typedPattern = dyn_cast<TypedPattern>(pattern)) {
-      hasOpaqueReturnTy =
-                        isa<OpaqueReturnTypeRepr>(typedPattern->getTypeRepr());
+      hasOpaqueReturnTy = typedPattern->getTypeRepr()->hasOpaque();
     }
     auto sf = CurDeclContext->getParentSourceFile();
     
@@ -7108,7 +7107,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                               CurDeclContext);
 
   // Let the source file track the opaque return type mapping, if any.
-  if (isa_and_nonnull<OpaqueReturnTypeRepr>(FuncRetTy) &&
+  if (FuncRetTy && FuncRetTy->hasOpaque() &&
       !InInactiveClauseEnvironment) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(FD);
@@ -7167,7 +7166,8 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
 
 /// Parse a function body for \p AFD, setting the body to \p AFD before
 /// returning it.
-BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
+BodyAndFingerprint
+Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
   assert(Tok.is(tok::l_brace));
 
   // Establish the new context.
@@ -7191,18 +7191,25 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
       auto *BS = BraceStmt::create(Context, LBraceLoc, ASTNode(CCE), RBraceLoc,
                                    /*implicit*/ true);
       AFD->setBodyParsed(BS);
-      return BS;
+      return {BS, Fingerprint::ZERO()};
     }
   }
 
+  llvm::SaveAndRestore<Optional<StableHasher>> T(CurrentTokenHash,
+                                                 StableHasher::defaultHasher());
+
   ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
-  if (Body.isNull())
-    return nullptr;
+  // Since we know 'Tok.is(tok::l_brace)', the body can't be null.
+  assert(Body.isNonNull());
+
+  // Clone the current hasher and extract a Fingerprint.
+  StableHasher currentHash{*CurrentTokenHash};
+  Fingerprint fp(std::move(currentHash));
 
   BraceStmt *BS = Body.get();
   // Reset the single expression body status.
   AFD->setHasSingleExpressionBody(false);
-  AFD->setBodyParsed(BS);
+  AFD->setBodyParsed(BS, fp);
 
   if (Parser::shouldReturnSingleExpressionElement(BS->getElements())) {
     auto Element = BS->getLastElement();
@@ -7225,7 +7232,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
         if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
           // This is an assignment.  We don't want to implicitly return
           // it.
-          return BS;
+          return {BS, fp};
         }
       }
       if (isa<FuncDecl>(AFD)) {
@@ -7246,7 +7253,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
     }
   }
 
-  return BS;
+  return {BS, fp};
 }
 
 /// Parse function body into \p AFD or skip it for delayed parsing.
@@ -7273,7 +7280,8 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   (void)parseAbstractFunctionBodyImpl(AFD);
 }
 
-BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
+BodyAndFingerprint
+Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed &&
          "function body should be delayed");
 
@@ -7762,8 +7770,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   {
     // Parse the body.
     if (parseMemberDeclList(LBLoc, RBLoc,
-                            diag::expected_lbrace_class,
-                            diag::expected_rbrace_class,
+                            isExplicitActorDecl ? diag::expected_lbrace_actor
+                                                : diag::expected_lbrace_class,
+                            isExplicitActorDecl ? diag::expected_rbrace_actor
+                                                : diag::expected_rbrace_class,
                             CD))
       Status.setIsParseError();
   }
@@ -7975,7 +7985,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.
-  if (isa_and_nonnull<OpaqueReturnTypeRepr>(ElementTy.get()) &&
+  if (ElementTy.get() && ElementTy.get()->hasOpaque() &&
       !InInactiveClauseEnvironment) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);

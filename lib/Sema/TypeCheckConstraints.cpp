@@ -541,25 +541,23 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   // Bind a property with an opaque return type to the underlying type
   // given by the initializer.
   if (auto var = pattern->getSingleVar()) {
+    SubstitutionMap substitutions;
     if (auto opaque = var->getOpaqueResultTypeDecl()) {
       init->forEachChildExpr([&](Expr *expr) -> Expr * {
         if (auto coercionExpr = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
-          auto underlyingType =
-              coercionExpr->getSubExpr()->getType()->mapTypeOutOfContext();
-          auto underlyingSubs = SubstitutionMap::get(
-              opaque->getOpaqueInterfaceGenericSignature(),
-              [&](SubstitutableType *t) -> Type {
-                if (t->isEqual(opaque->getUnderlyingInterfaceType())) {
-                  return underlyingType;
-                }
-                return Type(t);
-              },
-              LookUpConformanceInModule(opaque->getModuleContext()));
-
-          opaque->setUnderlyingTypeSubstitutions(underlyingSubs);
+          auto newSubstitutions =
+              coercionExpr->substitutions.mapReplacementTypesOutOfContext();
+          if (substitutions.empty()) {
+            substitutions = newSubstitutions;
+          } else {
+            assert(substitutions.getCanonical() ==
+                       newSubstitutions.getCanonical());
+          }
         }
         return expr;
       });
+
+      opaque->setUnderlyingTypeSubstitutions(substitutions);
     }
   }
 

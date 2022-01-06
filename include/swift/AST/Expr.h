@@ -971,21 +971,36 @@ class RegexLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
   StringRef RegexText;
   unsigned Version;
+  ArrayRef<uint8_t> SerializedCaptureStructure;
 
   RegexLiteralExpr(SourceLoc loc, StringRef regexText, unsigned version,
+                   ArrayRef<uint8_t> serializedCaps,
                    bool isImplicit)
       : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Loc(loc),
-        RegexText(regexText), Version(version) {}
+        RegexText(regexText), Version(version),
+        SerializedCaptureStructure(serializedCaps) {}
 
 public:
-  static RegexLiteralExpr *createParsed(ASTContext &ctx, SourceLoc loc,
-                                        StringRef regexText, unsigned version);
+  static RegexLiteralExpr *createParsed(
+      ASTContext &ctx, SourceLoc loc, StringRef regexText, unsigned version,
+      ArrayRef<uint8_t> serializedCaptureStructure);
+
+  typedef uint16_t CaptureStructureSerializationVersion;
+
+  static unsigned getCaptureStructureSerializationAllocationSize(
+      unsigned regexLength) {
+    return sizeof(CaptureStructureSerializationVersion) + regexLength + 1;
+  }
 
   /// Retrieve the raw regex text.
   StringRef getRegexText() const { return RegexText; }
 
   /// Retrieve the version of the regex string.
   unsigned getVersion() const { return Version; }
+
+  ArrayRef<uint8_t> getSerializedCaptureStructure() {
+    return SerializedCaptureStructure;
+  }
 
   SourceRange getSourceRange() const { return Loc; }
 
@@ -3003,8 +3018,13 @@ public:
 /// (opaque type)" and "S<T> ---> S<(opaque type)>".
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
 public:
-  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty) {}
+  /// The substitutions to be applied to the opaque type declaration to
+  /// produce the resulting type.
+  const SubstitutionMap substitutions;
+
+  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty, SubstitutionMap substitutions)
+    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty),
+      substitutions(substitutions) {}
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnderlyingToOpaque;

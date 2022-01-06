@@ -16,11 +16,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -30,6 +30,8 @@
 #include "swift/Config.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "swift/Parse/Lexer.h" // bad dependency
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
@@ -566,6 +568,11 @@ static bool isMainActor(Type type) {
   return false;
 }
 
+void swift::printClangDeclName(const clang::NamedDecl *ND,
+                               llvm::raw_ostream &os) {
+  ND->getNameForDiagnostic(os, ND->getASTContext().getPrintingPolicy(), false);
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier,
@@ -832,6 +839,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
                                            diagArg->FormatArgs);
     break;
   }
+
+  case DiagnosticArgumentKind::ClangDecl:
+    assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
+    Out << FormatOpts.OpeningQuotationMark;
+    printClangDeclName(Arg.getAsClangDecl(), Out);
+    Out << FormatOpts.ClosingQuotationMark;
+    break;
   }
 }
 

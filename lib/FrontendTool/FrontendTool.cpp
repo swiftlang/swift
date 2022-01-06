@@ -705,7 +705,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
 
-static bool performCompileStepsPostSema(CompilerInstance &Instance,
+bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
                                         FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
@@ -989,6 +989,30 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     } else {
       swift::verifyDependencies(Instance.getSourceMgr(),
                                 Instance.getMainModule()->getFiles());
+    }
+  }
+
+  if (Invocation.getLangOptions()
+          .EnableExperimentalEagerClangModuleDiagnostics) {
+
+    // A consumer meant to import all visible declarations.
+    class EagerConsumer : public VisibleDeclConsumer {
+    public:
+      virtual void
+      foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                DynamicLookupInfo dynamicLookupInfo = {}) override {
+        if (auto *IDC = dyn_cast<IterableDeclContext>(VD)) {
+          (void)IDC->getMembers();
+        }
+      }
+    };
+
+    EagerConsumer consumer;
+    for (auto module : ctx.getLoadedModules()) {
+      // None of the passed parameter have an effect, we just need to trigger
+      // imports.
+      module.second->lookupVisibleDecls(/*Access Path*/ {}, consumer,
+                                        NLKind::QualifiedLookup);
     }
   }
 
@@ -1433,6 +1457,14 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // If the stats reporter is installed, we need the ASTContext to live through
   // the entire compilation process.
   if (Instance.getASTContext().Stats) {
+    return;
+  }
+
+  // If this instance is used for multiple compilations, we need the ASTContext
+  // to live.
+  if (Instance.getInvocation()
+          .getFrontendOptions()
+          .ReuseFrontendForMutipleCompilations) {
     return;
   }
 

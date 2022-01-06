@@ -1217,6 +1217,9 @@ private:
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 
+  llvm::SmallVector<llvm::MDNode *> UsedConditionals;
+  void emitUsedConditionals();
+
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();

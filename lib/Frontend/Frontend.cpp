@@ -852,8 +852,10 @@ void CompilerInstance::verifyImplicitConcurrencyImport() {
 }
 
 bool CompilerInstance::canImportSwiftConcurrency() const {
-  return getASTContext().canImportModule(
-      {getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME), SourceLoc()});
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitStringProcessingImport() {
@@ -865,9 +867,10 @@ void CompilerInstance::verifyImplicitStringProcessingImport() {
 }
 
 bool CompilerInstance::canImportSwiftStringProcessing() const {
-  return getASTContext().canImportModule(
-      {getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME),
-       SourceLoc()});
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath);
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
@@ -881,7 +884,8 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     ImportPath::Builder importPath(Context->getIdentifier(moduleStr));
     UnloadedImportedModule import(importPath.copyTo(*Context),
                                   /*isScoped=*/false);
-    imports.AdditionalUnloadedImports.emplace_back(import, options);
+    imports.AdditionalUnloadedImports.emplace_back(
+        import, SourceLoc(), options);
   };
 
   for (auto &moduleStrAndTestable : frontendOpts.getImplicitImportModuleNames()) {
@@ -1114,6 +1118,7 @@ void CompilerInstance::performSema() {
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF);
+    return false;
   });
 
   finishTypeChecking();
@@ -1178,26 +1183,31 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports(
   return hadLoadError;
 }
 
-void CompilerInstance::forEachFileToTypeCheck(
-    llvm::function_ref<void(SourceFile &)> fn) {
+bool CompilerInstance::forEachFileToTypeCheck(
+    llvm::function_ref<bool(SourceFile &)> fn) {
   if (isWholeModuleCompilation()) {
     for (auto fileName : getMainModule()->getFiles()) {
       auto *SF = dyn_cast<SourceFile>(fileName);
       if (!SF) {
         continue;
       }
-      fn(*SF);
+      if (fn(*SF))
+        return true;
+      ;
     }
   } else {
     for (auto *SF : getPrimarySourceFiles()) {
-      fn(*SF);
+      if (fn(*SF))
+        return true;
     }
   }
+  return false;
 }
 
 void CompilerInstance::finishTypeChecking() {
   forEachFileToTypeCheck([](SourceFile &SF) {
     performWholeModuleTypeChecking(SF);
+    return false;
   });
 }
 
@@ -1237,7 +1247,9 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
   // Enable interface hash computation for primaries or emit-module-separately,
   // but not in WMO, as it's only currently needed for incremental mode.
   if (forPrimary ||
-      typeOpts.SkipFunctionBodies == FunctionBodySkipping::NonInlinableWithoutTypes) {
+      typeOpts.SkipFunctionBodies ==
+          FunctionBodySkipping::NonInlinableWithoutTypes ||
+      frontendOpts.ReuseFrontendForMutipleCompilations) {
     opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
   }
   return opts;

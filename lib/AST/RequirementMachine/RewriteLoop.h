@@ -38,7 +38,7 @@ struct RewriteStep {
     /// *** Rewrite step kinds introduced by Knuth-Bendix completion ***
     ///
 
-    /// Apply a rewrite rule to the term at the top of the A stack.
+    /// Apply a rewrite rule to the term at the top of the primary stack.
     ///
     /// Formally, this is a whiskered, oriented rewrite rule. For example,
     /// given a rule (X => Y) and the term A.X.B, the application at
@@ -51,10 +51,10 @@ struct RewriteStep {
     ///
     /// The StartOffset field encodes the offset where to apply the rule.
     ///
-    /// The RuleID field encodes the rule to apply.
+    /// The Arg field encodes the rule to apply.
     ApplyRewriteRule,
 
-    /// The term at the top of the A stack must be a term ending with a
+    /// The term at the top of the primary stack must be a term ending with a
     /// superclass or concrete type symbol.
     ///
     /// If not inverted: prepend the prefix to each substitution.
@@ -68,48 +68,61 @@ struct RewriteStep {
     /// *** Rewrite step kinds introduced by simplifySubstitutions() ***
     ///
 
-    /// Move a term from the A stack to the B stack (if not inverted) or
-    /// B stack to A stack (if inverted).
+    /// Move a term from the primary stack to the secondary stack (if not
+    /// inverted) or the secondary stack to primary stack (if inverted).
     Shift,
 
-    /// If not inverted: the top of the A stack must be a term ending with a
-    /// superclass or concrete type symbol. Each concrete substitution in the
-    /// term is pushed onto the A stack.
+    /// If not inverted: the top of the primary stack must be a term ending
+    /// with a superclass or concrete type symbol. Each concrete substitution
+    /// in the term is pushed onto the primary stack.
     ///
-    /// If inverted: pop concrete substitutions from the A stack, which must
-    /// follow a term ending with a superclass or concrete type symbol. The
-    /// new substitutions replace the substitutions in that symbol.
+    /// If inverted: pop concrete substitutions from the primary stack, which
+    /// must follow a term ending with a superclass or concrete type symbol.
+    /// The new substitutions replace the substitutions in that symbol.
     ///
-    /// The RuleID field encodes the number of substitutions.
+    /// The Arg field encodes the number of substitutions.
     Decompose,
 
     ///
     /// *** Rewrite step kinds introduced by the property map ***
     ///
 
-    /// If not inverted: the top of the A stack must be a term ending in a
-    /// concrete type symbol [concrete: C] followed by a protocol symbol [P].
+    /// If not inverted: the top of the primary stack must be a term T.[p1].[p2]
+    /// ending in a pair of property symbols [p1] and [p2], where [p1] < [p2].
+    /// The symbol [p2] is dropped, leaving behind the term T.[p1].
+    ///
+    /// If inverted: the top of the primary stack must be a term T.[p1]
+    /// ending in a property symbol [p1]. The rewrite system must have a
+    /// recorded relation for the pair ([p1], [p2]). The symbol [p2] is added
+    /// to the end of the term, leaving behind the term T.[p1].[p2].
+    ///
+    /// The Arg field stores the result of calling
+    /// RewriteSystem::recordRelation().
+    Relation,
+
+    /// If not inverted: the top of the primary stack must be a term ending in
+    /// a concrete type symbol [concrete: C] followed by a protocol symbol [P].
     /// These two symbols are combined into a single concrete conformance
     /// symbol [concrete: C : P].
     ///
-    /// If inverted: the top of the A stack must be a term ending in a
+    /// If inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
     /// with the concrete type symbol [concrete: C] followed by the protocol
     /// symbol [P].
     ConcreteConformance,
 
-    /// If not inverted: the top of the A stack must be a term ending in a
-    /// superclass symbol [superclass: C] followed by a protocol symbol [P].
+    /// If not inverted: the top of the primary stack must be a term ending in
+    /// a superclass symbol [superclass: C] followed by a protocol symbol [P].
     /// These two symbols are combined into a single concrete conformance
     /// symbol [concrete: C : P].
     ///
-    /// If inverted: the top of the A stack must be a term ending in a
+    /// If inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
     /// with the superclass symbol [superclass: C] followed by the protocol
     /// symbol [P].
     SuperclassConformance,
 
-    /// If not inverted: the top of the A stack must be a term ending in a
+    /// If not inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P] followed by an associated
     /// type symbol [P:X], and the concrete type symbol [concrete: C.X] for the
     /// type witness of 'X' in the conformance 'C : P'. The concrete type symbol
@@ -117,20 +130,16 @@ struct RewriteStep {
     ///
     /// If inverted: the concrete type symbol [concrete: C.X] is introduced.
     ///
-    /// The RuleID field is repurposed to store the result of calling
-    /// RewriteSystem::recordTypeWitness(). This index is then passed in
-    /// to RewriteSystem::getTypeWitness() when applying
-    /// the step.
+    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
     ConcreteTypeWitness,
 
-    /// If not inverted: the top of the A stack must be a term ending in a
+    /// If not inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P] followed by an associated
     /// type symbol [P:X]. The associated type symbol is eliminated.
     ///
     /// If inverted: the associated type symbol [P:X] is introduced.
     ///
-    /// The RuleID field is a TypeWitness ID as above.
-    /// the step.
+    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
     SameTypeWitness,
 
     /// If not inverted: replaces the abstract type witness term with the
@@ -139,7 +148,7 @@ struct RewriteStep {
     /// If inverted: replaces the subject type term with the abstract type
     /// term.
     ///
-    /// The RuleID field is a TypeWitness ID as above.
+    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
     AbstractTypeWitness,
   };
 
@@ -164,18 +173,18 @@ struct RewriteStep {
   /// at the beginning of each concrete substitution.
   ///
   /// If Kind is Concrete, the number of substitutions to push or pop.
-  unsigned RuleID : 16;
+  unsigned Arg : 16;
 
   RewriteStep(StepKind kind, unsigned startOffset, unsigned endOffset,
-              unsigned ruleID, bool inverse) {
+              unsigned arg, bool inverse) {
     Kind = kind;
 
     StartOffset = startOffset;
     assert(StartOffset == startOffset && "Overflow");
     EndOffset = endOffset;
     assert(EndOffset == endOffset && "Overflow");
-    RuleID = ruleID;
-    assert(RuleID == ruleID && "Overflow");
+    Arg = arg;
+    assert(Arg == arg && "Overflow");
     Inverse = inverse;
   }
 
@@ -187,42 +196,47 @@ struct RewriteStep {
   static RewriteStep forAdjustment(unsigned offset, unsigned endOffset,
                                    bool inverse) {
     return RewriteStep(AdjustConcreteType, /*startOffset=*/0, endOffset,
-                       /*ruleID=*/offset, inverse);
+                       /*arg=*/offset, inverse);
   }
 
   static RewriteStep forShift(bool inverse) {
     return RewriteStep(Shift, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+                       /*arg=*/0, inverse);
   }
 
   static RewriteStep forDecompose(unsigned numSubstitutions, bool inverse) {
     return RewriteStep(Decompose, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/numSubstitutions, inverse);
+                       /*arg=*/numSubstitutions, inverse);
+  }
+
+  static RewriteStep forRelation(unsigned relationID, bool inverse) {
+    return RewriteStep(Relation, /*startOffset=*/0, /*endOffset=*/0,
+                       /*arg=*/relationID, inverse);
   }
 
   static RewriteStep forConcreteConformance(bool inverse) {
     return RewriteStep(ConcreteConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+                       /*arg=*/0, inverse);
   }
 
   static RewriteStep forSuperclassConformance(bool inverse) {
     return RewriteStep(SuperclassConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+                       /*arg=*/0, inverse);
   }
 
   static RewriteStep forConcreteTypeWitness(unsigned witnessID, bool inverse) {
     return RewriteStep(ConcreteTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/witnessID, inverse);
+                       /*arg=*/witnessID, inverse);
   }
 
   static RewriteStep forSameTypeWitness(unsigned witnessID, bool inverse) {
     return RewriteStep(SameTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/witnessID, inverse);
+                       /*arg=*/witnessID, inverse);
   }
 
   static RewriteStep forAbstractTypeWitness(unsigned witnessID, bool inverse) {
     return RewriteStep(AbstractTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*ruleID=*/witnessID, inverse);
+                       /*arg=*/witnessID, inverse);
   }
 
   bool isInContext() const {
@@ -233,10 +247,10 @@ struct RewriteStep {
     Inverse = !Inverse;
   }
 
-  bool isInverseOf(const RewriteStep &other) const;
-
-  bool maybeSwapRewriteSteps(RewriteStep &other,
-                             const RewriteSystem &system);
+  unsigned getRuleID() const {
+    assert(Kind == RewriteStep::ApplyRewriteRule);
+    return Arg;
+  }
 
   void dump(llvm::raw_ostream &out,
             RewritePathEvaluator &evaluator,
@@ -361,32 +375,36 @@ struct AppliedRewriteStep {
 /// A rewrite path is a list of instructions for a two-stack interpreter.
 ///
 /// - ApplyRewriteRule and AdjustConcreteType manipulate the term at the top of
-///   the A stack.
+///   the primary stack.
 ///
 /// - Shift moves a term from A to B (if not inverted) or B to A (if inverted).
 ///
 /// - Decompose splits off the substitutions from a superclass or concrete type
-///   symbol at the top of the A stack (if not inverted) or assembles a new
-///   superclass or concrete type symbol at the top of the A stack
+///   symbol at the top of the primary stack (if not inverted) or assembles a
+///   new superclass or concrete type symbol at the top of the primary stack
 ///   (if inverted).
 struct RewritePathEvaluator {
-  SmallVector<MutableTerm, 2> A;
-  SmallVector<MutableTerm, 2> B;
+  /// The primary stack. Most rewrite steps operate on the top of this stack.
+  SmallVector<MutableTerm, 2> Primary;
+
+  /// The secondary stack. The 'Shift' rewrite step moves terms between the
+  /// primary and secondary stacks.
+  SmallVector<MutableTerm, 2> Secondary;
 
   explicit RewritePathEvaluator(const MutableTerm &term) {
-    A.push_back(term);
+    Primary.push_back(term);
   }
 
-  void checkA() const;
-  void checkB() const;
+  void checkPrimary() const;
+  void checkSecondary() const;
 
   MutableTerm &getCurrentTerm();
 
   /// We're "in context" if we're in the middle of rewriting concrete
   /// substitutions.
   bool isInContext() const {
-    assert(A.size() > 0);
-    return (A.size() > 1 || B.size() > 0);
+    assert(Primary.size() > 0);
+    return (Primary.size() > 1 || Secondary.size() > 0);
   }
 
   void apply(const RewriteStep &step,
@@ -401,6 +419,9 @@ struct RewritePathEvaluator {
 
   void applyShift(const RewriteStep &step,
                   const RewriteSystem &system);
+
+  void applyRelation(const RewriteStep &step,
+                     const RewriteSystem &system);
 
   void applyDecompose(const RewriteStep &step,
                       const RewriteSystem &system);

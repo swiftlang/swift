@@ -253,15 +253,15 @@ int swift::RunImmediately(CompilerInstance &CI,
   if (emplaceProcessArgs == nullptr)
     return -1;
 #else
-  // In case the compiler is built with libswift, it already has the stdlib
+  // In case the compiler is built with swift modules, it already has the stdlib
   // linked to. First try to lookup the symbol with the standard library
   // resolving.
   auto emplaceProcessArgs
      = (ArgOverride)dlsym(RTLD_DEFAULT, "_swift_stdlib_overrideUnsafeArgvArgc");
 
   if (dlerror()) {
-    // If this does not work (= not build with libswift), we have to explicitly
-    // load the stdlib.
+    // If this does not work (= the Swift modules are not linked to the tool),
+    // we have to explicitly load the stdlib.
     auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
     if (!stdlib) {
       CI.getDiags().diagnose(SourceLoc(),

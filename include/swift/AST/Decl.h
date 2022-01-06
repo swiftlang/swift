@@ -106,6 +106,7 @@ namespace swift {
 
   namespace ast_scope {
   class AbstractPatternEntryScope;
+  class GenericParamScope;
   class PatternEntryDeclScope;
   class PatternEntryInitializerScope;
   } // namespace ast_scope
@@ -1565,6 +1566,7 @@ class PatternBindingEntry {
   friend class PatternBindingInitializer;
   friend class PatternBindingDecl;
   friend class ast_scope::AbstractPatternEntryScope;
+  friend class ast_scope::GenericParamScope;
   friend class ast_scope::PatternEntryDeclScope;
   friend class ast_scope::PatternEntryInitializerScope;
 
@@ -2699,25 +2701,26 @@ public:
 /// The declared type uses a special kind of archetype type to represent
 /// abstracted types, e.g. `(some P, some Q)` becomes `((opaque archetype 0),
 /// (opaque archetype 1))`.
-class OpaqueTypeDecl : public GenericTypeDecl {
+class OpaqueTypeDecl final :
+    public GenericTypeDecl,
+    private llvm::TrailingObjects<OpaqueTypeDecl, OpaqueReturnTypeRepr *> {
+  friend TrailingObjects;
+
   /// The original declaration that "names" the opaque type. Although a specific
   /// opaque type cannot be explicitly named, oapque types can propagate
   /// arbitrarily through expressions, so we need to know *which* opaque type is
   /// propagated.
-  ValueDecl *NamingDecl;
+  ///
+  /// The bit indicates whether there are any trailing
+  /// OpaqueReturnTypeReprs.
+  llvm::PointerIntPair<ValueDecl *, 1>
+      NamingDeclAndHasOpaqueReturnTypeRepr;
 
   /// The generic signature of the opaque interface to the type. This is the
   /// outer generic signature with added generic parameters representing the
   /// abstracted underlying types.
   GenericSignature OpaqueInterfaceGenericSignature;
 
-  /// The type repr of the underlying type. Might be null if no source location
-  /// is availble, e.g. if this decl was loaded from a serialized module.
-  OpaqueReturnTypeRepr *UnderlyingInterfaceRepr;
-
-  /// The generic parameter that represents the underlying type.
-  GenericTypeParamType *UnderlyingInterfaceType;
-  
   /// If known, the underlying type and conformances of the opaque type,
   /// expressed as a SubstitutionMap for the opaque interface generic signature.
   /// This maps types in the interface generic signature to the outer generic
@@ -2725,19 +2728,36 @@ class OpaqueTypeDecl : public GenericTypeDecl {
   Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
   
   mutable Identifier OpaqueReturnTypeIdentifier;
-  
-public:
+
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
-                 OpaqueReturnTypeRepr *UnderlyingInterfaceRepr,
-                 GenericTypeParamType *UnderlyingInterfaceType);
+                 ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs);
 
-  ValueDecl *getNamingDecl() const { return NamingDecl; }
+  unsigned getNumOpaqueReturnTypeReprs() const {
+    return NamingDeclAndHasOpaqueReturnTypeRepr.getInt()
+      ? getOpaqueGenericParams().size()
+      : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<OpaqueReturnTypeRepr *>) const {
+    return getNumOpaqueReturnTypeReprs();
+  }
+
+public:
+  static OpaqueTypeDecl *get(
+      ValueDecl *NamingDecl, GenericParamList *GenericParams,
+      DeclContext *DC,
+      GenericSignature OpaqueInterfaceGenericSignature,
+      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs);
+
+  ValueDecl *getNamingDecl() const {
+    return NamingDeclAndHasOpaqueReturnTypeRepr.getPointer();
+  }
   
   void setNamingDecl(ValueDecl *D) {
-    assert(!NamingDecl && "already have naming decl");
-    NamingDecl = D;
+    assert(!getNamingDecl() && "already have naming decl");
+    NamingDeclAndHasOpaqueReturnTypeRepr.setPointer(D);
   }
 
   /// Is this opaque type the opaque return type of the given function?
@@ -2754,11 +2774,34 @@ public:
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
   }
-  
-  GenericTypeParamType *getUnderlyingInterfaceType() const {
-    return UnderlyingInterfaceType;
+
+  /// Retrieve the generic parameters that represent the opaque types described by this opaque
+  /// type declaration.
+  TypeArrayView<GenericTypeParamType> getOpaqueGenericParams() const {
+    return OpaqueInterfaceGenericSignature.getInnermostGenericParams();
   }
-  
+
+  /// Whether the generic parameters of this opaque type declaration were
+  /// explicit, i.e., for named opaque result types.
+  bool hasExplicitGenericParams() const;
+
+  /// When the generic parameters were explicit, returns the generic parameter
+  /// corresponding to the given ordinal.
+  ///
+  /// Otherwise, returns \c nullptr.
+  GenericTypeParamDecl *getExplicitGenericParam(unsigned ordinal) const;
+
+  /// Retrieve the buffer containing the opaque return type
+  /// representations that correspond to the opaque generic parameters.
+  ArrayRef<OpaqueReturnTypeRepr *> getOpaqueReturnTypeReprs() const {
+    return {
+      getTrailingObjects<OpaqueReturnTypeRepr *>(),
+      getNumOpaqueReturnTypeReprs()
+    };
+  }
+
+  /// The substitutions that map the generic parameters of the opaque type to
+  /// their underlying types, when that information is known.
   Optional<SubstitutionMap> getUnderlyingTypeSubstitutions() const {
     return UnderlyingTypeSubstitutions;
   }
@@ -5904,6 +5947,38 @@ public:
   }
 };
 
+class BodyAndFingerprint {
+  llvm::PointerIntPair<BraceStmt *, 1, bool> BodyAndHasFp;
+  Fingerprint Fp;
+
+public:
+  BodyAndFingerprint(BraceStmt *body, Optional<Fingerprint> fp)
+      : BodyAndHasFp(body, fp.hasValue()),
+        Fp(fp.hasValue() ? *fp : Fingerprint::ZERO()) {}
+  BodyAndFingerprint() : BodyAndFingerprint(nullptr, None) {}
+
+  BraceStmt *getBody() const { return BodyAndHasFp.getPointer(); }
+
+  Optional<Fingerprint> getFingerprint() const {
+    if (BodyAndHasFp.getInt())
+      return Fp;
+    else
+      return None;
+  }
+
+  void setFingerprint(Optional<Fingerprint> fp) {
+    if (fp.hasValue()) {
+      Fp = *fp;
+      BodyAndHasFp.setInt(true);
+    } else {
+      Fp = Fingerprint::ZERO();
+      BodyAndHasFp.setInt(false);
+    }
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, BodyAndFingerprint value);
+
 /// Base class for function-like declarations.
 class AbstractFunctionDecl : public GenericContext, public ValueDecl {
   friend class NeedsNewVTableEntryRequest;
@@ -5986,7 +6061,7 @@ protected:
   union {
     /// This enum member is active if getBodyKind() is BodyKind::Parsed or
     /// BodyKind::TypeChecked.
-    BraceStmt *Body;
+    BodyAndFingerprint BodyAndFP;
 
     /// This enum member is active if getBodyKind() is BodyKind::Deserialized.
     StringRef BodyStringRepresentation;
@@ -6022,9 +6097,10 @@ protected:
                        bool Throws, SourceLoc ThrowsLoc,
                        bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
-      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent, GenericParams),
-        ValueDecl(Kind, Parent, Name, NameLoc),
-        Body(nullptr), AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc) {
+      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent,
+                       GenericParams),
+        ValueDecl(Kind, Parent, Name, NameLoc), BodyAndFP(), AsyncLoc(AsyncLoc),
+        ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
@@ -6195,8 +6271,9 @@ public:
   void setBodyToBeReparsed(SourceRange bodyRange);
 
   /// Provide the parsed body for the function.
-  void setBodyParsed(BraceStmt *S) {
+  void setBodyParsed(BraceStmt *S, Optional<Fingerprint> fp = None) {
     setBody(S, BodyKind::Parsed);
+    BodyAndFP.setFingerprint(fp);
   }
 
   /// Was there a nested type declaration detected when parsing this
@@ -6285,6 +6362,15 @@ public:
   /// source range must be in the same buffer as the location of the declaration
   /// itself.
   void keepOriginalBodySourceRange();
+
+  /// Retrieve the fingerprint of the body. Note that this is not affected by
+  /// the body of the local functions or the members of the local types in this
+  /// function.
+  Optional<Fingerprint> getBodyFingerprint() const;
+
+  /// Retrieve the fingerprint of the body including the local type members and
+  /// the local funcition bodies.
+  Optional<Fingerprint> getBodyFingerprintIncludingLocalTypeMembers() const;
 
   /// Retrieve the source range of the *original* function body.
   ///

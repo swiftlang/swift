@@ -62,6 +62,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckPropertyWrapper.cpp
   TypeCheckProtocol.cpp
   TypeCheckProtocolInference.cpp
+  TypeCheckRegex.cpp
   TypeCheckRequestFunctions.cpp
   TypeCheckStmt.cpp
   TypeCheckStorage.cpp

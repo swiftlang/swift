@@ -113,7 +113,7 @@ void RewriteLoop::findProtocolConformanceRules(
     if (!evaluator.isInContext()) {
       switch (step.Kind) {
       case RewriteStep::ApplyRewriteRule: {
-        const auto &rule = system.getRule(step.RuleID);
+        const auto &rule = system.getRule(step.getRuleID());
 
         if (rule.isIdentityConformanceRule())
           break;
@@ -127,7 +127,7 @@ void RewriteLoop::findProtocolConformanceRules(
             // the prefix term is 'X'.
             const auto &term = evaluator.getCurrentTerm();
             MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
-            result[proto].RulesInContext.emplace_back(prefix, step.RuleID);
+            result[proto].RulesInContext.emplace_back(prefix, step.getRuleID());
           }
         }
 
@@ -137,6 +137,7 @@ void RewriteLoop::findProtocolConformanceRules(
       case RewriteStep::AdjustConcreteType:
       case RewriteStep::Shift:
       case RewriteStep::Decompose:
+      case RewriteStep::Relation:
       case RewriteStep::ConcreteConformance:
       case RewriteStep::SuperclassConformance:
       case RewriteStep::ConcreteTypeWitness:
@@ -262,7 +263,7 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
   const auto &step = *steps.begin();
 
 #ifndef NDEBUG
-  const auto &rule = System.getRule(step.RuleID);
+  const auto &rule = System.getRule(step.getRuleID());
   assert(rule.isAnyConformanceRule());
   assert(!rule.isIdentityConformanceRule());
 #endif
@@ -277,9 +278,10 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
     // Build the term U.
     MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
 
-    decomposeTermIntoConformanceRuleLeftHandSides(prefix, step.RuleID, result);
+    decomposeTermIntoConformanceRuleLeftHandSides(
+        prefix, step.getRuleID(), result);
   } else {
-    result.push_back(step.RuleID);
+    result.push_back(step.getRuleID());
   }
 }
 
@@ -655,21 +657,21 @@ bool MinimalConformances::isValidConformancePath(
 
       if (!foundValidConformancePath)
         return false;
-    }
+    } else {
+      auto found = ParentPaths.find(ruleID);
+      if (found != ParentPaths.end()) {
+        SWIFT_DEFER {
+          visited.erase(ruleID);
+        };
+        visited.insert(ruleID);
 
-    auto found = ParentPaths.find(ruleID);
-    if (found != ParentPaths.end()) {
-      SWIFT_DEFER {
-        visited.erase(ruleID);
-      };
-      visited.insert(ruleID);
-
-      // If 'req' is based on some other conformance requirement
-      // `T.[P.]A : Q', we want to make sure that we have a
-      // non-redundant derivation for 'T : P'.
-      if (!isValidConformancePath(visited, found->second,
-                                  /*allowConcrete=*/false)) {
-        return false;
+        // If 'req' is based on some other conformance requirement
+        // `T.[P.]A : Q', we want to make sure that we have a
+        // non-redundant derivation for 'T : P'.
+        if (!isValidConformancePath(visited, found->second,
+                                    /*allowConcrete=*/false)) {
+          return false;
+        }
       }
     }
   }
@@ -868,6 +870,9 @@ void MinimalConformances::computeMinimalConformances(bool firstPass) {
           llvm::dbgs() << " pass: ";
           llvm::dbgs() << System.getRule(ruleID).getLHS();
           llvm::dbgs() << "\n";
+          llvm::dbgs() << "-- via valid path: ";
+          dumpConformancePath(llvm::errs(), path);
+          llvm::dbgs() << "\n";
         }
 
         RedundantConformances.insert(ruleID);
@@ -897,6 +902,7 @@ void MinimalConformances::verifyMinimalConformances() const {
         llvm::errs() << "Redundant conformance is not recoverable:\n";
         llvm::errs() << rule << "\n\n";
         dumpMinimalConformanceEquations(llvm::errs());
+        dumpMinimalConformances(llvm::errs());
         abort();
       }
 
@@ -907,6 +913,7 @@ void MinimalConformances::verifyMinimalConformances() const {
       llvm::errs() << "Minimal conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
       dumpMinimalConformanceEquations(llvm::errs());
+      dumpMinimalConformances(llvm::errs());
       abort();
     }
   }

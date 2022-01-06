@@ -2891,6 +2891,10 @@ static bool usesFeatureBuiltinStackAlloc(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinAssumeAlignment(Decl *decl) {
+  return false;
+}
+
 /// Determine the set of "new" features used on a given declaration.
 ///
 /// Note: right now, all features we check for are "new". At some point, we'll
@@ -4334,9 +4338,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       case PrintOptions::OpaqueReturnTypePrintingMode::Description:
         return true;
       case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
-        return false;
+        return opaque->getDecl()->hasExplicitGenericParams();
       case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
-        return isSimpleUnderPrintOptions(opaque->getExistentialType());
+        return opaque->getDecl()->hasExplicitGenericParams() ||
+            isSimpleUnderPrintOptions(opaque->getExistentialType());
       }
       llvm_unreachable("bad opaque-return-type printing mode");
     }
@@ -5406,11 +5411,28 @@ public:
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
+    // Try to print a named opaque type.
+    auto printNamedOpaque = [&] {
+      if (auto genericParam =
+              T->getDecl()->getExplicitGenericParam(T->getOrdinal())) {
+        visit(genericParam->getDeclaredInterfaceType());
+        return true;
+      }
+
+      return false;
+    };
+
     switch (Options.OpaqueReturnTypePrinting) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+      if (printNamedOpaque())
+        return;
+
       Printer.printKeyword("some", Options, /*Suffix=*/" ");
       LLVM_FALLTHROUGH;
     case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
+      if (printNamedOpaque())
+        return;
+
       visit(T->getExistentialType());
       return;
     }

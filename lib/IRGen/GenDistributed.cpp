@@ -116,7 +116,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   // `self` of the distributed actor is going to be passed as an argument
   // to this accessor function.
   auto extInfo = SILExtInfoBuilder()
-                     .withRepresentation(SILFunctionTypeRepresentation::Thick)
+                     .withRepresentation(SILFunctionTypeRepresentation::Thin)
                      .withAsync()
                      .build();
 
@@ -132,7 +132,8 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
       /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Guaranteed,
       {/*argumentBuffer=*/getRawPointerParmeter(),
-       /*resultBuffer=*/getRawPointerParmeter()},
+       /*resultBuffer=*/getRawPointerParmeter(),
+       /*actor=*/methodTy->getParameters().back()},
       /*Yields=*/{},
       /*Results=*/{},
       /*ErrorResult=*/methodTy->getErrorResult(),
@@ -391,12 +392,12 @@ FunctionPointer DistributedAccessor::getPointerToMethod() const {
   auto signature = IGM.getSignature(fnType, fpKind.useSpecialConvention());
 
   auto *fnPtr =
-      IGM.getAddrOfSILFunction(Method, NotForDefinition,
-                               /*isDynamicallyReplaceable=*/false,
-                               /*shouldCallPreviousImplementation=*/false);
+    llvm::ConstantExpr::getBitCast(IGM.getAddrOfAsyncFunctionPointer(Method),
+                                   signature.getType()->getPointerTo());
 
-  return FunctionPointer::forDirect(fpKind, fnPtr, /*secondary=*/nullptr,
-                                    signature);
+  return FunctionPointer::forDirect(
+      FunctionPointer::Kind(fnType), fnPtr,
+      IGM.getAddrOfSILFunction(Method, NotForDefinition), signature);
 }
 
 Callee

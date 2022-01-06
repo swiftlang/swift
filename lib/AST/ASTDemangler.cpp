@@ -265,11 +265,6 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName);
     if (!opaqueDecl)
       return Type();
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
-    assert(ordinal == 0 && "not implemented");
-    if (ordinal != 0)
-      return Type();
-    
     SmallVector<Type, 8> allArgs;
     for (auto argSet : args) {
       allArgs.append(argSet.begin(), argSet.end());
