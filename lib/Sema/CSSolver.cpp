@@ -2171,6 +2171,168 @@ Constraint *ConstraintSystem::selectDisjunction() {
   if (disjunctions.empty())
     return nullptr;
 
+  // If there are only a few disjunctions available,
+  // let's just use selection alogirthm.
+  if (disjunctions.size() <= 2)
+    return selectBestDisjunction(disjunctions);
+
+  if (SelectedDisjunctions.empty())
+    return selectBestDisjunction(disjunctions);
+
+  auto *lastDisjunction = SelectedDisjunctions.back()->getLocator();
+
+  // First, let's built a dictionary of all disjunctions accessible
+  // via their anchoring expressions.
+  llvm::SmallDenseMap<ASTNode, Constraint *> anchoredDisjunctions;
+  for (auto *disjunction : disjunctions) {
+    if (auto anchor = simplifyLocatorToAnchor(disjunction->getLocator()))
+      anchoredDisjunctions.insert({anchor, disjunction});
+  }
+
+  auto lookupDisjunctionInCache =
+      [&anchoredDisjunctions](Expr *expr) -> Constraint * {
+    auto disjunction = anchoredDisjunctions.find(expr);
+    return disjunction != anchoredDisjunctions.end() ? disjunction->second
+                                                     : nullptr;
+  };
+
+  auto findDisjunction = [&](Expr *expr) -> Constraint * {
+    if (!expr || !(isa<UnresolvedDotExpr>(expr) || isa<ApplyExpr>(expr)))
+      return nullptr;
+
+    // For applications i.e. calls, let's match their function first.
+    if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
+      if (auto disjunction = lookupDisjunctionInCache(apply->getFn()))
+        return disjunction;
+    }
+
+    return lookupDisjunctionInCache(expr);
+  };
+
+  auto findClosestDisjunction = [&](Expr *expr) -> Constraint * {
+    Constraint *selectedDisjunction = nullptr;
+    expr->forEachChildExpr([&](Expr *expr) -> Expr * {
+      if (auto *disjunction = findDisjunction(expr)) {
+        selectedDisjunction = disjunction;
+        return nullptr;
+      }
+      return expr;
+    });
+    return selectedDisjunction;
+  };
+
+  if (auto *expr = getAsExpr(lastDisjunction->getAnchor())) {
+    // If this disjunction is derived from an overload set expression,
+    // let's look one level higher since its immediate parent is an
+    // operator application.
+    if (isa<OverloadedDeclRefExpr>(expr))
+      expr = getParentExpr(expr);
+
+    bool isMemberRef = isa<UnresolvedDotExpr>(expr);
+
+    // Implicit `.init` calls need some special handling.
+    if (lastDisjunction->isLastElement<LocatorPathElt::ConstructorMember>()) {
+      if (auto *call = dyn_cast<CallExpr>(expr)) {
+        expr = call->getFn();
+        isMemberRef = true;
+      }
+    }
+
+    if (isMemberRef) {
+      auto *parent = getParentExpr(expr);
+      // If this is a member application e.g. `.test(...)`,
+      // then let's see whether one of the arguments is a
+      // closure and if so, select the "best" disjunction
+      // from its body to be attempted next. This helps to
+      // type-check operator chains in a freshly resolved
+      // closure before moving to the next member in that
+      // chain of expressions for example:
+      //
+      // arr.map { $0 + 1 * 3 ... }.filter { ... }.reduce(0, +)
+      //
+      // Attempting to solve the body of the `.map` right after
+      // it has been selected helps to split up the constraint
+      // system.
+      if (auto *call = dyn_cast_or_null<CallExpr>(parent)) {
+        if (auto *arguments = call->getArgs()) {
+          for (const auto &argument : *arguments) {
+            auto *argExpr = argument.getExpr()->getSemanticsProvidingExpr();
+            auto *closure = dyn_cast<ClosureExpr>(argExpr);
+            // Even if the body of this closure participates in type-check
+            // it would be handled one statement at a time via a conjunction
+            // constraint.
+            if (!(closure && closure->hasSingleExpressionBody()))
+              continue;
+
+            // Note that it's important that we select the best possible
+            // disjunction from the body of the closure first, it helps
+            // to prune the solver space.
+            SmallVector<Constraint *, 4> innerDisjunctions;
+
+            for (auto *disjunction : disjunctions) {
+              auto *choice = disjunction->getNestedConstraints()[0];
+              if (choice->getKind() == ConstraintKind::BindOverload &&
+                  choice->getOverloadUseDC() == closure)
+                innerDisjunctions.push_back(disjunction);
+            }
+
+            if (!innerDisjunctions.empty())
+              return selectBestDisjunction(innerDisjunctions);
+          }
+        }
+      }
+    }
+
+    // First, let's see whether there is a direct parent in scope, since
+    // parent is the one which is going to use the result type of the
+    // last disjunction.
+    if (auto *parent = getParentExpr(expr)) {
+      if (isMemberRef && isa<CallExpr>(parent))
+        parent = getParentExpr(parent);
+
+      if (auto disjunction = findDisjunction(parent))
+        return disjunction;
+
+      // If parent is a tuple, let's collect disjunctions associated
+      // with its elements and run selection algorithm on them.
+      if (auto *tuple = dyn_cast_or_null<TupleExpr>(parent)) {
+        auto *elementExpr = expr;
+
+        // If current element has any unsolved disjunctions, let's
+        // attempt the closest to keep solving the local element.
+        if (auto disjunction = findClosestDisjunction(elementExpr))
+          return disjunction;
+
+        SmallVector<Constraint *, 4> tupleDisjunctions;
+        // Find all of the disjunctions that are nested inside of
+        // the current tuple for selection.
+        for (auto *disjunction : disjunctions) {
+          auto anchor = disjunction->getLocator()->getAnchor();
+          if (auto *expr = getAsExpr(anchor)) {
+            while ((expr = getParentExpr(expr))) {
+              if (expr == tuple) {
+                tupleDisjunctions.push_back(disjunction);
+                break;
+              }
+            }
+          }
+        }
+
+        // Let's use a pool of all disjunctions associated with
+        // this tuple. Picking the best one, regardless of the
+        // element would stir solving towards solving everything
+        // in a particular element.
+        if (!tupleDisjunctions.empty())
+          return selectBestDisjunction(tupleDisjunctions);
+      }
+    }
+
+    // If parent is not available (e.g. because it's already bound),
+    // let's look into the arguments, and find the closest unbound one.
+    if (auto *closestDisjunction = findClosestDisjunction(expr))
+      return closestDisjunction;
+  }
+
   return selectBestDisjunction(disjunctions);
 }
 
