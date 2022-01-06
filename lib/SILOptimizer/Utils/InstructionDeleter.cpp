@@ -60,6 +60,12 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
   if (!hasOnlyEndOfScopeOrEndOfLifetimeUses(inst)) {
     return false;
   }
+  // If the instruction is a lexical begin_borrow, bail out.
+  BeginBorrowInst *bbi = nullptr;
+  if ((bbi = dyn_cast<BeginBorrowInst>(inst)) && bbi->isLexical()) {
+    return false;
+  }
+
   // If inst is a copy or beginning of scope, inst is dead, since we know that
   // it is used only in a destroy_value or end-of-scope instruction.
   if (getSingleValueCopyOrCast(inst))

@@ -716,6 +716,43 @@ bad(%15 : @owned $Error):
   throw %15 : $Error
 }
 
+// Hoist up to two parallel barrier applies from a block with two predecessors.
+//
+// CHECK-LABEL: sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         [[REGISTER_3:%[^,]+]] = apply undef()
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         [[REGISTER_6:%[^,]+]] = apply undef()
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_up_to_two_barrier_applies'
+sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime_outer = begin_borrow [lexical] %instance : $C
+  cond_br undef, left, right
+
+left:
+  %result_left = apply undef() : $@convention(thin) () -> ()
+  br exit
+
+right:
+  %result_right = apply undef() : $@convention(thin) () -> ()
+  br exit
+
+exit:
+  end_borrow %lifetime_outer : $C
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // =============================================================================
 // instruction tests                                                          }}
 // =============================================================================
