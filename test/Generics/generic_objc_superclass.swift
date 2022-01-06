@@ -13,7 +13,6 @@ func foo<T : Generic<U>, U>(_: T, _: U) {
 
 // CHECK-LABEL: Requirement machine for <τ_0_0, τ_0_1 where τ_0_0 : Generic<τ_0_1>>
 // CHECK-NEXT: Rewrite system: {
-// CHECK-NEXT: - [superclass: Generic<τ_0_0> with <τ_0_1>].[layout: AnyObject] => [superclass: Generic<τ_0_0> with <τ_0_1>] [permanent]
 // CHECK-NEXT: - τ_0_0.[superclass: Generic<τ_0_0> with <τ_0_1>] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[layout: AnyObject] => τ_0_0
 // CHECK-NEXT: }

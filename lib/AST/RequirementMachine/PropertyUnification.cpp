@@ -37,6 +37,18 @@
 using namespace swift;
 using namespace rewriting;
 
+/// Returns true if we have not processed this rule before.
+bool PropertyMap::checkRuleOnce(unsigned ruleID) {
+  return CheckedRules.insert(ruleID).second;
+}
+
+/// Returns true if we have not processed this pair of rules before.
+bool PropertyMap::checkRulePairOnce(unsigned firstRuleID,
+                                    unsigned secondRuleID) {
+  return CheckedRulePairs.insert(
+      std::make_pair(firstRuleID, secondRuleID)).second;
+}
+
 unsigned RewriteSystem::recordRelation(Symbol lhs, Symbol rhs) {
   auto key = std::make_pair(lhs, rhs);
   auto found = RelationMap.find(key);
@@ -57,21 +69,26 @@ RewriteSystem::getRelation(unsigned index) const {
   return Relations[index];
 }
 
-/// Given two property rules (T.[p1] => T) and (T.[p2] => T) where [p1] < [p2],
-/// record a rewrite loop that makes the second rule redundant from the first.
-static void recordRelation(unsigned lhsRuleID, unsigned rhsRuleID,
+/// Given a key T, a rule (V.[p1] => V) where T == U.V, and a property [p2]
+/// where [p1] < [p2], record a rule (T.[p2] => T) that is induced by
+/// the original rule (V.[p1] => V).
+static void recordRelation(Term key,
+                           unsigned lhsRuleID,
+                           Symbol rhsProperty,
                            RewriteSystem &system,
                            SmallVectorImpl<InducedRule> &inducedRules,
                            bool debug) {
   const auto &lhsRule = system.getRule(lhsRuleID);
-  const auto &rhsRule = system.getRule(rhsRuleID);
-
   auto lhsProperty = lhsRule.getLHS().back();
-  auto rhsProperty = rhsRule.getLHS().back();
 
-  assert(lhsProperty.isProperty());
-  assert(rhsProperty.isProperty());
-  assert(lhsProperty.getKind() == rhsProperty.getKind());
+  assert(key.size() >= lhsRule.getRHS().size());
+
+  assert((lhsProperty.getKind() == Symbol::Kind::Layout &&
+          rhsProperty.getKind() == Symbol::Kind::Layout) ||
+         (lhsProperty.getKind() == Symbol::Kind::Superclass &&
+          rhsProperty.getKind() == Symbol::Kind::Layout) ||
+         (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
+          rhsProperty.getKind() == Symbol::Kind::Superclass));
 
   if (debug) {
     llvm::dbgs() << "%% Recording relation: ";
@@ -82,35 +99,56 @@ static void recordRelation(unsigned lhsRuleID, unsigned rhsRuleID,
 
   /// Build the following rewrite path:
   ///
-  ///   (T => T.[p1]).[p2] ⊗ T.Relation([p1].[p2] => [p1]) ⊗ (T.[p1] => T).
+  ///   U.(V => V.[p1]).[p2] ⊗ U.V.Relation([p1].[p2] => [p1]) ⊗ U.(V.[p1] => V).
   ///
   RewritePath path;
 
-  /// Starting from T.[p2], the LHS rule in reverse to get T.[p1].[p2].
-  path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
-                                       /*endOffset=*/1,
-                                       /*ruleID=*/lhsRuleID,
-                                       /*inverse=*/true));
+  /// Starting from U.V.[p2], apply the rule in reverse to get U.V.[p1].[p2].
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/key.size() - lhsRule.getRHS().size(),
+      /*endOffset=*/1,
+      /*ruleID=*/lhsRuleID,
+      /*inverse=*/true));
 
-  /// T.Relation([p1].[p2] => [p1]).
+  /// U.V.Relation([p1].[p2] => [p1]).
   path.add(RewriteStep::forRelation(relationID, /*inverse=*/false));
 
-  /// (T.[p1] => T).
-  path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
-                                       /*endOffset=*/0,
-                                       /*ruleID=*/lhsRuleID,
-                                       /*inverse=*/false));
+  /// U.(V.[p1] => V).
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/key.size() - lhsRule.getRHS().size(),
+      /*endOffset=*/0,
+      /*ruleID=*/lhsRuleID,
+      /*inverse=*/false));
 
   /// Add the rule (T.[p2] => T) with the above rewrite path.
-  ///
-  /// Since a rule (T.[p2] => T) *already exists*, both sides of the new
-  /// rule will simplify down to T, and the rewrite path will become a loop.
-  ///
-  /// This loop encodes the fact that (T.[p1] => T) makes (T.[p2] => T)
-  /// redundant.
-  inducedRules.emplace_back(MutableTerm(rhsRule.getLHS()),
-                            MutableTerm(rhsRule.getRHS()),
-                            path);
+  MutableTerm lhs(key);
+  lhs.add(rhsProperty);
+
+  MutableTerm rhs(key);
+
+  inducedRules.emplace_back(lhs, rhs, path);
+}
+
+static void recordConflict(Term key,
+                           unsigned existingRuleID,
+                           unsigned newRuleID,
+                           RewriteSystem &system) {
+  auto &existingRule = system.getRule(existingRuleID);
+  auto &newRule = system.getRule(newRuleID);
+
+  auto existingKind = existingRule.isPropertyRule()->getKind();
+  auto newKind = newRule.isPropertyRule()->getKind();
+
+  // The GSB only dropped the new rule in the case of a conflicting
+  // superclass requirement, so maintain that behavior here.
+  if (existingKind != Symbol::Kind::Superclass &&
+      existingKind == newKind) {
+    if (existingRule.getRHS().size() == key.size())
+      existingRule.markConflicting();
+  }
+
+  assert(newRule.getRHS().size() == key.size());
+  newRule.markConflicting();
 }
 
 /// This method takes a concrete type that was derived from a concrete type
@@ -383,45 +421,58 @@ static std::pair<Symbol, bool> unifySuperclasses(
   return std::make_pair(rhs, false);
 }
 
-/// Returns the old conflicting rule ID if there was a conflict,
-/// otherwise returns None.
-Optional<unsigned> PropertyBag::addProperty(
-    Symbol property, unsigned ruleID, RewriteSystem &system,
-    SmallVectorImpl<InducedRule> &inducedRules,
-    bool debug) {
+/// Record a protocol conformance, layout or superclass constraint on the given
+/// key. Must be called in monotonically non-decreasing key order.
+void PropertyMap::addProperty(
+    Term key, Symbol property, unsigned ruleID,
+    SmallVectorImpl<InducedRule> &inducedRules) {
+  assert(property.isProperty());
+  assert(*System.getRule(ruleID).isPropertyRule() == property);
+  auto *props = getOrCreateProperties(key);
+  bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   switch (property.getKind()) {
   case Symbol::Kind::Protocol:
-    ConformsTo.push_back(property.getProtocol());
-    ConformsToRules.push_back(ruleID);
-    return None;
+    props->ConformsTo.push_back(property.getProtocol());
+    props->ConformsToRules.push_back(ruleID);
+    return;
 
   case Symbol::Kind::Layout: {
     auto newLayout = property.getLayoutConstraint();
 
-    if (!Layout) {
+    if (!props->Layout) {
       // If we haven't seen a layout requirement before, just record it.
-      Layout = newLayout;
-      LayoutRule = ruleID;
+      props->Layout = newLayout;
+      props->LayoutRule = ruleID;
     } else {
       // Otherwise, compute the intersection.
-      assert(LayoutRule.hasValue());
-      auto mergedLayout = Layout.merge(property.getLayoutConstraint());
+      assert(props->LayoutRule.hasValue());
+      auto mergedLayout = props->Layout.merge(property.getLayoutConstraint());
 
       // If the intersection is invalid, we have a conflict.
-      if (!mergedLayout->isKnownLayout())
-        return LayoutRule;
+      if (!mergedLayout->isKnownLayout()) {
+        recordConflict(key, *props->LayoutRule, ruleID, System);
+        return;
+      }
 
       // If the intersection is equal to the existing layout requirement,
       // the new layout requirement is redundant.
-      if (mergedLayout == Layout) {
-        recordRelation(*LayoutRule, ruleID, system, inducedRules, debug);
+      if (mergedLayout == props->Layout) {
+        if (checkRulePairOnce(*props->LayoutRule, ruleID)) {
+          recordRelation(key, *props->LayoutRule, property, System,
+                         inducedRules, debug);
+        }
 
       // If the intersection is equal to the new layout requirement, the
       // existing layout requirement is redundant.
       } else if (mergedLayout == newLayout) {
-        recordRelation(ruleID, *LayoutRule, system, inducedRules, debug);
-        LayoutRule = ruleID;
+        if (checkRulePairOnce(ruleID, *props->LayoutRule)) {
+          auto oldProperty = System.getRule(*props->LayoutRule).getLHS().back();
+          recordRelation(key, ruleID, oldProperty, System,
+                         inducedRules, debug);
+        }
+
+        props->LayoutRule = ruleID;
       } else {
         llvm::errs() << "Arbitrary intersection of layout requirements is "
                      << "supported yet\n";
@@ -429,48 +480,65 @@ Optional<unsigned> PropertyBag::addProperty(
       }
     }
 
-    return None;
+    return;
   }
 
   case Symbol::Kind::Superclass: {
-    // FIXME: Also handle superclass vs concrete
+    if (checkRuleOnce(ruleID)) {
+      // A rule (T.[superclass: C] => T) induces a rule (T.[layout: L] => T),
+      // where L is either AnyObject or _NativeObject.
+      auto superclass =
+          property.getSuperclass()->getClassOrBoundGenericClass();
+      auto layout =
+          LayoutConstraint::getLayoutConstraint(
+            superclass->getLayoutConstraintKind(),
+            Context.getASTContext());
+      auto layoutSymbol = Symbol::forLayout(layout, Context);
 
-    if (!Superclass) {
-      Superclass = property;
-      SuperclassRule = ruleID;
-    } else {
-      assert(SuperclassRule.hasValue());
-      auto pair = unifySuperclasses(*Superclass, property,
-                                    system.getRewriteContext(),
-                                    inducedRules, debug);
-      Superclass = pair.first;
-      bool conflict = pair.second;
-      if (conflict)
-        return SuperclassRule;
+      recordRelation(key, ruleID, layoutSymbol, System,
+                     inducedRules, debug);
     }
 
-    return None;
+    if (!props->Superclass) {
+      props->Superclass = property;
+      props->SuperclassRule = ruleID;
+    } else {
+      assert(props->SuperclassRule.hasValue());
+      auto pair = unifySuperclasses(*props->Superclass, property,
+                                    System.getRewriteContext(),
+                                    inducedRules, debug);
+      props->Superclass = pair.first;
+      bool conflict = pair.second;
+      if (conflict) {
+        recordConflict(key, *props->SuperclassRule, ruleID, System);
+        return;
+      }
+    }
+
+    return;
   }
 
   case Symbol::Kind::ConcreteType: {
-    if (!ConcreteType) {
-      ConcreteType = property;
-      ConcreteTypeRule = ruleID;
+    if (!props->ConcreteType) {
+      props->ConcreteType = property;
+      props->ConcreteTypeRule = ruleID;
     } else {
-      assert(ConcreteTypeRule.hasValue());
-      bool conflict = unifyConcreteTypes(*ConcreteType, property,
-                                         system.getRewriteContext(),
+      assert(props->ConcreteTypeRule.hasValue());
+      bool conflict = unifyConcreteTypes(*props->ConcreteType, property,
+                                         System.getRewriteContext(),
                                          inducedRules, debug);
-      if (conflict)
-        return ConcreteTypeRule;
+      if (conflict) {
+        recordConflict(key, *props->ConcreteTypeRule, ruleID, System);
+        return;
+      }
     }
 
-    return None;
+    return;
   }
 
   case Symbol::Kind::ConcreteConformance:
     // FIXME
-    return None;
+    return;
 
   case Symbol::Kind::Name:
   case Symbol::Kind::GenericParam:
@@ -481,10 +549,39 @@ Optional<unsigned> PropertyBag::addProperty(
   llvm_unreachable("Bad symbol kind");
 }
 
+void PropertyMap::checkConcreteTypeRequirements(
+    SmallVectorImpl<InducedRule> &inducedRules) {
+  bool debug = Debug.contains(DebugFlags::ConcreteUnification);
+
+  for (auto *props : Entries) {
+    if (props->ConcreteTypeRule && props->SuperclassRule) {
+      auto concreteType = props->ConcreteType->getConcreteType();
+
+      // A rule (T.[concrete: C] => T) where C is a class type induces a rule
+      // (T.[superclass: C] => T).
+      if (concreteType->getClassOrBoundGenericClass()) {
+        auto superclassSymbol = Symbol::forSuperclass(
+            concreteType, props->ConcreteType->getSubstitutions(),
+            Context);
+
+        recordRelation(props->getKey(), *props->ConcreteTypeRule,
+                       superclassSymbol, System,
+                       inducedRules, debug);
+
+      // Otherwise, we have a concrete vs superclass conflict.
+      } else {
+        recordConflict(props->getKey(),
+                       *props->ConcreteTypeRule,
+                       *props->SuperclassRule, System);
+      }
+    }
+  }
+}
+
 /// For each fully-concrete type, find the shortest term having that concrete type.
 /// This is later used by computeConstraintTermForTypeWitness().
 void PropertyMap::computeConcreteTypeInDomainMap() {
-  for (const auto &props : Entries) {
+  for (auto *props : Entries) {
     if (!props->isConcreteType())
       continue;
 
@@ -510,7 +607,7 @@ void PropertyMap::computeConcreteTypeInDomainMap() {
 
 void PropertyMap::concretizeNestedTypesFromConcreteParents(
     SmallVectorImpl<InducedRule> &inducedRules) {
-  for (const auto &props : Entries) {
+  for (auto *props : Entries) {
     if (props->getConformsTo().empty())
       continue;
 

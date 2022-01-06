@@ -307,22 +307,6 @@ void PropertyMap::clear() {
   ConcreteTypeInDomainMap.clear();
 }
 
-/// Record a protocol conformance, layout or superclass constraint on the given
-/// key. Must be called in monotonically non-decreasing key order.
-///
-/// If there was a conflict, returns the conflicting rule ID; otherwise
-/// returns None.
-Optional<unsigned> PropertyMap::addProperty(
-    Term key, Symbol property, unsigned ruleID,
-    SmallVectorImpl<InducedRule> &inducedRules) {
-  assert(property.isProperty());
-  assert(*System.getRule(ruleID).isPropertyRule() == property);
-  auto *props = getOrCreateProperties(key);
-  bool debug = Debug.contains(DebugFlags::ConcreteUnification);
-  return props->addProperty(property, ruleID, System,
-                            inducedRules, debug);
-}
-
 /// Build the property map from all rules of the form T.[p] => T, where
 /// [p] is a property symbol.
 ///
@@ -379,24 +363,13 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   for (const auto &bucket : properties) {
     for (auto property : bucket) {
-      auto existingRuleID = addProperty(property.key, property.symbol,
-                                        property.ruleID, inducedRules);
-      if (existingRuleID) {
-        // The GSB only dropped the new rule in the case of a conflicting
-        // superclass requirement, so maintain that behavior here.
-        auto &existingRule = System.getRule(*existingRuleID);
-        if (existingRule.isPropertyRule()->getKind() !=
-            Symbol::Kind::Superclass) {
-          if (existingRule.getRHS().size() == property.key.size())
-            existingRule.markConflicting();
-        }
-
-        auto &newRule = System.getRule(property.ruleID);
-        assert(newRule.getRHS().size() == property.key.size());
-        newRule.markConflicting();
-      }
+      addProperty(property.key, property.symbol,
+                  property.ruleID, inducedRules);
     }
   }
+
+  // Now, check for conflicts between superclass and concrete type rules.
+  checkConcreteTypeRequirements(inducedRules);
 
   // We collect terms with fully concrete types so that we can re-use them
   // to tie off recursion in the next step.

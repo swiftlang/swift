@@ -87,6 +87,9 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs,
     }
   } matcher(result);
 
+  if (lhs->hasError() || rhs->hasError())
+    return;
+
   // FIXME: Record redundancy and diagnose upstream
   (void) matcher.match(lhs, rhs);
 }
@@ -923,25 +926,6 @@ void RuleBuilder::addRequirement(const Requirement &req,
                                               substitutions);
     auto superclassSymbol = Symbol::forSuperclass(otherType, substitutions,
                                                   Context);
-
-    {
-      // Build the symbol [layout: L].
-      auto layout =
-        LayoutConstraint::getLayoutConstraint(
-          otherType->getClassOrBoundGenericClass()->getLayoutConstraintKind(),
-          Context.getASTContext());
-      auto layoutSymbol = Symbol::forLayout(layout, Context);
-
-      MutableTerm layoutSubjectTerm;
-      layoutSubjectTerm.add(superclassSymbol);
-
-      MutableTerm layoutConstraintTerm = layoutSubjectTerm;
-      layoutConstraintTerm.add(layoutSymbol);
-
-      // Add the rule [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>].
-      PermanentRules.emplace_back(layoutConstraintTerm,
-                                  layoutSubjectTerm);
-    }
 
     // Build the term T.[superclass: C<X, Y>].
     constraintTerm = subjectTerm;
