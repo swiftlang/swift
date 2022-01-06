@@ -1,5 +1,5 @@
 // XXX: %target-swift-frontend -primary-file %s -emit-sil -parse-as-library -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --enable-var-scope --dump-input=always
-// TODO: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -11,9 +11,6 @@
 
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
-
-// TODO(distributed): work in progress
-// XFAIL: *
 
 import _Distributed
 
@@ -110,7 +107,7 @@ func test() async throws {
   let local = Greeter(system: system)
 
   // act as if we decoded an Invocation:
-  var invocation = FakeInvocation()
+  let invocation = FakeInvocation()
 
   try await system.executeDistributedTarget(
       on: local,
