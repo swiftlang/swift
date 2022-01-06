@@ -414,7 +414,8 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
-    llvm::FoldingSet<OpaqueTypeArchetypeType> OpaqueArchetypes;
+    llvm::DenseMap<std::pair<OpaqueTypeDecl *, SubstitutionMap>,
+                   GenericEnvironment *> OpaqueArchetypeEnvironments;
 
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
@@ -4280,77 +4281,62 @@ DependentMemberType *DependentMemberType::get(Type base,
   return known;
 }
 
-OpaqueTypeArchetypeType *
-OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
-                             SubstitutionMap Substitutions) {
-  auto opaqueParamType = Decl->getOpaqueGenericParams()[ordinal];
-
-  // TODO: We could attempt to preserve type sugar in the substitution map.
-  // Currently archetypes are assumed to be always canonical in many places,
-  // though, so doing so would require fixing those places.
-  Substitutions = Substitutions.getCanonical();
-
-  llvm::FoldingSetNodeID id;
-  Profile(id, Decl, ordinal, Substitutions);
-  
-  auto &ctx = Decl->getASTContext();
-
+/// Compute the recursive type properties of an opaque type archetype.
+static RecursiveTypeProperties getOpaqueTypeArchetypeProperties(
+    SubstitutionMap subs) {
   // An opaque type isn't contextually dependent like other archetypes, so
   // by itself, it doesn't impose the "Has Archetype" recursive property,
   // but the substituted types might. A disjoint "Has Opaque Archetype" tracks
   // the presence of opaque archetypes.
   RecursiveTypeProperties properties =
     RecursiveTypeProperties::HasOpaqueArchetype;
-  for (auto type : Substitutions.getReplacementTypes()) {
+  for (auto type : subs.getReplacementTypes()) {
     properties |= type->getRecursiveProperties();
   }
-  
+  return properties;
+}
+
+OpaqueTypeArchetypeType *OpaqueTypeArchetypeType::getNew(
+    GenericEnvironment *environment, Type interfaceType,
+    ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+    LayoutConstraint layout) {
+  auto properties = getOpaqueTypeArchetypeProperties(
+      environment->getOpaqueSubstitutions());
   auto arena = getArena(properties);
-  
-  llvm::FoldingSet<OpaqueTypeArchetypeType> &set
-    = ctx.getImpl().getArena(arena).OpaqueArchetypes;
-  
-  {
-    void *insertPos; // Discarded because the work below may invalidate the
-                     // insertion point inside the folding set
-    if (auto existing = set.FindNodeOrInsertPos(id, insertPos)) {
-      return existing;
-    }
-  }
-  
-  auto reqs = Decl->getOpaqueInterfaceGenericSignature()
-      ->getLocalRequirements(opaqueParamType);
-  auto superclass = reqs.superclass;
-  #if !DO_IT_CORRECTLY
-    // Ad-hoc substitute the generic parameters of the superclass.
-    // If we correctly applied the substitutions to the generic signature
-    // constraints above, this would be unnecessary.
-    if (superclass && superclass->hasTypeParameter()) {
-      superclass = superclass.subst(Substitutions);
-    }
-  #endif
+  auto size = OpaqueTypeArchetypeType::totalSizeToAlloc<
+      ProtocolDecl *, Type, LayoutConstraint>(
+         conformsTo.size(), superclass ? 1 : 0, layout ? 1 : 0);
+  ASTContext &ctx = interfaceType->getASTContext();
+  auto mem = ctx.Allocate(size, alignof(OpaqueTypeArchetypeType), arena);
+  return ::new (mem)
+      OpaqueTypeArchetypeType(environment, properties, interfaceType,
+                              conformsTo, superclass, layout);
+}
 
-  auto mem = ctx.Allocate(
-    OpaqueTypeArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
-      reqs.protos.size(), superclass ? 1 : 0, reqs.layout ? 1 : 0),
-      alignof(OpaqueTypeArchetypeType),
-      arena);
+Type OpaqueTypeArchetypeType::get(
+    OpaqueTypeDecl *Decl, unsigned ordinal, SubstitutionMap Substitutions) {
+  // TODO: We could attempt to preserve type sugar in the substitution map.
+  // Currently archetypes are assumed to be always canonical in many places,
+  // though, so doing so would require fixing those places.
+  Substitutions = Substitutions.getCanonical();
 
-  auto newOpaque = ::new (mem)
-      OpaqueTypeArchetypeType(Decl, Substitutions, properties, opaqueParamType,
-                              reqs.protos, superclass, reqs.layout);
+  auto &ctx = Decl->getASTContext();
 
-  // Look up the insertion point in the folding set again in case something
-  // invalidated it above.
-  {
-    void *insertPos;
-    auto existing = set.FindNodeOrInsertPos(id, insertPos);
-    (void)existing;
-    assert(!existing && "race to create opaque archetype?!");
-    set.InsertNode(newOpaque, insertPos);
+  // Look for an opaque archetype environment in the appropriate arena.
+  auto properties = getOpaqueTypeArchetypeProperties(Substitutions);
+  auto arena = getArena(properties);
+  auto &environments
+    = ctx.getImpl().getArena(arena).OpaqueArchetypeEnvironments;
+  GenericEnvironment *env = environments[{Decl, Substitutions}];
+
+  // Create the environment if it's missing.
+  if (!env) {
+    env = GenericEnvironment::forOpaqueType(Decl, Substitutions, arena);
+    environments[{Decl, Substitutions}] = env;
   }
 
-  return newOpaque;
+  auto opaqueParamType = Decl->getOpaqueGenericParams()[ordinal];
+  return env->getOrCreateArchetypeFromInterfaceType(opaqueParamType);
 }
 
 CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
@@ -4411,15 +4397,11 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
   if (Environment)
     return Environment;
   
-  auto thisType = Type(const_cast<OpenedArchetypeType*>(this));
+  auto thisType = const_cast<OpenedArchetypeType*>(this);
   auto &ctx = thisType->getASTContext();
   // Create a generic environment to represent the opened type.
   auto signature = ctx.getOpenedArchetypeSignature(Opened);
-  auto *env = GenericEnvironment::getIncomplete(signature);
-  env->addMapping(signature.getGenericParams().front().getPointer(), thisType);
-  Environment = env;
-  
-  return env;
+  return GenericEnvironment::forOpenedExistential(signature, thisType);
 }
 
 CanType OpenedArchetypeType::getAny(Type existential) {
@@ -4575,9 +4557,43 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<Type>(numGenericParams);
+  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap, Type>(
+      0, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  return new (mem) GenericEnvironment(signature);
+  return new (mem) GenericEnvironment(signature, Kind::Normal);
+}
+
+/// Create a new generic environment for an opened archetype.
+GenericEnvironment *GenericEnvironment::forOpenedExistential(
+    GenericSignature signature, const OpenedArchetypeType *type) {
+  auto &ctx = signature->getASTContext();
+
+  // Allocate and construct the new environment.
+  unsigned numGenericParams = signature.getGenericParams().size();
+  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap, Type>(
+      0, 0, numGenericParams);
+  void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
+  auto env = new (mem) GenericEnvironment(signature, Kind::OpenedExistential);
+  env->addMapping(
+      signature.getGenericParams().front(),
+      Type(const_cast<OpenedArchetypeType *>(type)));
+  return env;
+}
+
+/// Create a new generic environment for an opaque type with the given set of
+/// outer substitutions.
+GenericEnvironment *GenericEnvironment::forOpaqueType(
+    OpaqueTypeDecl *opaque, SubstitutionMap subs, AllocationArena arena) {
+  auto &ctx = opaque->getASTContext();
+
+  // Allocate and construct the new environment.
+  auto signature = opaque->getOpaqueInterfaceGenericSignature();
+  unsigned numGenericParams = signature.getGenericParams().size();
+  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap, Type>(
+      1, 1, numGenericParams);
+  void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment), arena);
+  auto env = new (mem) GenericEnvironment(GenericSignature(), opaque, subs);
+  return env;
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,

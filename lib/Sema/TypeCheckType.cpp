@@ -285,7 +285,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
 }
 
 /// Retrieve the identity form of the opaque type archetype type.
-static OpaqueTypeArchetypeType *getIdentityOpaqueTypeArchetypeType(
+static Type getIdentityOpaqueTypeArchetypeType(
     OpaqueTypeDecl *opaqueDecl, unsigned ordinal) {
   auto outerGenericSignature = opaqueDecl->getNamingDecl()
                                    ->getInnermostDeclContext()

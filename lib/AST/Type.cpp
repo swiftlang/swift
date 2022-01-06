@@ -3281,17 +3281,15 @@ NestedArchetypeType::NestedArchetypeType(const ASTContext &Ctx,
 {
 }
 
-OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
-                                   SubstitutionMap Substitutions,
-                                   RecursiveTypeProperties Props,
-                                   Type InterfaceType,
-                                   ArrayRef<ProtocolDecl*> ConformsTo,
-                                   Type Superclass, LayoutConstraint Layout)
-  : ArchetypeType(TypeKind::OpaqueTypeArchetype, OpaqueDecl->getASTContext(),
-                  Props,
-                  InterfaceType, ConformsTo, Superclass, Layout),
-    OpaqueDecl(OpaqueDecl),
-    Substitutions(Substitutions)
+OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
+    GenericEnvironment *environment,
+    RecursiveTypeProperties properties,
+    Type interfaceType,
+    ArrayRef<ProtocolDecl*> conformsTo,
+    Type superclass, LayoutConstraint layout)
+  : ArchetypeType(TypeKind::OpaqueTypeArchetype, interfaceType->getASTContext(),
+                  properties, interfaceType, conformsTo, superclass, layout),
+    Environment(environment)
 {
 }
 
@@ -3310,147 +3308,28 @@ SequenceArchetypeType::SequenceArchetypeType(
   assert(cast<GenericTypeParamType>(InterfaceType.getPointer())->isTypeSequence());
 }
 
-namespace {
-
-/// Substitute the outer generic parameters from a substitution map, ignoring
-/// innter generic parameters with a given depth.
-struct SubstituteOuterFromSubstitutionMap {
-  SubstitutionMap subs;
-  unsigned depth;
-
-  /// Whether this is a type parameter that should not be substituted.
-  bool isUnsubstitutedTypeParameter(Type type) const {
-    if (!type->isTypeParameter())
-      return false;
-
-    if (auto depMemTy = type->getAs<DependentMemberType>())
-      return isUnsubstitutedTypeParameter(depMemTy->getBase());
-
-    if (auto genericParam = type->getAs<GenericTypeParamType>())
-      return genericParam->getDepth() >= depth;
-
-    return false;
-  }
-
-  Type operator()(SubstitutableType *type) const {
-    if (isUnsubstitutedTypeParameter(type))
-      return Type(type);
-
-    return QuerySubstitutionMap{subs}(type);
-  }
-
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const {
-    if (isUnsubstitutedTypeParameter(dependentType))
-      return ProtocolConformanceRef(conformedProtocol);
-
-    return LookUpConformanceInSubstitutionMap(subs)(
-        dependentType, conformingReplacementType, conformedProtocol);
-  }
-};
-
-}
-
 CanType OpaqueTypeArchetypeType::getCanonicalInterfaceType(Type interfaceType) {
-  // Compute the canonical type within the generic signature of the opaque
-  // type declaration.
-  auto sig = getDecl()->getOpaqueInterfaceGenericSignature();
+  auto sig = Environment->getOpaqueTypeDecl()
+      ->getOpaqueInterfaceGenericSignature();
   CanType canonicalType = interfaceType->getCanonicalType(sig);
-  if (!interfaceType->hasTypeParameter())
-    return canonicalType;
-
-  // Substitute outer generic parameters only.
-  unsigned opaqueDepth =
-    getDecl()->getOpaqueGenericParams().front()->getDepth();
-  SubstituteOuterFromSubstitutionMap replacer{Substitutions, opaqueDepth};
-  return canonicalType.subst(replacer, replacer)->getCanonicalType();
+  return Environment->maybeApplyOpaqueTypeSubstitutions(canonicalType)
+      ->getCanonicalType();
 }
 
 GenericEnvironment *OpaqueTypeArchetypeType::getGenericEnvironment() const {
-  if (Environment)
-    return Environment;
-
-  // Create a new opaque archetype.
-  // It lives in an environment in which the interface generic arguments of the
-  // decl have all been same-type-bound to the arguments from our substitution
-  // map.
-  SmallVector<Requirement, 2> newRequirements;
-
-  // TODO: The proper thing to do to build the environment in which the opaque
-  // type's archetype exists would be to take the generic signature of the
-  // decl, feed it into a GenericSignatureBuilder, then add same-type
-  // constraints into the builder to bind the outer generic parameters
-  // to their substituted types provided by \c Substitutions. However,
-  // this is problematic for interface types. In a situation like this:
-  //
-  // __opaque_type Foo<t_0_0: P>: Q // internal signature <t_0_0: P, t_1_0: Q>
-  //
-  // func bar<t_0_0, t_0_1, t_0_2: P>() -> Foo<t_0_2>
-  //
-  // we'd want to feed the GSB constraints to form:
-  //
-  // <t_0_0: P, t_1_0: Q where t_0_0 == t_0_2>
-  //
-  // even though t_0_2 isn't *in* the generic signature being built; it
-  // represents a type
-  // bound elsewhere from some other generic context. If we knew the generic
-  // environment `t_0_2` came from, then maybe we could map it into that context,
-  // but currently we have no way to know that with certainty.
-  //
-  // Because opaque types are currently limited so that they only have immediate
-  // protocol constraints, and therefore don't interact with the outer generic
-  // parameters at all, we can get away without adding these constraints for now.
-  // Adding where clauses would break this hack.
-#if DO_IT_CORRECTLY
-  // Same-type-constrain the arguments in the outer signature to their
-  // replacements in the substitution map.
-  if (auto outerSig = Decl->getGenericSignature()) {
-    for (auto outerParam : outerSig.getGenericParams()) {
-      auto boundType = Type(outerParam).subst(Substitutions);
-      newRequirements.push_back(
-          Requirement(RequirementKind::SameType, Type(outerParam), boundType));
-    }
-  }
-#else
-  // Assert that there are no same type constraints on the opaque type or its
-  // associated types.
-  //
-  // This should not be possible until we add where clause support, with the
-  // exception of generic base class constraints (handled below).
-  (void)newRequirements;
-# ifndef NDEBUG
-  for (auto req : getDecl()
-                    ->getOpaqueInterfaceGenericSignature().getRequirements()) {
-    auto reqBase = req.getFirstType()->getRootGenericParam();
-    if (reqBase->isEqual(getInterfaceType())) {
-      assert(req.getKind() != RequirementKind::SameType
-             && "supporting where clauses on opaque types requires correctly "
-                "setting up the generic environment for "
-                "OpaqueTypeArchetypeTypes; see comment above");
-    }
-  }
-# endif
-#endif
-  auto signature = buildGenericSignature(
-        getDecl()->getASTContext(),
-        getDecl()->getOpaqueInterfaceGenericSignature(),
-        /*genericParams=*/{ },
-        std::move(newRequirements));
-
-  // Create a generic environment and bind the opaque archetype to the
-  // opaque interface type from the decl's signature.
-  auto *env = GenericEnvironment::getIncomplete(signature);
-  env->addMapping(
-      GenericParamKey(getInterfaceType()->castTo<GenericTypeParamType>()),
-      Type(const_cast<OpaqueTypeArchetypeType *>(this)));
-  Environment = env;
-
   return Environment;
 }
 
 GenericSignature OpaqueTypeArchetypeType::getBoundSignature() const {
   return getGenericEnvironment()->getGenericSignature();
+}
+
+OpaqueTypeDecl *OpaqueTypeArchetypeType::getDecl() const {
+  return Environment->getOpaqueTypeDecl();
+}
+
+SubstitutionMap OpaqueTypeArchetypeType::getSubstitutions() const {
+  return Environment->getOpaqueSubstitutions();
 }
 
 static Optional<std::pair<ArchetypeType *, OpaqueTypeArchetypeType*>>
@@ -3924,16 +3803,6 @@ std::string ArchetypeType::getFullName() const {
   llvm::SmallString<64> Result;
   collectFullName(this, Result);
   return Result.str().str();
-}
-
-void
-OpaqueTypeArchetypeType::Profile(llvm::FoldingSetNodeID &id,
-                                 OpaqueTypeDecl *decl,
-                                 unsigned ordinal,
-                                 SubstitutionMap subs) {
-  id.AddPointer(decl);
-  id.AddInteger(ordinal);
-  subs.profile(id);
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,

@@ -5548,37 +5548,36 @@ END_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
 
 /// An archetype that represents an opaque type.
 class OpaqueTypeArchetypeType final : public ArchetypeType,
-    public llvm::FoldingSetNode,
     private ArchetypeTrailingObjects<OpaqueTypeArchetypeType>
 {
   friend TrailingObjects;
   friend ArchetypeType;
   friend GenericSignatureBuilder;
 
-  /// The declaration that defines the opaque type.
-  OpaqueTypeDecl *OpaqueDecl;
-  /// The substitutions into the interface signature of the opaque type.
-  SubstitutionMap Substitutions;
-  
   /// A GenericEnvironment with this opaque archetype bound to the interface
   /// type of the output type from the OpaqueDecl.
-  mutable GenericEnvironment *Environment = nullptr;
-  
+  GenericEnvironment *Environment = nullptr;
+
+  friend class GenericEnvironment;
+
+  static OpaqueTypeArchetypeType *getNew(
+      GenericEnvironment *environment, Type interfaceType,
+      ArrayRef<ProtocolDecl*> conformsTo, Type superclass,
+      LayoutConstraint layout);
+
 public:
   /// Get an opaque archetype representing the underlying type of the given
   /// opaque type decl's opaque param with ordinal `ordinal`. For example, in
   /// `(some P, some Q)`, `some P`'s type param would have ordinal 0 and `some
   /// Q`'s type param would have ordinal 1.
-  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl, unsigned ordinal,
-                                      SubstitutionMap Substitutions);
+  static Type get(OpaqueTypeDecl *decl, unsigned ordinal, SubstitutionMap subs);
 
-  OpaqueTypeDecl *getDecl() const {
-    return OpaqueDecl;
-  }
-  SubstitutionMap getSubstitutions() const {
-    return Substitutions;
-  }
-  
+  /// Retrieve the opaque type declaration.
+  OpaqueTypeDecl *getDecl() const;
+
+  /// Retrieve the set of substitutions applied to the opaque type.
+  SubstitutionMap getSubstitutions() const;
+
   /// Get the generic signature used to build out this archetype. This is
   /// equivalent to the OpaqueTypeDecl's interface generic signature, with
   /// all of the generic parameters aside from the opaque type's interface
@@ -5605,22 +5604,12 @@ public:
   /// then the underlying type of `some P` would be ordinal 0, and `some Q` would be ordinal 1.
   unsigned getOrdinal() const;
   
-  static void Profile(llvm::FoldingSetNodeID &ID,
-                      OpaqueTypeDecl *OpaqueDecl,
-                      unsigned ordinal,
-                      SubstitutionMap Substitutions);
-  
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getOrdinal(), getSubstitutions());
-  };
-  
 private:
-  OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
-                          SubstitutionMap Substitutions,
-                          RecursiveTypeProperties Props,
-                          Type InterfaceType,
-                          ArrayRef<ProtocolDecl*> ConformsTo,
-                          Type Superclass, LayoutConstraint Layout);
+  OpaqueTypeArchetypeType(GenericEnvironment *environment,
+                          RecursiveTypeProperties properties,
+                          Type interfaceType,
+                          ArrayRef<ProtocolDecl*> conformsTo,
+                          Type superclass, LayoutConstraint layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
