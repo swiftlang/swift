@@ -636,7 +636,7 @@ extension _DoubleWidth: FixedWidthInteger {
   }
   
   @inlinable
-  init(integerLiteral x: Int) {
+  init(integerLiteral x: Int64) {
     self.init(x)
   }
   
