@@ -2610,6 +2610,7 @@ class OpaqueUnderlyingTypeChecker : public ASTWalker {
   OpaqueTypeDecl *OpaqueDecl;
   BraceStmt *Body;
   SmallVector<Candidate, 4> Candidates;
+  SmallPtrSet<const void *, 4> KnownCandidates;
 
   bool HasInvalidReturn = false;
 
@@ -2644,13 +2645,7 @@ public:
     // Check whether all of the underlying type candidates match up.
     // TODO [OPAQUE SUPPORT]: diagnose multiple opaque types
     SubstitutionMap underlyingSubs = Candidates.front().second;
-    SubstitutionMap canonicalUnderlyingSubs = underlyingSubs.getCanonical();
-    bool mismatch =
-        std::any_of(Candidates.begin() + 1, Candidates.end(),
-                    [&](Candidate &otherCandidate) {
-                      return canonicalUnderlyingSubs != otherCandidate.second.getCanonical();
-                    });
-    if (mismatch) {
+    if (Candidates.size() > 1) {
       unsigned mismatchIndex = OpaqueDecl->getOpaqueGenericParams().size();
       for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
         unsigned index = genericParam->getIndex();
@@ -2669,12 +2664,21 @@ public:
           break;
       }
       assert(mismatchIndex < OpaqueDecl->getOpaqueGenericParams().size());
-      TypeRepr *opaqueRepr =
-          OpaqueDecl->getOpaqueReturnTypeReprs()[mismatchIndex];
-      Implementation->diagnose(
-          diag::opaque_type_mismatched_underlying_type_candidates,
-          opaqueRepr)
-        .highlight(opaqueRepr->getSourceRange());
+
+      if (auto genericParam =
+              OpaqueDecl->getExplicitGenericParam(mismatchIndex)) {
+        Implementation->diagnose(
+            diag::opaque_type_mismatched_underlying_type_candidates_named,
+            genericParam->getName())
+          .highlight(genericParam->getLoc());
+      } else {
+        TypeRepr *opaqueRepr =
+            OpaqueDecl->getOpaqueReturnTypeReprs()[mismatchIndex];
+        Implementation->diagnose(
+            diag::opaque_type_mismatched_underlying_type_candidates,
+            opaqueRepr)
+          .highlight(opaqueRepr->getSourceRange());
+      }
 
       for (auto candidate : Candidates) {
         Ctx.Diags.diagnose(
@@ -2712,8 +2716,12 @@ public:
   
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
-      Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
-                                          underlyingToOpaque->substitutions));
+      auto key =
+          underlyingToOpaque->substitutions.getCanonical().getOpaqueValue();
+      if (KnownCandidates.insert(key).second) {
+        Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
+                                            underlyingToOpaque->substitutions));
+      }
       return {false, E};
     }
     return {true, E};

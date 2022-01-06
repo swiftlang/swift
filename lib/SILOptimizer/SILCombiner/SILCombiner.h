@@ -110,7 +110,7 @@ class SILCombiner :
   OwnershipFixupContext ownershipFixupContext;
   
   /// For invoking Swift instruction passes.
-  LibswiftPassInvocation libswiftPassInvocation;
+  SwiftPassInvocation swiftPassInvocation;
 
 public:
   SILCombiner(SILFunctionTransform *parentTransform,
@@ -158,7 +158,7 @@ public:
             [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
         deBlocks(&B.getFunction()),
         ownershipFixupContext(getInstModCallbacks(), deBlocks),
-        libswiftPassInvocation(parentTransform->getPassManager(),
+        swiftPassInvocation(parentTransform->getPassManager(),
                                parentTransform->getFunction(), this) {}
 
   bool runOnFunction(SILFunction &F);

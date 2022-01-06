@@ -362,6 +362,16 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addSROA();
   }
 
+  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
+    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+      return;
+
+    if (SILPrintFinalOSSAModule) {
+      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+    }
+    P.addNonTransparentFunctionOwnershipModelEliminator();
+  }
+
   // Promote stack allocations to values.
   P.addMem2Reg();
 
@@ -570,16 +580,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Needed to serialize static initializers of globals for cross-module
   // optimization.
   P.addGlobalOpt();
-
-  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
-    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-      return;
-
-    if (SILPrintFinalOSSAModule) {
-      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
-    }
-    P.addNonTransparentFunctionOwnershipModelEliminator();
-  }
 
   // Add the outliner pass (Osize).
   P.addOutliner();
@@ -826,16 +826,16 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // This also performs early OSSA based optimizations on *all* swift code.
   addPerfEarlyModulePassPipeline(P);
 
-  // Then if we were asked to stop optimization before lowering OSSA (causing us
-  // to exit early from addPerfEarlyModulePassPipeline), exit early.
-  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-    return P;
-
   // Then run an iteration of the high-level SSA passes.
   //
   // FIXME: When *not* emitting a .swiftmodule, skip the high-level function
   // pipeline to save compile time.
   addHighLevelFunctionPipeline(P);
+
+  // Then if we were asked to stop optimization before lowering OSSA (causing us
+  // to exit early from addHighLevelFunctionPipeline), exit early.
+  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+    return P;
 
   addHighLevelModulePipeline(P);
 
