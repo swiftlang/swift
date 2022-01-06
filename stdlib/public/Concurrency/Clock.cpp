@@ -19,7 +19,6 @@
 
 using namespace swift;
 
-SWIFT_RUNTIME_EXPORT
 SWIFT_CC(swift)
 void swift_get_time(
   long long *seconds,
@@ -71,7 +70,6 @@ void swift_get_time(
   }
 }
 
-SWIFT_RUNTIME_EXPORT
 SWIFT_CC(swift)
 void swift_get_clock_res(
   long long *seconds,
