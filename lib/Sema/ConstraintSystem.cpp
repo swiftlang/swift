@@ -1995,8 +1995,12 @@ ConstraintSystem::getTypeOfMemberReference(
         if (t->isEqual(selfTy))
           return baseObjTy;
       if (auto *metatypeTy = t->getAs<MetatypeType>())
-        if (metatypeTy->getInstanceType()->isEqual(selfTy))
-          return ExistentialMetatypeType::get(baseObjTy);
+        if (metatypeTy->getInstanceType()->isEqual(selfTy)) {
+          auto constraint = baseObjTy;
+          if (auto existential = baseObjTy->getAs<ExistentialType>())
+            constraint = existential->getConstraintType();
+          return ExistentialMetatypeType::get(constraint);
+        }
       return t;
     });
   }

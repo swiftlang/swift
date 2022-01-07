@@ -220,7 +220,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
     fromInstanceType = cast<MetatypeType>(fromInstanceType)
       .getInstanceType();
     toInstanceType = cast<ExistentialMetatypeType>(toInstanceType)
-      .getInstanceType();
+      ->getExistentialInstanceType()->getCanonicalType();
   }
 
   ArrayRef<ProtocolConformanceRef> conformances =

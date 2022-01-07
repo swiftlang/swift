@@ -464,6 +464,8 @@ Type TypeBase::eraseOpenedExistential(OpenedArchetypeType *opened) {
       auto instanceType = metatypeType->getInstanceType();
       if (instanceType->hasOpenedExistential()) {
         instanceType = instanceType->eraseOpenedExistential(opened);
+        if (auto existential = instanceType->getAs<ExistentialType>())
+          instanceType = existential->getConstraintType();
         return ExistentialMetatypeType::get(instanceType);
       }
     }
@@ -1199,6 +1201,9 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
 /// Look through a metatype, or just return the original type if it is
 /// not a metatype.
 Type TypeBase::getMetatypeInstanceType() {
+  if (auto existentialMetaType = getAs<ExistentialMetatypeType>())
+    return existentialMetaType->getExistentialInstanceType();
+
   if (auto metaTy = getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
