@@ -737,15 +737,17 @@ implementation details of a function type.
 ::
 
   #if SWIFT_VERSION >= 5.1
-    type ::= 'Qr'                         // opaque result type (of current decl)
+    type ::= 'Qr'                         // opaque result type (of current decl, used for the first opaque type parameter only)
+    type ::= 'QR' INDEX                   // same as above, for subsequent opaque type parameters, INDEX is the ordinal -1
     type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
 
     opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
   #endif
 
   #if SWIFT_VERSION >= 5.4
-    type ::= 'Qu'                         // opaque result type (of current decl)
+    type ::= 'Qu'                         // opaque result type (of current decl, first param)
                                           // used for ObjC class runtime name purposes.
+    type ::= 'QU' INDEX
   #endif
 
 Opaque return types have a special short representation in the mangling of
