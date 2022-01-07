@@ -5249,8 +5249,11 @@ void swift::diagnoseConformanceFailure(Type T,
       TypeChecker::containsProtocol(T, Proto, DC->getParentModule())) {
 
     if (!T->isObjCExistentialType()) {
+      Type constraintType = T;
+      if (auto existential = T->getAs<ExistentialType>())
+        constraintType = existential->getConstraintType();
       diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
-                     T, T->isEqual(Proto->getDeclaredInterfaceType()), 
+                     T, constraintType->isEqual(Proto->getDeclaredInterfaceType()),
                      Proto->getDeclaredInterfaceType());
       diags.diagnose(ComplainLoc,
                      diag::only_concrete_types_conform_to_protocols);
@@ -5382,7 +5385,10 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
   if (T->isExistentialType()) {
     // Handle the special case of the Error protocol, which self-conforms
     // *and* has a witness table.
-    if (T->isEqual(Proto->getDeclaredInterfaceType()) &&
+    auto constraint = T;
+    if (auto existential = T->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
+    if (constraint->isEqual(Proto->getDeclaredInterfaceType()) &&
         Proto->requiresSelfConformanceWitnessTable()) {
       auto &ctx = M->getASTContext();
       return ProtocolConformanceRef(ctx.getSelfConformance(Proto));

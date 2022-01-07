@@ -1017,6 +1017,12 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty,
   if (auto *NAT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
     return NAT->getDecl()->getNameStr();
   }
+
+  if (auto existential = Ty->getAs<ExistentialType>()) {
+    return getTypeName(Ctx, existential->getConstraintType(),
+                       IsImplicitlyUnwrappedOptional);
+  }
+
   if (Ty->getAnyNominal()) {
     if (IsImplicitlyUnwrappedOptional) {
       assert(Ty->getOptionalObjectType());
