@@ -8662,10 +8662,23 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dc->getAsDecl()))
     return getActorIsolation(vd);
 
+  // In the context of the initializing or default-value expression of a
+  // stored property, the isolation varies between global and type members:
+  //   - For a static stored property, the isolation matches the VarDecl.
+  //   - For a field of a nominal type, the expression is not isolated.
+  // Without this distinction, a nominal can have non-async initializers
+  // with various kinds of isolation, so an impossible constraint can be
+  // created. See SE-0327 for details.
   if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
-    if (auto *var = init->getBinding()->getAnchoringVarDecl(
-            init->getBindingIndex()))
+    if (auto *var =
+          init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
+
+      if (var->isInstanceMember() &&
+          !var->getAttrs().hasAttribute<LazyAttr>())
+        return ActorIsolation::forUnspecified();
+
       return getActorIsolation(var);
+    }
   }
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
