@@ -849,7 +849,7 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
     case SymbolKind::DistributedThunk: return appendOperator("TE");
-    case SymbolKind::DistributedMethodAccessor: return appendOperator("TF");
+    case SymbolKind::DistributedAccessor: return appendOperator("TF");
     case SymbolKind::AccessibleFunctionRecord: return appendOperator("HF");
   }
 }
@@ -3315,10 +3315,10 @@ void ASTMangler::appendAnyProtocolConformance(
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
     GenericSignature opaqueSignature = opaqueType->getBoundSignature();
-    GenericTypeParamType *opaqueTypeParam = opaqueSignature.getGenericParams().back();
     ConformanceAccessPath conformanceAccessPath =
-        opaqueSignature->getConformanceAccessPath(opaqueTypeParam,
-                                                  conformance.getAbstract());
+        opaqueSignature->getConformanceAccessPath(
+          opaqueType->getInterfaceType(),
+          conformance.getAbstract());
 
     // Append the conformance access path with the signature of the opaque type.
     appendDependentProtocolConformance(conformanceAccessPath, opaqueSignature);

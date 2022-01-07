@@ -190,6 +190,11 @@ class RewriteSystem final {
   /// Rewrite context for memory allocation.
   RewriteContext &Context;
 
+  /// If this is a rewrite system for a connected component of protocols,
+  /// this array is non-empty. Otherwise, it is a rewrite system for a
+  /// top-level generic signature and this array is empty.
+  ArrayRef<const ProtocolDecl *> Protos;
+
   /// The rules added so far, including rules from our client, as well
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
@@ -230,9 +235,13 @@ public:
 
   DebugOptions getDebugOptions() const { return Debug; }
 
-  void initialize(bool recordLoops,
+  void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
+
+  ArrayRef<const ProtocolDecl *> getProtocols() const {
+    return Protos;
+  }
 
   unsigned getRuleID(const Rule &rule) const {
     assert((unsigned)(&rule - &*Rules.begin()) < Rules.size());
@@ -399,6 +408,7 @@ public:
   unsigned recordTypeWitness(TypeWitness witness);
   const TypeWitness &getTypeWitness(unsigned index) const;
 
+private:
   //////////////////////////////////////////////////////////////////////////////
   ///
   /// Homotopy reduction
@@ -421,20 +431,10 @@ public:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
-  void recordRewriteLoop(RewriteLoop loop) {
-    if (!RecordLoops)
-      return;
-
-    Loops.push_back(loop);
-  }
+  bool isInMinimizationDomain(ArrayRef<const ProtocolDecl *> protos) const;
 
   void recordRewriteLoop(MutableTerm basepoint,
-                         RewritePath path) {
-    if (!RecordLoops)
-      return;
-
-    Loops.emplace_back(basepoint, path);
-  }
+                         RewritePath path);
 
   void propagateExplicitBits();
 
@@ -460,7 +460,7 @@ public:
   bool hadError() const;
 
   llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
-  getMinimizedProtocolRules(ArrayRef<const ProtocolDecl *> protos) const;
+  getMinimizedProtocolRules() const;
 
   std::vector<unsigned> getMinimizedGenericSignatureRules() const;
 

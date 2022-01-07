@@ -8023,6 +8023,8 @@ namespace {
     /// \returns true if any part of the processing fails.
     bool processDelayed() {
       bool hadError = false;
+      auto &solution = Rewriter.solution;
+      auto &cs = solution.getConstraintSystem();
 
       while (!ClosuresToTypeCheck.empty()) {
         auto *closure = ClosuresToTypeCheck.pop_back_val();
@@ -8034,10 +8036,7 @@ namespace {
         // as a stack because multi-statement closures could
         // have other multi-statement closures in the body.
         auto &ctx = closure->getASTContext();
-        if (ctx.TypeCheckerOpts.EnableMultiStatementClosureInference) {
-          auto &solution = Rewriter.solution;
-          auto &cs = solution.getConstraintSystem();
-
+        if (cs.participatesInInference(closure)) {
           hadError |= cs.applySolutionToBody(
               solution, closure, Rewriter.dc,
               [&](SolutionApplicationTarget target) {

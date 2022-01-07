@@ -54,7 +54,6 @@ class RequirementMachine final {
 
   CanGenericSignature Sig;
   SmallVector<Type, 2> Params;
-  ArrayRef<const ProtocolDecl *> Protos;
 
   RewriteContext &Context;
   RewriteSystem System;

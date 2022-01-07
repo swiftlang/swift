@@ -36,10 +36,12 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-LABEL: Requirement machine for <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2>
 // CHECK-NEXT: Rewrite system: {
 // CHECK:      - τ_0_0.[P1&P2:X].[superclass: Derived<τ_0_0> with <τ_0_0.[P2:A2]>] => τ_0_0.[P1&P2:X]
-// CHECK-NEXT: - τ_0_0.[P1&P2:X].[layout: _NativeClass] => τ_0_0.[P1&P2:X]
 // CHECK-NEXT: - τ_0_0.[P1&P2:X].[superclass: Base<τ_0_0> with <τ_0_0.[P1:A1]>] => τ_0_0.[P1&P2:X]
 // CHECK-NEXT: - τ_0_0.X => τ_0_0.[P1&P2:X]
 // CHECK-NEXT: - τ_0_0.[P2:X] => τ_0_0.[P1&P2:X]
+// CHECK-NEXT: - [P1:X].[layout: _NativeClass] => [P1:X]
+// CHECK-NEXT: - [P2:X].[layout: _NativeClass] => [P2:X]
+// CHECK-NEXT: - τ_0_0.[P1&P2:X].[layout: _NativeClass] => τ_0_0.[P1&P2:X]
 // CHECK-NEXT: - τ_0_0.[P2:A2].[Q:T] => τ_0_0.[P1:A1]
 // CHECK-NEXT: }
 // CHECK-NEXT: Rewrite loops: {

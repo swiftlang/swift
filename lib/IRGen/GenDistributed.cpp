@@ -75,7 +75,7 @@ class DistributedAccessor {
   IRGenFunction &IGF;
 
   /// Underlying distributed method for this accessor.
-  SILFunction *Method;
+  SILFunction *Target;
 
   /// The interface type of this accessor function.
   CanSILFunctionType AccessorType;
@@ -86,7 +86,7 @@ class DistributedAccessor {
   SmallVector<AllocationInfo, 4> AllocatedArguments;
 
 public:
-  DistributedAccessor(IRGenFunction &IGF, SILFunction *method,
+  DistributedAccessor(IRGenFunction &IGF, SILFunction *target,
                       CanSILFunctionType accessorTy);
 
   void emit();
@@ -94,9 +94,9 @@ public:
 private:
   void computeArguments(llvm::Value *argumentBuffer, Explosion &arguments);
 
-  FunctionPointer getPointerToMethod() const;
+  FunctionPointer getPointerToTarget() const;
 
-  Callee getCalleeForDistributedMethod(llvm::Value *self) const;
+  Callee getCalleeForDistributedTarget(llvm::Value *self) const;
 };
 
 } // end namespace
@@ -104,7 +104,7 @@ private:
 /// Compute a type of a distributed method accessor function based
 /// on the provided distributed method.
 static CanSILFunctionType getAccessorType(IRGenModule &IGM,
-                                          SILFunction *DistMethod) {
+                                          SILFunction *Target) {
   auto &Context = IGM.Context;
 
   auto getRawPointerParmeter = [&]() {
@@ -120,10 +120,10 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
                      .withAsync()
                      .build();
 
-  auto methodTy = DistMethod->getLoweredFunctionType();
+  auto targetTy = Target->getLoweredFunctionType();
 
-  assert(methodTy->isAsync());
-  assert(methodTy->hasErrorResult());
+  assert(targetTy->isAsync());
+  assert(targetTy->hasErrorResult());
 
   // Accessor gets argument value buffer and a reference to `self` of
   // the actor and produces a call to the distributed thunk forwarding
@@ -133,18 +133,18 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
       ParameterConvention::Direct_Guaranteed,
       {/*argumentBuffer=*/getRawPointerParmeter(),
        /*resultBuffer=*/getRawPointerParmeter(),
-       /*actor=*/methodTy->getParameters().back()},
+       /*actor=*/targetTy->getParameters().back()},
       /*Yields=*/{},
       /*Results=*/{},
-      /*ErrorResult=*/methodTy->getErrorResult(),
+      /*ErrorResult=*/targetTy->getErrorResult(),
       /*patternSubs=*/SubstitutionMap(),
       /*invocationSubs=*/SubstitutionMap(), Context);
 }
 
 llvm::Function *
-IRGenModule::getAddrOfDistributedMethodAccessor(SILFunction *F,
+IRGenModule::getAddrOfDistributedTargetAccessor(SILFunction *F,
                                                 ForDefinition_t forDefinition) {
-  auto entity = LinkEntity::forDistributedMethodAccessor(F);
+  auto entity = LinkEntity::forDistributedTargetAccessor(F);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
@@ -159,21 +159,21 @@ IRGenModule::getAddrOfDistributedMethodAccessor(SILFunction *F,
   return createFunction(*this, link, signature);
 }
 
-void IRGenModule::emitDistributedMethodAccessor(SILFunction *method) {
-  assert(method->isDistributed());
+void IRGenModule::emitDistributedTargetAccessor(SILFunction *target) {
+  assert(target->isDistributed());
 
-  auto *f = getAddrOfDistributedMethodAccessor(method, ForDefinition);
+  auto *f = getAddrOfDistributedTargetAccessor(target, ForDefinition);
   if (!f->isDeclaration())
     return;
 
   IRGenFunction IGF(*this, f);
-  DistributedAccessor(IGF, method, getAccessorType(*this, method)).emit();
+  DistributedAccessor(IGF, target, getAccessorType(*this, target)).emit();
 }
 
 DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
-                                         SILFunction *method,
+                                         SILFunction *target,
                                          CanSILFunctionType accessorTy)
-    : IGM(IGF.IGM), IGF(IGF), Method(method), AccessorType(accessorTy),
+    : IGM(IGF.IGM), IGF(IGF), Target(target), AccessorType(accessorTy),
       AsyncLayout(getAsyncContextLayout(
           IGM, AccessorType, AccessorType, SubstitutionMap(),
           /*suppress generics*/ true,
@@ -182,7 +182,7 @@ DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
 
 void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
                                            Explosion &arguments) {
-  auto fnType = Method->getLoweredFunctionType();
+  auto fnType = Target->getLoweredFunctionType();
 
   // Cover all of the arguments except to `self` of the actor.
   auto parameters = fnType->getParameters().drop_back();
@@ -283,8 +283,8 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
 }
 
 void DistributedAccessor::emit() {
-  auto methodTy = Method->getLoweredFunctionType();
-  SILFunctionConventions targetConv(methodTy, IGF.getSILModule());
+  auto targetTy = Target->getLoweredFunctionType();
+  SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
   SILFunctionConventions accessorConv(AccessorType, IGF.getSILModule());
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
 
@@ -306,7 +306,7 @@ void DistributedAccessor::emit() {
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
 
-  GenericContextScope scope(IGM, methodTy->getInvocationGenericSignature());
+  GenericContextScope scope(IGM, targetTy->getInvocationGenericSignature());
 
   // Preliminary: Setup async context for this accessor.
   {
@@ -315,7 +315,7 @@ void DistributedAccessor::emit() {
                                  /*useSpecialConvention*/ false)
             .getAsyncContextIndex();
 
-    auto entity = LinkEntity::forDistributedMethodAccessor(Method);
+    auto entity = LinkEntity::forDistributedTargetAccessor(Target);
     emitAsyncFunctionEntry(IGF, AsyncLayout, entity, asyncContextIdx);
     emitAsyncFunctionPointer(IGM, IGF.CurFn, entity, AsyncLayout.getSize());
   }
@@ -341,7 +341,7 @@ void DistributedAccessor::emit() {
     Explosion result;
     Explosion error;
 
-    auto callee = getCalleeForDistributedMethod(actorSelf);
+    auto callee = getCalleeForDistributedTarget(actorSelf);
     auto emission =
         getCallEmission(IGF, callee.getSwiftContext(), std::move(callee));
 
@@ -363,7 +363,7 @@ void DistributedAccessor::emit() {
     // Both accessor and distributed method are always `async throws`
     // so we need to load error value (if any) from the slot.
     {
-      assert(methodTy->hasErrorResult());
+      assert(targetTy->hasErrorResult());
 
       SILType errorType = accessorConv.getSILErrorType(expansionContext);
       Address calleeErrorSlot =
@@ -386,23 +386,23 @@ void DistributedAccessor::emit() {
   }
 }
 
-FunctionPointer DistributedAccessor::getPointerToMethod() const {
-  auto fnType = Method->getLoweredFunctionType();
-  auto fpKind = classifyFunctionPointerKind(Method);
+FunctionPointer DistributedAccessor::getPointerToTarget() const {
+  auto fnType = Target->getLoweredFunctionType();
+  auto fpKind = classifyFunctionPointerKind(Target);
   auto signature = IGM.getSignature(fnType, fpKind.useSpecialConvention());
 
   auto *fnPtr =
-    llvm::ConstantExpr::getBitCast(IGM.getAddrOfAsyncFunctionPointer(Method),
+    llvm::ConstantExpr::getBitCast(IGM.getAddrOfAsyncFunctionPointer(Target),
                                    signature.getType()->getPointerTo());
 
   return FunctionPointer::forDirect(
       FunctionPointer::Kind(fnType), fnPtr,
-      IGM.getAddrOfSILFunction(Method, NotForDefinition), signature);
+      IGM.getAddrOfSILFunction(Target, NotForDefinition), signature);
 }
 
 Callee
-DistributedAccessor::getCalleeForDistributedMethod(llvm::Value *self) const {
-  auto fnType = Method->getLoweredFunctionType();
+DistributedAccessor::getCalleeForDistributedTarget(llvm::Value *self) const {
+  auto fnType = Target->getLoweredFunctionType();
   CalleeInfo info{fnType, fnType, SubstitutionMap()};
-  return {std::move(info), getPointerToMethod(), self};
+  return {std::move(info), getPointerToTarget(), self};
 }

@@ -622,7 +622,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     }
 
     for (const auto &loop : resolvedLoops) {
-      recordRewriteLoop(loop);
+      recordRewriteLoop(loop.Basepoint, loop.Path);
     }
 
     resolvedCriticalPairs.clear();
