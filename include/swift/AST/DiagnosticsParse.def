@@ -1497,9 +1497,8 @@ ERROR(attr_unsupported_on_target, none,
 // availability
 ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))
-ERROR(attr_availability_unavailable_deprecated,none,
-      "'%0' attribute cannot be both unconditionally 'unavailable' and "
-      "'deprecated'", (StringRef))
+ERROR(attr_availability_multiple_kinds ,none,
+      "'%0' attribute cannot be both '%1' and '%2'", (StringRef, StringRef, StringRef))
 
 WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
