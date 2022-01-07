@@ -3320,10 +3320,6 @@ GenericEnvironment *OpaqueTypeArchetypeType::getGenericEnvironment() const {
   return Environment;
 }
 
-GenericSignature OpaqueTypeArchetypeType::getBoundSignature() const {
-  return getGenericEnvironment()->getGenericSignature();
-}
-
 OpaqueTypeDecl *OpaqueTypeArchetypeType::getDecl() const {
   return Environment->getOpaqueTypeDecl();
 }
