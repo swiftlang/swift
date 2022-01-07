@@ -291,6 +291,7 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
   switch (convention) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::Block:
     return llvm::CallingConv::C;
 
@@ -1316,6 +1317,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangCtx.VoidPtrTy);
     break;
 
+  case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     // No implicit arguments.
     break;
@@ -1633,6 +1635,7 @@ void SignatureExpansion::expandParameters() {
       case SILFunctionType::Representation::Method:
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
+      case SILFunctionType::Representation::CXXMethod:
       case SILFunctionType::Representation::Thin:
       case SILFunctionType::Representation::Closure:
         return FnType->hasErrorResult();
@@ -1800,6 +1803,7 @@ void SignatureExpansion::expandAsyncEntryType() {
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::Thin:
       case SILFunctionType::Representation::Closure:
+      case SILFunctionType::Representation::CXXMethod:
         return false;
 
       case SILFunctionType::Representation::Thick:
@@ -2193,7 +2197,20 @@ public:
       break;
 
     case SILFunctionTypeRepresentation::Block:
-      adjusted.add(getCallee().getBlockObject());
+    case SILFunctionTypeRepresentation::CXXMethod:
+      if (getCallee().getRepresentation() == SILFunctionTypeRepresentation::Block) {
+        adjusted.add(getCallee().getBlockObject());
+      } else {
+        auto selfParam = origCalleeType->getSelfParameter();
+        auto *arg = getCallee().getCXXMethodSelf();
+        // We might need to fix the level of indirection for foreign reference types.
+        if (selfParam.getInterfaceType().isForeignReferenceType() &&
+            isIndirectFormalParameter(selfParam.getConvention()))
+            arg = IGF.Builder.CreateLoad(arg, IGF.IGM.getPointerAlignment());
+
+        adjusted.add(arg);
+      }
+
       LLVM_FALLTHROUGH;
 
     case SILFunctionTypeRepresentation::CFunctionPointer:
@@ -2452,14 +2469,9 @@ public:
     // Translate the formal arguments and handle any special arguments.
     switch (getCallee().getRepresentation()) {
     case SILFunctionTypeRepresentation::ObjCMethod:
-      assert(false && "Should not reach this");
-      break;
-
     case SILFunctionTypeRepresentation::Block:
-      assert(false && "Should not reach this");
-      break;
-
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::CXXMethod:
       assert(false && "Should not reach this");
       break;
 
@@ -3138,6 +3150,9 @@ Callee::Callee(CalleeInfo &&info, const FunctionPointer &fn,
   case SILFunctionTypeRepresentation::CFunctionPointer:
     assert(!FirstData && !SecondData);
     break;
+  case SILFunctionTypeRepresentation::CXXMethod:
+    assert(FirstData && !SecondData);
+    break;
   }
 #endif
 
@@ -3150,6 +3165,7 @@ llvm::Value *Callee::getSwiftContext() const {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::CXXMethod:
     return nullptr;
 
   case SILFunctionTypeRepresentation::WitnessMethod:
@@ -3169,6 +3185,14 @@ llvm::Value *Callee::getBlockObject() const {
            SILFunctionTypeRepresentation::Block &&
          "not a block");
   assert(FirstData && "no block object set on callee");
+  return FirstData;
+}
+
+llvm::Value *Callee::getCXXMethodSelf() const {
+  assert(Info.OrigFnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::CXXMethod &&
+         "not a C++ method");
+  assert(FirstData && "no self object set on callee");
   return FirstData;
 }
 
@@ -3486,6 +3510,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   // The index of the first "physical" parameter from paramTys/FI that
   // corresponds to a logical parameter from params.
   unsigned firstParam = 0;
+  unsigned paramEnd = FI.arg_size();
 
   // Handle the ObjC prefix.
   if (callee.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
@@ -3499,14 +3524,19 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                 == SILFunctionTypeRepresentation::Block) {
     // Ignore the physical block-object parameter.
     firstParam += 1;
-    // Or the indirect result parameter.
-  } else if (fnType->getNumResults() > 0 &&
+  } else if (callee.getRepresentation() ==
+             SILFunctionTypeRepresentation::CXXMethod) {
+    // Skip the "self" param.
+    paramEnd--;
+  }
+
+  if (fnType->getNumResults() > 0 &&
              fnType->getSingleResult().isFormalIndirect()) {
     // Ignore the indirect result parameter.
     firstParam += 1;
   }
 
-  for (unsigned i = firstParam, e = FI.arg_size(); i != e; ++i) {
+  for (unsigned i = firstParam; i != paramEnd; ++i) {
     auto clangParamTy = FI.arg_begin()[i].type;
     auto &AI = FI.arg_begin()[i].info;
 
