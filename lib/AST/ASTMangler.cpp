@@ -831,9 +831,11 @@ std::string ASTMangler::mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl) {
 }
 
 std::string ASTMangler::mangleOpaqueTypeDecl(const ValueDecl *decl) {
-  DWARFMangling = true;
   OptimizeProtocolNames = false;
-  return mangleDeclAsUSR(decl, MANGLING_PREFIX_STR);
+
+  beginMangling();
+  appendEntity(decl);
+  return finalize();
 }
 
 std::string ASTMangler::mangleGenericSignature(const GenericSignature sig) {
