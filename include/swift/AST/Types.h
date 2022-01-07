@@ -5578,12 +5578,6 @@ public:
   /// Retrieve the set of substitutions applied to the opaque type.
   SubstitutionMap getSubstitutions() const;
 
-  /// Get the generic signature used to build out this archetype. This is
-  /// equivalent to the OpaqueTypeDecl's interface generic signature, with
-  /// all of the generic parameters aside from the opaque type's interface
-  /// type same-type-constrained to their substitutions for this type.
-  GenericSignature getBoundSignature() const;
-  
   /// Get a generic environment that has this opaque archetype bound within it.
   GenericEnvironment *getGenericEnvironment() const;
 

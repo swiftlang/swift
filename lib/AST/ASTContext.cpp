@@ -4615,7 +4615,7 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
   size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap, Type>(
       1, 1, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment), arena);
-  auto env = new (mem) GenericEnvironment(GenericSignature(), opaque, subs);
+  auto env = new (mem) GenericEnvironment(signature, opaque, subs);
   return env;
 }
 
