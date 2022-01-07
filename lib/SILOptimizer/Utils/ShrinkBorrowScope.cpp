@@ -147,6 +147,9 @@ public:
   }
 
   bool tryHoistOverInstruction(SILInstruction *instruction, bool rewrite = true) {
+    if (instruction == introducer) {
+      return false;
+    }
     if (users.contains(instruction)) {
       if (auto apply = ApplySite::isa(instruction)) {
         SmallVector<int, 2> rewritableArgumentIndices;
@@ -308,10 +311,6 @@ void ShrinkBorrowScope::findBarriers() {
     }
     SILInstruction *barrier = nullptr;
     while ((instruction = instruction->getPreviousInstruction())) {
-      if (instruction == introducer) {
-        barrier = instruction;
-        break;
-      }
       if (!tryHoistOverInstruction(instruction)) {
         barrier = instruction;
         break;
