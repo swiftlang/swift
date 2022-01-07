@@ -39,3 +39,24 @@ func asyncFunc() async {
     // expected-error@+1{{global function 'readStringFromIO' is unavailable from asynchronous contexts}}{{13-29=IOActor.readString}}
     let _ = readStringFromIO()
 }
+
+// expected-error@+2{{asynchronous global function 'unavailableAsyncFunc()' must be available from asynchronous contexts}}
+@available(*, noasync)
+func unavailableAsyncFunc() async {
+}
+
+protocol BadSyncable {
+    // expected-error@+2{{asynchronous property 'isSyncd' must be available from asynchronous contexts}}
+    @available(*, noasync)
+    var isSyncd: Bool { get async }
+
+    // expected-error@+2{{asynchronous instance method 'sync' must be available from asynchronous contexts}}
+    @available(*, noasync)
+    func sync(_ str: String) async
+}
+
+class TestClass {
+    // expected-error@+2{{'@available' attribute cannot be applied to this declaration}}
+    @available(*, noasync)
+    deinit { }
+}

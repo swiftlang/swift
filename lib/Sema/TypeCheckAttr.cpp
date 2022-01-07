@@ -1640,6 +1640,35 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     }
   }
 
+  if (attr->isNoAsync()) {
+    const DeclContext * dctx = dyn_cast<DeclContext>(D);
+    bool isAsyncDeclContext = dctx && dctx->isAsyncContext();
+
+    if (const AbstractStorageDecl *decl = dyn_cast<AbstractStorageDecl>(D)) {
+      const AccessorDecl * accessor = decl->getEffectfulGetAccessor();
+      isAsyncDeclContext |= accessor && accessor->isAsyncContext();
+    }
+
+    if (isAsyncDeclContext) {
+      if (const ValueDecl *vd = dyn_cast<ValueDecl>(D)) {
+        D->getASTContext().Diags.diagnose(
+            D->getLoc(), diag::async_named_decl_must_be_available_from_async,
+            D->getDescriptiveKind(), vd->getName());
+      } else {
+        D->getASTContext().Diags.diagnose(
+            D->getLoc(), diag::async_decl_must_be_available_from_async,
+            D->getDescriptiveKind());
+      }
+    }
+
+    // deinit's may not be unavailable from async contexts
+    if (isa<DestructorDecl>(D)) {
+      D->getASTContext().Diags.diagnose(
+          D->getLoc(), diag::invalid_decl_attribute, attr);
+    }
+
+  }
+
   if (!attr->hasPlatform() || !attr->isActivePlatform(Ctx) ||
       !attr->Introduced.hasValue()) {
     return;
