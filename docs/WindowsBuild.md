@@ -92,7 +92,7 @@ structure should resemble:
       ┕ usr/...
 ```
 
-Note that only ICU is required for building the toolchain, and SQLite is only
+Note that ICU is only required for building Foundation, and SQLite is only
 needed for building llbuild and onwards.  The ICU project provides binaries,
 alternatively, see the ICU project for details on building ICU from source.
 
@@ -134,10 +134,6 @@ cmake -B "S:\b\1" ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
   -D LLVM_EXTERNAL_SWIFT_SOURCE_DIR=S:\swift ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE=S:\Library\icu-67\usr\include ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N=S:\Library\icu-67\usr\lib\icuin67.lib ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=S:\Library\icu-67\usr\include ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC=S:\Library\icu-67\usr\lib\icuuc67.lib ^
   -G Ninja ^
   -S S:\llvm-project\llvm
 
