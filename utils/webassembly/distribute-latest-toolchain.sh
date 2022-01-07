@@ -33,7 +33,7 @@ head_sha=$(echo $latest_run | jq .head_sha --raw-output)
 
 get_artifact_url() {
   local name=$1
-  github $artifacts_url --fail | jq ".artifacts[] | select(.name == \"$name\") | .archive_download_url" | sed 's/\"//g'
+  github $artifacts_url --fail | jq ".artifacts[] | select((.name == \"$name\") and (.expired | not)) | .archive_download_url" | sed 's/\"//g'
 }
 
 download_artifact() {
