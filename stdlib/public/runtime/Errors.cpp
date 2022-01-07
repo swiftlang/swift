@@ -455,3 +455,10 @@ void swift::swift_abortDynamicReplacementDisabling() {
                     "Fatal error: trying to disable a dynamic replacement "
                     "that is already disabled");
 }
+
+/// Halt due to trying to use unicode data on platforms that don't have it.
+void swift::swift_abortDisabledUnicodeSupport() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "Unicode normalization data is disabled on this platform");
+
+}
