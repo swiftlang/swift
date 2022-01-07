@@ -6455,6 +6455,8 @@ inline NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
 inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
   if (auto Ty = dyn_cast<NominalOrBoundGenericNominalType>(*this))
     return Ty->getDecl();
+  if (auto Ty = dyn_cast<ExistentialType>(*this))
+    return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
   return nullptr;
 }
 
@@ -6463,6 +6465,9 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 }
 
 inline Type TypeBase::getNominalParent() {
+  if (auto existential = getAs<ExistentialType>())
+    return existential->getConstraintType()->getNominalParent();
+
   return castTo<AnyGenericType>()->getParent();
 }
 
