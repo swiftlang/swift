@@ -4085,18 +4085,20 @@ namespace {
             templateParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
+          // Subscripts and call operators are imported as normal methods.
+          bool staticOperator = mdecl->isOverloadedOperator() &&
+                                mdecl->getOverloadedOperator() != clang::OO_Call &&
+                                mdecl->getOverloadedOperator() != clang::OO_Subscript;
           if (mdecl->isStatic() ||
               // C++ operators that are implemented as non-static member
               // functions get imported into Swift as static member functions
               // that use an additional parameter for the left-hand side operand
               // instead of the receiver object.
-              (mdecl->getDeclName().getNameKind() ==
-                  clang::DeclarationName::CXXOperatorName &&
-                  isImportedAsStatic(mdecl->getOverloadedOperator()))) {
+              staticOperator) {
             selfIdx = None;
           } else {
-            selfIdx = 0;
-            // Don't import members of a class decl as mutating.
+            // Swift imports the "self" param last, even for clang functions.
+            selfIdx = bodyParams ? bodyParams->size() : 0;
             // If the method is imported as mutating, this implicitly makes the
             // parameter indirect.
             selfIsInOut =
