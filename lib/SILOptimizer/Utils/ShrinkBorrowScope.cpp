@@ -51,8 +51,6 @@ class ShrinkBorrowScope {
   ///       which is itself a deinit barrier.
   SmallPtrSet<SILBasicBlock *, 8> barredBlocks;
 
-  llvm::SmallDenseMap<ApplySite, size_t> transitiveUsesPerApplySite;
-
   // The list of blocks to look for new points at which to insert end_borrows
   // in.  A block must not be processed if all of its successors have not yet
   // been.  For that reason, it is necessary to allow the same block to be
@@ -136,12 +134,6 @@ public:
     }
   }
 
-  size_t usesInApply(ApplySite apply) {
-    if (auto count = transitiveUsesPerApplySite.lookup(apply))
-      return count;
-    return 0;
-  }
-
   bool canHoistOverInstruction(SILInstruction *instruction) {
     return tryHoistOverInstruction(instruction, /*rewrite=*/false);
   }
@@ -151,36 +143,7 @@ public:
       return false;
     }
     if (users.contains(instruction)) {
-      if (auto apply = ApplySite::isa(instruction)) {
-        SmallVector<int, 2> rewritableArgumentIndices;
-        auto count = apply.getNumArguments();
-        for (unsigned index = 0; index < count; ++index) {
-          auto argument = apply.getArgument(index);
-          if (canReplaceValueWithBorrowedValue(argument)) {
-            rewritableArgumentIndices.push_back(index);
-          }
-        }
-        if (rewritableArgumentIndices.size() != usesInApply(apply)) {
-          return false;
-        }
-        if (rewrite) {
-          // We can rewrite all the arguments which are transitive uses of the
-          // borrow.
-          for (auto index : rewritableArgumentIndices) {
-            auto argument = apply.getArgument(index);
-            auto borrowee = introducer->getOperand();
-            if (auto *cvi = dyn_cast<CopyValueInst>(argument)) {
-              cvi->setOperand(borrowee);
-              modifiedCopyValueInsts.push_back(cvi);
-              madeChange = true;
-            } else {
-              apply.setArgument(index, borrowee);
-              madeChange = true;
-            }
-          }
-        }
-        return true;
-      } else if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
         if (bbi->isLexical() &&
             canReplaceValueWithBorrowedValue(bbi->getOperand())) {
           if (rewrite) {
@@ -237,9 +200,6 @@ bool ShrinkBorrowScope::populateUsers() {
   for (auto *use : uses) {
     auto *user = use->getUser();
     users.insert(user);
-    if (auto apply = ApplySite::isa(user)) {
-      ++transitiveUsesPerApplySite[apply];
-    }
   }
   return true;
 }
