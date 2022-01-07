@@ -42,6 +42,7 @@ public func registerSILClasses() {
   register(EndAccessInst.self)
   register(EndBorrowInst.self)
   register(DeallocStackInst.self)
+  register(DeallocStackRefInst.self)
   register(CondFailInst.self)
   register(FixLifetimeInst.self)
   register(DebugValueInst.self)

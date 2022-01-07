@@ -3143,8 +3143,8 @@ optional ``objc`` attribute indicates that the object should be
 allocated using Objective-C's allocation methods (``+allocWithZone:``).
 
 The optional ``stack`` attribute indicates that the object can be allocated
-on the stack instead on the heap. In this case the instruction must have
-balanced with a ``dealloc_ref [stack]`` instruction to mark the end of the
+on the stack instead on the heap. In this case the instruction must be
+balanced with a ``dealloc_stack_ref`` instruction to mark the end of the
 object's lifetime.
 Note that the ``stack`` attribute only specifies that stack allocation is
 possible. The final decision on stack allocation is done during llvm IR
@@ -3381,13 +3381,25 @@ project_box
 
 Given a ``@box T`` reference, produces the address of the value inside the box.
 
+dealloc_stack_ref
+`````````````````
+::
+
+  sil-instruction ::= 'dealloc_stack_ref' sil-operand
+
+  dealloc_stack_ref %0 : $T
+  // $T must be a class type
+  // %0 must be an 'alloc_ref [stack]' instruction
+
+Marks the deallocation of the stack space for an ``alloc_ref [stack]``.
+
 dealloc_ref
 ```````````
 ::
 
-  sil-instruction ::= 'dealloc_ref' ('[' 'stack' ']')? sil-operand
+  sil-instruction ::= 'dealloc_ref' sil-operand
 
-  dealloc_ref [stack] %0 : $T
+  dealloc_ref %0 : $T
   // $T must be a class type
 
 Deallocates an uninitialized class type instance, bypassing the reference
