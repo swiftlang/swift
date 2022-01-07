@@ -278,6 +278,10 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
+  /// Whether to print the \c any keyword for existential
+  /// types.
+  bool PrintExplicitAny = false;
+
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
