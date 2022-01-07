@@ -2207,7 +2207,13 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
           Optional<MetatypeRepresentation> storedRepr;
           // The instance type is not a SIL type.
           auto instanceOptions = options;
-          instanceOptions.setContext(None);
+          TypeResolverContext context = TypeResolverContext::None;
+          if (isa<MetatypeTypeRepr>(repr)) {
+            context = TypeResolverContext::MetatypeBase;
+          } else if (isa<ProtocolTypeRepr>(repr)) {
+            context = TypeResolverContext::ProtocolMetatypeBase;
+          }
+          instanceOptions.setContext(context);
           instanceOptions -= TypeResolutionFlags::SILType;
 
           auto instanceTy = resolveType(base, instanceOptions);
@@ -3106,7 +3112,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
 
   ProtocolConformanceRef witnessMethodConformance;
   if (witnessMethodProtocol) {
-    auto resolved = resolveType(witnessMethodProtocol, options);
+    auto resolved = resolveType(witnessMethodProtocol,
+        options.withContext(TypeResolverContext::GenericRequirement));
     if (resolved->hasError())
       return resolved;
 
@@ -3383,9 +3390,7 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
   }
 
   // FIXME: Don't use ExistentialType for AnyObject for now.
-  bool isConstraintType = (result->is<ProtocolType>() &&
-                           !result->isAnyObject());
-  if (isConstraintType &&
+  if (result->isConstraintType() && !result->isAnyObject() &&
       getASTContext().LangOpts.EnableExplicitExistentialTypes &&
       options.isConstraintImplicitExistential()) {
     return ExistentialType::get(result);
@@ -3728,7 +3733,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       continue;
     }
 
-    if (ty->isExistentialType()) {
+    if (ty->isConstraintType()) {
       auto layout = ty->getExistentialLayout();
       if (auto superclass = layout.explicitSuperclass)
         if (checkSuperclass(tyR->getStartLoc(), superclass))
