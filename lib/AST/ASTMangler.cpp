@@ -1845,6 +1845,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
       OpArgs.push_back('B');
       appendClangTypeToVec(OpArgs);
       break;
+    case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::CFunctionPointer:
       if (!mangleClangType) {
         OpArgs.push_back('C');
@@ -3314,7 +3315,8 @@ void ASTMangler::appendAnyProtocolConformance(
                                                      conformance.getAbstract());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
-    GenericSignature opaqueSignature = opaqueType->getBoundSignature();
+    GenericSignature opaqueSignature =
+        opaqueType->getDecl()->getOpaqueInterfaceGenericSignature();
     ConformanceAccessPath conformanceAccessPath =
         opaqueSignature->getConformanceAccessPath(
           opaqueType->getInterfaceType(),

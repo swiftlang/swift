@@ -1897,7 +1897,11 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   // imported into Swift as static methods that have an additional
   // parameter for the left-hand side operand instead of the receiver object.
   if (auto CMD = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    if (clangDecl->isOverloadedOperator() && isImportedAsStatic(clangDecl->getOverloadedOperator())) {
+    // Subscripts and call operators are imported as normal methods.
+    bool staticOperator = clangDecl->isOverloadedOperator() &&
+                          clangDecl->getOverloadedOperator() != clang::OO_Call &&
+                          clangDecl->getOverloadedOperator() != clang::OO_Subscript;
+    if (staticOperator) {
       auto param = new (SwiftContext)
           ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
                     SwiftContext.getIdentifier("lhs"), dc);

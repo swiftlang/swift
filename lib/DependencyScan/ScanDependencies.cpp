@@ -332,6 +332,19 @@ static void discoverCrosssImportOverlayDependencies(
                 allModules.end(), action);
 }
 
+namespace {
+std::string quote(StringRef unquoted) {
+  llvm::SmallString<128> buffer;
+  llvm::raw_svector_ostream os(buffer);
+  for (const auto ch : unquoted) {
+    if (ch == '\\')
+      os << '\\';
+    os << ch;
+  }
+  return buffer.str().str();
+}
+}
+
 /// Write a single JSON field.
 template <typename T>
 void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
@@ -342,14 +355,14 @@ void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
 void writeJSONValue(llvm::raw_ostream &out, StringRef value,
                     unsigned indentLevel) {
   out << "\"";
-  out << value;
+  out << quote(value);
   out << "\"";
 }
 
 void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_ref_t value,
                     unsigned indentLevel) {
   out << "\"";
-  out << get_C_string(value);
+  out << quote(get_C_string(value));
   out << "\"";
 }
 
@@ -615,7 +628,7 @@ static void writeJSON(llvm::raw_ostream &out,
           const auto &arg =
               get_C_string(swiftTextualDeps->command_line->strings[i]);
           out.indent(6 * 2);
-          out << "\"" << arg << "\"";
+          out << "\"" << quote(arg) << "\"";
           if (i != count - 1)
             out << ",";
           out << "\n";
@@ -630,7 +643,7 @@ static void writeJSON(llvm::raw_ostream &out,
           const auto &candidate = get_C_string(
               swiftTextualDeps->compiled_module_candidates->strings[i]);
           out.indent(6 * 2);
-          out << "\"" << candidate << "\"";
+          out << "\"" << quote(candidate) << "\"";
           if (i != count - 1)
             out << ",";
           out << "\n";
@@ -654,7 +667,7 @@ static void writeJSON(llvm::raw_ostream &out,
           const auto &arg =
               get_C_string(swiftTextualDeps->extra_pcm_args->strings[i]);
           out.indent(6 * 2);
-          out << "\"" << arg << "\"";
+          out << "\"" << quote(arg) << "\"";
           if (i != count - 1)
             out << ",";
           out << "\n";

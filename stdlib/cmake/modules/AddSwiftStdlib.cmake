@@ -375,6 +375,10 @@ function(_add_target_variant_c_compile_flags)
   if(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING)
     list(APPEND result "-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING")
   endif()
+  
+  if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
+    list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
+  endif()
 
   list(APPEND result ${SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS})
 

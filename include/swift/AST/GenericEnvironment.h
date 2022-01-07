@@ -107,12 +107,10 @@ private:
   /// This is only useful when lazily populating a generic environment.
   Optional<Type> getMappingIfPresent(GenericParamKey key) const;
 
-  /// Get the "raw" generic signature, without substituting into opaque
-  /// type's signature.
-  GenericSignature getRawGenericSignature() const;
-
 public:
-  GenericSignature getGenericSignature() const;
+  GenericSignature getGenericSignature() const {
+    return SignatureAndKind.getPointer();
+  }
 
   Kind getKind() const { return SignatureAndKind.getInt(); }
 
