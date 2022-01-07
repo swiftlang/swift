@@ -808,6 +808,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
 ABSTRACT_INST(DeallocationInst, SILInstruction)
   BRIDGED_NON_VALUE_INST(DeallocStackInst, dealloc_stack,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
+  BRIDGED_NON_VALUE_INST(DeallocStackRefInst, dealloc_stack_ref,
+                 DeallocationInst, MayHaveSideEffects, DoesNotRelease)
   BRIDGED_NON_VALUE_INST(DeallocRefInst, dealloc_ref,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(DeallocPartialRefInst, dealloc_partial_ref,

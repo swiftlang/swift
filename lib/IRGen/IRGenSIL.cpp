@@ -1257,6 +1257,7 @@ public:
   void visitEndCOWMutationInst(EndCOWMutationInst *i);
   void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
+  void visitDeallocStackRefInst(DeallocStackRefInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
@@ -4515,9 +4516,9 @@ void IRGenSILFunction::visitSetDeallocatingInst(SetDeallocatingInst *i) {
     //     ...
     //   set_deallocating %0 // not needed
     //     // code which does not depend on the RC_DEALLOCATING_FLAG flag.
-    //   dealloc_ref %0      // not needed (stems from the inlined deallocator)
+    //   dealloc_ref %0      // stems from the inlined deallocator
     //     ...
-    //   dealloc_ref [stack] %0
+    //   dealloc_stack_ref %0
     SILBasicBlock::iterator Iter(i);
     SILBasicBlock::iterator End = i->getParent()->end();
     for (++Iter; Iter != End; ++Iter) {
@@ -5432,32 +5433,10 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   allocatedTI.deallocateStack(*this, stackAddr, allocatedType);
 }
 
-void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
-  // Lower the operand.
+void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
   Explosion self = getLoweredExplosion(i->getOperand());
   auto selfValue = self.claimNext();
-  auto *ARI = dyn_cast<AllocRefInst>(i->getOperand());
-  if (!i->canAllocOnStack()) {
-    if (ARI && StackAllocs.count(ARI)) {
-      // We can ignore dealloc_refs (without [stack]) for stack allocated
-      // objects.
-      //
-      //   %0 = alloc_ref [stack]
-      //     ...
-      //   dealloc_ref %0     // not needed (stems from the inlined deallocator)
-      //     ...
-      //   dealloc_ref [stack] %0
-      return;
-    }
-
-    auto classType = i->getOperand()->getType();
-    emitClassDeallocation(*this, classType, selfValue);
-    return;
-  }
-  // It's a dealloc_ref [stack]. Even if the alloc_ref did not allocate the
-  // object on the stack, we don't have to deallocate it, because it is
-  // deallocated in the final release.
-  assert(ARI->canAllocOnStack());
+  auto *ARI = i->getAllocRef();
   if (StackAllocs.count(ARI)) {
     if (IGM.IRGen.Opts.EmitStackPromotionChecks) {
       selfValue = Builder.CreateBitCast(selfValue, IGM.RefCountedPtrTy);
@@ -5471,6 +5450,25 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
       Builder.CreateLifetimeEnd(selfValue);
     }
   }
+}
+
+void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
+  // Lower the operand.
+  Explosion self = getLoweredExplosion(i->getOperand());
+  auto selfValue = self.claimNext();
+  auto *ARI = dyn_cast<AllocRefInst>(i->getOperand());
+  if (ARI && StackAllocs.count(ARI)) {
+    // We can ignore dealloc_refs for stack allocated objects.
+    //
+    //   %0 = alloc_ref [stack]
+    //     ...
+    //   dealloc_ref %0     // not needed (stems from the inlined deallocator)
+    //     ...
+    //   dealloc_stack_ref %0
+    return;
+  }
+  auto classType = i->getOperand()->getType();
+  emitClassDeallocation(*this, classType, selfValue);
 }
 
 void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {

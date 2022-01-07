@@ -371,6 +371,10 @@ namespace {
       return true;
     }
 
+    bool visitDeallocStackRefInst(const DeallocStackRefInst *RHS) {
+      return true;
+    }
+
     bool visitAllocStackInst(const AllocStackInst *RHS) {
       return true;
     }
@@ -1285,13 +1289,8 @@ bool SILInstruction::isAllocatingStack() const {
 }
 
 bool SILInstruction::isDeallocatingStack() const {
-  if (isa<DeallocStackInst>(this))
+  if (isa<DeallocStackInst>(this) || isa<DeallocStackRefInst>(this))
     return true;
-
-  if (auto *DRI = dyn_cast<DeallocRefInst>(this)) {
-    if (DRI->canAllocOnStack())
-      return true;
-  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     if (BI->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
