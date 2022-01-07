@@ -126,6 +126,7 @@ bool ObjectOutliner::isValidUseOfObject(SILInstruction *I,
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::DeallocRefInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::FixLifetimeInst:
@@ -491,6 +492,7 @@ bool ObjectOutliner::optimizeObjectAllocation(AllocRefInst *ARI) {
         B.createStrongRelease(User->getLoc(), GVI, B.getDefaultAtomicity());
         LLVM_FALLTHROUGH;
       case SILInstructionKind::DeallocRefInst:
+      case SILInstructionKind::DeallocStackRefInst:
         ToRemove.push_back(User);
         break;
       default:

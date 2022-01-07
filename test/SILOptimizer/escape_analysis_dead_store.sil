@@ -133,6 +133,6 @@ bb0:
   set_deallocating %0 : $TestArrayContainer
   strong_release %9 : $__ContiguousArrayStorageBase
   dealloc_ref %0 : $TestArrayContainer
-  dealloc_ref [stack] %0 : $TestArrayContainer
+  dealloc_stack_ref %0 : $TestArrayContainer
   return %17 : $Bool
 }

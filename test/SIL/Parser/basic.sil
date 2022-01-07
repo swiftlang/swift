@@ -746,8 +746,8 @@ sil @test_stack_flag : $@convention(thin) () -> () {
 bb0:
   // CHECK: alloc_ref [stack] $Class1
   %0 = alloc_ref [stack] $Class1
-  // CHECK: dealloc_ref [stack] %0 : $Class1
-  dealloc_ref [stack] %0 : $Class1
+  // CHECK: dealloc_stack_ref %0 : $Class1
+  dealloc_stack_ref  %0 : $Class1
   %2 = tuple ()
   return %2 : $()
 }
