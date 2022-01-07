@@ -3326,6 +3326,11 @@ MetatypeType::MetatypeType(Type T, const ASTContext *C,
 ExistentialMetatypeType *
 ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
                              const ASTContext &ctx) {
+  // If we're creating an existential metatype from an
+  // existential type, wrap the constraint type direcly.
+  if (auto existential = T->getAs<ExistentialType>())
+    T = existential->getConstraintType();
+
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -3356,6 +3361,18 @@ ExistentialMetatypeType::ExistentialMetatypeType(Type T,
     assert(getASTContext().LangOpts.EnableObjCInterop ||
            *repr != MetatypeRepresentation::ObjC);
   }
+}
+
+Type ExistentialMetatypeType::getExistentialInstanceType() {
+  auto instanceType = getInstanceType();
+  // Note that Any and AnyObject don't yet use ExistentialType.
+  if (getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+      !instanceType->is<ExistentialMetatypeType>() &&
+      !(instanceType->isAny() || instanceType->isAnyObject())) {
+    instanceType = ExistentialType::get(instanceType);
+  }
+
+  return instanceType;
 }
 
 ModuleType *ModuleType::get(ModuleDecl *M) {
@@ -4410,7 +4427,7 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
 
 CanType OpenedArchetypeType::getAny(Type existential) {
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
-    auto instanceTy = metatypeTy->getInstanceType();
+    auto instanceTy = metatypeTy->getExistentialInstanceType();
     return CanMetatypeType::get(OpenedArchetypeType::getAny(instanceTy));
   }
   assert(existential->isExistentialType());
