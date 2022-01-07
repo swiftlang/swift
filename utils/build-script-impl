@@ -2065,19 +2065,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD:PATH="$(build_directory ${host} libdispatch_static)"
                 )
 
-                if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
-                    LIBICU_BUILD_DIR="$(build_directory ${host} libicu)"
-                    ICU_TMPINSTALL=${LIBICU_BUILD_DIR}/tmp_install
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_PATH_TO_LIBICU_SOURCE:PATH="${LIBICU_SOURCE_DIR}"
-                        -DSWIFT_PATH_TO_LIBICU_BUILD:PATH="${LIBICU_BUILD_DIR}"
-                        -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
-                        -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
-                        -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB:BOOL=TRUE
-                    )
-                fi
-
                 if [[ "${SWIFT_SDKS}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
