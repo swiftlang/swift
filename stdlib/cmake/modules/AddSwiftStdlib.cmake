@@ -750,7 +750,9 @@ function(add_swift_target_library_single target name)
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
   if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
-    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
+    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
+       "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+       "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
       set(embed_bitcode_arg EMBED_BITCODE)
     endif()
@@ -1318,9 +1320,9 @@ function(add_swift_target_library_single target name)
     endif()
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
-      if(${SWIFTLIB_SINGLE_SDK} STREQUAL "IOS" OR
-         ${SWIFTLIB_SINGLE_SDK} STREQUAL "TVOS" OR
-         ${SWIFTLIB_SINGLE_SDK} STREQUAL "WATCHOS")
+      if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
+         "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+         "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
         # Please note that using a generator expression to fit
         # this in a single target_link_options does not work
         # (at least in CMake 3.15 and 3.16),
