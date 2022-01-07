@@ -1,6 +1,9 @@
 // RUN: %target-build-swift %s
 // RUN: %target-swift-frontend -c -g -Xllvm -verify-di-holes=true %s
 
+// Every so often this test crashes the linker on Linux
+// REQUIRES: rdar87254800
+
 // SR-15566: Differentiable functions with control flow yield an assertion failure: "location is a VarDecl, but SILDebugVariable is empty"
 
 import _Differentiation
