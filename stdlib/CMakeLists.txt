@@ -79,6 +79,10 @@ option(SWIFT_BUILD_TEST_SUPPORT_MODULES
 option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
        "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on Linux."
        "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
+       
+option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
+       "Should stdlib be built with full unicode support"
+       TRUE)
 
 # New options should be added to stdlib/cmake/modules/StdlibOptions.cmake,
 # so that they are considered in configurations using StandaloneOverlay.cmake
