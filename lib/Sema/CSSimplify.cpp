@@ -2886,42 +2886,40 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     return result;
   }
 
-  // Handle protocol compositions.
-  if (auto existential1 = type1->getAs<ProtocolCompositionType>()) {
-    if (auto existential2 = type2->getAs<ProtocolCompositionType>()) {
-      auto layout1 = existential1->getExistentialLayout();
-      auto layout2 = existential2->getExistentialLayout();
+  // Handle existential types.
+  if (type1->isExistentialType() && type2->isExistentialType()) {
+    auto layout1 = type1->getExistentialLayout();
+    auto layout2 = type2->getExistentialLayout();
 
-      // Explicit AnyObject and protocols must match exactly.
-      if (layout1.hasExplicitAnyObject != layout2.hasExplicitAnyObject)
+    // Explicit AnyObject and protocols must match exactly.
+    if (layout1.hasExplicitAnyObject != layout2.hasExplicitAnyObject)
+      return getTypeMatchFailure(locator);
+
+    if (layout1.getProtocols().size() != layout2.getProtocols().size())
+      return getTypeMatchFailure(locator);
+
+    for (unsigned i: indices(layout1.getProtocols())) {
+      if (!layout1.getProtocols()[i]->isEqual(layout2.getProtocols()[i]))
         return getTypeMatchFailure(locator);
-
-      if (layout1.getProtocols().size() != layout2.getProtocols().size())
-        return getTypeMatchFailure(locator);
-
-      for (unsigned i: indices(layout1.getProtocols())) {
-        if (!layout1.getProtocols()[i]->isEqual(layout2.getProtocols()[i]))
-          return getTypeMatchFailure(locator);
-      }
-
-      // This is the only interesting case. We might have type variables
-      // on either side of the superclass constraint, so make sure we
-      // recursively call matchTypes() here.
-      if (layout1.explicitSuperclass || layout2.explicitSuperclass) {
-        if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
-          return getTypeMatchFailure(locator);
-
-        auto result = matchTypes(layout1.explicitSuperclass,
-                                 layout2.explicitSuperclass,
-                                 ConstraintKind::Bind, subflags,
-                                 locator.withPathElement(
-                                   ConstraintLocator::ExistentialSuperclassType));
-        if (result.isFailure())
-          return result;
-      }
-
-      return getTypeMatchSuccess();
     }
+
+    // This is the only interesting case. We might have type variables
+    // on either side of the superclass constraint, so make sure we
+    // recursively call matchTypes() here.
+    if (layout1.explicitSuperclass || layout2.explicitSuperclass) {
+      if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
+        return getTypeMatchFailure(locator);
+
+      auto result = matchTypes(layout1.explicitSuperclass,
+                               layout2.explicitSuperclass,
+                               ConstraintKind::Bind, subflags,
+                               locator.withPathElement(
+                                 ConstraintLocator::ExistentialSuperclassType));
+      if (result.isFailure())
+        return result;
+    }
+
+    return getTypeMatchSuccess();
   }
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
@@ -6033,8 +6031,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               return true;
           return false;
         };
+
+        auto constraintType = meta1->getInstanceType();
+        if (auto existential = constraintType->getAs<ExistentialType>())
+          constraintType = existential->getConstraintType();
         
-        if (auto protoTy = meta1->getInstanceType()->getAs<ProtocolType>()) {
+        if (auto protoTy = constraintType->getAs<ProtocolType>()) {
           if (protoTy->getDecl()->isObjC()
               && isProtocolClassType(type2)) {
             increaseScore(ScoreKind::SK_UserConversion);
@@ -7007,7 +7009,12 @@ static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
   if (!nilLiteral)
     return false;
 
-  return toType->isEqual(nilLiteral->getDeclaredType()) &&
+  auto nilLiteralType = nilLiteral->getDeclaredType();
+  if (ctx.LangOpts.EnableExplicitExistentialTypes) {
+    nilLiteralType = ExistentialType::get(nilLiteralType);
+  }
+
+  return toType->isEqual(nilLiteralType) &&
          fromType->getOptionalObjectType();
 }
 
@@ -9808,7 +9815,7 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
     auto instanceTy = type2;
     if (auto metaTy = type2->getAs<ExistentialMetatypeType>()) {
       isMetatype = true;
-      instanceTy = metaTy->getInstanceType();
+      instanceTy = metaTy->getExistentialInstanceType();
     }
     assert(instanceTy->isExistentialType());
     Type openedTy = OpenedArchetypeType::get(instanceTy);
