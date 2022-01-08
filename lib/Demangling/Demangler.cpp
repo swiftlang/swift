@@ -2204,6 +2204,12 @@ NodePointer Demangler::demangleArchetype() {
   case 'r': {
     return createType(createNode(Node::Kind::OpaqueReturnType));
   }
+  case 'R': {
+    int ordinal = demangleIndex();
+    if (ordinal < 0)
+      return NULL;
+    return createType(createNode(Node::Kind::OpaqueReturnTypeIndexed, ordinal));
+  }
 
   case 'x': {
     NodePointer T = demangleAssociatedTypeSimple(nullptr);

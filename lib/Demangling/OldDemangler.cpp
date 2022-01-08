@@ -2078,6 +2078,13 @@ private:
         // Special mangling for opaque return type.
         return Factory.createNode(Node::Kind::OpaqueReturnType);
       }
+      if (Mangled.nextIf('U')) {
+        // Special mangling for opaque return type.
+        Node::IndexType ordinal;
+        if (!demangleIndex(ordinal, depth))
+          return nullptr;
+        return Factory.createNode(Node::Kind::OpaqueReturnTypeIndexed, ordinal);
+      }
       return demangleArchetypeType(depth + 1);
     }
     if (c == 'q') {
