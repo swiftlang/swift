@@ -831,9 +831,11 @@ std::string ASTMangler::mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl) {
 }
 
 std::string ASTMangler::mangleOpaqueTypeDecl(const ValueDecl *decl) {
-  DWARFMangling = true;
   OptimizeProtocolNames = false;
-  return mangleDeclAsUSR(decl, MANGLING_PREFIX_STR);
+
+  beginMangling();
+  appendEntity(decl);
+  return finalize();
 }
 
 std::string ASTMangler::mangleGenericSignature(const GenericSignature sig) {
@@ -1318,7 +1320,10 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       auto opaqueDecl = opaqueType->getDecl();
       if (opaqueDecl->getNamingDecl() == forDecl) {
         assert(opaqueType->getSubstitutions().isIdentity());
-        return appendOperator("Qr");
+        if (opaqueType->getOrdinal() == 0)
+          return appendOperator("Qr");
+
+        return appendOperator("QR", Index(opaqueType->getOrdinal() - 1));
       }
       
       // Otherwise, try to substitute it.
@@ -1358,7 +1363,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         addTypeSubstitution(nestedType, sig);
         return;
       }
-      
+
+      // FIXME: Never actually used.
       appendType(nestedType->getParent(), sig, forDecl);
       appendIdentifier(nestedType->getName().str());
       appendOperator("Qa");

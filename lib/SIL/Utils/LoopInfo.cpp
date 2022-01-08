@@ -54,8 +54,8 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
       if (isa<AllocStackInst>(address) || isa<PartialApplyInst>(address))
         alloc = cast<SingleValueInstruction>(address);
     }
-    if (auto *dealloc = dyn_cast<DeallocRefInst>(I))
-      alloc = dyn_cast<AllocRefInst>(dealloc->getOperand());
+    if (auto *dealloc = dyn_cast<DeallocStackRefInst>(I))
+      alloc = dealloc->getAllocRef();
 
     return alloc && contains(alloc);
   }

@@ -4301,14 +4301,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     ResultVal = B.createDeallocStack(InstLoc, Val);
     break;
-  case SILInstructionKind::DeallocRefInst: {
-    bool OnStack = false;
-    if (parseSILOptional(OnStack, *this, "stack"))
-      return true;
-
+  case SILInstructionKind::DeallocStackRefInst:
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createDeallocRef(InstLoc, Val, OnStack);
+    ResultVal = B.createDeallocStackRef(InstLoc, Val);
+    break;
+  case SILInstructionKind::DeallocRefInst: {
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDeallocRef(InstLoc, Val);
     break;
   }
   case SILInstructionKind::DeallocPartialRefInst: {

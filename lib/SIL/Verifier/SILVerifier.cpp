@@ -2992,11 +2992,9 @@ public:
     auto *cd = DI->getOperand()->getType().getClassOrBoundGenericClass();
     require(cd, "Operand of dealloc_ref must be of class type");
 
-    if (!DI->canAllocOnStack()) {
-      require(!checkResilience(cd, F.getModule().getSwiftModule(),
-                               F.getResilienceExpansion()),
-              "cannot directly deallocate resilient class");
-    }
+    require(!checkResilience(cd, F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot directly deallocate resilient class");
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),

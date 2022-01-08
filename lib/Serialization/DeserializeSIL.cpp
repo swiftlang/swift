@@ -1663,13 +1663,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;
   }
+  case SILInstructionKind::DeallocStackRefInst: {
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createDeallocStackRef(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
   case SILInstructionKind::DeallocRefInst: {
     auto Ty = MF->getType(TyID);
-    bool OnStack = (bool)Attr;
     ResultInst = Builder.createDeallocRef(
         Loc,
-        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
-        OnStack);
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;
   }
   case SILInstructionKind::DeallocPartialRefInst: {

@@ -42,7 +42,7 @@ bb0:
   %12 = init_existential_addr %6 : $*ArrayElementProtocol, $ArrayElementStruct
   store %11 to %12 : $*ArrayElementStruct
   strong_release %0 : $_ContiguousArrayStorage<ArrayElementProtocol>
-  dealloc_ref [stack] %0 : $_ContiguousArrayStorage<ArrayElementProtocol>
+  dealloc_stack_ref %0 : $_ContiguousArrayStorage<ArrayElementProtocol>
   %16 = tuple ()
   return %16 : $()
 }

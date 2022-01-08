@@ -12,14 +12,14 @@ class X {
 sil [always_inline] @callee_alloc_ref_stack : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref [stack] $X
-  dealloc_ref [stack] %0 : $X
+  dealloc_stack_ref %0 : $X
   %r = tuple ()
   return %r : $()
 }
 
 // CHECK-LABEL: sil @caller_alloc_ref_stack : $@convention(thin) () -> ()
 // CHECK: [[X:%[0-9]+]] = alloc_ref [stack] $X
-// CHECK: dealloc_ref [stack] [[X]] : $X
+// CHECK: dealloc_stack_ref [[X]] : $X
 sil @caller_alloc_ref_stack : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @callee_alloc_ref_stack : $@convention(thin) () -> ()

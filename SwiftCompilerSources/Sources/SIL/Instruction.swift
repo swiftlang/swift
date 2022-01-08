@@ -208,6 +208,10 @@ final public class DeallocStackInst : Instruction, UnaryInstruction {
   }
 }
 
+final public class DeallocStackRefInst : Instruction, UnaryInstruction {
+  public var allocRef: AllocRefInst { operand as! AllocRefInst }
+}
+
 final public class CondFailInst : Instruction, UnaryInstruction {
   public override var mayTrap: Bool { true }
 
