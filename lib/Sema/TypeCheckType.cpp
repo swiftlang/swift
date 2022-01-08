@@ -3862,13 +3862,6 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
     return constraintType;
   }
 
-  // Warn about `any Any` and `any AnyObject`.
-  if (constraintType->isAny() || constraintType->isAnyObject()) {
-    diagnose(repr->getLoc(), diag::unnecessary_any,
-             constraintType)
-      .fixItRemove({anyStart, anyEnd});
-  }
-
   return ExistentialType::get(constraintType);
 }
 

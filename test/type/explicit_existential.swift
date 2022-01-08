@@ -149,9 +149,9 @@ func testInvalidAny() {
   let _: any ((S) -> Void) = generic // expected-error{{'any' has no effect on concrete type '(S) -> Void'}}
 }
 
-func testRedundantAnyWarning() {
-  let _: any Any // expected-warning {{'any' is redundant on type 'Any'}}
-  let _: any AnyObject // expected-warning {{'any' is redundant on type 'AnyObject'}}
+func anyAny() {
+  let _: any Any
+  let _: any AnyObject
 }
 
 protocol P1 {}
