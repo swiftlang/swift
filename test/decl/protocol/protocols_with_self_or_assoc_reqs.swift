@@ -57,7 +57,7 @@ protocol P1 {
   func invariantSelf7(_: (G<Self>) -> Void)
   func invariantSelf8(_: G<(Self) -> Void>)
   func invariantSelf9(_: G<() -> Self>)
-  func invariantSelf10(_: P1 & C<Self>)
+  func invariantSelf10(_: any P1 & C<Self>)
   func invariantSelf11() -> G<Self>.InnerG<Void>
   func invariantAssoc1(_: inout Q)
   func invariantAssoc2(_: (inout Q) -> Void)
@@ -68,7 +68,7 @@ protocol P1 {
   func invariantAssoc7(_: (G<Q>) -> Void)
   func invariantAssoc8(_: G<(Q) -> Void>)
   func invariantAssoc9(_: G<() -> Q>)
-  func invariantAssoc10(_: P1 & C<Q>)
+  func invariantAssoc10(_: any P1 & C<Q>)
   func invariantAssoc11() -> G<Q>.InnerG<Void>
 
   // Properties
@@ -117,7 +117,7 @@ protocol P1 {
   var invariantSelfProp7: ((G<Self>) -> Void) -> Void { get }
   var invariantSelfProp8: (G<(Self) -> Void>) -> Void { get }
   var invariantSelfProp9: (G<() -> Self>) -> Void { get }
-  var invariantSelfProp10: (P1 & C<Self>) -> Void { get }
+  var invariantSelfProp10: (any P1 & C<Self>) -> Void { get }
   var invariantSelfProp11: G<Self>.InnerG<Void> { get }
   var invariantAssocProp1: (inout Q) -> Void { get }
   var invariantAssocProp2: ((inout Q) -> Void) -> Void { get }
@@ -128,7 +128,7 @@ protocol P1 {
   var invariantAssocProp7: ((G<Q>) -> Void) { get }
   var invariantAssocProp8: (G<(Q) -> Void>) { get }
   var invariantAssocProp9: (G<() -> Q>) -> Void { get }
-  var invariantAssocProp10: (P1 & C<Q>) -> Void { get }
+  var invariantAssocProp10: (any P1 & C<Q>) -> Void { get }
   var invariantAssocProp11: G<Q>.InnerG<Void> { get }
 
   // Subscripts
@@ -172,7 +172,7 @@ protocol P1 {
   subscript(invariantSelfSubscript4 _: (G<Self>) -> Void) -> Void { get }
   subscript(invariantSelfSubscript5 _: G<(Self) -> Void>) -> Void { get }
   subscript(invariantSelfSubscript6 _: G<() -> Self>) -> Void { get }
-  subscript(invariantSelfSubscript7 _: P1 & C<Self>) -> Void { get }
+  subscript(invariantSelfSubscript7 _: any P1 & C<Self>) -> Void { get }
   subscript(invariantSelfSubscript8 _: Void) -> G<Self>.InnerG<Void> { get }
   subscript(invariantAssocSubscript1 _: G<Q>) -> Void { get }
   subscript(invariantAssocSubscript2 _: Void) -> G<Q> { get }
@@ -180,7 +180,7 @@ protocol P1 {
   subscript(invariantAssocSubscript4 _: (G<Q>) -> Void) -> Void { get }
   subscript(invariantAssocSubscript5 _: G<(Q) -> Void>) -> Void { get }
   subscript(invariantAssocSubscript6 _: G<() -> Q>) -> Void { get }
-  subscript(invariantAssocSubscript7 _: P1 & C<Q>) -> Void { get }
+  subscript(invariantAssocSubscript7 _: any P1 & C<Q>) -> Void { get }
   subscript(invariantAssocSubscript8 _: Void) -> G<Q>.InnerG<Void> { get }
 }
 @available(macOS 10.15, *)
@@ -191,40 +191,40 @@ extension P1 {
 }
 
 do {
-  func testP1(arg: P1) {
+  func testP1(arg: any P1) {
     _ = arg.covariantSelfSimple() // ok
-    let _: P1 = arg.covariantSelfSimple() // ok
+    let _: any P1 = arg.covariantSelfSimple() // ok
     _ = arg.covariantSelfComplex({ _ in },  { _ in }, { _ in }, { _ in }) // ok
-    let _: [String : () -> (P1, P1)] = arg.covariantSelfComplex(
-      { (x: P1) in },
-      { (x: P1?) in },
-      { (x: Array<P1>) in },
-      { (x: Array<Array<P1>?>) in }
+    let _: [String : () -> (any P1, any P1)] = arg.covariantSelfComplex(
+      { (x: any P1) in },
+      { (x: (any P1)?) in },
+      { (x: Array<any P1>) in },
+      { (x: Array<Array<any P1>?>) in }
     ) // ok
     arg.covariantAssocSimple // expected-error {{member 'covariantAssocSimple' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.covariantAssocComplex({ _ in }, { _ in }, { _ in }, { _ in }) // expected-error {{member 'covariantAssocComplex' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     // FIXME: expected-error@-1 {{unable to infer type of a closure parameter '_' in the current context}}
 
     _ = arg.covariantSelfPropSimple // ok
-    let _: P1 = arg.covariantSelfPropSimple // ok
+    let _: any P1 = arg.covariantSelfPropSimple // ok
     _ = arg.covariantSelfPropComplex // ok
     let _: (
-      _: (P1) -> Void,
-      _: (P1?) -> Void,
-      _: (Array<P1>) -> Void,
-      _: (Array<Array<P1>?>) -> Void
-    ) -> [String : () -> (P1, P1)] = arg.covariantSelfPropComplex // ok
+      _: (any P1) -> Void,
+      _: ((any P1)?) -> Void,
+      _: (Array<any P1>) -> Void,
+      _: (Array<Array<any P1>?>) -> Void
+    ) -> [String : () -> (any P1, any P1)] = arg.covariantSelfPropComplex // ok
     arg.covariantAssocPropSimple // expected-error {{member 'covariantAssocPropSimple' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.covariantAssocPropComplex // expected-error {{member 'covariantAssocPropComplex' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
 
     _ = arg[covariantSelfSubscriptSimple: ()] // ok
-    let _: P1 = arg[covariantSelfSubscriptSimple: ()] // ok
+    let _: any P1 = arg[covariantSelfSubscriptSimple: ()] // ok
     _ = arg[covariantSelfSubscriptComplex: { _ in },  { _ in }, { _ in }, { _ in }] // ok
-    let _: [String : () -> (P1, P1)] = arg[
-      covariantSelfSubscriptComplex: { (x: P1) in },
-      { (x: P1?) in },
-      { (x: Array<P1>) in },
-      { (x: Array<Array<P1>?>) in }
+    let _: [String : () -> (any P1, any P1)] = arg[
+      covariantSelfSubscriptComplex: { (x: any P1) in },
+      { (x: (any P1)?) in },
+      { (x: Array<any P1>) in },
+      { (x: Array<Array<any P1>?>) in }
     ] // ok
     arg[covariantAssocSubscriptSimple: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[covariantAssocSubscriptComplex: { _ in }, { _ in }, { _ in }, { _ in }] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
@@ -444,15 +444,15 @@ protocol P1_TypeMemberOnInstanceAndViceVersa {
 do {
   // Test that invalid reference errors prevail over unsupported existential
   // member accesses.
-  func test(protoMeta: P1_TypeMemberOnInstanceAndViceVersa.Protocol,
-            existMeta: P1_TypeMemberOnInstanceAndViceVersa.Type,
-            instance: P1_TypeMemberOnInstanceAndViceVersa) {
+  func test(protoMeta: (any P1_TypeMemberOnInstanceAndViceVersa).Type,
+            existMeta: any P1_TypeMemberOnInstanceAndViceVersa.Type,
+            instance: any P1_TypeMemberOnInstanceAndViceVersa) {
     // P1_TypeMemberOnInstanceAndViceVersa.Protocol
-    protoMeta.static_invariantSelfMethod() // expected-error {{static member 'static_invariantSelfMethod' cannot be used on protocol metatype 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'}}
-    protoMeta.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' cannot be used on protocol metatype 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'}}
-    protoMeta[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'}}
+    protoMeta.static_invariantSelfMethod() // expected-error {{static member 'static_invariantSelfMethod' cannot be used on protocol metatype '(P1_TypeMemberOnInstanceAndViceVersa).Protocol'}}
+    protoMeta.static_invariantSelfProp // expected-error {{static member 'static_invariantSelfProp' cannot be used on protocol metatype '(P1_TypeMemberOnInstanceAndViceVersa).Protocol'}}
+    protoMeta[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on protocol metatype '(P1_TypeMemberOnInstanceAndViceVersa).Protocol'}}
     _ = protoMeta.covariantSelfMethod // ok
-    protoMeta.invariantSelfMethod // expected-error {{member 'invariantSelfMethod' cannot be used on value of protocol type 'P1_TypeMemberOnInstanceAndViceVersa.Protocol'; use a generic constraint instead}}
+    protoMeta.invariantSelfMethod // expected-error {{member 'invariantSelfMethod' cannot be used on value of protocol type '(P1_TypeMemberOnInstanceAndViceVersa).Protocol'; use a generic constraint instead}}
     protoMeta.invariantSelfProp // expected-error {{instance member 'invariantSelfProp' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
     protoMeta[invariantSelfSubscript: ()] // expected-error {{instance member 'subscript' cannot be used on type 'P1_TypeMemberOnInstanceAndViceVersa'}}
 
@@ -481,7 +481,7 @@ protocol P2 {
 
   var prop: Self { get set }
 }
-func takesP2(p2: P2) {
+func takesP2(p2: any P2) {
   _ = p2[]
   // expected-error@-1{{member 'subscript' cannot be used on value of protocol type 'P2'; use a generic constraint instead}}
   _ = p2.prop
@@ -500,7 +500,7 @@ protocol MiscTestsProto {
   subscript(intToInt _: Int) -> Int { get }
 }
 do {
-  func miscTests(_ arg: MiscTestsProto) { // ok
+  func miscTests(_ arg: any MiscTestsProto) { // ok
     arg.runce(5)
 
     do {
@@ -515,7 +515,7 @@ do {
     _ = arg[intToAssoc: 17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'MiscTestsProto'; use a generic constraint instead}}
   }
 
-  func existentialSequence(_ e: Sequence) {
+  func existentialSequence(_ e: any Sequence) {
     var x = e.makeIterator() // expected-error{{member 'makeIterator' cannot be used on value of protocol type 'Sequence'; use a generic constraint instead}}
     x.next()
     x.nonexistent()
