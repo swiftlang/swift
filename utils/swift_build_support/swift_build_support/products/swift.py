@@ -13,7 +13,6 @@
 from . import cmark
 from . import earlyswiftdriver
 from . import libcxx
-from . import libicu
 from . import llvm
 from . import product
 from ..cmake import CMakeOptions
@@ -198,5 +197,4 @@ updated without updating swift.py?")
         return [cmark.CMark,
                 earlyswiftdriver.EarlySwiftDriver,
                 llvm.LLVM,
-                libcxx.LibCXX,
-                libicu.LibICU]
+                libcxx.LibCXX]

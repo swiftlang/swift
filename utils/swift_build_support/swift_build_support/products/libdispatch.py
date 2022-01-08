@@ -12,7 +12,6 @@
 
 from . import cmark
 from . import libcxx
-from . import libicu
 from . import llvm
 from . import product
 from . import swift
@@ -52,5 +51,4 @@ class LibDispatch(product.Product):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU,
                 swift.Swift]
