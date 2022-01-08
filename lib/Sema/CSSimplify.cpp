@@ -10401,6 +10401,24 @@ retry_after_fail:
           }
         }
 
+        // Disabled overloads need special handling depending mode.
+        if (constraint->isDisabled()) {
+          // In diagnostic mode, invalidate previous common result type if
+          // current overload choice has a fix to make sure that we produce
+          // the best diagnostics possible.
+          if (shouldAttemptFixes()) {
+            if (constraint->getFix())
+              commonResultType = ErrorType::get(getASTContext());
+            return true;
+          }
+
+          // In performance mode, let's skip the disabled overload choice
+          // and continue - this would make sure that common result type
+          // could be found if one exists among the overloads the solver
+          // is actually going to attempt.
+          return false;
+        }
+
         // Determine the type that this choice will have.
         Type choiceType = getEffectiveOverloadType(
             constraint->getLocator(), choice, /*allowMembers=*/true,
