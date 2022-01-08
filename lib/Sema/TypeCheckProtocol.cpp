@@ -4792,11 +4792,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     // With SE-0335, using a type alias as both a type witness and a generic
     // constraint will be disallowed in Swift 6, because existential types
     // must be explicit, and a generic constraint isn't a valid type witness.
-    //
-    // Note that Any and AnyObject aren't yet resolved using ExistentialType.
-    if (getASTContext().LangOpts.EnableExplicitExistentialTypes &&
-        memberType->isConstraintType() &&
-        !(memberType->isAny() || memberType->isAnyObject())) {
+    if (memberType->isConstraintType()) {
       memberType = ExistentialType::get(memberType);
     }
 

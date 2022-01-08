@@ -1501,7 +1501,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::Existential: {
     auto *existential = cast<ExistentialType>(this);
     auto constraint = existential->getConstraintType()->getCanonicalType();
-    Result = ExistentialType::get(constraint);
+    Result = ExistentialType::get(constraint).getPointer();
     break;
   }
   case TypeKind::ExistentialMetatype: {
@@ -3251,10 +3251,7 @@ Type ArchetypeType::getExistentialType() const {
   auto constraint = ProtocolCompositionType::get(
      ctx, constraintTypes, requiresClass());
 
-  if (ctx.LangOpts.EnableExplicitExistentialTypes)
-    return ExistentialType::get(constraint);
-
-  return constraint;
+  return ExistentialType::get(constraint);
 }
 
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,

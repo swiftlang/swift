@@ -847,9 +847,9 @@ Type ASTContext::get##NAME##Type() const { \
 }
 #include "swift/AST/KnownStdlibTypes.def"
 
-CanType ASTContext::getExceptionType() const {
+CanType ASTContext::getErrorExistentialType() const {
   if (auto exn = getErrorDecl()) {
-    return exn->getDeclaredInterfaceType()->getCanonicalType();
+    return exn->getExistentialType()->getCanonicalType();
   } else {
     // Use Builtin.NativeObject just as a stand-in.
     return TheNativeObjectType;
@@ -858,16 +858,6 @@ CanType ASTContext::getExceptionType() const {
 
 ProtocolDecl *ASTContext::getErrorDecl() const {
   return getProtocol(KnownProtocolKind::Error);
-}
-
-CanType ASTContext::getErrorExistentialType() const {
-  Type errorType = getExceptionType();
-  if (LangOpts.EnableExplicitExistentialTypes &&
-      errorType->isConstraintType()) {
-    errorType = ExistentialType::get(errorType);
-  }
-
-  return errorType->getCanonicalType();
 }
 
 EnumElementDecl *ASTContext::getOptionalSomeDecl() const {
@@ -2266,7 +2256,7 @@ ASTContext::getSelfConformance(ProtocolDecl *protocol) {
   auto &entry = selfConformances[protocol];
   if (!entry) {
     entry = new (*this, AllocationArena::Permanent)
-      SelfProtocolConformance(protocol->getDeclaredInterfaceType());
+      SelfProtocolConformance(protocol->getExistentialType());
   }
   return entry;
 }
@@ -3367,15 +3357,7 @@ ExistentialMetatypeType::ExistentialMetatypeType(Type T,
 }
 
 Type ExistentialMetatypeType::getExistentialInstanceType() {
-  auto instanceType = getInstanceType();
-  // Note that Any and AnyObject don't yet use ExistentialType.
-  if (getASTContext().LangOpts.EnableExplicitExistentialTypes &&
-      !instanceType->is<ExistentialMetatypeType>() &&
-      !(instanceType->isAny() || instanceType->isAnyObject())) {
-    instanceType = ExistentialType::get(instanceType);
-  }
-
-  return instanceType;
+  return ExistentialType::get(getInstanceType());
 }
 
 ModuleType *ModuleType::get(ModuleDecl *M) {
@@ -4130,11 +4112,22 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
                            RecursiveTypeProperties properties)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
 
-ExistentialType *ExistentialType::get(Type constraint) {
+Type ExistentialType::get(Type constraint) {
+  auto &C = constraint->getASTContext();
+  if (!C.LangOpts.EnableExplicitExistentialTypes)
+    return constraint;
+
+  // FIXME: Any and AnyObject don't yet use ExistentialType.
+  if (constraint->isAny() || constraint->isAnyObject())
+    return constraint;
+
+  // ExistentialMetatypeType is already an existential type.
+  if (constraint->is<ExistentialMetatypeType>())
+    return constraint;
+
   auto properties = constraint->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  auto &C = constraint->getASTContext();
   auto &entry = C.getImpl().getArena(arena).ExistentialTypes[constraint];
   if (entry)
     return entry;

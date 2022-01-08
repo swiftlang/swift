@@ -287,11 +287,6 @@ CanType TypeJoin::visitExistentialType(CanType second) {
   if (!joinInstance)
     return CanType();
 
-  if (joinInstance->is<ExistentialMetatypeType>() ||
-      joinInstance->isAny() ||
-      joinInstance->isAnyObject())
-    return joinInstance;
-
   return ExistentialType::get(joinInstance)->getCanonicalType();
 }
 

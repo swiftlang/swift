@@ -3449,9 +3449,7 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     return ErrorType::get(getASTContext());
   }
 
-  // FIXME: Don't use ExistentialType for AnyObject for now.
-  if (result->isConstraintType() && !result->isAnyObject() &&
-      getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+  if (result->isConstraintType() &&
       options.isConstraintImplicitExistential()) {
     return ExistentialType::get(result);
   }
@@ -3840,10 +3838,8 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   auto composition =
       ProtocolCompositionType::get(getASTContext(), Members,
                                    /*HasExplicitAnyObject=*/false);
-  if (getASTContext().LangOpts.EnableExplicitExistentialTypes &&
-      options.isConstraintImplicitExistential() &&
-      !composition->isAny()) {
-    composition = ExistentialType::get(composition);
+  if (options.isConstraintImplicitExistential()) {
+    return ExistentialType::get(composition);
   }
   return composition;
 }
@@ -3871,7 +3867,6 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
     diagnose(repr->getLoc(), diag::unnecessary_any,
              constraintType)
       .fixItRemove({anyStart, anyEnd});
-    return constraintType;
   }
 
   return ExistentialType::get(constraintType);
