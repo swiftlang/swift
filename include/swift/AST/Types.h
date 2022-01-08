@@ -5466,14 +5466,6 @@ public:
   /// Check if the archetype contains a nested type with the given name.
   bool hasNestedType(Identifier Name) const;
 
-  /// Retrieve the known nested types of this archetype.
-  ///
-  /// Useful only for debugging dumps; all other queries should attempt to
-  /// find a particular nested type by name, directly, or look at the
-  /// protocols to which this archetype conforms.
-  ArrayRef<std::pair<Identifier, Type>>
-  getKnownNestedTypes() const;
-
   /// Register a nested type with the given name.
   void registerNestedType(Identifier name, Type nested);
 

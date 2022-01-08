@@ -658,24 +658,6 @@ public:
 
             return true;
           }
-
-          // Make sure that none of the nested types are dependent.
-          for (const auto &nested : archetype->getKnownNestedTypes()) {
-            if (!nested.second)
-              continue;
-            
-            if (auto nestedType = nested.second) {
-              if (nestedType->hasTypeParameter()) {
-                Out << "Nested type " << nested.first.str()
-                    << " of archetype " << archetype->getString()
-                    << " is dependent type " << nestedType->getString()
-                    << "\n";
-                return true;
-              }
-            }
-
-            verifyChecked(nested.second, visitedArchetypes);
-          }
         }
 
         return false;

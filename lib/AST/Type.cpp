@@ -3767,12 +3767,6 @@ bool ArchetypeType::hasNestedType(Identifier Name) const {
   return Pos != NestedTypes.end() && Pos->first == Name;
 }
 
-ArrayRef<std::pair<Identifier, Type>>
-ArchetypeType::getKnownNestedTypes() const {
-  populateNestedTypes();
-  return NestedTypes;
-}
-
 void ArchetypeType::registerNestedType(Identifier name, Type nested) {
   populateNestedTypes();
 
