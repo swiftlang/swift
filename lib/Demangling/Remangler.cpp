@@ -965,6 +965,7 @@ ManglingError Remangler::mangleDependentAssociatedTypeRef(Node *node,
 ManglingError
 Remangler::mangleDependentGenericConformanceRequirement(Node *node,
                                                         unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   Node *ProtoOrClass = node->getChild(1);
   if (ProtoOrClass->getFirstChild()->getKind() == Node::Kind::Protocol) {
     RETURN_IF_ERROR(manglePureProtocol(ProtoOrClass, depth + 1));
