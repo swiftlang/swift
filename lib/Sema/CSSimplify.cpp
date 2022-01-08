@@ -10432,6 +10432,34 @@ retry_after_fail:
           return true;
         }
 
+        // This is the situation where a property has the same name
+        // as a method e.g.
+        //
+        // protocol P {
+        //   var test: String { get }
+        // }
+        //
+        // extension P {
+        //   var test: String { get { return "" } }
+        // }
+        //
+        // struct S : P {
+        //  func test() -> Int { 42 }
+        // }
+        //
+        // var s = S()
+        // s.test() <- disjunction would have two choices here, one
+        //             for the property from `P` and one for the method of `S`.
+        //
+        // In cases like this, let's exclude property overload from common
+        // result determination because it cannot be applied.
+        //
+        // Note that such overloads cannot be disabled, because they still
+        // have to be checked in diagnostic mode and there is (currently)
+        // no way to re-enable them for diagnostics.
+        if (!choiceType->lookThroughAllOptionalTypes()->is<FunctionType>())
+          return true;
+
         // If types lined up exactly, let's favor this overload choice.
         if (Type(argFnType)->isEqual(choiceType))
           constraint->setFavored();
