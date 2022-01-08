@@ -3421,8 +3421,8 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
     // The referenced type might be a different opaque result type.
 
     // First, unwrap any nested associated types to get the root archetype.
-    while (auto nestedTy = ty->getAs<NestedArchetypeType>())
-      ty = nestedTy->getParent();
+    if (auto nestedTy = ty->getAs<NestedArchetypeType>())
+      ty = nestedTy->getRoot();
 
     // If the root archetype is an opaque result type, check that its
     // descriptor is accessible.
@@ -3786,31 +3786,19 @@ void ArchetypeType::registerNestedType(Identifier name, Type nested) {
   found->second = nested;
 }
 
-static void collectFullName(const ArchetypeType *Archetype,
-                            SmallVectorImpl<char> &Result) {
-  if (auto nested = dyn_cast<NestedArchetypeType>(Archetype)) {
-    collectFullName(nested->getParent(), Result);
-    Result.push_back('.');
-  }
-  Result.append(Archetype->getName().str().begin(),
-                Archetype->getName().str().end());
-}
-
 AssociatedTypeDecl *NestedArchetypeType::getAssocType() const {
   return InterfaceType->castTo<DependentMemberType>()->getAssocType();
 }
 
 Identifier ArchetypeType::getName() const {
-  if (auto nested = dyn_cast<NestedArchetypeType>(this))
-    return nested->getAssocType()->getName();
   assert(InterfaceType);
+  if (auto depMemTy = InterfaceType->getAs<DependentMemberType>())
+    return depMemTy->getName();
   return InterfaceType->castTo<GenericTypeParamType>()->getName();
 }
 
 std::string ArchetypeType::getFullName() const {
-  llvm::SmallString<64> Result;
-  collectFullName(this, Result);
-  return Result.str().str();
+  return InterfaceType.getString();
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
