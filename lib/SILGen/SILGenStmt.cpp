@@ -273,15 +273,78 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   return Condition(TrueBB, FalseBB, ContBB, Loc);
 }
 
+/// Returns whether this node may still be interesting in case we are in
+/// unreachable code.
+static bool mayStillBeInterestingWhenInUnreachableCode(const ASTNode &ESD) {
+  if (auto D = ESD.dyn_cast<Decl *>()) {
+    // TODO: Only functions *which are used in reachable code*?
+    return isa<FuncDecl>(D);
+  }
+
+  return false;
+}
+
+/// Returns whether this node may receive diagnostics about unreachable code.
+static bool mayReceiveUnreachableCodeDiagnostics(const ASTNode &ESD) {
+  // If this is an implicit statement or expression, just skip over it,
+  // don't emit a diagnostic here.
+  if (auto *S = ESD.dyn_cast<Stmt *>()) {
+    // Return statement in a single-expression closure or function is
+    // implicit, but the result isn't. So, skip over return statements
+    // that are implicit and either have no results or the result is
+    // implicit. Otherwise, don't so we can emit unreachable code
+    // diagnostics.
+    if (S->isImplicit() && isa<ReturnStmt>(S)) {
+      auto returnStmt = cast<ReturnStmt>(S);
+      if (!returnStmt->hasResult()) {
+        return false;
+      }
+      if (returnStmt->getResult()->isImplicit()) {
+        return false;
+      }
+    }
+    if (S->isImplicit() && !isa<ReturnStmt>(S)) {
+      return false;
+    }
+  } else if (auto *E = ESD.dyn_cast<Expr *>()) {
+    // Optional chaining expressions are wrapped in a structure like.
+    //
+    // (optional_evaluation_expr implicit type='T?'
+    //   (call_expr type='T?'
+    //     (exprs...
+    //
+    // Walk through it to find out if the statement is actually implicit.
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
+      if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
+        if (IIO->getSubExpr()->isImplicit())
+          return false;
+      if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
+        if (C->isImplicit())
+          return false;
+    } else if (E->isImplicit()) {
+      // Ignore all other implicit expressions.
+      return false;
+    }
+  } else if (auto D = ESD.dyn_cast<Decl *>()) {
+    // Local declarations aren't unreachable - only their usages can be. To
+    // that end, we only care about pattern bindings since their
+    // initializer expressions can be unreachable.
+    if (!isa<PatternBindingDecl>(D))
+      return false;
+  }
+
+  return true;
+}
+
 void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   LexicalScope BraceScope(SGF, CleanupLocation(S));
   // Keep in sync with DiagnosticsSIL.def.
-  const unsigned ReturnStmtType   = 0;
-  const unsigned BreakStmtType    = 1;
-  const unsigned ContinueStmtType = 2;
-  const unsigned ThrowStmtType    = 3;
-  const unsigned UnknownStmtType  = 4;
+  constexpr unsigned ReturnStmtType = 0;
+  constexpr unsigned BreakStmtType = 1;
+  constexpr unsigned ContinueStmtType = 2;
+  constexpr unsigned ThrowStmtType = 3;
+  constexpr unsigned UnknownStmtType = 4;
   unsigned StmtType = UnknownStmtType;
 
   // Emit local auxiliary declarations.
@@ -296,87 +359,52 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     SGF.LocalAuxiliaryDecls.clear();
   }
 
+  // Track whether we have already emitted a diagnostic
+  bool hasDiagnosedUnreachability = false;
+
   for (auto &ESD : S->getElements()) {
     
     if (auto D = ESD.dyn_cast<Decl*>())
       if (isa<IfConfigDecl>(D))
         continue;
-    
-    // If we ever reach an unreachable point, stop emitting statements and issue
-    // an unreachable code diagnostic.
-    if (!SGF.B.hasValidInsertionPoint()) {
-      // If this is an implicit statement or expression, just skip over it,
-      // don't emit a diagnostic here.
-      if (auto *S = ESD.dyn_cast<Stmt*>()) {
-        // Return statement in a single-expression closure or function is
-        // implicit, but the result isn't. So, skip over return statements
-        // that are implicit and either have no results or the result is
-        // implicit. Otherwise, don't so we can emit unreachable code
-        // diagnostics.
-        if (S->isImplicit() && isa<ReturnStmt>(S)) {
-          auto returnStmt = cast<ReturnStmt>(S);
-          if (!returnStmt->hasResult()) {
-            continue;
-          }
-          if (returnStmt->getResult()->isImplicit()) {
-            continue;
-          }
-        }
-        if (S->isImplicit() && !isa<ReturnStmt>(S)) {
-          continue;
-        }
-      } else if (auto *E = ESD.dyn_cast<Expr*>()) {
-        // Optional chaining expressions are wrapped in a structure like.
-        //
-        // (optional_evaluation_expr implicit type='T?'
-        //   (call_expr type='T?'
-        //     (exprs...
-        //
-        // Walk through it to find out if the statement is actually implicit.
-        if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
-          if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
-            if (IIO->getSubExpr()->isImplicit()) continue;
-          if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
-            if (C->isImplicit()) continue;
-        } else if (E->isImplicit()) {
-          // Ignore all other implicit expressions.
-          continue;
-        }
-      } else if (auto D = ESD.dyn_cast<Decl*>()) {
-        // Local declarations aren't unreachable - only their usages can be. To
-        // that end, we only care about pattern bindings since their
-        // initializer expressions can be unreachable.
-        if (!isa<PatternBindingDecl>(D))
-          continue;
-      }
-      
-      if (StmtType != UnknownStmtType) {
-        diagnose(getASTContext(), ESD.getStartLoc(),
-                 diag::unreachable_code_after_stmt, StmtType);
-      } else {
-        diagnose(getASTContext(), ESD.getStartLoc(),
-                 diag::unreachable_code);
-        if (!S->getElements().empty()) {
-          for (auto *arg : SGF.getFunction().getArguments()) {
-            auto argTy = arg->getType().getASTType();
-            if (argTy->isStructurallyUninhabited()) {
-              // Use the interface type in this diagnostic because the SIL type
-              // unpacks tuples. But, the SIL type being exploded means it
-              // points directly at the offending tuple element type and we can
-              // use that to point the user at problematic component(s).
-              auto argIFaceTy = arg->getDecl()->getInterfaceType();
-              diagnose(getASTContext(), S->getStartLoc(),
-                       diag::unreachable_code_uninhabited_param_note,
-                       arg->getDecl()->getBaseName().userFacingName(),
-                       argIFaceTy,
-                       argIFaceTy->is<EnumType>(),
-                       argTy);
-              break;
+
+    // If we have reached an unreachable point, only consider nodes that may
+    // still be interesting, and consider emitting a diagnostic
+    if (!SGF.B.hasValidInsertionPoint() &&
+        !mayStillBeInterestingWhenInUnreachableCode(ESD)) {
+
+      // If we haven't done so already, emit a diagnostic when appropriate for
+      // this node
+      if (!hasDiagnosedUnreachability &&
+          mayReceiveUnreachableCodeDiagnostics(ESD)) {
+        if (StmtType != UnknownStmtType) {
+          diagnose(getASTContext(), ESD.getStartLoc(),
+                   diag::unreachable_code_after_stmt, StmtType);
+        } else {
+          diagnose(getASTContext(), ESD.getStartLoc(), diag::unreachable_code);
+          if (!S->getElements().empty()) {
+            for (auto *arg : SGF.getFunction().getArguments()) {
+              auto argTy = arg->getType().getASTType();
+              if (argTy->isStructurallyUninhabited()) {
+                // Use the interface type in this diagnostic because the SIL
+                // type unpacks tuples. But, the SIL type being exploded means
+                // it points directly at the offending tuple element type and we
+                // can use that to point the user at problematic component(s).
+                auto argIFaceTy = arg->getDecl()->getInterfaceType();
+                diagnose(getASTContext(), S->getStartLoc(),
+                         diag::unreachable_code_uninhabited_param_note,
+                         arg->getDecl()->getBaseName().userFacingName(),
+                         argIFaceTy, argIFaceTy->is<EnumType>(), argTy);
+                break;
+              }
             }
           }
         }
+
+        hasDiagnosedUnreachability = true;
       }
-      return;
+
+      continue;
     }
 
     // Process children.
@@ -384,11 +412,11 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       visit(S);
       if (isa<ReturnStmt>(S))
         StmtType = ReturnStmtType;
-      if (isa<BreakStmt>(S))
+      else if (isa<BreakStmt>(S))
         StmtType = BreakStmtType;
-      if (isa<ContinueStmt>(S))
+      else if (isa<ContinueStmt>(S))
         StmtType = ContinueStmtType;
-      if (isa<ThrowStmt>(S))
+      else if (isa<ThrowStmt>(S))
         StmtType = ThrowStmtType;
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
