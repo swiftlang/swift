@@ -5218,7 +5218,7 @@ class ExistentialType final : public TypeBase {
         ConstraintType(constraintType) {}
 
 public:
-  static ExistentialType *get(Type constraint);
+  static Type get(Type constraint);
 
   Type getConstraintType() const { return ConstraintType; }
 

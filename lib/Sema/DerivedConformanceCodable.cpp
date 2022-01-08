@@ -1211,10 +1211,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   //                         output: ()
   // Create from the inside out:
 
-  auto encoderType = C.getEncoderType();
-  if (C.LangOpts.EnableExplicitExistentialTypes)
-    encoderType = ExistentialType::get(encoderType);
-
+  auto encoderType = ExistentialType::get(C.getEncoderType());
   auto returnType = TupleType::getEmpty(C);
 
   // Params: (Encoder)
@@ -1805,10 +1802,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   // Compute from the inside out:
 
   // Params: (Decoder)
-  auto decoderType = C.getDecoderType();
-  if (C.LangOpts.EnableExplicitExistentialTypes)
-    decoderType = ExistentialType::get(decoderType);
-
+  auto decoderType = ExistentialType::get(C.getDecoderType());
   auto *decoderParamDecl = new (C) ParamDecl(
       SourceLoc(), SourceLoc(), C.Id_from,
       SourceLoc(), C.Id_decoder, conformanceDC);

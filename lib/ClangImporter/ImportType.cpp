@@ -1019,12 +1019,10 @@ namespace {
               if (memberTypes.empty())
                 hasExplicitAnyObject = true;
 
-              Type importedTypeArg = ProtocolCompositionType::get(
-                  Impl.SwiftContext, memberTypes,
-                  hasExplicitAnyObject);
-              if (Impl.SwiftContext.LangOpts.EnableExplicitExistentialTypes) {
-                importedTypeArg = ExistentialType::get(importedTypeArg);
-              }
+              Type importedTypeArg = ExistentialType::get(
+                  ProtocolCompositionType::get(
+                      Impl.SwiftContext, memberTypes,
+                      hasExplicitAnyObject));
               importedTypeArgs.push_back(importedTypeArg);
             }
           }
@@ -1153,8 +1151,7 @@ namespace {
             }
           }
 
-          if (bridgedType->isConstraintType() &&
-              Impl.SwiftContext.LangOpts.EnableExplicitExistentialTypes)
+          if (bridgedType->isConstraintType())
             bridgedType = ExistentialType::get(bridgedType);
 
           return { importedType,
@@ -1177,13 +1174,9 @@ namespace {
           members.push_back(proto->getDeclaredInterfaceType());
         }
 
-        importedType = ProtocolCompositionType::get(Impl.SwiftContext,
-                                                    members,
-                                                    /*HasExplicitAnyObject=*/false);
-
-        if (Impl.SwiftContext.LangOpts.EnableExplicitExistentialTypes) {
-          importedType = ExistentialType::get(importedType);
-        }
+        importedType = ExistentialType::get(
+            ProtocolCompositionType::get(Impl.SwiftContext, members,
+                                         /*HasExplicitAnyObject=*/false));
       }
 
       // Class or Class<P> maps to an existential metatype.
@@ -2460,9 +2453,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     bool paramIsIUO;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
-      swiftParamTy = SwiftContext.getNSCopyingType();
-      if (SwiftContext.LangOpts.EnableExplicitExistentialTypes)
-        swiftParamTy = ExistentialType::get(swiftParamTy);
+      swiftParamTy = ExistentialType::get(SwiftContext.getNSCopyingType());
       if (!swiftParamTy)
         return {Type(), false};
       if (optionalityOfParam != OTK_None)

@@ -526,7 +526,6 @@ public:
 
   /// Retrieve the declaration of Swift.Error.
   ProtocolDecl *getErrorDecl() const;
-  CanType getExceptionType() const;
   CanType getErrorExistentialType() const;
   
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \

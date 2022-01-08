@@ -6849,12 +6849,7 @@ static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
   if (!nilLiteral)
     return false;
 
-  auto nilLiteralType = nilLiteral->getDeclaredType();
-  if (ctx.LangOpts.EnableExplicitExistentialTypes) {
-    nilLiteralType = ExistentialType::get(nilLiteralType);
-  }
-
-  return toType->isEqual(nilLiteralType) &&
+  return toType->isEqual(nilLiteral->getExistentialType()) &&
          fromType->getOptionalObjectType();
 }
 
