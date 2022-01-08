@@ -188,7 +188,7 @@ public func useFoo(x: String, y: C) {
   let _ = bauble(z: y, u: y)
 }
 
-// CHECK-LABEL: define {{.*}} @"$s18opaque_result_type6bauble1z1uSayQr_QrSgtGx_q_tAA6MarkerRzAA1PRzAA1QRzAaIR_r0_lF"
+// CHECK-LABEL: define {{.*}} @"$s18opaque_result_type6bauble1z1uSayQr_QR_SgtGx_q_tAA6MarkerRzAA1PRzAA1QRzAaIR_r0_lF"
 
 // CHECK-LABEL: define {{.*}} @"$s18opaque_result_type6useFoo1x1yySS_AA1CCtF"
 // CHECK: [[OPAQUE:%.*]] = call {{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMg"
@@ -203,7 +203,7 @@ struct Boom<T: P> {
 }
 
 // CHECK-LABEL: define {{.*}} @"$s18opaque_result_type9gimmeBoomypyF
-// CHECK: call swiftcc void @"$s18opaque_result_type4BoomV5prop15prop2ACyxGSi_AcEQr_QrtvpQOyx_Qo__AcEQr_QrtvpQOyx_Qo0_ttcfcfA0_"
+// CHECK: call swiftcc void @"$s18opaque_result_type4BoomV5prop15prop2ACyxGSi_AcEQr_QR_tvpQOyx_Qo__AcEQr_QR_tvpQOyx_Qo0_ttcfcfA0_"
 public func gimmeBoom() -> Any {
   Boom<String>(prop1: 5)
 }
