@@ -731,12 +731,14 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
 
   for (auto *user : useState.inits) {
     if (upwardScanForInit(user, useState)) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found init block at: " << *user);
       initBlocks.insert(user->getParent());
     }
   }
 
   for (auto *user : useState.livenessUses) {
     if (upwardScanForUseOut(user, useState)) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found use block at: " << *user);
       livenessBlocks.insert(user->getParent());
       livenessWorklist.push_back(user);
     }
@@ -1338,7 +1340,8 @@ struct DataflowState {
   llvm::DenseSet<SILBasicBlock *> initBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> destroyBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> reinitBlocks;
-  llvm::DenseMap<SILBasicBlock *, Operand *> consumingClosureBlocks;
+  llvm::DenseMap<SILBasicBlock *, Operand *> closureConsumeBlocks;
+  llvm::DenseMap<SILBasicBlock *, ClosureOperandState *> closureUseBlocks;
   SmallVector<MarkUnresolvedMoveAddrInst *, 8> markMovesThatPropagateDownwards;
 
   SILOptFunctionBuilder &funcBuilder;
@@ -1372,7 +1375,8 @@ struct DataflowState {
     destroyBlocks.clear();
     reinitBlocks.clear();
     markMovesThatPropagateDownwards.clear();
-    consumingClosureBlocks.clear();
+    closureConsumeBlocks.clear();
+    closureUseBlocks.clear();
   }
 };
 
@@ -1586,6 +1590,38 @@ bool DataflowState::process(
         break;
       }
 
+      // Now see if we have a closure use.
+      {
+        auto iter = closureUseBlocks.find(next);
+        if (iter != closureUseBlocks.end()) {
+          LLVM_DEBUG(llvm::dbgs() << "    Is Use Block! Emitting Error!\n");
+          // We found one! Emit the diagnostic and continue and see if we can
+          // get more diagnostics.
+          auto &astContext = fn->getASTContext();
+          {
+            auto diag =
+                diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+            StringRef name = getDebugVarName(address);
+            diagnose(astContext, getSourceLocFromValue(address), diag, name);
+          }
+
+          {
+            auto diag = diag::sil_movekillscopyablevalue_move_here;
+            diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+          }
+
+          {
+            auto diag = diag::sil_movekillscopyablevalue_use_here;
+            for (auto *user : iter->second->pairedUseInsts) {
+              diagnose(astContext, user->getLoc().getSourceLoc(), diag);
+            }
+          }
+
+          emittedSingleDiagnostic = true;
+          break;
+        }
+      }
+
       // Then see if this is a destroy block. If so, do not add successors and
       // continue. This is because we stop processing at destroy_addr. This
       // destroy_addr is paired with the mark_unresolved_move_addr.
@@ -1614,8 +1650,8 @@ bool DataflowState::process(
       }
 
       {
-        auto iter = consumingClosureBlocks.find(next);
-        if (iter != consumingClosureBlocks.end()) {
+        auto iter = closureConsumeBlocks.find(next);
+        if (iter != closureConsumeBlocks.end()) {
           LLVM_DEBUG(llvm::dbgs() << "    Is reinit Block! Setting up for "
                                      "later deletion if possible!\n");
           auto indexIter = useState.closureOperandToIndexMap.find(iter->second);
@@ -1735,6 +1771,35 @@ void DataflowState::init() {
     if (upwardScanForDestroys(reinit, useState)) {
       LLVM_DEBUG(llvm::dbgs() << "    Found reinit block at: " << *reinit);
       reinitBlocks[reinit->getParent()] = reinit;
+    }
+  }
+
+  for (auto closureUse : useState.closureUses) {
+    auto *use = closureUse.first;
+    auto &state = closureUse.second;
+    auto *user = use->getUser();
+
+    switch (state.result) {
+    case DownwardScanResult::Invalid:
+    case DownwardScanResult::Destroy:
+    case DownwardScanResult::Reinit:
+    case DownwardScanResult::UseForDiagnostic:
+    case DownwardScanResult::MoveOut:
+      llvm_unreachable("unhandled");
+    case DownwardScanResult::ClosureUse:
+      if (upwardScanForUseOut(user, useState)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "    Found closure liveness block at: " << *user);
+        closureUseBlocks[user->getParent()] = &state;
+      }
+      break;
+    case DownwardScanResult::ClosureConsume:
+      if (upwardScanForDestroys(user, useState)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "    Found closure consuming block at: " << *user);
+        closureConsumeBlocks[user->getParent()] = use;
+      }
+      break;
     }
   }
 }
