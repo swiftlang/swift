@@ -389,3 +389,16 @@ public func partialApplyTest<T>(_ x: __owned T) { // expected-error {{'x' used a
     }
     f()
 }
+
+/////////////////
+// Defer Tests //
+/////////////////
+
+// TODO: Emit an error in the defer.
+public func deferTest<T>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    defer { // expected-note {{use here}}
+        nonConsumingUse(x)
+    }
+    print("do Something")
+}
