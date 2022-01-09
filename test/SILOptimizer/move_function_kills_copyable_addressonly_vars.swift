@@ -346,6 +346,79 @@ extension DeferTestProtocol {
         }
         print("123")
     }
+
+    mutating func deferTestFail8() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            if booleanValue {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail9() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            if booleanValue {
+                nonConsumingUse(k) // expected-note {{use here}}
+            } else {
+                nonConsumingUse(k)
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail10() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            for _ in 0..<1024 {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail11() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            print("creating blocks2")
+        }
+        defer {
+            for _ in 0..<1024 {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail12() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self) // expected-note {{move here}}
+            print("creating blocks2")
+        }
+
+        defer {
+            for _ in 0..<1024 {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
 }
 
 ////////////////
