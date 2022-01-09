@@ -350,3 +350,16 @@ public func castTestIfLet2(_ x : __owned EnumWithKlass) { // expected-error {{'x
         print("no")
     }
 }
+
+/////////////////////////
+// Partial Apply Tests //
+/////////////////////////
+
+// Emit a better error here. At least we properly error.
+public func partialApplyTest(_ x: __owned Klass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    let f = { // expected-note {{use here}}
+        print(x)
+    }
+    f()
+}
