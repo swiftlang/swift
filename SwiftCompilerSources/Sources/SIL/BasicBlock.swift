@@ -31,13 +31,13 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
   public var reverseInstructions: ReverseList<Instruction> {
     ReverseList(startAt: SILBasicBlock_lastInst(bridged).instruction)
   }
-  
+
   public var terminator: TermInst {
     SILBasicBlock_lastInst(bridged).instruction as! TermInst
   }
 
   public var successors: SuccessorArray { terminator.successors }
-  
+
   public var predecessors: PredecessorList {
     PredecessorList(startAt: SILBasicBlock_getFirstPred(bridged))
   }
@@ -60,7 +60,7 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
     }
     fatalError()
   }
-  
+
   public var label: String { "bb\(index)" }
 
   var bridged: BridgedBasicBlock { BridgedBasicBlock(obj: SwiftObject(self)) }
@@ -82,20 +82,20 @@ public struct ArgumentArray : RandomAccessCollection {
 
 public struct SuccessorArray : RandomAccessCollection, CustomReflectable {
   private let succArray: BridgedArrayRef
-  
+
   init(succArray: BridgedArrayRef) {
     self.succArray = succArray
   }
-  
+
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return Int(succArray.numElements) }
-  
+
   public subscript(_ index: Int) -> BasicBlock {
     precondition(index >= 0 && index < endIndex)
     let s = BridgedSuccessor(succ: succArray.data + index &* BridgedSuccessorSize);
     return SILSuccessor_getTargetBlock(s).block
   }
-  
+
   public var customMirror: Mirror {
     let c: [Mirror.Child] = map { (label: nil, value: $0.label) }
     return Mirror(self, children: c)
@@ -104,7 +104,7 @@ public struct SuccessorArray : RandomAccessCollection, CustomReflectable {
 
 public struct PredecessorList : Sequence, IteratorProtocol, CustomReflectable {
   private var currentSucc: OptionalBridgedSuccessor
-  
+
   public init(startAt: OptionalBridgedSuccessor) { currentSucc = startAt }
 
   public mutating func next() -> BasicBlock? {
