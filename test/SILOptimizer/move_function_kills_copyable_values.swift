@@ -5,6 +5,8 @@
 import Swift
 
 public class Klass {}
+public class SubKlass1 : Klass {}
+public class SubKlass2 : Klass {}
 
 //////////////////
 // Declarations //
@@ -259,4 +261,121 @@ public func multipleVarsWithSubsequentBorrows() -> Bool {
     let k2 = k
     let k3 = _move(k)
     return k2 === k3
+}
+
+////////////////
+// Cast Tests //
+////////////////
+
+public func castTest0(_ x: __owned SubKlass1) -> Klass { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    return x as Klass // expected-note {{use here}}
+}
+
+public func castTest1(_ x: __owned Klass) -> SubKlass1 { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    return x as! SubKlass1 // expected-note {{use here}}
+}
+
+public func castTest2(_ x: __owned Klass) -> SubKlass1? { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    return x as? SubKlass1 // expected-note {{use here}}
+}
+
+public func castTestSwitch1(_ x : __owned Klass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    switch x {
+    case let k as SubKlass1: // expected-note {{use here}}
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitch2(_ x : __owned Klass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    switch x {
+    case let k as SubKlass1:
+        print(k)
+    case let k as SubKlass2: // expected-note {{use here}}
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitchInLoop(_ x : __owned Klass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+
+    for _ in 0..<1024 {
+        switch x {
+        case let k as SubKlass1: // expected-note {{use here}}
+            print(k)
+        default:
+            print("Nope")
+        }
+    }
+}
+
+public func castTestIfLet(_ x : __owned Klass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    if case let k as SubKlass1 = x { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+public func castTestIfLetInLoop(_ x : __owned Klass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    for _ in 0..<1024 {
+        if case let k as SubKlass1 = x { // expected-note {{use here}}
+            print(k)
+        } else {
+            print("no")
+        }
+    }
+}
+
+public enum EnumWithKlass {
+    case none
+    case klass(Klass)
+}
+
+public func castTestIfLet2(_ x : __owned EnumWithKlass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    if case let .klass(k as SubKlass1) = x { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+/////////////////////////
+// Partial Apply Tests //
+/////////////////////////
+
+// Emit a better error here. At least we properly error.
+public func partialApplyTest(_ x: __owned Klass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    let f = { // expected-note {{use here}}
+        print(x)
+    }
+    f()
+}
+
+/////////////////
+// Defer Tests //
+/////////////////
+
+// TODO: Improve this error msg.
+//
+// NOTE: This will require adding knowledge about captured defer arguments for
+// values. This at least prevents the error from happening.
+public func deferTest(_ x: __owned Klass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    defer { // expected-note {{use here}}
+        nonConsumingUse(x)
+    }
+    print("do Something")
 }

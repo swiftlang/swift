@@ -8,7 +8,13 @@ import Swift
 // Declarations //
 //////////////////
 
-public class Klass {}
+public class Klass {
+    var k: Klass? = nil
+
+    func getOtherKlass() -> Klass? { nil }
+}
+public class SubKlass1 : Klass {}
+public class SubKlass2 : Klass {}
 
 struct KlassWrapper {
     var k: Klass
@@ -388,5 +394,283 @@ extension KlassWrapper {
             print("foo bar")
         }
         print("123")
+    }
+
+    mutating func deferTestFail8() { // expected-error {{'self' used after being moved}}
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            if booleanValue {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = KlassWrapper(k: Klass())
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail9() { // expected-error {{'self' used after being moved}}
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            if booleanValue {
+                nonConsumingUse(k) // expected-note {{use here}}
+            } else {
+                nonConsumingUse(k)
+            }
+            self = KlassWrapper(k: Klass())
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail10() { // expected-error {{'self' used after being moved}}
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            for _ in 0..<1024 {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = KlassWrapper(k: Klass())
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail11() { // expected-error {{'self' used after being moved}}
+        let _ = _move(self) // expected-note {{move here}}
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            print("creating blocks2")
+        }
+        defer {
+            for _ in 0..<1024 {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = KlassWrapper(k: Klass())
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail12() { // expected-error {{'self' used after being moved}}
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self) // expected-note {{move here}}
+            print("creating blocks2")
+        }
+
+        defer {
+            for _ in 0..<1024 {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = KlassWrapper(k: Klass())
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestSuccess13() {
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        defer {
+            self = KlassWrapper(k: Klass())
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestSuccess14() {
+        if booleanValue {
+            print("creating blocks")
+            self.doSomething()
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        defer {
+            self = KlassWrapper(k: Klass())
+        }
+        print("foo bar")
+    }
+}
+
+////////////////
+// Cast Tests //
+////////////////
+
+public func castTest0(_ x: __owned SubKlass1) -> Klass {
+    var x2 = x  // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as Klass // expected-note {{use here}}
+}
+
+public func castTest1(_ x: __owned Klass) -> SubKlass1 {
+    var x2 = x  // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as! SubKlass1 // expected-note {{use here}}
+}
+
+public func castTest2(_ x: __owned Klass) -> SubKlass1? {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as? SubKlass1 // expected-note {{use here}}
+}
+
+public func castTestSwitch1(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    switch x2 {  // expected-note {{use here}}
+    case let k as SubKlass1:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitch2(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    switch x2 { // expected-note {{use here}}
+    case let k as SubKlass1:
+        print(k)
+    case let k as SubKlass2:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitchInLoop(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+
+    for _ in 0..<1024 {
+        switch x2 { // expected-note {{use here}}
+        case let k as SubKlass1:
+            print(k)
+        default:
+            print("Nope")
+        }
+    }
+}
+
+public func castTestIfLet(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    if case let k as SubKlass1 = x2 { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+public func castTestIfLetInLoop(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    for _ in 0..<1024 {
+        if case let k as SubKlass1 = x2 { // expected-note {{use here}}
+            print(k)
+        } else {
+            print("no")
+        }
+    }
+}
+
+public enum EnumWithKlass {
+    case none
+    case klass(Klass)
+}
+
+public func castTestIfLet2(_ x : __owned EnumWithKlass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    if case let .klass(k as SubKlass1) = x2 { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+///////////////
+// GEP Tests //
+///////////////
+
+public func castAccess(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let _ = x2.k // expected-note {{use here}}
+}
+
+public func castAccess2(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let _ = x2.k!.getOtherKlass() // expected-note {{use here}}
+}
+
+/////////////////////////
+// Partial Apply Tests //
+/////////////////////////
+
+// Emit a better error here. At least we properly error.
+public func partialApplyTest(_ x: __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let f = { // expected-note {{use here}}
+        print(x2)
+    }
+    f()
+}
+
+////////////////////////
+// Misc Tests on Self //
+////////////////////////
+
+extension KlassWrapper {
+
+    func doSomething() { print("foo") }
+
+    // This test makes sure that we are able to properly put in the destroy_addr
+    // in the "creating blocks" branch. There used to be a bug where the impl
+    // would need at least one destroy_addr to properly infer the value to put
+    // into blocks not reachable from the _move but that are on the dominance
+    // frontier from the _move. This was unnecessary and the test makes sure we
+    // do not fail on this again.
+    mutating func noDestroyAddrBeforeOptInsertAfter() {
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        self = .init(k: Klass())
+        print("foo bar")
+    }
+
+    // A derived version of noDestroyAddrBeforeOptInsertAfter that makes sure
+    // when we insert the destroy_addr, we destroy self at the end of the block.
+    mutating func noDestroyAddrBeforeOptInsertAfter2() {
+        if booleanValue {
+            print("creating blocks")
+            self.doSomething()
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        self = .init(k: Klass())
+        print("foo bar")
     }
 }
