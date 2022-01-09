@@ -258,6 +258,10 @@ public:
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
 
+  // Find a node by its kind, traversing the node depth-first,
+  // and bailing out early if not found at the 'maxDepth'.
+  NodePointer findByKind(Node::Kind kind, int maxDepth);
+
   /// Prints the whole node tree in readable form to stderr.
   ///
   /// Useful to be called from the debugger.

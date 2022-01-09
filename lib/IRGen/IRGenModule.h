@@ -401,7 +401,7 @@ public:
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
 
-  /// Emit type metadata recrods for functions that can be looked up by name at
+  /// Emit type metadata records for functions that can be looked up by name at
   /// runtime.
   void emitAccessibleFunctions();
 

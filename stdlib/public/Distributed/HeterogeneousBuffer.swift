@@ -12,14 +12,6 @@
 
 import Swift
 
-extension MemoryLayout {
-  /// Find the next offset that's appropriately aligned
-  /// for this type.
-  static func nextAlignedOffset(_ offset: Int) -> Int {
-    ((offset + alignment - 1) & ~(alignment - 1))
-  }
-}
-
 @available(SwiftStdlib 5.6, *)
 struct HeterogeneousBuffer {
   let types: [Any.Type]
@@ -75,6 +67,14 @@ struct HeterogeneousBuffer {
 
   func deallocate() {
     buffer.deallocate()
+  }
+}
+
+extension MemoryLayout {
+  /// Find the next offset that's appropriately aligned
+  /// for this type.
+  static func nextAlignedOffset(_ offset: Int) -> Int {
+    ((offset + alignment - 1) & ~(alignment - 1))
   }
 }
 
