@@ -1,0 +1,6 @@
+framework module WithSubmodule {
+  explicit module Submodule {
+    header "Submodule.h"
+    export *
+  }
+}
