@@ -726,33 +726,46 @@ public func enumPatternMatchIfLet2(_ x: EnumTy) {
 // This is wrong.
 public func enumPatternMatchSwitch1(_ x: EnumTy) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
-    switch x2 {
-    case let .klass(k):  // expected-note {{consuming use}}
+    switch x2 { // expected-note {{consuming use}}
+    case let .klass(k):
         classUseMoveOnlyWithoutEscaping(k)
-        // TODO: This should be flagged as a consuming use!
+        // This should be flagged as the use after free use. We are atleast
+        // erroring though.
         enumUseMoveOnlyWithoutEscaping(x2)
     case .int:
         break
     }
 }
 
-// This is wrong.
 public func enumPatternMatchSwitch2(_ x: EnumTy) {
-    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    @_noImplicitCopy let x2 = x
     switch x2 {
-    case let .klass(k): // expected-note {{consuming use}}
+    case let .klass(k):
         classUseMoveOnlyWithoutEscaping(k)
     case .int:
         break
     }
 }
 
-// This is wrong today. We should error on x2.
+// QOI: We can do better here. We should also flag x2
 public func enumPatternMatchSwitch2WhereClause(_ x: EnumTy) {
     @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
-    switch x2 {
-    case let .klass(k) // expected-note {{consuming use}}
+    switch x2 { // expected-note {{consuming use}}
+    case let .klass(k)
            where x2.doSomething():
+        classUseMoveOnlyWithoutEscaping(k)
+    case .int:
+        break
+    case .klass:
+        break
+    }
+}
+
+public func enumPatternMatchSwitch2WhereClause2(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    switch x2 {
+    case let .klass(k)
+           where boolValue:
         classUseMoveOnlyWithoutEscaping(k)
     case .int:
         break
