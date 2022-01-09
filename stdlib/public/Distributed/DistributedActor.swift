@@ -145,29 +145,6 @@ extension DistributedActor {
 }
 
 /******************************************************************************/
-/******************************** Misc ****************************************/
-/******************************************************************************/
-
-/// Error protocol to which errors thrown by any `DistributedActorSystem` should conform.
-@available(SwiftStdlib 5.6, *)
-public protocol DistributedActorSystemError: Error {
-}
-
-@available(SwiftStdlib 5.6, *)
-public struct DistributedActorCodingError: DistributedActorSystemError {
-  public let message: String
-
-  public init(message: String) {
-    self.message = message
-  }
-
-  public static func missingActorSystemUserInfo<Act>(_ actorType: Act.Type) -> Self
-      where Act: DistributedActor {
-    .init(message: "Missing DistributedActorSystem userInfo while decoding")
-  }
-}
-
-/******************************************************************************/
 /************************* Runtime Functions **********************************/
 /******************************************************************************/
 

@@ -415,6 +415,20 @@ void Node::reverseChildren(size_t StartingAt) {
   }
 }
 
+Node* Node::findByKind(Node::Kind kind, int maxDepth) {
+  if (getKind() == kind)
+    return this;
+
+  if (maxDepth <= 0)
+    return nullptr;
+
+  for (auto node : *this)
+    if (auto matchingChild = node->findByKind(kind, maxDepth - 1))
+      return matchingChild;
+
+  return nullptr;
+}
+
 //////////////////////////////////
 // NodeFactory member functions //
 //////////////////////////////////
