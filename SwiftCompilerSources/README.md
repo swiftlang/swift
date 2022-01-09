@@ -135,7 +135,7 @@ No yet implemented instruction classes are mapped to a "placeholder" instruction
 
 Similar to SIL, the optimizer also uses a small bridging layer (`OptimizerBridging.h`).
 Passes are registered in `registerSwiftPasses()`, called from `initializeSwiftModules()`.
-The C++ PassManager can then call a Swift pass like any other `SILFunctionTransform` pass.
+The C++ `PassManager` can then call a Swift pass like any other `SILFunctionTransform` pass.
 
 To add a new function pass:
 
@@ -160,7 +160,7 @@ To add a new instruction pass:
 * create a new Swift file in `SwiftCompilerSources/Optimizer/InstructionPasses`
 * add an `InstructionPass` global
 * register the pass in `registerSwiftPasses()`
-* if this passes replaces an existing `SILCombiner` visit function, remove the old visit function
+* if this pass replaces an existing `SILCombiner` visit function, remove the old visit function
 
 ## Performance
 
