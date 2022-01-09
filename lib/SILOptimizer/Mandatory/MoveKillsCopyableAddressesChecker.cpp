@@ -751,7 +751,10 @@ bool ClosureArgDataflowState::performLivenessDataflow(
   for (unsigned i : indices(livenessWorklist)) {
     auto *&user = livenessWorklist[i];
 
+    // If our use is in the first block, then we are done with this user. Set
+    // the found single liveness use flag and continue!
     if (frontBlock == user->getParent()) {
+      foundSingleLivenessUse = true;
       continue;
     }
 
