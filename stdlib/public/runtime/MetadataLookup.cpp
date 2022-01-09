@@ -1898,6 +1898,158 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
                                     {}, {}).getType().getMetadata();
 }
 
+// ==== Function metadata functions ----------------------------------------------
+
+static llvm::Optional<llvm::StringRef>
+cstrToStringRef(const char *typeNameStart, size_t typeNameLength) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  for (char c : typeName) {
+    if (c >= '\x01' && c <= '\x1F')
+      return llvm::None;
+  }
+  return typeName;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+unsigned
+swift_func_getParameterCount(const char *typeNameStart, size_t typeNameLength) {
+  llvm::Optional<llvm::StringRef> typeName =
+      cstrToStringRef(typeNameStart, typeNameLength);
+  if (!typeName)
+    return -1;
+
+  StackAllocatedDemangler<1024> demangler;
+
+  auto node = demangler.demangleSymbol(*typeName);
+  if (!node) return -2;
+
+  node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
+  if (!node) return -3;
+
+  node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
+  if (!node) return -4;
+
+  node = node->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/3);
+  // Get the "deepest" Tuple from the ArgumentTuple, that's the arguments
+  while (node && node->getKind() != Node::Kind::Tuple) {
+    node = node->getFirstChild();
+  }
+
+  if (node) {
+    return node->getNumChildren();
+  }
+
+  return -5;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+const Metadata *_Nullable
+swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength) {
+  llvm::Optional<llvm::StringRef> typeName =
+      cstrToStringRef(typeNameStart, typeNameLength);
+  if (!typeName) return nullptr;
+
+  StackAllocatedDemangler<1024> demangler;
+  auto node = demangler.demangleSymbol(*typeName);
+  if (!node) return nullptr;
+
+  node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
+  if (!node) return nullptr;
+
+  node = node->findByKind(Node::Kind::ReturnType, /*maxDepth=*/4);
+  if (!node) return nullptr;
+
+  DecodedMetadataBuilder builder(
+      demangler,
+      /*substGenericParam=*/
+      [](unsigned, unsigned) { return nullptr; },
+      /*SubstDependentWitnessTableFn=*/
+      [](const Metadata *, unsigned) { return nullptr; });
+
+  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+  auto builtTypeOrError = decoder.decodeMangledType(node);
+  if (builtTypeOrError.isError()) {
+    auto err = builtTypeOrError.getError();
+    char *errStr = err->copyErrorString();
+    err->freeErrorString(errStr);
+    return nullptr;
+  }
+
+  return builtTypeOrError.getType();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+unsigned
+swift_func_getParameterTypeInfo(
+    const char *typeNameStart, size_t typeNameLength,
+    Metadata const **types, unsigned typesLength) {
+  if (typesLength < 0) return -1;
+
+  llvm::Optional<llvm::StringRef> typeName =
+      cstrToStringRef(typeNameStart, typeNameLength);
+  if (!typeName) return -1;
+
+  StackAllocatedDemangler<1024> demangler;
+  auto node = demangler.demangleSymbol(*typeName);
+  if (!node) return -1;
+
+  node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
+  if (!node) return -3;
+
+  node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
+  if (!node) return -4;
+
+  node = node->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/3);
+  // Get the "deepest" Tuple from the ArgumentTuple, that's the arguments
+  while (node && node->getKind() != Node::Kind::Tuple) {
+    node = node->getFirstChild();
+  }
+
+  // Only successfully return if the expected parameter count is the same
+  // as space prepared for it in the buffer.
+  if (!node || (node && node->getNumChildren() != typesLength)) {
+    return -5;
+  }
+
+  DecodedMetadataBuilder builder(
+      demangler,
+      /*substGenericParam=*/
+      [](unsigned, unsigned) { return nullptr; },
+      /*SubstDependentWitnessTableFn=*/
+      [](const Metadata *, unsigned) { return nullptr; });
+  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+
+  auto typeIdx = 0;
+  // for each parameter (TupleElement), store it into the provided buffer
+  for (auto tupleElement : *node) {
+    assert(tupleElement->getKind() == Node::Kind::TupleElement);
+    assert(tupleElement->getNumChildren() == 1);
+
+    auto typeNode = tupleElement->getFirstChild();
+    assert(typeNode->getKind() == Node::Kind::Type);
+
+    auto builtTypeOrError = decoder.decodeMangledType(tupleElement);
+    if (builtTypeOrError.isError()) {
+      auto err = builtTypeOrError.getError();
+      char *errStr = err->copyErrorString();
+      err->freeErrorString(errStr);
+      typeIdx += 1;
+      continue;
+    }
+
+    types[typeIdx] = builtTypeOrError.getType();
+    typeIdx += 1;
+  } // end foreach parameter
+
+  if (node) {
+    return node->getNumChildren();
+  }
+
+  return -9;
+}
+
+// ==== End of Function metadata functions ---------------------------------------
+
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 MetadataResponse
 swift_getOpaqueTypeMetadata(MetadataRequest request,
@@ -1964,12 +2116,9 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
       MetadataState::Complete, demangler, node,
       nullptr,
       /* no substitutions */
-      [&](unsigned depth, unsigned index) {
-        return nullptr;
-      },
-      [&](const Metadata *type, unsigned index) {
-        return nullptr;
-      }).getType().getMetadata();
+      [&](unsigned depth, unsigned index) { return nullptr; },
+      [&](const Metadata *type, unsigned index) { return nullptr; }
+    ).getType().getMetadata();
   } else {
     metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
                                                           typeStr.size());
@@ -2059,7 +2208,7 @@ buildEnvironmentPath(
   unsigned totalKeyParamCount = 0;
   auto genericParams = environment->getGenericParameters();
   for (unsigned numLocalParams : environment->getGenericParameterCounts()) {
-    // Adkjust totalParamCount so we have the # of local parameters.
+    // Adjust totalParamCount so we have the # of local parameters.
     numLocalParams -= totalParamCount;
 
     // Get the local generic parameters.

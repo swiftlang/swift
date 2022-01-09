@@ -176,6 +176,7 @@ namespace irgen {
       AsyncLetGetThrowing,
       AsyncLetFinish,
       TaskGroupWaitNext,
+      DistributedExecuteTarget,
     };
 
     class Kind {
@@ -221,6 +222,7 @@ namespace irgen {
         case SpecialKind::AsyncLetWait:
         case SpecialKind::AsyncLetWaitThrowing:
         case SpecialKind::TaskGroupWaitNext:
+        case SpecialKind::DistributedExecuteTarget:
           return false;
         }
         
@@ -243,6 +245,7 @@ namespace irgen {
         case SpecialKind::AsyncLetGetThrowing:
         case SpecialKind::AsyncLetFinish:
         case SpecialKind::TaskGroupWaitNext:
+        case SpecialKind::DistributedExecuteTarget:
           return true;
         }
         llvm_unreachable("covered switch");

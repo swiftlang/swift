@@ -210,7 +210,7 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
         Address(currentOffset, IGM.getPointerAlignment()),
         IGM.getStoragePointerType(paramTy));
 
-    // 3. Adjust typed pointer to the alignement of the type.
+    // 3. Adjust typed pointer to the alignment of the type.
     auto alignedOffset = typeInfo.roundUpToTypeAlignment(IGF, eltPtr, paramTy);
 
     if (paramTy.isObject()) {
