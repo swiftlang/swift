@@ -251,26 +251,56 @@ struct ClosureOperandState {
   /// points.
   DebugValueInst *singleDebugValue = nullptr;
 
-  /// If set to true, this closure invocation propagates a use upwards that will
-  /// result in an error.
-  bool isUpwardsUse = false;
+  bool isUpwardsUse() const {
+    return result == DownwardScanResult::ClosureUse;
+  }
 
-  /// If set to true, then the var in the callee is reinited and or destroyed
-  /// with a destroy_addr. We can convert the inout_aliasable to an out
-  /// parameter.
-  bool isUpwardsConsume = false;
-
-  /// We do not propagate inits towards function exits, we just use them to stop
-  /// propagating uses or consumes. This is because we only care about analyzing
-  /// the address while the parameter value has not be reinited over. We can
-  /// rely on SILGen when working with vars (the only way this can happen).
-  bool isUpwardsInit = false;
+  bool isUpwardsConsume() const {
+    return result == DownwardScanResult::ClosureConsume;
+  }
 };
 
 } // namespace
 
+static void convertMemoryReinitToInitForm(SILInstruction *memInst) {
+  switch (memInst->getKind()) {
+  default:
+    llvm_unreachable("unsupported?!");
+
+  case SILInstructionKind::CopyAddrInst: {
+    auto *cai = cast<CopyAddrInst>(memInst);
+    cai->setIsInitializationOfDest(IsInitialization_t::IsInitialization);
+    return;
+  }
+  case SILInstructionKind::StoreInst: {
+    auto *si = cast<StoreInst>(memInst);
+    si->setOwnershipQualifier(StoreOwnershipQualifier::Init);
+    return;
+  }
+  }
+}
+
+static bool memInstMustReinitialize(Operand *memOper) {
+  SILValue address = memOper->get();
+  auto *memInst = memOper->getUser();
+  switch (memInst->getKind()) {
+  default:
+    return false;
+
+  case SILInstructionKind::CopyAddrInst: {
+    auto *CAI = cast<CopyAddrInst>(memInst);
+    return CAI->getDest() == address && !CAI->isInitializationOfDest();
+  }
+  case SILInstructionKind::StoreInst: {
+    auto *si = cast<StoreInst>(memInst);
+    return si->getDest() == address &&
+           si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
+  }
+  }
+}
+
 //===----------------------------------------------------------------------===//
-//                               Use Gathering
+//                               Use State
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -704,7 +734,6 @@ bool ClosureArgDataflowState::handleSingleBlockCase(
           return false;
 
         state.pairedConsumingInsts.push_back(dvi);
-        state.isUpwardsConsume = true;
         state.result = DownwardScanResult::ClosureConsume;
         return true;
       }
@@ -718,7 +747,6 @@ bool ClosureArgDataflowState::handleSingleBlockCase(
         return false;
 
       state.pairedConsumingInsts.push_back(&inst);
-      state.isUpwardsConsume = true;
       state.result = DownwardScanResult::ClosureConsume;
       return true;
     }
@@ -728,7 +756,6 @@ bool ClosureArgDataflowState::handleSingleBlockCase(
       LLVM_DEBUG(llvm::dbgs()
                  << "ClosureArgDataflow: Found liveness use: " << inst);
       state.pairedUseInsts.push_back(&inst);
-      state.isUpwardsUse = true;
       state.result = DownwardScanResult::ClosureUse;
       return true;
     }
@@ -923,7 +950,6 @@ bool ClosureArgDataflowState::process(
         state.pairedUseInsts.push_back(ptr);
       }
     }
-    state.isUpwardsUse = true;
     state.result = DownwardScanResult::ClosureUse;
     return true;
   }
@@ -960,7 +986,6 @@ bool ClosureArgDataflowState::process(
         return false;
       postDominatingConsumingUsers.insert(ptr);
     }
-    state.isUpwardsConsume = true;
     state.result = DownwardScanResult::ClosureConsume;
     return true;
   }
