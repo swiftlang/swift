@@ -136,6 +136,13 @@ public func errorLoopMultipleMove(_ x: __owned Klass) -> () { // expected-error 
     }
 }
 
+public func errorLoopMultipleMove1(_ x: __owned Klass) -> () { // expected-error {{'x' used after being moved}}
+    for _ in 0..<1024 {
+        let _ = _move(x) // expected-note {{move here}}
+                         // expected-note @-1 {{cyclic move here. move will occur multiple times in the loop}}
+    }
+}
+
 public func errorLoopMoveOfParameter(_ x: __owned Klass) -> () { // expected-error {{'x' used after being moved}}
     let _ = _move(x) // expected-note {{move here}}
     for _ in 0..<1024 {
