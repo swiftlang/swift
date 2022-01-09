@@ -19,6 +19,10 @@ var booleanValue: Bool { false }
 func nonConsumingUse<T>(_ k: T) {}
 func exchangeUse<T>(_ k: __owned T) -> T { k }
 
+public protocol P {}
+public protocol SubP1 : P {}
+public protocol SubP2 : P {}
+
 ///////////
 // Tests //
 ///////////
@@ -206,7 +210,7 @@ struct S<T> {
 // Defer Tests //
 /////////////////
 
-protocol P {
+protocol DeferTestProtocol {
     var k: Klass { get }
 
     static func getP() -> Self
@@ -222,7 +226,7 @@ protocol P {
     mutating func deferTestFail7()
 }
 
-extension P {
+extension DeferTestProtocol {
     mutating func deferTestSuccess1() {
         let selfType = type(of: self)
         let _ = _move(self)
@@ -341,5 +345,111 @@ extension P {
             print("foo bar")
         }
         print("123")
+    }
+}
+
+////////////////
+// Cast Tests //
+////////////////
+
+public func castTest0<T : SubP1>(_ x: __owned T) -> P {
+    var x2 = x  // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as P // expected-note {{use here}}
+}
+
+public func castTest1<T : P>(_ x: __owned T) -> SubP1 {
+    var x2 = x  // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as! SubP1 // expected-note {{use here}}
+}
+
+public func castTest2<T : P>(_ x: __owned T) -> SubP1? {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as? SubP1 // expected-note {{use here}}
+}
+
+public func castTestSwitch1<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    switch x2 {  // expected-note {{use here}}
+    case let k as SubP1:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitch2<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    switch x2 { // expected-note {{use here}}
+    case let k as SubP1:
+        print(k)
+    case let k as SubP2:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitchInLoop<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+
+    for _ in 0..<1024 {
+        switch x2 { // expected-note {{use here}}
+        case let k as SubP1:
+            print(k)
+        default:
+            print("Nope")
+        }
+    }
+}
+
+public func castTestIfLet<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    if case let k as SubP1 = x2 { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+public func castTestIfLetInLoop<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    for _ in 0..<1024 {
+        if case let k as SubP1 = x2 { // expected-note {{use here}}
+            print(k)
+        } else {
+            print("no")
+        }
+    }
+}
+
+public enum EnumWithP<T> {
+    case none
+    case klass(T)
+}
+
+public func castTestIfLet2<T : P>(_ x : __owned EnumWithP<T>) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    if case let .klass(k as SubP1) = x2 { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
     }
 }
