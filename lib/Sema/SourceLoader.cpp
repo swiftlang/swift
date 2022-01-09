@@ -73,7 +73,7 @@ bool SourceLoader::canImportModule(ImportPath::Module path,
                                    llvm::VersionTuple version,
                                    bool underlyingVersion) {
   // FIXME: Swift submodules?
-  if (path.size() > 1)
+  if (path.hasSubmodule())
     return false;
 
   auto ID = path[0];
