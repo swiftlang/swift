@@ -697,7 +697,7 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
 
     // If we see a destroy, then we know we are upwards consume... stash it so
     // that we can destroy it
-    if (auto *dvi = dyn_cast<DestroyValueInst>(&inst)) {
+    if (auto *dvi = dyn_cast<DestroyAddrInst>(&inst)) {
       if (useState.destroyToIndexMap.count(dvi)) {
         LLVM_DEBUG(llvm::dbgs()
                    << "ClosureArgDataflow: Found Consume: " << *dvi);
