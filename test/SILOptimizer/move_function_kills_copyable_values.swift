@@ -363,3 +363,19 @@ public func partialApplyTest(_ x: __owned Klass) { // expected-error {{'x' used 
     }
     f()
 }
+
+/////////////////
+// Defer Tests //
+/////////////////
+
+// TODO: Improve this error msg.
+//
+// NOTE: This will require adding knowledge about captured defer arguments for
+// values. This at least prevents the error from happening.
+public func deferTest(_ x: __owned Klass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    defer { // expected-note {{use here}}
+        nonConsumingUse(x)
+    }
+    print("do Something")
+}
