@@ -9,6 +9,8 @@ import Swift
 //////////////////
 
 public class Klass {}
+public class SubKlass1 : Klass {}
+public class SubKlass2 : Klass {}
 
 struct KlassWrapper {
     var k: Klass
@@ -388,5 +390,111 @@ extension KlassWrapper {
             print("foo bar")
         }
         print("123")
+    }
+}
+
+////////////////
+// Cast Tests //
+////////////////
+
+public func castTest0(_ x: __owned SubKlass1) -> Klass {
+    var x2 = x  // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as Klass // expected-note {{use here}}
+}
+
+public func castTest1(_ x: __owned Klass) -> SubKlass1 {
+    var x2 = x  // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as! SubKlass1 // expected-note {{use here}}
+}
+
+public func castTest2(_ x: __owned Klass) -> SubKlass1? {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as? SubKlass1 // expected-note {{use here}}
+}
+
+public func castTestSwitch1(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    switch x2 {  // expected-note {{use here}}
+    case let k as SubKlass1:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitch2(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    switch x2 { // expected-note {{use here}}
+    case let k as SubKlass1:
+        print(k)
+    case let k as SubKlass2:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitchInLoop(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+
+    for _ in 0..<1024 {
+        switch x2 { // expected-note {{use here}}
+        case let k as SubKlass1:
+            print(k)
+        default:
+            print("Nope")
+        }
+    }
+}
+
+public func castTestIfLet(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    if case let k as SubKlass1 = x2 { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+public func castTestIfLetInLoop(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    for _ in 0..<1024 {
+        if case let k as SubKlass1 = x2 { // expected-note {{use here}}
+            print(k)
+        } else {
+            print("no")
+        }
+    }
+}
+
+public enum EnumWithKlass {
+    case none
+    case klass(Klass)
+}
+
+public func castTestIfLet2(_ x : __owned EnumWithKlass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    if case let .klass(k as SubKlass1) = x2 { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
     }
 }
