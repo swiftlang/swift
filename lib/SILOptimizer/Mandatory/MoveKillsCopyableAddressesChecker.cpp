@@ -251,97 +251,16 @@ struct ClosureOperandState {
   /// points.
   DebugValueInst *singleDebugValue = nullptr;
 
-  /// If set to true, this closure invocation propagates a use upwards that will
-  /// result in an error.
-  bool isUpwardsUse = false;
+  bool isUpwardsUse() const {
+    return result == DownwardScanResult::ClosureUse;
+  }
 
-  /// If set to true, then the var in the callee is reinited and or destroyed
-  /// with a destroy_addr. We can convert the inout_aliasable to an out
-  /// parameter.
-  bool isUpwardsConsume = false;
-
-  /// We do not propagate inits towards function exits, we just use them to stop
-  /// propagating uses or consumes. This is because we only care about analyzing
-  /// the address while the parameter value has not be reinited over. We can
-  /// rely on SILGen when working with vars (the only way this can happen).
-  bool isUpwardsInit = false;
+  bool isUpwardsConsume() const {
+    return result == DownwardScanResult::ClosureConsume;
+  }
 };
 
 } // namespace
-
-//===----------------------------------------------------------------------===//
-//                               Use Gathering
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct UseState {
-  SILValue address;
-  SmallVector<MarkUnresolvedMoveAddrInst *, 1> markMoves;
-  SmallPtrSet<SILInstruction *, 1> seenMarkMoves;
-  SmallSetVector<SILInstruction *, 2> inits;
-  SmallSetVector<SILInstruction *, 4> livenessUses;
-  SmallBlotSetVector<DestroyAddrInst *, 4> destroys;
-  llvm::SmallDenseMap<SILInstruction *, unsigned, 4> destroyToIndexMap;
-  SmallBlotSetVector<SILInstruction *, 4> reinits;
-  llvm::SmallDenseMap<SILInstruction *, unsigned, 4> reinitToIndexMap;
-  llvm::SmallMapVector<Operand *, ClosureOperandState, 1>
-      consumingClosureOperands;
-  llvm::SmallDenseMap<Operand *, unsigned, 1> consumingClosureOperandToIndexMap;
-
-  void insertMarkUnresolvedMoveAddr(MarkUnresolvedMoveAddrInst *inst) {
-    if (!seenMarkMoves.insert(inst).second)
-      return;
-    markMoves.emplace_back(inst);
-  }
-
-  void insertDestroy(DestroyAddrInst *dai) {
-    destroyToIndexMap[dai] = destroys.size();
-    destroys.insert(dai);
-  }
-
-  void insertReinit(SILInstruction *inst) {
-    reinitToIndexMap[inst] = reinits.size();
-    reinits.insert(inst);
-  }
-
-  void insertConsumingClosureOperand(Operand *op) {
-    consumingClosureOperandToIndexMap[op] = consumingClosureOperands.size();
-    consumingClosureOperands[op] = {};
-  }
-
-  void clear() {
-    address = SILValue();
-    markMoves.clear();
-    seenMarkMoves.clear();
-    inits.clear();
-    livenessUses.clear();
-    destroys.clear();
-    destroyToIndexMap.clear();
-    reinits.clear();
-    reinitToIndexMap.clear();
-    consumingClosureOperands.clear();
-    consumingClosureOperandToIndexMap.clear();
-  }
-
-  SILFunction *getFunction() const { return address->getFunction(); }
-};
-
-/// Visit all of the uses of a lexical lifetime, initializing useState as we go.
-struct GatherLexicalLifetimeUseVisitor : public AccessUseVisitor {
-  UseState &useState;
-
-  GatherLexicalLifetimeUseVisitor(UseState &useState)
-      : AccessUseVisitor(AccessUseType::Overlapping,
-                         NestedAccessType::IgnoreAccessBegin),
-        useState(useState) {}
-
-  bool visitUse(Operand *op, AccessUseType useTy) override;
-  void reset(SILValue address) { useState.address = address; }
-  void clear() { useState.clear(); }
-};
-
-} // end anonymous namespace
 
 static void convertMemoryReinitToInitForm(SILInstruction *memInst) {
   switch (memInst->getKind()) {
@@ -380,80 +299,64 @@ static bool memInstMustReinitialize(Operand *memOper) {
   }
 }
 
-// Filter out recognized uses that do not write to memory.
-//
-// TODO: Ensure that all of the conditional-write logic below is encapsulated in
-// mayWriteToMemory and just call that instead. Possibly add additional
-// verification that visitAccessPathUses recognizes all instructions that may
-// propagate pointers (even though they don't write).
-bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
-                                               AccessUseType useTy) {
-  // If this operand is for a dependent type, then it does not actually access
-  // the operand's address value. It only uses the metatype defined by the
-  // operation (e.g. open_existential).
-  if (op->isTypeDependent()) {
-    return true;
+//===----------------------------------------------------------------------===//
+//                               Use State
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct UseState {
+  SILValue address;
+  SmallVector<MarkUnresolvedMoveAddrInst *, 1> markMoves;
+  SmallPtrSet<SILInstruction *, 1> seenMarkMoves;
+  SmallSetVector<SILInstruction *, 2> inits;
+  SmallSetVector<SILInstruction *, 4> livenessUses;
+  SmallBlotSetVector<DestroyAddrInst *, 4> destroys;
+  llvm::SmallDenseMap<SILInstruction *, unsigned, 4> destroyToIndexMap;
+  SmallBlotSetVector<SILInstruction *, 4> reinits;
+  llvm::SmallDenseMap<SILInstruction *, unsigned, 4> reinitToIndexMap;
+  llvm::SmallMapVector<Operand *, ClosureOperandState, 1> closureUses;
+  llvm::SmallDenseMap<Operand *, unsigned, 1> closureOperandToIndexMap;
+
+  void insertMarkUnresolvedMoveAddr(MarkUnresolvedMoveAddrInst *inst) {
+    if (!seenMarkMoves.insert(inst).second)
+      return;
+    markMoves.emplace_back(inst);
   }
 
-  // If we have a move from src, this is a mark_move we want to visit.
-  if (auto *move = dyn_cast<MarkUnresolvedMoveAddrInst>(op->getUser())) {
-    if (move->getSrc() == op->get()) {
-      LLVM_DEBUG(llvm::dbgs() << "Found move: " << *move);
-      useState.insertMarkUnresolvedMoveAddr(move);
-      return true;
-    }
+  void insertDestroy(DestroyAddrInst *dai) {
+    destroyToIndexMap[dai] = destroys.size();
+    destroys.insert(dai);
   }
 
-  if (memInstMustInitialize(op)) {
-    LLVM_DEBUG(llvm::dbgs() << "Found init: " << *op->getUser());
-    useState.inits.insert(op->getUser());
-    return true;
+  void insertReinit(SILInstruction *inst) {
+    reinitToIndexMap[inst] = reinits.size();
+    reinits.insert(inst);
   }
 
-  if (memInstMustReinitialize(op)) {
-    LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *op->getUser());
-    useState.insertReinit(op->getUser());
-    return true;
+  void insertClosureOperand(Operand *op) {
+    closureOperandToIndexMap[op] = closureUses.size();
+    closureUses[op] = {};
   }
 
-  if (auto *dvi = dyn_cast<DestroyAddrInst>(op->getUser())) {
-    // If we see a destroy_addr not on our base address, bail! Just error and
-    // say that we do not understand the code.
-    if (dvi->getOperand() != useState.address) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "!!! Error! Found destroy_addr no on base address: "
-                 << *dvi);
-      return false;
-    }
-    LLVM_DEBUG(llvm::dbgs() << "Found destroy_addr: " << *dvi);
-    useState.insertDestroy(dvi);
-    return true;
+  void clear() {
+    address = SILValue();
+    markMoves.clear();
+    seenMarkMoves.clear();
+    inits.clear();
+    livenessUses.clear();
+    destroys.clear();
+    destroyToIndexMap.clear();
+    reinits.clear();
+    reinitToIndexMap.clear();
+    closureUses.clear();
+    closureOperandToIndexMap.clear();
   }
 
-  // Then see if we have a inout_aliasable full apply site use. In that case, we
-  // are going to try and extend move checking into the partial apply using
-  // cloning to eliminate destroys or reinits.
-  if (auto fas = FullApplySite::isa(op->getUser())) {
-    if (fas.getArgumentOperandConvention(*op) ==
-        SILArgumentConvention::Indirect_InoutAliasable) {
-      // If we don't find the function, we can't handle this, so bail.
-      auto *func = fas.getCalleeFunction();
-      if (!func || !func->isDefer())
-        return false;
-      useState.insertConsumingClosureOperand(op);
-      return true;
-    }
-  }
+  SILFunction *getFunction() const { return address->getFunction(); }
+};
 
-  // Ignore dealloc_stack.
-  if (isa<DeallocStackInst>(op->getUser()))
-    return true;
-
-  LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *op->getUser());
-  useState.livenessUses.insert(op->getUser());
-
-  return true;
-}
+} // namespace
 
 //===----------------------------------------------------------------------===//
 //                                  Dataflow
@@ -505,14 +408,14 @@ downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
     if (auto fas = FullApplySite::isa(&next)) {
       LLVM_DEBUG(llvm::dbgs() << "DownwardScan: ClosureCheck: " << **fas);
       for (auto &op : fas.getArgumentOperands()) {
-        auto iter = useState.consumingClosureOperands.find(&op);
-        if (iter == useState.consumingClosureOperands.end()) {
+        auto iter = useState.closureUses.find(&op);
+        if (iter == useState.closureUses.end()) {
           continue;
         }
 
         LLVM_DEBUG(llvm::dbgs()
                    << "DownwardScan: ClosureCheck: Matching Operand: "
-                   << fas.getAppliedArgIndex(op) << '\n');
+                   << fas.getAppliedArgIndex(op));
         *foundInst = &next;
         *foundOperand = &op;
         switch (iter->second.result) {
@@ -523,10 +426,12 @@ downwardScanForMoveOut(MarkUnresolvedMoveAddrInst *mvi, UseState &useState,
         case DownwardScanResult::MoveOut:
           llvm_unreachable("unhandled");
         case DownwardScanResult::ClosureConsume:
+          LLVM_DEBUG(llvm::dbgs() << ". ClosureConsume.\n");
           llvm::copy(iter->second.pairedConsumingInsts,
                      std::back_inserter(foundClosureInsts));
           break;
         case DownwardScanResult::ClosureUse:
+          LLVM_DEBUG(llvm::dbgs() << ". ClosureUse.\n");
           llvm::copy(iter->second.pairedUseInsts,
                      std::back_inserter(foundClosureInsts));
           break;
@@ -572,8 +477,7 @@ static bool upwardScanForUseOut(SILInstruction *inst, UseState &useState) {
       return false;
     if (auto fas = FullApplySite::isa(&iter)) {
       for (auto &op : fas.getArgumentOperands()) {
-        if (useState.consumingClosureOperands.find(&op) !=
-            useState.consumingClosureOperands.end())
+        if (useState.closureUses.find(&op) != useState.closureUses.end())
           return false;
       }
     }
@@ -602,8 +506,7 @@ static bool upwardScanForDestroys(SILInstruction *inst, UseState &useState) {
       return false;
     if (auto fas = FullApplySite::isa(&iter)) {
       for (auto &op : fas.getArgumentOperands()) {
-        if (useState.consumingClosureOperands.find(&op) !=
-            useState.consumingClosureOperands.end())
+        if (useState.closureUses.find(&op) != useState.closureUses.end())
           return false;
       }
     }
@@ -626,8 +529,7 @@ static bool upwardScanForInit(SILInstruction *inst, UseState &useState) {
       return false;
     if (auto fas = FullApplySite::isa(&iter)) {
       for (auto &op : fas.getArgumentOperands()) {
-        if (useState.consumingClosureOperands.find(&op) !=
-            useState.consumingClosureOperands.end())
+        if (useState.closureUses.find(&op) != useState.closureUses.end())
           return false;
       }
     }
@@ -650,14 +552,14 @@ namespace {
 /// since there must be some sort of use for the closure to even reference it
 /// and the compiler emits assigns when it reinitializes vars this early in the
 /// pipeline.
-struct ConsumingClosureArgDataflowState {
+struct ClosureArgDataflowState {
   SmallVector<SILInstruction *, 32> livenessWorklist;
   SmallVector<SILInstruction *, 32> consumingWorklist;
   PrunedLiveness livenessForConsumes;
   UseState &useState;
 
 public:
-  ConsumingClosureArgDataflowState(UseState &useState) : useState(useState) {}
+  ClosureArgDataflowState(UseState &useState) : useState(useState) {}
 
   bool process(
       SILArgument *arg, ClosureOperandState &state,
@@ -688,7 +590,7 @@ private:
 
 } // namespace
 
-bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
+bool ClosureArgDataflowState::handleSingleBlockCase(
     SILArgument *address, ClosureOperandState &state) {
   // Walk the instructions from the beginning of the block to the end.
   for (auto &inst : *address->getParent()) {
@@ -697,7 +599,7 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
 
     // If we see a destroy, then we know we are upwards consume... stash it so
     // that we can destroy it
-    if (auto *dvi = dyn_cast<DestroyValueInst>(&inst)) {
+    if (auto *dvi = dyn_cast<DestroyAddrInst>(&inst)) {
       if (useState.destroyToIndexMap.count(dvi)) {
         LLVM_DEBUG(llvm::dbgs()
                    << "ClosureArgDataflow: Found Consume: " << *dvi);
@@ -706,7 +608,6 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
           return false;
 
         state.pairedConsumingInsts.push_back(dvi);
-        state.isUpwardsConsume = true;
         state.result = DownwardScanResult::ClosureConsume;
         return true;
       }
@@ -720,7 +621,6 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
         return false;
 
       state.pairedConsumingInsts.push_back(&inst);
-      state.isUpwardsConsume = true;
       state.result = DownwardScanResult::ClosureConsume;
       return true;
     }
@@ -730,7 +630,6 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
       LLVM_DEBUG(llvm::dbgs()
                  << "ClosureArgDataflow: Found liveness use: " << inst);
       state.pairedUseInsts.push_back(&inst);
-      state.isUpwardsUse = true;
       state.result = DownwardScanResult::ClosureUse;
       return true;
     }
@@ -741,9 +640,10 @@ bool ConsumingClosureArgDataflowState::handleSingleBlockCase(
   return false;
 }
 
-bool ConsumingClosureArgDataflowState::performLivenessDataflow(
+bool ClosureArgDataflowState::performLivenessDataflow(
     const BasicBlockSet &initBlocks, const BasicBlockSet &livenessBlocks,
     const BasicBlockSet &consumingBlocks) {
+  LLVM_DEBUG(llvm::dbgs() << "ClosureArgLivenessDataflow. Start!\n");
   bool foundSingleLivenessUse = false;
   auto *fn = useState.getFunction();
   auto *frontBlock = &*fn->begin();
@@ -752,8 +652,12 @@ bool ConsumingClosureArgDataflowState::performLivenessDataflow(
   for (unsigned i : indices(livenessWorklist)) {
     auto *&user = livenessWorklist[i];
 
-    if (frontBlock == user->getParent())
+    // If our use is in the first block, then we are done with this user. Set
+    // the found single liveness use flag and continue!
+    if (frontBlock == user->getParent()) {
+      foundSingleLivenessUse = true;
       continue;
+    }
 
     bool success = false;
     for (auto *predBlock : user->getParent()->getPredecessorBlocks()) {
@@ -782,7 +686,7 @@ bool ConsumingClosureArgDataflowState::performLivenessDataflow(
   return foundSingleLivenessUse;
 }
 
-bool ConsumingClosureArgDataflowState::performConsumingDataflow(
+bool ClosureArgDataflowState::performConsumingDataflow(
     const BasicBlockSet &initBlocks, const BasicBlockSet &consumingBlocks) {
   auto *fn = useState.getFunction();
   auto *frontBlock = &*fn->begin();
@@ -821,18 +725,20 @@ bool ConsumingClosureArgDataflowState::performConsumingDataflow(
   return foundSingleConsumingUse;
 }
 
-void ConsumingClosureArgDataflowState::classifyUses(
-    BasicBlockSet &initBlocks, BasicBlockSet &livenessBlocks,
-    BasicBlockSet &consumingBlocks) {
+void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
+                                           BasicBlockSet &livenessBlocks,
+                                           BasicBlockSet &consumingBlocks) {
 
   for (auto *user : useState.inits) {
     if (upwardScanForInit(user, useState)) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found init block at: " << *user);
       initBlocks.insert(user->getParent());
     }
   }
 
   for (auto *user : useState.livenessUses) {
     if (upwardScanForUseOut(user, useState)) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found use block at: " << *user);
       livenessBlocks.insert(user->getParent());
       livenessWorklist.push_back(user);
     }
@@ -868,7 +774,7 @@ void ConsumingClosureArgDataflowState::classifyUses(
   }
 }
 
-bool ConsumingClosureArgDataflowState::process(
+bool ClosureArgDataflowState::process(
     SILArgument *address, ClosureOperandState &state,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
   clear();
@@ -915,10 +821,11 @@ bool ConsumingClosureArgDataflowState::process(
   if (performLivenessDataflow(initBlocks, livenessBlocks, consumingBlocks)) {
     for (unsigned i : indices(livenessWorklist)) {
       if (auto *ptr = livenessWorklist[i]) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "ClosureArgLivenessDataflow. Liveness User: " << *ptr);
         state.pairedUseInsts.push_back(ptr);
       }
     }
-    state.isUpwardsUse = true;
     state.result = DownwardScanResult::ClosureUse;
     return true;
   }
@@ -932,8 +839,10 @@ bool ConsumingClosureArgDataflowState::process(
     // debug_value user. If we have many we can't handle it since something in
     // SILGen is emitting weird code. Our tests will ensure that SILGen does not
     // diverge by mistake. So we are really just being careful.
-    if (hasMoreThanOneDebugUse(address))
+    if (hasMoreThanOneDebugUse(address)) {
+      // Failing b/c more than one debug use!
       return false;
+    }
 
     SWIFT_DEFER { livenessForConsumes.clear(); };
     auto *frontBlock = &*fn->begin();
@@ -953,7 +862,6 @@ bool ConsumingClosureArgDataflowState::process(
         return false;
       postDominatingConsumingUsers.insert(ptr);
     }
-    state.isUpwardsConsume = true;
     state.result = DownwardScanResult::ClosureConsume;
     return true;
   }
@@ -1324,6 +1232,103 @@ void ClosureArgumentInOutToOutCloner::populateCloned() {
       });
 }
 
+/////////////////////////////////////
+// Caller Lexical Lifetime Visitor //
+/////////////////////////////////////
+
+namespace {
+
+/// Visit all of the uses of a lexical lifetime, initializing useState as we go.
+struct GatherLexicalLifetimeUseVisitor : public AccessUseVisitor {
+  UseState &useState;
+
+  GatherLexicalLifetimeUseVisitor(UseState &useState)
+      : AccessUseVisitor(AccessUseType::Overlapping,
+                         NestedAccessType::IgnoreAccessBegin),
+        useState(useState) {}
+
+  bool visitUse(Operand *op, AccessUseType useTy) override;
+  void reset(SILValue address) { useState.address = address; }
+  void clear() { useState.clear(); }
+};
+
+} // end anonymous namespace
+
+// Filter out recognized uses that do not write to memory.
+//
+// TODO: Ensure that all of the conditional-write logic below is encapsulated in
+// mayWriteToMemory and just call that instead. Possibly add additional
+// verification that visitAccessPathUses recognizes all instructions that may
+// propagate pointers (even though they don't write).
+bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
+                                               AccessUseType useTy) {
+  // If this operand is for a dependent type, then it does not actually access
+  // the operand's address value. It only uses the metatype defined by the
+  // operation (e.g. open_existential).
+  if (op->isTypeDependent()) {
+    return true;
+  }
+
+  // If we have a move from src, this is a mark_move we want to visit.
+  if (auto *move = dyn_cast<MarkUnresolvedMoveAddrInst>(op->getUser())) {
+    if (move->getSrc() == op->get()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found move: " << *move);
+      useState.insertMarkUnresolvedMoveAddr(move);
+      return true;
+    }
+  }
+
+  if (memInstMustInitialize(op)) {
+    LLVM_DEBUG(llvm::dbgs() << "Found init: " << *op->getUser());
+    useState.inits.insert(op->getUser());
+    return true;
+  }
+
+  if (memInstMustReinitialize(op)) {
+    LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *op->getUser());
+    useState.insertReinit(op->getUser());
+    return true;
+  }
+
+  if (auto *dvi = dyn_cast<DestroyAddrInst>(op->getUser())) {
+    // If we see a destroy_addr not on our base address, bail! Just error and
+    // say that we do not understand the code.
+    if (dvi->getOperand() != useState.address) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "!!! Error! Found destroy_addr no on base address: "
+                 << *dvi);
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "Found destroy_addr: " << *dvi);
+    useState.insertDestroy(dvi);
+    return true;
+  }
+
+  // Then see if we have a inout_aliasable full apply site use. In that case, we
+  // are going to try and extend move checking into the partial apply using
+  // cloning to eliminate destroys or reinits.
+  if (auto fas = FullApplySite::isa(op->getUser())) {
+    if (fas.getArgumentOperandConvention(*op) ==
+        SILArgumentConvention::Indirect_InoutAliasable) {
+      // If we don't find the function, we can't handle this, so bail.
+      auto *func = fas.getCalleeFunction();
+      if (!func || !func->isDefer())
+        return false;
+      useState.insertClosureOperand(op);
+      return true;
+    }
+  }
+
+  // Ignore dealloc_stack.
+  if (isa<DeallocStackInst>(op->getUser()))
+    return true;
+
+  LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *op->getUser());
+  useState.livenessUses.insert(op->getUser());
+
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                              Global Dataflow
 //===----------------------------------------------------------------------===//
@@ -1335,7 +1340,8 @@ struct DataflowState {
   llvm::DenseSet<SILBasicBlock *> initBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> destroyBlocks;
   llvm::DenseMap<SILBasicBlock *, SILInstruction *> reinitBlocks;
-  llvm::DenseMap<SILBasicBlock *, Operand *> consumingClosureBlocks;
+  llvm::DenseMap<SILBasicBlock *, Operand *> closureConsumeBlocks;
+  llvm::DenseMap<SILBasicBlock *, ClosureOperandState *> closureUseBlocks;
   SmallVector<MarkUnresolvedMoveAddrInst *, 8> markMovesThatPropagateDownwards;
 
   SILOptFunctionBuilder &funcBuilder;
@@ -1358,7 +1364,7 @@ struct DataflowState {
   bool handleSingleBlockClosure(SILArgument *address,
                                 ClosureOperandState &state);
   bool cleanupAllDestroyAddr(
-      SILFunction *fn, SmallBitVector &destroyIndices,
+      SILValue address, SILFunction *fn, SmallBitVector &destroyIndices,
       SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
       BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
       BasicBlockSet &blocksWithMovesThatAreNowTakes,
@@ -1369,21 +1375,22 @@ struct DataflowState {
     destroyBlocks.clear();
     reinitBlocks.clear();
     markMovesThatPropagateDownwards.clear();
-    consumingClosureBlocks.clear();
+    closureConsumeBlocks.clear();
+    closureUseBlocks.clear();
   }
 };
 
 } // namespace
 
 bool DataflowState::cleanupAllDestroyAddr(
-    SILFunction *fn, SmallBitVector &destroyIndices,
+    SILValue address, SILFunction *fn, SmallBitVector &destroyIndices,
     SmallBitVector &reinitIndices, SmallBitVector &consumingClosureIndices,
     BasicBlockSet &blocksVisitedWhenProcessingNewTakes,
     BasicBlockSet &blocksWithMovesThatAreNowTakes,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
   bool madeChange = false;
   BasicBlockWorklist worklist(fn);
-  SILValue daiOperand;
+
   LLVM_DEBUG(llvm::dbgs() << "Cleanup up destroy addr!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Visiting destroys!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Destroy Indices: " << destroyIndices << "\n");
@@ -1394,9 +1401,6 @@ bool DataflowState::cleanupAllDestroyAddr(
     if (!dai)
       continue;
     LLVM_DEBUG(llvm::dbgs() << "    Destroy: " << *dai);
-    SILValue op = (*dai)->getOperand();
-    assert(daiOperand == SILValue() || op == daiOperand);
-    daiOperand = op;
     for (auto *predBlock : (*dai)->getParent()->getPredecessorBlocks()) {
       worklist.pushIfNotVisited(predBlock);
     }
@@ -1408,7 +1412,7 @@ bool DataflowState::cleanupAllDestroyAddr(
     auto reinit = useState.reinits[index];
     if (!reinit)
       continue;
-    LLVM_DEBUG(llvm::dbgs() << "  Reinit: " << *reinit);
+    LLVM_DEBUG(llvm::dbgs() << "  Reinit: " << **reinit);
     for (auto *predBlock : (*reinit)->getParent()->getPredecessorBlocks()) {
       worklist.pushIfNotVisited(predBlock);
     }
@@ -1417,7 +1421,7 @@ bool DataflowState::cleanupAllDestroyAddr(
   LLVM_DEBUG(llvm::dbgs() << "    Visiting consuming closures!\n");
   for (int index = consumingClosureIndices.find_first(); index != -1;
        index = consumingClosureIndices.find_next(index)) {
-    auto &pair = *std::next(useState.consumingClosureOperands.begin(), index);
+    auto &pair = *std::next(useState.closureUses.begin(), index);
     auto *op = pair.first;
     LLVM_DEBUG(llvm::dbgs() << "  Consuming closure: " << *op->getUser());
     for (auto *predBlock : op->getUser()->getParent()->getPredecessorBlocks()) {
@@ -1429,16 +1433,33 @@ bool DataflowState::cleanupAllDestroyAddr(
   while (auto *next = worklist.pop()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Looking at block: bb" << next->getDebugID() << "\n");
-    // Any blocks that contained processed moves are stop points.
-    if (blocksWithMovesThatAreNowTakes.contains(next))
-      continue;
 
+    // Any blocks that contained processed moves are stop points.
+    if (blocksWithMovesThatAreNowTakes.contains(next)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "    Block contained a move that is now a true take.\n");
+      continue;
+    }
+
+    // Then if we find that we have a block that was never visited when we
+    // walked along successor edges from the move, then we know that we need to
+    // insert a destroy_addr.
+    //
+    // This is safe to do since this block lives along the dominance frontier
+    // and we do not allow for critical edges, so as we walk along predecessors,
+    // given that any such block must also have a successor that was reachable
+    // from our move, we know that this unprocessed block must only have one
+    // successor, a block reachable from our move and thus must not have any
+    // unhandled uses.
     if (!blocksVisitedWhenProcessingNewTakes.contains(next)) {
+      LLVM_DEBUG(llvm::dbgs() << "    Found a block that was not visited when "
+                                 "we processed takes of the given move.\n");
       // Insert a destroy_addr here since the block isn't reachable from any of
       // our moves.
-      SILBuilderWithScope builder(next->getTerminator());
+      SILBuilderWithScope builder(
+          std::prev(next->getTerminator()->getIterator()));
       auto *dvi = builder.createDestroyAddr(
-          RegularLocation::getAutoGeneratedLocation(), daiOperand);
+          RegularLocation::getAutoGeneratedLocation(), address);
       useState.destroys.insert(dvi);
       continue;
     }
@@ -1478,7 +1499,7 @@ bool DataflowState::cleanupAllDestroyAddr(
   // rather than multiple times for multiple vars.
   for (int index = consumingClosureIndices.find_first(); index != -1;
        index = consumingClosureIndices.find_next(index)) {
-    auto &pair = *std::next(useState.consumingClosureOperands.begin(), index);
+    auto &pair = *std::next(useState.closureUses.begin(), index);
     auto *closureUse = pair.first;
     if (!closureUse)
       continue;
@@ -1526,13 +1547,12 @@ bool DataflowState::process(
   SmallBitVector indicesOfPairedConsumingClosureUses;
   auto getIndicesOfPairedConsumingClosureUses = [&]() -> SmallBitVector & {
     if (indicesOfPairedConsumingClosureUses.size() !=
-        useState.consumingClosureOperands.size())
-      indicesOfPairedConsumingClosureUses.resize(
-          useState.consumingClosureOperands.size());
+        useState.closureUses.size())
+      indicesOfPairedConsumingClosureUses.resize(useState.closureUses.size());
     return indicesOfPairedConsumingClosureUses;
   };
 
-  BasicBlockSet visitedByNewMove(fn);
+  BasicBlockSet blocksVisitedWhenProcessingNewTakes(fn);
   BasicBlockSet blocksWithMovesThatAreNowTakes(fn);
   bool convertedMarkMoveToTake = false;
   for (auto *mvi : markMovesThatPropagateDownwards) {
@@ -1541,12 +1561,12 @@ bool DataflowState::process(
     LLVM_DEBUG(llvm::dbgs() << "Checking Multi Block Dataflow for: " << *mvi);
 
     BasicBlockWorklist worklist(fn);
-    BasicBlockSetVector setVector(fn);
+    BasicBlockSetVector visitedBlocks(fn);
     for (auto *succBlock : mvi->getParent()->getSuccessorBlocks()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "    SuccBlocks: " << succBlock->getDebugID() << "\n");
       worklist.pushIfNotVisited(succBlock);
-      setVector.insert(succBlock);
+      visitedBlocks.insert(succBlock);
     }
 
     while (auto *next = worklist.pop()) {
@@ -1584,6 +1604,38 @@ bool DataflowState::process(
         break;
       }
 
+      // Now see if we have a closure use.
+      {
+        auto iter = closureUseBlocks.find(next);
+        if (iter != closureUseBlocks.end()) {
+          LLVM_DEBUG(llvm::dbgs() << "    Is Use Block! Emitting Error!\n");
+          // We found one! Emit the diagnostic and continue and see if we can
+          // get more diagnostics.
+          auto &astContext = fn->getASTContext();
+          {
+            auto diag =
+                diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+            StringRef name = getDebugVarName(address);
+            diagnose(astContext, getSourceLocFromValue(address), diag, name);
+          }
+
+          {
+            auto diag = diag::sil_movekillscopyablevalue_move_here;
+            diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+          }
+
+          {
+            auto diag = diag::sil_movekillscopyablevalue_use_here;
+            for (auto *user : iter->second->pairedUseInsts) {
+              diagnose(astContext, user->getLoc().getSourceLoc(), diag);
+            }
+          }
+
+          emittedSingleDiagnostic = true;
+          break;
+        }
+      }
+
       // Then see if this is a destroy block. If so, do not add successors and
       // continue. This is because we stop processing at destroy_addr. This
       // destroy_addr is paired with the mark_unresolved_move_addr.
@@ -1612,13 +1664,12 @@ bool DataflowState::process(
       }
 
       {
-        auto iter = consumingClosureBlocks.find(next);
-        if (iter != consumingClosureBlocks.end()) {
+        auto iter = closureConsumeBlocks.find(next);
+        if (iter != closureConsumeBlocks.end()) {
           LLVM_DEBUG(llvm::dbgs() << "    Is reinit Block! Setting up for "
                                      "later deletion if possible!\n");
-          auto indexIter =
-              useState.consumingClosureOperandToIndexMap.find(iter->second);
-          assert(indexIter != useState.consumingClosureOperandToIndexMap.end());
+          auto indexIter = useState.closureOperandToIndexMap.find(iter->second);
+          assert(indexIter != useState.closureOperandToIndexMap.end());
           getIndicesOfPairedConsumingClosureUses().set(indexIter->second);
           continue;
         }
@@ -1647,7 +1698,7 @@ bool DataflowState::process(
       // Otherwise, add successors if we haven't visited them to the worklist.
       for (auto *succBlock : next->getSuccessorBlocks()) {
         worklist.pushIfNotVisited(succBlock);
-        setVector.insert(succBlock);
+        visitedBlocks.insert(succBlock);
       }
     }
 
@@ -1664,8 +1715,8 @@ bool DataflowState::process(
       builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
                              IsTake, IsInitialization);
       // Flush our SetVector into the visitedByNewMove.
-      for (auto *block : setVector) {
-        visitedByNewMove.insert(block);
+      for (auto *block : visitedBlocks) {
+        blocksVisitedWhenProcessingNewTakes.insert(block);
       }
       convertedMarkMoveToTake = true;
     }
@@ -1679,9 +1730,10 @@ bool DataflowState::process(
   // Now that we have processed all of our mark_moves, eliminate all of the
   // destroy_addr.
   madeChange |= cleanupAllDestroyAddr(
-      fn, getIndicesOfPairedDestroys(), getIndicesOfPairedReinits(),
-      getIndicesOfPairedConsumingClosureUses(), visitedByNewMove,
-      blocksWithMovesThatAreNowTakes, postDominatingConsumingUsers);
+      address, fn, getIndicesOfPairedDestroys(), getIndicesOfPairedReinits(),
+      getIndicesOfPairedConsumingClosureUses(),
+      blocksVisitedWhenProcessingNewTakes, blocksWithMovesThatAreNowTakes,
+      postDominatingConsumingUsers);
 
   return madeChange;
 }
@@ -1734,6 +1786,35 @@ void DataflowState::init() {
     if (upwardScanForDestroys(reinit, useState)) {
       LLVM_DEBUG(llvm::dbgs() << "    Found reinit block at: " << *reinit);
       reinitBlocks[reinit->getParent()] = reinit;
+    }
+  }
+
+  for (auto closureUse : useState.closureUses) {
+    auto *use = closureUse.first;
+    auto &state = closureUse.second;
+    auto *user = use->getUser();
+
+    switch (state.result) {
+    case DownwardScanResult::Invalid:
+    case DownwardScanResult::Destroy:
+    case DownwardScanResult::Reinit:
+    case DownwardScanResult::UseForDiagnostic:
+    case DownwardScanResult::MoveOut:
+      llvm_unreachable("unhandled");
+    case DownwardScanResult::ClosureUse:
+      if (upwardScanForUseOut(user, useState)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "    Found closure liveness block at: " << *user);
+        closureUseBlocks[user->getParent()] = &state;
+      }
+      break;
+    case DownwardScanResult::ClosureConsume:
+      if (upwardScanForDestroys(user, useState)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "    Found closure consuming block at: " << *user);
+        closureConsumeBlocks[user->getParent()] = use;
+      }
+      break;
     }
   }
 }
@@ -1928,7 +2009,7 @@ struct MoveKillsCopyableAddressesChecker {
   UseState useState;
   DataflowState dataflowState;
   UseState closureUseState;
-  ConsumingClosureArgDataflowState closureUseDataflowState;
+  ClosureArgDataflowState closureUseDataflowState;
   SILOptFunctionBuilder &funcBuilder;
   llvm::SmallMapVector<FullApplySite, SmallBitVector, 8>
       applySiteToPromotedArgIndices;
@@ -2110,7 +2191,7 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   //
   // This summary will let us treat the whole closure's effect on the closure
   // operand as if it was a single instruction.
-  for (auto &pair : useState.consumingClosureOperands) {
+  for (auto &pair : useState.closureUses) {
     auto *operand = pair.first;
     auto &closureState = pair.second;
 
