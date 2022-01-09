@@ -1017,6 +1017,7 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
     switch (K) {
     case FunctionSigSpecializationParamKind::BoxToValue:
     case FunctionSigSpecializationParamKind::BoxToStack:
+    case FunctionSigSpecializationParamKind::InOutToOut:
       print(Node->getChild(Idx++), depth + 1);
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
@@ -1586,6 +1587,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     case FunctionSigSpecializationParamKind::BoxToStack:
       Printer << "Stack Promoted from Box";
+      return nullptr;
+    case FunctionSigSpecializationParamKind::InOutToOut:
+      Printer << "InOut Converted to Out";
       return nullptr;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
       Printer << "Constant Propagated Function";
