@@ -463,6 +463,35 @@ extension KlassWrapper {
         }
         print("foo bar")
     }
+
+    mutating func deferTestSuccess13() {
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        defer {
+            self = KlassWrapper(k: Klass())
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestSuccess14() {
+        if booleanValue {
+            print("creating blocks")
+            self.doSomething()
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        defer {
+            self = KlassWrapper(k: Klass())
+        }
+        print("foo bar")
+    }
 }
 
 ////////////////
@@ -602,4 +631,46 @@ public func partialApplyTest(_ x: __owned Klass) {
         print(x2)
     }
     f()
+}
+
+////////////////////////
+// Misc Tests on Self //
+////////////////////////
+
+extension KlassWrapper {
+
+    func doSomething() { print("foo") }
+
+    // This test makes sure that we are able to properly put in the destroy_addr
+    // in the "creating blocks" branch. There used to be a bug where the impl
+    // would need at least one destroy_addr to properly infer the value to put
+    // into blocks not reachable from the _move but that are on the dominance
+    // frontier from the _move. This was unnecessary and the test makes sure we
+    // do not fail on this again.
+    mutating func noDestroyAddrBeforeOptInsertAfter() {
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        self = .init(k: Klass())
+        print("foo bar")
+    }
+
+    // A derived version of noDestroyAddrBeforeOptInsertAfter that makes sure
+    // when we insert the destroy_addr, we destroy self at the end of the block.
+    mutating func noDestroyAddrBeforeOptInsertAfter2() {
+        if booleanValue {
+            print("creating blocks")
+            self.doSomething()
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        self = .init(k: Klass())
+        print("foo bar")
+    }
 }
