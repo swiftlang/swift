@@ -276,19 +276,42 @@ struct ArgumentInitHelper {
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
       if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
-              SGF.getModule()) &&
-          value->getOwnershipKind() == OwnershipKind::Owned) {
+              SGF.getModule())) {
         bool isNoImplicitCopy = false;
         if (auto *arg = dyn_cast<SILFunctionArgument>(value))
           isNoImplicitCopy = arg->isNoImplicitCopy();
-        value =
-            SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
-        SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+
+        // If we have a no implicit copy argument and the argument is trivial,
+        // we need to use copyable to move only to convert it to its move only
+        // form.
         if (isNoImplicitCopy) {
-          value = SGF.B.emitCopyValueOperation(loc, value);
-          value = SGF.B.createMarkMustCheckInst(
-              loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
-          SGF.enterDestroyCleanup(value);
+          bool originalValWasTrivial = false;
+          if (value->getType().isTrivial(SGF.F)) {
+            originalValWasTrivial = true;
+            value = SGF.B.createCopyableToMoveOnlyWrapperValue(loc, value);
+            SGF.emitManagedRValueWithCleanup(value);
+          }
+
+          if (value->getOwnershipKind() == OwnershipKind::Owned) {
+            value = SILValue(
+                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
+            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+            if (originalValWasTrivial)
+              value = SGF.B.createExplicitCopyValue(loc, value);
+            else
+              value = SGF.B.emitCopyValueOperation(loc, value);
+            if (!value->getType().isMoveOnlyWrapped())
+              value = SGF.B.createCopyableToMoveOnlyWrapperValue(loc, value);
+            value = SGF.B.createMarkMustCheckInst(
+                loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+            SGF.enterDestroyCleanup(value);
+          }
+        } else {
+          if (value->getOwnershipKind() == OwnershipKind::Owned) {
+            value = SILValue(
+                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
+            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+          }
         }
       }
       SGF.B.createDebugValue(loc, value, varinfo);

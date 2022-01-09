@@ -12,6 +12,7 @@
 
 #include "SILGenBuilder.h"
 #include "ArgumentSource.h"
+#include "Cleanup.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
@@ -450,6 +451,9 @@ static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
   case SILArgumentConvention::Direct_Unowned:
     // Unowned parameters are only guaranteed at the instant of the call, so we
     // must retain them even if we're in a context that can accept a +0 value.
+    //
+    // NOTE: If we have a trivial value, the copy will do nothing, so this is
+    // just a convenient way to avoid writing conditional code.
     return ManagedValue::forUnmanaged(arg).copy(SGF, loc);
 
   case SILArgumentConvention::Direct_Owned:
@@ -881,4 +885,38 @@ ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
   auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
                                    base.forward(getSILGenFunction()));
   return cloner.clone(mdi);
+}
+
+ManagedValue SILGenBuilder::createBeginBorrow(SILLocation loc,
+                                              ManagedValue value,
+                                              bool isLexical) {
+  auto *newValue =
+      SILBuilder::createBeginBorrow(loc, value.getValue(), isLexical);
+  SGF.emitManagedBorrowedRValueWithCleanup(newValue);
+  return ManagedValue::forUnmanaged(newValue);
+}
+
+ManagedValue SILGenBuilder::createMoveValue(SILLocation loc,
+                                            ManagedValue value) {
+  assert(value.isPlusOne(SGF) && "Must be +1 to be moved!");
+  CleanupCloner cloner(*this, value);
+  auto *mdi = createMoveValue(loc, value.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
+}
+
+ManagedValue
+SILGenBuilder::createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc,
+                                                         ManagedValue value) {
+  assert(value.isPlusOne(SGF) && "Argument must be at +1!");
+  CleanupCloner cloner(*this, value);
+  auto *mdi = createOwnedMoveOnlyWrapperToCopyableValue(
+      loc, value.forward(getSILGenFunction()));
+  return cloner.clone(mdi);
+}
+
+ManagedValue SILGenBuilder::createGuaranteedMoveOnlyWrapperToCopyableValue(
+    SILLocation loc, ManagedValue value) {
+  auto *mdi =
+      createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value.getValue());
+  return ManagedValue::forUnmanaged(mdi);
 }
