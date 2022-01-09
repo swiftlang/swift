@@ -356,133 +356,7 @@ struct UseState {
   SILFunction *getFunction() const { return address->getFunction(); }
 };
 
-/// Visit all of the uses of a lexical lifetime, initializing useState as we go.
-struct GatherLexicalLifetimeUseVisitor : public AccessUseVisitor {
-  UseState &useState;
-
-  GatherLexicalLifetimeUseVisitor(UseState &useState)
-      : AccessUseVisitor(AccessUseType::Overlapping,
-                         NestedAccessType::IgnoreAccessBegin),
-        useState(useState) {}
-
-  bool visitUse(Operand *op, AccessUseType useTy) override;
-  void reset(SILValue address) { useState.address = address; }
-  void clear() { useState.clear(); }
-};
-
-} // end anonymous namespace
-
-static void convertMemoryReinitToInitForm(SILInstruction *memInst) {
-  switch (memInst->getKind()) {
-  default:
-    llvm_unreachable("unsupported?!");
-
-  case SILInstructionKind::CopyAddrInst: {
-    auto *cai = cast<CopyAddrInst>(memInst);
-    cai->setIsInitializationOfDest(IsInitialization_t::IsInitialization);
-    return;
-  }
-  case SILInstructionKind::StoreInst: {
-    auto *si = cast<StoreInst>(memInst);
-    si->setOwnershipQualifier(StoreOwnershipQualifier::Init);
-    return;
-  }
-  }
-}
-
-static bool memInstMustReinitialize(Operand *memOper) {
-  SILValue address = memOper->get();
-  auto *memInst = memOper->getUser();
-  switch (memInst->getKind()) {
-  default:
-    return false;
-
-  case SILInstructionKind::CopyAddrInst: {
-    auto *CAI = cast<CopyAddrInst>(memInst);
-    return CAI->getDest() == address && !CAI->isInitializationOfDest();
-  }
-  case SILInstructionKind::StoreInst: {
-    auto *si = cast<StoreInst>(memInst);
-    return si->getDest() == address &&
-           si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
-  }
-  }
-}
-
-// Filter out recognized uses that do not write to memory.
-//
-// TODO: Ensure that all of the conditional-write logic below is encapsulated in
-// mayWriteToMemory and just call that instead. Possibly add additional
-// verification that visitAccessPathUses recognizes all instructions that may
-// propagate pointers (even though they don't write).
-bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
-                                               AccessUseType useTy) {
-  // If this operand is for a dependent type, then it does not actually access
-  // the operand's address value. It only uses the metatype defined by the
-  // operation (e.g. open_existential).
-  if (op->isTypeDependent()) {
-    return true;
-  }
-
-  // If we have a move from src, this is a mark_move we want to visit.
-  if (auto *move = dyn_cast<MarkUnresolvedMoveAddrInst>(op->getUser())) {
-    if (move->getSrc() == op->get()) {
-      LLVM_DEBUG(llvm::dbgs() << "Found move: " << *move);
-      useState.insertMarkUnresolvedMoveAddr(move);
-      return true;
-    }
-  }
-
-  if (memInstMustInitialize(op)) {
-    LLVM_DEBUG(llvm::dbgs() << "Found init: " << *op->getUser());
-    useState.inits.insert(op->getUser());
-    return true;
-  }
-
-  if (memInstMustReinitialize(op)) {
-    LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *op->getUser());
-    useState.insertReinit(op->getUser());
-    return true;
-  }
-
-  if (auto *dvi = dyn_cast<DestroyAddrInst>(op->getUser())) {
-    // If we see a destroy_addr not on our base address, bail! Just error and
-    // say that we do not understand the code.
-    if (dvi->getOperand() != useState.address) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "!!! Error! Found destroy_addr no on base address: "
-                 << *dvi);
-      return false;
-    }
-    LLVM_DEBUG(llvm::dbgs() << "Found destroy_addr: " << *dvi);
-    useState.insertDestroy(dvi);
-    return true;
-  }
-
-  // Then see if we have a inout_aliasable full apply site use. In that case, we
-  // are going to try and extend move checking into the partial apply using
-  // cloning to eliminate destroys or reinits.
-  if (auto fas = FullApplySite::isa(op->getUser())) {
-    if (fas.getArgumentOperandConvention(*op) ==
-        SILArgumentConvention::Indirect_InoutAliasable) {
-      // If we don't find the function, we can't handle this, so bail.
-      auto *func = fas.getCalleeFunction();
-      if (!func || !func->isDefer())
-        return false;
-      useState.insertClosureOperand(op);
-      return true;
-    }
-  }
-
-  // Ignore dealloc_stack.
-  if (isa<DeallocStackInst>(op->getUser()))
-    return true;
-
-  LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *op->getUser());
-  useState.livenessUses.insert(op->getUser());
-
-  return true;
-}
+} // namespace
 
 //===----------------------------------------------------------------------===//
 //                                  Dataflow
@@ -1354,6 +1228,103 @@ void ClosureArgumentInOutToOutCloner::populateCloned() {
         LLVM_DEBUG(llvm::dbgs() << "Found it! Mapping to : " << *iter->second);
         return iter->second;
       });
+}
+
+/////////////////////////////////////
+// Caller Lexical Lifetime Visitor //
+/////////////////////////////////////
+
+namespace {
+
+/// Visit all of the uses of a lexical lifetime, initializing useState as we go.
+struct GatherLexicalLifetimeUseVisitor : public AccessUseVisitor {
+  UseState &useState;
+
+  GatherLexicalLifetimeUseVisitor(UseState &useState)
+      : AccessUseVisitor(AccessUseType::Overlapping,
+                         NestedAccessType::IgnoreAccessBegin),
+        useState(useState) {}
+
+  bool visitUse(Operand *op, AccessUseType useTy) override;
+  void reset(SILValue address) { useState.address = address; }
+  void clear() { useState.clear(); }
+};
+
+} // end anonymous namespace
+
+// Filter out recognized uses that do not write to memory.
+//
+// TODO: Ensure that all of the conditional-write logic below is encapsulated in
+// mayWriteToMemory and just call that instead. Possibly add additional
+// verification that visitAccessPathUses recognizes all instructions that may
+// propagate pointers (even though they don't write).
+bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
+                                               AccessUseType useTy) {
+  // If this operand is for a dependent type, then it does not actually access
+  // the operand's address value. It only uses the metatype defined by the
+  // operation (e.g. open_existential).
+  if (op->isTypeDependent()) {
+    return true;
+  }
+
+  // If we have a move from src, this is a mark_move we want to visit.
+  if (auto *move = dyn_cast<MarkUnresolvedMoveAddrInst>(op->getUser())) {
+    if (move->getSrc() == op->get()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found move: " << *move);
+      useState.insertMarkUnresolvedMoveAddr(move);
+      return true;
+    }
+  }
+
+  if (memInstMustInitialize(op)) {
+    LLVM_DEBUG(llvm::dbgs() << "Found init: " << *op->getUser());
+    useState.inits.insert(op->getUser());
+    return true;
+  }
+
+  if (memInstMustReinitialize(op)) {
+    LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *op->getUser());
+    useState.insertReinit(op->getUser());
+    return true;
+  }
+
+  if (auto *dvi = dyn_cast<DestroyAddrInst>(op->getUser())) {
+    // If we see a destroy_addr not on our base address, bail! Just error and
+    // say that we do not understand the code.
+    if (dvi->getOperand() != useState.address) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "!!! Error! Found destroy_addr no on base address: "
+                 << *dvi);
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "Found destroy_addr: " << *dvi);
+    useState.insertDestroy(dvi);
+    return true;
+  }
+
+  // Then see if we have a inout_aliasable full apply site use. In that case, we
+  // are going to try and extend move checking into the partial apply using
+  // cloning to eliminate destroys or reinits.
+  if (auto fas = FullApplySite::isa(op->getUser())) {
+    if (fas.getArgumentOperandConvention(*op) ==
+        SILArgumentConvention::Indirect_InoutAliasable) {
+      // If we don't find the function, we can't handle this, so bail.
+      auto *func = fas.getCalleeFunction();
+      if (!func || !func->isDefer())
+        return false;
+      useState.insertClosureOperand(op);
+      return true;
+    }
+  }
+
+  // Ignore dealloc_stack.
+  if (isa<DeallocStackInst>(op->getUser()))
+    return true;
+
+  LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *op->getUser());
+  useState.livenessUses.insert(op->getUser());
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
