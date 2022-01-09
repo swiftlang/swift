@@ -8,7 +8,9 @@ import Swift
 // Declarations //
 //////////////////
 
-public class Klass {}
+public class Klass {
+    public func getOtherKlass() -> Klass? { return nil }
+}
 
 struct KlassWrapper {
     var k: Klass
@@ -19,7 +21,9 @@ var booleanValue: Bool { false }
 func nonConsumingUse<T>(_ k: T) {}
 func exchangeUse<T>(_ k: __owned T) -> T { k }
 
-public protocol P {}
+public protocol P {
+    var k: Klass { get }
+}
 public protocol SubP1 : P {}
 public protocol SubP2 : P {}
 
@@ -214,16 +218,6 @@ protocol DeferTestProtocol {
     var k: Klass { get }
 
     static func getP() -> Self
-    mutating func deferTestSuccess1()
-    mutating func deferTestSuccess2()
-    mutating func deferTestSuccess3()
-    mutating func deferTestFail1()
-    mutating func deferTestFail2()
-    mutating func deferTestFail3()
-    mutating func deferTestFail4()
-    mutating func deferTestFail5()
-    mutating func deferTestFail6()
-    mutating func deferTestFail7()
 }
 
 extension DeferTestProtocol {
@@ -525,4 +519,37 @@ public func castTestIfLet2<T : P>(_ x : __owned EnumWithP<T>) {
     } else {
         print("no")
     }
+}
+
+///////////////
+// GEP Tests //
+///////////////
+
+public func castAccess<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let _ = x2.k // expected-note {{use here}}
+}
+
+public func castAccess2<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let _ = x2.k.getOtherKlass() // expected-note {{use here}}
+}
+
+/////////////////////////
+// Partial Apply Tests //
+/////////////////////////
+
+// This makes sure we always fail if we are asked to check in a partial apply.
+public func partialApplyTest<T : P>(_ x: __owned T) {
+    var x2 = x
+    x2 = x
+    let _ = _move(x2) // expected-error {{_move applied to value that the compiler does not support checking}}
+    let f = {
+        print(x2)
+    }
+    f()
 }

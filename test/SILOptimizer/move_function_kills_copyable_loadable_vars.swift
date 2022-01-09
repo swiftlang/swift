@@ -8,7 +8,11 @@ import Swift
 // Declarations //
 //////////////////
 
-public class Klass {}
+public class Klass {
+    var k: Klass? = nil
+
+    func getOtherKlass() -> Klass? { nil }
+}
 public class SubKlass1 : Klass {}
 public class SubKlass2 : Klass {}
 
@@ -565,4 +569,37 @@ public func castTestIfLet2(_ x : __owned EnumWithKlass) {
     } else {
         print("no")
     }
+}
+
+///////////////
+// GEP Tests //
+///////////////
+
+public func castAccess(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let _ = x2.k // expected-note {{use here}}
+}
+
+public func castAccess2(_ x : __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let _ = x2.k!.getOtherKlass() // expected-note {{use here}}
+}
+
+/////////////////////////
+// Partial Apply Tests //
+/////////////////////////
+
+// Emit a better error here. At least we properly error.
+public func partialApplyTest(_ x: __owned Klass) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let f = { // expected-note {{use here}}
+        print(x2)
+    }
+    f()
 }
