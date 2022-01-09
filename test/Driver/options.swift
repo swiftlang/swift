@@ -2,7 +2,7 @@
 
 // RUN: not %swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | %FileCheck -check-prefix=STDLIB_MODULE %s
 // RUN: %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" -parse-stdlib -###
-// STDLIB_MODULE: error: module name "Swift" is reserved for the standard library{{$}}
+// STDLIB_MODULE: error: module name 'Swift' is reserved for the standard library{{$}}
 
 // RUN: not %swiftc_driver -crazy-option-that-does-not-exist %s 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
 // RUN: not %swift_driver -crazy-option-that-does-not-exist 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
@@ -88,7 +88,7 @@
 // INCREMENTAL_WITHOUT_OFM: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
 
 // RUN: %swiftc_driver -incremental -output-file-map %S/Inputs/empty-ofm.json %s -### 2>&1 | %FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM_ENTRY %s
-// INCREMENTAL_WITHOUT_OFM_ENTRY: ignoring -incremental; output file map has no master dependencies entry ("swift-dependencies" under "")
+// INCREMENTAL_WITHOUT_OFM_ENTRY: ignoring -incremental; output file map has no master dependencies entry ('swift-dependencies' under '')
 // INCREMENTAL_WITHOUT_OFM_ENTRY: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
 
 // RUN: %swiftc_driver -driver-print-jobs -enforce-exclusivity=checked %s | %FileCheck -check-prefix=EXCLUSIVITY_CHECKED %s

@@ -506,7 +506,7 @@ class ClassWithConvenienceInit {
   
   convenience init(newY: Int) {
     self.init(newX: 19)
-    x = 67  // expected-error {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
+    x = 67  // expected-error {{'let' property 'x' may not be initialized directly; use 'self.init(...)' or 'self = ...' instead}}
   }
 }
 
@@ -514,7 +514,7 @@ struct StructWithDelegatingInit {
   let x: Int // expected-note {{declared here}}
   
   init(x: Int) { self.x = x }
-  init() { self.init(x: 0); self.x = 22 } // expected-error {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
+  init() { self.init(x: 0); self.x = 22 } // expected-error {{'let' property 'x' may not be initialized directly; use 'self.init(...)' or 'self = ...' instead}}
 }
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function

@@ -729,7 +729,7 @@ ERROR(sema_no_import_repl,none,
 NOTE(sema_no_import_no_sdk,none,
      "did you forget to set an SDK using -sdk or SDKROOT?", ())
 NOTE(sema_no_import_no_sdk_xcrun,none,
-     "use \"xcrun swiftc\" to select the default macOS SDK "
+     "use 'xcrun swiftc' to select the default macOS SDK "
      "installed with Xcode", ())
 WARNING(sema_import_current_module,none,
         "this file is part of module %0; ignoring import", (Identifier))
@@ -4060,7 +4060,7 @@ NOTE(masked_mutable_property,none,
 
 ERROR(assignment_let_property_delegating_init,none,
       "'let' property %0 may not be initialized directly; use "
-      "\"self.init(...)\" or \"self = ...\" instead", (DeclNameRef))
+      "'self.init(...)' or 'self = ...' instead", (DeclNameRef))
 
 ERROR(label_shadowed, none,
       "label %0 cannot be reused on an inner statement", (Identifier))
@@ -4109,7 +4109,7 @@ ERROR(type_mismatch_fallthrough_pattern_list,none,
       "pattern variable bound to type %0, fallthrough case bound to type %1", (Type, Type))
 
 ERROR(unknown_case_must_be_catchall,none,
-      "'@unknown' is only supported for catch-all cases (\"case _\")", ())
+      "'@unknown' is only supported for catch-all cases ('case _')", ())
 ERROR(unknown_case_where_clause,none,
       "'where' cannot be used with '@unknown'", ())
 ERROR(unknown_case_multiple_patterns,none,
@@ -5794,7 +5794,7 @@ NOTE(missing_several_cases,none,
      "%select{missing cases|a default clause}0"
      "?", (bool))
 NOTE(missing_unknown_case,none,
-     "handle unknown values using \"@unknown default\"", ())
+     "handle unknown values using '@unknown default'", ())
 
 NOTE(non_exhaustive_switch_drop_unknown,none,
      "remove '@unknown' to handle remaining values", ())

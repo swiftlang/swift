@@ -150,7 +150,7 @@ extension MyGenericPoint {
 
 extension CPoint {
   init(xx: Double, yy: Double) {
-    self.x = xx // expected-error {{'self' used before 'self.init' call or assignment to 'self'}} expected-note {{use "self.init()" to initialize the struct with zero values}} {{5-5=self.init()\n}}
+    self.x = xx // expected-error {{'self' used before 'self.init' call or assignment to 'self'}} expected-note {{use 'self.init()' to initialize the struct with zero values}} {{5-5=self.init()\n}}
     self.y = yy // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 
@@ -171,7 +171,7 @@ extension CPoint {
   }
 
   init(other: CPoint, xx: Double) {
-    self.x = xx // expected-error {{'self' used before 'self.init' call or assignment to 'self'}} expected-note {{use "self.init()" to initialize the struct with zero values}} {{5-5=self.init()\n}}
+    self.x = xx // expected-error {{'self' used before 'self.init' call or assignment to 'self'}} expected-note {{use 'self.init()' to initialize the struct with zero values}} {{5-5=self.init()\n}}
     self = other
   }
 

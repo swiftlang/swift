@@ -11,11 +11,11 @@ public struct Animal {
   public let name: String // expected-note 2 {{declared here}}
 
   @inlinable public init(name: String) {
-    self.name = name // expected-error {{'let' property 'name' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
+    self.name = name // expected-error {{'let' property 'name' may not be initialized directly; use 'self.init(...)' or 'self = ...' instead}}
   }
 
   @_transparent public init(cat: String) {
-    self.name = cat // expected-error {{'let' property 'name' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
+    self.name = cat // expected-error {{'let' property 'name' may not be initialized directly; use 'self.init(...)' or 'self = ...' instead}}
   }
 
   // This is OK

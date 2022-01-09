@@ -497,7 +497,7 @@ func testUnknownInSwitchSwitch(e: E) {
       s + "!"
     default:
       "nothing"
-    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ("case _")}}
+    @unknown case .a: // expected-error{{'@unknown' is only supported for catch-all cases ('case _')}}
       // expected-error@-1{{'case' blocks cannot appear after the 'default' block of a 'switch'}}
       "a"
     }
