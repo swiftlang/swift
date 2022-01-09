@@ -23,7 +23,12 @@ func exchangeUse<T>(_ k: __owned T) -> T { k }
 
 public protocol P {
     var k: Klass { get }
+
+    static func getP() -> Self
+
+    func doSomething()
 }
+
 public protocol SubP1 : P {}
 public protocol SubP2 : P {}
 
@@ -214,10 +219,7 @@ struct S<T> {
 // Defer Tests //
 /////////////////
 
-protocol DeferTestProtocol {
-    var k: Klass { get }
-
-    static func getP() -> Self
+protocol DeferTestProtocol : P {
 }
 
 extension DeferTestProtocol {
@@ -413,6 +415,37 @@ extension DeferTestProtocol {
         }
         print("foo bar")
     }
+
+    mutating func deferTestSuccess13() {
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        defer {
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestSuccess14() {
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+            self.doSomething()
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        defer {
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
 }
 
 ////////////////
@@ -553,3 +586,48 @@ public func partialApplyTest<T : P>(_ x: __owned T) {
     }
     f()
 }
+
+////////////////////////
+// Misc Tests on Self //
+////////////////////////
+
+protocol MiscTests : P {}
+
+extension MiscTests {
+
+    // This test makes sure that we are able to properly put in the destroy_addr
+    // in the "creating blocks" branch. There used to be a bug where the impl
+    // would need at least one destroy_addr to properly infer the value to put
+    // into blocks not reachable from the _move but that are on the dominance
+    // frontier from the _move. This was unnecessary and the test makes sure we
+    // do not fail on this again.
+    mutating func noDestroyAddrBeforeOptInsertAfter() {
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        self = selfType.getP()
+        print("foo bar")
+    }
+
+    // A derived version of noDestroyAddrBeforeOptInsertAfter that makes sure
+    // when we insert the destroy_addr, we destroy self at the end of the block.
+    mutating func noDestroyAddrBeforeOptInsertAfter2() {
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+            self.doSomething()
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        self = selfType.getP()
+        print("foo bar")
+    }
+}
+
