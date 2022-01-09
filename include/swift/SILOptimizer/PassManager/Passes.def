@@ -131,7 +131,7 @@ PASS(ArrayCountPropagation, "array-count-propagation",
      "Array Count Propagation")
 PASS(ArrayElementPropagation, "array-element-propagation",
      "Array Element Propagation")
-PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
+SWIFT_FUNCTION_PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
 PASS(BasicInstructionPropertyDumper, "basic-instruction-property-dump",
      "Print SIL Instruction MemBehavior and ReleaseBehavior Information")

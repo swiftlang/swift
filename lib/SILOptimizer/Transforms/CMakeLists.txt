@@ -7,7 +7,6 @@ target_sources(swiftSILOptimizer PRIVATE
   AllocBoxToStack.cpp
   ArrayCountPropagation.cpp
   ArrayElementValuePropagation.cpp
-  AssumeSingleThreaded.cpp
   COWOpts.cpp
   CSE.cpp
   ConditionForwarding.cpp
