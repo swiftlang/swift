@@ -1981,12 +1981,6 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
 
-  // Add existing operator bindings to the main partition first. This often
-  // helps the solver find a solution fast.
-  existingOperatorBindingsForDisjunction(CS, Choices, everythingElse);
-  for (auto index : everythingElse)
-    taken.insert(Choices[index]);
-
   // First collect disabled and favored constraints.
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
     if (constraint->isDisabled()) {
