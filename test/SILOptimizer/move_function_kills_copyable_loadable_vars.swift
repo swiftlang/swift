@@ -710,3 +710,24 @@ func multipleCapture2(_ k: Klass) -> () {
     print("foo bar")
 }
 
+//////////////////////
+// Reinit in pieces //
+//////////////////////
+
+// These tests exercise the diagnostic to see how we error if we re-initialize a
+// var in pieces. Eventually we should teach either this diagnostic pass how to
+// handle this or teach DI how to combine the initializations into one large
+// reinit.
+struct KlassPair {
+    var lhs: Klass
+    var rhs: Klass
+}
+
+func reinitInPieces1(_ k: KlassPair) {
+    var k2 = k
+    k2 = k
+
+    let _ = _move(k2) // expected-error {{_move applied to value that the compiler does not support checking}}
+    k2.lhs = Klass()
+    k2.rhs = Klass()
+}

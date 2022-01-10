@@ -668,3 +668,25 @@ func multipleCapture2<T : P>(_ k: T) -> () {
     print("foo bar")
 }
 
+//////////////////////
+// Reinit in pieces //
+//////////////////////
+
+// These tests exercise the diagnostic to see how we error if we re-initialize a
+// var in pieces. Eventually we should teach either this diagnostic pass how to
+// handle this or teach DI how to combine the initializations into one large
+// reinit.
+struct ProtPair<T : P> {
+    var lhs: T
+    var rhs: T
+}
+
+func reinitInPieces1<T : P>(_ k: ProtPair<T>) {
+    let selfType = type(of: k.lhs)
+    var k2 = k
+    k2 = k
+
+    let _ = _move(k2) // expected-error {{_move applied to value that the compiler does not support checking}}
+    k2.lhs = selfType.getP()
+    k2.rhs = selfType.getP()
+}
