@@ -1769,10 +1769,15 @@ public:
                               "@_implementationOnly ");
         }
 
-        static bool treatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
 #ifndef NDEBUG
-        treatAsError = true;
+        static bool enableTreatAsError = true;
+#else
+        static bool enableTreatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
 #endif
+
+        bool isImportOfUnderlying = importer->getName() == target->getName();
+        bool treatAsError = enableTreatAsError &&
+                            !isImportOfUnderlying;
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
