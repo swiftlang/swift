@@ -126,10 +126,11 @@ public protocol DistributedActorSystem: Sendable {
 //      target: RemoteCallTarget,
 //      arguments: Invocation,
 //      throwing: Err.Type,
-//      returning: Res.Type // TODO: to make it `: SerializationRequirement` it'd need to be an ad hoc requirement
+//      returning: Res.Type
 //  ) async throws -> Res.Type
 //      where Act: DistributedActor,
-//            Act.ID == ActorID
+//            Act.ID == ActorID,
+//            Res: SerializationRequirement
 
 }
 
@@ -152,15 +153,121 @@ extension DistributedActorSystem {
   /// The reason for this API using a `ResultHandler` rather than returning values directly,
   /// is that thanks to this approach it can avoid any existential boxing, and can serve the most
   /// latency sensitive-use-cases.
-  func executeDistributedTarget<Act, ResultHandler>(
+  public func executeDistributedTarget<Act, ResultHandler>(
       on actor: Act,
-      mangledMethodName: String,
+      mangledTargetName: String,
       invocation: Self.Invocation,
       handler: ResultHandler
   ) async throws where Act: DistributedActor,
                        Act.ID == ActorID,
                        ResultHandler: DistributedTargetInvocationResultHandler {
-    fatalError("TODO: synthesize and invoke the _executeDistributedTarget")
+    // NOTE: this implementation is not the most efficient, nor final, version of this func
+    // we end up demangling the name multiple times, perform more heap allocations than
+    // we truly need to etc. We'll eventually move this implementation to a specialized one
+    // avoiding these issues.
+
+    guard mangledTargetName.count > 0 && mangledTargetName.first == "$" else {
+      throw ExecuteDistributedTargetError(
+          message: "Illegal mangledTargetName detected, must start with '$'")
+    }
+
+    // Get the expected parameter count of the func
+    let nameUTF8 = Array(mangledTargetName.utf8)
+    let paramCount = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
+      __getParameterCount(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
+    }
+
+    guard paramCount >= 0 else {
+      throw ExecuteDistributedTargetError(
+          message: """
+                   Failed to decode distributed invocation target expected parameter count,
+                   error code: \(paramCount)
+                   mangled name: \(mangledTargetName)
+                   """)
+    }
+
+    // Prepare buffer for the parameter types to be decoded into:
+    let paramTypesBuffer = UnsafeMutableRawBufferPointer
+        .allocate(byteCount: MemoryLayout<Any.Type>.size * Int(paramCount),
+                  alignment: MemoryLayout<Any.Type>.alignment)
+    defer {
+      paramTypesBuffer.deallocate()
+    }
+
+    // Demangle and write all parameter types into the prepared buffer
+    let decodedNum = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
+      __getParameterTypeInfo(
+          nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
+          paramTypesBuffer.baseAddress!._rawValue, Int(paramCount))
+    }
+
+    // Fail if the decoded parameter types count seems off and fishy
+    guard decodedNum == paramCount else {
+      throw ExecuteDistributedTargetError(
+          message: """
+                   Failed to decode the expected number of params of distributed invocation target, error code: \(decodedNum)
+                   (decoded: \(decodedNum), expected params: \(paramCount)
+                   mangled name: \(mangledTargetName)
+                   """)
+    }
+
+    // Copy the types from the buffer into a Swift Array
+    var paramTypes: [Any.Type] = []
+    do {
+      paramTypes.reserveCapacity(Int(decodedNum))
+      for paramType in paramTypesBuffer.bindMemory(to: Any.Type.self) {
+        paramTypes.append(paramType)
+      }
+    }
+
+    // Decode the return type
+    func allocateReturnTypeBuffer<R>(_: R.Type) -> UnsafeRawPointer? {
+      if R.self == Void.self {
+        return nil
+      }
+      return UnsafeRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
+    }
+    guard let returnType: Any.Type = _getReturnTypeInfo(mangledMethodName: mangledTargetName) else {
+      throw ExecuteDistributedTargetError(
+          message: "Failed to decode distributed target return type")
+    }
+    let resultBuffer = _openExistential(returnType, do: allocateReturnTypeBuffer)
+    func destroyReturnTypeBuffer<R>(_: R.Type) {
+      resultBuffer?.assumingMemoryBound(to: R.self).deallocate()
+    }
+    defer {
+      _openExistential(returnType, do: destroyReturnTypeBuffer)
+    }
+
+    // Prepare the buffer to decode the argument values into
+    let hargs = HeterogeneousBuffer.allocate(forTypes: paramTypes)
+    defer {
+      hargs.deinitialize()
+      hargs.deallocate()
+    }
+
+    do {
+      // Execute the target!
+      try await _executeDistributedTarget(
+          on: actor,
+          mangledTargetName, UInt(mangledTargetName.count),
+          argumentBuffer: hargs.buffer._rawValue,
+          resultBuffer: resultBuffer?._rawValue
+      )
+
+      // Get the result out of the buffer and invoke onReturn with the right type
+      guard let resultBuffer = resultBuffer else {
+        try await handler.onReturn(value: ())
+        return
+      }
+      func onReturn<R>(_: R.Type) async throws {
+        try await handler.onReturn/*<R>*/(value: resultBuffer)
+      }
+
+      try await _openExistential(returnType, do: onReturn)
+    } catch {
+      try await handler.onThrow(error: error)
+    }
   }
 }
 
@@ -170,73 +277,8 @@ func _executeDistributedTarget(
   on actor: AnyObject, // DistributedActor
   _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
   argumentBuffer: Builtin.RawPointer, // HeterogeneousBuffer of arguments
-  resultBuffer: Builtin.RawPointer
+  resultBuffer: Builtin.RawPointer?
 ) async throws
-
-//  {
-//
-//    // TODO: this entire function has to be implemented in SIL, so the below is pseudo-code...
-//    // ===== SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL ===== //
-//    // 1) get the substitutions
-//    // TODO: we should guarantee the order in which we call those -- so the subs first...
-//    //       meaning that we should also ENCODE the subs first (!)
-//    let subs: [String] = arguments.genericSubstitutions() // TODO: or do we need a streaming decoder here too???
-//
-//    // 2) find the distributed method
-//    // TODO: if we can in one call, we would prefer that
-//    let types: ([Any.Type], Any.Type, Any.Type) = try __getTypeInfo(mangledMethodName, subs)
-//    let argumentTypes: [Any.Type] = try __getArgumentsTypeInfo(mangledMethodName, subs) // TODO: IRGen???
-//    // ^^^^^ Some of this will have to be in the runtime
-//    // - demangling generic function type "given the subs"
-//    // - produce the concrete type
-//    // - do these things: checkGenericArguments / the runtimes demangling facilities
-//    // - _getTypeByMangledNameInContext - TODO: exists but is only for Types, we need functions
-//    //   - or this one _getTypeByMangledNameInEnvironment;
-//    //    - we need some other entrypoint tho, to fold in a call to "checkGenericRequirements" checks `where` in runtime
-//    //    - spits out list of witness tables, which generic func invocation needs
-//    //  - there is a way to do it we think, just not exposed?
-//
-//    // 3) stack-allocate the pre-sized HeterogeneousBuffer
-//    var hbuf = HeterogeneousBuffer.allocate(forTypes: argumentTypes) // STACK ALLOC THIS
-//    defer {
-//      hbuf.deinitialize()
-//      hbuf.deallocate()
-//    }
-//
-//    // 4) decode all arguments, we can provide the substituted types to it:
-//    var decoder = arguments.argumentDecoder()
-//    var offset = 0
-//    for AnyT in argumentTypes { // TODO: can this be a loop in SIL or we need to unroll....?
-//      let OpenT = // SIL: open_existential AnyT
-//      offset = MemoryLayout<OpenT>.nextAlignedOffset(offset) // ??????
-//      try decoder.decodeNext(as: OpenT, into: hbuf.pointer(at: offset)) // ??????
-//    }
-//
-//    // 5) look up the accessor
-//    let distFuncAccessor = __lookupDistributedFuncAccessor(mangledName: mangledMethodName, substitutions: subs)
-//
-//    // 6) invoke the accessor with the prepared het-buffer
-//    do {
-//      // indirect return here:
-//      let RetType: Any.Type = __getReturnTypeInfo(mangledMethodName: mangledMethodName, subs)
-//      let OpenedRetType = // $open_existential RetType
-//      let retBuf: UnsafeMutablePointer<OpenedRetType> = .allocate(MemoryLayout<OpenedRetType>.size)
-//      defer {
-//        retBuf.deinitialize()
-//        retBuf.deallocate()
-//      }
-//
-//      try await __invokeDistributedFuncAccessor(distFuncAccessor, actor, hbuf.buffer, returningInto: retBuf) // pass as UnsafeMutableRawPointer
-//
-//      handler.onReturn(retBuf.pointee)
-//    } catch {
-//      // errors are always indirectly
-//      handler.onThrow(error)
-//    }
-//
-//    // ===== SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL SIL ===== //
-//
-//  }
 
 // ==== ----------------------------------------------------------------------------------------------------------------
 // MARK: Support types
@@ -374,29 +416,37 @@ public protocol DistributedTargetInvocationArgumentDecoder {
 
 @available(SwiftStdlib 5.6, *)
 public protocol DistributedTargetInvocationResultHandler {
+  // FIXME: these must be ad-hoc protocol requirements, because Res: SerializationRequirement !!!
   func onReturn<Res>(value: Res) async throws
-  func onThrow<Err>(error: Err) async throws where Err: Error
+  func onThrow<Err: Error>(error: Err) async throws
 }
 
-// ==== ----------------------------------------------------------------------------------------------------------------
-// MARK: Runtime helper functions
+/******************************************************************************/
+/******************************** Errors **************************************/
+/******************************************************************************/
+
+/// Error protocol to which errors thrown by any `DistributedActorSystem` should conform.
+@available(SwiftStdlib 5.6, *)
+public protocol DistributedActorSystemError: Error {}
 
 @available(SwiftStdlib 5.6, *)
-@_silgen_name("swift_distributed_lookupDistributedFuncAccessor")
-func __lookupDistributedFuncAccessor(mangledMethodName: String, subs: [(Int, Int, String)]) -> Builtin.RawPointer
+public struct ExecuteDistributedTargetError: DistributedActorSystemError {
+  private let message: String
+  internal init(message: String) {
+    self.message = message
+  }
+}
 
 @available(SwiftStdlib 5.6, *)
-@_silgen_name("swift_distributed_invokeDistributedFuncAccessor")
-func __invokeDistributedFuncAccessor(
-    accessor: Builtin.RawPointer,
-    actor: AnyObject,
-    buffer: UnsafeMutableRawPointer, // __owned???
-    returningInto: UnsafeMutableRawPointer) async throws
+public struct DistributedActorCodingError: DistributedActorSystemError {
+  public let message: String
 
-@available(SwiftStdlib 5.6, *)
-@_silgen_name("swift_distributed_func_getArgumentsTypeInfo")
-func __getArgumentsTypeInfo(mangledMethodName: String, subs: [(Int, Int, String)]) -> [Any.Type]
+  public init(message: String) {
+    self.message = message
+  }
 
-@available(SwiftStdlib 5.6, *)
-@_silgen_name("swift_distributed_func_getReturnTypeInfo")
-func __getReturnTypeInfo(mangledMethodName: String, subs: [(Int, Int, String)]) -> Any.Type
+  public static func missingActorSystemUserInfo<Act>(_ actorType: Act.Type) -> Self
+      where Act: DistributedActor {
+    .init(message: "Missing DistributedActorSystem userInfo while decoding")
+  }
+}

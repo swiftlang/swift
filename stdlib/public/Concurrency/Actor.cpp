@@ -1723,17 +1723,21 @@ static void ::swift_distributed_execute_target_resume(
 
 SWIFT_CC(swiftasync)
 void ::swift_distributed_execute_target(
-    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext, DefaultActor *actor,
-    const char *targetNameStart, size_t targetNameLength, void *argumentBuffer,
+    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    DefaultActor *actor,
+    const char *targetNameStart, size_t targetNameLength,
+    void *argumentBuffer,
     void *resultBuffer) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
-
-  if (!accessor)
-    return;
+  if (!accessor) {
+    assert(false && "no distributed accessor accessor");
+    return; // FIXME(distributed): return -1 here so the lib can fail the call
+  }
 
   auto *asyncFnPtr = reinterpret_cast<
       const AsyncFunctionPointer<DistributedAccessorSignature> *>(
       accessor->Function.get());
+  assert(asyncFnPtr && "no function pointer for distributed_execute_target");
 
   DistributedAccessorSignature::FunctionType *accessorEntry =
       asyncFnPtr->Function.get();

@@ -44,7 +44,7 @@ let simplifyStrongRetainPass = InstructionPass<StrongRetainInst>(
     }
   }
 })
-  
+
 let simplifyStrongReleasePass = InstructionPass<StrongReleaseInst>(
   name: "simplify-strong_release", {
   (release: StrongReleaseInst, context: PassContext) in
@@ -65,7 +65,7 @@ let simplifyStrongReleasePass = InstructionPass<StrongReleaseInst>(
     }
   }
 })
-  
+
 /// Returns true if \p value is something where reference counting instructions
 /// don't have any effect.
 private func isNotReferenceCounted(value: Value, context: PassContext) -> Bool {

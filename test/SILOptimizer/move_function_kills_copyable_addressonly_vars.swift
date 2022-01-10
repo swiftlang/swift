@@ -8,7 +8,9 @@ import Swift
 // Declarations //
 //////////////////
 
-public class Klass {}
+public class Klass {
+    public func getOtherKlass() -> Klass? { return nil }
+}
 
 struct KlassWrapper {
     var k: Klass
@@ -18,6 +20,17 @@ func consumingUse<T>(_ k: __owned T) {}
 var booleanValue: Bool { false }
 func nonConsumingUse<T>(_ k: T) {}
 func exchangeUse<T>(_ k: __owned T) -> T { k }
+
+public protocol P {
+    var k: Klass { get }
+
+    static func getP() -> Self
+
+    func doSomething()
+}
+
+public protocol SubP1 : P {}
+public protocol SubP2 : P {}
 
 ///////////
 // Tests //
@@ -206,23 +219,10 @@ struct S<T> {
 // Defer Tests //
 /////////////////
 
-protocol P {
-    var k: Klass { get }
-
-    static func getP() -> Self
-    mutating func deferTestSuccess1()
-    mutating func deferTestSuccess2()
-    mutating func deferTestSuccess3()
-    mutating func deferTestFail1()
-    mutating func deferTestFail2()
-    mutating func deferTestFail3()
-    mutating func deferTestFail4()
-    mutating func deferTestFail5()
-    mutating func deferTestFail6()
-    mutating func deferTestFail7()
+protocol DeferTestProtocol : P {
 }
 
-extension P {
+extension DeferTestProtocol {
     mutating func deferTestSuccess1() {
         let selfType = type(of: self)
         let _ = _move(self)
@@ -342,4 +342,292 @@ extension P {
         }
         print("123")
     }
+
+    mutating func deferTestFail8() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            if booleanValue {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail9() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            if booleanValue {
+                nonConsumingUse(k) // expected-note {{use here}}
+            } else {
+                nonConsumingUse(k)
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail10() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        defer {
+            for _ in 0..<1024 {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail11() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        let _ = _move(self) // expected-note {{move here}}
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            print("creating blocks2")
+        }
+        defer {
+            for _ in 0..<1024 {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestFail12() { // expected-error {{'self' used after being moved}}
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self) // expected-note {{move here}}
+            print("creating blocks2")
+        }
+
+        defer {
+            for _ in 0..<1024 {
+                nonConsumingUse(k) // expected-note {{use here}}
+            }
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestSuccess13() {
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        defer {
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
+
+    mutating func deferTestSuccess14() {
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+            self.doSomething()
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        defer {
+            self = selfType.getP()
+        }
+        print("foo bar")
+    }
 }
+
+////////////////
+// Cast Tests //
+////////////////
+
+public func castTest0<T : SubP1>(_ x: __owned T) -> P {
+    var x2 = x  // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as P // expected-note {{use here}}
+}
+
+public func castTest1<T : P>(_ x: __owned T) -> SubP1 {
+    var x2 = x  // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as! SubP1 // expected-note {{use here}}
+}
+
+public func castTest2<T : P>(_ x: __owned T) -> SubP1? {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    return x2 as? SubP1 // expected-note {{use here}}
+}
+
+public func castTestSwitch1<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    switch x2 {  // expected-note {{use here}}
+    case let k as SubP1:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitch2<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    switch x2 { // expected-note {{use here}}
+    case let k as SubP1:
+        print(k)
+    case let k as SubP2:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitchInLoop<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+
+    for _ in 0..<1024 {
+        switch x2 { // expected-note {{use here}}
+        case let k as SubP1:
+            print(k)
+        default:
+            print("Nope")
+        }
+    }
+}
+
+public func castTestIfLet<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    if case let k as SubP1 = x2 { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+public func castTestIfLetInLoop<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    for _ in 0..<1024 {
+        if case let k as SubP1 = x2 { // expected-note {{use here}}
+            print(k)
+        } else {
+            print("no")
+        }
+    }
+}
+
+public enum EnumWithP<T> {
+    case none
+    case klass(T)
+}
+
+public func castTestIfLet2<T : P>(_ x : __owned EnumWithP<T>) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    if case let .klass(k as SubP1) = x2 { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+///////////////
+// GEP Tests //
+///////////////
+
+public func castAccess<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let _ = x2.k // expected-note {{use here}}
+}
+
+public func castAccess2<T : P>(_ x : __owned T) {
+    var x2 = x // expected-error {{'x2' used after being moved}}
+    x2 = x
+    let _ = _move(x2) // expected-note {{move here}}
+    let _ = x2.k.getOtherKlass() // expected-note {{use here}}
+}
+
+/////////////////////////
+// Partial Apply Tests //
+/////////////////////////
+
+// This makes sure we always fail if we are asked to check in a partial apply.
+public func partialApplyTest<T : P>(_ x: __owned T) {
+    var x2 = x
+    x2 = x
+    let _ = _move(x2) // expected-error {{_move applied to value that the compiler does not support checking}}
+    let f = {
+        print(x2)
+    }
+    f()
+}
+
+////////////////////////
+// Misc Tests on Self //
+////////////////////////
+
+protocol MiscTests : P {}
+
+extension MiscTests {
+
+    // This test makes sure that we are able to properly put in the destroy_addr
+    // in the "creating blocks" branch. There used to be a bug where the impl
+    // would need at least one destroy_addr to properly infer the value to put
+    // into blocks not reachable from the _move but that are on the dominance
+    // frontier from the _move. This was unnecessary and the test makes sure we
+    // do not fail on this again.
+    mutating func noDestroyAddrBeforeOptInsertAfter() {
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        self = selfType.getP()
+        print("foo bar")
+    }
+
+    // A derived version of noDestroyAddrBeforeOptInsertAfter that makes sure
+    // when we insert the destroy_addr, we destroy self at the end of the block.
+    mutating func noDestroyAddrBeforeOptInsertAfter2() {
+        let selfType = type(of: self)
+        if booleanValue {
+            print("creating blocks")
+            self.doSomething()
+        } else {
+            let _ = _move(self)
+            print("creating blocks2")
+        }
+
+        self = selfType.getP()
+        print("foo bar")
+    }
+}
+
