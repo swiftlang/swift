@@ -172,7 +172,7 @@ extension BridgedStringRef {
     let buffer = UnsafeBufferPointer<UInt8>(start: data, count: Int(length))
     return String(decoding: buffer, as: UTF8.self)
   }
-  
+
   func takeString() -> String {
     let str = string
     freeBridgedStringRef(self)
@@ -205,7 +205,7 @@ extension UnsafeMutablePointer where Pointee == BridgedSwiftObject {
     let ptr = Unmanaged.passUnretained(object).toOpaque()
     self = ptr.bindMemory(to: BridgedSwiftObject.self, capacity: 1)
   }
-  
+
   func getAs<T: AnyObject>(_ objectType: T.Type) -> T {
     return Unmanaged<T>.fromOpaque(self).takeUnretainedValue()
   }
