@@ -17,12 +17,13 @@
 // RUN: env ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR=1 \
 // RUN:    %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
-// RUN:   -library-level api -verify
+// RUN:   -library-level api -verify -module-name MainLib
 
 import PublicSwift
-import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'main'}}
+import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}
 
 import PublicClang
-import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'main'}}
-import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'main'}}
-import main // expected-warning{{'implementation-only-import-suggestion-as-error.swift' is part of module 'main'; ignoring import}}
+import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'MainLib'}}
+import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'MainLib'}}
+
+@_exported import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}
