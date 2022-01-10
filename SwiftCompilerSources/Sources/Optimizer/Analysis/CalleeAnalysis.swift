@@ -23,7 +23,7 @@ public struct CalleeAnalysis {
 
 public struct FunctionArray : RandomAccessCollection, CustomReflectable {
   fileprivate let bridged: BridgedCalleeList
-  
+
   public var startIndex: Int { 0 }
   public var endIndex: Int { BridgedFunctionArray_size(bridged) }
 
