@@ -19,6 +19,7 @@
 
 using namespace swift;
 
+SWIFT_EXPORT_FROM(swift_Concurrency) 
 SWIFT_CC(swift)
 void swift_get_time(
   long long *seconds,
@@ -70,6 +71,7 @@ void swift_get_time(
   }
 }
 
+SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift)
 void swift_get_clock_res(
   long long *seconds,
