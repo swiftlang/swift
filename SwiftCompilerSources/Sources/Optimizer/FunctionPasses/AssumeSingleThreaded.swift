@@ -9,6 +9,21 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// Assume that user code is single-threaded.
+//
+// Convert all reference counting operations into non-atomic ones.
+//
+// To get rid of most atomic reference counting operations, the standard
+// library should be compiled in this mode as well .
+//
+// This pass affects only reference counting operations resulting from SIL
+// instructions. It wouldn't affect places in the runtime C++ code which
+// hard-code calls to retain/release. We could take advantage of the Instruments
+// instrumentation stubs to redirect calls from the runtime if it was
+// significant, or else just build a single-threaded variant of the runtime.
+//
+//===----------------------------------------------------------------------===//
 
 import SIL
 
