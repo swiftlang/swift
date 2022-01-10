@@ -1933,118 +1933,6 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
   }
 }
 
-void DisjunctionChoiceProducer::partitionGenericOperators(
-    SmallVectorImpl<unsigned>::iterator first,
-    SmallVectorImpl<unsigned>::iterator last) {
-  auto *argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
-  if (!isOperatorDisjunction(Disjunction) || !argFnType)
-    return;
-
-  auto operatorName = Choices[0]->getOverloadChoice().getName();
-  if (!operatorName.getBaseIdentifier().isArithmeticOperator())
-    return;
-
-  SmallVector<unsigned, 4> concreteOverloads;
-  SmallVector<unsigned, 4> numericOverloads;
-  SmallVector<unsigned, 4> sequenceOverloads;
-  SmallVector<unsigned, 4> simdOverloads;
-  SmallVector<unsigned, 4> otherGenericOverloads;
-
-  auto refinesOrConformsTo = [&](NominalTypeDecl *nominal, KnownProtocolKind kind) -> bool {
-    if (!nominal)
-      return false;
-
-    auto *protocol =
-        TypeChecker::getProtocol(CS.getASTContext(), SourceLoc(), kind);
-
-    if (auto *refined = dyn_cast<ProtocolDecl>(nominal))
-      return refined->inheritsFrom(protocol);
-
-    return (bool)TypeChecker::conformsToProtocol(nominal->getDeclaredType(), protocol,
-                                                 CS.DC->getParentModule());
-  };
-
-  // Gather Numeric and Sequence overloads into separate buckets.
-  for (auto iter = first; iter != last; ++iter) {
-    unsigned index = *iter;
-    auto *decl = Choices[index]->getOverloadChoice().getDecl();
-    auto *nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
-
-    if (isSIMDOperator(decl)) {
-      simdOverloads.push_back(index);
-    } else if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
-      concreteOverloads.push_back(index);
-    } else if (refinesOrConformsTo(nominal, KnownProtocolKind::AdditiveArithmetic)) {
-      numericOverloads.push_back(index);
-    } else if (refinesOrConformsTo(nominal, KnownProtocolKind::Sequence)) {
-      sequenceOverloads.push_back(index);
-    } else {
-      otherGenericOverloads.push_back(index);
-    }
-  }
-
-  auto sortPartition = [&](SmallVectorImpl<unsigned> &partition) {
-    llvm::sort(partition, [&](unsigned lhs, unsigned rhs) -> bool {
-      auto *declA =
-          dyn_cast<ValueDecl>(Choices[lhs]->getOverloadChoice().getDecl());
-      auto *declB =
-          dyn_cast<ValueDecl>(Choices[rhs]->getOverloadChoice().getDecl());
-
-      return TypeChecker::isDeclRefinementOf(declA, declB);
-    });
-  };
-
-  // Sort sequence overloads so that refinements are attempted first.
-  // If the solver finds a solution with an overload, it can then skip
-  // subsequent choices that the successful choice is a refinement of.
-  sortPartition(sequenceOverloads);
-
-  // Attempt concrete overloads first.
-  first = std::copy(concreteOverloads.begin(), concreteOverloads.end(), first);
-
-  // Check if any of the known argument types conform to one of the standard
-  // arithmetic protocols. If so, the sovler should attempt the corresponding
-  // overload choices first.
-  for (auto arg : argFnType->getParams()) {
-    auto argType = arg.getPlainType();
-    argType = CS.getFixedTypeRecursive(argType, /*wantRValue=*/true);
-
-    if (argType->isTypeVariableOrMember())
-      continue;
-
-    if (TypeChecker::conformsToKnownProtocol(
-            argType, KnownProtocolKind::AdditiveArithmetic,
-            CS.DC->getParentModule())) {
-      first =
-          std::copy(numericOverloads.begin(), numericOverloads.end(), first);
-      numericOverloads.clear();
-      break;
-    }
-
-    if (TypeChecker::conformsToKnownProtocol(
-            argType, KnownProtocolKind::Sequence,
-            CS.DC->getParentModule())) {
-      first =
-          std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
-      sequenceOverloads.clear();
-      break;
-    }
-
-    if (TypeChecker::conformsToKnownProtocol(
-            argType, KnownProtocolKind::SIMD,
-            CS.DC->getParentModule())) {
-      first = std::copy(simdOverloads.begin(), simdOverloads.end(), first);
-      simdOverloads.clear();
-      break;
-    }
-  }
-
-  first = std::copy(otherGenericOverloads.begin(), otherGenericOverloads.end(), first);
-  first = std::copy(numericOverloads.begin(), numericOverloads.end(), first);
-  first = std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
-  first = std::copy(simdOverloads.begin(), simdOverloads.end(), first);
-}
-
 void DisjunctionChoiceProducer::partitionDisjunction(
     SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
@@ -2081,8 +1969,14 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   // First collect some things that we'll generally put near the beginning or
   // end of the partitioning.
   SmallVector<unsigned, 4> favored;
-  SmallVector<unsigned, 4> everythingElse;
+  // start - Operator section
+  SmallVector<unsigned, 4> concreteOperators;
+  SmallVector<unsigned, 4> numericOperators;
+  SmallVector<unsigned, 4> sequenceOperators;
   SmallVector<unsigned, 4> simdOperators;
+  SmallVector<unsigned, 4> genericOperators;
+  // end - operator section
+  SmallVector<unsigned, 4> everythingElse;
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
 
@@ -2126,17 +2020,64 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     });
   }
 
-  // Partition SIMD operators.
-  if (isOperatorDisjunction(Disjunction) &&
-      !Choices[0]->getOverloadChoice().getName().getBaseIdentifier().isArithmeticOperator()) {
-    forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-      if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
-        simdOperators.push_back(index);
-        return true;
-      }
+  bool isArithmeticOperator = false;
 
-      return false;
+  if (isOperatorDisjunction(Disjunction)) {
+    auto operatorName = Choices[0]->getOverloadChoice().getName();
+    isArithmeticOperator =
+        operatorName.getBaseIdentifier().isArithmeticOperator();
+  }
+
+  if (isArithmeticOperator) {
+    auto refinesOrConformsTo = [&](NominalTypeDecl *nominal,
+                                   KnownProtocolKind kind) -> bool {
+      if (!nominal)
+        return false;
+
+      auto *protocol =
+          TypeChecker::getProtocol(CS.getASTContext(), SourceLoc(), kind);
+
+      if (auto *refined = dyn_cast<ProtocolDecl>(nominal))
+        return refined->inheritsFrom(protocol);
+
+      return (bool)TypeChecker::conformsToProtocol(
+          nominal->getDeclaredType(), protocol, CS.DC->getParentModule());
+    };
+
+    forEachChoice(Choices, [&](unsigned index, Constraint *choice) -> bool {
+      auto *decl = choice->getOverloadChoice().getDecl();
+      auto *nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
+
+      if (isSIMDOperator(decl)) {
+        simdOperators.push_back(index);
+      } else if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
+        concreteOperators.push_back(index);
+      } else if (refinesOrConformsTo(nominal,
+                                     KnownProtocolKind::AdditiveArithmetic)) {
+        numericOperators.push_back(index);
+      } else if (refinesOrConformsTo(nominal, KnownProtocolKind::Sequence)) {
+        sequenceOperators.push_back(index);
+      } else {
+        genericOperators.push_back(index);
+      }
+      return true;
     });
+
+    auto sortPartition = [&](SmallVectorImpl<unsigned> &partition) {
+      llvm::sort(partition, [&](unsigned lhs, unsigned rhs) -> bool {
+        auto *declA =
+            dyn_cast<ValueDecl>(Choices[lhs]->getOverloadChoice().getDecl());
+        auto *declB =
+            dyn_cast<ValueDecl>(Choices[rhs]->getOverloadChoice().getDecl());
+
+        return TypeChecker::isDeclRefinementOf(declA, declB);
+      });
+    };
+
+    // Sort sequence overloads so that refinements are attempted first.
+    // If the solver finds a solution with an overload, it can then skip
+    // subsequent choices that the successful choice is a refinement of.
+    sortPartition(sequenceOperators);
   }
 
   // Gather the remaining options.
@@ -2156,8 +2097,53 @@ void DisjunctionChoiceProducer::partitionDisjunction(
       };
 
   appendPartition(favored);
+
+  if (isArithmeticOperator) {
+    appendPartition(concreteOperators);
+
+    if (auto *argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction)) {
+      // Check if any of the known argument types conform to one of the standard
+      // arithmetic protocols. If so, the solver should attempt the
+      // corresponding overload choices first.
+      for (auto arg : argFnType->getParams()) {
+        auto argType = arg.getPlainType();
+        argType = CS.getFixedTypeRecursive(argType, /*wantRValue=*/true);
+
+        if (argType->isTypeVariableOrMember())
+          continue;
+
+        if (TypeChecker::conformsToKnownProtocol(
+                argType, KnownProtocolKind::AdditiveArithmetic,
+                CS.DC->getParentModule())) {
+          appendPartition(numericOperators);
+          numericOperators.clear();
+          break;
+        }
+
+        if (TypeChecker::conformsToKnownProtocol(argType,
+                                                 KnownProtocolKind::Sequence,
+                                                 CS.DC->getParentModule())) {
+          appendPartition(sequenceOperators);
+          sequenceOperators.clear();
+          break;
+        }
+
+        if (TypeChecker::conformsToKnownProtocol(
+                argType, KnownProtocolKind::SIMD, CS.DC->getParentModule())) {
+          appendPartition(simdOperators);
+          simdOperators.clear();
+          break;
+        }
+      }
+    }
+
+    appendPartition(genericOperators);
+    appendPartition(numericOperators);
+    appendPartition(sequenceOperators);
+    appendPartition(simdOperators);
+  }
+
   appendPartition(everythingElse);
-  appendPartition(simdOperators);
   appendPartition(unavailable);
   appendPartition(disabled);
 

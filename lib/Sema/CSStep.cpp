@@ -546,12 +546,6 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
     if (!choice.isGenericOperator() && choice.isSymmetricOperator()) {
       if (!BestNonGenericScore || score < BestNonGenericScore) {
         BestNonGenericScore = score;
-        if (shouldSkipGenericOperators()) {
-          // The disjunction choice producer shouldn't do the work
-          // to partition the generic operator choices if generic
-          // operators are going to be skipped.
-          Producer.setNeedsGenericOperatorOrdering(false);
-        }
       }
     }
 

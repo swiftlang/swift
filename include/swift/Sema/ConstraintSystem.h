@@ -5847,8 +5847,6 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
 
   unsigned Index = 0;
 
-  bool needsGenericOperatorOrdering = true;
-
 public:
   using Element = DisjunctionChoice;
 
@@ -5866,10 +5864,6 @@ public:
     partitionDisjunction(Ordering, PartitionBeginning);
   }
 
-  void setNeedsGenericOperatorOrdering(bool flag) {
-    needsGenericOperatorOrdering = flag;
-  }
-
   Optional<Element> operator()() override {
     if (isExhausted())
       return None;
@@ -5881,18 +5875,6 @@ public:
       ++PartitionIndex;
 
     ++Index;
-
-    auto choice = DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
-                                    IsExplicitConversion, isBeginningOfPartition);
-    // Partition the generic operators before producing the first generic
-    // operator disjunction choice.
-    if (needsGenericOperatorOrdering && choice.isGenericOperator()) {
-      unsigned nextPartitionIndex = (PartitionIndex < PartitionBeginning.size() ?
-                                     PartitionBeginning[PartitionIndex] : Ordering.size());
-      partitionGenericOperators(Ordering.begin() + currIndex,
-                                Ordering.begin() + nextPartitionIndex);
-      needsGenericOperatorOrdering = false;
-    }
 
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);
@@ -5908,12 +5890,6 @@ private:
   // have to visit all of the options.
   void partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
-
-  /// Partition the choices in the range \c first to \c last into groups and
-  /// order the groups in the best order to attempt based on the argument
-  /// function type that the operator is applied to.
-  void partitionGenericOperators(SmallVectorImpl<unsigned>::iterator first,
-                                 SmallVectorImpl<unsigned>::iterator last);
 };
 
 class ConjunctionElementProducer : public BindingProducer<ConjunctionElement> {
