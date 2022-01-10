@@ -631,3 +631,40 @@ extension MiscTests {
     }
 }
 
+//////////////////////////////////
+// Multiple Captures from Defer //
+//////////////////////////////////
+
+func multipleCapture1<T : P>(_ k: T) -> () {
+    let kType = type(of: k)
+    var k2 = k
+    var k3 = k
+    let _ = _move(k2)
+    let _ = _move(k3)
+    var k4 = k
+    k4 = k
+    defer {
+        k2 = kType.getP()
+        print(k4)
+        k3 = kType.getP()
+    }
+    print("foo bar")
+}
+
+func multipleCapture2<T : P>(_ k: T) -> () {
+    let kType = type(of: k)
+    var k2 = k // expected-error {{'k2' used after being moved}}
+    k2 = k
+    var k3 = k
+    let _ = _move(k2) // expected-note {{move here}}
+    let _ = _move(k3)
+    var k4 = k
+    k4 = k
+    defer {
+        print(k2) // expected-note {{use here}}
+        print(k4)
+        k3 = kType.getP()
+    }
+    print("foo bar")
+}
+
