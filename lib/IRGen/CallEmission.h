@@ -97,7 +97,9 @@ public:
                        WitnessMetadata *witnessMetadata);
   virtual Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) = 0;
 
-  void addAttribute(unsigned Index, llvm::Attribute::AttrKind Attr);
+  void addFnAttribute(llvm::Attribute::AttrKind Attr);
+
+  void addParamAttribute(unsigned ParamIndex, llvm::Attribute::AttrKind Attr);
 
   void emitToMemory(Address addr, const LoadableTypeInfo &substResultTI,
                     bool isOutlined);

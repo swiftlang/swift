@@ -310,11 +310,11 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   if (!linkFilePath.empty()) {
-    auto linkFile = linkFilePath.str();
-    if (llvm::sys::fs::is_regular_file(linkFile)) {
-      Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
+    if (llvm::sys::fs::is_regular_file(linkFilePath)) {
+      Arguments.push_back(
+          context.Args.MakeArgString(Twine("@") + linkFilePath));
     } else {
-      llvm::report_fatal_error(linkFile + " not found");
+      llvm::report_fatal_error(Twine(linkFilePath) + " not found");
     }
   }
 
