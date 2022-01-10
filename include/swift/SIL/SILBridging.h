@@ -87,6 +87,10 @@ typedef struct {
 } BridgedFunction;
 
 typedef struct {
+  OptionalSwiftObject obj;
+} OptionalBridgedFunction;
+
+typedef struct {
   SwiftObject obj;
 } BridgedGlobalVar;
 
@@ -135,6 +139,12 @@ typedef enum {
   MayReadWriteBehavior,
   MayHaveSideEffectsBehavior
 } BridgedMemoryBehavior;
+
+// AST bridging
+
+typedef struct {
+  const void * _Nonnull op;
+} BridgedSubstitutionMap;
 
 typedef enum {
   UnknownBuiltin = 0,
@@ -189,6 +199,7 @@ BridgedType SILValue_getType(BridgedValue value);
 
 SwiftInt SILType_isAddress(BridgedType);
 SwiftInt SILType_isTrivial(BridgedType, BridgedFunction);
+BridgedSubstitutionMap SILType_getContextSubstitutionMap(BridgedType);
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
 
@@ -236,7 +247,7 @@ BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedLocation loc, BridgedStringRef name,
           BridgedType operandType, BridgedType resultType, BridgedValueArray arguments);
 BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge);
+          BridgedLocation loc, BridgedValue condition, BridgedStringRef message);
 BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
           BridgedLocation loc, BridgedType type, SwiftInt value);
 BridgedInstruction SILBuilder_createDeallocStackRef(BridgedInstruction insertionPoint,

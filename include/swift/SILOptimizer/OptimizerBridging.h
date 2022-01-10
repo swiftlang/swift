@@ -69,6 +69,14 @@ enum {
   BridgedSlabCapacity = 64 * sizeof(uintptr_t)
 };
 
+typedef struct {
+  void * _Nullable rcia;
+} BridgedRCIdentityAnalysis;
+
+typedef struct {
+  void * _Nonnull functionInfo;
+} BridgedRCIdentityFunctionInfo;
+
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
 typedef void (* _Nonnull BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
 
@@ -133,6 +141,18 @@ void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block);
 BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set);
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
+BridgedRCIdentityAnalysis
+PassContext_getRCIdentityAnalysis(BridgedPassContext context);
+
+BridgedRCIdentityFunctionInfo
+RCIdentityAnalysis_getFunctionInfo(BridgedRCIdentityAnalysis bridgedAnalysis,
+                                   BridgedFunction function);
+
+BridgedValue RCIdentityFunctionInfo_getRCIdentityRoot(
+    BridgedRCIdentityFunctionInfo bridgedInfo, BridgedValue value);
+
+OptionalBridgedFunction PassContext_getDestructor(BridgedPassContext context,
+                                                  BridgedType type);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -24,6 +24,7 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -1222,7 +1223,7 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
 }
 
 void PassContext_eraseInstruction(BridgedPassContext passContext,
-                                   BridgedInstruction inst) {
+                                  BridgedInstruction inst) {
   castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
 }
 
@@ -1243,8 +1244,8 @@ void PassContext_fixStackNesting(BridgedPassContext passContext,
 SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context) {
   SILPassManager *pm = castToPassInvocation(context)->getPassManager();
   ASTContext &ctxt = pm->getModule()->getASTContext();
-  return AvailabilityContext::forDeploymentTarget(ctxt).
-           isContainedIn(ctxt.getSwift51Availability());
+  return AvailabilityContext::forDeploymentTarget(ctxt).isContainedIn(
+    ctxt.getSwift51Availability());
 }
 
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
@@ -1253,7 +1254,8 @@ BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
   return {pm->getAnalysis<AliasAnalysis>(invocation->getFunction())};
 }
 
-BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context) {
+BridgedCalleeAnalysis
+PassContext_getCalleeAnalysis(BridgedPassContext context) {
   SILPassManager *pm = castToPassInvocation(context)->getPassManager();
   return {pm->getAnalysis<BasicCalleeAnalysis>()};
 }
@@ -1318,4 +1320,32 @@ BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
   castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
+BridgedRCIdentityAnalysis
+PassContext_getRCIdentityAnalysis(BridgedPassContext context) {
+  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
+  return {pm->getAnalysis<RCIdentityAnalysis>()};
+}
+
+OptionalBridgedFunction PassContext_getDestructor(BridgedPassContext context,
+                                                  BridgedType type) {
+  auto *cd = castToSILType(type).getClassOrBoundGenericClass();
+  assert(cd && "no class type allocated with alloc_ref");
+
+  auto *pm = castToPassInvocation(context)->getPassManager();
+  // Find the destructor of the type.
+  auto *destructor = cd->getDestructor();
+  SILDeclRef deallocRef(destructor, SILDeclRef::Kind::Deallocator);
+
+  return {pm->getModule()->lookUpFunction(deallocRef)};
+}
+
+BridgedSubstitutionMap
+PassContext_getContextSubstitutionMap(BridgedPassContext context,
+                                      BridgedType bridgedType) {
+  auto type = castToSILType(bridgedType);
+  auto *ntd = type.getASTType()->getAnyNominal();
+  auto *pm = castToPassInvocation(context)->getPassManager();
+  auto *m = pm->getModule()->getSwiftModule();
+  
+  return {type.getASTType()->getContextSubstitutionMap(m, ntd).getOpaqueValue()};
 }
