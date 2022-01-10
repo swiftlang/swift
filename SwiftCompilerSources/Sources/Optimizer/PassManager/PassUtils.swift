@@ -78,6 +78,12 @@ struct PassContext {
 
     SILInstruction_setOperand(instruction.bridged, index, value.bridged)
   }
+
+  func setAtomicity(of instruction: RefCountingInst, isAtomic: Bool) {
+    PassContext_notifyChanges(passContext, instructionsChanged)
+
+    RefCountingInst_setIsAtomic(instruction.bridged, isAtomic)
+  }
 }
 
 struct FunctionPass {
