@@ -697,16 +697,30 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
   bool hasFixes = delta.Data[SK_Fix] > 0;
   bool hasAsyncMismatch = delta.Data[SK_AsyncInSyncMismatch] > 0;
-  auto isBeginningOfPartition = choice.isBeginningOfPartition();
+  bool isBeginningOfPartition = choice.isBeginningOfPartition();
 
   // Attempt to short-circuit evaluation of this disjunction only
   // if the disjunction choice we are comparing to did not involve:
   //   1. selecting unavailable overloads
   //   2. result in fixes being applied to reach a solution
   //   3. selecting an overload that results in an async/sync mismatch
-  return !hasUnavailableOverloads && !hasFixes && !hasAsyncMismatch &&
-         (isBeginningOfPartition ||
-          shortCircuitDisjunctionAt(choice, lastChoice));
+  if (hasUnavailableOverloads || hasFixes || hasAsyncMismatch)
+    return false;
+
+  // Similar to \c shouldSkip - don't stop at the beginning of generic partition
+  // for unary operators when there was a solution with concrete operator choice
+  // that required an implicit CGFloat<->Double conversion, because not all of
+  // such operators have concrete `CGFloat` overloads.
+  if (isBeginningOfPartition && choice.isGenericUnaryOperator()) {
+    if (BestNonGenericScore) {
+      auto &score = BestNonGenericScore->Data;
+      if (score[SK_ImplicitValueConversion] > 0)
+        return false;
+    }
+  }
+
+  return isBeginningOfPartition ||
+         shortCircuitDisjunctionAt(choice, lastChoice);
 }
 
 bool swift::isSIMDOperator(ValueDecl *value) {

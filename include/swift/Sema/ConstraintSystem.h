@@ -5630,6 +5630,10 @@ public:
   bool isSymmetricOperator() const;
   bool isUnaryOperator() const;
 
+  bool isGenericUnaryOperator() const {
+    return isGenericOperator() && isUnaryOperator();
+  }
+
   void print(llvm::raw_ostream &Out, SourceManager *SM) const {
     Out << "disjunction choice ";
     Choice->print(Out, SM);
