@@ -60,7 +60,7 @@ public struct Builder {
       return cf.getAs(CondFailInst.self)
     }
   }
-  
+
   public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
     notifyInstructionsChanged()
     let literal = SILBuilder_createIntegerLiteral(

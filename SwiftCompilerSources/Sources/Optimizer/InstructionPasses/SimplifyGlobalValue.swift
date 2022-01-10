@@ -31,7 +31,7 @@ let simplifyGlobalValuePass = InstructionPass<GlobalValueInst>(
     users.removeAll()
   }
 })
-  
+
 /// Returns true if reference counting and debug_value users of a global_value
 /// can be deleted.
 private func checkUsers(of val: Value, users: inout StackList<Instruction>) -> Bool {
