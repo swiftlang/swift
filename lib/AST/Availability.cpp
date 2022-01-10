@@ -506,7 +506,6 @@ ASTContext::getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) {
     default: break;
     }
   }
-  llvm::report_fatal_error(
-      Twine("Missing call to getSwiftXYAvailability for Swift ") +
-      swiftVersion.getAsString());
+  llvm::report_fatal_error("Missing call to getSwiftXYAvailability for Swift " +
+                           swiftVersion.getAsString());
 }

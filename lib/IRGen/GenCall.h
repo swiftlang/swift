@@ -156,6 +156,11 @@ namespace irgen {
                                   Alignment align,
                                   llvm::Type *storageType);
 
+  /// Add signext or zeroext attribute set for an argument that needs
+  /// extending.
+  void addExtendAttribute(IRGenModule &IGM, llvm::AttributeList &attrs,
+                          unsigned index, bool signExtend);
+
   /// Can a series of values be simply pairwise coerced to (or from) an
   /// explosion schema, or do they need to traffic through memory?
   bool canCoerceToSchema(IRGenModule &IGM,

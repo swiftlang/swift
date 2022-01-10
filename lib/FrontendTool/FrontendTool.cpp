@@ -1871,15 +1871,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   //
   // Unfortunately it's not really safe to do anything else, since very
   // low-level operations in LLVM can trigger fatal errors.
-  auto diagnoseFatalError = [&PDC](const char *reason, bool shouldCrash) {
-    static const char *recursiveFatalError = nullptr;
+  auto diagnoseFatalError = [&PDC](const std::string &reason, bool shouldCrash){
+    static const std::string *recursiveFatalError = nullptr;
     if (recursiveFatalError) {
       // Report the /original/ error through LLVM's default handler, not
       // whatever we encountered.
       llvm::remove_fatal_error_handler();
-      llvm::report_fatal_error(recursiveFatalError, shouldCrash);
+      llvm::report_fatal_error(*recursiveFatalError, shouldCrash);
     }
-    recursiveFatalError = reason;
+    recursiveFatalError = &reason;
 
     SourceManager dummyMgr;
 
@@ -1895,13 +1895,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     if (shouldCrash)
       abort();
   };
-  llvm::ScopedFatalErrorHandler handler(
-      [](void *rawCallback, const char *reason, bool shouldCrash) {
-        auto *callback =
-            static_cast<decltype(&diagnoseFatalError)>(rawCallback);
-        (*callback)(reason, shouldCrash);
-      },
-      &diagnoseFatalError);
+  llvm::ScopedFatalErrorHandler handler([](void *rawCallback,
+                                           const std::string &reason,
+                                           bool shouldCrash) {
+    auto *callback = static_cast<decltype(&diagnoseFatalError)>(rawCallback);
+    (*callback)(reason, shouldCrash);
+  }, &diagnoseFatalError);
 
   std::unique_ptr<CompilerInstance> Instance =
     std::make_unique<CompilerInstance>();

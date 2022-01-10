@@ -1157,8 +1157,7 @@ parseArgsUntil(const llvm::opt::OptTable& Opts,
     }
 
     unsigned Prev = Index;
-    Arg *A = Opts.ParseOneArg(*Args, Index, FlagsToInclude, FlagsToExclude)
-                 .release();
+    Arg *A = Opts.ParseOneArg(*Args, Index, FlagsToInclude, FlagsToExclude);
     assert(Index > Prev && "Parser failed to consume argument.");
 
     // Check for missing argument error.

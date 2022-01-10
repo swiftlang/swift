@@ -38,11 +38,11 @@ struct WidthPreservingAPIntDenseMapInfo {
   }
 
   static unsigned getHashValue(const APInt &Key) {
-    return llvm::DenseMapInfo<APInt>::getHashValue(Key);
+    return static_cast<unsigned>(hash_value(Key));
   }
 
   static bool isEqual(const APInt &LHS, const APInt &RHS) {
-    return llvm::DenseMapInfo<APInt>::isEqual(LHS, RHS);
+    return LHS.getBitWidth() == RHS.getBitWidth() && LHS == RHS;
   }
 };
 

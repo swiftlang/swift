@@ -5023,8 +5023,10 @@ namespace {
         auto candidate = IGF.IGM.getAddrOfTypeMetadata(type);
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
                                            {request.get(IGF), candidate});
-        call->addFnAttr(llvm::Attribute::NoUnwind);
-        call->addFnAttr(llvm::Attribute::ReadNone);
+        call->addAttribute(llvm::AttributeList::FunctionIndex,
+                           llvm::Attribute::NoUnwind);
+        call->addAttribute(llvm::AttributeList::FunctionIndex,
+                           llvm::Attribute::ReadNone);
 
         return MetadataResponse::handle(IGF, request, call);
       });

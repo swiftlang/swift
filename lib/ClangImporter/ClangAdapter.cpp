@@ -396,7 +396,6 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::Float16:
     case clang::BuiltinType::Float128:
     case clang::BuiltinType::NullPtr:
-    case clang::BuiltinType::Ibm128:
       return OmissionTypeName();
 
     // Objective-C types that aren't mapped directly; rather, pointers to

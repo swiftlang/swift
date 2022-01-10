@@ -603,8 +603,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::CallInst *call = IGF.Builder.CreateCall(fn,
                                         {context, errorBuffer.getAddress()});
     call->setCallingConv(IGF.IGM.SwiftCC);
-    call->addFnAttr(llvm::Attribute::NoUnwind);
-    call->addParamAttr(1, llvm::Attribute::ReadOnly);
+    call->addAttribute(llvm::AttributeList::FunctionIndex,
+                       llvm::Attribute::NoUnwind);
+    call->addAttribute(llvm::AttributeList::FirstArgIndex + 1,
+                       llvm::Attribute::ReadOnly);
 
     auto attrs = call->getAttributes();
     IGF.IGM.addSwiftSelfAttributes(attrs, 0);

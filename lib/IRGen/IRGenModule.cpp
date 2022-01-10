@@ -103,7 +103,6 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
-  CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -114,6 +113,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     break;
   case IRGenDebugInfoLevel::ASTTypes:
   case IRGenDebugInfoLevel::DwarfTypes:
+    CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
@@ -947,8 +947,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
       else
         buildFnAttr.addAttribute(Attr);
     }
-    fn->addFnAttrs(buildFnAttr);
-    fn->addRetAttrs(buildRetAttr);
+    fn->addAttributes(llvm::AttributeList::FunctionIndex, buildFnAttr);
+    fn->addAttributes(llvm::AttributeList::ReturnIndex, buildRetAttr);
     fn->addParamAttrs(0, buildFirstParamAttr);
   }
 
@@ -1186,10 +1186,14 @@ void IRGenerator::addBackDeployedObjCActorInitialization(ClassDecl *ClassDecl) {
 
 llvm::AttributeList IRGenModule::getAllocAttrs() {
   if (AllocAttrs.isEmpty()) {
-    AllocAttrs = llvm::AttributeList().addRetAttribute(
-        getLLVMContext(), llvm::Attribute::NoAlias);
     AllocAttrs =
-        AllocAttrs.addFnAttribute(getLLVMContext(), llvm::Attribute::NoUnwind);
+        llvm::AttributeList::get(getLLVMContext(),
+                                 llvm::AttributeList::ReturnIndex,
+                                 llvm::Attribute::NoAlias);
+    AllocAttrs =
+        AllocAttrs.addAttribute(getLLVMContext(),
+                                llvm::AttributeList::FunctionIndex,
+                                llvm::Attribute::NoUnwind);
   }
   return AllocAttrs;
 }
@@ -1206,7 +1210,7 @@ void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
 void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   llvm::AttrBuilder b;
   setHasNoFramePointer(b);
-  F->addFnAttrs(b);
+  F->addAttributes(llvm::AttributeList::FunctionIndex, b);
 }
 
 /// Construct initial function attributes from options.
@@ -1230,7 +1234,8 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
   llvm::AttrBuilder b;
   constructInitialFnAttributes(b);
-  return llvm::AttributeList().addFnAttributes(getLLVMContext(), b);
+  return llvm::AttributeList::get(getLLVMContext(),
+                                  llvm::AttributeList::FunctionIndex, b);
 }
 
 llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {
@@ -1246,7 +1251,7 @@ llvm::Constant *IRGenModule::getOpaquePtr(llvm::Constant *ptr) {
 }
 
 static void appendEncodedName(raw_ostream &os, StringRef name) {
-  if (clang::isValidAsciiIdentifier(name)) {
+  if (clang::isValidIdentifier(name)) {
     os << "_" << name;
   } else {
     for (auto c : name)
