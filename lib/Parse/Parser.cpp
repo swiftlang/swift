@@ -951,6 +951,7 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
     return false;
   }
 
+
   // When we know we're supposed to get an identifier or operator, map the
   // postfix '!' to an operator name.
   if (Tok.is(tok::exclaim_postfix)) {

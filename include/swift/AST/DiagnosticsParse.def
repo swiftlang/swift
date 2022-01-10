@@ -1616,6 +1616,8 @@ ERROR(attr_private_import_expected_sourcefile_name,none,
       "expected a source file name in @_private(sourceFile:)", ())
 ERROR(attr_private_import_expected_colon,none,
       "expected ':' after @_private(sourceFile", ())
+ERROR(operator_in_import_path,none,
+      "Cannot include postfix operator in import declaration.",())
 
 // opened
 ERROR(opened_attribute_expected_lparen,none,
