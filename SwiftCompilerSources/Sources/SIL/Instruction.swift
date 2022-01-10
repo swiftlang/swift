@@ -39,11 +39,11 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   final public var description: String {
     SILNode_debugDescription(bridgedNode).takeString()
   }
-  
+
   final public var operands: OperandArray {
     return OperandArray(opArray: SILInstruction_getOperands(bridged))
   }
-  
+
   fileprivate var resultCount: Int { 0 }
   fileprivate func getResult(index: Int) -> Value { fatalError() }
 
@@ -184,7 +184,7 @@ final public class StoreInst : Instruction {
   public var destinationOperand: Operand { return operands[1] }
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
-  
+
   // must match with enum class StoreOwnershipQualifier
   public enum StoreOwnership: Int {
     case unqualified = 0, initialize = 1, assign = 2, trivial = 3
@@ -210,7 +210,7 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
 final public class EndBorrowInst : Instruction, UnaryInstruction {}
 
 final public class DeallocStackInst : Instruction, UnaryInstruction {
-  public var allocstack: AllocStackInst {
+  public var allocStack: AllocStackInst {
     return operand as! AllocStackInst
   }
 }
@@ -381,7 +381,7 @@ class StructElementAddrInst : SingleValueInstruction, UnaryInstruction {
 
 final public class EnumInst : SingleValueInstruction {
   public var caseIndex: Int { EnumInst_caseIndex(bridged) }
-  
+
   public var operand: Value? { operands.first?.value }
 }
 
@@ -449,7 +449,7 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var numArguments: Int { ApplyInst_numArguments(bridged) }
-  
+
   public var singleDirectResult: Value? { self }
 }
 
@@ -511,7 +511,7 @@ final public class DestructureTupleInst : MultipleValueInstruction {
 
 final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { BeginApplyInst_numArguments(bridged) }
-  
+
   public var singleDirectResult: Value? { nil }
 }
 
@@ -542,16 +542,16 @@ final public class UnwindInst : TermInst {
 
 final public class TryApplyInst : TermInst, FullApplySite {
   public var numArguments: Int { TryApplyInst_numArguments(bridged) }
-  
+
   public var normalBlock: BasicBlock { successors[0] }
   public var errorBlock: BasicBlock { successors[1] }
-  
+
   public var singleDirectResult: Value? { normalBlock.arguments[0] }
 }
 
 final public class BranchInst : TermInst {
   public var targetBlock: BasicBlock { BranchInst_getTargetBlock(bridged).block }
-  
+
   public func getArgument(for operand: Operand) -> Argument {
     return targetBlock.arguments[operand.index]
   }
