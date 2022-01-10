@@ -87,3 +87,28 @@ extension String.UTF16View {
   @inlinable @inline(__always)
   internal var _shortHeuristic: Int { return 32 }
 }
+
+// These were previously using grapheme cache bits in String.Index. We no longer
+// need that cache, so keep them here for ABI compatibility.
+extension String.Index {
+  @usableFromInline
+  internal var characterStride: Int? {
+    let value = (_rawBits & 0x3F00) &>> 8
+    return value > 0 ? Int(truncatingIfNeeded: value) : nil
+  }
+
+  @usableFromInline
+  internal init(
+    encodedOffset: Int, transcodedOffset: Int, characterStride: Int
+  ) {
+    self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
+    if _slowPath(characterStride > 0x3F) { return }
+    self._rawBits |= UInt64(truncatingIfNeeded: characterStride &<< 8)
+    self._invariantCheck()
+  }
+
+  @usableFromInline
+  internal init(encodedOffset pos: Int, characterStride char: Int) {
+    self.init(encodedOffset: pos, transcodedOffset: 0, characterStride: char)
+  }
+}

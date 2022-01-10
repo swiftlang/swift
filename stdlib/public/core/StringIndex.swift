@@ -16,20 +16,20 @@ import SwiftShims
 
 String's Index has the following layout:
 
- ┌──────────┬───────────────────╥────────────────┬──────────╥────────────────┐
- │ b63:b16  │      b15:b14      ║     b13:b8     │  b7:b1   ║       b0       │
- ├──────────┼───────────────────╫────────────────┼──────────╫────────────────┤
- │ position │ transcoded offset ║ grapheme cache │ reserved ║ scalar aligned │
- └──────────┴───────────────────╨────────────────┴──────────╨────────────────┘
-                                └──────── resilient ────────┘
+ ┌──────────┬───────────────────╥──────────────╥────────────────┐
+ │ b63:b16  │      b15:b14      ║    b13:b1    ║       b0       │
+ ├──────────┼───────────────────╫──────────────╫────────────────┤
+ │ position │ transcoded offset ║   reserved   ║ scalar aligned │
+ └──────────┴───────────────────╨──────────────╨────────────────┘
+                                └── resilient ─┘
 
 Position, transcoded offset, and scalar aligned are fully exposed in the ABI.
-Grapheme cache and reserved are partially resilient: the fact that there are 13
+The reserved part is partially resilient: the fact that there are 13
 bits with a default value of `0` is ABI, but not the layout, construction, or
-interpretation of those bits. All use of grapheme cache should be behind
+interpretation of those bits. All use of these bits should be behind
 non-inlinable function calls. Inlinable code should not set a non-zero value to
-grapheme cache bits: doing so breaks back deployment as they will be interpreted
-as a set cache.
+these bits: doing so breaks back deployment as they will be interpreted
+as a grapheme cache (previously used as grapheme cache).
 
 - position aka `encodedOffset`: A 48-bit offset into the string's code units
 
@@ -37,15 +37,17 @@ as a set cache.
 
 <resilience barrier>
 
-- grapheme cache: A 6-bit value remembering the distance to the next grapheme
-boundary.
-
-- reserved: 7-bit for future use.
+- reserved: 13-bits for future use.
 
 <resilience barrier>
 
 - scalar aligned, whether this index is known to be scalar-aligned (see below)
 
+
+Previously:
+
+- b13:b8 were used as grapheme cache. Since handling grapheme breaking ourselves,
+  we no longer needed this cache.
 
 */
 extension String {
@@ -95,12 +97,6 @@ extension String.Index {
     return Int(truncatingIfNeeded: orderingValue & 0x3)
   }
 
-  @usableFromInline
-  internal var characterStride: Int? {
-    let value = (_rawBits & 0x3F00) &>> 8
-    return value > 0 ? Int(truncatingIfNeeded: value) : nil
-  }
-
   @inlinable @inline(__always)
   internal init(encodedOffset: Int, transcodedOffset: Int) {
     let pos = UInt64(truncatingIfNeeded: encodedOffset)
@@ -140,21 +136,6 @@ extension String.Index {
   @inlinable @inline(__always)
   internal init(_encodedOffset offset: Int) {
     self.init(encodedOffset: offset, transcodedOffset: 0)
-  }
-
-  @usableFromInline
-  internal init(
-    encodedOffset: Int, transcodedOffset: Int, characterStride: Int
-  ) {
-    self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
-    if _slowPath(characterStride > 0x3F) { return }
-    self._rawBits |= UInt64(truncatingIfNeeded: characterStride &<< 8)
-    self._invariantCheck()
-  }
-
-  @usableFromInline
-  internal init(encodedOffset pos: Int, characterStride char: Int) {
-    self.init(encodedOffset: pos, transcodedOffset: 0, characterStride: char)
   }
 
   #if !INTERNAL_CHECKS_ENABLED

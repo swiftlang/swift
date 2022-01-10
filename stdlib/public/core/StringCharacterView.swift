@@ -63,11 +63,8 @@ extension String: BidirectionalCollection {
     let i = _guts.scalarAlign(i)
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
-    let nextStride = _characterStride(
-      startingAt: Index(_encodedOffset: nextOffset)._scalarAligned)
 
-    return Index(
-      encodedOffset: nextOffset, characterStride: nextStride)._scalarAligned
+    return Index(encodedOffset: nextOffset)._scalarAligned
   }
 
   /// Returns the position immediately before the given index.
@@ -82,8 +79,7 @@ extension String: BidirectionalCollection {
     let i = _guts.scalarAlign(i)
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
-    return Index(
-      encodedOffset: priorOffset, characterStride: stride)._scalarAligned
+    return Index(encodedOffset: priorOffset)._scalarAligned
   }
   /// Returns an index that is the specified distance from the given index.
   ///
@@ -202,9 +198,6 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always)
   internal func _characterStride(startingAt i: Index) -> Int {
     _internalInvariant_5_1(i._isScalarAligned)
-
-    // Fast check if it's already been measured, otherwise check resiliently
-    if let d = i.characterStride { return d }
 
     if i == endIndex { return 0 }
 
