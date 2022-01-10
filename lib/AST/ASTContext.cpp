@@ -4323,10 +4323,7 @@ CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
   return CanOpenedArchetypeType(result);
 }
 
-GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
-  if (Environment)
-    return Environment;
-  
+GenericEnvironment *OpenedArchetypeType::createGenericEnvironment() const {
   auto thisType = const_cast<OpenedArchetypeType*>(this);
   auto &ctx = thisType->getASTContext();
   // Create a generic environment to represent the opened type.

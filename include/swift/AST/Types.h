@@ -5396,6 +5396,7 @@ protected:
   }
   Type InterfaceType;
   MutableArrayRef<std::pair<Identifier, Type>> NestedTypes;
+  mutable GenericEnvironment *Environment = nullptr;
 
   void populateNestedTypes() const;
   void resolveNestedType(std::pair<Identifier, Type> &nested) const;
@@ -5494,7 +5495,8 @@ protected:
                 RecursiveTypeProperties properties,
                 Type InterfaceType,
                 ArrayRef<ProtocolDecl *> ConformsTo,
-                Type Superclass, LayoutConstraint Layout);
+                Type Superclass, LayoutConstraint Layout,
+                GenericEnvironment *Environment);
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 END_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
@@ -5507,8 +5509,6 @@ class PrimaryArchetypeType final : public ArchetypeType,
   friend TrailingObjects;
   friend ArchetypeType;
                                   
-  GenericEnvironment *Environment;
-
 public:
   /// getNew - Create a new primary archetype with the given name.
   ///
@@ -5520,11 +5520,6 @@ public:
                                GenericTypeParamType *InterfaceType,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass, LayoutConstraint Layout);
-
-  /// Retrieve the generic environment in which this archetype resides.
-  GenericEnvironment *getGenericEnvironment() const {
-    return Environment;
-  }
 
   GenericTypeParamType *getInterfaceType() const {
     return cast<GenericTypeParamType>(InterfaceType.getPointer());
@@ -5551,10 +5546,6 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   friend ArchetypeType;
   friend GenericSignatureBuilder;
 
-  /// A GenericEnvironment with this opaque archetype bound to the interface
-  /// type of the output type from the OpaqueDecl.
-  GenericEnvironment *Environment = nullptr;
-
   friend class GenericEnvironment;
 
   static OpaqueTypeArchetypeType *getNew(
@@ -5574,9 +5565,6 @@ public:
 
   /// Retrieve the set of substitutions applied to the opaque type.
   SubstitutionMap getSubstitutions() const;
-
-  /// Get a generic environment that has this opaque archetype bound within it.
-  GenericEnvironment *getGenericEnvironment() const;
 
   /// Compute the canonical interface type within the environment of this
   /// opaque type archetype.
@@ -5662,6 +5650,11 @@ class OpenedArchetypeType final : public ArchetypeType,
   mutable GenericEnvironment *Environment = nullptr;
   TypeBase *Opened;
   UUID ID;
+
+  /// Create a generic environment with this opened type bound to its generic
+  /// parameter.
+  GenericEnvironment *createGenericEnvironment() const;
+
 public:
   /// Create a new archetype that represents the opened type
   /// of an existential value.
@@ -5687,11 +5680,7 @@ public:
   Type getOpenedExistentialType() const {
     return Opened;
   }
-  
-  /// Get a generic environment with this opened type bound to its generic
-  /// parameter.
-  GenericEnvironment *getGenericEnvironment() const;
-  
+
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
   }
@@ -5765,8 +5754,6 @@ class SequenceArchetypeType final
   friend TrailingObjects;
   friend ArchetypeType;
 
-  GenericEnvironment *Environment;
-
 public:
   /// getNew - Create a new sequence archetype with the given name.
   ///
@@ -5777,9 +5764,6 @@ public:
       GenericTypeParamType *InterfaceType,
       SmallVectorImpl<ProtocolDecl *> &ConformsTo, Type Superclass,
       LayoutConstraint Layout);
-
-  /// Retrieve the generic environment in which this archetype resides.
-  GenericEnvironment *getGenericEnvironment() const { return Environment; }
 
   GenericTypeParamType *getInterfaceType() const {
     return cast<GenericTypeParamType>(InterfaceType.getPointer());

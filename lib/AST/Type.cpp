@@ -3185,9 +3185,11 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
                              RecursiveTypeProperties properties,
                              Type InterfaceType,
                              ArrayRef<ProtocolDecl *> ConformsTo,
-                             Type Superclass, LayoutConstraint Layout)
+                             Type Superclass, LayoutConstraint Layout,
+                             GenericEnvironment *Environment)
   : SubstitutableType(Kind, &Ctx, properties),
-    InterfaceType(InterfaceType)
+    InterfaceType(InterfaceType),
+    Environment(Environment)
 {
   // Set up the bits we need for trailing objects to work.
   Bits.ArchetypeType.ExpandedNestedTypes = false;
@@ -3209,20 +3211,21 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
 }
 
 GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
-  auto root = getRoot();
-  if (auto primary = dyn_cast<PrimaryArchetypeType>(root)) {
-    return primary->getGenericEnvironment();
+  if (Environment) {
+    return Environment;
   }
-  if (auto opened = dyn_cast<OpenedArchetypeType>(root)) {
-    return opened->getGenericEnvironment();
+
+  // Opened archetypes lazily create their generic environment.
+  if (auto opened = dyn_cast<OpenedArchetypeType>(this)) {
+    return Environment = opened->createGenericEnvironment();
   }
-  if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(root)) {
-    return opaque->getGenericEnvironment();
+
+  // Nested archetypes get their environment from their root.
+  if (auto nested = dyn_cast<NestedArchetypeType>(this)) {
+    return Environment = nested->getRoot()->getGenericEnvironment();
   }
-  if (auto opaque = dyn_cast<SequenceArchetypeType>(root)) {
-    return opaque->getGenericEnvironment();
-  }
-  llvm_unreachable("unhandled root archetype kind?!");
+
+  llvm_unreachable("Archetype without a generic environment!");
 }
 
 ArchetypeType *ArchetypeType::getRoot() const {
@@ -3261,8 +3264,7 @@ PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
                                      Type Superclass, LayoutConstraint Layout)
   : ArchetypeType(TypeKind::PrimaryArchetype, Ctx,
                   RecursiveTypeProperties::HasArchetype,
-                  InterfaceType, ConformsTo, Superclass, Layout),
-    Environment(GenericEnv)
+                  InterfaceType, ConformsTo, Superclass, Layout, GenericEnv)
 {
 }
 
@@ -3274,7 +3276,8 @@ OpenedArchetypeType::OpenedArchetypeType(const ASTContext &Ctx,
   : ArchetypeType(TypeKind::OpenedArchetype, Ctx,
                   RecursiveTypeProperties::HasArchetype
                     | RecursiveTypeProperties::HasOpenedExistential,
-                  Type(), ConformsTo, Superclass, Layout),
+                  Type(), ConformsTo, Superclass, Layout,
+                  /*Environment=*/nullptr),
     Opened(Existential.getPointer()),
     ID(uuid)
 {
@@ -3288,7 +3291,8 @@ NestedArchetypeType::NestedArchetypeType(const ASTContext &Ctx,
                                        LayoutConstraint Layout)
   : ArchetypeType(TypeKind::NestedArchetype, Ctx,
                   Parent->getRecursiveProperties(),
-                  InterfaceType, ConformsTo, Superclass, Layout),
+                  InterfaceType, ConformsTo, Superclass, Layout,
+                  /*Environment=*/nullptr),
     Parent(Parent)
 {
 }
@@ -3300,8 +3304,8 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
     ArrayRef<ProtocolDecl*> conformsTo,
     Type superclass, LayoutConstraint layout)
   : ArchetypeType(TypeKind::OpaqueTypeArchetype, interfaceType->getASTContext(),
-                  properties, interfaceType, conformsTo, superclass, layout),
-    Environment(environment)
+                  properties, interfaceType, conformsTo, superclass, layout,
+                  environment)
 {
 }
 
@@ -3315,8 +3319,7 @@ SequenceArchetypeType::SequenceArchetypeType(
     LayoutConstraint Layout)
     : ArchetypeType(TypeKind::SequenceArchetype, Ctx,
                     RecursiveTypeProperties::HasArchetype, InterfaceType,
-                    ConformsTo, Superclass, Layout),
-      Environment(GenericEnv) {
+                    ConformsTo, Superclass, Layout, GenericEnv) {
   assert(cast<GenericTypeParamType>(InterfaceType.getPointer())->isTypeSequence());
 }
 
@@ -3326,10 +3329,6 @@ CanType OpaqueTypeArchetypeType::getCanonicalInterfaceType(Type interfaceType) {
   CanType canonicalType = interfaceType->getCanonicalType(sig);
   return Environment->maybeApplyOpaqueTypeSubstitutions(canonicalType)
       ->getCanonicalType();
-}
-
-GenericEnvironment *OpaqueTypeArchetypeType::getGenericEnvironment() const {
-  return Environment;
 }
 
 OpaqueTypeDecl *OpaqueTypeArchetypeType::getDecl() const {
