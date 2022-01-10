@@ -1971,6 +1971,7 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   SmallVector<unsigned, 4> favored;
   // start - Operator section
   SmallVector<unsigned, 4> concreteOperators;
+  SmallVector<unsigned, 4> partiallySpecializedOperators;
   SmallVector<unsigned, 4> numericOperators;
   SmallVector<unsigned, 4> sequenceOperators;
   SmallVector<unsigned, 4> simdOperators;
@@ -2044,6 +2045,36 @@ void DisjunctionChoiceProducer::partitionDisjunction(
           nominal->getDeclaredType(), protocol, CS.DC->getParentModule());
     };
 
+    auto isPartiallySpecialized = [&](ValueDecl *choice) -> bool {
+      auto choiceType = choice->getInterfaceType();
+
+      auto *fnType = choiceType->getAs<AnyFunctionType>();
+      if (!(fnType && fnType->is<GenericFunctionType>()))
+        return false;
+
+      if (choice->getDeclContext()->getSelfNominalTypeDecl())
+        fnType = fnType->getResult()->castTo<AnyFunctionType>();
+
+      // Type has to be either bound generic e.g. `S<T>`,
+      // or unbound generic e.g. `Array`, or concrete.
+      auto isAcceptableType = [&](Type type) {
+        if (auto *UGT = type->getAs<UnboundGenericType>())
+          return isa<NominalTypeDecl>(UGT->getDecl());
+
+        return type->is<BoundGenericType>() ||
+               !(type->hasTypeParameter() || type->hasDependentMember());
+      };
+
+      if (llvm::all_of(fnType->getParams(),
+                       [&](const AnyFunctionType::Param &param) {
+                         return isAcceptableType(param.getPlainType());
+                       })) {
+        return isAcceptableType(fnType->getResult());
+      }
+
+      return false;
+    };
+
     forEachChoice(Choices, [&](unsigned index, Constraint *choice) -> bool {
       auto *decl = choice->getOverloadChoice().getDecl();
       auto *nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
@@ -2052,6 +2083,8 @@ void DisjunctionChoiceProducer::partitionDisjunction(
         simdOperators.push_back(index);
       } else if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
         concreteOperators.push_back(index);
+      } else if (isPartiallySpecialized(decl)) {
+        partiallySpecializedOperators.push_back(index);
       } else if (refinesOrConformsTo(nominal,
                                      KnownProtocolKind::AdditiveArithmetic)) {
         numericOperators.push_back(index);
@@ -2100,6 +2133,7 @@ void DisjunctionChoiceProducer::partitionDisjunction(
 
   if (isArithmeticOperator) {
     appendPartition(concreteOperators);
+    appendPartition(partiallySpecializedOperators);
 
     if (auto *argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction)) {
       // Check if any of the known argument types conform to one of the standard
