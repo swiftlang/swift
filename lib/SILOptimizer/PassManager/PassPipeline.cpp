@@ -766,7 +766,9 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 #endif
 
   // Only has an effect if the -assume-single-thread option is specified.
-  P.addAssumeSingleThreaded();
+  if (P.getOptions().AssumeSingleThreaded) {
+    P.addAssumeSingleThreaded();
+  }
 
   // Emits remarks on all functions with @_assemblyVision attribute.
   P.addAssemblyVisionRemarkGenerator();
@@ -925,7 +927,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.addUsePrespecialized();
 
   // Has only an effect if the -assume-single-thread option is specified.
-  P.addAssumeSingleThreaded();
+  if (P.getOptions().AssumeSingleThreaded) {
+    P.addAssumeSingleThreaded();
+  }
 
   // Create pre-specializations.
   P.addOnonePrespecializations();

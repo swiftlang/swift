@@ -8,6 +8,5 @@
 // CHECK: passes:          [ "serialize-sil", "ownership-model-eliminator" ]
 // CHECK: ---
 // CHECK: name:            Rest of Onone
-// CHECK: passes:          [ "use-prespecialized", "sil-assume-single-threaded",
-// CHECK:                    "sil-debuginfo-gen" ]
+// CHECK: passes:          [ "use-prespecialized", "onone-prespecializer", "sil-debuginfo-gen" ]
 // CHECK: ...
