@@ -466,6 +466,19 @@ CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
       type, { })->getCanonicalType();
 }
 
+bool GenericSignatureImpl::isValidTypeInContext(Type type) const {
+  auto &ctx = getASTContext();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    llvm::errs() << "Not implemented\n";
+    abort();
+
+  case RequirementMachineMode::Enabled:
+  case RequirementMachineMode::Verify:
+    return getRequirementMachine()->isValidTypeInContext(type);
+  }
+}
+
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>
 CanGenericSignature::getGenericParams() const {
   auto params = getPointer()->getGenericParams().getOriginalArray();
