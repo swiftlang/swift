@@ -186,8 +186,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
   if (wtable) return wtable;
 
-  auto origRoot = archetype->getRoot();
-  auto environment = origRoot->getGenericEnvironment();
+  auto environment = archetype->getGenericEnvironment();
 
   // Otherwise, ask the generic signature for the environment for the best
   // path to the conformance.

@@ -281,7 +281,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     auto *depMemTy = requirements.anchor->castTo<DependentMemberType>();
     result = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
                                          requirements.protos, superclass,
-                                         requirements.layout);
+                                         requirements.layout, this);
     parentArchetype->registerNestedType(depMemTy->getName(), result);
   } else if (genericParam->isTypeSequence()) {
     result = SequenceArchetypeType::get(ctx, this, genericParam,

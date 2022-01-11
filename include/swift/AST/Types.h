@@ -5396,7 +5396,7 @@ protected:
   }
   Type InterfaceType;
   MutableArrayRef<std::pair<Identifier, Type>> NestedTypes;
-  mutable GenericEnvironment *Environment = nullptr;
+  GenericEnvironment *Environment = nullptr;
 
   void populateNestedTypes() const;
   void resolveNestedType(std::pair<Identifier, Type> &nested) const;
@@ -5474,7 +5474,7 @@ public:
   ArchetypeType *getRoot() const;
   
   /// Get the generic environment this archetype lives in.
-  GenericEnvironment *getGenericEnvironment() const;
+  GenericEnvironment *getGenericEnvironment() const { return Environment; }
   
   /// Get the protocol/class existential type that most closely represents the
   /// set of constraints on this archetype.
@@ -5706,7 +5706,8 @@ public:
   getNew(const ASTContext &Ctx, ArchetypeType *Parent,
          DependentMemberType *InterfaceType,
          SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-         Type Superclass, LayoutConstraint Layout);
+         Type Superclass, LayoutConstraint Layout,
+         GenericEnvironment *Environment);
 
   /// Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
@@ -5729,7 +5730,8 @@ private:
                      ArchetypeType *Parent,
                      Type InterfaceType,
                      ArrayRef<ProtocolDecl *> ConformsTo,
-                     Type Superclass, LayoutConstraint Layout);
+                     Type Superclass, LayoutConstraint Layout,
+                      GenericEnvironment *Environment);
 };
 BEGIN_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
 CanArchetypeType getParent() const {
