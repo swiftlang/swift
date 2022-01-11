@@ -1316,6 +1316,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::OptionalSome:
     printPattern(cast<OptionalSomePattern>(pattern)->getSubPattern());
+    Printer << '?';
     break;
 
   case PatternKind::Bool:
@@ -4366,7 +4367,6 @@ void PrintAST::visitLazyInitializerExpr(LazyInitializerExpr *expr) {
 }
 
 void PrintAST::visitOpenExistentialExpr(OpenExistentialExpr *expr) {
-  visit(expr->getValueProvidingExpr());
   visit(expr->getExistentialValue());
   visit(expr->getSubExpr());
 }
@@ -4399,6 +4399,7 @@ void PrintAST::visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
 }
 
 void PrintAST::visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
+  Printer << "_";
 }
 
 void PrintAST::visitEditorPlaceholderExpr(EditorPlaceholderExpr *expr) {
@@ -4406,6 +4407,14 @@ void PrintAST::visitEditorPlaceholderExpr(EditorPlaceholderExpr *expr) {
 
 void PrintAST::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
   visit(expr->getSubExpr());
+  Printer << " as! ";
+  printType(expr->getCastType());
+}
+
+void PrintAST::visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
+  visit(expr->getSubExpr());
+  Printer << " as? ";
+  printType(expr->getCastType());
 }
 
 void PrintAST::visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
@@ -4466,10 +4475,6 @@ void PrintAST::visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *expr) {
 }
 
 void PrintAST::visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *expr) {
-}
-
-void PrintAST::visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
-  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *expr) {
@@ -4535,8 +4540,8 @@ void PrintAST::visitBraceStmt(BraceStmt *stmt) {
 }
 
 void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
+  Printer << tok::kw_return;
   if (stmt->hasResult()) {
-    Printer << tok::kw_return;
     Printer << " ";
     visit(stmt->getResult());
   }

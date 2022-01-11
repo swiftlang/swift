@@ -647,14 +647,7 @@ struct PrintOptions {
   ///
   /// This is only intended for debug output.
   static PrintOptions printEverything() {
-    PrintOptions result = printVerbose();
-    result.ExcludeAttrList.clear();
-    result.ExcludeAttrList.push_back(DAK_FixedLayout);
-    result.PrintStorageRepresentationAttrs = true;
-    result.AbstractAccessors = false;
-    result.PrintAccess = true;
-    result.SkipEmptyExtensionDecls = false;
-    result.SkipMissingMemberPlaceholders = false;
+    PrintOptions result = printDeclarations();
     result.FunctionDefinitions = true;
     result.PrintExprs = true;
     return result;

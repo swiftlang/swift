@@ -26,3 +26,33 @@ func test(payload: Payload) -> Int? {
 // CHECK-LABEL:   return nil
 // CHECK-LABEL: }
 // CHECK-LABEL:}
+
+func process(payload: Payload) {
+  if case .empty = payload {
+    return
+  }
+  _ = test(payload: payload)
+}
+// CHECK-LABEL: internal func process(payload: Payload) {
+// CHECK-LABEL:   if .empty = payload {
+// CHECK-LABEL:     return
+// CHECK-LABEL:   }
+// CHECK-LABEL:   _ = test(payload: payload)
+// CHECK-LABEL: }
+
+func foo(_ x: Int?) {
+  switch x {
+  case let x?:
+    break
+  case nil:
+    break
+  }
+}
+// CHECK-LABEL: internal func foo(_ x: Int?) {
+// CHECK-LABEL:   switch x {
+// CHECK-LABEL:   case let x?:
+// CHECK-LABEL:     break
+// CHECK-LABEL:   case .none:
+// CHECK-LABEL:     break
+// CHECK-LABEL:   }
+// CHECK-LABEL: }
