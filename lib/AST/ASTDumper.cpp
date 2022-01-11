@@ -3742,7 +3742,6 @@ namespace {
     void visitNestedArchetypeType(NestedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "nested_archetype_type", label);
       printField("name", T->getFullName());
-      printField("parent", T->getParent());
       printField("assoc_type", T->getAssocType()->printRef());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

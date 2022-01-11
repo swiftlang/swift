@@ -3211,11 +3211,10 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
 }
 
 ArchetypeType *ArchetypeType::getRoot() const {
-  auto parent = this;
-  while (auto nested = dyn_cast<NestedArchetypeType>(parent)) {
-    parent = nested->getParent();
-  }
-  return const_cast<ArchetypeType*>(parent);
+  auto gp = InterfaceType->getRootGenericParam();
+  assert(gp && "Missing root generic parameter?");
+  return getGenericEnvironment()->mapTypeIntoContext(
+      Type(gp))->castTo<ArchetypeType>();
 }
 
 Type ArchetypeType::getExistentialType() const {

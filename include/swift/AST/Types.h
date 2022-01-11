@@ -5734,9 +5734,6 @@ private:
                       GenericEnvironment *Environment);
 };
 BEGIN_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
-CanArchetypeType getParent() const {
-  return CanArchetypeType(getPointer()->getParent());
-}
 END_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
 
 /// An archetype that represents an opaque element of a type sequence in context.
@@ -6615,7 +6612,7 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
     return false;
 
   case TypeKind::NestedArchetype:
-    return cast<NestedArchetypeType>(this)->getParent()->hasSimpleTypeRepr();
+    return cast<NestedArchetypeType>(this)->getRoot()->hasSimpleTypeRepr();
       
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::OpenedArchetype:
