@@ -3192,7 +3192,6 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
     Environment(Environment)
 {
   // Set up the bits we need for trailing objects to work.
-  Bits.ArchetypeType.ExpandedNestedTypes = false;
   Bits.ArchetypeType.HasSuperclass = static_cast<bool>(Superclass);
   Bits.ArchetypeType.HasLayoutConstraint = static_cast<bool>(Layout);
   Bits.ArchetypeType.NumProtocols = ConformsTo.size();
@@ -3695,78 +3694,25 @@ namespace {
   };
 } // end anonymous namespace
 
-void ArchetypeType::populateNestedTypes() const {
-  if (Bits.ArchetypeType.ExpandedNestedTypes) return;
+Type ArchetypeType::getNestedType(AssociatedTypeDecl *assocType) {
+  Type interfaceType = getInterfaceType();
+  Type memberInterfaceType =
+      DependentMemberType::get(interfaceType, assocType->getName());
+  return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
+      memberInterfaceType);
+}
 
-  // Collect the set of nested types of this archetype.
-  SmallVector<std::pair<Identifier, Type>, 4> nestedTypes;
-  llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
-  ProtocolType::visitAllProtocols(getConformsTo(),
-                                  [&](ProtocolDecl *proto) -> bool {
-    for (auto assocType : proto->getAssociatedTypeMembers()) {
-      if (knownNestedTypes.insert(assocType->getName()).second)
-        nestedTypes.push_back({ assocType->getName(), Type() });
-    }
-
-    return false;
+Type ArchetypeType::getNestedTypeByName(Identifier name) {
+  AssociatedTypeDecl *assocType = nullptr;
+  ProtocolType::visitAllProtocols(getConformsTo(), [&](ProtocolDecl *proto) {
+    assocType = proto->getAssociatedType(name);
+    return assocType != nullptr;
   });
 
-  // Record the nested types.
-  auto mutableThis = const_cast<ArchetypeType *>(this);
+  if (assocType)
+    return getNestedType(assocType);
 
-  std::sort(nestedTypes.begin(), nestedTypes.end(), OrderArchetypeByName());
-  auto &Ctx = mutableThis->getASTContext();
-  mutableThis->NestedTypes = Ctx.AllocateCopy(nestedTypes);
-  mutableThis->Bits.ArchetypeType.ExpandedNestedTypes = true;
-}
-
-Type ArchetypeType::getNestedType(Identifier Name) const {
-  populateNestedTypes();
-
-  auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
-                              OrderArchetypeByName());
-  if (Pos == NestedTypes.end() || Pos->first != Name) {
-    return ErrorType::get(const_cast<ArchetypeType *>(this)->getASTContext());
-  }
-
-  // If the type is null, lazily resolve it. 
-  if (!Pos->second) {
-    resolveNestedType(*Pos);
-  }
-
-  return Pos->second;
-}
-
-Optional<Type> ArchetypeType::getNestedTypeIfKnown(Identifier Name) const {
-  populateNestedTypes();
-
-  auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
-                              OrderArchetypeByName());
-  if (Pos == NestedTypes.end() || Pos->first != Name || !Pos->second)
-    return None;
-
-  return Pos->second;
-}
-
-bool ArchetypeType::hasNestedType(Identifier Name) const {
-  populateNestedTypes();
-
-  auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
-                              OrderArchetypeByName());
-  return Pos != NestedTypes.end() && Pos->first == Name;
-}
-
-void ArchetypeType::registerNestedType(Identifier name, Type nested) {
-  populateNestedTypes();
-
-  auto found = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), name,
-                                OrderArchetypeByName());
-  assert(found != NestedTypes.end() && found->first == name &&
-         "Unable to find nested type?");
-  assert(!found->second ||
-         found->second->isEqual(nested) ||
-         found->second->is<ErrorType>());
-  found->second = nested;
+  return Type();
 }
 
 AssociatedTypeDecl *NestedArchetypeType::getAssocType() const {
@@ -3974,8 +3920,12 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    if (archetypeParent->hasNestedType(name))
-      return archetypeParent->getNestedType(name);
+//    if (assocType && !archetypeParent->getSuperclass())
+//      return archetypeParent->getNestedType(assocType);
+
+    // FIXME: This is really slow for the case where we have an associated type.
+    if (Type memberArchetypeByName = archetypeParent->getNestedTypeByName(name))
+      return memberArchetypeByName;
 
     // If looking for an associated type and the archetype is constrained to a
     // class, continue to the default associated type lookup

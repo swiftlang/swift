@@ -218,6 +218,31 @@ Type TypeBase::mapTypeOutOfContext() {
     SubstFlags::AllowLoweredTypes);
 }
 
+class GenericEnvironment::NestedTypeStorage
+    : public llvm::DenseMap<CanType, Type> { };
+
+auto GenericEnvironment::getOrCreateNestedTypeStorage() -> NestedTypeStorage & {
+  if (nestedTypeStorage)
+    return *nestedTypeStorage;
+
+  nestedTypeStorage = new NestedTypeStorage();
+  ASTContext &ctx = getGenericParams().front()->getASTContext();
+  ctx.addCleanup([nestedTypeStorage=this->nestedTypeStorage]() {
+    delete nestedTypeStorage;
+  });
+
+  return *nestedTypeStorage;
+}
+
+static Type stripBoundDependentMemberTypes(Type t) {
+  if (auto *depMemTy = t->getAs<DependentMemberType>()) {
+    return DependentMemberType::get(
+      stripBoundDependentMemberTypes(depMemTy->getBase()),
+      depMemTy->getName());
+  }
+
+  return t;
+}
 Type
 GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   auto genericSig = getGenericSignature();
@@ -248,18 +273,16 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   // First, write an ErrorType to the location where this type is cached,
   // to catch re-entrant lookups that might arise from an invalid generic
   // signature (eg, <X where X == Array<X>>).
-  ArchetypeType *parentArchetype = nullptr;
+  CanDependentMemberType nestedDependentMemberType;
   GenericTypeParamType *genericParam = nullptr;
   if (auto depMemTy = requirements.anchor->getAs<DependentMemberType>()) {
-    parentArchetype =
-      getOrCreateArchetypeFromInterfaceType(depMemTy->getBase())
-        ->castTo<ArchetypeType>();
+    nestedDependentMemberType = cast<DependentMemberType>(
+        stripBoundDependentMemberTypes(depMemTy)->getCanonicalType());
+    auto &entry = getOrCreateNestedTypeStorage()[nestedDependentMemberType];
+    if (entry)
+      return entry;
 
-    auto name = depMemTy->getName();
-    if (auto type = parentArchetype->getNestedTypeIfKnown(name))
-      return *type;
-
-    parentArchetype->registerNestedType(name, ErrorType::get(ctx));
+    entry = ErrorType::get(ctx);
   } else {
     genericParam = requirements.anchor->castTo<GenericTypeParamType>();
     if (auto type = getMappingIfPresent(genericParam))
@@ -277,12 +300,12 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
   Type result;
 
-  if (parentArchetype) {
+  if (nestedDependentMemberType) {
     auto *depMemTy = requirements.anchor->castTo<DependentMemberType>();
     result = NestedArchetypeType::getNew(ctx, depMemTy,
                                          requirements.protos, superclass,
                                          requirements.layout, this);
-    parentArchetype->registerNestedType(depMemTy->getName(), result);
+    getOrCreateNestedTypeStorage()[nestedDependentMemberType] = result;
   } else if (genericParam->isTypeSequence()) {
     result = SequenceArchetypeType::get(ctx, this, genericParam,
                                         requirements.protos, superclass,
@@ -308,21 +331,6 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   }
 
   return result;
-}
-
-void ArchetypeType::resolveNestedType(
-                                    std::pair<Identifier, Type> &nested) const {
-  Type interfaceType = getInterfaceType();
-  Type memberInterfaceType =
-      DependentMemberType::get(interfaceType, nested.first);
-
-  Type result = getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
-      memberInterfaceType);
-
-  assert(!nested.second ||
-         nested.second->isEqual(result) ||
-         nested.second->is<ErrorType>());
-  nested.second = result;
 }
 
 Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{

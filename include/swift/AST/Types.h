@@ -369,8 +369,7 @@ protected:
     NumParams : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+1+16,
-    ExpandedNestedTypes : 1,
+  SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
     HasSuperclass : 1,
     HasLayoutConstraint : 1,
     : NumPadBits,
@@ -5395,13 +5394,8 @@ protected:
     return Bits.ArchetypeType.HasLayoutConstraint ? 1 : 0;
   }
   Type InterfaceType;
-  MutableArrayRef<std::pair<Identifier, Type>> NestedTypes;
   GenericEnvironment *Environment = nullptr;
 
-  void populateNestedTypes() const;
-  void resolveNestedType(std::pair<Identifier, Type> &nested) const;
-
-  
   // Helper to get the trailing objects of one of the subclasses.
   template<typename Type>
   const Type *getSubclassTrailingObjects() const;
@@ -5455,20 +5449,14 @@ public:
     return !getConformsTo().empty() || getSuperclass();
   }
 
+  /// Retrieve the nested type with the given associated type.
+  Type getNestedType(AssociatedTypeDecl *assocType);
+
   /// Retrieve the nested type with the given name.
-  Type getNestedType(Identifier Name) const;
-
-  /// Retrieve the nested type with the given name, if it's already
-  /// known.
   ///
-  /// This is an implementation detail used by the generic signature builder.
-  Optional<Type> getNestedTypeIfKnown(Identifier Name) const;
-
-  /// Check if the archetype contains a nested type with the given name.
-  bool hasNestedType(Identifier Name) const;
-
-  /// Register a nested type with the given name.
-  void registerNestedType(Identifier name, Type nested);
+  /// This is a slow operation because it must scan all of the protocols to
+  /// which the archetype conforms.
+  Type getNestedTypeByName(Identifier name);
 
   /// Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.

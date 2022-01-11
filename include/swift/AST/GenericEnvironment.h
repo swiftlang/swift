@@ -72,9 +72,12 @@ public:
     Opaque,
   };
 
+  class NestedTypeStorage;
+
 private:
   mutable llvm::PointerIntPair<GenericSignature, 2, Kind> SignatureAndKind{
       GenericSignature(), Kind::Normal};
+  NestedTypeStorage *nestedTypeStorage = nullptr;
 
   friend TrailingObjects;
   friend OpaqueTypeArchetypeType;
@@ -92,6 +95,9 @@ private:
   /// generic parameters, stored in parallel with the generic parameters of the
   /// generic signature.
   ArrayRef<Type> getContextTypes() const;
+
+  /// Get the nested type storage, allocating it if required.
+  NestedTypeStorage &getOrCreateNestedTypeStorage();
 
   explicit GenericEnvironment(GenericSignature signature, Kind kind);
   explicit GenericEnvironment(
