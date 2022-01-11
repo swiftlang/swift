@@ -945,6 +945,39 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     return result;
   }
 
+  // If the type witness is completely concrete, check if one of our prefix
+  // types has the same concrete type, and if so, introduce a same-type
+  // requirement between the subject type and the prefix.
+  if (!typeWitness->hasTypeParameter()) {
+    auto begin = key.begin();
+    auto end = key.end();
+
+    while (begin != end) {
+      MutableTerm prefix(begin, end);
+      if (auto *props = lookUpProperties(prefix)) {
+        if (props->isConcreteType() &&
+            props->getConcreteType() == typeWitness) {
+          auto result = props->getKey();
+
+          RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
+                                             result);
+          unsigned witnessID = System.recordTypeWitness(witness);
+          path.add(RewriteStep::forAbstractTypeWitness(
+              witnessID, /*inverse=*/false));
+
+          if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+             llvm::dbgs() << "^^ Type witness can re-use property bag of "
+                          << result << "\n";
+          }
+
+          return MutableTerm(result);
+        }
+      }
+
+      --end;
+    }
+  }
+
   // Otherwise the type witness is concrete, but may contain type
   // parameters in structural position.
 
