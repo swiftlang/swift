@@ -117,7 +117,7 @@ public:
     return Superclass.hasValue();
   }
 
-  Type getSuperclassBound() const {
+  CanType getSuperclassBound() const {
     return Superclass->getSuperclass();
   }
 
@@ -130,7 +130,7 @@ public:
     return ConcreteType.hasValue();
   }
 
-  Type getConcreteType() const {
+  CanType getConcreteType() const {
     return ConcreteType->getConcreteType();
   }
 
