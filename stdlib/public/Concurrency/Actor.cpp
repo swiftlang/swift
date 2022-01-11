@@ -1685,7 +1685,12 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
 ///    argumentBuffer: Builtin.RawPointer,
 ///    resultBuffer: Builtin.RawPointer) async throws
 using TargetExecutorSignature =
-    AsyncSignature<void(DefaultActor *, const char *, size_t, void *, void *),
+    AsyncSignature<void(/*on=*/DefaultActor *,
+                        /*targetName=*/const char *, /*targetNameSize=*/size_t,
+                        /*argumentBuffer=*/void *,
+                        /*resultBuffer=*/void *,
+                        /*resumeFunc=*/TaskContinuationFunction *,
+                        /*callContext=*/AsyncContext *),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -1714,7 +1719,9 @@ static void ::swift_distributed_execute_target_resume(
       reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
           parentCtx->ResumeParent);
   swift_task_dealloc(context);
-  return resumeInParent(parentCtx, error);
+  // See `swift_distributed_execute_target` - `parentCtx` in this case
+  // is `callContext` which should be completely transparent on resume.
+  return resumeInParent(parentCtx->Parent, error);
 }
 
 SWIFT_CC(swiftasync)
@@ -1723,7 +1730,9 @@ void ::swift_distributed_execute_target(
     DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,
     void *argumentBuffer,
-    void *resultBuffer) {
+    void *resultBuffer,
+    TaskContinuationFunction *resumeFunc,
+    AsyncContext *callContext) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     assert(false && "no distributed accessor accessor");
@@ -1741,7 +1750,17 @@ void ::swift_distributed_execute_target(
   AsyncContext *calleeContext = reinterpret_cast<AsyncContext *>(
       swift_task_alloc(asyncFnPtr->ExpectedContextSize));
 
-  calleeContext->Parent = callerContext;
+  // TODO(concurrency): Special functions like this one are currently set-up
+  // to pass "caller" context and resume function as extra parameters due to
+  // how they are declared in C. But this particular function behaves exactly
+  // like a regular `async throws`, which means that we need to initialize
+  // intermediate `callContext` using parent `callerContext`. A better fix for
+  // this situation would be to adjust IRGen and handle function like this
+  // like regular `async` functions even though they are classified as special.
+  callContext->Parent = callerContext;
+  callContext->ResumeParent = resumeFunc;
+
+  calleeContext->Parent = callContext;
   calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       swift_distributed_execute_target_resume);
 
