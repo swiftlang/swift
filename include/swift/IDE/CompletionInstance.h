@@ -53,7 +53,7 @@ struct CompletionInstanceResult {
 
 /// The results returned from \c CompletionInstance::codeComplete.
 struct CodeCompleteResult {
-  CodeCompletionResultSink ResultSink;
+  CodeCompletionResultSink &ResultSink;
   SwiftCompletionInfo &Info;
 };
 

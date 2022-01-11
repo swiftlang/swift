@@ -735,7 +735,8 @@ void swift::ide::CompletionInstance::codeComplete(
                 SwiftCompletionInfo Info{&CI.getASTContext(),
                                          &CI.getInvocation(),
                                          &CompletionContext};
-                DeliverTransformed(ResultType::success({/*Results=*/{}, Info}));
+                CodeCompletionResultSink ResultSink;
+                DeliverTransformed(ResultType::success({ResultSink, Info}));
                 return;
               }
 
@@ -752,7 +753,8 @@ void swift::ide::CompletionInstance::codeComplete(
                 SwiftCompletionInfo Info{&CI.getASTContext(),
                                          &CI.getInvocation(),
                                          &CompletionContext};
-                DeliverTransformed(ResultType::success({/*Results=*/{}, Info}));
+                CodeCompletionResultSink ResultSink;
+                DeliverTransformed(ResultType::success({ResultSink, Info}));
               }
             },
             Callback);
