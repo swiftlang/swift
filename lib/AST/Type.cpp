@@ -3703,14 +3703,11 @@ Type ArchetypeType::getNestedType(AssociatedTypeDecl *assocType) {
 }
 
 Type ArchetypeType::getNestedTypeByName(Identifier name) {
-  AssociatedTypeDecl *assocType = nullptr;
-  ProtocolType::visitAllProtocols(getConformsTo(), [&](ProtocolDecl *proto) {
-    assocType = proto->getAssociatedType(name);
-    return assocType != nullptr;
-  });
-
-  if (assocType)
+  auto memberDecl = getGenericEnvironment()->getGenericSignature()
+      ->lookupNestedType(getInterfaceType(), name);
+  if (auto assocType = dyn_cast_or_null<AssociatedTypeDecl>(memberDecl)) {
     return getNestedType(assocType);
+  }
 
   return Type();
 }
@@ -3920,10 +3917,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-//    if (assocType && !archetypeParent->getSuperclass())
-//      return archetypeParent->getNestedType(assocType);
-
-    // FIXME: This is really slow for the case where we have an associated type.
     if (Type memberArchetypeByName = archetypeParent->getNestedTypeByName(name))
       return memberArchetypeByName;
 
