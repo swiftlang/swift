@@ -253,3 +253,25 @@ public enum EnumWithTupleWithOpaqueField {
   case a(Int)
   case b((OpaqueProps, String))
 }
+
+// rdar://86800325 - Make sure we don't crash on result builders.
+@resultBuilder
+struct Builder {
+  static func buildBlock(_: Any...) -> Int { 5 }
+}
+
+protocol P2 {
+  associatedtype A: P2
+
+  @Builder var builder: A { get }
+}
+
+extension Int: P2 {
+  var builder: some P2 { 5 }
+}
+
+struct UseBuilder: P2 {
+  var builder: some P2 {
+    let extractedExpr: some P2 = 5
+  }
+}
