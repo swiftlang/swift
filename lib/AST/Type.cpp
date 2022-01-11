@@ -3409,7 +3409,7 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
     // The referenced type might be a different opaque result type.
 
     // First, unwrap any nested associated types to get the root archetype.
-    if (auto nestedTy = ty->getAs<NestedArchetypeType>())
+    if (auto nestedTy = ty->getAs<ArchetypeType>())
       ty = nestedTy->getRoot();
 
     // If the root archetype is an opaque result type, check that its
@@ -4258,8 +4258,9 @@ static Type substType(Type derivedType,
       return Type(type);
 
     // For nested archetypes, we can substitute the parent.
-    auto nestedArchetype = cast<NestedArchetypeType>(substOrig);
+    auto nestedArchetype = cast<ArchetypeType>(substOrig);
     auto parent = nestedArchetype->getParent();
+    assert(parent && "Not a nested archetype");
 
     // Substitute into the parent type.
     Type substParent = substType(parent, substitutions,
@@ -4270,11 +4271,11 @@ static Type substType(Type derivedType,
       return Type(type);
 
     // Get the associated type reference from a child archetype.
-    AssociatedTypeDecl *assocType = nestedArchetype->getAssocType();
+    AssociatedTypeDecl *assocType = nestedArchetype->getInterfaceType()
+        ->castTo<DependentMemberType>()->getAssocType();
 
     return getMemberForBaseType(lookupConformances, parent, substParent,
-                                assocType, nestedArchetype->getName(),
-                                options);
+                                assocType, assocType->getName(), options);
   });
 }
 

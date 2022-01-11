@@ -70,10 +70,12 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   }
 
   // If there's no local or opaque metadata, it must be a nested type.
-  auto nested = cast<NestedArchetypeType>(archetype);
+  assert(archetype->getParent() && "Not a nested archetype");
 
-  CanArchetypeType parent(nested->getParent());
-  AssociatedType association(nested->getAssocType());
+  CanArchetypeType parent(archetype->getParent());
+  AssociatedType association(
+      archetype->getInterfaceType()->castTo<DependentMemberType>()
+        ->getAssocType());
 
   MetadataResponse response =
     emitAssociatedTypeMetadataRef(IGF, parent, association, request);

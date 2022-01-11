@@ -199,8 +199,9 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   // Swift 5.1 runtime, so we needed to add a new mangling in 5.2.
   if (type->hasOpaqueArchetype()) {
     auto hasOpaqueAssocType = type.findIf([](CanType t) -> bool {
-      if (auto a = dyn_cast<NestedArchetypeType>(t)) {
-        return isa<OpaqueTypeArchetypeType>(a->getRoot());
+      if (auto a = dyn_cast<ArchetypeType>(t)) {
+        return isa<OpaqueTypeArchetypeType>(a->getRoot()) &&
+          a->getInterfaceType()->is<DependentMemberType>();
       }
       return false;
     });
