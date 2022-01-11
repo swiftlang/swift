@@ -816,6 +816,10 @@ bool CompilerInvocation::shouldImportSwiftStringProcessing() const {
   return getLangOptions().EnableExperimentalStringProcessing;
 }
 
+bool CompilerInvocation::shouldImportSwiftExceptionHandling() const {
+  return getLangOptions().EnableExperimentalExceptionHandling;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -873,6 +877,21 @@ bool CompilerInstance::canImportSwiftStringProcessing() const {
   return getASTContext().canImportModule(modulePath);
 }
 
+void CompilerInstance::verifyImplicitExceptionHandlingImport() {
+  if (Invocation.shouldImportSwiftExceptionHandling() &&
+      !canImportSwiftExceptionHandling()) {
+    Diagnostics.diagnose(SourceLoc(),
+                         diag::warn_implicit_exception_handling_import_failed);
+  }
+}
+
+bool CompilerInstance::canImportSwiftExceptionHandling() const {
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(SWIFT_EXCEPTION_HANDLING_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath);
+}
+
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 
@@ -923,6 +942,19 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     case ImplicitStdlibKind::Stdlib:
       if (canImportSwiftStringProcessing())
         pushImport(SWIFT_STRING_PROCESSING_NAME);
+      break;
+    }
+  }
+
+  if (Invocation.shouldImportSwiftExceptionHandling()) {
+    switch (imports.StdlibKind) {
+    case ImplicitStdlibKind::Builtin:
+    case ImplicitStdlibKind::None:
+      break;
+
+    case ImplicitStdlibKind::Stdlib:
+      if (canImportSwiftExceptionHandling())
+        pushImport(SWIFT_EXCEPTION_HANDLING_NAME);
       break;
     }
   }
@@ -1144,6 +1176,7 @@ bool CompilerInstance::loadStdlibIfNeeded() {
 
   verifyImplicitConcurrencyImport();
   verifyImplicitStringProcessingImport();
+  verifyImplicitExceptionHandlingImport();
 
   // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {

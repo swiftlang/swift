@@ -606,6 +606,11 @@ def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
+def enable_experimental_exception_handling :
+  Flag<["-"], "enable-experimental-exception-handling">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable Objective-C/C++ exception handling (experimental feature)">;
+
 def experimental_emit_module_separately:
   Flag<["-"], "experimental-emit-module-separately">,
   Flags<[NoInteractiveOption, HelpHidden]>,

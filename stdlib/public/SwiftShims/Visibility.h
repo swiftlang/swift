@@ -109,6 +109,12 @@
 #define SWIFT_WEAK_IMPORT
 #endif
 
+#if (__has_attribute(disable_tail_calls))
+#define SWIFT_DISABLE_TAIL_CALLS __attribute__((disable_tail_calls))
+#else
+#define SWIFT_DISABLE_TAIL_CALLS
+#endif
+
 // Define the appropriate attributes for sharing symbols across
 // image (executable / shared-library) boundaries.
 //
@@ -196,6 +202,11 @@
 #define SWIFT_IMAGE_EXPORTS_swift_Differentiation 1
 #else
 #define SWIFT_IMAGE_EXPORTS_swift_Differentiation 0
+#endif
+#if defined(swift_ExceptionHandling_EXPORTS)
+#define SWIFT_IMAGE_EXPORTS_swift_ExceptionHandling 1
+#else
+#define SWIFT_IMAGE_EXPORTS_swift_ExceptionHandling 0
 #endif
 
 #define SWIFT_EXPORT_FROM_ATTRIBUTE(LIBRARY)                          \

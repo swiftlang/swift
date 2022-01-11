@@ -489,6 +489,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalStringProcessing |=
       Args.hasArg(OPT_enable_experimental_string_processing);
 
+  // Experimental exception handling (automatic if C++ interop is enabled)
+  Opts.EnableExperimentalExceptionHandling |=
+      Args.hasArg(OPT_enable_experimental_exception_handling)
+      || Args.hasArg(OPT_enable_experimental_cxx_interop);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   Opts.CheckAPIAvailabilityOnly |=

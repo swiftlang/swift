@@ -147,6 +147,9 @@ namespace swift {
     /// Enable experimental string processing
     bool EnableExperimentalStringProcessing = false;
 
+    /// Enable experimental exception handling
+    bool EnableExperimentalExceptionHandling = false;
+
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
