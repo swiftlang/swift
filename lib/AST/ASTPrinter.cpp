@@ -1325,10 +1325,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
 
   case PatternKind::Expr: {
-    if (Options.PrintExprs) {
-        auto expr = cast<ExprPattern>(pattern)->getSubExpr();
-        visit(expr);
-    }
+    auto expr = cast<ExprPattern>(pattern)->getSubExpr();
+    visit(expr);
     break;
   }
 
