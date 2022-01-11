@@ -13,7 +13,7 @@
 import SILBridging
 
 public struct Type {
-  var bridged: BridgedType
+  public let bridged: BridgedType
 
   public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
   public var isObject: Bool { !isAddress }

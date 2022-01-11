@@ -13,7 +13,7 @@
 import SILBridging
 
 public struct SubstitutionMap {
-  let bridged: BridgedSubstitutionMap
+  public let bridged: BridgedSubstitutionMap
 
   public init(_ bridged: BridgedSubstitutionMap) {
     self.bridged = bridged

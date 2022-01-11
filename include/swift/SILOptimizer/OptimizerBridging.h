@@ -151,8 +151,12 @@ RCIdentityAnalysis_getFunctionInfo(BridgedRCIdentityAnalysis bridgedAnalysis,
 BridgedValue RCIdentityFunctionInfo_getRCIdentityRoot(
     BridgedRCIdentityFunctionInfo bridgedInfo, BridgedValue value);
 
-OptionalBridgedFunction PassContext_getDestructor(BridgedPassContext context,
+OptionalBridgedFunction PassContext_getDeallocRef(BridgedPassContext context,
                                                   BridgedType type);
+
+BridgedSubstitutionMap
+PassContext_getContextSubstitutionMap(BridgedPassContext context,
+                                      BridgedType bridgedType);
 
 #ifdef __cplusplus
 } // extern "C"

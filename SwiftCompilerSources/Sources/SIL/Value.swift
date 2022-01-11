@@ -24,11 +24,11 @@ extension Value {
   }
 
   public var uses: UseList {
-    return UseList(SILValue_firstUse(bridged))
+    UseList(SILValue_firstUse(bridged))
   }
 
   public var type: Type {
-    return Type(bridged: SILValue_getType(bridged))
+    Type(bridged: SILValue_getType(bridged))
   }
 
   public var hashable: HashableValue { ObjectIdentifier(self) }
@@ -48,7 +48,7 @@ public func ==(_ lhs: Value, _ rhs: Value) -> Bool {
 }
 
 extension BridgedValue {
-  func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
+  public func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
 }
 
 final class Undef : Value {

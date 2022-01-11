@@ -1320,13 +1320,15 @@ BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
   castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
+}
+
 BridgedRCIdentityAnalysis
 PassContext_getRCIdentityAnalysis(BridgedPassContext context) {
   SILPassManager *pm = castToPassInvocation(context)->getPassManager();
   return {pm->getAnalysis<RCIdentityAnalysis>()};
 }
 
-OptionalBridgedFunction PassContext_getDestructor(BridgedPassContext context,
+OptionalBridgedFunction PassContext_getDeallocRef(BridgedPassContext context,
                                                   BridgedType type) {
   auto *cd = castToSILType(type).getClassOrBoundGenericClass();
   assert(cd && "no class type allocated with alloc_ref");

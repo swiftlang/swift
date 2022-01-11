@@ -219,4 +219,3 @@ extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
     return nil
   }
 }
-

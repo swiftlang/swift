@@ -93,7 +93,7 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   }
 
   // Pre-populate the "unimplemented" ranges of metatypes.
-  // If a specifc class is not implemented in Swift yet, it bridges to an
+  // If a specific class is not implemented in Swift yet, it bridges to an
   // "unimplemented" class. This ensures that optimizations handle _all_ kind of
   // instructions gracefully, without the need to define the not-yet-used
   // classes in Swift.
@@ -541,3 +541,45 @@ BridgedInstruction SILBuilder_createDeallocStackRef(BridgedInstruction insertion
   return {builder.createDeallocStackRef(getRegularLocation(loc),
                                         castToSILValue(operand))};
 }
+
+BridgedInstruction
+SILBuilder_createUncheckedRefCast(BridgedInstruction insertionPoint,
+                                  BridgedLocation loc, BridgedValue op,
+                                  BridgedType type) {
+  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+  return {builder.createUncheckedRefCast(getRegularLocation(loc),
+                                         castToSILValue(op), getSILType(type))};
+}
+
+BridgedInstruction
+SILBuilder_createSetDeallocating(BridgedInstruction insertionPoint,
+                                 BridgedLocation loc, BridgedValue op,
+                                 bool isAtomic) {
+  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+  return {builder.createSetDeallocating(
+      getRegularLocation(loc), castToSILValue(op),
+      isAtomic ? RefCountingInst::Atomicity::Atomic
+               : RefCountingInst::Atomicity::NonAtomic)};
+}
+
+BridgedInstruction
+SILBuilder_createFunctionRef(BridgedInstruction insertionPoint,
+                             BridgedLocation loc,
+                             BridgedFunction function) {
+  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+  return {builder.createFunctionRef(getRegularLocation(loc),
+                                    castToFunction(function))};
+}
+
+BridgedInstruction SILBuilder_createApply(BridgedInstruction insertionPoint,
+                                          BridgedLocation loc,
+                                          BridgedValue function,
+                                          BridgedSubstitutionMap subMap,
+                                          BridgedValueArray arguments) {
+  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+  SmallVector<SILValue, 16> argValues;
+  return {builder.createApply(getRegularLocation(loc), castToSILValue(function),
+                              castToSubstitutionMap(subMap),
+                              getSILValues(arguments, argValues))};
+}
+

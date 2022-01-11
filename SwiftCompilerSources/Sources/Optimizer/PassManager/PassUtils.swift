@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -114,6 +115,14 @@ struct PassContext {
   
   func fixStackNesting(function: Function) {
     PassContext_fixStackNesting(_bridged, function.bridged)
+  }
+
+  func getDeallocRef(for type: Type) -> Function? {
+    PassContext_getDeallocRef(_bridged, type.bridged).function
+  }
+
+  func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {
+    SubstitutionMap(PassContext_getContextSubstitutionMap(_bridged, type.bridged))
   }
 }
 
