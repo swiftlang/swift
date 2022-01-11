@@ -3210,6 +3210,15 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
                           getSubclassTrailingObjects<ProtocolDecl *>());
 }
 
+ArchetypeType *ArchetypeType::getParent() const {
+  if (auto depMemTy = getInterfaceType()->getAs<DependentMemberType>()) {
+    return getGenericEnvironment()->mapTypeIntoContext(depMemTy->getBase())
+        ->castTo<ArchetypeType>();
+  }
+
+  return nullptr;
+}
+
 ArchetypeType *ArchetypeType::getRoot() const {
   auto gp = InterfaceType->getRootGenericParam();
   assert(gp && "Missing root generic parameter?");
@@ -3265,16 +3274,16 @@ OpenedArchetypeType::OpenedArchetypeType(const ASTContext &Ctx,
 }
 
 NestedArchetypeType::NestedArchetypeType(const ASTContext &Ctx,
-                                       ArchetypeType *Parent,
                                        Type InterfaceType,
                                        ArrayRef<ProtocolDecl *> ConformsTo,
                                        Type Superclass,
                                        LayoutConstraint Layout,
                                        GenericEnvironment *Environment)
   : ArchetypeType(TypeKind::NestedArchetype, Ctx,
-                  Parent->getRecursiveProperties(),
-                  InterfaceType, ConformsTo, Superclass, Layout, Environment),
-    Parent(Parent)
+                  Environment->mapTypeIntoContext(
+                      InterfaceType->getRootGenericParam())
+                        ->getRecursiveProperties(),
+                  InterfaceType, ConformsTo, Superclass, Layout, Environment)
 {
 }
 
@@ -3590,7 +3599,6 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
 CanNestedArchetypeType NestedArchetypeType::getNew(
                                    const ASTContext &Ctx,
-                                   ArchetypeType *Parent,
                                    DependentMemberType *InterfaceType,
                                    SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                    Type Superclass,
@@ -3608,7 +3616,7 @@ CanNestedArchetypeType NestedArchetypeType::getNew(
       alignof(NestedArchetypeType), arena);
 
   return CanNestedArchetypeType(::new (mem) NestedArchetypeType(
-      Ctx, Parent, InterfaceType, ConformsTo, Superclass, Layout, Environment));
+      Ctx, InterfaceType, ConformsTo, Superclass, Layout, Environment));
 }
 
 CanPrimaryArchetypeType

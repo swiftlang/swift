@@ -5470,6 +5470,10 @@ public:
   /// Register a nested type with the given name.
   void registerNestedType(Identifier name, Type nested);
 
+  /// Retrieve the parent of this archetype, or null if this is a
+  /// primary archetype.
+  ArchetypeType *getParent() const;
+
   /// Return the root archetype parent of this archetype.
   ArchetypeType *getRoot() const;
   
@@ -5696,25 +5700,17 @@ class NestedArchetypeType final : public ArchetypeType,
   friend TrailingObjects;
   friend ArchetypeType;
   
-  ArchetypeType *Parent;
-
 public:
   /// getNew - Create a new nested archetype with the given associated type.
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static CanTypeWrapper<NestedArchetypeType>
-  getNew(const ASTContext &Ctx, ArchetypeType *Parent,
+  getNew(const ASTContext &Ctx,
          DependentMemberType *InterfaceType,
          SmallVectorImpl<ProtocolDecl *> &ConformsTo,
          Type Superclass, LayoutConstraint Layout,
          GenericEnvironment *Environment);
 
-  /// Retrieve the parent of this archetype, or null if this is a
-  /// primary archetype.
-  ArchetypeType *getParent() const {
-    return Parent;
-  }
-  
   AssociatedTypeDecl *getAssocType() const;
 
   static bool classof(const TypeBase *T) {
@@ -5727,7 +5723,6 @@ public:
 
 private:
   NestedArchetypeType(const ASTContext &Ctx,
-                     ArchetypeType *Parent,
                      Type InterfaceType,
                      ArrayRef<ProtocolDecl *> ConformsTo,
                      Type Superclass, LayoutConstraint Layout,
