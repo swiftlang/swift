@@ -12,7 +12,8 @@
 
 import SILBridging
 
-final public class Function : CustomStringConvertible {
+final public class Function : CustomStringConvertible, HasName {
+
   public var name: String {
     return SILFunction_getName(bridged).string
   }
@@ -26,11 +27,7 @@ final public class Function : CustomStringConvertible {
   }
 
   public var blocks : List<BasicBlock> {
-    return List(startAt: SILFunction_firstBlock(bridged).block)
-  }
-
-  public var reverseBlocks : ReverseList<BasicBlock> {
-    return ReverseList(startAt: SILFunction_lastBlock(bridged).block)
+    return List(first: SILFunction_firstBlock(bridged).block)
   }
 
   public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {

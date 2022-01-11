@@ -25,6 +25,11 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     SILInstruction_previous(bridged).instruction
   }
 
+  // Needed for ReverseList<Instruction>.reversed(). Never use directly.
+  public var _firstInList: Instruction { SILBasicBlock_firstInst(block.bridged).instruction! }
+  // Needed for List<Instruction>.reversed(). Never use directly.
+  public var _lastInList: Instruction { SILBasicBlock_lastInst(block.bridged).instruction! }
+
   final public var block: BasicBlock {
     SILInstruction_getParent(bridged).block
   }

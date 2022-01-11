@@ -20,14 +20,19 @@ public protocol ListNode : AnyObject {
   associatedtype Element
   var next: Element? { get }
   var previous: Element? { get }
+  
+  /// The first node in the list. Used to implement `reversed()`.
+  var _firstInList: Element { get }
+
+  /// The last node in the list. Used to implement `reversed()`.
+  var _lastInList: Element { get }
 }
 
 public struct List<NodeType: ListNode> :
-      Sequence, IteratorProtocol, CustomReflectable
-      where NodeType.Element == NodeType {
+      CollectionLikeSequence, IteratorProtocol where NodeType.Element == NodeType {
   private var currentNode: NodeType?
   
-  public init(startAt: NodeType?) { currentNode = startAt }
+  public init(first: NodeType?) { currentNode = first }
 
   public mutating func next() -> NodeType? {
     if let node = currentNode {
@@ -39,18 +44,19 @@ public struct List<NodeType: ListNode> :
 
   public var first: NodeType? { currentNode }
 
-  public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: nil, value: $0) }
-    return Mirror(self, children: c)
+  public func reversed() -> ReverseList<NodeType> {
+    if let node = first {
+      return ReverseList(first: node._lastInList)
+    }
+    return ReverseList(first: nil)
   }
 }
 
 public struct ReverseList<NodeType: ListNode> :
-      Sequence, IteratorProtocol, CustomReflectable
-      where NodeType.Element == NodeType {
+      CollectionLikeSequence, IteratorProtocol where NodeType.Element == NodeType {
   private var currentNode: NodeType?
   
-  public init(startAt: NodeType?) { currentNode = startAt }
+  public init(first: NodeType?) { currentNode = first }
 
   public mutating func next() -> NodeType? {
     if let node = currentNode {
@@ -62,22 +68,100 @@ public struct ReverseList<NodeType: ListNode> :
 
   public var first: NodeType? { currentNode }
 
+  public func reversed() -> ReverseList<NodeType> {
+    if let node = first {
+      return ReverseList(first: node._firstInList)
+    }
+    return ReverseList(first: nil)
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
+//                            Sequence Utilities
+//===----------------------------------------------------------------------===//
+
+/// Types conforming to `HasName` will be displayed by their name (instead of the
+/// full object) in collection descriptions.
+///
+/// This is useful to make collections, e.g. of BasicBlocks or Functions, readable.
+public protocol HasName {
+  var name: String { get }
+}
+
+private struct CustomMirrorChild : CustomStringConvertible, CustomReflectable {
+  public var description: String
+  public var customMirror: Mirror { Mirror(self, children: []) }
+  
+  public init(description: String) { self.description = description }
+}
+
+/// Makes a Sequence's `description` and `customMirror` formatted like Array, e.g. [a, b, c].
+public protocol FormattedLikeArray : Sequence, CustomStringConvertible, CustomReflectable {
+}
+
+extension FormattedLikeArray {
+  /// Display a Sequence in an array like format, e.g. [a, b, c]
+  public var description: String {
+    "[" + map {
+      if let named = $0 as? HasName {
+        return named.name
+      }
+      return String(describing: $0)
+    }.joined(separator: ", ") + "]"
+  }
+  
+  /// The mirror which adds the children of a Sequence, similar to `Array`.
   public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: nil, value: $0) }
-    return Mirror(self, children: c)
+    // If the one-line description is not too large, print that instead of the
+    // children in separate lines.
+    if description.count <= 80 {
+      return Mirror(self, children: [])
+    }
+    let c: [Mirror.Child] = map {
+      let val: Any
+      if let named = $0 as? HasName {
+        val = CustomMirrorChild(description: named.name)
+      } else {
+        val = $0
+      }
+      return (label: nil, value: val)
+    }
+    return Mirror(self, children: c, displayStyle: .collection)
   }
 }
 
-
-//===----------------------------------------------------------------------===//
-//                            General Utilities
-//===----------------------------------------------------------------------===//
-
-extension Sequence {
-  public var isEmpty: Bool {
-    !contains(where: { _ in true })
-  }
+/// A Sequence which is not consuming and therefore behaves like a Collection.
+///
+/// Many sequences in SIL and the optimizer should be collections but cannot
+/// because their Index cannot conform to Comparable. Those sequences conform
+/// to CollectionLikeSequence.
+///
+/// For convenience it also inherits from FormattedLikeArray.
+public protocol CollectionLikeSequence : FormattedLikeArray {
 }
+
+public extension CollectionLikeSequence {
+  var isEmpty: Bool { !contains(where: { _ in true }) }
+}
+
+// Also make the lazy sequences a CollectionLikeSequence if the underlying sequence is one.
+
+extension LazySequence : CollectionLikeSequence,
+                         FormattedLikeArray, CustomStringConvertible, CustomReflectable
+                         where Base: CollectionLikeSequence {}
+
+extension FlattenSequence : CollectionLikeSequence,
+                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
+                            where Base: CollectionLikeSequence {}
+
+extension LazyMapSequence : CollectionLikeSequence,
+                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
+                            where Base: CollectionLikeSequence {}
+
+extension LazyFilterSequence : CollectionLikeSequence,
+                               FormattedLikeArray, CustomStringConvertible, CustomReflectable
+                               where Base: CollectionLikeSequence {}
 
 //===----------------------------------------------------------------------===//
 //                            Bridging Utilities
