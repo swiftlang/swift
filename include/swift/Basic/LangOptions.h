@@ -390,6 +390,9 @@ namespace swift {
     /// cases.
     bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
 
+    /// Enable making top-level code support concurrency
+    bool EnableExperimentalAsyncTopLevel = false;
+
     /// Regex for the passes that should report passed and missed optimizations.
     ///
     /// These are shared_ptrs so that this class remains copyable.
