@@ -4217,6 +4217,12 @@ void PrintAST::visitTupleExpr(TupleExpr *expr) {
   Printer << ")";
 }
 
+void PrintAST::visitPackExpr(PackExpr *expr) {
+}
+
+void PrintAST::visitReifyPackExpr(ReifyPackExpr *expr) {
+}
+
 void PrintAST::visitAssignExpr(AssignExpr *expr) {
   visit(expr->getDest());
   Printer << " = ";
