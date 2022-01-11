@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
 // REQUIRES: concurrency
 
+func unspecifiedAsync() async {}
 
 actor MyActor {
 
@@ -74,6 +75,45 @@ actor MyActor {
 
   init() {
     p = 27
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC4withACSi_tYacfc : $@convention(method) @async (Int, @owned MyActor) -> @owned MyActor {
+  // CHECK:         bb0({{%[0-9]+}} : $Int, {{%[0-9]+}} : @owned $MyActor):
+  // CHECK:           hop_to_executor {{%[0-9]+}} : $MainActor
+  // CHECK:           builtin "initializeDefaultActor"
+  // CHECK:           [[FUNC:%[0-9]+]] = function_ref @$s4test16unspecifiedAsyncyyYaF : $@convention(thin) @async () -> ()
+  // CHECK:           %24 = apply [[FUNC]]() : $@convention(thin) @async () -> ()
+  // CHECK-NEXT:      hop_to_executor {{%[0-9]+}} : $MainActor
+  // CHECK:       } // end sil function '$s4test7MyActorC4withACSi_tYacfc'
+  @MainActor
+  init(with v: Int) async {
+    p = 1
+    await unspecifiedAsync()
+    p = 2
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC10delegatingACSb_tYacfC : $@convention(method) @async (Bool, @thick MyActor.Type) -> @owned MyActor {
+  //        ** first hop is in the prologue
+  // CHECK:         bb0({{%[0-9]+}} : $Bool, {{%[0-9]+}} : $@thick MyActor.Type):
+  // CHECK:           hop_to_executor {{%[0-9]+}} : $MainActor
+  // CHECK:           struct_extract {{%[0-9]+}} : $Bool, #Bool._value
+  // CHECK:           cond_br
+  //        ** second hop is right after delegating to the async init
+  // CHECK:         = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) @async (Int, @thick MyActor.Type) -> @owned MyActor
+  // CHECK-NEXT:    hop_to_executor {{%[0-9]+}} : $MainActor
+  //        ** third hop is right after calling an arbitrary async function
+  // CHECK:         [[FUNC:%[0-9]+]] = function_ref @$s4test16unspecifiedAsyncyyYaF : $@convention(thin) @async () -> ()
+  // CHECK:         = apply [[FUNC]]() : $@convention(thin) @async () -> ()
+  // CHECK-NEXT:    hop_to_executor %9 : $MainActor
+  // CHECK:       } // end sil function '$s4test7MyActorC10delegatingACSb_tYacfC'
+  @MainActor
+  convenience init(delegating c: Bool) async {
+    if c {
+      self.init()
+    } else {
+      await self.init(with: 0)
+    }
+    await unspecifiedAsync()
   }
 }
   

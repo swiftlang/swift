@@ -315,6 +315,34 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   return;
 }
 
+/// Returns true if the given async constructor will have its
+/// required actor hops injected later by definite initialization.
+static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
+                                           ActorIsolation const& isolation) {
+  // must be async, but we can assume that.
+  assert(ctor->hasAsync());
+
+  auto *dc = ctor->getDeclContext();
+  auto selfClassDecl = dc->getSelfClassDecl();
+
+  // must be an actor
+  if (!selfClassDecl || !selfClassDecl->isAnyActor())
+    return false;
+
+  // must be instance isolated
+  switch (isolation) {
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
+      return true;
+
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent:
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      return false;
+  }
+}
+
 void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
 
@@ -360,9 +388,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Make sure we've hopped to the right global actor, if any.
   if (ctor->hasAsync()) {
-    SILLocation prologueLoc(selfDecl);
-    prologueLoc.markAsPrologue();
-    emitConstructorPrologActorHop(prologueLoc, getActorIsolation(ctor));
+    auto isolation = getActorIsolation(ctor);
+    // if it's not injected by definite init, we do it in the prologue now.
+    if (!ctorHopsInjectedByDefiniteInit(ctor, isolation)) {
+      SILLocation prologueLoc(selfDecl);
+      prologueLoc.markAsPrologue();
+      emitConstructorPrologActorHop(prologueLoc, isolation);
+    }
   }
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -754,10 +786,14 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     selfClassDecl->isDistributedActor() && !isDelegating;
 
   // Make sure we've hopped to the right global actor, if any.
-  if (ctor->hasAsync() && !selfClassDecl->isActor()) {
-    SILLocation prologueLoc(selfDecl);
-    prologueLoc.markAsPrologue();
-    emitConstructorPrologActorHop(prologueLoc, getActorIsolation(ctor));
+  if (ctor->hasAsync()) {
+    auto isolation = getActorIsolation(ctor);
+    // if it's not injected by definite init, we do it in the prologue now.
+    if (!ctorHopsInjectedByDefiniteInit(ctor, isolation)) {
+      SILLocation prologueLoc(selfDecl);
+      prologueLoc.markAsPrologue();
+      emitConstructorPrologActorHop(prologueLoc, isolation);
+    }
   }
 
   if (!NeedsBoxForSelf) {
