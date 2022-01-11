@@ -8035,7 +8035,6 @@ namespace {
         // Note that in this mode `ClosuresToTypeCheck` acts
         // as a stack because multi-statement closures could
         // have other multi-statement closures in the body.
-        auto &ctx = closure->getASTContext();
         if (cs.participatesInInference(closure)) {
           hadError |= cs.applySolutionToBody(
               solution, closure, Rewriter.dc,
