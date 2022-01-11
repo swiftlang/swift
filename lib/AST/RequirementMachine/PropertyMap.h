@@ -165,9 +165,6 @@ class PropertyMap {
   std::vector<PropertyBag *> Entries;
   Trie<PropertyBag *, MatchKind::Longest> Trie;
 
-  using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
-  llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
-
   // Building the property map introduces new induced rules, which
   // runs another round of Knuth-Bendix completion, which rebuilds the
   // property map again.
@@ -235,7 +232,6 @@ private:
   void checkConcreteTypeRequirements(
                    SmallVectorImpl<InducedRule> &inducedRules);
 
-  void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(
                    SmallVectorImpl<InducedRule> &inducedRules);
 

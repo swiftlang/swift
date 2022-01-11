@@ -304,7 +304,6 @@ void PropertyMap::clear() {
 
   Trie.clear();
   Entries.clear();
-  ConcreteTypeInDomainMap.clear();
 }
 
 /// Build the property map from all rules of the form T.[p] => T, where
@@ -374,10 +373,6 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   // Now, check for conflicts between superclass and concrete type rules.
   checkConcreteTypeRequirements(inducedRules);
-
-  // We collect terms with fully concrete types so that we can re-use them
-  // to tie off recursion in the next step.
-  computeConcreteTypeInDomainMap();
 
   // Now, we merge concrete type rules with conformance rules, by adding
   // relations between associated type members of type parameters with

@@ -578,33 +578,6 @@ void PropertyMap::checkConcreteTypeRequirements(
   }
 }
 
-/// For each fully-concrete type, find the shortest term having that concrete type.
-/// This is later used by computeConstraintTermForTypeWitness().
-void PropertyMap::computeConcreteTypeInDomainMap() {
-  for (auto *props : Entries) {
-    if (!props->isConcreteType())
-      continue;
-
-    auto concreteType = props->ConcreteType->getConcreteType();
-    if (concreteType->hasTypeParameter())
-      continue;
-
-    assert(props->ConcreteType->getSubstitutions().empty());
-
-    auto domain = props->Key.getRootProtocols();
-    auto concreteTypeKey = std::make_pair(concreteType, domain);
-
-    auto found = ConcreteTypeInDomainMap.find(concreteTypeKey);
-    if (found != ConcreteTypeInDomainMap.end())
-      continue;
-
-    auto inserted = ConcreteTypeInDomainMap.insert(
-        std::make_pair(concreteTypeKey, props->Key));
-    assert(inserted.second);
-    (void) inserted;
-  }
-}
-
 void PropertyMap::concretizeNestedTypesFromConcreteParents(
     SmallVectorImpl<InducedRule> &inducedRules) {
   for (auto *props : Entries) {
@@ -1003,9 +976,6 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   if (requirementKind == RequirementKind::SameType &&
       typeWitnessSymbol.getConcreteType() == concreteType &&
       typeWitnessSymbol.getSubstitutions() == substitutions) {
-    // FIXME: ConcreteTypeInDomainMap should support substitutions so
-    // that we can remove this.
-
     if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
       llvm::dbgs() << "^^ Type witness is the same as the concrete type\n";
     }
@@ -1026,29 +996,6 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
         witnessID, /*inverse=*/false));
 
     return result;
-  }
-
-  // If the type witness is completely concrete, try to introduce a
-  // same-type requirement with another representative type parameter,
-  // if we have one.
-  if (!typeWitness->hasTypeParameter()) {
-    // Check if we have a shorter representative we can use.
-    auto domain = key.getRootProtocols();
-    auto concreteTypeKey = std::make_pair(typeWitness, domain);
-
-    auto found = ConcreteTypeInDomainMap.find(concreteTypeKey);
-    if (found != ConcreteTypeInDomainMap.end()) {
-      MutableTerm result(found->second);
-      if (result != subjectType) {
-        if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
-          llvm::dbgs() << "^^ Type witness can re-use property bag of "
-                       << found->second << "\n";
-        }
-
-        // FIXME: Record a rewrite path.
-        return result;
-      }
-    }
   }
 
   // Otherwise, add a concrete type requirement for the type witness.
