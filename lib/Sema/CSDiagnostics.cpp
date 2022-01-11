@@ -6264,6 +6264,16 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsError() {
+  const auto paramType = getToType();
+
+  // If the parameter type contains an opened archetype, it's an unsupported
+  // existential member access; refrain from exposing type system implementation
+  // details in diagnostics and complaining about a parameter the user cannot
+  // fulfill, and let the member access failure prevail.
+  if (paramType->hasOpenedExistential()) {
+    return false;
+  }
+
   if (diagnoseMisplacedMissingArgument())
     return true;
 
@@ -6289,7 +6299,6 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
     return true;
 
   auto argType = getFromType();
-  auto paramType = getToType();
 
   if (paramType->isAnyObject()) {
     emitDiagnostic(diag::cannot_convert_argument_value_anyobject, argType,

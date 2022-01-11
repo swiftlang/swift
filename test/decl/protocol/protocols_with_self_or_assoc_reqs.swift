@@ -304,87 +304,52 @@ do {
     arg[covariantAssocSubscriptComplex: { _ in }, { _ in }, { _ in }, { _ in }] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
 
     arg.contravariantSelf1(0) // expected-error {{member 'contravariantSelf1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(P1)?'}}
     arg.contravariantSelf2(0) // expected-error {{member 'contravariantSelf2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Silence these since we cannot make use of the member anyway.
-    // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type '() -> P1'}}
     arg.contravariantSelf3(0) // expected-error {{member 'contravariantSelf3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Array<() -> P1>'}}
     arg.contravariantSelf4(0) // expected-error {{member 'contravariantSelf4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[String : () -> P1]'}}
     arg.contravariantSelf5(0) // expected-error {{member 'contravariantSelf5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '() -> (P1, P1)'}}
     arg.contravariantSelf6(0) // expected-error {{member 'contravariantSelf6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '((P1) -> Void) -> Void'}}
     arg.contravariantSelf7() // expected-error {{member 'contravariantSelf7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.contravariantSelf8() // expected-error {{member 'contravariantSelf8' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.contravariantSelf9(0) // expected-error {{member 'contravariantSelf9' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[String : (() -> P1)?]'}}
     arg.contravariantSelf10() // expected-error {{member 'contravariantSelf10' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.contravariantSelf11(0) // expected-error {{member 'contravariantSelf11' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(P1).Type'}}
     arg.contravariantAssoc1(0) // expected-error {{member 'contravariantAssoc1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '((P1).Q)?'}}
     arg.contravariantAssoc2(0) // expected-error {{member 'contravariantAssoc2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '() -> (P1).Q'}}
     arg.contravariantAssoc3(0) // expected-error {{member 'contravariantAssoc3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Array<() -> (P1).Q>'}}
     arg.contravariantAssoc4(0) // expected-error {{member 'contravariantAssoc4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[String : () -> (P1).Q]'}}
     arg.contravariantAssoc5(0) // expected-error {{member 'contravariantAssoc5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '() -> ((P1).Q, (P1).Q)'}}
     arg.contravariantAssoc6(0) // expected-error {{member 'contravariantAssoc6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(((P1).Q) -> Void) -> Void'}}
     arg.contravariantAssoc7() // expected-error {{member 'contravariantAssoc7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.contravariantAssoc8() // expected-error {{member 'contravariantAssoc8' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.contravariantAssoc9(0) // expected-error {{member 'contravariantAssoc9' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[String : (() -> (P1).Q)?]'}}
     arg.contravariantAssoc10() // expected-error {{member 'contravariantAssoc10' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.contravariantAssoc11(0) // expected-error {{member 'contravariantAssoc11' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '((P1).Q).Type'}}
 
     arg.invariantSelf1(0) // expected-error {{member 'invariantSelf1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'P1'}}
     if #available(macOS 10.15, *) {
       arg.invariantSelf1_1() // expected-error {{member 'invariantSelf1_1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     }
     arg.invariantSelf2(0) // expected-error {{member 'invariantSelf2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Silence these since we cannot make use of the member anyway.
-    // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type '(inout P1) -> Void'}}
     arg.invariantSelf3(0) // expected-error {{member 'invariantSelf3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Array<() -> P1>'}}
     arg.invariantSelf4(0) // expected-error {{member 'invariantSelf4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<P1>'}}
     arg.invariantSelf5() // expected-error {{member 'invariantSelf5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelf6() // expected-error {{member 'invariantSelf6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelf7(0) // expected-error {{member 'invariantSelf7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(Struct<P1>) -> Void'}}
     arg.invariantSelf8(0) // expected-error {{member 'invariantSelf8' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<(P1) -> Void>'}}
     arg.invariantSelf9(0) // expected-error {{member 'invariantSelf9' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<() -> P1>'}}
     arg.invariantSelf10(0) // expected-error {{member 'invariantSelf10' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Class<P1>'}}
     arg.invariantSelf11() // expected-error {{member 'invariantSelf11' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssoc1(0) // expected-error {{member 'invariantAssoc1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(P1).Q'}}
     arg.invariantAssoc2(0) // expected-error {{member 'invariantAssoc2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Silence these since we cannot make use of the member anyway.
-    // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type '(inout (P1).Q) -> Void'}}
     arg.invariantAssoc3(0) // expected-error {{member 'invariantAssoc3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Array<() -> (P1).Q>'}}
     arg.invariantAssoc4(0) // expected-error {{member 'invariantAssoc4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<(P1).Q>'}}
     arg.invariantAssoc5() // expected-error {{member 'invariantAssoc5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssoc6() // expected-error {{member 'invariantAssoc6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantAssoc7(0) // expected-error {{member 'invariantAssoc7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(Struct<(P1).Q>) -> Void'}}
     arg.invariantAssoc8(0) // expected-error {{member 'invariantAssoc8' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<((P1).Q) -> Void>'}}
     arg.invariantAssoc9(0) // expected-error {{member 'invariantAssoc9' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<() -> (P1).Q>'}}
     arg.invariantAssoc10(0) // expected-error {{member 'invariantAssoc10' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Class<(P1).Q>'}}
     arg.invariantAssoc11() // expected-error {{member 'invariantAssoc11' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
 
     arg.contravariantSelfProp1 // expected-error {{member 'contravariantSelfProp1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
@@ -437,73 +402,43 @@ do {
     arg.invariantAssocProp11 // expected-error {{member 'invariantAssocProp11' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
 
     arg[contravariantSelfSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(P1)?'}}
     arg[contravariantSelfSubscript2: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Silence these since we cannot make use of the member anyway.
-    // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type '() -> P1'}}
     arg[contravariantSelfSubscript3: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Array<() -> P1>'}}
     arg[contravariantSelfSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[String : () -> P1]'}}
     arg[contravariantSelfSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '() -> (P1, P1)'}}
     arg[contravariantSelfSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '((P1) -> Void) -> Void'}}
     arg[contravariantSelfSubscript7: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[contravariantSelfSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[contravariantSelfSubscript9: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[String : (() -> P1)?]'}}
     arg[contravariantSelfSubscript10: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[contravariantSelfSubscript11: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(P1).Type'}}
     arg[contravariantAssocSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '((P1).Q)?'}}
     arg[contravariantAssocSubscript2: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Silence these since we cannot make use of the member anyway.
-    // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type '() -> (P1).Q'}}
     arg[contravariantAssocSubscript3: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Array<() -> (P1).Q>'}}
     arg[contravariantAssocSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[String : () -> (P1).Q]'}}
     arg[contravariantAssocSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '() -> ((P1).Q, (P1).Q)'}}
     arg[contravariantAssocSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(((P1).Q) -> Void) -> Void'}}
     arg[contravariantAssocSubscript7: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[contravariantAssocSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[contravariantAssocSubscript9: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[String : (() -> (P1).Q)?]'}}
     arg[contravariantAssocSubscript10: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[contravariantAssocSubscript11: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '((P1).Q).Type'}}
 
     arg[invariantSelfSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Silence these since we cannot make use of the member anyway.
-    // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type 'Struct<P1>'}}
     arg[invariantSelfSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[invariantSelfSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[invariantSelfSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(Struct<P1>) -> Void'}}
     arg[invariantSelfSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<(P1) -> Void>'}}
     arg[invariantSelfSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<() -> P1>'}}
     arg[invariantSelfSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Class<P1>'}}
     arg[invariantSelfSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[invariantAssocSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // FIXME: Silence these since we cannot make use of the member anyway.
-    // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type 'Struct<(P1).Q>'}}
     arg[invariantAssocSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[invariantAssocSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg[invariantAssocSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(Struct<(P1).Q>) -> Void'}}
     arg[invariantAssocSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<((P1).Q) -> Void>'}}
     arg[invariantAssocSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Struct<() -> (P1).Q>'}}
     arg[invariantAssocSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Class<(P1).Q>'}}
     arg[invariantAssocSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
   }
 }
@@ -614,7 +549,6 @@ do {
   exist.method7(false)
   // expected-error@-1 {{instance method 'method7' requires that 'Class<UnfulfillableGenericRequirements>' conform to 'UnfulfillableGenericRequirements'}}
   // expected-error@-2 {{member 'method7' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; use a generic constraint instead}}
-  // expected-error@-3 {{cannot convert value of type 'Bool' to expected argument type 'Class<UnfulfillableGenericRequirements>'}}
 }
 protocol UnfulfillableGenericRequirementsDerived1: UnfulfillableGenericRequirements where A == Bool {}
 protocol UnfulfillableGenericRequirementsDerived2: UnfulfillableGenericRequirements where A == Class<Self> {}
@@ -661,11 +595,8 @@ do {
 
   exist.method1() // expected-error {{instance method 'method1()' requires that '(InvalidTypeParameters).A' conform to 'InvalidTypeParameters'}}
   exist.method2(false) // expected-error {{instance method 'method2' requires that '(InvalidTypeParameters).A' conform to 'InvalidTypeParameters'}}
-  // expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type '((InvalidTypeParameters).A).A'}}
   exist.method3(false, false) // expected-error {{instance method 'method3' requires that '(InvalidTypeParameters).A' conform to 'InvalidTypeParameters'}}
   // expected-error@-1 {{member 'method3' cannot be used on value of protocol type 'InvalidTypeParameters'; use a generic constraint instead}}
-  // expected-error@-2 {{cannot convert value of type 'Bool' to expected argument type '(InvalidTypeParameters).A'}}
-  // expected-error@-3 {{cannot convert value of type 'Bool' to expected argument type '((InvalidTypeParameters).A).A'}}
 }
 
 protocol GenericRequirementFailures {
@@ -686,7 +617,6 @@ do {
   exist.method2() // expected-error {{referencing instance method 'method2()' on 'GenericRequirementFailures' requires the types '(GenericRequirementFailures).A' and 'Never' be equivalent}}
   exist.method3(false) // expected-error {{referencing instance method 'method3' on 'GenericRequirementFailures' requires the types '(GenericRequirementFailures).A' and 'Never' be equivalent}}
   // expected-error@-1 {{member 'method3' cannot be used on value of protocol type 'GenericRequirementFailures'; use a generic constraint instead}}
-  // expected-error@-2 {{cannot convert value of type 'Bool' to expected argument type '(GenericRequirementFailures).A'}}
   exist.method4() // expected-error {{referencing instance method 'method4()' on 'GenericRequirementFailures' requires that '(GenericRequirementFailures).A' conform to 'GenericRequirementFailures'}}
 }
 protocol GenericRequirementFailuresDerived: GenericRequirementFailures where A: GenericRequirementFailures {}
@@ -830,10 +760,8 @@ do {
     let _: (Bool, any ConcreteAssocTypes) = arg.property2 // ok
     _ = arg.property3 // expected-error {{member 'property3' cannot be used on value of protocol type 'ConcreteAssocTypes'; use a generic constraint instead}}
     _ = arg[subscript1: false] // expected-error {{member 'subscript' cannot be used on value of protocol type 'ConcreteAssocTypes'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type 'Class<(ConcreteAssocTypes).A4>'}}
     _ = arg[subscript2: false] // expected-error {{member 'subscript' cannot be used on value of protocol type 'ConcreteAssocTypes'; use a generic constraint instead}}
     _ = arg[subscript3: false] // expected-error {{member 'subscript' cannot be used on value of protocol type 'ConcreteAssocTypes'; use a generic constraint instead}}
-    // expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type '(Bool, ConcreteAssocTypes)'}}
 
     let _: (
       Struct<Bool>, (any ConcreteAssocTypes).Type, () -> Bool
@@ -909,5 +837,5 @@ do {
   // FIXME: Should GenericSignature::getConcreteType return the null type instead
   // of the error type here for Self.A, despite the broken conformance?
   let exist: any CompositionBrokenClassConformance_b & BadConformanceClass
-  exist.method(false) // expected-error {{cannot convert value of type 'Bool' to expected argument type '(BadConformanceClass & CompositionBrokenClassConformance_b).A'}}
+  exist.method(false) // expected-error {{type of expression is ambiguous without more context}}
 }
