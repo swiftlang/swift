@@ -129,6 +129,7 @@ public:
   bool isCanonicalTypeInContext(Type type) const;
   Type getCanonicalTypeInContext(Type type,
                       TypeArrayView<GenericTypeParamType> genericParams) const;
+  bool isValidTypeInContext(Type type) const;
   ConformanceAccessPath getConformanceAccessPath(Type type,
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
