@@ -1309,8 +1309,10 @@ public:
   using BuiltTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
 
-  BuiltType decodeMangledType(NodePointer node) {
-    return Demangle::decodeMangledType(*this, node).getType();
+  BuiltType decodeMangledType(NodePointer node,
+                              bool forRequirement = true) {
+    return Demangle::decodeMangledType(*this, node, forRequirement)
+        .getType();
   }
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
@@ -1478,7 +1480,8 @@ public:
 
   TypeLookupErrorOr<BuiltType>
   createProtocolCompositionType(llvm::ArrayRef<BuiltProtocolDecl> protocols,
-                                BuiltType superclass, bool isClassBound) const {
+                                BuiltType superclass, bool isClassBound,
+                                bool forRequirement = true) const {
     // Determine whether we have a class bound.
     ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
     if (isClassBound || superclass) {
