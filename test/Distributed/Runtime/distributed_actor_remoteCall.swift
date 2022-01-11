@@ -22,6 +22,40 @@ distributed actor Greeter {
   distributed func hello() {
     print("EXECUTING HELLO")
   }
+
+  distributed func test(i: Int, s: String) -> String {
+    return s
+  }
+
+//  nonisolated func __DISTTHUNK__test(i: Int, s: String) async throws -> String {
+//    // bb0:
+//    let remote = __isRemoteActor(self)
+//
+//    if remote {
+//      // bb1:
+//      var invocation = try self.actorSystem.makeInvocation()
+//      try invocation.recordArgument/*<Int>*/(i)
+//      try invocation.recordArgument/*<String>*/(s)
+//      try invocation.recordReturnType/*<String>*/(String.self)
+//      // try invocation.recordErrorType/*<Error>*/(Error.self)
+//      try invocation.doneRecording()
+//
+//      let target = RemoteCallTarget(mangledName: "MANGLED_NAME")
+//
+//      try await self.actorSystem.remoteCall<Self, Never, String>(
+//          on: self,
+//          target,
+//          invocation,
+//          throwing: Never.self,
+//          returning: String.self
+//      )
+//
+//    } else {
+//      // bb2:
+//      await self.test(i: i, s: s)
+//    }
+//  }
+
 }
 
 

@@ -1385,6 +1385,7 @@ NominalTypeDecl::lookupDirect(DeclName name,
                            DirectLookupRequest({this, name, flags}), {});
 }
 
+// FIXME(distributed): remove this, we don't need them anymore
 AbstractFunctionDecl*
 NominalTypeDecl::lookupDirectRemoteFunc(AbstractFunctionDecl *func) {
   auto &C = func->getASTContext();

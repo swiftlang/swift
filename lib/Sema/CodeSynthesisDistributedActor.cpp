@@ -112,6 +112,7 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
   return { body, /*isTypeChecked=*/true };
 }
 
+// FIXME(distributed): remove this, won't be needed with the new remoteCall
 static Identifier makeRemoteFuncIdentifier(FuncDecl* distributedFunc) {
   auto &C = distributedFunc->getASTContext();
   assert(distributedFunc->isDistributed());
@@ -197,7 +198,7 @@ static AbstractFunctionDecl *addImplicitDistributedActorRemoteFunction(
 //
 // The "derived" mechanisms are not really geared towards emitting for
 // what already has a witness.
-static ValueDecl *addImplicitDistributedActorIDProperty(
+static VarDecl *addImplicitDistributedActorIDProperty(
 //    DeclContext *parentDC,
     NominalTypeDecl *nominal) {
   if (!nominal || !nominal->isDistributedActor())
@@ -242,6 +243,43 @@ static ValueDecl *addImplicitDistributedActorIDProperty(
 }
 
 /******************************************************************************/
+/************ LOCATING AD-HOC PROTOCOL REQUIREMENT IMPLS **********************/
+/******************************************************************************/
+
+AbstractFunctionDecl*
+GetDistributedActorSystemRemoteCallFunctionRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *decl) const {
+  auto &C = decl->getASTContext();
+
+  // It would be nice to check if this is a DistributedActorSystem
+  // "conforming" type, but we can't do this as we invoke this function WHILE
+  // deciding if the type conforms or not;
+
+  // Not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed)) {
+    return nullptr;
+  }
+
+  AbstractFunctionDecl *remoteCallFunc = nullptr;
+  for (auto value : decl->lookupDirect(C.Id_remoteCall)) {
+    auto func = dyn_cast<AbstractFunctionDecl>(value);
+    if (func && func->isDistributedActorSystemRemoteCall()) {
+      remoteCallFunc = func;
+      break;
+    }
+  }
+
+  if (!remoteCallFunc) {
+    fprintf(stderr, "[%s:%d] (%s) NOT FOUND\n", __FILE__, __LINE__, __FUNCTION__);
+    decl->dump();
+    fprintf(stderr, "[%s:%d] (%s) --------------------!!!!!\n", __FILE__, __LINE__, __FUNCTION__);
+  }
+  return remoteCallFunc;
+}
+
+
+/******************************************************************************/
 /************************ SYNTHESIS ENTRY POINT *******************************/
 /******************************************************************************/
 
@@ -261,7 +299,7 @@ AbstractFunctionDecl *GetDistributedRemoteFuncRequest::evaluate(
   return addImplicitDistributedActorRemoteFunction(DC, func);
 }
 
-ValueDecl *GetDistributedActorIDPropertyRequest::evaluate(
+VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *actor) const {
   if (!actor->isDistributedActor())
     return nullptr;
@@ -274,4 +312,25 @@ ValueDecl *GetDistributedActorIDPropertyRequest::evaluate(
     return nullptr;
 
   return addImplicitDistributedActorIDProperty(actor);
+}
+
+VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *actor) const {
+  if (!actor->isDistributedActor())
+    return nullptr;
+
+  auto &C = actor->getASTContext();
+
+  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
+
+
+  for (auto system : actor->lookupDirect(C.Id_actorSystem)) {
+    // TODO(distributed): may need to check conformance here?
+    return dyn_cast<VarDecl>(system);
+  }
+
+  return nullptr;
 }

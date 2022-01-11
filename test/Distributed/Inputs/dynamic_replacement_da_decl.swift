@@ -48,7 +48,7 @@ final class FakeActorSystem: DistributedActorSystem {
   func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor,
       Act.ID == ActorID {
-    ActorAddress(parse: "xxx")
+    ActorAddress(parse: "fake://\(actorType)")
   }
 
   func actorReady<Act>(_ actor: Act)
@@ -61,6 +61,19 @@ final class FakeActorSystem: DistributedActorSystem {
 
   func makeInvocation() -> Invocation {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: Invocation,
+      throwing: Err.Type,
+      returning: Res.Type
+  ) async throws -> Res.Type
+      where Act: DistributedActor,
+            Act.ID == ActorID,
+            Res: SerializationRequirement {
+    // empty
   }
 }
 

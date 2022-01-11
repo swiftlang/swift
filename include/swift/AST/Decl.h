@@ -3352,8 +3352,15 @@ public:
   /// If the passed in function is not distributed this function returns null.
   AbstractFunctionDecl* lookupDirectRemoteFunc(AbstractFunctionDecl *func);
 
+  /// Find the distributed actor system instance of this distributed actor.
+  VarDecl *getDistributedActorSystemProperty() const;
+
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
-  ValueDecl *getDistributedActorIDProperty() const;
+  VarDecl *getDistributedActorIDProperty() const;
+
+  /// Find the 'remoteCall' ad-hoc protocol requirement on a
+  /// 'DistributedActorSystem' protocol of specific implementation type.
+  AbstractFunctionDecl* getDistributedActorSystemRemoteCallFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -6348,6 +6355,11 @@ public:
     return getBodyKind() == BodyKind::SILSynthesize
     && getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
   }
+
+  /// Determines whether this function is a 'remoteCall' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedActorSystem' protocol.
+  bool isDistributedActorSystemRemoteCall() const;
 
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.

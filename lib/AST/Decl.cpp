@@ -7387,6 +7387,37 @@ bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
 }
 
+bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall() const {
+  auto &C = this->getASTContext();
+
+  // Check the name
+  if (this->getBaseName() != C.Id_remoteCall)
+    return false;
+
+  auto params = this->getParameters();
+  // Check the expected argument count
+  if (!params || params->size() != 5)
+    return false;
+
+  // Check API names of the arguments
+  auto actorParam = params->get(0);
+  auto targetParam = params->get(1);
+  auto invocationParam = params->get(2);
+  auto thrownTypeParam = params->get(3);
+  auto returnedTypeParam = params->get(4);
+  if (actorParam->getArgumentName() != C.Id_on ||
+      targetParam->getArgumentName() != C.Id_target ||
+      invocationParam->getArgumentName() != C.Id_invocation ||
+      thrownTypeParam->getArgumentName() != C.Id_throwing ||
+      returnedTypeParam->getArgumentName() != C.Id_returning)
+    return false;
+
+  // FIXME(distributed): check the right types of the args and generics...
+  // FIXME(distributed): check access level actually is ok, i.e. not private etc
+
+  return true;
+}
+
 bool AbstractFunctionDecl::isDistributed() const {
   return this->getAttrs().hasAttribute<DistributedActorAttr>();
 }
@@ -7403,7 +7434,34 @@ AbstractFunctionDecl::getDistributedActorRemoteFuncDecl() const {
       nullptr);
 }
 
-ValueDecl*
+AbstractFunctionDecl*
+NominalTypeDecl::getDistributedActorSystemRemoteCallFunction() const {
+  const NominalTypeDecl *system = this;
+  if (this->isDistributedActor()) {
+    auto var = this->getDistributedActorSystemProperty();
+    system = var->getInterfaceType()->getAnyNominal();
+  }
+
+  auto mutableSystem = const_cast<NominalTypeDecl *>(system);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem},
+      nullptr);
+}
+
+VarDecl*
+NominalTypeDecl::getDistributedActorSystemProperty() const {
+  if (!this->isDistributedActor())
+    return nullptr;
+
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedActorSystemPropertyRequest{mutableThis},
+      nullptr);
+}
+
+VarDecl*
 NominalTypeDecl::getDistributedActorIDProperty() const {
   if (!this->isDistributedActor())
     return nullptr;

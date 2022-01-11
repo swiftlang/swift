@@ -598,27 +598,45 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
   // // if __isRemoteActor(self)
   // {
-  //   return try await self._remote_X(...)
+  //   var invocation = self.actorSystem.invocation
   // }
   {
     B.emitBlock(isRemoteBB);
 
     auto *selfTyDecl = FunctionDC->getParent()->getSelfNominalTypeDecl();
-    assert(selfTyDecl && "distributed instance method declared outside of actor");
+    assert(selfTyDecl &&
+           "distributed instance method declared outside of actor");
 
-    auto remoteFnDecl = selfTyDecl->lookupDirectRemoteFunc(fd);
-    assert(remoteFnDecl && "Could not find _remote_<dist_func_name> function");
-    auto remoteFnRef = SILDeclRef(remoteFnDecl);
 
-    SILGenFunctionBuilder builder(SGM);
-    auto remoteFnSIL = builder.getOrCreateFunction(loc, remoteFnRef, ForDefinition);
-    SILValue remoteFn = B.createFunctionRefFor(loc, remoteFnSIL);
+    auto OLDSYNTHESIS = false; // FIXME(distributed): remove!!!!!!!!!!!!!!!!!!!!!!!!
+    if (OLDSYNTHESIS) {
+      // return try await self._remote_X(...)
+      auto remoteFnDecl = selfTyDecl->lookupDirectRemoteFunc(fd);
+      assert(remoteFnDecl &&
+             "Could not find _remote_<dist_func_name> function");
+      auto remoteFnRef = SILDeclRef(remoteFnDecl);
 
-    auto subs = F.getForwardingSubstitutionMap();
+      SILGenFunctionBuilder builder(SGM);
+      auto remoteFnSIL =
+          builder.getOrCreateFunction(loc, remoteFnRef, ForDefinition);
+      SILValue remoteFn = B.createFunctionRefFor(loc, remoteFnSIL);
 
-    SmallVector<SILValue, 8> remoteParams(params);
+      auto subs = F.getForwardingSubstitutionMap();
 
-    B.createTryApply(loc, remoteFn, subs, remoteParams, remoteReturnBB, remoteErrorBB);
+      SmallVector<SILValue, 8> remoteParams(params);
+
+      B.createTryApply(loc, remoteFn, subs, remoteParams, remoteReturnBB,
+                       remoteErrorBB);
+    } else {
+      // -----------------------------------------------------------------------
+      auto remoteCallFunc =
+          selfTyDecl->getDistributedActorSystemRemoteCallFunction();
+      assert(remoteCallFunc && "no remoteCall func found!");
+
+      fprintf(stderr, "[%s:%d] (%s) got the func\n", __FILE__, __LINE__, __FUNCTION__);
+      remoteCallFunc->dump();
+
+    }
   }
 
   // // else

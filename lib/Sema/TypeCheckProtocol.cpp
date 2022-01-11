@@ -21,6 +21,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "TypeCheckObjC.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -5105,6 +5106,12 @@ void ConformanceChecker::resolveValueWitnesses() {
       // Let it get diagnosed later.
       break;
     }
+  }
+
+  // Finally, check some ad-hoc protocol requirements
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
+    checkDistributedActorSystemAdHocProtocolRequirements(
+        Context, Proto, Conformance, Adoptee, /*diagnose=*/true);
   }
 }
 

@@ -110,6 +110,105 @@ bool IsDistributedActorRequest::evaluate(
 
 // ==== ------------------------------------------------------------------------
 
+bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
+    ASTContext &C,
+    ProtocolDecl *Proto,
+    NormalProtocolConformance *Conformance,
+    Type Adoptee,
+    bool diagnose) {
+  auto decl = Adoptee->getAnyNominal();
+
+  // ==== ----------------------------------------------------------------------
+  // Check the ad-hoc requirements of 'DistributedActorSystem":
+  // - remoteCall
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
+    if (decl->getDistributedActorSystemRemoteCallFunction()) {
+      // ok, we found it!
+      return false;
+    }
+
+    if (diagnose) {
+      decl->diagnose(
+          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getDescriptiveKind(), decl->getName(), C.Id_remoteCall);
+      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getName(), C.Id_remoteCall, "func remoteCall<Act, Err, Res>(\n"
+                                            "    on actor: Act,\n"
+                                            "    target: RemoteCallTarget,\n"
+                                            "    invocation: Invocation,\n"
+                                            "    throwing: Err.Type,\n"
+                                            "    returning: Res.Type\n"
+                                            ") async throws -> Res.Type\n"
+                                            "  where Act: DistributedActor,\n"
+                                            "        Act.ID == ActorID,\n"
+                                            "        Res: SerializationRequirement\n");
+    }
+    return true;
+  }
+
+  // ==== ----------------------------------------------------------------------
+  // Check the ad-hoc requirements of 'DistributedTargetInvocation'
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocation)) {
+    // FIXME(distributed): implement finding this the requirements here
+
+//    if (!decl.get...() && diagnose) {
+//      decl->diagnose(
+//          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+//          decl->getDescriptiveKind(), decl->getName(), C.Id_recordReturnType);
+//      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+//                     decl->getName(),
+//                     C.Id_recordArgument,
+//                     "mutating func recordArgument<Argument: SerializationRequirement>("
+//                     "argument: Argument"
+//                     ") throws\n");
+//    }
+//
+//    if (!decl.get...() && diagnose) {
+//      decl->diagnose(
+//          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+//          decl->getDescriptiveKind(), decl->getName(), C.Id_recordReturnType);
+//      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+//                     decl->getName(),
+//                     C.Id_recordReturnType,
+//                     "mutating func recordReturnType<R: SerializationRequirement>("
+//                     "mangledType: R.Type"
+//                     ") throws\n");
+//    }
+//    return true;
+  }
+
+  // ==== ----------------------------------------------------------------------
+  // Check the ad-hoc requirements of 'DistributedTargetInvocationArgumentDecoder'
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationArgumentDecoder)) {
+    // FIXME(distributed): implement finding this the requirements here
+
+//    if (diagnose) {
+//      decl->diagnose(
+//          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+//          decl->getDescriptiveKind(), decl->getName(), C.Id_remoteCall);
+//      decl->diagnose(
+//          diag::
+//              note_distributed_actor_system_conformance_missing_adhoc_requirement,
+//          decl->getName(), C.Id_remoteCall,
+//          "mutating func decodeNext<Argument: SerializationRequirement>(\n"
+//          "    into pointer: UnsafeMutablePointer<Argument>\n"
+//          ") throws\n");
+//    }
+//    return true;
+  }
+
+
+  // ==== ----------------------------------------------------------------------
+  // Check the ad-hoc requirements of 'DistributedTargetInvocationArgumentDecoder'
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler)) {
+    // FIXME(distributed): implement finding this the requirements here
+//
+//    return true;
+  }
+
+  return false;
+}
+
 /// Check whether the function is a proper distributed function
 ///
 /// \param diagnose Whether to emit a diagnostic when a problem is encountered.

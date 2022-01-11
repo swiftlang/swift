@@ -124,7 +124,7 @@ public protocol DistributedActorSystem: Sendable {
 //  func remoteCall<Act, Err, Res>(
 //      on actor: Act,
 //      target: RemoteCallTarget,
-//      arguments: Invocation,
+//      invocation: Invocation,
 //      throwing: Err.Type,
 //      returning: Res.Type
 //  ) async throws -> Res.Type
@@ -337,15 +337,6 @@ public protocol DistributedTargetInvocation {
 
   // === Sending / recording  -------------------------------------------------
 
-  // RECIPIENT:
-  // when we get the gen args; we can check them against the where clause
-  // and throw, rather than blow up... we have the ability to check the where clause
-  // the same code as implements `as?` takes generic signature and checks type arguments against that
-  //
-  // accessor is not generic, gets the subs passed in, forms SubsMap and uses to look up other things
-  // pass to call emission which would do the right thing...
-  /// Ad-hoc requirement
-  ///
   /// The arguments must be encoded order-preserving, and once `decodeGenericSubstitutions`
   /// is called, the substitutions must be returned in the same order in which they were recorded.
   mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws
@@ -357,6 +348,7 @@ public protocol DistributedTargetInvocation {
 
 //  /// Ad-hoc requirement
 //  ///
+//  /// Record the return type of the distributed method.
 //  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws
 
   mutating func recordErrorType<E: Error>(mangledType: E.Type) throws
@@ -416,7 +408,9 @@ public protocol DistributedTargetInvocationArgumentDecoder {
 
 @available(SwiftStdlib 5.6, *)
 public protocol DistributedTargetInvocationResultHandler {
-  // FIXME: these must be ad-hoc protocol requirements, because Res: SerializationRequirement !!!
+  associatedtype SerializationRequirement
+
+  // FIXME(distributed): these must be ad-hoc protocol requirements, because Res: SerializationRequirement !!!
   func onReturn<Res>(value: Res) async throws
   func onThrow<Err: Error>(error: Err) async throws
 }
