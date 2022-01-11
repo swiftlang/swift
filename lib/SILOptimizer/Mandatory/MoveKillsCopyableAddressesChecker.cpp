@@ -1160,9 +1160,9 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
       swift::getSpecializedLinkage(orig, orig->getLinkage()), clonedName,
       clonedTy, orig->getGenericEnvironment(), orig->getLocation(),
       orig->isBare(), orig->isTransparent(), serialized, IsNotDynamic,
-      IsNotDistributed, orig->getEntryCount(), orig->isThunk(),
-      orig->getClassSubclassScope(), orig->getInlineStrategy(),
-      orig->getEffectsKind(), orig, orig->getDebugScope());
+      orig->getEntryCount(), orig->isThunk(), orig->getClassSubclassScope(),
+      orig->getInlineStrategy(), orig->getEffectsKind(), orig,
+      orig->getDebugScope());
   for (auto &Attr : orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
