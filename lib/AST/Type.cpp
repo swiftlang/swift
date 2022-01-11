@@ -3215,11 +3215,6 @@ GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
     return Environment;
   }
 
-  // Opened archetypes lazily create their generic environment.
-  if (auto opened = dyn_cast<OpenedArchetypeType>(this)) {
-    return Environment = opened->createGenericEnvironment();
-  }
-
   // Nested archetypes get their environment from their root.
   if (auto nested = dyn_cast<NestedArchetypeType>(this)) {
     return Environment = nested->getRoot()->getGenericEnvironment();

@@ -5647,13 +5647,8 @@ class OpenedArchetypeType final : public ArchetypeType,
   friend TrailingObjects;
   friend ArchetypeType;
   
-  mutable GenericEnvironment *Environment = nullptr;
   TypeBase *Opened;
   UUID ID;
-
-  /// Create a generic environment with this opened type bound to its generic
-  /// parameter.
-  GenericEnvironment *createGenericEnvironment() const;
 
 public:
   /// Create a new archetype that represents the opened type

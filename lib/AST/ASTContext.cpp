@@ -4319,16 +4319,13 @@ CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
       GenericTypeParamType::get(/*type sequence*/ false,
                                 /*depth*/ 0, /*index*/ 0, ctx);
 
-  openedExistentialArchetypes[*knownID] = result;
-  return CanOpenedArchetypeType(result);
-}
+  auto signature = ctx.getOpenedArchetypeSignature(existential);
+  result->Environment = GenericEnvironment::forOpenedExistential(
+      signature, result);
 
-GenericEnvironment *OpenedArchetypeType::createGenericEnvironment() const {
-  auto thisType = const_cast<OpenedArchetypeType*>(this);
-  auto &ctx = thisType->getASTContext();
-  // Create a generic environment to represent the opened type.
-  auto signature = ctx.getOpenedArchetypeSignature(Opened);
-  return GenericEnvironment::forOpenedExistential(signature, thisType);
+  openedExistentialArchetypes[*knownID] = result;
+
+  return CanOpenedArchetypeType(result);
 }
 
 CanType OpenedArchetypeType::getAny(Type existential) {
