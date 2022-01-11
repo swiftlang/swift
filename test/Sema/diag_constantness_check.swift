@@ -424,3 +424,32 @@ func testCallsWithinClosures(s: String, x: Int) {
     constantArgumentFunction("string with a single interpolation \(x)")
   }
 }
+
+@resultBuilder
+struct MyArrayBuilder {
+    typealias Component = [Int]
+    typealias Expression = Int
+    static func buildExpression(_ element: Expression) -> Component {
+        return [element]
+    }
+    static func buildBlock(_ components: Component...) -> Component {
+        return Array(components.joined())
+    }
+}
+
+struct MyArray {
+    public init(@MyArrayBuilder arr: () -> [Int]) {}
+}
+
+func testResultBuilder(x: Int, y: Int) -> MyArray {
+    let _: MyArray = MyArray {
+        constantArgumentFunctionReturningInt(x)
+          // expected-error@-1 {{argument must be an integer literal}}
+        constantArgumentFunctionReturningInt(y)
+          // expected-error@-1 {{argument must be an integer literal}}
+    }
+    let _: MyArray = MyArray {
+        constantArgumentFunctionReturningInt(x)
+          // expected-error@-1 {{argument must be an integer literal}}
+    }
+}
