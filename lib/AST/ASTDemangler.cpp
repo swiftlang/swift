@@ -70,8 +70,9 @@ TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
   return getTypeDeclForMangling(ctx, mangling);
 }
 
-Type ASTBuilder::decodeMangledType(NodePointer node) {
-  return swift::Demangle::decodeMangledType(*this, node).getType();
+Type ASTBuilder::decodeMangledType(NodePointer node, bool forRequirement) {
+  return swift::Demangle::decodeMangledType(*this, node, forRequirement)
+      .getType();
 }
 
 TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
@@ -578,22 +579,19 @@ Type ASTBuilder::createImplFunctionType(
 Type ASTBuilder::createProtocolCompositionType(
     ArrayRef<ProtocolDecl *> protocols,
     Type superclass,
-    bool isClassBound) {
+    bool isClassBound,
+    bool forRequirement) {
   std::vector<Type> members;
   for (auto protocol : protocols)
     members.push_back(protocol->getDeclaredInterfaceType());
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
 
-  // FIXME: When explicit existential types are enabled, protocol
-  // compositions should be wrapped in ExistentialType based on
-  // context, similar to how protocol compositions are resolved
-  // during type resolution. For example, protocol compositions
-  // in parameter types should be wrapped in ExistentialType, but
-  // protocol compositions on the right side of a conformance
-  // requirement should not.
   Type composition = ProtocolCompositionType::get(Ctx, members, isClassBound);
-  return composition;
+  if (forRequirement)
+    return composition;
+
+  return ExistentialType::get(composition);
 }
 
 static MetatypeRepresentation
