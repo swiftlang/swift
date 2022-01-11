@@ -4734,14 +4734,29 @@ case TypeKind::Id:
   case TypeKind::SILBox: {
     bool changed = false;
     auto boxTy = cast<SILBoxType>(base);
-#ifndef NDEBUG
-    // This interface isn't suitable for updating the substitution map in a
-    // generic SILBox.
-    for (Type type : boxTy->getSubstitutions().getReplacementTypes()) {
-      assert(type->isEqual(type.transformRec(fn))
+
+    SmallVector<Type, 4> newReplacements;
+    auto subs = boxTy->getSubstitutions();
+    for (Type type : subs.getReplacementTypes()) {
+      auto transformed = type.transformRec(fn);
+      // This interface isn't suitable for updating the substitution map in a
+      // generic SILBox, with the exception of stripping off ExistentialType.
+      assert((type->isEqual(transformed) ||
+              type.findIf([](Type type) {
+                 return type->is<ExistentialType>();
+               }))
              && "SILBoxType substitutions can't be transformed");
+      newReplacements.push_back(transformed->getCanonicalType());
+      if (!type->isEqual(transformed))
+        changed = true;
     }
-#endif
+
+    if (changed) {
+      subs = SubstitutionMap::get(subs.getGenericSignature(),
+                                  newReplacements,
+                                  subs.getConformances());
+    }
+
     SmallVector<SILField, 4> newFields;
     auto *l = boxTy->getLayout();
     for (auto f : l->getFields()) {
@@ -4753,7 +4768,7 @@ case TypeKind::Id:
     boxTy = SILBoxType::get(Ptr->getASTContext(),
                             SILLayout::get(Ptr->getASTContext(),
                                            l->getGenericSignature(), newFields),
-                            boxTy->getSubstitutions());
+                            subs);
     return boxTy;
   }
   
