@@ -378,12 +378,12 @@ var x12: X {
   }
 }
 
-var x13: X {} // expected-error {{computed property must have accessors specified}}
+var x13: X {} // expected-error {{missing return in accessor expected to return 'X'}}
 
 struct X14 {}
 extension X14 {
   var x14: X {
-  } // expected-error {{computed property must have accessors specified}}
+  } // expected-error {{missing return in accessor expected to return 'X'}}
 }
 
 // Type checking problems
@@ -1339,4 +1339,13 @@ class SR_9267_C2 {
 class LazyPropInClass {
   lazy var foo: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
   // expected-note@-1 {{Remove '=' to make 'foo' a computed property}}{{21-23=}}{{3-8=}}
+}
+
+// SR-15657
+enum SR15657 {
+  var foo: Int {} // expected-error{{missing return in accessor expected to return 'Int'}}
+}
+
+enum SR15657_G<T> {
+  var foo: T {} // expected-error{{missing return in accessor expected to return 'T'}}
 }

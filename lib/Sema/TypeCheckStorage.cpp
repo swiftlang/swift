@@ -3326,6 +3326,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
 
+  auto *DC = storage->getDeclContext();
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {
@@ -3354,10 +3355,10 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readImpl = ReadImplKind::Stored;
     }
 
-  // Extensions can't have stored properties. If there are braces, assume
-  // this is an incomplete computed property. This avoids an "extensions
-  // must not contain stored properties" error later on.
-  } else if (isa<ExtensionDecl>(storage->getDeclContext()) &&
+  // Extensions and enums can't have stored properties. If there are braces,
+  // assume this is an incomplete computed property. This avoids an
+  // "extensions|enums must not contain stored properties" error later on.
+  } else if ((isa<ExtensionDecl>(DC) || isa<EnumDecl>(DC)) &&
              storage->getBracesRange().isValid()) {
     readImpl = ReadImplKind::Get;
 
