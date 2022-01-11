@@ -41,6 +41,16 @@ struct PassContext {
     return DeadEndBlocksAnalysis(bridged: bridgeDEA)
   }
 
+  var dominatorTree: DominatorTree {
+    let bridgedDT = PassContext_getDomTree(_bridged)
+    return DominatorTree(bridged: bridgedDT)
+  }
+
+  var postDominatorTree: PostDominatorTree {
+    let bridgedPDT = PassContext_getPostDomTree(_bridged)
+    return PostDominatorTree(bridged: bridgedPDT)
+  }
+
   func notifyInstructionsChanged() {
     PassContext_notifyChanges(_bridged, instructionsChanged)
   }

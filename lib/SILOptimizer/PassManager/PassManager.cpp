@@ -23,6 +23,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -1247,6 +1248,32 @@ PassContext_getDeadEndBlocksAnalysis(BridgedPassContext context) {
   SwiftPassInvocation *invocation = castToPassInvocation(context);
   SILPassManager *pm = invocation->getPassManager();
   return {pm->getAnalysis<DeadEndBlocksAnalysis>(invocation->getFunction())};
+}
+
+BridgedDomTree PassContext_getDomTree(BridgedPassContext context) {
+  SwiftPassInvocation *invocation = castToPassInvocation(context);
+  SILPassManager *pm = invocation->getPassManager();
+  return {pm->getAnalysis<DominanceAnalysis>(invocation->getFunction())};
+}
+
+SwiftInt DominatorTree_dominates(BridgedDomTree domTree,
+                                 BridgedBasicBlock dominating,
+                                 BridgedBasicBlock dominated) {
+  DominanceInfo *di = static_cast<DominanceInfo *>(domTree.dt);
+  return di->dominates(castToBasicBlock(dominating), castToBasicBlock(dominated)) ? 1 : 0;
+}
+
+BridgedPostDomTree PassContext_getPostDomTree(BridgedPassContext context) {
+  SwiftPassInvocation *invocation = castToPassInvocation(context);
+  SILPassManager *pm = invocation->getPassManager();
+  return {pm->getAnalysis<PostDominanceAnalysis>(invocation->getFunction())};
+}
+
+SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
+                                         BridgedBasicBlock dominating,
+                                         BridgedBasicBlock dominated) {
+  auto *pdi = static_cast<PostDominanceInfo *>(pdomTree.pdt);
+  return pdi->dominates(castToBasicBlock(dominating), castToBasicBlock(dominated)) ? 1 : 0;
 }
 
 BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context) {

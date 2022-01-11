@@ -44,6 +44,14 @@ typedef struct {
 } BridgedDeadEndBlocksAnalysis;
 
 typedef struct {
+  void * _Nullable dt;
+} BridgedDomTree;
+
+typedef struct {
+  void * _Nullable pdt;
+} BridgedPostDomTree;
+
+typedef struct {
   void * _Nonnull opaquePtr;
   unsigned char kind;
   unsigned char incomplete;
@@ -91,6 +99,18 @@ PassContext_getDeadEndBlocksAnalysis(BridgedPassContext context);
 
 SwiftInt DeadEndBlocksAnalysis_isDeadEnd(BridgedDeadEndBlocksAnalysis debAnalysis,
                                          BridgedBasicBlock);
+
+BridgedDomTree PassContext_getDomTree(BridgedPassContext context);
+
+SwiftInt DominatorTree_dominates(BridgedDomTree domTree,
+                                 BridgedBasicBlock dominating,
+                                 BridgedBasicBlock dominated);
+
+BridgedPostDomTree PassContext_getPostDomTree(BridgedPassContext context);
+
+SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
+                                         BridgedBasicBlock dominating,
+                                         BridgedBasicBlock dominated);
 
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
 BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab);
