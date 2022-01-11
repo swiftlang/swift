@@ -2144,6 +2144,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
   switch (I->getKind()) {
     case SILInstructionKind::AllocStackInst:
     case SILInstructionKind::AllocRefInst:
+    case SILInstructionKind::AllocRefDynamicInst:
     case SILInstructionKind::AllocBoxInst:
       ConGraph->getNode(cast<SingleValueInstruction>(I));
       return;

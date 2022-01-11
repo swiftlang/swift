@@ -828,10 +828,30 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
                                                llvm::Value *metadata,
                                                SILType selfType,
                                                bool objc,
+                                               int &StackAllocSize,
                                                TailArraysRef TailArrays) {
   // If we need to use Objective-C allocation, do so.
   if (objc) {
+    StackAllocSize = -1;
     return emitObjCAllocObjectCall(IGF, metadata, selfType);
+  }
+
+  llvm::Value *Promoted;
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                          /*forBackwardDeployment=*/false);
+
+  // If we are allowed to allocate on the stack we are allowed to use
+  // `selfType`'s size assumptions.
+  if (StackAllocSize >= 0 &&
+      (Promoted = stackPromote(IGF, classLayout, StackAllocSize,
+                                           TailArrays))) {
+    llvm::Value *val = IGF.Builder.CreateBitCast(Promoted,
+                                                 IGF.IGM.RefCountedPtrTy);
+    val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
+
+    llvm::Type *destType = classLayout.getType()->getPointerTo();
+    return IGF.Builder.CreateBitCast(val, destType);
   }
 
   // Otherwise, allocate using Swift's routines.
@@ -845,10 +865,8 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
 
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
-  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &layout = classTI.getClassLayout(IGF.IGM, selfType,
-                                        /*forBackwardDeployment=*/false);
-  llvm::Type *destType = layout.getType()->getPointerTo();
+  StackAllocSize = -1;
+  llvm::Type *destType = classLayout.getType()->getPointerTo();
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
