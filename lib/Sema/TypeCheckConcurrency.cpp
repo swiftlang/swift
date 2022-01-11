@@ -136,8 +136,13 @@ bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn) {
     if (isa<DestructorDecl>(fn))
       return true;
 
-    return requiresFlowIsolation(ActorIsolation::forActorInstance(nominal),
-                                 cast<ConstructorDecl>(fn));
+    // construct an isolation corresponding to the type.
+    auto actorTypeIso =
+      nominal->isDistributedActor()
+        ? ActorIsolation::forDistributedActorInstance(nominal)
+        : ActorIsolation::forActorInstance(nominal);
+
+    return requiresFlowIsolation(actorTypeIso, cast<ConstructorDecl>(fn));
   }
 
   // Otherwise, the type must be isolated to a global actor.
@@ -514,13 +519,12 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     }
 
     case ActorIsolation::Independent:
-      // While some synchronous, non-delegating actor inits are
-      // nonisolated, they need cross-actor restrictions (e.g., for Sendable).
+      // While some synchronous actor inits are not isolated they still need
+      // cross-actor restrictions (e.g., for Sendable) for safety.
       if (auto *ctor = dyn_cast<ConstructorDecl>(decl))
-        if (!ctor->isConvenienceInit())
-          if (auto *parent = ctor->getParent()->getSelfClassDecl())
-            if (parent->isAnyActor())
-              return forActorSelf(parent, /*isCrossActor=*/true);
+        if (auto *parent = ctor->getParent()->getSelfClassDecl())
+          if (parent->isAnyActor())
+            return forActorSelf(parent, /*isCrossActor=*/true);
 
       // `nonisolated let` members are cross-actor as well.
       if (auto var = dyn_cast<VarDecl>(decl)) {
@@ -3570,12 +3574,11 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // Every actor's convenience or synchronous init is
-  // assumed to be actor-independent.
+  // When no other isolation applies, an actor's non-async init is independent
   if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
     if (nominal->isAnyActor())
       if (auto ctor = dyn_cast<ConstructorDecl>(value))
-        if (ctor->isConvenienceInit() || !ctor->hasAsync())
+        if (!ctor->hasAsync())
           defaultIsolation = ActorIsolation::forIndependent();
 
   // Function used when returning an inferred isolation.

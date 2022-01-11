@@ -315,6 +315,17 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   return;
 }
 
+// FIXME: the callers of ctorHopsInjectedByDefiniteInit is not correct (rdar://87485045)
+// we must still set the SGF.ExpectedExecutor field to say that we must
+// hop to the executor after every apply in the constructor. This seems to
+// happen for the main actor isolated async inits, but not for the plain ones,
+// where 'self' is not going to directly be the instance. We have to extend the
+// ExecutorBreadcrumb class to detect whether it needs to do a load or not
+// in it's emit method.
+//
+// So, the big problem right now is that for a delegating async actor init,
+// after calling an async function, no hop-back is being emitted.
+
 /// Returns true if the given async constructor will have its
 /// required actor hops injected later by definite initialization.
 static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
