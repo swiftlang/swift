@@ -118,6 +118,7 @@ public:
     EmitSyntax,        ///< Parse and dump Syntax tree as JSON
     DumpAST,           ///< Parse, type-check, and dump AST
     PrintAST,          ///< Parse, type-check, and pretty-print AST
+    PrintASTDecl,      ///< Parse, type-check, and pretty-print AST declarations
 
     /// Parse and dump scope map.
     DumpScopeMaps,
