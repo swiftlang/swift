@@ -47,6 +47,9 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-NEXT: Rewrite loops: {
 // CHECK:      }
 // CHECK-NEXT: Property map: {
+// CHECK-NEXT:   [P1] => { conforms_to: [P1] }
+// CHECK-NEXT:   [P2] => { conforms_to: [P2] }
+// CHECK-NEXT:   [Q] => { conforms_to: [Q] }
 // CHECK-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Base<τ_0_0> with <[P1:A1]>] }
 // CHECK-NEXT:   [P2:A2] => { conforms_to: [Q] }
 // CHECK-NEXT:   [P2:X] => { layout: _NativeClass superclass: [superclass: Derived<τ_0_0> with <[P2:A2]>] }
