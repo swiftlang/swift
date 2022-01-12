@@ -129,13 +129,7 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
   const char * const msg = "Found unexpected null pointer value"
                     " while trying to cast value of type '%s' (%p)"
                     " to '%s' (%p)%s\n";
-  if (runtime::bincompat::unexpectedObjCNullWhileCastingIsFatal()) {
-    // By default, Swift 5.4 and later issue a fatal error.
-    swift::fatalError(/* flags = */ 0, msg,
-                      srcTypeName.c_str(), srcType,
-                      destTypeName.c_str(), destType,
-                      "");
-  } else {
+  if (runtime::bincompat::useLegacyPermissiveObjCNullSemanticsInCasting()) {
     // In backwards compatibility mode, this code will warn and return the null
     // reference anyway: If you examine the calls to the function, you'll see
     // that most callers fail the cast in that case, but a few casts (e.g., with
@@ -145,6 +139,12 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
                    srcTypeName.c_str(), srcType,
                    destTypeName.c_str(), destType,
                    ": Continuing with null object, but expect problems later.");
+  } else {
+    // By default, Swift 5.4 and later issue a fatal error.
+    swift::fatalError(/* flags = */ 0, msg,
+                      srcTypeName.c_str(), srcType,
+                      destTypeName.c_str(), destType,
+                      "");
   }
   return object;
 }
@@ -1092,7 +1092,7 @@ tryCastUnwrappingOptionalBoth(
     srcValue, /*emptyCases=*/1);
   auto sourceIsNil = (sourceEnumCase != 0);
   if (sourceIsNil) {
-    if (runtime::bincompat::useLegacyOptionalNilInjection()) {
+    if (runtime::bincompat::useLegacyOptionalNilInjectionInCasting()) {
       auto destInnerType = cast<EnumMetadata>(destType)->getGenericArgs()[0];
       // Set .none at the outer level
       destInnerType->vw_storeEnumTagSinglePayload(destLocation, 1, 1);
