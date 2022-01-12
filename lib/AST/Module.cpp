@@ -822,6 +822,17 @@ void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   Results.append(decls.begin(), decls.end());
 }
 
+void SourceFile::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
+  if (Imports.hasValue()) {
+    for (auto import : *Imports) {
+      if (import.options.contains(ImportFlags::Exported)) {
+        import.module.importedModule->getDisplayDecls(Results);
+      }
+    }
+  }
+  getTopLevelDecls(Results);
+}
+
 void ModuleDecl::getOperatorDecls(
     SmallVectorImpl<OperatorDecl *> &results) const {
   // For a parsed module, we can check the source cache on the module rather

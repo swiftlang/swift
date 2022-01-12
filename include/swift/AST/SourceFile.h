@@ -393,6 +393,8 @@ protected:
 public:
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
+  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
+
   virtual void
   getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;
 
