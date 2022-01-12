@@ -3703,10 +3703,12 @@ Type ArchetypeType::getNestedType(AssociatedTypeDecl *assocType) {
 }
 
 Type ArchetypeType::getNestedTypeByName(Identifier name) {
-  auto memberDecl = getGenericEnvironment()->getGenericSignature()
-      ->lookupNestedType(getInterfaceType(), name);
-  if (auto assocType = dyn_cast_or_null<AssociatedTypeDecl>(memberDecl)) {
-    return getNestedType(assocType);
+  Type interfaceType = getInterfaceType();
+  Type memberInterfaceType = DependentMemberType::get(interfaceType, name);
+  auto genericSig = getGenericEnvironment()->getGenericSignature();
+  if (genericSig->isValidTypeInContext(memberInterfaceType)) {
+    return getGenericEnvironment()->getOrCreateArchetypeFromInterfaceType(
+        memberInterfaceType);
   }
 
   return Type();
