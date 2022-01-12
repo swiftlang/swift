@@ -288,6 +288,10 @@ public:
 
   ~SourceFile();
 
+  bool hasImports() const {
+    return Imports.hasValue();
+  }
+
   /// Retrieve an immutable view of the source file's imports.
   ArrayRef<AttributedImport<ImportedModule>> getImports() const {
     return *Imports;
@@ -392,8 +396,6 @@ protected:
 
 public:
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
-
-  virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
   getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results) const override;
