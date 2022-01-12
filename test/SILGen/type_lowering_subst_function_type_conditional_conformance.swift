@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -requirement-machine=verify | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 enum E<T : P> {
   case a(T.X)

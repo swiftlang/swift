@@ -458,11 +458,6 @@ static llvm::cl::opt<bool>
                        llvm::cl::desc("Ignore [always_inline] attribute."),
                        llvm::cl::init(false));
 
-static llvm::cl::opt<std::string> EnableRequirementMachine(
-    "requirement-machine",
-    llvm::cl::desc("Control usage of experimental generics implementation: "
-                   "'on', 'off', or 'verify'."));
-
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   const SILOptions &opts = Module->getOptions();
@@ -581,23 +576,6 @@ int main(int argc, char **argv) {
 
   Invocation.getDiagnosticOptions().VerifyMode =
       VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
-
-  if (EnableRequirementMachine.size()) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(
-        EnableRequirementMachine)
-      .Case("off", RequirementMachineMode::Disabled)
-      .Case("on", RequirementMachineMode::Enabled)
-      .Case("verify", RequirementMachineMode::Verify)
-      .Default(None);
-
-    if (value)
-      Invocation.getLangOptions().EnableRequirementMachine = *value;
-    else {
-      fprintf(stderr, "Invalid value for -requirement-machine flag: %s\n",
-              EnableRequirementMachine.c_str());
-      exit(-1);
-    }
-  }
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
