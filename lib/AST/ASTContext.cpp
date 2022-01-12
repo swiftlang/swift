@@ -389,6 +389,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::FoldingSet<PackType> PackTypes;
+    llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    MetatypeType*> MetatypeTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
@@ -471,7 +472,6 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
-  llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
@@ -2960,20 +2960,25 @@ Type TupleTypeElt::getType() const {
 PackExpansionType *PackExpansionType::get(Type patternTy) {
   assert(patternTy && "Missing pattern type in expansion");
 
+  auto properties = patternTy->getRecursiveProperties();
+  auto arena = getArena(properties);
+
   auto &context = patternTy->getASTContext();
   llvm::FoldingSetNodeID id;
   PackExpansionType::Profile(id, patternTy);
 
   void *insertPos;
   if (PackExpansionType *expType =
-          context.getImpl().PackExpansionTypes.FindNodeOrInsertPos(id,
-                                                                   insertPos))
+          context.getImpl()
+              .getArena(arena)
+              .PackExpansionTypes.FindNodeOrInsertPos(id, insertPos))
     return expType;
 
   const ASTContext *canCtx = patternTy->isCanonical() ? &context : nullptr;
   PackExpansionType *expansionTy = new (context, AllocationArena::Permanent)
       PackExpansionType(patternTy, canCtx);
-  context.getImpl().PackExpansionTypes.InsertNode(expansionTy, insertPos);
+  context.getImpl().getArena(arena).PackExpansionTypes.InsertNode(expansionTy,
+                                                                  insertPos);
   return expansionTy;
 }
 
