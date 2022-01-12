@@ -1003,6 +1003,7 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
+    // Add the identity conformance rule [P].[P] => [P].
     MutableTerm lhs;
     lhs.add(Symbol::forProtocol(proto, Context));
     lhs.add(Symbol::forProtocol(proto, Context));

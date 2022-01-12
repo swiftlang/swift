@@ -117,7 +117,7 @@ public:
     return Superclass.hasValue();
   }
 
-  Type getSuperclassBound() const {
+  CanType getSuperclassBound() const {
     return Superclass->getSuperclass();
   }
 
@@ -130,7 +130,7 @@ public:
     return ConcreteType.hasValue();
   }
 
-  Type getConcreteType() const {
+  CanType getConcreteType() const {
     return ConcreteType->getConcreteType();
   }
 
@@ -164,9 +164,6 @@ class PropertyMap {
   RewriteSystem &System;
   std::vector<PropertyBag *> Entries;
   Trie<PropertyBag *, MatchKind::Longest> Trie;
-
-  using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
-  llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
 
   // Building the property map introduces new induced rules, which
   // runs another round of Knuth-Bendix completion, which rebuilds the
@@ -235,7 +232,6 @@ private:
   void checkConcreteTypeRequirements(
                    SmallVectorImpl<InducedRule> &inducedRules);
 
-  void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(
                    SmallVectorImpl<InducedRule> &inducedRules);
 
