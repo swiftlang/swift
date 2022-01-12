@@ -356,7 +356,7 @@ DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
 
 void DeclAttributes::dump(const Decl *D) const {
   StreamPrinter P(llvm::errs());
-  PrintOptions PO = PrintOptions::printEverything();
+  PrintOptions PO = PrintOptions::printDeclarations();
   print(P, PO, D);
 }
 

@@ -764,14 +764,21 @@ tryCastToAnyHashable(
   assert(cast<StructMetadata>(destType)->Description
          == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
 
+  const HashableWitnessTable *hashableConformance = nullptr;
+  
   switch (srcType->getKind()) {
   case MetadataKind::ForeignClass: // CF -> String
   case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
 #if SWIFT_OBJC_INTEROP
-    // TODO: Implement a fast path for NSString->AnyHashable casts.
-    // These are incredibly common because an NSDictionary with
-    // NSString keys is bridged by default to [AnyHashable:Any].
-    // Until this is implemented, fall through to the general case
+    auto cls = srcType;
+    auto nsString = getNSStringMetadata();
+    do {
+      if (cls == nsString) {
+        hashableConformance = getNSStringHashableConformance();
+        break;
+      }
+      cls = _swift_class_getSuperclass(cls);
+    } while (cls != nullptr);
     break;
 #else
     // If no Obj-C interop, just fall through to the general case.
@@ -805,8 +812,11 @@ tryCastToAnyHashable(
 
 
   // General case: If it conforms to Hashable, we cast it
-  auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-    swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
+  if (hashableConformance == nullptr) {
+    hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
+      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor)
+    );
+  }
   if (hashableConformance) {
     _swift_convertToAnyHashableIndirect(srcValue, destLocation,
                                         srcType, hashableConformance);

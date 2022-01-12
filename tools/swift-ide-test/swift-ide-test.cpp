@@ -527,6 +527,12 @@ FunctionDefinitions("function-definitions",
                     llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
+Expressions("expressions",
+            llvm::cl::desc("Print expressions"),
+            llvm::cl::cat(Category),
+            llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 AbstractAccessors("abstract-accessors",
                   llvm::cl::desc("Hide the concrete accessors used to "
                                  "implement a property or subscript"),
@@ -2595,7 +2601,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
   int ExitCode = 0;
 
-  PrintOptions Options = PrintOptions::printEverything();
+  PrintOptions Options = PrintOptions::printDeclarations();
 
   for (StringRef ModuleName : ModulesToPrint) {
     auto *M = getModuleByFullName(Context, ModuleName);
@@ -2687,7 +2693,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
       llvm::outs() << remangled << "\n";
 
-      auto Options = PrintOptions::printEverything();
+      auto Options = PrintOptions::printDeclarations();
       Options.PrintAccess = false;
       LTD->print(llvm::outs(), Options);
       llvm::outs() << "\n";
@@ -3234,7 +3240,7 @@ static int doPrintTypes(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
-  PrintOptions Options = PrintOptions::printEverything();
+  PrintOptions Options = PrintOptions::printDeclarations();
   Options.FullyQualifiedTypes = FullyQualifiedTypes;
   ASTTypePrinter Printer(CI.getSourceMgr(), Options);
 
@@ -4379,6 +4385,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;
     PrintOpts.AbstractAccessors = options::AbstractAccessors;
     PrintOpts.FunctionDefinitions = options::FunctionDefinitions;
+    PrintOpts.PrintExprs = options::Expressions;
     PrintOpts.PreferTypeRepr = options::PreferTypeRepr;
     PrintOpts.ExplodePatternBindingDecls = options::ExplodePatternBindingDecls;
     PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;

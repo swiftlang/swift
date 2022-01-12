@@ -917,12 +917,26 @@ bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return true;
 
   if (memInstMustInitialize(op)) {
+    if (stripAccessMarkers(op->get()) != useState.address) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "!!! Error! Found init use not on base address: "
+                 << *op->getUser());
+      return false;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "ClosureUse: Found init: " << *op->getUser());
     useState.inits.insert(op->getUser());
     return true;
   }
 
   if (memInstMustReinitialize(op)) {
+    if (stripAccessMarkers(op->get()) != useState.address) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "!!! Error! Found reinit use not on base address: "
+                 << *op->getUser());
+      return false;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "ClosureUse: Found reinit: " << *op->getUser());
     useState.insertReinit(op->getUser());
     return true;
@@ -1279,12 +1293,26 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
   }
 
   if (memInstMustInitialize(op)) {
+    if (stripAccessMarkers(op->get()) != useState.address) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "!!! Error! Found init use not on base address: "
+                 << *op->getUser());
+      return false;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "Found init: " << *op->getUser());
     useState.inits.insert(op->getUser());
     return true;
   }
 
   if (memInstMustReinitialize(op)) {
+    if (stripAccessMarkers(op->get()) != useState.address) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "!!! Error! Found reinit use not on base address: "
+                 << *op->getUser());
+      return false;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *op->getUser());
     useState.insertReinit(op->getUser());
     return true;
@@ -1308,6 +1336,14 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
   // are going to try and extend move checking into the partial apply using
   // cloning to eliminate destroys or reinits.
   if (auto fas = FullApplySite::isa(op->getUser())) {
+    if (stripAccessMarkers(op->get()) != useState.address) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "!!! Error! Found consuming closure use not on base address: "
+          << *op->getUser());
+      return false;
+    }
+
     if (fas.getArgumentOperandConvention(*op) ==
         SILArgumentConvention::Indirect_InoutAliasable) {
       // If we don't find the function, we can't handle this, so bail.

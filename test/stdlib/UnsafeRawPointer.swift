@@ -201,6 +201,7 @@ func checkPtr(
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:") {
   let check = checkPtr(UnsafeMutableRawPointer.initializeMemory(as:from:count:))
   check(Check.Disjoint)

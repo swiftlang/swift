@@ -525,6 +525,9 @@ public:
     return reinterpret_cast<Job*>(Value);
   }
 
+  /// Get the Job pointer with no preconditions on its type, for tracing.
+  Job *getRawJob() const { return reinterpret_cast<Job *>(Value & JobMask); }
+
   bool operator==(JobRef other) const {
     return Value == other.Value;
   }
@@ -687,6 +690,7 @@ public:
     flags.setIsDistributedRemote(isDistributedRemote);
     new (&CurrentState) swift::atomic<State>(State{JobRef(), flags});
     JobStorageHeapObject.metadata = nullptr;
+    concurrency::trace::actor_create(this);
   }
 
   /// Properly destruct an actor, except for the heap header.
@@ -768,8 +772,10 @@ void DefaultActorImpl::destroy() {
     newState.Flags.setStatus(Status::Zombie_Latching);
     if (CurrentState.compare_exchange_weak(oldState, newState,
                                            std::memory_order_relaxed,
-                                           std::memory_order_relaxed))
+                                           std::memory_order_relaxed)) {
+      concurrency::trace::actor_destroy(this);
       return;
+    }
   }
 }
 
@@ -795,6 +801,8 @@ void DefaultActorImpl::deallocate() {
 }
 
 void DefaultActorImpl::deallocateUnconditional() {
+  concurrency::trace::actor_deallocate(this);
+
   if (JobStorageHeapObject.metadata != nullptr)
     JobStorage.~ProcessInlineJob();
   auto metadata = cast<ClassMetadata>(this->metadata);
@@ -926,12 +934,19 @@ static Job *preprocessQueue(JobRef first,
   return firstNewJob;
 }
 
+static void traceJobQueue(DefaultActorImpl *actor, Job *first) {
+  concurrency::trace::actor_note_job_queue(actor, first, [](Job *job) {
+    return getNextJobInQueue(job).getAsPreprocessedJob();
+  });
+}
+
 void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
   SWIFT_TASK_DEBUG_LOG("giving up thread for actor %p", this);
   auto oldState = CurrentState.load(std::memory_order_acquire);
   assert(oldState.Flags.isAnyRunningStatus());
 
   auto firstNewJob = preprocessQueue(oldState.FirstJob, JobRef(), nullptr);
+  traceJobQueue(this, firstNewJob);
 
   _swift_tsan_release(this);
   while (true) {
@@ -978,16 +993,23 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
       firstNewJob = preprocessQueue(oldState.FirstJob,
                                     firstPreprocessed,
                                     firstNewJob);
+      traceJobQueue(this, firstNewJob);
 
       // Try again.
       continue;
     }
 
-#define LOG_STATE_TRANSITION                                                   \
-  SWIFT_TASK_DEBUG_LOG("actor %p transitioned from %zx to %zx (%s)\n", this,   \
-                       oldState.Flags.getOpaqueValue(),                        \
-                       newState.Flags.getOpaqueValue(), __FUNCTION__)
-    LOG_STATE_TRANSITION;
+#define ACTOR_STATE_TRANSITION                                                 \
+  do {                                                                         \
+    SWIFT_TASK_DEBUG_LOG("actor %p transitioned from %zx to %zx (%s)\n", this, \
+                         oldState.Flags.getOpaqueValue(),                      \
+                         newState.Flags.getOpaqueValue(), __FUNCTION__);       \
+    concurrency::trace::actor_state_changed(                                   \
+        this, newState.FirstJob.getRawJob(),                                   \
+        newState.FirstJob.needsPreprocessing(),                                \
+        newState.Flags.getOpaqueValue());                                      \
+  } while (0)
+    ACTOR_STATE_TRANSITION;
 
     // The priority of the remaining work.
     auto newPriority = newState.Flags.getMaxPriority();
@@ -1040,7 +1062,8 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
         auto success = CurrentState.compare_exchange_weak(oldState, newState,
                             /*success*/ std::memory_order_relaxed,
                             /*failure*/ std::memory_order_acquire);
-        if (success) LOG_STATE_TRANSITION;
+        if (success)
+          ACTOR_STATE_TRANSITION;
         return success;
       };
 
@@ -1082,7 +1105,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
                               /*success*/ std::memory_order_relaxed,
                               /*failure*/ std::memory_order_acquire))
         continue;
-      LOG_STATE_TRANSITION;
+      ACTOR_STATE_TRANSITION;
       _swift_tsan_acquire(this);
 
       // If that succeeded, we can proceed to the main body.
@@ -1100,6 +1123,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
   // Okay, now it's safe to look at queue state.
   // Preprocess any queue items at the front of the queue.
   auto newFirstJob = preprocessQueue(oldState.FirstJob, JobRef(), nullptr);
+  traceJobQueue(this, newFirstJob);
 
   _swift_tsan_release(this);
   while (true) {
@@ -1144,11 +1168,12 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
       newFirstJob = preprocessQueue(oldState.FirstJob,
                                     firstPreprocessed,
                                     newFirstJob);
+      traceJobQueue(this, newFirstJob);
 
       // Loop to retry updating the state.
       continue;
     }
-    LOG_STATE_TRANSITION;
+    ACTOR_STATE_TRANSITION;
 
     // We successfully updated the state.
 
@@ -1180,10 +1205,12 @@ static void swift_job_runImpl(Job *job, ExecutorRef executor) {
   if (!executor.isGeneric()) trackingInfo.disallowSwitching();
 
   trackingInfo.enterAndShadow(executor);
+  auto traceHandle = concurrency::trace::job_run_begin(job, &executor);
 
   SWIFT_TASK_DEBUG_LOG("%s(%p)", __func__, job);
   runJobInEstablishedExecutorContext(job);
 
+  concurrency::trace::job_run_end(job, &executor, traceHandle);
   trackingInfo.leave();
 
   // Give up the current executor if this is a switching context
@@ -1237,6 +1264,7 @@ static void processDefaultActor(DefaultActorImpl *currentActor,
 
     SWIFT_TASK_DEBUG_LOG("processDefaultActor %p claimed job %p", currentActor,
                          job);
+    concurrency::trace::actor_dequeue(currentActor, job);
 
     // If we failed to claim a job, we have nothing to do.
     if (!job) {
@@ -1351,7 +1379,8 @@ void DefaultActorImpl::enqueue(Job *job) {
           /*success*/ std::memory_order_release,
           /*failure*/ std::memory_order_relaxed))
       continue;
-    LOG_STATE_TRANSITION;
+    ACTOR_STATE_TRANSITION;
+    concurrency::trace::actor_enqueue(this, job);
 
     // Okay, we successfully updated the status.  Schedule a job to
     // process the actor if necessary.
@@ -1381,7 +1410,7 @@ bool DefaultActorImpl::tryAssumeThread(RunningJobInfo runner) {
     if (CurrentState.compare_exchange_weak(oldState, newState,
                               /*success*/ std::memory_order_relaxed,
                               /*failure*/ std::memory_order_acquire)) {
-      LOG_STATE_TRANSITION;
+      ACTOR_STATE_TRANSITION;
       _swift_tsan_acquire(this);
       return true;
     }
@@ -1687,7 +1716,12 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
 ///    argumentBuffer: Builtin.RawPointer,
 ///    resultBuffer: Builtin.RawPointer) async throws
 using TargetExecutorSignature =
-    AsyncSignature<void(DefaultActor *, const char *, size_t, void *, void *),
+    AsyncSignature<void(/*on=*/DefaultActor *,
+                        /*targetName=*/const char *, /*targetNameSize=*/size_t,
+                        /*argumentBuffer=*/void *,
+                        /*resultBuffer=*/void *,
+                        /*resumeFunc=*/TaskContinuationFunction *,
+                        /*callContext=*/AsyncContext *),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -1716,7 +1750,9 @@ static void ::swift_distributed_execute_target_resume(
       reinterpret_cast<TargetExecutorSignature::ContinuationType *>(
           parentCtx->ResumeParent);
   swift_task_dealloc(context);
-  return resumeInParent(parentCtx, error);
+  // See `swift_distributed_execute_target` - `parentCtx` in this case
+  // is `callContext` which should be completely transparent on resume.
+  return resumeInParent(parentCtx->Parent, error);
 }
 
 SWIFT_CC(swiftasync)
@@ -1725,7 +1761,9 @@ void ::swift_distributed_execute_target(
     DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,
     void *argumentBuffer,
-    void *resultBuffer) {
+    void *resultBuffer,
+    TaskContinuationFunction *resumeFunc,
+    AsyncContext *callContext) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     assert(false && "no distributed accessor accessor");
@@ -1743,7 +1781,17 @@ void ::swift_distributed_execute_target(
   AsyncContext *calleeContext = reinterpret_cast<AsyncContext *>(
       swift_task_alloc(asyncFnPtr->ExpectedContextSize));
 
-  calleeContext->Parent = callerContext;
+  // TODO(concurrency): Special functions like this one are currently set-up
+  // to pass "caller" context and resume function as extra parameters due to
+  // how they are declared in C. But this particular function behaves exactly
+  // like a regular `async throws`, which means that we need to initialize
+  // intermediate `callContext` using parent `callerContext`. A better fix for
+  // this situation would be to adjust IRGen and handle function like this
+  // like regular `async` functions even though they are classified as special.
+  callContext->Parent = callerContext;
+  callContext->ResumeParent = resumeFunc;
+
+  calleeContext->Parent = callContext;
   calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       swift_distributed_execute_target_resume);
 

@@ -959,6 +959,7 @@ mirrors.test("Addressing") {
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 mirrors.test("Invalid Path Type")
   .skip(.custom(
     { _isFastAssertConfiguration() },

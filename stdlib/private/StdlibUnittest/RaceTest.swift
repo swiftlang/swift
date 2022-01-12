@@ -339,7 +339,7 @@ public func evaluateObservationsAllEqual<T : Equatable>(_ observations: [T])
   return .pass
 }
 
-// Notes: WebAssembly/WASI doesn't support multi thread yet
+// WebAssembly/WASI doesn't support multi-threading yet
 #if os(WASI)
 public func runRaceTest<RT : RaceTestWithPerTrialData>(
   _: RT.Type,
@@ -790,4 +790,4 @@ public func runRaceTest(
     timeoutInSeconds: timeoutInSeconds, threads: threads)
 }
 
-#endif
+#endif // os(WASI)

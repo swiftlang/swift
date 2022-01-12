@@ -85,6 +85,8 @@ void (*swift::swift_task_enqueueMainExecutor_hook)(
 void swift::swift_task_enqueueGlobal(Job *job) {
   _swift_tsan_release(job);
 
+  concurrency::trace::job_enqueue_global(job);
+
   if (swift_task_enqueueGlobal_hook)
     swift_task_enqueueGlobal_hook(job, swift_task_enqueueGlobalImpl);
   else
@@ -92,6 +94,8 @@ void swift::swift_task_enqueueGlobal(Job *job) {
 }
 
 void swift::swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job) {
+  concurrency::trace::job_enqueue_global_with_delay(delay, job);
+
   if (swift_task_enqueueGlobalWithDelay_hook)
     swift_task_enqueueGlobalWithDelay_hook(
         delay, job, swift_task_enqueueGlobalWithDelayImpl);
@@ -100,6 +104,7 @@ void swift::swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job) {
 }
 
 void swift::swift_task_enqueueMainExecutor(Job *job) {
+  concurrency::trace::job_enqueue_main_executor(job);
   if (swift_task_enqueueMainExecutor_hook)
     swift_task_enqueueMainExecutor_hook(job,
                                         swift_task_enqueueMainExecutorImpl);

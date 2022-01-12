@@ -306,6 +306,7 @@ func checkPtr(
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 UnsafeMutablePointerTestSuite.test("moveAssign:from:") {
   let check = checkPtr(UnsafeMutablePointer.moveAssign, true)
   check(Check.Disjoint)
@@ -341,6 +342,7 @@ UnsafeMutablePointerTestSuite.test("moveInitialize:from:") {
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 UnsafeMutablePointerTestSuite.test("initialize:from:") {
   let check = checkPtr(UnsafeMutablePointer.initialize(from:count:), false)
   check(Check.Disjoint)

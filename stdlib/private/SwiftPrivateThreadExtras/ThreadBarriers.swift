@@ -39,7 +39,7 @@ public struct _stdlib_thread_barrier_t {
   var mutex: UnsafeMutablePointer<pthread_mutex_t?>?
   var cond: UnsafeMutablePointer<pthread_cond_t?>?
 #elseif os(WASI)
-  // No pthread for WASI
+  // pthread is currently not available on WASI
 #else
   var mutex: UnsafeMutablePointer<pthread_mutex_t>?
   var cond: UnsafeMutablePointer<pthread_cond_t>?
@@ -72,7 +72,7 @@ public func _stdlib_thread_barrier_init(
   barrier.pointee.cond = UnsafeMutablePointer.allocate(capacity: 1)
   InitializeConditionVariable(barrier.pointee.cond!)
 #elseif os(WASI)
-  // WASI environment has a only single thread
+  // WASI environment has only a single thread
 #else
   barrier.pointee.mutex = UnsafeMutablePointer.allocate(capacity: 1)
   barrier.pointee.cond = UnsafeMutablePointer.allocate(capacity: 1)
@@ -108,7 +108,7 @@ public func _stdlib_thread_barrier_destroy(
   // Condition Variables do not need to be explicitly destroyed
   // Mutexes do not need to be explicitly destroyed
 #elseif os(WASI)
-  // WASI environment has a only single thread
+  // WASI environment has only a single thread
 #else
   guard pthread_cond_destroy(barrier.pointee.cond!) == 0 &&
     pthread_mutex_destroy(barrier.pointee.mutex!) == 0 else {
@@ -133,7 +133,7 @@ public func _stdlib_thread_barrier_wait(
 #if os(Windows)
   AcquireSRWLockExclusive(barrier.pointee.mutex!)
 #elseif os(WASI)
-  // WASI environment has a only single thread
+  // WASI environment has only a single thread
 #else
   if pthread_mutex_lock(barrier.pointee.mutex!) != 0 {
     return -1

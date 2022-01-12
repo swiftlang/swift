@@ -431,6 +431,7 @@ keyPath.test("optional force-unwrapping") {
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 keyPath.test("optional force-unwrapping trap") {
   let origin_x = \TestOptional.origin!.x
   var value = TestOptional(origin: nil)

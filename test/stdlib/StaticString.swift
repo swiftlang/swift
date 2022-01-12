@@ -74,6 +74,7 @@ StaticStringTestSuite.test("PointerRepresentation/NonASCII") {
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 StaticStringTestSuite.test("PointerRepresentation/unicodeScalar")
   .skip(.custom(
     { _isFastAssertConfiguration() },
@@ -126,6 +127,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/NonASCII") {
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
   .skip(.custom(
     { _isFastAssertConfiguration() },

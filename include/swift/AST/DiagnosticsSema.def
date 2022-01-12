@@ -1108,7 +1108,7 @@ WARNING(conditional_downcast_same_type,none,
         "bridging conversion; did you mean to use 'as'?}2",
         (Type, Type, unsigned))
 WARNING(is_expr_same_type,none,
-        "checking a value with optional type %0 against dynamic type %1 "
+        "checking a value with optional type %0 against type %1 "
         "succeeds whenever the value is non-nil; did you mean to use "
         "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,

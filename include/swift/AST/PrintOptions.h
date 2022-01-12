@@ -128,6 +128,9 @@ struct PrintOptions {
   /// Whether to print function definitions.
   bool FunctionDefinitions = false;
 
+  /// Whether to print expressions.
+  bool PrintExprs = false;
+  
   /// Whether to print '{ get set }' on readwrite computed properties.
   bool PrintGetSetOnRWProperties = true;
 
@@ -644,6 +647,13 @@ struct PrintOptions {
   ///
   /// This is only intended for debug output.
   static PrintOptions printEverything() {
+    PrintOptions result = printDeclarations();
+    result.FunctionDefinitions = true;
+    result.PrintExprs = true;
+    return result;
+  }
+
+  static PrintOptions printDeclarations() {
     PrintOptions result = printVerbose();
     result.ExcludeAttrList.clear();
     result.ExcludeAttrList.push_back(DAK_FixedLayout);
