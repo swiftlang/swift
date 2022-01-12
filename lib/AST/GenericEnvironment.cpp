@@ -307,7 +307,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
                                          requirements.layout, this);
     getOrCreateNestedTypeStorage()[nestedDependentMemberType] = result;
   } else if (genericParam->isTypeSequence()) {
-    result = SequenceArchetypeType::get(ctx, this, genericParam,
+    result = SequenceArchetypeType::get(ctx, this, requirements.anchor,
                                         requirements.protos, superclass,
                                         requirements.layout);
     addMapping(genericParam, result);
@@ -315,13 +315,13 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     switch (getKind()) {
     case Kind::Normal:
     case Kind::OpenedExistential:
-      result = PrimaryArchetypeType::getNew(ctx, this, genericParam,
+      result = PrimaryArchetypeType::getNew(ctx, this, requirements.anchor,
                                             requirements.protos, superclass,
                                             requirements.layout);
       break;
 
     case Kind::Opaque:
-      result = OpaqueTypeArchetypeType::getNew(this, genericParam,
+      result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
                                                requirements.protos, superclass,
                                                requirements.layout);
       break;

@@ -3625,7 +3625,7 @@ CanNestedArchetypeType NestedArchetypeType::getNew(
 CanPrimaryArchetypeType
 PrimaryArchetypeType::getNew(const ASTContext &Ctx,
                       GenericEnvironment *GenericEnv,
-                      GenericTypeParamType *InterfaceType,
+                      Type InterfaceType,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass,
                       LayoutConstraint Layout) {
@@ -3648,7 +3648,7 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
 CanSequenceArchetypeType
 SequenceArchetypeType::get(const ASTContext &Ctx,
                            GenericEnvironment *GenericEnv,
-                           GenericTypeParamType *InterfaceType,
+                           Type InterfaceType,
                            SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                            Type Superclass, LayoutConstraint Layout) {
   assert(!Superclass || Superclass->getClassOrBoundGenericClass());

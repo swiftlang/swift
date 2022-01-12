@@ -5923,8 +5923,20 @@ public:
     printArchetypeCommon(T, T->getAssocType());
   }
 
+  static AbstractTypeParamDecl *getAbstractTypeParamDecl(ArchetypeType *T) {
+    if (auto gp = T->getInterfaceType()->getAs<GenericTypeParamType>()) {
+      return gp->getDecl();
+    }
+
+    auto depMemTy = T->getInterfaceType()->castTo<DependentMemberType>();
+    return depMemTy->getAssocType();
+  }
+
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
-    printArchetypeCommon(T, T->getInterfaceType()->getDecl());
+    if (auto parent = T->getParent())
+      visitParentType(parent);
+
+    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
@@ -5996,7 +6008,9 @@ public:
   }
 
   void visitSequenceArchetypeType(SequenceArchetypeType *T) {
-    printArchetypeCommon(T, T->getInterfaceType()->getDecl());
+    if (auto parent = T->getParent())
+      visitParentType(parent);
+    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {

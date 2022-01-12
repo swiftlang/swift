@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 657; // opaque interface type
+const uint16_t SWIFTMODULE_VERSION_MINOR = 658; // primary archetype interface type
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1072,8 +1072,7 @@ namespace decls_block {
   using PrimaryArchetypeTypeLayout = BCRecordLayout<
     PRIMARY_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
-    BCVBR<4>, // generic type parameter depth
-    BCVBR<4>  // index + 1, or zero if we have a generic type parameter decl
+    TypeIDField              // interface type
   >;
 
   using OpenedArchetypeTypeLayout = BCRecordLayout<
@@ -1097,9 +1096,7 @@ namespace decls_block {
   using SequenceArchetypeTypeLayout = BCRecordLayout<
     SEQUENCE_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
-    BCVBR<4>,                // generic type parameter depth
-    BCVBR<4> // index + 1, or zero if we have a generic type
-             // parameter decl
+    TypeIDField              // interface type
   >;
 
   using DynamicSelfTypeLayout = BCRecordLayout<

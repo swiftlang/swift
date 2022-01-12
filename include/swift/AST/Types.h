@@ -5512,14 +5512,10 @@ public:
   static CanTypeWrapper<PrimaryArchetypeType>
                         getNew(const ASTContext &Ctx,
                                GenericEnvironment *GenericEnv,
-                               GenericTypeParamType *InterfaceType,
+                               Type InterfaceType,
                                SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                                Type Superclass, LayoutConstraint Layout);
 
-  GenericTypeParamType *getInterfaceType() const {
-    return cast<GenericTypeParamType>(InterfaceType.getPointer());
-  }
-      
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PrimaryArchetype;
   }
@@ -5743,13 +5739,9 @@ public:
   /// by this routine.
   static CanTypeWrapper<SequenceArchetypeType>
   get(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
-      GenericTypeParamType *InterfaceType,
+      Type InterfaceType,
       SmallVectorImpl<ProtocolDecl *> &ConformsTo, Type Superclass,
       LayoutConstraint Layout);
-
-  GenericTypeParamType *getInterfaceType() const {
-    return cast<GenericTypeParamType>(InterfaceType.getPointer());
-  }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SequenceArchetype;

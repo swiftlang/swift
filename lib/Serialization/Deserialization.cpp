@@ -5480,19 +5480,21 @@ public:
   Expected<Type> deserializePrimaryArchetypeType(ArrayRef<uint64_t> scratch,
                                                  StringRef blobData) {
     GenericSignatureID sigID;
-    unsigned depth, index;
+    TypeID interfaceTypeID;
 
     decls_block::PrimaryArchetypeTypeLayout::readRecord(scratch, sigID,
-                                                        depth, index);
+                                                        interfaceTypeID);
 
-    auto sig = MF.getGenericSignature(sigID);
-    if (!sig)
-      MF.fatal();
+    auto sigOrError = MF.getGenericSignatureChecked(sigID);
+    if (!sigOrError)
+      return sigOrError.takeError();
 
-    Type interfaceType =
-        GenericTypeParamType::get(/*type sequence*/ false, depth, index, ctx);
-    Type contextType = sig.getGenericEnvironment()
-        ->mapTypeIntoContext(interfaceType);
+    auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTypeOrError)
+      return interfaceTypeOrError.takeError();
+
+    Type contextType = sigOrError.get().getGenericEnvironment()
+        ->mapTypeIntoContext(interfaceTypeOrError.get());
 
     if (contextType->hasError())
       MF.fatal();
@@ -5549,17 +5551,16 @@ public:
   Expected<Type> deserializeSequenceArchetypeType(ArrayRef<uint64_t> scratch,
                                                   StringRef blobData) {
     GenericSignatureID sigID;
-    unsigned depth, index;
+    TypeID interfaceTypeID;
 
-    decls_block::SequenceArchetypeTypeLayout::readRecord(scratch, sigID, depth,
-                                                         index);
+    decls_block::SequenceArchetypeTypeLayout::readRecord(scratch, sigID,
+                                                         interfaceTypeID);
 
     auto sig = MF.getGenericSignature(sigID);
     if (!sig)
       MF.fatal();
 
-    Type interfaceType =
-        GenericTypeParamType::get(/*type sequence*/ true, depth, index, ctx);
+    Type interfaceType = MF.getType(interfaceTypeID);
     Type contextType =
         sig.getGenericEnvironment()->mapTypeIntoContext(interfaceType);
 

@@ -4462,14 +4462,11 @@ public:
     auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
 
     GenericSignatureID sigID = S.addGenericSignatureRef(sig);
-    auto interfaceType = archetypeTy->getInterfaceType()
-      ->castTo<GenericTypeParamType>();
+    TypeID interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[PrimaryArchetypeTypeLayout::Code];
     PrimaryArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                           sigID,
-                                           interfaceType->getDepth(),
-                                           interfaceType->getIndex());
+                                           sigID, interfaceTypeID);
   }
 
   void visitOpenedArchetypeType(const OpenedArchetypeType *archetypeTy) {
@@ -4503,13 +4500,11 @@ public:
     auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
 
     GenericSignatureID sigID = S.addGenericSignatureRef(sig);
-    auto interfaceType =
-        archetypeTy->getInterfaceType()->castTo<GenericTypeParamType>();
+    TypeID interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SequenceArchetypeTypeLayout::Code];
     SequenceArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                            sigID, interfaceType->getDepth(),
-                                            interfaceType->getIndex());
+                                            sigID, interfaceTypeID);
   }
 
   void visitGenericTypeParamType(const GenericTypeParamType *genericParam) {
