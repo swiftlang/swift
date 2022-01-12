@@ -83,7 +83,7 @@ public:
 /// Wait for a task's status record lock to be unlocked.
 ///
 /// When this function returns, `oldStatus` will have been updated
-/// to the last value read and `isLocked()` will be false.
+/// to the last value read and `isStatusRecordLocked()` will be false.
 /// Of course, another thread may still be concurrently trying
 /// to acquire the record lock.
 static void waitForStatusRecordUnlock(AsyncTask *task,
@@ -92,12 +92,12 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
   StatusRecordLockRecord::Waiter waiter(StatusRecordLockLock);
 
   while (true) {
-    assert(oldStatus.isLocked());
+    assert(oldStatus.isStatusRecordLocked());
 
     bool waited = waiter.tryReloadAndWait([&]() -> StatusRecordLockRecord* {
       // Check that oldStatus is still correct.
       oldStatus = task->_private().Status.load(std::memory_order_acquire);
-      if (!oldStatus.isLocked())
+      if (!oldStatus.isStatusRecordLocked())
         return nullptr;
 
       // The innermost entry should be a record lock record; wait
@@ -110,7 +110,7 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
 
     // Reload the status before trying to relock.
     oldStatus = task->_private().Status.load(std::memory_order_acquire);
-    if (!oldStatus.isLocked())
+    if (!oldStatus.isStatusRecordLocked())
       return;
   }
 }
@@ -171,7 +171,7 @@ static bool withStatusRecordLock(AsyncTask *task,
       return false;
 
     // If the old info says we're locked, wait for the lock to clear.
-    if (status.isLocked()) {
+    if (status.isStatusRecordLocked()) {
       waitForStatusRecordUnlock(task, status);
       continue;
     }
@@ -231,7 +231,7 @@ static bool withStatusRecordLock(AsyncTask *task,
   // task will see, we need to do so in some other way, probably via
   // atomic objects in the task status records.  Because of this, we can
   // actually unpublish the lock with a relaxed store.
-  assert(!status.isLocked());
+  assert(!status.isStatusRecordLocked());
   status.traceStatusChanged(task);
   task->_private().Status.store(status,
                                 /*success*/ std::memory_order_relaxed);
@@ -271,7 +271,7 @@ bool swift::addStatusRecord(
 
   while (true) {
     // Wait for any active lock to be released.
-    if (oldStatus.isLocked())
+    if (oldStatus.isStatusRecordLocked())
       waitForStatusRecordUnlock(task, oldStatus);
 
     // Reset the parent of the new record.
@@ -309,7 +309,7 @@ bool swift::removeStatusRecord(TaskStatusRecord *record) {
 
   while (true) {
     // Wait for any active lock to be released.
-    if (oldStatus.isLocked())
+    if (oldStatus.isStatusRecordLocked())
       waitForStatusRecordUnlock(task, oldStatus);
 
     // If the record is the innermost record, try to just pop it off.
@@ -653,9 +653,9 @@ static NearestTaskDeadline swift_task_getNearestDeadlineImpl(AsyncTask *task) {
 
   // If it's locked, wait for the lock; we can't safely step through
   // the RecordLockStatusRecord on a different thread.
-  if (oldStatus.isLocked()) {
+  if (oldStatus.isStatusRecordLocked()) {
     waitForStatusRecordUnlock(task, oldStatus);
-    assert(!oldStatus.isLocked());
+    assert(!oldStatus.isStatusRecordLocked());
   }
 
   // Walk all the records looking for deadlines.

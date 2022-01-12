@@ -176,8 +176,9 @@ class alignas(sizeof(void*) * 2) ActiveTaskStatus {
     IsCancelled = 0x100,
 
     /// Whether the task status is "locked", meaning that further
-    /// accesses need to wait on the task status record lock
-    IsLocked = 0x200,
+    /// accesses need to wait on the task status record lock. This is separate
+    /// from the drain lock of the task.
+    IsStatusRecordLocked = 0x200,
 
     /// Whether the running priority has been escalated above the
     /// priority recorded in the Job header.
@@ -226,11 +227,11 @@ public:
   }
 
   /// Is there an active lock on the cancellation information?
-  bool isLocked() const { return Flags & IsLocked; }
+  bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
   ActiveTaskStatus withLockingRecord(TaskStatusRecord *lockRecord) const {
-    assert(!isLocked());
+    assert(!isStatusRecordLocked());
     assert(lockRecord->Parent == Record);
-    return ActiveTaskStatus(lockRecord, Flags | IsLocked);
+    return ActiveTaskStatus(lockRecord, Flags | IsStatusRecordLocked);
   }
 
   JobPriority getStoredPriority() const {
@@ -389,7 +390,7 @@ inline void AsyncTask::flagAsRunning() {
   auto oldStatus = _private().Status.load(std::memory_order_relaxed);
   while (true) {
     assert(!oldStatus.isRunning());
-    if (oldStatus.isLocked()) {
+    if (oldStatus.isStatusRecordLocked()) {
       flagAsRunning_slow();
       adoptTaskVoucher(this);
       swift_task_enterThreadLocalContext(
@@ -421,7 +422,7 @@ inline void AsyncTask::flagAsSuspended() {
   auto oldStatus = _private().Status.load(std::memory_order_relaxed);
   while (true) {
     assert(oldStatus.isRunning());
-    if (oldStatus.isLocked()) {
+    if (oldStatus.isStatusRecordLocked()) {
       flagAsSuspended_slow();
       swift_task_exitThreadLocalContext(
           (char *)&_private().ExclusivityAccessSet[0]);
