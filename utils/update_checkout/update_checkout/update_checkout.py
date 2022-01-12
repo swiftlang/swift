@@ -156,6 +156,18 @@ def update_single_repository(pool_args):
             if checkout_target:
                 shell.run(['git', 'status', '--porcelain', '-uno'],
                           echo=False)
+
+                # Some of the projects switch branches/tags when they
+                # are updated. Local checkout might not have that tag/branch
+                # fetched yet, so let's attempt to fetch before attempting
+                # checkout.
+                try:
+                    shell.run(['git', 'rev-parse', '--verify', checkout_target])
+                except Exception:
+                    shell.run(["git", "fetch", "--recurse-submodules=yes",
+                               "--tags"],
+                              echo=True)
+
                 try:
                     shell.run(['git', 'checkout', checkout_target], echo=True)
                 except Exception as originalException:
