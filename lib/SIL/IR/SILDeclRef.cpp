@@ -459,6 +459,14 @@ SILDeclRef SILDeclRef::getAsyncMainDeclEntryPoint(ValueDecl *decl) {
   return result;
 }
 
+SILDeclRef SILDeclRef::getAsyncMainFileEntryPoint(FileUnit *file) {
+  assert(file->hasEntryPoint() && !file->getMainDecl());
+  SILDeclRef result;
+  result.loc = file;
+  result.kind = Kind::AsyncEntryPoint;
+  return result;
+}
+
 SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
   assert(file->hasEntryPoint() && !file->getMainDecl());
   SILDeclRef result;
@@ -490,6 +498,19 @@ AutoClosureExpr *SILDeclRef::getAutoClosureExpr() const {
 
 FuncDecl *SILDeclRef::getFuncDecl() const {
   return dyn_cast<FuncDecl>(getDecl());
+}
+
+ModuleDecl *SILDeclRef::getModuleContext() const {
+  if (hasDecl()) {
+    return getDecl()->getModuleContext();
+  } else if (hasFileUnit()) {
+    return getFileUnit()->getParentModule();
+  } else if (hasClosureExpr()) {
+    return getClosureExpr()->getParentModule();
+  } else if (hasAutoClosureExpr()) {
+    return getAutoClosureExpr()->getParentModule();
+  }
+  llvm_unreachable("Unknown declaration reference");
 }
 
 bool SILDeclRef::isSetter() const {

@@ -240,10 +240,14 @@ struct SILDeclRef {
   /// Produces a SILDeclRef for the entry-point of a main FileUnit.
   static SILDeclRef getMainFileEntryPoint(FileUnit *file);
 
+  /// Produces a SILDeclRef for the entry-point of an async main FileUnit.
+  static SILDeclRef getAsyncMainFileEntryPoint(FileUnit *file);
+
   bool isNull() const { return loc.isNull(); }
   explicit operator bool() const { return !isNull(); }
-  
+
   bool hasDecl() const { return loc.is<ValueDecl *>(); }
+  bool hasFileUnit() const { return loc.is<FileUnit *>(); }
   bool hasClosureExpr() const;
   bool hasAutoClosureExpr() const;
   bool hasFuncDecl() const;
@@ -260,11 +264,14 @@ struct SILDeclRef {
     return loc.get<FileUnit *>();
   }
 
+  /// Get ModuleDecl that contains the SILDeclRef
+  ModuleDecl *getModuleContext() const;
+
   /// Retrieves the ASTContext from the underlying AST node being stored.
   ASTContext &getASTContext() const;
 
   llvm::Optional<AnyFunctionRef> getAnyFunctionRef() const;
-  
+
   SILLocation getAsRegularLocation() const;
 
   enum class ManglingKind {
