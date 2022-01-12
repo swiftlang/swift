@@ -4133,6 +4133,20 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
                                        IsInitialization_t isInit) {
   assert(destTL.getLoweredType().getAddressType() == dest->getType());
 
+  // If our rvalue is a move only value, insert a moveonly_to_copyable
+  // instruction. This type must have come from the usage of an @_noImplicitCopy
+  // or @_isNoEscape. We rely on the relevant checkers at the SIL level to
+  // validate that this is safe to do. SILGen is just leaving in crumbs to be
+  // checked.
+  //
+  // TODO: For now we are only supporting objects since we are setup to handle
+  // lets when opaque values are enabled. We may also in the future support
+  // vars. If we do that before opaque values are enabled, we will use it to
+  // also handle address only lets.
+  if (rvalue->getType().isMoveOnly() && rvalue->getType().isObject()) {
+    rvalue = B.createOwnedMoveOnlyToCopyableValue(loc, rvalue);
+  }
+
   // Easy case: the types match.
   if (rvalue->getType() == destTL.getLoweredType()) {
     assert(!silConv.useLoweredAddresses()
