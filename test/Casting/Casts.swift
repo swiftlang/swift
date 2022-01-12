@@ -957,7 +957,13 @@ CastsTests.test("Recursive AnyHashable") {
 // SR-14635 (aka rdar://78224322)
 #if _runtime(_ObjC)
 CastsTests.test("Do not overuse __SwiftValue")
-.xfail(.objCRuntime("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.osxAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.iOSAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.iOSSimulatorAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.tvOSAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.tvOSSimulatorAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.watchOSAny("SR-14635 not yet fully enabled for Apple OSes"))
+.skip(.watchOSSimulatorAny("SR-14635 not yet fully enabled for Apple OSes"))
 .code {
   struct Bar {}
   // This used to succeed because of overeager __SwiftValue
