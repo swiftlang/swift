@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -requirement-machine=on | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // The GSB computes an incorrect canonical type here, which caused a SILGen assert.
 

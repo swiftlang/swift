@@ -95,7 +95,6 @@ namespace swift {
   class TypeVariableType;
   class TupleType;
   class FunctionType;
-  class GenericSignatureBuilder;
   class ArchetypeType;
   class Identifier;
   class InheritedNameSet;
@@ -1225,14 +1224,6 @@ public:
   /// Increments \c NumTypoCorrections then checks this against the limit in
   /// the language options.
   bool shouldPerformTypoCorrection();
-  
-private:
-  /// Register the given generic signature builder to be used as the canonical
-  /// generic signature builder for the given signature, if we don't already
-  /// have one.
-  void registerGenericSignatureBuilder(GenericSignature sig,
-                                       GenericSignatureBuilder &&builder);
-  friend class GenericSignatureBuilder;
 
 private:
   friend class IntrinsicInfo;
@@ -1240,11 +1231,6 @@ private:
   llvm::LLVMContext &getIntrinsicScratchContext() const;
 
 public:
-  /// Retrieve or create the stored generic signature builder for the given
-  /// canonical generic signature and module.
-  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
-                                                     CanGenericSignature sig);
-
   rewriting::RewriteContext &getRewriteContext();
 
   /// This is a hack to break cycles. Don't introduce new callers of this
