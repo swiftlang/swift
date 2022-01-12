@@ -11,26 +11,26 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 9999, *)
 public struct ContinuousClock {
   public struct Instant: Codable, Sendable {
-    var value: Duration
+    internal var _value: Duration
     
-    init(_ value: Duration) {
-      self.value = value
+    internal init(_value: Duration) {
+      self._value = _value
     }
   }
   
   public init() { }
 }
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 9999, *)
 extension Clock where Self == ContinuousClock {
-  @available(SwiftStdlib 5.1, *)
+  @available(SwiftStdlib 9999, *)
   public static var continuous: ContinuousClock { return ContinuousClock() }
 }
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 9999, *)
 extension ContinuousClock: Clock {
   public var now: ContinuousClock.Instant {
     ContinuousClock.now
@@ -53,45 +53,45 @@ extension ContinuousClock: Clock {
       seconds: &seconds, 
       nanoseconds: &nanoseconds, 
       clock: .continuous)
-    return ContinuousClock.Instant(
+    return ContinuousClock.Instant(_value:
       .seconds(seconds) + .nanoseconds(nanoseconds))
   }
   
   public func sleep(
     until deadline: Instant, tolerance: Duration? = nil
   ) async throws {
-    try await Task.sleep(until: 
-      deadline.value.seconds, deadline.value.nanoseconds, 
+    try await Task._sleep(until: 
+      deadline._value.seconds, deadline._value.nanoseconds, 
       tolerance: tolerance, 
       clock: .continuous)
   }
 }
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 9999, *)
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }
   
   public func advanced(by duration: Duration) -> ContinuousClock.Instant {
-    return ContinuousClock.Instant(value + duration)
+    return ContinuousClock.Instant(_value: _value + duration)
   }
   
   public func duration(to other: ContinuousClock.Instant) -> Duration {
-    other.value - value
+    other._value - _value
   }
   
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(value)
+    hasher.combine(_value)
   }
   
   public static func == (
     _ lhs: ContinuousClock.Instant, _ rhs: ContinuousClock.Instant
   ) -> Bool {
-    return lhs.value == rhs.value
+    return lhs._value == rhs._value
   }
   
   public static func < (
     _ lhs: ContinuousClock.Instant, _ rhs: ContinuousClock.Instant
   ) -> Bool {
-    return lhs.value < rhs.value
+    return lhs._value < rhs._value
   }
 }
