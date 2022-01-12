@@ -401,7 +401,7 @@ func SR15161_as(e: Error?) {
 }
 
 func SR15161_is(e: Error?) {
-  _ = e is NSError // expected-warning{{checking a value with optional type 'Error?' against dynamic type 'NSError' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
+  _ = e is NSError // expected-warning{{checking a value with optional type 'Error?' against type 'NSError' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
 }
 
 func SR15161_as_1(e: Error?) {

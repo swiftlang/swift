@@ -443,8 +443,7 @@ func h<T : C3>(_ x : T) {
 }
 func i<T : C3>(_ x : T?) -> Bool {
   return x is P1
-  // FIXME: Bogus diagnostic.  See SR-11920.
-  // expected-warning@-2 {{checking a value with optional type 'T?' against dynamic type 'P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
+  // expected-warning@-1 {{checking a value with optional type 'T?' against type 'P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
 }
 func j(_ x : C1) -> Bool {
   return x is P1
