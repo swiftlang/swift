@@ -637,8 +637,10 @@ private:
   void visitCopyValueInst(CopyValueInst *Inst);
   void visitProjectBoxInst(ProjectBoxInst *Inst);
   void checkNoPromotedBoxInApply(ApplySite Apply);
-#define APPLYSITE_INST(Name, Parent) void visit##Name(Name *Inst);
-#include "swift/SIL/SILNodes.def"
+  void visitApplyInst(ApplyInst *Inst);
+  void visitBeginApplyInst(BeginApplyInst *Inst);
+  void visitPartialApplyInst(PartialApplyInst *Inst);
+  void visitTryApplyInst(TryApplyInst *Inst);
 };
 } // end anonymous namespace
 
