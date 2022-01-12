@@ -1211,14 +1211,15 @@ bool DeclContext::isClassConstrainedProtocolExtension() const {
 bool DeclContext::isAsyncContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Initializer:
-  case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
   case DeclContextKind::GenericTypeDecl:
     return false;
+  case DeclContextKind::FileUnit:
+  case DeclContextKind::TopLevelCodeDecl:
+    return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel;
   case DeclContextKind::AbstractClosureExpr:
     return cast<AbstractClosureExpr>(this)->isBodyAsync();
   case DeclContextKind::AbstractFunctionDecl: {
