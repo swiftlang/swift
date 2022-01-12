@@ -22,22 +22,22 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
-#if !defined(NDEBUG) && !SWIFT_RUNTIME
-
-// Except in the runtime, DEMANGLER_ASSERT() works like assert()
-#define DEMANGLER_ASSERT(expr, node)                                           \
-  do {                                                                         \
-    if (!(expr))                                                               \
-      swift::Demangle::failAssert(__FILE__, __LINE__, node, #expr);            \
-  } while (0)
-
-#else
+#if SWIFT_RUNTIME || defined(NDEBUG)
 
 // In the runtime and non-asserts builds, DEMANGLER_ASSERT() returns an error
 #define DEMANGLER_ASSERT(expr, node)                                           \
   do {                                                                         \
     if (!(expr))                                                               \
       return ManglingError(ManglingError::AssertionFailed, (node), __LINE__);  \
+  } while (0)
+
+#else
+
+// Except in the runtime, assert builds cause DEMANGLER_ASSERT() to assert()
+#define DEMANGLER_ASSERT(expr, node)                                           \
+  do {                                                                         \
+    if (!(expr))                                                               \
+      swift::Demangle::failAssert(__FILE__, __LINE__, node, #expr);            \
   } while (0)
 
 #endif // !defined(NDEBUG) && !SWIFT_RUNTIME
