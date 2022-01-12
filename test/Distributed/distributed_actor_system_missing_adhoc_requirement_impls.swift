@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-distributed -c -enable-batch-mode -module-name foo -primary-file %S/Inputs/dynamic_replacement_da_extension.swift -primary-file %S/Inputs/dynamic_replacement_da_decl.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -18,6 +18,9 @@ struct ActorAddress: Sendable, Hashable, Codable {
 }
 
 struct FakeActorSystem: DistributedActorSystem {
+  // expected-error@-1{{struct 'FakeActorSystem' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-2{{protocol 'FakeActorSystem' requires function 'remoteCall' with signature:}}
+
   typealias ActorID = ActorAddress
   typealias Invocation = FakeInvocation
   typealias SerializationRequirement = Codable
@@ -65,12 +68,18 @@ struct FakeInvocation: DistributedTargetInvocation {
   mutating func decodeErrorType() throws -> Any.Type? { nil }
 
   struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
+    typealias SerializationRequirement = FakeInvocation.SerializationRequirement
+    mutating func decodeNext<Argument>(
+      _ argumentType: Argument.Type,
+      into pointer: UnsafeMutablePointer<Argument>
+    ) throws {}
   }
 }
 
 @available(SwiftStdlib 5.5, *)
 struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  typealias SerializationRequirement = FakeInvocation.SerializationRequirement
+
   func onReturn<Res>(value: Res) async throws {
     print("RETURN: \(value)")
   }
@@ -79,4 +88,3 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
   }
 }
 
-// expec

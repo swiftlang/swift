@@ -73,8 +73,12 @@ final class FakeActorSystem: DistributedActorSystem {
       where Act: DistributedActor,
             Act.ID == ActorID,
             Res: SerializationRequirement {
-    // empty
+    throw FakeDistributedSystemError(message: "mock impl")
   }
+}
+
+struct FakeDistributedSystemError: DistributedActorSystemError {
+  let message: String
 }
 
 struct FakeInvocation: DistributedTargetInvocation {
