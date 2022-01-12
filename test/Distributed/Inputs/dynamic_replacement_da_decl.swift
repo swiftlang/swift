@@ -90,12 +90,18 @@ struct FakeInvocation: DistributedTargetInvocation {
   // === Receiving / decoding -------------------------------------------------
 
   mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
+  func makeArgumentDecoder() -> FakeArgumentDecoder { .init() }
   mutating func decodeReturnType() throws -> Any.Type? { nil }
   mutating func decodeErrorType() throws -> Any.Type? { nil }
 
   struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
     typealias SerializationRequirement = Codable
+
+    // FIXME(distributed): should have 'Argument: SerializationRequirement'
+    mutating func decodeNext<Argument>(
+      _ argumentType: Argument.Type,
+      into pointer: UnsafeMutablePointer<Argument>
+    ) throws { }
   }
 }
 

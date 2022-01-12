@@ -3362,6 +3362,15 @@ public:
   /// 'DistributedActorSystem' protocol of specific implementation type.
   AbstractFunctionDecl* getDistributedActorSystemRemoteCallFunction() const;
 
+  /// Find the 'makeInvocation' function.
+  AbstractFunctionDecl* getDistributedActorSystemMakeInvocationFunction() const;
+
+  /// Find the 'DistributedTargetInvocation.recordArgument' function.
+  AbstractFunctionDecl* getDistributedActorInvocationRecordArgumentFunction() const;
+
+  /// Find the 'DistributedTargetInvocation.doneRecording' function.
+  AbstractFunctionDecl* getDistributedActorInvocationDoneRecordingFunction() const;
+
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);

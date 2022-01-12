@@ -121,7 +121,7 @@ void emitDistributedActorSystemWitnessCall(
     subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
   }
 
-  Optional<SILValue> temporaryActorIDBuffer;
+  Optional<SILValue> temporaryArgumentBuffer;
 
   // If the self parameter is indirect but the actorSystem is a value, put it
   // into a temporary allocation.
@@ -134,6 +134,158 @@ void emitDistributedActorSystemWitnessCall(
     B.emitStoreValueOperation(
         loc, actorSystem, buf, StoreOwnershipQualifier::Init);
     temporaryActorSystemBuffer = SILValue(buf);
+  }
+
+  // === Call the method.
+  // --- Push the arguments
+  SmallVector<SILValue, 2> allArgs;
+  auto params = methodSILFnTy->getParameters();
+  for (size_t i = 0; i < args.size(); ++i) {
+    auto arg = args[i];
+    // FIXME(distributed): handle multiple ones (!!!!)
+    if (params[i].isFormalIndirect() &&
+        !arg->getType().isAddress() &&
+        !dyn_cast<AnyMetatypeType>(arg->getType().getASTType())) {
+      auto buf = B.createAllocStack(loc, arg->getType(), None);
+      auto argCopy = B.emitCopyValueOperation(loc, arg);
+      B.emitStoreValueOperation(
+          loc, argCopy, buf, StoreOwnershipQualifier::Init);
+      temporaryArgumentBuffer = SILValue(buf);
+      allArgs.push_back(*temporaryArgumentBuffer);
+    } else {
+      allArgs.push_back(arg);
+    }
+  }
+  // Push the self argument
+  auto selfArg = temporaryActorSystemBuffer ? *temporaryActorSystemBuffer : actorSystem;
+  allArgs.push_back(selfArg);
+
+  SILInstruction *apply;
+  if (tryTargets) {
+    apply = B.createTryApply(
+        loc, witnessMethod, subs, allArgs, tryTargets->first,
+        tryTargets->second);
+  } else {
+    apply = B.createApply(loc, witnessMethod, subs, allArgs);
+  }
+
+  // Local function to emit a cleanup after the call.
+  auto emitCleanup = [&](llvm::function_ref<void(SILBuilder &builder)> fn) {
+    if (tryTargets) {
+      {
+        SILBuilderWithScope normalBuilder(tryTargets->first, apply);
+        fn(normalBuilder);
+      }
+      {
+        SILBuilderWithScope errorBuilder(tryTargets->second, apply);
+        fn(errorBuilder);
+      }
+    } else {
+      fn(B);
+    }
+  };
+
+  // ==== If we had to create a buffers we need to clean them up
+  // --- Cleanup id buffer
+  if (temporaryArgumentBuffer) {
+    emitCleanup([&](SILBuilder & builder) {
+      auto value = builder.emitLoadValueOperation(
+          loc, *temporaryArgumentBuffer, LoadOwnershipQualifier::Take);
+      builder.emitDestroyValueOperation(loc, value);
+      builder.createDeallocStack(loc, *temporaryArgumentBuffer);
+    });
+  }
+  // --- Cleanup actorSystem buffer
+  if (temporaryActorSystemBuffer) {
+    emitCleanup([&](SILBuilder & builder) {
+      auto value = builder.emitLoadValueOperation(
+          loc, *temporaryActorSystemBuffer, LoadOwnershipQualifier::Take);
+      builder.emitDestroyValueOperation(loc, value);
+      builder.createDeallocStack(loc, *temporaryActorSystemBuffer);
+    });
+  }
+}
+
+void emitDistributedWitnessCall(
+    SILBuilder &B, SILLocation loc, DeclName methodName,
+    SILValue base, ProtocolDecl *proto, SILType actorType,
+    llvm::ArrayRef<SILValue> args,
+    llvm::Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
+  auto &F = B.getFunction();
+  auto &M = B.getModule();
+  auto &C = F.getASTContext();
+
+  // Dig out the conformance to the passed in protocol.
+  auto astType = base->getType().getASTType();
+  auto *module = M.getSwiftModule();
+  ProtocolConformanceRef confRef;
+
+  // If the base is an existential open it.
+  if (astType->isAnyExistentialType()) {
+    OpenedArchetypeType *opened;
+    astType = astType->openAnyExistentialType(opened)->getCanonicalType();
+    base = B.createOpenExistentialAddr(
+        loc, base, F.getLoweredType(astType),
+        OpenedExistentialAccess::Immutable);
+  }
+
+  if (astType->isTypeParameter() || astType->is<ArchetypeType>()) {
+    confRef = ProtocolConformanceRef(proto);
+  } else {
+    confRef = module->lookupConformance(astType, proto);
+  }
+
+  assert(!confRef.isInvalid() &&
+         "Missing conformance to `DistributedActorSystem`");
+
+  // Dig out the method.
+  auto method = cast<FuncDecl>(proto->getSingleRequirement(methodName));
+  auto methodRef = SILDeclRef(method, SILDeclRef::Kind::Func);
+  auto methodSILTy =
+      M.Types.getConstantInfo(B.getTypeExpansionContext(), methodRef)
+          .getSILType();
+
+  auto witnessMethod = B.createWitnessMethod(
+      loc, astType, confRef, methodRef, methodSILTy);
+
+  // prepare conformance substitutions
+  SubstitutionMap subs;
+  {
+    auto genericSig = method->getGenericSignature();
+    SmallVector<Type, 2> subTypes;
+    SmallVector<ProtocolConformanceRef, 2> subConformances;
+    subTypes.push_back(astType);
+    subConformances.push_back(confRef);
+    if (actorType) {
+      ProtocolDecl *actorProto = C.getProtocol(
+          KnownProtocolKind::DistributedActor);
+      assert(actorProto);
+
+      ProtocolConformanceRef conformance;
+      auto distributedActorConfRef = module->lookupConformance(
+          actorType.getASTType(), actorProto);
+      assert(!distributedActorConfRef.isInvalid() &&
+             "Missing conformance to `DistributedActor`");
+      subTypes.push_back(actorType.getASTType());
+      subConformances.push_back(distributedActorConfRef);
+    }
+
+    subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
+  }
+
+  Optional<SILValue> temporaryActorIDBuffer;
+
+  // If the self parameter is indirect but the actorSystem is a value, put it
+  // into a temporary allocation.
+  auto methodSILFnTy = methodSILTy.castTo<SILFunctionType>();
+  Optional<SILValue> temporaryInvocationBuffer;
+  if (methodSILFnTy->getSelfParameter().isFormalIndirect() &&
+      !base->getType().isAddress()) {
+    auto buf = B.createAllocStack(loc, base->getType(), None);
+    base = B.emitCopyValueOperation(loc, base);
+    B.emitStoreValueOperation(
+        loc, base, buf, StoreOwnershipQualifier::Init);
+    temporaryInvocationBuffer = SILValue(buf);
   }
 
   // === Call the method.
@@ -156,7 +308,7 @@ void emitDistributedActorSystemWitnessCall(
     }
   }
   // Push the self argument
-  auto selfArg = temporaryActorSystemBuffer ? *temporaryActorSystemBuffer : actorSystem;
+  auto selfArg = temporaryInvocationBuffer ? *temporaryInvocationBuffer : base;
   allArgs.push_back(selfArg);
 
   SILInstruction *apply;
@@ -195,12 +347,12 @@ void emitDistributedActorSystemWitnessCall(
     });
   }
   // --- Cleanup actorSystem buffer
-  if (temporaryActorSystemBuffer) {
+  if (temporaryInvocationBuffer) {
     emitCleanup([&](SILBuilder & builder) {
       auto value = builder.emitLoadValueOperation(
-          loc, *temporaryActorSystemBuffer, LoadOwnershipQualifier::Take);
+          loc, *temporaryInvocationBuffer, LoadOwnershipQualifier::Take);
       builder.emitDestroyValueOperation(loc, value);
-      builder.createDeallocStack(loc, *temporaryActorSystemBuffer);
+      builder.createDeallocStack(loc, *temporaryInvocationBuffer);
     });
   }
 }

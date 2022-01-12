@@ -4439,7 +4439,7 @@ ERROR(distributed_actor_protocol_illegal_inheritance,none,
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
 ERROR(distributed_actor_system_conformance_missing_adhoc_requirement,none,
-      "%0 %1 is missing witness for ad-hoc protocol requirement %2"
+      "%0 %1 is missing witness for protocol requirement %2"
       "", (DescriptiveDeclKind, DeclName, DeclName))
 NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
       "protocol %0 requires function %1 with signature:\n%2",

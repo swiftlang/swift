@@ -7449,6 +7449,73 @@ NominalTypeDecl::getDistributedActorSystemRemoteCallFunction() const {
       nullptr);
 }
 
+AbstractFunctionDecl*
+NominalTypeDecl::getDistributedActorSystemMakeInvocationFunction() const {
+  auto &C = this->getASTContext();
+  NominalTypeDecl *system = const_cast<NominalTypeDecl *>(this);
+  if (this->isDistributedActor()) {
+    auto var = this->getDistributedActorSystemProperty();
+    system = var->getInterfaceType()->getAnyNominal();
+  }
+
+  // FIXME(distributed): implement more properly...
+  for (auto value : system->lookupDirect(C.Id_makeInvocation)) {
+    auto func = dyn_cast<AbstractFunctionDecl>(value);
+    if (!func)
+      continue;
+
+    if (func->getParameters()->size() != 0)
+      return nullptr;
+
+    return func;
+  }
+
+  // TODO(distributed): make a Request for it?
+  return nullptr;
+}
+
+AbstractFunctionDecl*
+NominalTypeDecl::getDistributedActorInvocationRecordArgumentFunction() const {
+  auto &C = this->getASTContext();
+
+  // FIXME(distributed): implement more properly...
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  for (auto value : mutableThis->lookupDirect(C.Id_recordArgument)) {
+    auto func = dyn_cast<AbstractFunctionDecl>(value);
+    if (!func)
+      continue;
+
+    if (func->getParameters()->size() != 0)
+      return nullptr;
+
+    return func;
+  }
+
+  // TODO(distributed): make a Request for it?
+  return nullptr;
+}
+
+AbstractFunctionDecl*
+NominalTypeDecl::getDistributedActorInvocationDoneRecordingFunction() const {
+  auto &C = this->getASTContext();
+
+  // FIXME(distributed): implement more properly...
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  for (auto value : mutableThis->lookupDirect(C.Id_doneRecording)) {
+    auto func = dyn_cast<AbstractFunctionDecl>(value);
+    if (!func)
+      continue;
+
+    if (func->getParameters()->size() != 0)
+      return nullptr;
+
+    return func;
+  }
+
+  // TODO(distributed): make a Request for it?
+  return nullptr;
+}
+
 VarDecl*
 NominalTypeDecl::getDistributedActorSystemProperty() const {
   if (!this->isDistributedActor())

@@ -120,7 +120,7 @@ public struct FakeInvocation: DistributedTargetInvocation {
   // === Receiving / decoding -------------------------------------------------
 
   public mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  public mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
+  public func makeArgumentDecoder() -> FakeArgumentDecoder { .init() }
   public mutating func decodeReturnType() throws -> Any.Type? { nil }
   public mutating func decodeErrorType() throws -> Any.Type? { nil }
 

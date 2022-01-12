@@ -2029,20 +2029,20 @@ public:
   void emitDistributedActorReady(
       SILLocation loc, ConstructorDecl *ctor, ManagedValue actorSelf);
   
-  /// For a distributed actor, emits code to invoke the transport's
+  /// For a distributed actor, emits code to invoke the system's
   /// resignID function.
   ///
   /// Specifically, this code emits SIL that performs the call
   ///
   /// \verbatim
-  ///   self.system.resignID(self.id)
+  ///   self.actorSystem.resignID(self.id)
   /// \endverbatim
   ///
   /// using the current builder's state as the injection point.
   ///
   /// \param actorDecl the declaration corresponding to the actor
   /// \param actorSelf the SIL value representing the distributed actor instance
-  void emitResignIDCall(SILLocation loc,
+  void emitDistributedActorSystemResignIDCall(SILLocation loc,
                               ClassDecl *actorDecl, ManagedValue actorSelf);
   
   /// Emit code that tests whether the distributed actor is local, and if so,
@@ -2053,6 +2053,21 @@ public:
                                          ClassDecl *actorDecl,
                                          ManagedValue actorSelf,
                                          SILBasicBlock *continueBB);
+
+  /// For a distributed actor, emits code to invoke the system's
+  /// resignID function.
+  ///
+  /// Specifically, this code emits SIL that performs the call
+  ///
+  /// \verbatim
+  ///   try self.actorSystem.makeInvocation()
+  /// \endverbatim
+  ///
+  /// using the current builder's state as the injection point.
+  void emitDistributedActorSystemMakeInvocationCall(
+      SILLocation loc,
+      ClassDecl *actorDecl, ManagedValue actorSelf,
+      SILBasicBlock *normalBB, SILBasicBlock *errorBB);
 
   void emitDistributedActorClassMemberDestruction(
       SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,

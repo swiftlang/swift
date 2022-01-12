@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "swift/AST/Decl.h"
 #include <utility>
 
 namespace swift {
@@ -35,7 +36,7 @@ class SILValue;
 /// \returns nullptr if the function does not have such a parameter.
 SILArgument *findFirstDistributedActorSystemArg(SILFunction &F);
 
-/// Emit a call to a witness of the actor actorSystem protocol.
+/// Emit a call to a witness of the DistributedActorSystem protocol.
 ///
 /// \param methodName The name of the method on the DistributedActorSystem protocol.
 /// \param actorSystem The actorSystem on which to invoke the method
@@ -47,6 +48,14 @@ SILArgument *findFirstDistributedActorSystemArg(SILFunction &F);
 void emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
     SILValue actorSystem, SILType actorType, llvm::ArrayRef<SILValue> args,
+    llvm::Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
+        llvm::None);
+
+/// Emit a call to a witness of the passed 'proto' protocol.
+void emitDistributedWitnessCall(
+    SILBuilder &B, SILLocation loc, DeclName methodName,
+    SILValue base, ProtocolDecl *proto, SILType actorType,
+    llvm::ArrayRef<SILValue> args,
     llvm::Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
         llvm::None);
 

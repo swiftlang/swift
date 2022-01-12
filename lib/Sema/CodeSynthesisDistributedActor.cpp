@@ -12,7 +12,6 @@
 
 #include "TypeCheckDistributed.h"
 
-
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTPrinter.h"
@@ -270,11 +269,6 @@ GetDistributedActorSystemRemoteCallFunctionRequest::evaluate(
     }
   }
 
-  if (!remoteCallFunc) {
-    fprintf(stderr, "[%s:%d] (%s) NOT FOUND\n", __FILE__, __LINE__, __FUNCTION__);
-    decl->dump();
-    fprintf(stderr, "[%s:%d] (%s) --------------------!!!!!\n", __FILE__, __LINE__, __FUNCTION__);
-  }
   return remoteCallFunc;
 }
 
@@ -327,9 +321,9 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     return nullptr;
 
 
-  for (auto system : actor->lookupDirect(C.Id_actorSystem)) {
+  if (auto system = actor->lookupDirect(C.Id_actorSystem).begin()) {
     // TODO(distributed): may need to check conformance here?
-    return dyn_cast<VarDecl>(system);
+    return dyn_cast<VarDecl>(*system);
   }
 
   return nullptr;
