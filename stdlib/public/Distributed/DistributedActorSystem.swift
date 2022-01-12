@@ -222,18 +222,20 @@ extension DistributedActorSystem {
 
     // Decode the return type
     func allocateReturnTypeBuffer<R>(_: R.Type) -> UnsafeRawPointer? {
-      if R.self == Void.self {
-        return nil
-      }
       return UnsafeRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
     }
     guard let returnType: Any.Type = _getReturnTypeInfo(mangledMethodName: mangledTargetName) else {
       throw ExecuteDistributedTargetError(
           message: "Failed to decode distributed target return type")
     }
-    let resultBuffer = _openExistential(returnType, do: allocateReturnTypeBuffer)
+
+    guard let resultBuffer = _openExistential(returnType, do: allocateReturnTypeBuffer) else {
+      throw ExecuteDistributedTargetError(
+          message: "Failed to allocate buffer for distributed target return type")
+    }
+
     func destroyReturnTypeBuffer<R>(_: R.Type) {
-      resultBuffer?.assumingMemoryBound(to: R.self).deallocate()
+      resultBuffer.assumingMemoryBound(to: R.self).deallocate()
     }
     defer {
       _openExistential(returnType, do: destroyReturnTypeBuffer)
@@ -252,16 +254,11 @@ extension DistributedActorSystem {
           on: actor,
           mangledTargetName, UInt(mangledTargetName.count),
           argumentBuffer: hargs.buffer._rawValue,
-          resultBuffer: resultBuffer?._rawValue
+          resultBuffer: resultBuffer._rawValue
       )
 
-      // Get the result out of the buffer and invoke onReturn with the right type
-      guard let resultBuffer = resultBuffer else {
-        try await handler.onReturn(value: ())
-        return
-      }
-      func onReturn<R>(_: R.Type) async throws {
-        try await handler.onReturn/*<R>*/(value: resultBuffer)
+      func onReturn<R>(_ resultTy: R.Type) async throws {
+        try await handler.onReturn/*<R>*/(value: resultBuffer.load(as: resultTy))
       }
 
       try await _openExistential(returnType, do: onReturn)
@@ -277,7 +274,7 @@ func _executeDistributedTarget(
   on actor: AnyObject, // DistributedActor
   _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
   argumentBuffer: Builtin.RawPointer, // HeterogeneousBuffer of arguments
-  resultBuffer: Builtin.RawPointer?
+  resultBuffer: Builtin.RawPointer
 ) async throws
 
 // ==== ----------------------------------------------------------------------------------------------------------------

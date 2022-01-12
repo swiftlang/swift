@@ -18,12 +18,37 @@
 import _Distributed
 
 final class Obj: @unchecked Sendable, Codable  {}
+
 struct LargeStruct: Sendable, Codable {
+  var q: String
+  var a: Int
+  var b: Int64
+  var c: Double
+  var d: String
+}
+
+enum E : Sendable, Codable {
+  case foo, bar
 }
 
 distributed actor Greeter {
-  distributed func hello() {
-    print("EXECUTING HELLO")
+  distributed func empty() {
+  }
+
+  distributed func hello() -> String {
+    return "Hello, World!"
+  }
+
+  distributed func answer() -> Int {
+    return 42
+  }
+
+  distributed func largeResult() -> LargeStruct {
+    .init(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
+  }
+
+  distributed func enumResult() -> E {
+    .bar
   }
 }
 
@@ -102,7 +127,11 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // actual mangled name:
-let helloName = "$s4main7GreeterC5helloyyFTE"
+let emptyName = "$s4main7GreeterC5emptyyyFTE"
+let helloName = "$s4main7GreeterC5helloSSyFTE"
+let answerName = "$s4main7GreeterC6answerSiyFTE"
+let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
+let enumResult = "$s4main7GreeterC10enumResultAA1EOyFTE"
 
 func test() async throws {
   let system = FakeActorSystem()
@@ -113,13 +142,50 @@ func test() async throws {
   let invocation = FakeInvocation()
 
   try await system.executeDistributedTarget(
+    on: local,
+    mangledTargetName: emptyName,
+    invocation: invocation,
+    handler: FakeResultHandler()
+  )
+
+  // CHECK: RETURN: ()
+
+  try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: helloName,
       invocation: invocation,
       handler: FakeResultHandler()
   )
 
-  // CHECK: done
+  // CHECK: RETURN: Hello, World!
+
+  try await system.executeDistributedTarget(
+      on: local,
+      mangledTargetName: answerName,
+      invocation: invocation,
+      handler: FakeResultHandler()
+  )
+
+  // CHECK: RETURN: 42
+
+  try await system.executeDistributedTarget(
+      on: local,
+      mangledTargetName: largeResultName,
+      invocation: invocation,
+      handler: FakeResultHandler()
+  )
+
+  // CHECK: RETURN: LargeStruct(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
+
+  try await system.executeDistributedTarget(
+      on: local,
+      mangledTargetName: enumResult,
+      invocation: invocation,
+      handler: FakeResultHandler()
+  )
+  // CHECK: RETURN: bar
+
+  // CHECK-NEXT: done
   print("done")
 }
 
