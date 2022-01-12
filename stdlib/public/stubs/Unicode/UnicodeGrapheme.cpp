@@ -12,6 +12,7 @@
 
 #include "Common/GraphemeData.h"
 #include "../SwiftShims/UnicodeData.h"
+#include <limits>
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar) {
@@ -56,4 +57,17 @@ __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar) 
   // array (this occurs when a scalar doesn't map to any grapheme break
   // property). Return the max value here to indicate .any.
   return 0xFF;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_bool _swift_stdlib_isLinkingConsonant(__swift_uint32_t scalar) {
+  auto idx = _swift_stdlib_getScalarBitArrayIdx(scalar,
+                                          _swift_stdlib_linkingConsonant,
+                                          _swift_stdlib_linkingConsonant_ranks);
+
+  if (idx == std::numeric_limits<__swift_intptr_t>::max()) {
+    return false;
+  }
+
+  return true;
 }
