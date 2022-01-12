@@ -854,20 +854,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
 
-  if (auto A = Args.getLastArg(OPT_requirement_machine_EQ)) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
-        .Case("off", RequirementMachineMode::Disabled)
-        .Case("on", RequirementMachineMode::Enabled)
-        .Case("verify", RequirementMachineMode::Verify)
-        .Default(None);
-
-    if (value)
-      Opts.EnableRequirementMachine = *value;
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
-
   if (auto A = Args.getLastArg(OPT_requirement_machine_protocol_signatures_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
         .Case("off", RequirementMachineMode::Disabled)

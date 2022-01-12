@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/Inputs/rdar79564324_other.swift -emit-module-path %t/rdar79564324_other.swiftmodule -requirement-machine=on -dump-requirement-machine 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen %s -I %t -requirement-machine=on
+// RUN: %target-swift-frontend -emit-module %S/Inputs/rdar79564324_other.swift -emit-module-path %t/rdar79564324_other.swiftmodule -dump-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -I %t
 
 import rdar79564324_other
 

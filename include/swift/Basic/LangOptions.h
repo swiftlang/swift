@@ -477,10 +477,6 @@ namespace swift {
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
 
-    /// Whether the new experimental generics implementation is enabled.
-    RequirementMachineMode EnableRequirementMachine =
-        RequirementMachineMode::Enabled;
-
     /// Enables merged associated type support, which might go away.
     bool RequirementMachineMergedAssociatedTypes = true;
 
