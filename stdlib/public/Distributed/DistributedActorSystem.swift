@@ -224,12 +224,12 @@ extension DistributedActorSystem {
       return UnsafeRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
     }
 
-    guard let returnType: Any.Type = _getReturnTypeInfo(mangledMethodName: mangledTargetName) else {
+    guard let returnTypeFromTypeInfo: Any.Type = _getReturnTypeInfo(mangledMethodName: mangledTargetName) else {
       throw ExecuteDistributedTargetError(
         message: "Failed to decode distributed target return type")
     }
 
-    guard let resultBuffer = _openExistential(returnType, do: allocateReturnTypeBuffer) else {
+    guard let resultBuffer = _openExistential(returnTypeFromTypeInfo, do: allocateReturnTypeBuffer) else {
       throw ExecuteDistributedTargetError(
         message: "Failed to allocate buffer for distributed target return type")
     }
@@ -239,7 +239,7 @@ extension DistributedActorSystem {
     }
 
     defer {
-      _openExistential(returnType, do: destroyReturnTypeBuffer)
+      _openExistential(returnTypeFromTypeInfo, do: destroyReturnTypeBuffer)
     }
 
     // Prepare the buffer to decode the argument values into
@@ -250,6 +250,33 @@ extension DistributedActorSystem {
     }
 
     do {
+      // Decode the invocation and pack arguments into the h-buffer
+
+      // TODO(distributed): decode the generics info
+      var argumentDecoder = invocation.makeArgumentDecoder()
+      var paramIdx = 0
+      for unsafeRawArgPointer in hargs {
+        guard paramIdx < paramCount else {
+          throw ExecuteDistributedTargetError(
+            message: "Unexpected attempt to decode more parameters than expected: \(paramIdx + 1)")
+        }
+        let paramType = paramTypes[paramIdx]
+        paramIdx += 1
+
+        // FIXME(distributed): func doDecode<Arg: SerializationRequirement>(_: Arg.Type) throws {
+        // FIXME:     but how would we call this...?
+        // FIXME:     > type 'Arg' constrained to non-protocol, non-class type 'Self.Invocation.SerializationRequirement'
+        func doDecodeArgument<Arg>(_: Arg.Type) throws {
+          let unsafeArgPointer = unsafeRawArgPointer
+            .bindMemory(to: Arg.self, capacity: 1)
+          try argumentDecoder.decodeNext(Arg.self, into: unsafeArgPointer)
+        }
+        try _openExistential(paramType, do: doDecodeArgument)
+      }
+
+       let returnType = try invocation.decodeReturnType() ?? returnTypeFromTypeInfo
+       // let errorType = try invocation.decodeErrorType() // TODO: decide how to use?
+
       // Execute the target!
       try await _executeDistributedTarget(
         on: actor,

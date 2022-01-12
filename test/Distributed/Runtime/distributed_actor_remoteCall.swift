@@ -47,9 +47,14 @@ distributed actor Greeter {
     .init(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
   }
 
+  distributed func echo(name: String) -> String {
+    return "Echo: \(name)"
+  }
+
   distributed func enumResult() -> E {
     .bar
   }
+
 
   distributed func test(i: Int, s: String) -> String {
     return s
@@ -142,8 +147,12 @@ struct FakeInvocation: DistributedTargetInvocation {
   typealias ArgumentDecoder = FakeArgumentDecoder
   typealias SerializationRequirement = Codable
 
+  var arguments: [Any] = []
+
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {
+    arguments.append(argument)
+  }
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
@@ -151,16 +160,34 @@ struct FakeInvocation: DistributedTargetInvocation {
   // === Receiving / decoding -------------------------------------------------
 
   mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  func makeArgumentDecoder() -> FakeArgumentDecoder { .init() }
+  func makeArgumentDecoder() -> FakeArgumentDecoder {
+    .init(invocation: self)
+  }
   mutating func decodeReturnType() throws -> Any.Type? { nil }
   mutating func decodeErrorType() throws -> Any.Type? { nil }
 
   struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
     typealias SerializationRequirement = Codable
+    let invocation: FakeInvocation
+    var index: Int = 0
+
     mutating func decodeNext<Argument>(
       _ argumentType: Argument.Type,
       into pointer: UnsafeMutablePointer<Argument>
-    ) throws {}
+    ) throws {
+      guard index < invocation.arguments.count else {
+        fatalError("Attempted to decode more arguments than stored! Index: \(index), args: \(invocation.arguments)")
+      }
+
+      let anyArgument = invocation.arguments[index]
+      guard let argument = anyArgument as? Argument else {
+        fatalError("Cannot cast argument\(anyArgument) to expected \(Argument.self)")
+      }
+
+      print("  > argument: \(argument)")
+      pointer.pointee = argument
+      index += 1
+    }
   }
 }
 
@@ -184,7 +211,9 @@ let emptyName = "$s4main7GreeterC5emptyyyFTE"
 let helloName = "$s4main7GreeterC5helloSSyFTE"
 let answerName = "$s4main7GreeterC6answerSiyFTE"
 let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
-let enumResult = "$s4main7GreeterC10enumResultAA1EOyFTE"
+let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
+
+let echoName = "$s4main7GreeterC4echo4nameS2S_tFTE"
 
 func test() async throws {
   let system = FakeActorSystem()
@@ -200,7 +229,6 @@ func test() async throws {
     invocation: &invocation,
     handler: FakeResultHandler()
   )
-
   // CHECK: RETURN: ()
 
   try await system.executeDistributedTarget(
@@ -209,7 +237,6 @@ func test() async throws {
       invocation: &invocation,
       handler: FakeResultHandler()
   )
-
   // CHECK: RETURN: Hello, World!
 
   try await system.executeDistributedTarget(
@@ -218,7 +245,6 @@ func test() async throws {
       invocation: &invocation,
       handler: FakeResultHandler()
   )
-
   // CHECK: RETURN: 42
 
   try await system.executeDistributedTarget(
@@ -227,16 +253,26 @@ func test() async throws {
       invocation: &invocation,
       handler: FakeResultHandler()
   )
-
   // CHECK: RETURN: LargeStruct(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
 
   try await system.executeDistributedTarget(
       on: local,
-      mangledTargetName: enumResult,
+      mangledTargetName: enumResultName,
       invocation: &invocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: bar
+
+  var echoInvocation = system.makeInvocation()
+  try echoInvocation.recordArgument(argument: "Caplin")
+  try echoInvocation.doneRecording()
+  try await system.executeDistributedTarget(
+      on: local,
+      mangledTargetName: echoName,
+      invocation: &echoInvocation,
+      handler: FakeResultHandler()
+  )
+  // CHECK: RETURN: Echo: Caplin
 
   // CHECK-NEXT: done
   print("done")
