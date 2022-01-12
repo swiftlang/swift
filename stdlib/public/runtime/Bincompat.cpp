@@ -118,6 +118,27 @@ bool useLegacyOptionalNilInjectionInCasting() {
 #endif
 }
 
+// Should casting be strict about protocol conformance when
+// boxing Swift values to pass to Obj-C?
+
+// Earlier versions of the Swift runtime would allow you to
+// cast a swift value to e.g., `NSCopying` or `NSObjectProtocol`
+// even if that value did not actually conform.  This was
+// due to the fact that the `__SwiftValue` box type itself
+// conformed to these protocols.
+
+// But this was not really sound, as it implies for example that
+// `x is NSCopying` is always `true` regardless of whether
+// `x` actually has the `copyWithZone()` method required
+// by that protocol.
+bool useLegacyObjCBoxingInCasting() {
+#if BINARY_COMPATIBILITY_APPLE
+  return true; // For now, continue using the legacy behavior on Apple OSes
+#else
+  return false; // Always use the new behavior on non-Apple OSes
+#endif
+}
+
 } // namespace bincompat
 
 } // namespace runtime

@@ -34,6 +34,10 @@ bool useLegacyPermissiveObjCNullSemanticsInCasting();
 /// to nested optionals
 bool useLegacyOptionalNilInjectionInCasting();
 
+/// Whether to use legacy semantics when boxing Swift values for
+/// Obj-C interop
+bool useLegacyObjCBoxingInCasting();
+
 } // namespace bincompat
 
 } // namespace runtime
