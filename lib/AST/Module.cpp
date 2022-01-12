@@ -788,6 +788,24 @@ void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
 }
 
+void ModuleDecl::dumpDisplayDecls() const {
+  SmallVector<Decl *, 32> Decls;
+  getDisplayDecls(Decls);
+  for (auto *D : Decls) {
+    D->dump(llvm::errs());
+    llvm::errs() << "\n";
+  }
+}
+
+void ModuleDecl::dumpTopLevelDecls() const {
+  SmallVector<Decl *, 32> Decls;
+  getTopLevelDecls(Decls);
+  for (auto *D : Decls) {
+    D->dump(llvm::errs());
+    llvm::errs() << "\n";
+  }
+}
+
 void ModuleDecl::getExportedPrespecializations(
     SmallVectorImpl<Decl *> &Results) const {
   FORWARD(getExportedPrespecializations, (Results));
@@ -3060,6 +3078,22 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
       return !matchAttributes(D->getAttrs());
     });
   Results.erase(newEnd, Results.end());
+}
+
+void FileUnit::dumpDisplayDecls() const {
+  SmallVector<Decl *, 32> Decls;
+  getDisplayDecls(Decls);
+  for (auto *D : Decls) {
+    D->dump(llvm::errs());
+  }
+}
+
+void FileUnit::dumpTopLevelDecls() const {
+  SmallVector<Decl *, 32> Decls;
+  getTopLevelDecls(Decls);
+  for (auto *D : Decls) {
+    D->dump(llvm::errs());
+  }
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const FileUnit *file) {
