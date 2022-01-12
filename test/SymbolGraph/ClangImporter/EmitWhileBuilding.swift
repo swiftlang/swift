@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-module-path %t/EmitWhileBuilding.framework/Modules/EmitWhileBuilding.swiftmodule/%target-swiftmodule-name -import-underlying-module -F %t -module-name EmitWhileBuilding -disable-objc-attr-requires-foundation-module %s -emit-symbol-graph -emit-symbol-graph-dir %t
 // RUN: %{python} -m json.tool %t/EmitWhileBuilding.symbols.json %t/EmitWhileBuilding.formatted.symbols.json
 // RUN: %FileCheck %s --input-file %t/EmitWhileBuilding.formatted.symbols.json
+// RUN: %FileCheck %s --input-file %t/EmitWhileBuilding.formatted.symbols.json --check-prefix HEADER
 
 // REQUIRES: objc_interop
 
@@ -10,6 +11,9 @@ import Foundation
 
 public enum SwiftEnum {}
 
+// HEADER:       "precise": "c:@testVariable"
+
+// CHECK:        "precise": "s:17EmitWhileBuilding9SwiftEnumO",
 // CHECK:        "declarationFragments": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:           "kind": "keyword",
