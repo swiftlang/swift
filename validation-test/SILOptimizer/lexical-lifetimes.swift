@@ -181,8 +181,9 @@ class FooerAsync {
     return do_foo_async {
       // At this point, strongSelf is keeping the object alive.
       weakSelf?.foo1()
-      // By this point, strongSelf has been nil'd, dropping the object's retain
-      // count to 0, deallocating the object, so weakSelf is nil.
+      // By this point, strongSelf has been nil'd.  However, self in the 
+      // enclosing foo() may still be keeping the object alive, depending on how
+      // the closure was scheduled.
       weakSelf?.foo2()
     }
   }
@@ -192,7 +193,6 @@ class FooerAsync {
     strongSelf = nil
   }
   func foo2() {
-    // CHECK-NOT: FooerAsync foo2
     print(type(of: self), #function)
   }
 }
