@@ -15,6 +15,6 @@
 
 func foo() {}
 
-// CHECK-ABS: !DIFile(filename: "{{[a-zA-Z]:\\.*\\}}debug_compilation_dir.swift", directory: "Z:\path\to")
-// CHECK-REL: !DIFile(filename: "debug_compilation_dir.swift", directory: "Z:\path\to")
+// CHECK-ABS: !DIFile(filename: "{{[a-zA-Z]:\\\\.*\\\\}}debug_compilation_dir.swift", directory: "Z:\\path\\to")
+// CHECK-REL: !DIFile(filename: "debug_compilation_dir.swift", directory: "Z:\\path\\to")
 // CHECK-REL-CWD: !DIFile(filename: "debug_compilation_dir.swift", directory: ".")
