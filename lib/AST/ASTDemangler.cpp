@@ -274,7 +274,8 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
         opaqueDecl->getGenericSignature(), allArgs,
         LookUpConformanceInModule(parentModule));
-    return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+    Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
+    return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
   }
   
   // TODO: named opaque types

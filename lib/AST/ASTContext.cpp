@@ -4244,7 +4244,7 @@ OpaqueTypeArchetypeType *OpaqueTypeArchetypeType::getNew(
 }
 
 Type OpaqueTypeArchetypeType::get(
-    OpaqueTypeDecl *Decl, unsigned ordinal, SubstitutionMap Substitutions) {
+    OpaqueTypeDecl *Decl, Type interfaceType, SubstitutionMap Substitutions) {
   // TODO: We could attempt to preserve type sugar in the substitution map.
   // Currently archetypes are assumed to be always canonical in many places,
   // though, so doing so would require fixing those places.
@@ -4265,8 +4265,7 @@ Type OpaqueTypeArchetypeType::get(
     environments[{Decl, Substitutions}] = env;
   }
 
-  auto opaqueParamType = Decl->getOpaqueGenericParams()[ordinal];
-  return env->getOrCreateArchetypeFromInterfaceType(opaqueParamType);
+  return env->getOrCreateArchetypeFromInterfaceType(interfaceType);
 }
 
 CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,

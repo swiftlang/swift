@@ -4482,11 +4482,11 @@ public:
   visitOpaqueTypeArchetypeType(const OpaqueTypeArchetypeType *archetypeTy) {
     using namespace decls_block;
     auto declID = S.addDeclRef(archetypeTy->getDecl());
+    auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
     auto substMapID = S.addSubstitutionMapRef(archetypeTy->getSubstitutions());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
     OpaqueArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          declID, archetypeTy->getOrdinal(),
-                                          substMapID);
+                                          declID, interfaceTypeID, substMapID);
   }
 
   void visitNestedArchetypeType(const NestedArchetypeType *archetypeTy) {

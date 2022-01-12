@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 656; // enable explicit existentials
+const uint16_t SWIFTMODULE_VERSION_MINOR = 657; // opaque interface type
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1084,7 +1084,7 @@ namespace decls_block {
   using OpaqueArchetypeTypeLayout = BCRecordLayout<
     OPAQUE_ARCHETYPE_TYPE,
     DeclIDField,           // the opaque type decl
-    BCVBR<4>,              // the ordinal
+    TypeIDField,           // the interface type
     SubstitutionMapIDField // the arguments
   >;
   

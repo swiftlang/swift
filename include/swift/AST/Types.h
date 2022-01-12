@@ -5547,10 +5547,12 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
 
 public:
   /// Get an opaque archetype representing the underlying type of the given
-  /// opaque type decl's opaque param with ordinal `ordinal`. For example, in
-  /// `(some P, some Q)`, `some P`'s type param would have ordinal 0 and `some
-  /// Q`'s type param would have ordinal 1.
-  static Type get(OpaqueTypeDecl *decl, unsigned ordinal, SubstitutionMap subs);
+  /// opaque type decl's interface type. For example, in
+  /// `(some P, some Q)`, `some P`'s interface type would be the generic
+  /// parameter with index 0, and `some Q`'s interface type would be the
+  /// generic parameter with index 1.
+  static Type get(OpaqueTypeDecl *decl, Type interfaceType,
+                  SubstitutionMap subs);
 
   /// Retrieve the opaque type declaration.
   OpaqueTypeDecl *getDecl() const;

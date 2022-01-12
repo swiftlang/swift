@@ -5513,21 +5513,26 @@ public:
   Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     DeclID opaqueDeclID;
-    unsigned ordinal;
+    TypeID interfaceTypeID;
     SubstitutionMapID subsID;
     decls_block::OpaqueArchetypeTypeLayout::readRecord(
-        scratch, opaqueDeclID, ordinal, subsID);
+        scratch, opaqueDeclID, interfaceTypeID, subsID);
 
     auto opaqueTypeOrError = MF.getDeclChecked(opaqueDeclID);
     if (!opaqueTypeOrError)
       return opaqueTypeOrError.takeError();
+
+    auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTypeOrError)
+      return interfaceTypeOrError.takeError();
 
     auto opaqueDecl = cast<OpaqueTypeDecl>(opaqueTypeOrError.get());
     auto subsOrError = MF.getSubstitutionMapChecked(subsID);
     if (!subsOrError)
       return subsOrError.takeError();
 
-    return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subsOrError.get());
+    return OpaqueTypeArchetypeType::get(
+        opaqueDecl, interfaceTypeOrError.get(), subsOrError.get());
   }
       
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,

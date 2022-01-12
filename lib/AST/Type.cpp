@@ -4922,7 +4922,8 @@ case TypeKind::Id:
          return newSubs[index];
        },
        LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
-    return OpaqueTypeArchetypeType::get(opaque->getDecl(), opaque->getOrdinal(),
+    return OpaqueTypeArchetypeType::get(opaque->getDecl(),
+                                        opaque->getInterfaceType(),
                                         newSubMap);
   }
   case TypeKind::NestedArchetype: {
