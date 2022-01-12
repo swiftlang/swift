@@ -239,12 +239,23 @@ public:
   bool isStoredPriorityEscalated() const {
     return Flags & IsEscalated;
   }
+
+  /// Creates a new active task status for a task with the specified priority
+  /// and masks away any existing priority related flags on the task status. All
+  /// other flags about the task are unmodified. This is only safe to use to
+  /// generate an initial task status for a new task that is not yet running.
+  ActiveTaskStatus withNewPriority(JobPriority priority) const {
+    return ActiveTaskStatus(Record,
+                            (Flags & ~PriorityMask) | uintptr_t(priority));
+  }
+
   ActiveTaskStatus withEscalatedPriority(JobPriority priority) const {
     assert(priority > getStoredPriority());
     return ActiveTaskStatus(Record,
                             (Flags & ~PriorityMask)
                                | IsEscalated | uintptr_t(priority));
   }
+
   ActiveTaskStatus withoutStoredPriorityEscalation() const {
     assert(isStoredPriorityEscalated());
     return ActiveTaskStatus(Record, Flags & ~IsEscalated);
@@ -446,6 +457,39 @@ inline OpaqueValue *AsyncTask::localValueGet(const HeapObject *key) {
 inline bool AsyncTask::localValuePop() {
   return _private().Local.popValue(this);
 }
+
+/*************** Methods for Status records manipulation ******************/
+
+/// Remove a status record from a task.  After this call returns,
+/// the record's memory can be freely modified or deallocated.
+///
+/// This must be called synchronously with the task.  The record must
+/// be registered with the task or else this may crash.
+///
+/// The given record need not be the last record added to
+/// the task, but the operation may be less efficient if not.
+///
+/// Returns false if the task has been cancelled.
+SWIFT_CC(swift)
+bool removeStatusRecord(TaskStatusRecord *record);
+
+/// Add a status record to a task. This must be called synchronously with the
+/// task.
+///
+/// This function also takes in a function_ref which is given the task status of
+/// the task we're adding the record to, to determine if the current status of
+/// the task permits adding the status record. This function_ref may be called
+/// multiple times and must be idempotent.
+SWIFT_CC(swift)
+bool addStatusRecord(TaskStatusRecord *record,
+                     llvm::function_ref<bool(ActiveTaskStatus)> testAddRecord);
+
+/// A helper function for updating a new child task that is created with
+/// information from the parent or the group that it was going to be added to.
+SWIFT_CC(swift)
+void updateNewChildWithParentAndGroupState(AsyncTask *child,
+                                           ActiveTaskStatus parentStatus,
+                                           TaskGroup *group);
 
 } // end namespace swift
 
