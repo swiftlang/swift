@@ -51,7 +51,11 @@ static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
   // TODO: This should really be tracked separately from other destroys so that
   // we distinguish the lifetime of the container from the value itself.
   assert(isa<ProjectBoxInst>(uninitMemory));
-  auto *mui = cast<MarkUninitializedInst>(uninitMemory->getOperand(0));
+  auto value = uninitMemory->getOperand(0);
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(value)) {
+    value = bbi->getOperand();
+  }
+  auto *mui = cast<MarkUninitializedInst>(value);
   for (auto *user : mui->getUsersOfType<DestroyValueInst>()) {
     useInfo.trackDestroy(user);
   }
@@ -114,6 +118,12 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
   auto &Module = MI->getModule();
 
   SILValue Address = MemoryInst;
+  if (auto BBI = MemoryInst->getSingleUserOfType<BeginBorrowInst>()) {
+    if (auto PBI = BBI->getSingleUserOfType<ProjectBoxInst>()) {
+      IsBox = true;
+      Address = PBI;
+    }
+  }
   if (auto PBI = MemoryInst->getSingleUserOfType<ProjectBoxInst>()) {
     IsBox = true;
     Address = PBI;
