@@ -141,12 +141,12 @@ func test() async throws {
   let local = Greeter(system: system)
 
   // act as if we decoded an Invocation:
-  let invocation = FakeInvocation()
+  var invocation = FakeInvocation()
 
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: helloName,
-      invocation: invocation,
+      invocation: &invocation,
       handler: FakeResultHandler()
   )
 
