@@ -329,8 +329,12 @@ extension MutableCollection where Self: BidirectionalCollection {
   }
 }
 
+// FIXME(ABI): unused return value
 /// Merges the elements in the ranges `lo..<mid` and `mid..<hi` using `buffer`
 /// as out-of-place storage. Stable.
+///
+/// The unused return value is legacy ABI. It was originally added as a
+/// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
 ///
 /// - Precondition: `lo..<mid` and `mid..<hi` must already be sorted according
 ///   to `areInIncreasingOrder`.
@@ -506,8 +510,12 @@ internal func _findNextRun<C: RandomAccessCollection>(
 }
 
 extension UnsafeMutableBufferPointer {
+  // FIXME(ABI): unused return value
   /// Merges the elements at `runs[i]` and `runs[i - 1]`, using `buffer` as
   /// out-of-place storage.
+  ///
+  /// The unused return value is legacy ABI. It was originally added as a
+  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
   ///
   /// - Precondition: `runs.count > 1` and `i > 0`
   /// - Precondition: `buffer` must have at least
@@ -537,9 +545,13 @@ extension UnsafeMutableBufferPointer {
 
     return true
   }
-  
+
+  // FIXME(ABI): unused return value
   /// Merges upper elements of `runs` until the required invariants are
   /// satisfied.
+  ///
+  /// The unused return value is legacy ABI. It was originally added as a
+  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
   ///
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
@@ -611,8 +623,12 @@ extension UnsafeMutableBufferPointer {
 
     return true
   }
-  
+
+  // FIXME(ABI): unused return value
   /// Merges elements of `runs` until only one run remains.
+  ///
+  /// The unused return value is legacy ABI. It was originally added as a
+  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
   ///
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
