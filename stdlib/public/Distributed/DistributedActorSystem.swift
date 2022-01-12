@@ -127,7 +127,7 @@ public protocol DistributedActorSystem: Sendable {
 //      invocation: Invocation,
 //      throwing: Err.Type,
 //      returning: Res.Type
-//  ) async throws -> Res.Type
+//  ) async throws -> Res
 //      where Act: DistributedActor,
 //            Act.ID == ActorID,
 //            Res: SerializationRequirement
@@ -317,8 +317,8 @@ public struct RemoteCallTarget {
   let mangledName: String
 
   // Only intended to be created by the _Distributed library.
-  internal init(mangledName: String) {
-    self.mangledName = mangledName
+  public init(_mangledName: String) {
+    self.mangledName = _mangledName
   }
 
   // <module>.Base.hello(hi:)
@@ -367,19 +367,19 @@ public protocol DistributedTargetInvocation {
 
   /// The arguments must be encoded order-preserving, and once `decodeGenericSubstitutions`
   /// is called, the substitutions must be returned in the same order in which they were recorded.
-  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws
 
 //  /// Ad-hoc requirement
 //  ///
 //  /// Record an argument of `Argument` type in this arguments storage.
 //  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws
 
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
 //  /// Ad-hoc requirement
 //  ///
 //  /// Record the return type of the distributed method.
-//  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws
+//  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws
 
   mutating func doneRecording() throws
 

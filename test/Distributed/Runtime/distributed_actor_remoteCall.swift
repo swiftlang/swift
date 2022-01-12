@@ -18,6 +18,9 @@ final class Obj: @unchecked Sendable, Codable  {}
 struct LargeStruct: Sendable, Codable {
 }
 
+@_silgen_name("swift_distributed_actor_is_remote")
+func __isRemoteActor(_ actor: AnyObject) -> Bool
+
 distributed actor Greeter {
   distributed func hello() {
     print("EXECUTING HELLO")
@@ -34,25 +37,25 @@ distributed actor Greeter {
     if remote {
       // bb1:
       var invocation = try self.actorSystem.makeInvocation()
-      try invocation.recordArgument/*<Int>*/(i)
-      try invocation.recordArgument/*<String>*/(s)
+      try invocation.recordArgument/*<Int>*/(argument: i)
+      try invocation.recordArgument/*<String>*/(argument: s)
       try invocation.recordReturnType/*<String>*/(String.self)
-      // try invocation.recordErrorType/*<Error>*/(Error.self)
+      try invocation.recordErrorType/*<Error>*/(Error.self)
       try invocation.doneRecording()
 
-      let target = RemoteCallTarget(mangledName: "MANGLED_NAME")
+      let target = RemoteCallTarget(_mangledName: "MANGLED_NAME")
 
-      try await self.actorSystem.remoteCall<Self, Never, String>(
+      return try await self.actorSystem.remoteCall(
           on: self,
-          target,
-          invocation,
+          target: target,
+          invocation: invocation,
           throwing: Never.self,
           returning: String.self
       )
 
     } else {
       // bb2:
-      await self.test(i: i, s: s)
+      return try await self.test(i: i, s: s)
     }
   }
 
@@ -95,16 +98,29 @@ struct FakeActorSystem: DistributedActorSystem {
     .init()
   }
 
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation: Invocation,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+    Act.ID == ActorID,
+    Res: SerializationRequirement {
+    fatalError("INVOKED REMOTE CALL")
+  }
+
 }
 
 struct FakeInvocation: DistributedTargetInvocation {
   typealias ArgumentDecoder = FakeArgumentDecoder
   typealias SerializationRequirement = Codable
 
-  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
   mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
 
   // === Receiving / decoding -------------------------------------------------
@@ -116,11 +132,17 @@ struct FakeInvocation: DistributedTargetInvocation {
 
   struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
     typealias SerializationRequirement = Codable
+    mutating func decodeNext<Argument>(
+      _ argumentType: Argument.Type,
+      into pointer: UnsafeMutablePointer<Argument>
+    ) throws {}
   }
 }
 
 @available(SwiftStdlib 5.5, *)
 struct FakeResultHandler: DistributedTargetInvocationResultHandler {
+  typealias SerializationRequirement = Codable
+
   func onReturn<Res>(value: Res) async throws {
     print("RETURN: \(value)")
   }

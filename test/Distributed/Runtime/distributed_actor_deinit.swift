@@ -95,10 +95,10 @@ struct FakeDistributedInvocation: DistributedTargetInvocation {
   typealias  ArgumentDecoder = FakeDistributedTargetInvocationArgumentDecoder
   typealias SerializationRequirement = Codable
 
-  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws { }
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws { }
   mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws { }
-  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws { }
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws { }
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws { }
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws { }
   mutating func doneRecording() throws { }
 
   // === Receiving / decoding -------------------------------------------------

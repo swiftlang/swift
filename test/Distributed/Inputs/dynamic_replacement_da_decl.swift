@@ -69,7 +69,7 @@ final class FakeActorSystem: DistributedActorSystem {
       invocation: Invocation,
       throwing: Err.Type,
       returning: Res.Type
-  ) async throws -> Res.Type
+  ) async throws -> Res
       where Act: DistributedActor,
             Act.ID == ActorID,
             Res: SerializationRequirement {
@@ -85,7 +85,7 @@ struct FakeInvocation: DistributedTargetInvocation {
   typealias ArgumentDecoder = FakeArgumentDecoder
   typealias SerializationRequirement = Codable
 
-  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
   mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
   mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}

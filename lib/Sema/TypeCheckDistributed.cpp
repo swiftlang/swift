@@ -138,7 +138,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
                                             "    invocation: Invocation,\n"
                                             "    throwing: Err.Type,\n"
                                             "    returning: Res.Type\n"
-                                            ") async throws -> Res.Type\n"
+                                            ") async throws -> Res\n"
                                             "  where Act: DistributedActor,\n"
                                             "        Act.ID == ActorID,\n"
                                             "        Res: SerializationRequirement\n");
