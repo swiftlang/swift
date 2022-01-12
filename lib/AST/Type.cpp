@@ -3225,6 +3225,10 @@ ArchetypeType *ArchetypeType::getRoot() const {
       Type(gp))->castTo<ArchetypeType>();
 }
 
+bool ArchetypeType::isRoot() const {
+  return getInterfaceType()->is<GenericTypeParamType>();
+}
+
 Type ArchetypeType::getExistentialType() const {
   // Opened types hold this directly.
   if (auto opened = dyn_cast<OpenedArchetypeType>(this))
@@ -4247,21 +4251,19 @@ static Type substType(Type derivedType,
     if (isa<GenericTypeParamType>(substOrig))
       return ErrorType::get(type);
 
-    if (isa<PrimaryArchetypeType>(substOrig))
-      return ErrorType::get(type);
-
-    if (isa<SequenceArchetypeType>(substOrig))
-      return ErrorType::get(type);
-
     // Opened existentials cannot be substituted in this manner,
     // but if they appear in the original type this is not an
     // error.
-    if (isa<OpenedArchetypeType>(substOrig))
+    auto origArchetype = cast<ArchetypeType>(substOrig);
+    if (isa<OpenedArchetypeType>(origArchetype->getRoot()))
       return Type(type);
 
+    // Root archetypes must already have been substituted above.
+    if (origArchetype->isRoot())
+      return ErrorType::get(type);
+
     // For nested archetypes, we can substitute the parent.
-    auto nestedArchetype = cast<ArchetypeType>(substOrig);
-    auto parent = nestedArchetype->getParent();
+    auto parent = origArchetype->getParent();
     assert(parent && "Not a nested archetype");
 
     // Substitute into the parent type.
@@ -4273,7 +4275,7 @@ static Type substType(Type derivedType,
       return Type(type);
 
     // Get the associated type reference from a child archetype.
-    AssociatedTypeDecl *assocType = nestedArchetype->getInterfaceType()
+    AssociatedTypeDecl *assocType = origArchetype->getInterfaceType()
         ->castTo<DependentMemberType>()->getAssocType();
 
     return getMemberForBaseType(lookupConformances, parent, substParent,

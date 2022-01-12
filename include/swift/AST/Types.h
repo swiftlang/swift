@@ -5464,7 +5464,10 @@ public:
 
   /// Return the root archetype parent of this archetype.
   ArchetypeType *getRoot() const;
-  
+
+  /// Determine whether this is a root archetype within the environment.
+  bool isRoot() const;
+
   /// Get the generic environment this archetype lives in.
   GenericEnvironment *getGenericEnvironment() const { return Environment; }
   
