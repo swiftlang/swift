@@ -105,7 +105,7 @@ public protocol DistributedActorSystem: Sendable {
 
   /// Invoked by the Swift runtime when a distributed remote call is about to be made.
   ///
-  /// The returned DistributedTargetInvocation will be populated with all
+  /// The returned `DistributedTargetInvocation` will be populated with all
   /// arguments, generic substitutions, and specific error and return types
   /// that are associated with this specific invocation.
   @inlinable
@@ -156,7 +156,7 @@ extension DistributedActorSystem {
   public func executeDistributedTarget<Act, ResultHandler>(
       on actor: Act,
       mangledTargetName: String,
-      invocation: Self.Invocation,
+      invocation: inout Self.Invocation,
       handler: ResultHandler
   ) async throws where Act: DistributedActor,
                        Act.ID == ActorID,
@@ -247,6 +247,34 @@ extension DistributedActorSystem {
     }
 
     do {
+      // Decode the invocation and pack arguments into the h-buffer
+
+      // TODO(distributed): decode the generics info
+
+      var argumentDecoder = invocation.makeArgumentDecoder()
+      var paramIdx = 0
+      for unsafeRawArgPointer in hargs {
+        guard paramIdx < paramCount else {
+          throw ExecuteDistributedTargetError(
+            message: "Unexpected attempt to decode more parameters than expected: \(paramIdx + 1)")
+        }
+        let paramType = paramTypes[paramIdx]
+        paramIdx += 1
+
+        // FIXME(distributed): func doDecode<Arg: SerializationRequirement>(_: Arg.Type) throws {
+        // FIXME:     but how would we call this...?
+        // FIXME:     > type 'Arg' constrained to non-protocol, non-class type 'Self.Invocation.SerializationRequirement'
+        func doDecodeArgument<Arg>(_: Arg.Type) throws {
+          let unsafeArgPointer = unsafeRawArgPointer
+            .bindMemory(to: Arg.self, capacity: 1)
+          try argumentDecoder.decodeNext(Arg.self, into: unsafeArgPointer)
+        }
+        try _openExistential(paramType, do: doDecodeArgument)
+      }
+
+      let returnType = try invocation.decodeReturnType() ?? Void.self
+      let errorType = try invocation.decodeErrorType() ?? Never.self
+
       // Execute the target!
       try await _executeDistributedTarget(
           on: actor,
@@ -346,12 +374,12 @@ public protocol DistributedTargetInvocation {
 //  /// Record an argument of `Argument` type in this arguments storage.
 //  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws
 
+  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws
+
 //  /// Ad-hoc requirement
 //  ///
 //  /// Record the return type of the distributed method.
 //  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws
-
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws
 
   mutating func doneRecording() throws
 
@@ -359,7 +387,7 @@ public protocol DistributedTargetInvocation {
 
   mutating func decodeGenericSubstitutions() throws -> [Any.Type]
 
-  mutating func argumentDecoder() -> Self.ArgumentDecoder
+  func makeArgumentDecoder() -> Self.ArgumentDecoder
 
   mutating func decodeReturnType() throws -> Any.Type?
 
@@ -370,20 +398,6 @@ public protocol DistributedTargetInvocation {
 ///
 /// It will be called exactly `N` times where `N` is the known number of arguments
 /// to the target invocation.
-///
-/// ## Ad-hoc protocol requirement
-///
-/// Adopters of this protocol must defined the following method:
-///
-/// ```
-/// mutating func decodeNext<Argument: SerializationRequirement>(
-///     into pointer: UnsafeMutablePointer<Argument>
-/// ) throws
-/// ```
-///
-/// which will be invoked with the specific `Argument` type that the target invocation is expecting.
-///
-/// This method is allowed to invoke
 @available(SwiftStdlib 5.6, *)
 public protocol DistributedTargetInvocationArgumentDecoder {
   associatedtype SerializationRequirement
@@ -404,6 +418,12 @@ public protocol DistributedTargetInvocationArgumentDecoder {
 //  mutating func decodeNext<Argument: SerializationRequirement>(
 //      into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
 //  ) throws
+
+  // FIXME(distributed): remove this since it must have the ': SerializationRequirement'
+  mutating func decodeNext<Argument>(
+      _ argumentType: Argument.Type,
+      into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
+  ) throws
 }
 
 @available(SwiftStdlib 5.6, *)
