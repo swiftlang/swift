@@ -26,6 +26,6 @@ extension P where Self : Derived {
 // CHECK-NEXT: Rewrite loops: {
 // CHECK:      }
 // CHECK-NEXT: Property map: {
-// CHECK-NEXT:   [P] => { layout: _NativeClass superclass: [superclass: Base] }
+// CHECK-NEXT:   [P] => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Base] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Derived] }
 // CHECK-NEXT: }
