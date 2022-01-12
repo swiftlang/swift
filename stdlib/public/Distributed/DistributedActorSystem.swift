@@ -154,10 +154,10 @@ extension DistributedActorSystem {
   /// is that thanks to this approach it can avoid any existential boxing, and can serve the most
   /// latency sensitive-use-cases.
   public func executeDistributedTarget<Act, ResultHandler>(
-      on actor: Act,
-      mangledTargetName: String,
-      invocation: inout Self.Invocation,
-      handler: ResultHandler
+    on actor: Act,
+    mangledTargetName: String,
+    invocation: inout Invocation,
+    handler: ResultHandler
   ) async throws where Act: DistributedActor,
                        Act.ID == ActorID,
                        ResultHandler: DistributedTargetInvocationResultHandler {
@@ -165,10 +165,9 @@ extension DistributedActorSystem {
     // we end up demangling the name multiple times, perform more heap allocations than
     // we truly need to etc. We'll eventually move this implementation to a specialized one
     // avoiding these issues.
-
     guard mangledTargetName.count > 0 && mangledTargetName.first == "$" else {
       throw ExecuteDistributedTargetError(
-          message: "Illegal mangledTargetName detected, must start with '$'")
+        message: "Illegal mangledTargetName detected, must start with '$'")
     }
 
     // Get the expected parameter count of the func
@@ -179,17 +178,17 @@ extension DistributedActorSystem {
 
     guard paramCount >= 0 else {
       throw ExecuteDistributedTargetError(
-          message: """
-                   Failed to decode distributed invocation target expected parameter count,
-                   error code: \(paramCount)
-                   mangled name: \(mangledTargetName)
-                   """)
+        message: """
+                 Failed to decode distributed invocation target expected parameter count,
+                 error code: \(paramCount)
+                 mangled name: \(mangledTargetName)
+                 """)
     }
 
     // Prepare buffer for the parameter types to be decoded into:
     let paramTypesBuffer = UnsafeMutableRawBufferPointer
-        .allocate(byteCount: MemoryLayout<Any.Type>.size * Int(paramCount),
-                  alignment: MemoryLayout<Any.Type>.alignment)
+      .allocate(byteCount: MemoryLayout<Any.Type>.size * Int(paramCount),
+        alignment: MemoryLayout<Any.Type>.alignment)
     defer {
       paramTypesBuffer.deallocate()
     }
@@ -197,18 +196,18 @@ extension DistributedActorSystem {
     // Demangle and write all parameter types into the prepared buffer
     let decodedNum = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
       __getParameterTypeInfo(
-          nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
-          paramTypesBuffer.baseAddress!._rawValue, Int(paramCount))
+        nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
+        paramTypesBuffer.baseAddress!._rawValue, Int(paramCount))
     }
 
     // Fail if the decoded parameter types count seems off and fishy
     guard decodedNum == paramCount else {
       throw ExecuteDistributedTargetError(
-          message: """
-                   Failed to decode the expected number of params of distributed invocation target, error code: \(decodedNum)
-                   (decoded: \(decodedNum), expected params: \(paramCount)
-                   mangled name: \(mangledTargetName)
-                   """)
+        message: """
+                 Failed to decode the expected number of params of distributed invocation target, error code: \(decodedNum)
+                 (decoded: \(decodedNum), expected params: \(paramCount)
+                 mangled name: \(mangledTargetName)
+                 """)
     }
 
     // Copy the types from the buffer into a Swift Array
@@ -224,19 +223,21 @@ extension DistributedActorSystem {
     func allocateReturnTypeBuffer<R>(_: R.Type) -> UnsafeRawPointer? {
       return UnsafeRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
     }
+
     guard let returnType: Any.Type = _getReturnTypeInfo(mangledMethodName: mangledTargetName) else {
       throw ExecuteDistributedTargetError(
-          message: "Failed to decode distributed target return type")
+        message: "Failed to decode distributed target return type")
     }
 
     guard let resultBuffer = _openExistential(returnType, do: allocateReturnTypeBuffer) else {
       throw ExecuteDistributedTargetError(
-          message: "Failed to allocate buffer for distributed target return type")
+        message: "Failed to allocate buffer for distributed target return type")
     }
 
     func destroyReturnTypeBuffer<R>(_: R.Type) {
       resultBuffer.assumingMemoryBound(to: R.self).deallocate()
     }
+
     defer {
       _openExistential(returnType, do: destroyReturnTypeBuffer)
     }
@@ -249,40 +250,12 @@ extension DistributedActorSystem {
     }
 
     do {
-      // Decode the invocation and pack arguments into the h-buffer
-
-      // TODO(distributed): decode the generics info
-
-      var argumentDecoder = invocation.makeArgumentDecoder()
-      var paramIdx = 0
-      for unsafeRawArgPointer in hargs {
-        guard paramIdx < paramCount else {
-          throw ExecuteDistributedTargetError(
-            message: "Unexpected attempt to decode more parameters than expected: \(paramIdx + 1)")
-        }
-        let paramType = paramTypes[paramIdx]
-        paramIdx += 1
-
-        // FIXME(distributed): func doDecode<Arg: SerializationRequirement>(_: Arg.Type) throws {
-        // FIXME:     but how would we call this...?
-        // FIXME:     > type 'Arg' constrained to non-protocol, non-class type 'Self.Invocation.SerializationRequirement'
-        func doDecodeArgument<Arg>(_: Arg.Type) throws {
-          let unsafeArgPointer = unsafeRawArgPointer
-            .bindMemory(to: Arg.self, capacity: 1)
-          try argumentDecoder.decodeNext(Arg.self, into: unsafeArgPointer)
-        }
-        try _openExistential(paramType, do: doDecodeArgument)
-      }
-
-      let returnType = try invocation.decodeReturnType() ?? Void.self
-      let errorType = try invocation.decodeErrorType() ?? Never.self
-
       // Execute the target!
       try await _executeDistributedTarget(
-          on: actor,
-          mangledTargetName, UInt(mangledTargetName.count),
-          argumentBuffer: hargs.buffer._rawValue,
-          resultBuffer: resultBuffer._rawValue
+        on: actor,
+        mangledTargetName, UInt(mangledTargetName.count),
+        argumentBuffer: hargs.buffer._rawValue,
+        resultBuffer: resultBuffer._rawValue
       )
 
       func onReturn<R>(_ resultTy: R.Type) async throws {

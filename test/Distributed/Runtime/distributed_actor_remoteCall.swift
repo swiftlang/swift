@@ -197,7 +197,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: emptyName,
-    invocation: invocation,
+    invocation: &invocation,
     handler: FakeResultHandler()
   )
 
@@ -215,7 +215,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: answerName,
-      invocation: invocation,
+      invocation: &invocation,
       handler: FakeResultHandler()
   )
 
@@ -224,7 +224,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: largeResultName,
-      invocation: invocation,
+      invocation: &invocation,
       handler: FakeResultHandler()
   )
 
@@ -233,7 +233,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: enumResult,
-      invocation: invocation,
+      invocation: &invocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: bar
