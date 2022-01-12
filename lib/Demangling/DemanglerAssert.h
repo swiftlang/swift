@@ -40,7 +40,7 @@
       swift::Demangle::failAssert(__FILE__, __LINE__, node, #expr);            \
   } while (0)
 
-#endif // !defined(NDEBUG) && !SWIFT_RUNTIME
+#endif // SWIFT_RUNTIME || defined(NDEBUG)
 
 namespace swift {
 namespace Demangle {
