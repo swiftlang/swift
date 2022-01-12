@@ -1197,6 +1197,13 @@ static bool performAction(CompilerInstance &Instance,
               llvm::outs(), PrintOptions::printEverything());
           return Instance.getASTContext().hadError();
         });
+  case FrontendOptions::ActionType::PrintASTDecl:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          getPrimaryOrMainSourceFile(Instance).print(
+              llvm::outs(), PrintOptions::printDeclarations());
+          return Instance.getASTContext().hadError();
+        });
   case FrontendOptions::ActionType::DumpScopeMaps:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {

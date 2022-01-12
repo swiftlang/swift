@@ -1477,7 +1477,7 @@ static StringRef prettyPrintAttrs(const ValueDecl *VD,
   llvm::raw_svector_ostream os(out);
   StreamPrinter printer(os);
 
-  PrintOptions opts = PrintOptions::printEverything();
+  PrintOptions opts = PrintOptions::printDeclarations();
   VD->getAttrs().print(printer, opts, attrs, VD);
   return StringRef(out.begin(), out.size()).drop_back();
 }
