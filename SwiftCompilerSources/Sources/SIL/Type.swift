@@ -12,19 +12,55 @@
 
 import SILBridging
 
-public struct Type {
-  public let bridged: BridgedType
-
+public struct Type : CustomStringConvertible, CustomReflectable {
+  var bridged: BridgedType
+  
   public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
   public var isObject: Bool { !isAddress }
 
   public func isTrivial(in function: Function) -> Bool {
     return SILType_isTrivial(bridged, function.bridged) != 0
   }
+  
+  public var isNominal: Bool { SILType_isNominal(bridged) != 0 }
+  public var isClass: Bool { SILType_isClass(bridged) != 0 }
+  public var isStruct: Bool { SILType_isStruct(bridged) != 0 }
+  public var isTuple: Bool { SILType_isTuple(bridged) != 0 }
+  public var isEnum: Bool { SILType_isEnum(bridged) != 0 }
+
+  public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
+
+  public func isNonTrivialOrContainsRawPointer(in function: Function) -> Bool {
+    return SILType_isNonTrivialOrContainsRawPointer(bridged, function.bridged) != 0
+  }
+  
+  public func getFieldIndexOfNominal(fieldName: String) -> Int? {
+    let idx = fieldName.withBridgedStringRef {
+      SILType_getFieldIdxOfNominalType(bridged, $0)
+    }
+    return idx >= 0 ? idx : nil
+  }
+
+  public func getFieldTypeOfNominal(fieldIndex: Int, in function: Function) -> Type {
+    SILType_getTypeOfField(bridged, fieldIndex, function.bridged).type
+  }
+  
+  public var description: String { SILType_debugDescription(bridged).takeString() }
+
+  public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
-extension Type: Equatable {
-  public static func == (lhs: Type, rhs: Type) -> Bool {
-    lhs.bridged.typePtr == rhs.bridged.typePtr
+public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let type: Type
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { SILType_getNumTupleElements(type.bridged) }
+
+  public subscript(_ index: Int) -> Type {
+    SILType_getTupleElementType(type.bridged, index).type
   }
+}
+
+extension BridgedType {
+  var type: Type { Type(bridged: self) }
 }

@@ -195,6 +195,26 @@ SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function) {
   return fTy->getNumParameters() + fTy->getNumIndirectFormalResults() - 1;
 }
 
+SwiftInt SILFunction_getNumSILArguments(BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  SILFunctionConventions conv(f->getConventionsInContext());
+  return conv.getNumSILArguments();
+}
+
+BridgedType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx) {
+  SILFunction *f = castToFunction(function);
+  SILFunctionConventions conv(f->getConventionsInContext());
+  SILType argTy = conv.getSILArgumentType(idx, f->getTypeExpansionContext());
+  return {argTy.getOpaqueValue()};
+}
+
+BridgedType SILFunction_getSILResultType(BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  SILFunctionConventions conv(f->getConventionsInContext());
+  SILType resTy = conv.getSILResultType(f->getTypeExpansionContext());
+  return {resTy.getOpaqueValue()};
+}
+
 //===----------------------------------------------------------------------===//
 //                               SILBasicBlock
 //===----------------------------------------------------------------------===//
@@ -325,12 +345,98 @@ BridgedType SILValue_getType(BridgedValue value) {
 //                            SILType
 //===----------------------------------------------------------------------===//
 
+BridgedStringRef SILType_debugDescription(BridgedType type) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  castToSILType(type).print(os);
+  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+}
+
 SwiftInt SILType_isAddress(BridgedType type) {
   return castToSILType(type).isAddress();
 }
 
 SwiftInt SILType_isTrivial(BridgedType type, BridgedFunction function) {
   return castToSILType(type).isTrivial(*castToFunction(function));
+}
+
+SwiftInt SILType_isNominal(BridgedType type) {
+  return castToSILType(type).getNominalOrBoundGenericNominal() ? 1 : 0;
+}
+
+SwiftInt SILType_isClass(BridgedType type) {
+  return castToSILType(type).getClassOrBoundGenericClass() ? 1 : 0;
+}
+
+SwiftInt SILType_isStruct(BridgedType type) {
+  return castToSILType(type).getStructOrBoundGenericStruct() ? 1 : 0;
+}
+
+SwiftInt SILType_isTuple(BridgedType type) {
+  return castToSILType(type).is<TupleType>() ? 1 : 0;
+}
+
+SwiftInt SILType_isEnum(BridgedType type) {
+  return castToSILType(type).getEnumOrBoundGenericEnum() ? 1 : 0;
+}
+
+SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType type,
+                                                  BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  return castToSILType(type).isNonTrivialOrContainsRawPointer(*f);
+}
+
+SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
+                                          BridgedStringRef fieldName) {
+  SILType ty = castToSILType(type);
+  auto *nominal = ty.getNominalOrBoundGenericNominal();
+  if (!nominal)
+    return -1;
+
+  SmallVector<NominalTypeDecl *, 5> decls;
+  decls.push_back(nominal);
+  if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
+    while ((cd = cd->getSuperclassDecl()) != nullptr) {
+      decls.push_back(cd);
+    }
+  }
+  std::reverse(decls.begin(), decls.end());
+
+  SwiftInt idx = 0;
+  StringRef fieldNm((const char *)fieldName.data, fieldName.length);
+  for (auto *decl : decls) {
+    for (VarDecl *field : decl->getStoredProperties()) {
+      if (field->getName().str() == fieldNm)
+        return idx;
+      idx++;
+    }
+  }
+  return -1;
+}
+
+BridgedType SILType_getTypeOfField(BridgedType type, SwiftInt fieldIndex,
+                                   BridgedFunction inFunction) {
+  SILType ty = castToSILType(type);
+  auto *nominal = ty.getNominalOrBoundGenericNominal();
+  assert(nominal);
+
+  VarDecl *field = getIndexedField(nominal, (unsigned)fieldIndex);
+  assert(field);
+
+  SILFunction *f = castToFunction(inFunction);
+  SILType fieldTy = ty.getFieldType(field, f->getModule(),f->getTypeExpansionContext());
+  return {fieldTy.getOpaqueValue()};
+}
+
+SwiftInt SILType_getNumTupleElements(BridgedType type) {
+  TupleType *tupleTy = castToSILType(type).castTo<TupleType>();
+  return tupleTy->getNumElements();
+}
+
+BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx) {
+  SILType ty = castToSILType(type);
+  SILType elmtTy = ty.getTupleElementType((unsigned)elementIdx);
+  return {elmtTy.getOpaqueValue()};
 }
 
 //===----------------------------------------------------------------------===//

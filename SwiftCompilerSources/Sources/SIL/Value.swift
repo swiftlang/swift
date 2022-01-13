@@ -27,9 +27,7 @@ extension Value {
     UseList(SILValue_firstUse(bridged))
   }
 
-  public var type: Type {
-    Type(bridged: SILValue_getType(bridged))
-  }
+  public var type: Type { SILValue_getType(bridged).type }
 
   public var hashable: HashableValue { ObjectIdentifier(self) }
 

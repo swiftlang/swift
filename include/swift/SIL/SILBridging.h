@@ -22,6 +22,8 @@ extern "C" {
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
+typedef intptr_t SwiftInt;
+
 typedef struct {
   const unsigned char * _Nullable data;
   size_t length;
@@ -156,8 +158,6 @@ typedef enum {
 #include "swift/AST/Builtins.def"
 } BridgedBuiltinID;
 
-typedef intptr_t SwiftInt;
-
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
 
 void OStream_write(BridgedOStream os, BridgedStringRef str);
@@ -175,6 +175,9 @@ OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function);
 SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function);
 SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function);
+SwiftInt SILFunction_getNumSILArguments(BridgedFunction function);
+BridgedType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx);
+BridgedType SILFunction_getSILResultType(BridgedFunction function);
 
 BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 BridgedStringRef SILGlobalVariable_debugDescription(BridgedGlobalVar global);
@@ -201,8 +204,21 @@ BridgedStringRef SILNode_debugDescription(BridgedNode node);
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
 BridgedType SILValue_getType(BridgedValue value);
 
+BridgedStringRef SILType_debugDescription(BridgedType);
 SwiftInt SILType_isAddress(BridgedType);
 SwiftInt SILType_isTrivial(BridgedType, BridgedFunction);
+SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType, BridgedFunction);
+SwiftInt SILType_isNominal(BridgedType type);
+SwiftInt SILType_isClass(BridgedType type);
+SwiftInt SILType_isStruct(BridgedType type);
+SwiftInt SILType_isTuple(BridgedType type);
+SwiftInt SILType_isEnum(BridgedType type);
+SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
+                                          BridgedStringRef fieldName);
+BridgedType SILType_getTypeOfField(BridgedType type, SwiftInt fieldIndex,
+                                   BridgedFunction inFunction);
+SwiftInt SILType_getNumTupleElements(BridgedType type);
+BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx);
 BridgedSubstitutionMap SILType_getContextSubstitutionMap(BridgedType);
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);

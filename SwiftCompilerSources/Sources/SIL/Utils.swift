@@ -219,3 +219,12 @@ extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
     return nil
   }
 }
+
+extension BridgedArrayRef {
+  func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
+    return data.withMemoryRebound(to: ty, capacity: numElements) { (ptr: UnsafePointer<T>) -> R in
+      let buffer = UnsafeBufferPointer(start: ptr, count: numElements)
+      return c(buffer)
+    }
+  }
+}
