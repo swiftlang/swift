@@ -204,7 +204,7 @@ How to build the swift compiler modules. Possible values are
                    `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
     CROSSCOMPILE-WITH-HOSTLIBS:    build with a bootstrapping-with-hostlibs compiled
                                    compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
-]=]  OFF "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" OFF)
+]=]  OFF "NOT XCODE" OFF)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
