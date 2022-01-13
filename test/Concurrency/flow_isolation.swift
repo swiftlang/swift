@@ -392,6 +392,13 @@ actor MyActor {
         callMethod(self)
     }
 
+    convenience init(ci2 c: Bool) async {
+      self.init(i1: c)
+      self.x = 1
+      callMethod(self)
+      self.x = 0
+    }
+
     init(i1 c:  Bool) {
         self.x = 0
         _ = self.x

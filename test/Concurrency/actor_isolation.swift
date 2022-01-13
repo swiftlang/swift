@@ -1160,16 +1160,25 @@ class GenericSub2<T>: GenericSuper<[T]> { } // expected-error{{global actor 'Gen
 
 /// Diagnostics for `nonisolated` on an actor initializer.
 actor Butterfly {
+  var flapsPerSec = 0 // expected-note 3{{mutation of this property is only permitted within the actor}}
+
   nonisolated init() {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
 
   nonisolated init(async: Void) async {}
 
-  nonisolated convenience init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+  nonisolated convenience init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
     self.init()
+    self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
   }
 
-  nonisolated convenience init(cookies: Void) async { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+  nonisolated convenience init(cookies: Void) async {
     self.init()
+    self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
+  }
+
+  convenience init(brownies: Void) {
+    self.init()
+    self.flapsPerSec = 0 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
   }
 }
 
