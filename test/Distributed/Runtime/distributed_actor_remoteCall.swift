@@ -1,13 +1,20 @@
 // XXX: %target-swift-frontend -primary-file %s -emit-sil -parse-as-library -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --enable-var-scope --dump-input=always
 // RUN: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
+
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
+
+// FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
+// UNSUPPORTED: linux
+
 import _Distributed
 
 final class Obj: @unchecked Sendable, Codable  {}
