@@ -3302,10 +3302,6 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
 {
 }
 
-unsigned OpaqueTypeArchetypeType::getOrdinal() const {
-  return getInterfaceType()->castTo<GenericTypeParamType>()->getIndex();
-}
-
 SequenceArchetypeType::SequenceArchetypeType(
     const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,

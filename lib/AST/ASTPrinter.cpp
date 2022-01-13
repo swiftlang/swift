@@ -5893,6 +5893,12 @@ public:
   }
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
+    if (auto parent = T->getParent()) {
+      visitParentType(parent);
+      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      return;
+    }
+
     if (Options.PrintForSIL)
       Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
     visit(T->getOpenedExistentialType());
@@ -5940,10 +5946,17 @@ public:
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
+    if (auto parent = T->getParent()) {
+      visitParentType(parent);
+      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      return;
+    }
+
     // Try to print a named opaque type.
     auto printNamedOpaque = [&] {
-      if (auto genericParam =
-              T->getDecl()->getExplicitGenericParam(T->getOrdinal())) {
+      unsigned ordinal =
+          T->getInterfaceType()->castTo<GenericTypeParamType>()->getIndex();
+      if (auto genericParam = T->getDecl()->getExplicitGenericParam(ordinal)) {
         visit(genericParam->getDeclaredInterfaceType());
         return true;
       }

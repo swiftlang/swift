@@ -3722,6 +3722,7 @@ namespace {
                               StringRef label) {
       printCommon(label, className);
       printField("address", static_cast<void *>(T));
+      printRec("interface_type", T->getInterfaceType());
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
         OS << " layout=";
@@ -3731,6 +3732,7 @@ namespace {
         printField("conforms_to", proto->printRef());
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);
+
     }
     
     void visitPrimaryArchetypeType(PrimaryArchetypeType *T, StringRef label) {
@@ -3755,7 +3757,6 @@ namespace {
                                       StringRef label) {
       printArchetypeCommon(T, "opaque_type", label);
       printField("decl", T->getDecl()->getNamingDecl()->printRef());
-      printField("ordinal", T->getOrdinal());
       if (!T->getSubstitutions().empty()) {
         OS << '\n';
         SmallPtrSet<const ProtocolConformance *, 4> Dumped;
