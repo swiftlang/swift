@@ -360,69 +360,6 @@ public:
       Symbol concreteConformanceSymbol,
       Symbol associatedTypeSymbol);
 
-  /// A type witness has a subject type, stored in LHS, which takes the form:
-  ///
-  /// T.[concrete: C : P].[P:X]
-  ///
-  /// For some concrete type C, protocol P and associated type X.
-  ///
-  /// The type witness of X in the conformance C : P is either a concrete type,
-  /// or an abstract type parameter.
-  ///
-  /// If it is a concrete type, then RHS stores the concrete type symbol.
-  ///
-  /// If it is an abstract type parameter, then RHS stores the type term.
-  ///
-  /// Think of these as rewrite rules which are lazily created, but always
-  /// "there" -- they encode information about concrete conformances, which
-  /// are solved outside of the requirement machine itself.
-  ///
-  /// We don't want to eagerly pull in all concrete conformances and walk
-  /// them recursively introducing rewrite rules.
-  ///
-  /// The RewriteStep::{Concrete,Same,Abstract}TypeWitness rewrite step kinds
-  /// reference TypeWitnesses via their RuleID field.
-  ///
-  /// Type witnesses are recorded lazily in property map construction, in
-  /// PropertyMap::computeConstraintTermForTypeWitness().
-  struct TypeWitness {
-    Term LHS;
-    llvm::PointerUnion<Symbol, Term> RHS;
-
-    TypeWitness(Term lhs, llvm::PointerUnion<Symbol, Term> rhs);
-
-    friend bool operator==(const TypeWitness &lhs,
-                           const TypeWitness &rhs);
-
-    Symbol getConcreteConformance() const {
-      return *(LHS.end() - 2);
-    }
-
-    Symbol getAssocType() const {
-      return *(LHS.end() - 1);
-    }
-
-    Symbol getConcreteType() const {
-      return RHS.get<Symbol>();
-    }
-
-    Term getAbstractType() const {
-      return RHS.get<Term>();
-    }
-
-    void dump(llvm::raw_ostream &out) const;
-  };
-
-private:
-  /// Cache for concrete type witnesses. The value in the map is an index
-  /// into the vector.
-  llvm::DenseMap<Term, unsigned> TypeWitnessMap;
-  std::vector<TypeWitness> TypeWitnesses;
-
-public:
-  unsigned recordTypeWitness(TypeWitness witness);
-  const TypeWitness &getTypeWitness(unsigned index) const;
-
 private:
   //////////////////////////////////////////////////////////////////////////////
   ///
