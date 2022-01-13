@@ -24,7 +24,7 @@ void RewriteStep::dump(llvm::raw_ostream &out,
                        RewritePathEvaluator &evaluator,
                        const RewriteSystem &system) const {
   switch (Kind) {
-  case ApplyRewriteRule: {
+  case Rule: {
     auto result = evaluator.applyRewriteRule(*this, system);
 
     if (!result.prefix.empty()) {
@@ -190,7 +190,7 @@ RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
                                        const RewriteSystem &system) {
   auto &term = getCurrentTerm();
 
-  assert(step.Kind == RewriteStep::ApplyRewriteRule);
+  assert(step.Kind == RewriteStep::Rule);
 
   const auto &rule = system.getRule(step.getRuleID());
 
@@ -662,7 +662,7 @@ RewritePathEvaluator::applyAbstractTypeWitness(const RewriteStep &step,
 void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
-  case RewriteStep::ApplyRewriteRule:
+  case RewriteStep::Rule:
     (void) applyRewriteRule(step, system);
     break;
 

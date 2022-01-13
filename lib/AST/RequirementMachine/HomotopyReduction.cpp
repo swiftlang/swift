@@ -86,7 +86,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
 
   for (auto step : Path) {
     switch (step.Kind) {
-    case RewriteStep::ApplyRewriteRule: {
+    case RewriteStep::Rule: {
       if (!step.isInContext() && !evaluator.isInContext())
         rulesInEmptyContext.insert(step.getRuleID());
 
@@ -207,7 +207,7 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
 
   for (auto step : Steps) {
     switch (step.Kind) {
-    case RewriteStep::ApplyRewriteRule: {
+    case RewriteStep::Rule: {
       if (step.getRuleID() != ruleID)
         break;
 
@@ -263,7 +263,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
   bool foundAny = false;
 
   for (const auto &step : Steps) {
-    if (step.Kind == RewriteStep::ApplyRewriteRule &&
+    if (step.Kind == RewriteStep::Rule &&
         step.getRuleID() == ruleID) {
       foundAny = true;
       break;
@@ -283,7 +283,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
   for (const auto &step : Steps) {
     switch (step.Kind) {
-    case RewriteStep::ApplyRewriteRule: {
+    case RewriteStep::Rule: {
       if (step.getRuleID() != ruleID) {
         newSteps.push_back(step);
         break;

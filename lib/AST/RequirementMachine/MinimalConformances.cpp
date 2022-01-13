@@ -112,7 +112,7 @@ void RewriteLoop::findProtocolConformanceRules(
   for (const auto &step : Path) {
     if (!evaluator.isInContext()) {
       switch (step.Kind) {
-      case RewriteStep::ApplyRewriteRule: {
+      case RewriteStep::Rule: {
         const auto &rule = system.getRule(step.getRuleID());
 
         if (rule.isIdentityConformanceRule())
@@ -268,7 +268,7 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
   assert(!rule.isIdentityConformanceRule());
 #endif
 
-  assert(step.Kind == RewriteStep::ApplyRewriteRule);
+  assert(step.Kind == RewriteStep::Rule);
   assert(step.EndOffset == 0);
   assert(!step.Inverse);
 

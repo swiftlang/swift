@@ -52,7 +52,7 @@ struct RewriteStep {
     /// The StartOffset field encodes the offset where to apply the rule.
     ///
     /// The Arg field encodes the rule to apply.
-    ApplyRewriteRule,
+    Rule,
 
     /// The term at the top of the primary stack must be a term ending with a
     /// superclass or concrete type symbol.
@@ -167,7 +167,7 @@ struct RewriteStep {
   /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
   unsigned EndOffset : 16;
 
-  /// If Kind is ApplyRewriteRule, the index of the rule in the rewrite system.
+  /// If Kind is Rule, the index of the rule in the rewrite system.
   ///
   /// If Kind is AdjustConcreteType, the length of the prefix to add or remove
   /// at the beginning of each concrete substitution.
@@ -190,7 +190,7 @@ struct RewriteStep {
 
   static RewriteStep forRewriteRule(unsigned startOffset, unsigned endOffset,
                                     unsigned ruleID, bool inverse) {
-    return RewriteStep(ApplyRewriteRule, startOffset, endOffset, ruleID, inverse);
+    return RewriteStep(Rule, startOffset, endOffset, ruleID, inverse);
   }
 
   static RewriteStep forAdjustment(unsigned offset, unsigned endOffset,
@@ -249,7 +249,7 @@ struct RewriteStep {
   }
 
   unsigned getRuleID() const {
-    assert(Kind == RewriteStep::ApplyRewriteRule);
+    assert(Kind == RewriteStep::Rule);
     return Arg;
   }
 
@@ -375,15 +375,16 @@ struct AppliedRewriteStep {
 
 /// A rewrite path is a list of instructions for a two-stack interpreter.
 ///
-/// - ApplyRewriteRule and AdjustConcreteType manipulate the term at the top of
-///   the primary stack.
-///
 /// - Shift moves a term from A to B (if not inverted) or B to A (if inverted).
 ///
 /// - Decompose splits off the substitutions from a superclass or concrete type
 ///   symbol at the top of the primary stack (if not inverted) or assembles a
 ///   new superclass or concrete type symbol at the top of the primary stack
 ///   (if inverted).
+///
+/// - All other rewrite step kinds manipulate the term at the top of the primary
+///   stack.
+///
 struct RewritePathEvaluator {
   /// The primary stack. Most rewrite steps operate on the top of this stack.
   SmallVector<MutableTerm, 2> Primary;
