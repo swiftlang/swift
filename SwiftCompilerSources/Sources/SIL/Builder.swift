@@ -67,4 +67,10 @@ public struct Builder {
       bridgedInsPoint, location.bridgedLocation, type.bridged, value)
     return literal.getAs(IntegerLiteralInst.self)
   }
+  
+  public func createDeallocStackRef(_ operand: Value) -> DeallocStackRefInst {
+    notifyInstructionsChanged()
+    let dr = SILBuilder_createDeallocStackRef(bridgedInsPoint, location.bridgedLocation, operand.bridged)
+    return dr.getAs(DeallocStackRefInst.self)
+  }
 }

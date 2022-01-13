@@ -19,9 +19,14 @@ public struct CalleeAnalysis {
   public func getCallees(callee: Value) -> FunctionArray {
     return FunctionArray(bridged: CalleeAnalysis_getCallees(bridged, callee.bridged))
   }
+
+  public func getDestructors(destroyInst: Instruction) -> FunctionArray {
+    return FunctionArray(bridged:
+      CalleeAnalysis_getInstCallees(bridged, destroyInst.bridged))
+  }
 }
 
-public struct FunctionArray : RandomAccessCollection, CustomReflectable {
+public struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let bridged: BridgedCalleeList
 
   public var startIndex: Int { 0 }
@@ -32,9 +37,4 @@ public struct FunctionArray : RandomAccessCollection, CustomReflectable {
   }
 
   public var allCalleesKnown: Bool { bridged.incomplete == 0 }
-
-  public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: nil, value: $0.name) }
-    return Mirror(self, children: c)
-  }
 }
