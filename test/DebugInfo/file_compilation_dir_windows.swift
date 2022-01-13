@@ -1,16 +1,16 @@
 // REQUIRES: OS=windows-msvc
 // RUN: %target-swiftc_driver -g \
-// RUN:   -c -debug-compilation-dir Z:\path\to \
+// RUN:   -c -file-compilation-dir Z:\path\to \
 // RUN:   %s -o - -emit-ir | %FileCheck --check-prefix=CHECK-ABS %s
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t
 // RUN: cd %t
 // RUN: cp %s .
 // RUN: %target-swiftc_driver -g \
-// RUN:   -c -debug-compilation-dir Z:\path\to \
+// RUN:   -c -file-compilation-dir Z:\path\to \
 // RUN:   file_compilation_dir.swift -o - -emit-ir | %FileCheck --check-prefix=CHECK-REL %s
 // RUN: %target-swiftc_driver -g \
-// RUN:   -c -debug-compilation-dir . \
+// RUN:   -c -file-compilation-dir . \
 // RUN:   file_compilation_dir.swift -o - -emit-ir | %FileCheck --check-prefix=CHECK-REL-CWD %s
 
 func foo() {}
