@@ -33,27 +33,34 @@ func tuple_patterns() {
   var (a, b) : (Int, Float)
   // CHECK: [[ABOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[AADDR:%[0-9]+]] = mark_uninitialized [var] [[ABOX]]
-  // CHECK: [[PBA:%.*]] = project_box [[AADDR]]
+  // CHECK: [[A_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[AADDR]]
+  // CHECK: [[PBA:%.*]] = project_box [[A_LIFETIME]]
   // CHECK: [[BBOX:%[0-9]+]] = alloc_box ${ var Float }
   // CHECK: [[BADDR:%[0-9]+]] = mark_uninitialized [var] [[BBOX]]
-  // CHECK: [[PBB:%.*]] = project_box [[BADDR]]
+  // CHECK: [[B_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BADDR]]
+  // CHECK: [[PBB:%.*]] = project_box [[B_LIFETIME]]
 
   var (c, d) = (a, b)
   // CHECK: [[CADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBC:%.*]] = project_box [[CADDR]]
+  // CHECK: [[C_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[CADDR]]
+  // CHECK: [[PBC:%.*]] = project_box [[C_LIFETIME]]
   // CHECK: [[DADDR:%[0-9]+]] = alloc_box ${ var Float }
-  // CHECK: [[PBD:%.*]] = project_box [[DADDR]]
+  // CHECK: [[D_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[DADDR]]
+  // CHECK: [[PBD:%.*]] = project_box [[D_LIFETIME]]
   // CHECK: [[READA:%.*]] = begin_access [read] [unknown] [[PBA]] : $*Int
   // CHECK: copy_addr [[READA]] to [initialization] [[PBC]]
   // CHECK: [[READB:%.*]] = begin_access [read] [unknown] [[PBB]] : $*Float
   // CHECK: copy_addr [[READB]] to [initialization] [[PBD]]
   // CHECK: [[EADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBE:%.*]] = project_box [[EADDR]]
+  // CHECK: [[E_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[EADDR]]
+  // CHECK: [[PBE:%.*]] = project_box [[E_LIFETIME]]
   // CHECK: [[FADDR:%[0-9]+]] = alloc_box ${ var Float }
-  // CHECK: [[PBF:%.*]] = project_box [[FADDR]]
+  // CHECK: [[F_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[FADDR]]
+  // CHECK: [[PBF:%.*]] = project_box [[F_LIFETIME]]
   // CHECK: [[GADDR:%[0-9]+]] = alloc_box ${ var () }
   // CHECK: [[HADDR:%[0-9]+]] = alloc_box ${ var Double }
-  // CHECK: [[PBH:%.*]] = project_box [[HADDR]]
+  // CHECK: [[H_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[HADDR]]
+  // CHECK: [[PBH:%.*]] = project_box [[H_LIFETIME]]
   // CHECK: [[EFGH:%[0-9]+]] = apply
   // CHECK: ([[E:%[0-9]+]], [[F:%[0-9]+]], [[H:%[0-9]+]]) = destructure_tuple
   // CHECK: store [[E]] to [trivial] [[PBE]]
@@ -62,7 +69,8 @@ func tuple_patterns() {
   var (e,f,g,h) : (Int, Float, (), Double) = MRV()
 
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBI:%.*]] = project_box [[IADDR]]
+  // CHECK: [[I_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[IADDR]]
+  // CHECK: [[PBI:%.*]] = project_box [[I_LIFETIME]]
   // CHECK-NOT: alloc_box ${ var Float }
   // CHECK: [[READA:%.*]] = begin_access [read] [unknown] [[PBA]] : $*Int
   // CHECK: copy_addr [[READA]] to [initialization] [[PBI]]
@@ -72,9 +80,11 @@ func tuple_patterns() {
   var (i,_) = (a, b)
 
   // CHECK: [[JADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBJ:%.*]] = project_box [[JADDR]]
+  // CHECK: [[J_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[JADDR]]
+  // CHECK: [[PBJ:%.*]] = project_box [[J_LIFETIME]]
   // CHECK-NOT: alloc_box ${ var Float }
   // CHECK: [[KADDR:%[0-9]+]] = alloc_box ${ var () }
+  // CHECK: [[K_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[KADDR]]
   // CHECK-NOT: alloc_box ${ var Double }
   // CHECK: [[J_K_:%[0-9]+]] = apply
   // CHECK: ([[J:%[0-9]+]], [[K:%[0-9]+]], {{%[0-9]+}}) = destructure_tuple
@@ -85,10 +95,12 @@ func tuple_patterns() {
 // CHECK-LABEL: sil hidden [ossa] @$s5decls16simple_arguments{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: [[X:%[0-9]+]] = alloc_box ${ var Int }
-// CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
+// CHECK: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
 // CHECK-NEXT: store %0 to [trivial] [[PBX]]
 // CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box ${ var Int }
-// CHECK-NEXT: [[PBY:%[0-9]+]] = project_box [[Y]]
+// CHECK-NEXT: [[Y_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[Y]]
+// CHECK-NEXT: [[PBY:%[0-9]+]] = project_box [[Y_LIFETIME]]
 // CHECK-NEXT: store %1 to [trivial] [[PBY]]
 func simple_arguments(x: Int, y: Int) -> Int {
   var x = x
@@ -106,7 +118,8 @@ func tuple_argument(x: (Int, Float, ())) {
 // CHECK-LABEL: sil hidden [ossa] @$s5decls14inout_argument{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Int, %1 : $Int):
 // CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box ${ var Int }
-// CHECK: [[PBX:%.*]] = project_box [[X_LOCAL]]
+// CHECK: [[X_LOCAL_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X_LOCAL]]
+// CHECK: [[PBX:%.*]] = project_box [[X_LOCAL_LIFETIME]]
 func inout_argument(x: inout Int, y: Int) {
   var y = y
   x = y
@@ -130,7 +143,8 @@ func store_to_global(x: Int) {
   var x = x
   global = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBX:%.*]] = project_box [[XADDR]]
+  // CHECK: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[XADDR]]
+  // CHECK: [[PBX:%.*]] = project_box [[X_LIFETIME]]
   // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @$s5decls6globalSivau
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]

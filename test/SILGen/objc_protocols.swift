@@ -239,7 +239,8 @@ extension InformallyFunging: NSFunging { }
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
-  // CHECK:   [[PB:%.*]] = project_box [[I2_BOX]]
+  // CHECK:   [[I2_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[I2_BOX]]
+  // CHECK:   [[PB:%.*]] = project_box [[I2_LIFETIME]]
   // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
   // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]]) Initializable).Type to $@objc_metatype (@opened([[N]]) Initializable).Type
   // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype (@opened([[N]]) Initializable).Type, $@opened([[N]]) Initializable
@@ -249,6 +250,7 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
   // CHECK:   store [[I2_EXIST_CONTAINER]] to [init] [[PB]] : $*Initializable
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Initializable
   // CHECK:   [[I2:%[0-9]+]] = load [copy] [[READ]] : $*Initializable
+  // CHECK:   end_borrow [[I2_LIFETIME]]
   // CHECK:   destroy_value [[I2_BOX]] : ${ var Initializable }
   // CHECK:   return [[I2]] : $Initializable
   var i2 = im.init(int: i)
