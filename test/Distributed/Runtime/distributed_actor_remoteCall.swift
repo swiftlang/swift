@@ -116,12 +116,13 @@ struct FakeActorSystem: DistributedActorSystem {
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
+  var substitutions: [Any.Type] = []
   var arguments: [Any] = []
   var returnType: Any.Type? = nil
   var errorType: Any.Type? = nil
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
-    fatalError("NOT IMPLEMENTED: \(#function)")
+    substitutions.append(type)
   }
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
     arguments.append(argument)
@@ -137,7 +138,7 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
   // === Receiving / decoding -------------------------------------------------
 
   func decodeGenericSubstitutions() throws -> [Any.Type] {
-    []
+    return substitutions
   }
 
   var argumentIndex: Int = 0
