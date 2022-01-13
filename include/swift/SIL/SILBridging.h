@@ -217,14 +217,14 @@ SwiftInt SILType_isClass(BridgedType type);
 SwiftInt SILType_isStruct(BridgedType type);
 SwiftInt SILType_isTuple(BridgedType type);
 SwiftInt SILType_isEnum(BridgedType type);
-SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
-                                          BridgedStringRef fieldName);
 SwiftInt SILType_getNumTupleElements(BridgedType type);
 BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx);
+SwiftInt SILType_getNumNominalFields(BridgedType type);
+BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
+                                        BridgedFunction function);
+SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
+                                          BridgedStringRef fieldName);
 BridgedSubstitutionMap SILType_getContextSubstitutionMap(BridgedType);
-SwiftInt SILType_getNumStructFields(BridgedType type);
-BridgedType SILType_getStructFieldType(BridgedType type, SwiftInt index,
-                                       BridgedFunction function);
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
 

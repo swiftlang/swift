@@ -1363,6 +1363,17 @@ unsigned swift::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
                    "property of the operand type");
 }
 
+unsigned swift::getNumFieldsInNominal(NominalTypeDecl *decl) {
+  unsigned count = 0;
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
+         superDecl = superDecl->getSuperclassDecl()) {
+      count += superDecl->getStoredProperties().size();
+    }
+  }
+  return count + decl->getStoredProperties().size();
+}
+
 unsigned swift::getCaseIndex(EnumElementDecl *enumElement) {
   unsigned idx = 0;
   for (EnumElementDecl *e : enumElement->getParentEnum()->getAllElements()) {
