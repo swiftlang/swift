@@ -4874,7 +4874,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                            diag::expected_identifier_in_decl, "import"))
       return nullptr;
     if (Tok.is(tok::oper_postfix)) {
-        diagnose(Tok, diag::operator_in_import_path)
+        diagnose(Tok, diag::unexpected_operator_in_import_path)
           .fixItRemove(Tok.getLoc());
         return nullptr;
     }

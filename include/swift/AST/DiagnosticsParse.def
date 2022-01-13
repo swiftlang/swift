@@ -312,6 +312,8 @@ ERROR(decl_expected_module_name,none,
 ERROR(expected_module_alias,none,
       "cannot refer to module as %0 because it has been aliased; use %1 "
       "instead", (Identifier, Identifier))
+ERROR(unexpected_operator_in_import_path,none,
+      "cannot include postfix operator in import declaration",())
 
 // Extension
 ERROR(expected_lbrace_extension,PointsToFirstBadToken,
@@ -1616,8 +1618,6 @@ ERROR(attr_private_import_expected_sourcefile_name,none,
       "expected a source file name in @_private(sourceFile:)", ())
 ERROR(attr_private_import_expected_colon,none,
       "expected ':' after @_private(sourceFile", ())
-ERROR(operator_in_import_path,none,
-      "Cannot include postfix operator in import declaration.",())
 
 // opened
 ERROR(opened_attribute_expected_lparen,none,
