@@ -1,5 +1,7 @@
 
-// RUN: %target-swift-emit-silgen -swift-version 5 -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 5 -disable-availability-checking -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+
+// REQUIRES: concurrency
 
 var zero: Int = 0
 
