@@ -208,7 +208,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue instance,
     instance = stripCasts(instance);
 
     if (isa<AllocRefInst>(instance) || isa<MetatypeInst>(instance)) {
-      if (instance->getType().getASTType()->hasDynamicSelfType())
+      if (instance->getType().getSemanticASTType()->hasDynamicSelfType())
         return SILValue();
       return instance;
     }
@@ -1166,6 +1166,10 @@ swift::tryDevirtualizeWitnessMethod(ApplySite applySite,
 /// new instruction in that case, or nullptr otherwise.
 ///
 /// Return the new apply and true if the CFG was also modified.
+///
+/// NOTE: All instructions handled in this code must make class queries based
+/// off SILType::getSemanticASTType() rather than SILType::getASTType() to
+/// ensure that we handle @moveOnly types better.
 std::pair<ApplySite, bool>
 swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
                             OptRemark::Emitter *ore) {
@@ -1203,7 +1207,8 @@ swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
   /// %YY = function_ref @...
   if (auto *cmi = dyn_cast<ClassMethodInst>(fas.getCallee())) {
     auto instance = stripUpCasts(cmi->getOperand());
-    auto classType = getSelfInstanceType(instance->getType().getASTType());
+    auto classType =
+        getSelfInstanceType(instance->getType().getSemanticASTType());
     auto *cd = classType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(fas, classType, cd, cha))
@@ -1215,7 +1220,8 @@ swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
     if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha)) {
       // Update the classDecl, because we are stripping casts more aggressively
       // in getInstanceWithExactDynamicType than in stripUpCasts.
-      CanType classType = getSelfInstanceType(instance->getType().getASTType());
+      CanType classType =
+          getSelfInstanceType(instance->getType().getSemanticASTType());
       // This should never be null - make the check just to be on the safe side.
       if (ClassDecl *cd = classType.getClassOrBoundGenericClass())
         return tryDevirtualizeClassMethod(fas, instance, cd, ore);
@@ -1230,7 +1236,8 @@ swift::tryDevirtualizeApply(ApplySite applySite, ClassHierarchyAnalysis *cha,
 
   if (isa<SuperMethodInst>(fas.getCallee())) {
     auto instance = fas.getArguments().back();
-    auto classType = getSelfInstanceType(instance->getType().getASTType());
+    auto classType =
+        getSelfInstanceType(instance->getType().getSemanticASTType());
     auto *cd = classType.getClassOrBoundGenericClass();
 
     return tryDevirtualizeClassMethod(fas, instance, cd, ore);
@@ -1270,7 +1277,8 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
   /// %YY = function_ref @...
   if (auto *cmi = dyn_cast<ClassMethodInst>(applySite.getCallee())) {
     auto instance = stripUpCasts(cmi->getOperand());
-    auto classType = getSelfInstanceType(instance->getType().getASTType());
+    auto classType =
+        getSelfInstanceType(instance->getType().getSemanticASTType());
     auto *cd = classType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(applySite, classType, cd, cha))
@@ -1280,7 +1288,8 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
     // Try to check if the exact dynamic type of the instance is statically
     // known.
     if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha)) {
-      CanType classType = getSelfInstanceType(instance->getType().getASTType());
+      CanType classType =
+          getSelfInstanceType(instance->getType().getSemanticASTType());
       ClassDecl *cd = classType.getClassOrBoundGenericClass();
       return cd && canDevirtualizeClassMethod(applySite, cd);
     }
@@ -1293,7 +1302,8 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
 
   if (isa<SuperMethodInst>(applySite.getCallee())) {
     auto instance = applySite.getArguments().back();
-    auto classType = getSelfInstanceType(instance->getType().getASTType());
+    auto classType =
+        getSelfInstanceType(instance->getType().getSemanticASTType());
     auto *cd = classType.getClassOrBoundGenericClass();
 
     return canDevirtualizeClassMethod(applySite, cd);

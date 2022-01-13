@@ -245,7 +245,7 @@ public:
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
   ClassDecl *getClassOrBoundGenericClass() const {
-    return getASTType().getClassOrBoundGenericClass();
+    return getSemanticASTType().getClassOrBoundGenericClass();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
@@ -274,7 +274,7 @@ public:
   /// If this type maps to a Swift class, check if that class is a foreign
   /// reference type.
   bool isForeignReferenceType() const {
-    return getASTType().isForeignReferenceType();
+    return getSemanticASTType().isForeignReferenceType();
   }
 
   /// True if the type is an address type.

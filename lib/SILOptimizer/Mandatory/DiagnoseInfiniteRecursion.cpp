@@ -79,8 +79,8 @@ static bool isRecursiveCall(FullApplySite applySite) {
     // outside the current module.  Because we're not doing IPA, let
     // alone cross-module IPA, this is all well and good.
     SILModule &module = parentFunc->getModule();
-    CanType classType = CMI->getOperand()->getType().getASTType();
-    ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+    ClassDecl *classDecl =
+        CMI->getOperand()->getType().getClassOrBoundGenericClass();
     if (classDecl && classDecl->getModuleContext() != module.getSwiftModule())
       return false;
 
