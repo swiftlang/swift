@@ -288,6 +288,10 @@ public:
 
   ~SourceFile();
 
+  bool hasImports() const {
+    return Imports.hasValue();
+  }
+
   /// Retrieve an immutable view of the source file's imports.
   ArrayRef<AttributedImport<ImportedModule>> getImports() const {
     return *Imports;
