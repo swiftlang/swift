@@ -109,12 +109,6 @@ void FunctionSignatureSpecializationMangler::setArgumentBoxToStack(
       ArgumentModifierIntBase(ArgumentModifier::BoxToStack);
 }
 
-void FunctionSignatureSpecializationMangler::setArgumentInOutToOut(
-    unsigned OrigArgIdx) {
-  OrigArgs[OrigArgIdx].first =
-      ArgumentModifierIntBase(ArgumentModifier::InOutToOut);
-}
-
 void
 FunctionSignatureSpecializationMangler::
 setReturnValueOwnedToUnowned() {
@@ -227,11 +221,6 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
 
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToStack)) {
     ArgOpBuffer << 's';
-    return;
-  }
-
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::InOutToOut)) {
-    ArgOpBuffer << 'r';
     return;
   }
 
