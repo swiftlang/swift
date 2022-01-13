@@ -1823,7 +1823,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                                           ResourceDir);
     }
 
-    if (const Arg *A = Args.getLastArg(OPT_debug_compilation_dir))
+    if (const Arg *A = Args.getLastArg(OPT_file_compilation_dir))
       Opts.DebugCompilationDir = A->getValue();
     else {
       llvm::SmallString<256> cwd;
