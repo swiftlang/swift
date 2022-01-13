@@ -12,6 +12,7 @@
 
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -58,6 +59,12 @@ class SwiftPassInvocation {
   /// All slabs, allocated by the pass.
   SILModule::SlabList allocatedSlabs;
 
+  static constexpr int BlockSetCapacity = 8;
+  char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
+  bool aliveBlockSets[BlockSetCapacity];
+
+  int numBlockSetsAllocated = 0;
+
   void endPassRunChecks();
 
 public:
@@ -75,6 +82,10 @@ public:
   FixedSizeSlab *allocSlab(FixedSizeSlab *afterSlab);
 
   FixedSizeSlab *freeSlab(FixedSizeSlab *slab);
+
+  BasicBlockSet *allocBlockSet();
+
+  void freeBlockSet(BasicBlockSet *set);
 
   /// The top-level API to erase an instruction, called from the Swift pass.
   void eraseInstruction(SILInstruction *inst);

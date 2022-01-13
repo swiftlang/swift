@@ -22,19 +22,19 @@ let simplifyGlobalValuePass = InstructionPass<GlobalValueInst>(
   name: "simplify-global_value", {
   (globalValue: GlobalValueInst, context: PassContext) in
 
-  var users = StackList<Instruction>(context)
+  var users = Stack<Instruction>(context)
+  defer { users.deinitialize() }
+  
   if checkUsers(of: globalValue, users: &users) {
-    while let inst = users.pop() {
+    for inst in users {
       context.erase(instruction: inst)
     }
-  } else {
-    users.removeAll()
   }
 })
 
 /// Returns true if reference counting and debug_value users of a global_value
 /// can be deleted.
-private func checkUsers(of val: Value, users: inout StackList<Instruction>) -> Bool {
+private func checkUsers(of val: Value, users: inout Stack<Instruction>) -> Bool {
   for use in val.uses {
     let user = use.instruction
     if user is RefCountingInst || user is DebugValueInst {

@@ -40,10 +40,34 @@ typedef struct {
 } BridgedCalleeAnalysis;
 
 typedef struct {
+  void * _Nullable dea;
+} BridgedDeadEndBlocksAnalysis;
+
+typedef struct {
+  void * _Nullable dt;
+} BridgedDomTree;
+
+typedef struct {
+  void * _Nullable pdt;
+} BridgedPostDomTree;
+
+typedef struct {
   void * _Nonnull opaquePtr;
   unsigned char kind;
   unsigned char incomplete;
 } BridgedCalleeList;
+
+typedef struct {
+  void * _Nullable bbs;
+} BridgedBasicBlockSet;
+
+typedef struct {
+  void * _Nullable data;
+} BridgedSlab;
+
+enum {
+  BridgedSlabCapacity = 64 * sizeof(uintptr_t)
+};
 
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
 typedef void (* _Nonnull BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
@@ -66,9 +90,49 @@ BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context);
 
 BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
                                             BridgedValue callee);
+BridgedCalleeList CalleeAnalysis_getInstCallees(BridgedCalleeAnalysis calleeAnalysis,
+                                                BridgedInstruction inst);
 SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees);
 BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
                                          SwiftInt index);
+
+BridgedDeadEndBlocksAnalysis
+PassContext_getDeadEndBlocksAnalysis(BridgedPassContext context);
+
+SwiftInt DeadEndBlocksAnalysis_isDeadEnd(BridgedDeadEndBlocksAnalysis debAnalysis,
+                                         BridgedBasicBlock);
+
+BridgedDomTree PassContext_getDomTree(BridgedPassContext context);
+
+SwiftInt DominatorTree_dominates(BridgedDomTree domTree,
+                                 BridgedBasicBlock dominating,
+                                 BridgedBasicBlock dominated);
+
+BridgedPostDomTree PassContext_getPostDomTree(BridgedPassContext context);
+
+SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
+                                         BridgedBasicBlock dominating,
+                                         BridgedBasicBlock dominated);
+
+BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
+BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab);
+BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
+                                  BridgedSlab afterSlab);
+BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
+                                 BridgedSlab slab);
+
+void PassContext_fixStackNesting(BridgedPassContext context,
+                                 BridgedFunction function);
+
+BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context);
+void PassContext_freeBasicBlockSet(BridgedPassContext context,
+                                   BridgedBasicBlockSet set);
+SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock block);
+void BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block);
+void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block);
+BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set);
+
+void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
 
 #ifdef __cplusplus
 } // extern "C"
