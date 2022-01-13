@@ -16,11 +16,14 @@ import _Concurrency
 public protocol DistributedActorSystem: Sendable {
   /// The identity used by actors that communicate via this transport
   associatedtype ActorID: Sendable & Hashable & Codable // TODO: make Codable conditional here
-  /// The specific type of the argument builder to be used for remote calls.
-  associatedtype Invocation: DistributedTargetInvocation
+
+  associatedtype InvocationEncoder: DistributedTargetInvocationEncoder
+  associatedtype InvocationDecoder: DistributedTargetInvocationDecoder
 
   /// The serialization requirement that will be applied to all distributed targets used with this system.
-  typealias SerializationRequirement = Invocation.SerializationRequirement
+  associatedtype SerializationRequirement
+    where SerializationRequirement == InvocationEncoder.SerializationRequirement,
+          SerializationRequirement == InvocationDecoder.SerializationRequirement
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Resolving actors by identity
@@ -104,12 +107,12 @@ public protocol DistributedActorSystem: Sendable {
   /// arguments, generic substitutions, and specific error and return types
   /// that are associated with this specific invocation.
   @inlinable
-  func makeInvocation() throws -> Invocation
+  func makeInvocationEncoder() throws -> InvocationEncoder
 
   /// Invoked by the Swift runtime when making a remote call.
   ///
   /// The `arguments` are the arguments container that was previously created
-  /// by `makeInvocation` and has been populated with all arguments.
+  /// by `makeInvocationEncoder` and has been populated with all arguments.
   ///
   /// This method should perform the actual remote function call, and await for its response.
   ///
@@ -119,7 +122,7 @@ public protocol DistributedActorSystem: Sendable {
 //  func remoteCall<Act, Err, Res>(
 //      on actor: Act,
 //      target: RemoteCallTarget,
-//      invocation: inout Invocation,
+//      invocation: inout InvocationDecoder,
 //      throwing: Err.Type,
 //      returning: Res.Type
 //  ) async throws -> Res
@@ -149,7 +152,7 @@ extension DistributedActorSystem {
   public func executeDistributedTarget<Act, ResultHandler>(
     on actor: Act,
     mangledTargetName: String,
-    invocation: inout Invocation,
+    invocationDecoder: inout InvocationDecoder,
     handler: ResultHandler
   ) async throws where Act: DistributedActor,
                        Act.ID == ActorID,
@@ -245,41 +248,43 @@ extension DistributedActorSystem {
     do {
       // Decode the invocation and pack arguments into the h-buffer
       // TODO(distributed): decode the generics info
-      var argumentDecoder = invocation.makeArgumentDecoder()
-      var paramIdx = 0
-      for unsafeRawArgPointer in hargs {
-        guard paramIdx < paramCount else {
-          throw ExecuteDistributedTargetError(
-            message: "Unexpected attempt to decode more parameters than expected: \(paramIdx + 1)")
-        }
-        let paramType = paramTypes[paramIdx]
-        paramIdx += 1
+      // TODO(distributed): move this into the IRGen synthesized funcs, so we don't need hargs at all and can specialize the decodeNextArgument calls
+      do {
+        var paramIdx = 0
+        for unsafeRawArgPointer in hargs {
+          guard paramIdx < paramCount else {
+            throw ExecuteDistributedTargetError(
+              message: "Unexpected attempt to decode more parameters than expected: \(paramIdx + 1)")
+          }
+          let paramType = paramTypes[paramIdx]
+          paramIdx += 1
 
-        // FIXME(distributed): func doDecode<Arg: SerializationRequirement>(_: Arg.Type) throws {
-        // FIXME:     but how would we call this...?
-        // FIXME:     > type 'Arg' constrained to non-protocol, non-class type 'Self.Invocation.SerializationRequirement'
-        func doDecodeArgument<Arg>(_: Arg.Type) throws {
-          let unsafeArgPointer = unsafeRawArgPointer
-            .bindMemory(to: Arg.self, capacity: 1)
-          try argumentDecoder.decodeNext(Arg.self, into: unsafeArgPointer)
+          // FIXME(distributed): func doDecode<Arg: SerializationRequirement>(_: Arg.Type) throws {
+          // FIXME:     but how would we call this...?
+          // FIXME:     > type 'Arg' constrained to non-protocol, non-class type 'Self.Invocation.SerializationRequirement'
+          func doDecodeArgument<Arg>(_: Arg.Type) throws {
+            let unsafeArgPointer = unsafeRawArgPointer
+              .bindMemory(to: Arg.self, capacity: 1)
+            try invocationDecoder.decodeNextArgument(Arg.self, into: unsafeArgPointer)
+          }
+          try _openExistential(paramType, do: doDecodeArgument)
         }
-        try _openExistential(paramType, do: doDecodeArgument)
       }
 
-      let returnType = try invocation.decodeReturnType() ?? returnTypeFromTypeInfo
+      let returnType = try invocationDecoder.decodeReturnType() ?? returnTypeFromTypeInfo
       // let errorType = try invocation.decodeErrorType() // TODO: decide how to use?
+
       // Execute the target!
       try await _executeDistributedTarget(
         on: actor,
         mangledTargetName, UInt(mangledTargetName.count),
-        argumentBuffer: hargs.buffer._rawValue,
+        argumentBuffer: hargs.buffer._rawValue, // TODO(distributed): pass the invocationDecoder instead, so we can decode inside IRGen directly into the argument explosion
         resultBuffer: resultBuffer._rawValue
       )
 
       func onReturn<R>(_ resultTy: R.Type) async throws {
         try await handler.onReturn/*<R>*/(value: resultBuffer.load(as: resultTy))
       }
-
       try await _openExistential(returnType, do: onReturn)
     } catch {
       try await handler.onThrow(error: error)
@@ -314,7 +319,7 @@ public struct RemoteCallTarget {
   }
 }
 
-/// Represents an invocation of a distributed target (method or computed property).
+/// Used to encode an invocation of a distributed target (method or computed property).
 ///
 /// ## Forming an invocation
 ///
@@ -345,12 +350,9 @@ public struct RemoteCallTarget {
 /// Note that the decoding will be provided the specific types that the sending side used to preform the call,
 /// so decoding can rely on simply invoking e.g. `Codable` (if that is the `SerializationRequirement`) decoding
 /// entry points on the provided types.
-@available(SwiftStdlib 5.6, *)
-public protocol DistributedTargetInvocation {
-  associatedtype ArgumentDecoder: DistributedTargetInvocationArgumentDecoder
+public protocol DistributedTargetInvocationEncoder {
   associatedtype SerializationRequirement
 
-  // === Sending / recording  -------------------------------------------------
   /// The arguments must be encoded order-preserving, and once `decodeGenericSubstitutions`
   /// is called, the substitutions must be returned in the same order in which they were recorded.
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws
@@ -358,32 +360,24 @@ public protocol DistributedTargetInvocation {
 //  /// Ad-hoc requirement
 //  ///
 //  /// Record an argument of `Argument` type in this arguments storage.
-//  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws
+//  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
+
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
 //  /// Ad-hoc requirement
 //  ///
 //  /// Record the return type of the distributed method.
 //  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws
+
   mutating func doneRecording() throws
-
-  // === Receiving / decoding -------------------------------------------------
-  mutating func decodeGenericSubstitutions() throws -> [Any.Type]
-
-  func makeArgumentDecoder() -> Self.ArgumentDecoder
-
-  mutating func decodeReturnType() throws -> Any.Type?
-
-  mutating func decodeErrorType() throws -> Any.Type?
 }
 
-/// Decoding iterator produced by `DistributedTargetInvocation.argumentDecoder()`.
-///
-/// It will be called exactly `N` times where `N` is the known number of arguments
-/// to the target invocation.
-@available(SwiftStdlib 5.6, *)
-public protocol DistributedTargetInvocationArgumentDecoder {
+/// Decoder that must be provided to `executeDistributedTarget` and is used
+/// by the Swift runtime to decode arguments of the invocation.
+public protocol DistributedTargetInvocationDecoder {
   associatedtype SerializationRequirement
+
+  func decodeGenericSubstitutions() throws -> [Any.Type]
 
 //  /// Ad-hoc protocol requirement
 //  ///
@@ -398,14 +392,27 @@ public protocol DistributedTargetInvocationArgumentDecoder {
 //  /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
 //  /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
 //  /// performs the actual distributed (local) instance method invocation.
-//  mutating func decodeNext<Argument: SerializationRequirement>(
+//  mutating func decodeNextArgument<Argument: SerializationRequirement>(
 //      into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
 //  ) throws
   // FIXME(distributed): remove this since it must have the ': SerializationRequirement'
-  mutating func decodeNext<Argument>(
+  mutating func decodeNextArgument<Argument>(
     _ argumentType: Argument.Type,
     into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
   ) throws
+
+  func decodeErrorType() throws -> Any.Type?
+
+  func decodeReturnType() throws -> Any.Type?
+}
+
+///
+/// It will be called exactly `N` times where `N` is the known number of arguments
+/// to the target invocation.
+@available(SwiftStdlib 5.6, *)
+public protocol DistributedTargetInvocationArgumentDecoder {
+
+
 }
 
 @available(SwiftStdlib 5.6, *)
@@ -427,8 +434,9 @@ public protocol DistributedActorSystemError: Error {}
 
 @available(SwiftStdlib 5.6, *)
 public struct ExecuteDistributedTargetError: DistributedActorSystemError {
-  private let message: String
-  internal init(message: String) {
+  let message: String
+
+  public init(message: String) {
     self.message = message
   }
 }

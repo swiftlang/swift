@@ -56,7 +56,9 @@ struct ActorAddress: Sendable, Hashable, Codable {
 
 final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   typealias ActorID = ActorAddress
-  typealias Invocation = FakeDistributedInvocation
+  typealias SerializationRequirement = Codable
+  typealias InvocationDecoder = FakeDistributedInvocation
+  typealias InvocationEncoder = FakeDistributedInvocation
 
   var n = 0
 
@@ -86,27 +88,38 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
     print("resign address:\(id)")
   }
 
-  @inlinable func makeInvocation() throws -> Invocation {
+  @inlinable func makeInvocationEncoder() throws -> InvocationEncoder {
     .init()
   }
 }
 
-struct FakeDistributedInvocation: DistributedTargetInvocation {
+struct FakeDistributedInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias  ArgumentDecoder = FakeDistributedTargetInvocationArgumentDecoder
   typealias SerializationRequirement = Codable
 
-  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws { }
-  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws { }
-  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws { }
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws { }
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws { }
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws { }
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws { }
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws { }
   mutating func doneRecording() throws { }
 
   // === Receiving / decoding -------------------------------------------------
 
-  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func argumentDecoder() -> Self.ArgumentDecoder { .init() }
-  mutating func decodeReturnType() throws -> Any.Type? { nil }
-  mutating func decodeErrorType() throws -> Any.Type? { nil }
+  func decodeGenericSubstitutions() throws -> [Any.Type] {
+    []
+  }
+  func decodeNextArgument<Argument>(
+    _ argumentType: Argument.Type,
+    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
+  ) throws {
+    // ...
+  }
+  func decodeReturnType() throws -> Any.Type? {
+    nil
+  }
+  func decodeErrorType() throws -> Any.Type? {
+    nil
+  }
 }
 
 struct FakeDistributedTargetInvocationArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
