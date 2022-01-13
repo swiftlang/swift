@@ -25,9 +25,16 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     SILInstruction_previous(bridged).instruction
   }
 
+  // Needed for ReverseList<Instruction>.reversed(). Never use directly.
+  public var _firstInList: Instruction { SILBasicBlock_firstInst(block.bridged).instruction! }
+  // Needed for List<Instruction>.reversed(). Never use directly.
+  public var _lastInList: Instruction { SILBasicBlock_lastInst(block.bridged).instruction! }
+
   final public var block: BasicBlock {
     SILInstruction_getParent(bridged).block
   }
+
+  final public var function: Function { block.function }
 
   final public var description: String {
     SILNode_debugDescription(bridgedNode).takeString()
@@ -263,7 +270,19 @@ final public class LoadInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class LoadBorrowInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class BuiltinInst : SingleValueInstruction {}
+final public class BuiltinInst : SingleValueInstruction {
+  // TODO: find a way to directly reuse the BuiltinValueKind enum
+  public enum ID  {
+    case None
+    case DestroyArray
+  }
+  public var id: ID? {
+    switch BuiltinInst_getID(bridged) {
+      case DestroyArrayBuiltin: return .DestroyArray
+      default: return .None
+    }
+  }
+}
 
 final public class UpcastInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -321,6 +340,12 @@ class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
 public class GlobalAccessInst : SingleValueInstruction {
   final public var global: GlobalVariable {
     GlobalAccessInst_getGlobal(bridged).globalVar
+  }
+}
+
+final public class FunctionRefInst : GlobalAccessInst {
+  public var referencedFunction: Function {
+    FunctionRefInst_getReferencedFunction(bridged).function
   }
 }
 
@@ -398,6 +423,12 @@ class ObjCMetatypeToObjectInst : SingleValueInstruction, UnaryInstruction {}
 final public
 class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
+final public
+class MarkDependenceInst : SingleValueInstruction {
+  public var value: Value { return operands[0].value }
+  public var base: Value { return operands[1].value }
+}
+
 final public class BridgeObjectToRefInst : SingleValueInstruction,
                                            UnaryInstruction {}
 
@@ -442,10 +473,18 @@ public protocol Allocation : AnyObject { }
 final public class AllocStackInst : SingleValueInstruction, Allocation {
 }
 
-final public class AllocRefInst : SingleValueInstruction, Allocation {
+public class AllocRefInstBase : SingleValueInstruction, Allocation {
+  final public var isObjC: Bool { AllocRefInstBase_isObjc(bridged) != 0 }
+
+  final public var canAllocOnStack: Bool {
+    AllocRefInstBase_canAllocOnStack(bridged) != 0
+  }
 }
 
-final public class AllocRefDynamicInst : SingleValueInstruction, Allocation {
+final public class AllocRefInst : AllocRefInstBase {
+}
+
+final public class AllocRefDynamicInst : AllocRefInstBase {
 }
 
 final public class AllocBoxInst : SingleValueInstruction, Allocation {

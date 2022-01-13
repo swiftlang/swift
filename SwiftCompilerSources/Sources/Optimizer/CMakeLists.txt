@@ -15,6 +15,7 @@ endif()
 add_swift_compiler_module(Optimizer DEPENDS ${dependencies})
 
 add_subdirectory(Analysis)
+add_subdirectory(DataStructures)
 add_subdirectory(InstructionPasses)
 add_subdirectory(PassManager)
 add_subdirectory(FunctionPasses)

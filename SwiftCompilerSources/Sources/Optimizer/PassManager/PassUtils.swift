@@ -20,20 +20,47 @@ public typealias BridgedInstructionPassCtxt =
 
 struct PassContext {
 
-  fileprivate let passContext: BridgedPassContext
+  let _bridged: BridgedPassContext
 
   var isSwift51RuntimeAvailable: Bool {
-    PassContext_isSwift51RuntimeAvailable(passContext) != 0
+    PassContext_isSwift51RuntimeAvailable(_bridged) != 0
   }
 
   var aliasAnalysis: AliasAnalysis {
-    let bridgedAA = PassContext_getAliasAnalysis(passContext)
+    let bridgedAA = PassContext_getAliasAnalysis(_bridged)
     return AliasAnalysis(bridged: bridgedAA)
   }
 
   var calleeAnalysis: CalleeAnalysis {
-    let bridgeCA = PassContext_getCalleeAnalysis(passContext)
+    let bridgeCA = PassContext_getCalleeAnalysis(_bridged)
     return CalleeAnalysis(bridged: bridgeCA)
+  }
+
+  var deadEndBlocks: DeadEndBlocksAnalysis {
+    let bridgeDEA = PassContext_getDeadEndBlocksAnalysis(_bridged)
+    return DeadEndBlocksAnalysis(bridged: bridgeDEA)
+  }
+
+  var dominatorTree: DominatorTree {
+    let bridgedDT = PassContext_getDomTree(_bridged)
+    return DominatorTree(bridged: bridgedDT)
+  }
+
+  var postDominatorTree: PostDominatorTree {
+    let bridgedPDT = PassContext_getPostDomTree(_bridged)
+    return PostDominatorTree(bridged: bridgedPDT)
+  }
+
+  func notifyInstructionsChanged() {
+    PassContext_notifyChanges(_bridged, instructionsChanged)
+  }
+
+  private func notifyCallsChanged() {
+    PassContext_notifyChanges(_bridged, callsChanged)
+  }
+
+  private func notifyBranchesChanged() {
+    PassContext_notifyChanges(_bridged, branchesChanged)
   }
 
   enum EraseMode {
@@ -48,20 +75,20 @@ struct PassContext {
         for result in instruction.results {
           for use in result.uses {
             assert(use.instruction is DebugValueInst)
-            PassContext_eraseInstruction(passContext, use.instruction.bridged)
+            PassContext_eraseInstruction(_bridged, use.instruction.bridged)
           }
         }
     }
 
     if instruction is FullApplySite {
-      PassContext_notifyChanges(passContext, callsChanged)
+      notifyCallsChanged()
     }
     if instruction is TermInst {
-      PassContext_notifyChanges(passContext, branchesChanged)
+      notifyBranchesChanged()
     }
-    PassContext_notifyChanges(passContext, instructionsChanged)
+    notifyInstructionsChanged()
 
-    PassContext_eraseInstruction(passContext, instruction.bridged)
+    PassContext_eraseInstruction(_bridged, instruction.bridged)
   }
 
   func replaceAllUses(of value: Value, with replacement: Value) {
@@ -72,17 +99,21 @@ struct PassContext {
 
   func setOperand(of instruction: Instruction, at index : Int, to value: Value) {
     if instruction is FullApplySite && index == ApplyOperands.calleeOperandIndex {
-      PassContext_notifyChanges(passContext, callsChanged)
+      notifyCallsChanged()
     }
-    PassContext_notifyChanges(passContext, instructionsChanged)
+    notifyInstructionsChanged()
 
     SILInstruction_setOperand(instruction.bridged, index, value.bridged)
   }
 
   func setAtomicity(of instruction: RefCountingInst, isAtomic: Bool) {
-    PassContext_notifyChanges(passContext, instructionsChanged)
+    PassContext_notifyChanges(_bridged, instructionsChanged)
 
     RefCountingInst_setIsAtomic(instruction.bridged, isAtomic)
+  }
+  
+  func fixStackNesting(function: Function) {
+    PassContext_fixStackNesting(_bridged, function.bridged)
   }
 }
 
@@ -99,7 +130,7 @@ struct FunctionPass {
 
   func run(_ bridgedCtxt: BridgedFunctionPassCtxt) {
     let function = bridgedCtxt.function.function
-    let context = PassContext(passContext: bridgedCtxt.passContext)
+    let context = PassContext(_bridged: bridgedCtxt.passContext)
     runFunction(function, context)
   }
 }
@@ -117,14 +148,8 @@ struct InstructionPass<InstType: Instruction> {
 
   func run(_ bridgedCtxt: BridgedInstructionPassCtxt) {
     let inst = bridgedCtxt.instruction.getAs(InstType.self)
-    let context = PassContext(passContext: bridgedCtxt.passContext)
+    let context = PassContext(_bridged: bridgedCtxt.passContext)
     runFunction(inst, context)
-  }
-}
-
-extension StackList {
-  init(_ context: PassContext) {
-    self.init(context: context.passContext)
   }
 }
 
@@ -132,11 +157,18 @@ extension Builder {
   init(at insPnt: Instruction, location: Location,
        _ context: PassContext) {
     self.init(insertionPoint: insPnt, location: location,
-              passContext: context.passContext)
+              passContext: context._bridged)
   }
 
   init(at insPnt: Instruction, _ context: PassContext) {
     self.init(insertionPoint: insPnt, location: insPnt.location,
-              passContext: context.passContext)
+              passContext: context._bridged)
+  }
+}
+
+extension AllocRefInstBase {
+  func setIsStackAllocatable(_ context: PassContext) {
+    AllocRefInstBase_setIsStackAllocatable(bridged)
+    context.notifyInstructionsChanged()
   }
 }
