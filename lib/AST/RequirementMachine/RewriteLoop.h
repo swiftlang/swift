@@ -119,15 +119,6 @@ struct RewriteStep {
     ///
     /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
     SameTypeWitness,
-
-    /// If not inverted: replaces the abstract type witness term with the
-    /// subject type term.
-    ///
-    /// If inverted: replaces the subject type term with the abstract type
-    /// term.
-    ///
-    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
-    AbstractTypeWitness,
   };
 
   /// The rewrite step kind.
@@ -200,11 +191,6 @@ struct RewriteStep {
 
   static RewriteStep forSameTypeWitness(unsigned witnessID, bool inverse) {
     return RewriteStep(SameTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/witnessID, inverse);
-  }
-
-  static RewriteStep forAbstractTypeWitness(unsigned witnessID, bool inverse) {
-    return RewriteStep(AbstractTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
                        /*arg=*/witnessID, inverse);
   }
 
@@ -405,9 +391,6 @@ struct RewritePathEvaluator {
 
   void applySameTypeWitness(const RewriteStep &step,
                             const RewriteSystem &system);
-
-  void applyAbstractTypeWitness(const RewriteStep &step,
-                                const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
 };

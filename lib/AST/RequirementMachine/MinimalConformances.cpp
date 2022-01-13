@@ -140,7 +140,6 @@ void RewriteLoop::findProtocolConformanceRules(
       case RewriteStep::Relation:
       case RewriteStep::ConcreteTypeWitness:
       case RewriteStep::SameTypeWitness:
-      case RewriteStep::AbstractTypeWitness:
         break;
       }
     }

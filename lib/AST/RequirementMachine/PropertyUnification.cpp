@@ -837,13 +837,15 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     //
     // Where S[n] is the nth substitution term.
 
-    auto result = Context.getRelativeTermForType(typeWitness, substitutions);
+    auto result = Context.getRelativeTermForType(
+        typeWitness, substitutions);
 
-    RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
-                                       Term::get(result, Context));
-    unsigned witnessID = System.recordTypeWitness(witness);
-    path.add(RewriteStep::forAbstractTypeWitness(
-        witnessID, /*inverse=*/false));
+    unsigned relationID = System.recordRelation(
+        Term::get(result, Context),
+        Term::get(subjectType, Context));
+    path.add(RewriteStep::forRelation(
+        /*startOffset=*/0, relationID,
+        /*inverse=*/false));
 
     return result;
   }
@@ -862,11 +864,11 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
             props->getConcreteType() == typeWitness) {
           auto result = props->getKey();
 
-          RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
-                                             result);
-          unsigned witnessID = System.recordTypeWitness(witness);
-          path.add(RewriteStep::forAbstractTypeWitness(
-              witnessID, /*inverse=*/false));
+          unsigned relationID = System.recordRelation(
+              result, Term::get(subjectType, Context));
+          path.add(RewriteStep::forRelation(
+              /*startOffset=*/0, relationID,
+              /*inverse=*/false));
 
           if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
              llvm::dbgs() << "^^ Type witness can re-use property bag of "
