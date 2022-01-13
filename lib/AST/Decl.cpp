@@ -7407,7 +7407,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall() const {
   auto returnedTypeParam = params->get(4);
   if (actorParam->getArgumentName() != C.Id_on ||
       targetParam->getArgumentName() != C.Id_target ||
-      invocationParam->getArgumentName() != C.Id_invocation ||
+      invocationParam->getArgumentName() != C.Id_invocationDecoder ||
       thrownTypeParam->getArgumentName() != C.Id_throwing ||
       returnedTypeParam->getArgumentName() != C.Id_returning)
     return false;
@@ -7459,13 +7459,15 @@ NominalTypeDecl::getDistributedActorSystemMakeInvocationFunction() const {
   }
 
   // FIXME(distributed): implement more properly...
-  for (auto value : system->lookupDirect(C.Id_makeInvocation)) {
+  for (auto value : system->lookupDirect(C.Id_makeInvocationEncoder)) {
     auto func = dyn_cast<AbstractFunctionDecl>(value);
     if (!func)
       continue;
 
     if (func->getParameters()->size() != 0)
-      return nullptr;
+      continue;
+
+    // TODO(distriuted): return type must conform to our expected protocol
 
     return func;
   }
@@ -7474,21 +7476,25 @@ NominalTypeDecl::getDistributedActorSystemMakeInvocationFunction() const {
   return nullptr;
 }
 
-AbstractFunctionDecl*
-NominalTypeDecl::getDistributedActorInvocationRecordArgumentFunction() const {
+ConstructorDecl*
+NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   auto &C = this->getASTContext();
 
-  // FIXME(distributed): implement more properly...
+  // FIXME(distributed): implement more properly... do with caching etc
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
-  for (auto value : mutableThis->lookupDirect(C.Id_recordArgument)) {
-    auto func = dyn_cast<AbstractFunctionDecl>(value);
-    if (!func)
+  for (auto value : mutableThis->getMembers()) {
+    auto ctor = dyn_cast<ConstructorDecl>(value);
+    if (!ctor)
       continue;
 
-    if (func->getParameters()->size() != 0)
+    auto params = ctor->getParameters();
+    if (params->size() != 1)
       return nullptr;
 
-    return func;
+    if (params->get(0)->getArgumentName() == C.getIdentifier("_mangledName"))
+      return ctor;
+
+    return nullptr;
   }
 
   // TODO(distributed): make a Request for it?

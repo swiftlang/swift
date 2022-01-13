@@ -123,7 +123,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
   // - remoteCall
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
     if (decl->getDistributedActorSystemRemoteCallFunction()) {
-      // ok, we found it!
+      // TODO: check the access level of func is okey to conform to the thing
       return false;
     }
 
@@ -135,7 +135,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getName(), C.Id_remoteCall, "func remoteCall<Act, Err, Res>(\n"
                                             "    on actor: Act,\n"
                                             "    target: RemoteCallTarget,\n"
-                                            "    invocation: Invocation,\n"
+                                            "    invocationDecoder: inout InvocationDecoder,\n"
                                             "    throwing: Err.Type,\n"
                                             "    returning: Res.Type\n"
                                             ") async throws -> Res\n"
@@ -148,7 +148,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
 
   // ==== ----------------------------------------------------------------------
   // Check the ad-hoc requirements of 'DistributedTargetInvocation'
-  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocation)) {
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder)) {
     // FIXME(distributed): implement finding this the requirements here
 
 //    if (!decl.get...() && diagnose) {
@@ -176,27 +176,6 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
 //    }
 //    return true;
   }
-
-  // ==== ----------------------------------------------------------------------
-  // Check the ad-hoc requirements of 'DistributedTargetInvocationArgumentDecoder'
-  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationArgumentDecoder)) {
-    // FIXME(distributed): implement finding this the requirements here
-
-//    if (diagnose) {
-//      decl->diagnose(
-//          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
-//          decl->getDescriptiveKind(), decl->getName(), C.Id_remoteCall);
-//      decl->diagnose(
-//          diag::
-//              note_distributed_actor_system_conformance_missing_adhoc_requirement,
-//          decl->getName(), C.Id_remoteCall,
-//          "mutating func decodeNext<Argument: SerializationRequirement>(\n"
-//          "    into pointer: UnsafeMutablePointer<Argument>\n"
-//          ") throws\n");
-//    }
-//    return true;
-  }
-
 
   // ==== ----------------------------------------------------------------------
   // Check the ad-hoc requirements of 'DistributedTargetInvocationArgumentDecoder'

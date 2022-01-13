@@ -1,0 +1,116 @@
+// MyDistActor.TESTTESTTESTTEST(i:s:)
+sil hidden @$s14default_deinit11MyDistActorC16TESTTESTTESTTEST1i1sySi_SStYaKF : $@convention(method) @async (Int, @guaranteed String, @guaranteed MyDistActor) -> @error Error {
+// %0 "i" // user: %3
+// %1 "s" // user: %4
+// %2 "self" // users: %8, %7, %63, %50, %39, %16, %5
+bb0(%0 : $Int, %1 : $String, %2 : $MyDistActor):
+ debug_value %0 : $Int, let, name "i", argno 1 // id: %3
+ debug_value %1 : $String, let, name "s", argno 2 // id: %4
+ debug_value %2 : $MyDistActor, let, name "self", argno 3, implicit // id: %5
+ debug_value undef : $Error, var, name "$error", argno 4 // id: %6
+ strong_retain %2 : $MyDistActor // id: %7
+ %8 = init_existential_ref %2 : $MyDistActor : $MyDistActor, $AnyObject // users: %11, %10
+ // function_ref swift_distributed_actor_is_remote
+ %9 = function_ref @swift_distributed_actor_is_remote : $@convention(thin) (@guaranteed AnyObject) -> Bool // user: %10
+ %10 = apply %9(%8) : $@convention(thin) (@guaranteed AnyObject) -> Bool // users: %13, %12
+ strong_release %8 : $AnyObject // id: %11
+ debug_value %10 : $Bool, let, name "remote" // id: %12
+ %13 = struct_extract %10 : $Bool, #Bool._value // user: %14
+ cond_br %13, bb1, bb6 // id: %14
+
+bb1: // Preds: bb0
+ %15 = alloc_stack $FakeInvocation, var, name "invocation" // users: %22, %59, %78, %70, %23, %48
+ %16 = ref_element_addr %2 : $MyDistActor, #MyDistActor.actorSystem // user: %17
+ %17 = load %16 : $*FakeActorSystem // users: %21, %20, %18
+ retain_value %17 : $FakeActorSystem // id: %18
+ // function_ref FakeActorSystem.makeInvocationEncoder()
+ %19 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV21makeInvocationEncoderAA0aG0VyF : $@convention(method) (@guaranteed FakeActorSystem) -> FakeInvocation // user: %20
+ %20 = apply %19(%17) : $@convention(method) (@guaranteed FakeActorSystem) -> FakeInvocation // user: %22
+ release_value %17 : $FakeActorSystem // id: %21
+ store %20 to %15 : $*FakeInvocation // id: %22
+ %23 = begin_access [modify] [static] %15 : $*FakeInvocation // users: %27, %25, %69
+ // function_ref FakeInvocation.doneRecording()
+ %24 = function_ref @$s27FakeDistributedActorSystems0A10InvocationV13doneRecordingyyKF : $@convention(method) (@inout FakeInvocation) -> @error Error // user: %25
+ try_apply %24(%23) : $@convention(method) (@inout FakeInvocation) -> @error Error, normal bb2, error bb9 // id: %25
+
+bb2(%26 : $()): // Preds: bb1
+ end_access %23 : $*FakeInvocation // id: %27
+ %28 = alloc_stack $RemoteCallTarget, let, name "target" // users: %58, %57, %50, %77, %76, %37
+ %29 = metatype $@thin RemoteCallTarget.Type // user: %37
+ %30 = string_literal utf8 "MANGLED_NAME" // user: %35
+ %31 = integer_literal $Builtin.Word, 12 // user: %35
+ %32 = integer_literal $Builtin.Int1, -1 // user: %35
+ %33 = metatype $@thin String.Type // user: %35
+ // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+ %34 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %35
+ %35 = apply %34(%30, %31, %32, %33) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %37
+ // function_ref RemoteCallTarget.init(_mangledName:)
+ %36 = function_ref @$s12_Distributed16RemoteCallTargetV12_mangledNameACSS_tcfC : $@convention(method) (@owned String, @thin RemoteCallTarget.Type) -> @out RemoteCallTarget // user: %37
+ %37 = apply %36(%28, %35, %29) : $@convention(method) (@owned String, @thin RemoteCallTarget.Type) -> @out RemoteCallTarget
+ %38 = alloc_stack $String // users: %54, %56, %50, %75
+ %39 = ref_element_addr %2 : $MyDistActor, #MyDistActor.actorSystem // user: %40
+ %40 = load %39 : $*FakeActorSystem // users: %74, %53, %50, %41
+ retain_value %40 : $FakeActorSystem // id: %41
+ %42 = metatype $@thin Never.Type
+ %43 = metatype $@thick Never.Type // user: %50
+ br bb3 // id: %44
+
+bb3: // Preds: bb2
+ %45 = metatype $@thick String.Type // user: %46
+ %46 = enum $Optional<@thick String.Type>, #Optional.some!enumelt, %45 : $@thick String.Type // user: %50
+ br bb4 // id: %47
+
+bb4: // Preds: bb3
+ %48 = begin_access [modify] [static] %15 : $*FakeInvocation // users: %52, %50, %73
+ // function_ref FakeActorSystem.remoteCall<A, B, C>(on:target:invocationDecoder:throwing:returning:)
+ %49 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mSgtYaKAJ0bC0RzSeR0_SER0_AA0C7AddressV2IDRtzr1_lF : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %50
+ try_apply %49<MyDistActor, Never, String>(%38, %2, %28, %48, %43, %46, %40) : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error), normal bb5, error bb10 // id: %50
+
+bb5(%51 : $()): // Preds: bb4
+ end_access %48 : $*FakeInvocation // id: %52
+ release_value %40 : $FakeActorSystem // id: %53
+ %54 = load %38 : $*String // user: %55
+ release_value %54 : $String // id: %55
+ dealloc_stack %38 : $*String // id: %56
+ destroy_addr %28 : $*RemoteCallTarget // id: %57
+ dealloc_stack %28 : $*RemoteCallTarget // id: %58
+ dealloc_stack %15 : $*FakeInvocation // id: %59
+ br bb8 // id: %60
+
+bb6: // Preds: bb0
+ // function_ref MyDistActor.test()
+ %61 = function_ref @$s14default_deinit11MyDistActorC4testyyFTE : $@convention(method) @async (@guaranteed MyDistActor) -> @error Error // user: %63
+ %62 = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+ try_apply %61(%2) : $@convention(method) @async (@guaranteed MyDistActor) -> @error Error, normal bb7, error bb11 // id: %63
+
+bb7(%64 : $()): // Preds: bb6
+ br bb8 // id: %65
+
+bb8: // Preds: bb7 bb5
+ %66 = tuple () // user: %67
+ return %66 : $() // id: %67
+
+// %68 // user: %71
+bb9(%68 : $Error): // Preds: bb1
+ end_access %23 : $*FakeInvocation // id: %69
+ dealloc_stack %15 : $*FakeInvocation // id: %70
+ br bb12(%68 : $Error) // id: %71
+
+// %72 // user: %79
+bb10(%72 : $Error): // Preds: bb4
+ end_access %48 : $*FakeInvocation // id: %73
+ release_value %40 : $FakeActorSystem // id: %74
+ dealloc_stack %38 : $*String // id: %75
+ destroy_addr %28 : $*RemoteCallTarget // id: %76
+ dealloc_stack %28 : $*RemoteCallTarget // id: %77
+ dealloc_stack %15 : $*FakeInvocation // id: %78
+ br bb12(%72 : $Error) // id: %79
+
+// %80 // user: %81
+bb11(%80 : $Error): // Preds: bb6
+ br bb12(%80 : $Error) // id: %81
+
+// %82 // user: %83
+bb12(%82 : $Error): // Preds: bb11 bb10 bb9
+ throw %82 : $Error // id: %83
+} // end sil function '$s14default_deinit11MyDistActorC16TESTTESTTESTTEST1i1sySi_SStYaKF'

@@ -97,10 +97,9 @@ PROTOCOL(Differentiable)
 
 // Distributed Actors
 PROTOCOL(DistributedActor)
-PROTOCOL(ActorIdentity)
 PROTOCOL(DistributedActorSystem)
-PROTOCOL(DistributedTargetInvocation)
-PROTOCOL(DistributedTargetInvocationArgumentDecoder)
+PROTOCOL(DistributedTargetInvocationEncoder)
+PROTOCOL(DistributedTargetInvocationDecoder)
 PROTOCOL(DistributedTargetInvocationResultHandler)
 
 PROTOCOL(AsyncSequence)

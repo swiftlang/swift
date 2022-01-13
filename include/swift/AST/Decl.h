@@ -3368,6 +3368,9 @@ public:
   /// Find the 'DistributedTargetInvocation.recordArgument' function.
   AbstractFunctionDecl* getDistributedActorInvocationRecordArgumentFunction() const;
 
+  /// Find the 'RemoteCallTarget.init(_mangledName:)' initializer function
+  ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
+
   /// Find the 'DistributedTargetInvocation.doneRecording' function.
   AbstractFunctionDecl* getDistributedActorInvocationDoneRecordingFunction() const;
 
