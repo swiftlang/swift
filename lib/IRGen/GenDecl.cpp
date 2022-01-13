@@ -2844,7 +2844,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     unsigned argIdx = 0;
     for (auto arg : forwardedArgs) {
       // Replace the context argument.
-      if (argIdx == asyncContextIndex)
+      if (argIdx == asyncFnPtr.getSignature().getAsyncContextIndex())
         arguments.push_back(Builder.CreateBitOrPointerCast(
             calleeContextBuffer.getAddress(), IGM.SwiftContextPtrTy));
       else
