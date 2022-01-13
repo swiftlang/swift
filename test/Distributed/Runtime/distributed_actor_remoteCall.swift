@@ -102,7 +102,8 @@ struct ActorAddress: Sendable, Hashable, Codable {
 
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
-  typealias Invocation = FakeInvocation
+  typealias InvocationDecoder = FakeInvocation
+  typealias InvocationEncoder = FakeInvocation
   typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
@@ -124,14 +125,14 @@ struct FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocation() -> Invocation {
+  func makeInvocationEncoder() -> InvocationDecoder {
     .init()
   }
 
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocation: Invocation,
+    invocationDecoder: InvocationDecoder,
     throwing: Err.Type,
     returning: Res.Type
   ) async throws -> Res
@@ -143,51 +144,58 @@ struct FakeActorSystem: DistributedActorSystem {
 
 }
 
-struct FakeInvocation: DistributedTargetInvocation {
-  typealias ArgumentDecoder = FakeArgumentDecoder
+struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
   var arguments: [Any] = []
+  var returnType: Any.Type? = nil
+  var errorType: Any.Type? = nil
 
-  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
+    fatalError("NOT IMPLEMENTED: \(#function)")
+  }
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
     arguments.append(argument)
   }
-  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
+    self.errorType = type
+  }
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {
+    self.returnType = type
+  }
   mutating func doneRecording() throws {}
 
   // === Receiving / decoding -------------------------------------------------
 
-  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  func makeArgumentDecoder() -> FakeArgumentDecoder {
-    .init(invocation: self)
+  func decodeGenericSubstitutions() throws -> [Any.Type] {
+    []
   }
-  mutating func decodeReturnType() throws -> Any.Type? { nil }
-  mutating func decodeErrorType() throws -> Any.Type? { nil }
 
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
-    let invocation: FakeInvocation
-    var index: Int = 0
-
-    mutating func decodeNext<Argument>(
-      _ argumentType: Argument.Type,
-      into pointer: UnsafeMutablePointer<Argument>
-    ) throws {
-      guard index < invocation.arguments.count else {
-        fatalError("Attempted to decode more arguments than stored! Index: \(index), args: \(invocation.arguments)")
-      }
-
-      let anyArgument = invocation.arguments[index]
-      guard let argument = anyArgument as? Argument else {
-        fatalError("Cannot cast argument\(anyArgument) to expected \(Argument.self)")
-      }
-
-      print("  > argument: \(argument)")
-      pointer.pointee = argument
-      index += 1
+  var argumentIndex: Int = 0
+  mutating func decodeNextArgument<Argument>(
+    _ argumentType: Argument.Type,
+    into pointer: UnsafeMutablePointer<Argument>
+  ) throws {
+    guard argumentIndex < arguments.count else {
+      fatalError("Attempted to decode more arguments than stored! Index: \(argumentIndex), args: \(arguments)")
     }
+
+    let anyArgument = arguments[argumentIndex]
+    guard let argument = anyArgument as? Argument else {
+      fatalError("Cannot cast argument\(anyArgument) to expected \(Argument.self)")
+    }
+
+    print("  > decode argument: \(argument)")
+    pointer.pointee = argument
+    argumentIndex += 1
+  }
+
+  func decodeErrorType() throws -> Any.Type? {
+    self.errorType
+  }
+
+  func decodeReturnType() throws -> Any.Type? {
+    self.returnType
   }
 }
 
@@ -221,20 +229,20 @@ func test() async throws {
   let local = Greeter(system: system)
 
   // act as if we decoded an Invocation:
-  var invocation = FakeInvocation()
+  var emptyInvocation = FakeInvocation()
 
   try await system.executeDistributedTarget(
-    on: local,
-    mangledTargetName: emptyName,
-    invocation: &invocation,
-    handler: FakeResultHandler()
+      on: local,
+      mangledTargetName: emptyName,
+      invocationDecoder: &emptyInvocation,
+      handler: FakeResultHandler()
   )
   // CHECK: RETURN: ()
 
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: helloName,
-      invocation: &invocation,
+      invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: Hello, World!
@@ -242,7 +250,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: answerName,
-      invocation: &invocation,
+      invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: 42
@@ -250,7 +258,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: largeResultName,
-      invocation: &invocation,
+      invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: LargeStruct(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
@@ -258,24 +266,24 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: enumResultName,
-      invocation: &invocation,
+      invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: bar
 
-  var echoInvocation = system.makeInvocation()
-  try echoInvocation.recordArgument(argument: "Caplin")
+  var echoInvocation = system.makeInvocationEncoder()
+  try echoInvocation.recordArgument("Caplin")
   try echoInvocation.doneRecording()
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: echoName,
-      invocation: &echoInvocation,
+      invocationDecoder: &echoInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: Echo: Caplin
 
-  // CHECK-NEXT: done
   print("done")
+  // CHECK-NEXT: done
 }
 
 @main struct Main {
