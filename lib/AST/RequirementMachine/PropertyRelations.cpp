@@ -90,6 +90,34 @@ unsigned RewriteSystem::recordConcreteConformanceRelation(
       Term::get(rhsTerm, Context));
 }
 
+/// Record a relation ([concrete: C : P].[P:X].[concrete: C.X] =>
+/// [concrete: C : P].[P:X]) which "concretizes" a nested type C.X of a
+/// type parameter conforming to P known to equal the concrete type C.
+unsigned RewriteSystem::recordConcreteTypeWitnessRelation(
+    Symbol concreteConformanceSymbol,
+    Symbol associatedTypeSymbol,
+    Symbol typeWitnessSymbol) {
+  assert(concreteConformanceSymbol.getKind() ==
+         Symbol::Kind::ConcreteConformance);
+  assert(associatedTypeSymbol.getKind() ==
+         Symbol::Kind::AssociatedType);
+  assert(associatedTypeSymbol.getProtocols().size() == 1);
+  assert(concreteConformanceSymbol.getProtocol() ==
+         associatedTypeSymbol.getProtocols()[0]);
+  assert(typeWitnessSymbol.getKind() == Symbol::Kind::ConcreteType);
+
+  MutableTerm rhsTerm;
+  rhsTerm.add(concreteConformanceSymbol);
+  rhsTerm.add(associatedTypeSymbol);
+
+  MutableTerm lhsTerm(rhsTerm);
+  lhsTerm.add(typeWitnessSymbol);
+
+  return recordRelation(
+      Term::get(lhsTerm, Context),
+      Term::get(rhsTerm, Context));
+}
+
 RewriteSystem::TypeWitness::TypeWitness(
     Term lhs, llvm::PointerUnion<Symbol, Term> rhs)
   : LHS(lhs), RHS(rhs) {

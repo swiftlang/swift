@@ -346,9 +346,15 @@ public:
   Relation getRelation(unsigned index) const;
 
   unsigned recordRelation(Symbol lhs, Symbol rhs);
+
   unsigned recordConcreteConformanceRelation(
-    Symbol concreteSymbol, Symbol protocolSymbol,
-    Symbol concreteConformanceSymbol);
+      Symbol concreteSymbol, Symbol protocolSymbol,
+      Symbol concreteConformanceSymbol);
+
+  unsigned recordConcreteTypeWitnessRelation(
+      Symbol concreteConformanceSymbol,
+      Symbol associatedTypeSymbol,
+      Symbol typeWitnessSymbol);
 
   /// A type witness has a subject type, stored in LHS, which takes the form:
   ///

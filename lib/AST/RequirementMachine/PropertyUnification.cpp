@@ -898,6 +898,15 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
                                      typeWitnessSymbol);
   unsigned witnessID = System.recordTypeWitness(witness);
 
+  auto concreteConformanceSymbol = *(subjectType.end() - 2);
+  auto associatedTypeSymbol = *(subjectType.end() - 1);
+
+  // Record the relation before simplifying typeWitnessSymbol below.
+  unsigned relationID = System.recordConcreteTypeWitnessRelation(
+      concreteConformanceSymbol,
+      associatedTypeSymbol,
+      typeWitnessSymbol);
+
   // Simplify the substitution terms in the type witness symbol.
   RewritePath substPath;
   System.simplifySubstitutions(typeWitnessSymbol, &substPath);
@@ -914,7 +923,7 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
     // Add a rule T.[concrete: C : P] => T.[concrete: C : P].[P:X].
     MutableTerm result(key);
-    result.add(witness.getConcreteConformance());
+    result.add(concreteConformanceSymbol);
 
     // ([concrete: C : P] => [concrete: C : P].[P:X].[concrete: C])
     path.add(RewriteStep::forSameTypeWitness(
@@ -924,8 +933,9 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     path.append(substPath);
 
     // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
-    path.add(RewriteStep::forConcreteTypeWitness(
-        witnessID, /*inverse=*/false));
+    path.add(RewriteStep::forRelation(
+        /*startOffset=*/key.size(), relationID,
+        /*inverse=*/false));
 
     return result;
   }
@@ -944,8 +954,9 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   path.append(substPath);
 
   // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
-  path.add(RewriteStep::forConcreteTypeWitness(
-      witnessID, /*inverse=*/false));
+  path.add(RewriteStep::forRelation(
+      /*startOffset=*/key.size(), relationID,
+      /*inverse=*/false));
 
   return constraintType;
 }

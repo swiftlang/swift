@@ -102,17 +102,6 @@ struct RewriteStep {
 
     /// If not inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P] followed by an associated
-    /// type symbol [P:X], and the concrete type symbol [concrete: C.X] for the
-    /// type witness of 'X' in the conformance 'C : P'. The concrete type symbol
-    /// is eliminated.
-    ///
-    /// If inverted: the concrete type symbol [concrete: C.X] is introduced.
-    ///
-    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
-    ConcreteTypeWitness,
-
-    /// If not inverted: the top of the primary stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P] followed by an associated
     /// type symbol [P:X]. The associated type symbol is eliminated.
     ///
     /// If inverted: the associated type symbol [P:X] is introduced.
@@ -182,11 +171,6 @@ struct RewriteStep {
                                  bool inverse) {
     return RewriteStep(Relation, startOffset, /*endOffset=*/0,
                        /*arg=*/relationID, inverse);
-  }
-
-  static RewriteStep forConcreteTypeWitness(unsigned witnessID, bool inverse) {
-    return RewriteStep(ConcreteTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/witnessID, inverse);
   }
 
   static RewriteStep forSameTypeWitness(unsigned witnessID, bool inverse) {
@@ -384,9 +368,6 @@ struct RewritePathEvaluator {
                 const RewriteSystem &system);
 
   void applyConcreteConformance(const RewriteStep &step,
-                                const RewriteSystem &system);
-
-  void applyConcreteTypeWitness(const RewriteStep &step,
                                 const RewriteSystem &system);
 
   void applySameTypeWitness(const RewriteStep &step,
