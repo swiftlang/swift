@@ -77,30 +77,31 @@ static void recordRelation(Term key,
 
   unsigned relationID = system.recordRelation(lhsProperty, rhsProperty);
 
-  /// Build the following rewrite path:
-  ///
-  ///   U.(V => V.[p1]).[p2] ⊗ U.V.Relation([p1].[p2] => [p1]) ⊗ U.(V.[p1] => V).
-  ///
+  // Build the following rewrite path:
+  //
+  //   U.(V => V.[p1]).[p2] ⊗ U.V.Relation([p1].[p2] => [p1]) ⊗ U.(V.[p1] => V).
+  //
   RewritePath path;
 
-  /// Starting from U.V.[p2], apply the rule in reverse to get U.V.[p1].[p2].
+  // Starting from U.V.[p2], apply the rule in reverse to get U.V.[p1].[p2].
   path.add(RewriteStep::forRewriteRule(
       /*startOffset=*/key.size() - lhsRule.getRHS().size(),
       /*endOffset=*/1,
       /*ruleID=*/lhsRuleID,
       /*inverse=*/true));
 
-  /// U.V.Relation([p1].[p2] => [p1]).
-  path.add(RewriteStep::forRelation(relationID, /*inverse=*/false));
+  // U.V.Relation([p1].[p2] => [p1]).
+  path.add(RewriteStep::forRelation(/*startOffset=*/key.size(),
+                                    relationID, /*inverse=*/false));
 
-  /// U.(V.[p1] => V).
+  // U.(V.[p1] => V).
   path.add(RewriteStep::forRewriteRule(
       /*startOffset=*/key.size() - lhsRule.getRHS().size(),
       /*endOffset=*/0,
       /*ruleID=*/lhsRuleID,
       /*inverse=*/false));
 
-  /// Add the rule (T.[p2] => T) with the above rewrite path.
+  // Add the rule (T.[p2] => T) with the above rewrite path.
   MutableTerm lhs(key);
   lhs.add(rhsProperty);
 

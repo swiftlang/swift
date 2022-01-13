@@ -209,8 +209,9 @@ struct RewriteStep {
                        /*arg=*/numSubstitutions, inverse);
   }
 
-  static RewriteStep forRelation(unsigned relationID, bool inverse) {
-    return RewriteStep(Relation, /*startOffset=*/0, /*endOffset=*/0,
+  static RewriteStep forRelation(unsigned startOffset, unsigned relationID,
+                                 bool inverse) {
+    return RewriteStep(Relation, startOffset, /*endOffset=*/0,
                        /*arg=*/relationID, inverse);
   }
 
@@ -420,11 +421,12 @@ struct RewritePathEvaluator {
   void applyShift(const RewriteStep &step,
                   const RewriteSystem &system);
 
-  void applyRelation(const RewriteStep &step,
-                     const RewriteSystem &system);
-
   void applyDecompose(const RewriteStep &step,
                       const RewriteSystem &system);
+
+  AppliedRewriteStep
+  applyRelation(const RewriteStep &step,
+                const RewriteSystem &system);
 
   void applyConcreteConformance(const RewriteStep &step,
                                 const RewriteSystem &system);

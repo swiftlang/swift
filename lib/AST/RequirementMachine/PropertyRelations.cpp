@@ -18,7 +18,15 @@
 using namespace swift;
 using namespace rewriting;
 
-unsigned RewriteSystem::recordRelation(Symbol lhs, Symbol rhs) {
+RewriteSystem::Relation
+RewriteSystem::getRelation(unsigned index) const {
+  return Relations[index];
+}
+
+/// Record a relation that transforms the left hand side when it appears
+/// at the end of a term to the right hand side. Returns the relation ID,
+/// which can be passed to RewriteStep::forRelation().
+unsigned RewriteSystem::recordRelation(Term lhs, Term rhs) {
   auto key = std::make_pair(lhs, rhs);
   auto found = RelationMap.find(key);
   if (found != RelationMap.end())
@@ -33,9 +41,28 @@ unsigned RewriteSystem::recordRelation(Symbol lhs, Symbol rhs) {
   return index;
 }
 
-RewriteSystem::Relation
-RewriteSystem::getRelation(unsigned index) const {
-  return Relations[index];
+/// Given a left-hand side symbol [p1] and a right-hand side symbol
+/// [p2], record a relation ([p1].[p2] => [p1]), which denotes that
+/// the property p1 implies the property p2.
+///
+/// An example is a superclass requirement that implies a layout
+/// requirement.
+unsigned RewriteSystem::recordRelation(Symbol lhsProperty,
+                                       Symbol rhsProperty) {
+  assert(lhsProperty.isProperty());
+  assert(rhsProperty.isProperty());
+
+  MutableTerm lhsTerm;
+  lhsTerm.add(lhsProperty);
+  lhsTerm.add(rhsProperty);
+
+  MutableTerm rhsTerm;
+  rhsTerm.add(lhsProperty);
+
+  // Record a relation ([p1].[p2] => [p1]).
+  return recordRelation(
+      Term::get(lhsTerm, Context),
+      Term::get(rhsTerm, Context));
 }
 
 RewriteSystem::TypeWitness::TypeWitness(

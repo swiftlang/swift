@@ -329,21 +329,23 @@ private:
 
   //////////////////////////////////////////////////////////////////////////////
   ///
-  /// "Pseudo-rules" for the property map
+  /// Relations are "pseudo-rules" introduced by the property map
   ///
   //////////////////////////////////////////////////////////////////////////////
 
 public:
   /// The left hand side is known to be smaller than the right hand side.
-  using Relation = std::pair<Symbol, Symbol>;
+  using Relation = std::pair<Term, Term>;
 
 private:
   llvm::DenseMap<Relation, unsigned> RelationMap;
   std::vector<Relation> Relations;
 
 public:
-  unsigned recordRelation(Symbol lhs, Symbol rhs);
+  unsigned recordRelation(Term lhs, Term rhs);
   Relation getRelation(unsigned index) const;
+
+  unsigned recordRelation(Symbol lhs, Symbol rhs);
 
   /// A type witness has a subject type, stored in LHS, which takes the form:
   ///

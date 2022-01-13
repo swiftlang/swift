@@ -65,16 +65,18 @@ void RewriteStep::dump(llvm::raw_ostream &out,
     break;
   }
   case Relation: {
-    evaluator.applyRelation(*this, system);
+    auto result = evaluator.applyRelation(*this, system);
 
-    auto relation = system.getRelation(Arg);
-    out << "Relation(";
-    if (Inverse) {
-      out << relation.second << " > " << relation.first;
-    } else {
-      out << relation.first << " < " << relation.second;
+    if (!result.prefix.empty()) {
+      out << result.prefix;
+      out << ".";
     }
-    out << ")";
+    out << "(" << result.lhs << " =>> " << result.rhs << ")";
+    if (!result.suffix.empty()) {
+      out << ".";
+      out << result.suffix;
+    }
+
     break;
   }
   case ConcreteConformance: {
@@ -293,41 +295,6 @@ void RewritePathEvaluator::applyShift(const RewriteStep &step,
   }
 }
 
-void RewritePathEvaluator::applyRelation(const RewriteStep &step,
-                                         const RewriteSystem &system) {
-  assert(step.Kind == RewriteStep::Relation);
-
-  auto relation = system.getRelation(step.Arg);
-  auto &term = getCurrentTerm();
-
-  if (!step.Inverse) {
-    // Given a term T.[p1].[p2].U where |U| == EndOffset, build the
-    // term T.[p1].U.
-
-    auto lhsProperty = *(term.end() - step.EndOffset - 2);
-    auto rhsProperty = *(term.end() - step.EndOffset - 1);
-    assert(lhsProperty == relation.first);
-    assert(rhsProperty == relation.second);
-
-    MutableTerm result(term.begin(), term.end() - step.EndOffset - 1);
-    result.append(term.end() - step.EndOffset, term.end());
-
-    term = result;
-  } else {
-    // Given a term T.[p1].U where |U| == EndOffset, build the
-    // term T.[p1].[p2].U.
-
-    auto lhsProperty = *(term.end() - step.EndOffset - 1);
-    assert(lhsProperty == relation.first);
-
-    MutableTerm result(term.begin(), term.end() - step.EndOffset);
-    result.add(relation.second);
-    result.append(term.end() - step.EndOffset, term.end());
-
-    term = result;
-  }
-}
-
 void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
                                           const RewriteSystem &system) {
   assert(step.Kind == RewriteStep::Decompose);
@@ -402,6 +369,46 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
     // Pop the substitutions from the primary stack.
     Primary.resize(Primary.size() - numSubstitutions);
   }
+}
+
+AppliedRewriteStep
+RewritePathEvaluator::applyRelation(const RewriteStep &step,
+                                    const RewriteSystem &system) {
+  assert(step.Kind == RewriteStep::Relation);
+
+  auto relation = system.getRelation(step.Arg);
+  auto &term = getCurrentTerm();
+
+  auto lhs = (step.Inverse ? relation.second : relation.first);
+  auto rhs = (step.Inverse ? relation.first : relation.second);
+
+  auto bug = [&](StringRef msg) {
+    llvm::errs() << msg << "\n";
+    llvm::errs() << "- Term: " << term << "\n";
+    llvm::errs() << "- StartOffset: " << step.StartOffset << "\n";
+    llvm::errs() << "- EndOffset: " << step.EndOffset << "\n";
+    llvm::errs() << "- Expected subterm: " << lhs << "\n";
+    abort();
+  };
+
+  if (term.size() != step.StartOffset + lhs.size() + step.EndOffset) {
+    bug("Invalid whiskering");
+  }
+
+  if (!std::equal(term.begin() + step.StartOffset,
+                  term.begin() + step.StartOffset + lhs.size(),
+                  lhs.begin())) {
+    bug("Invalid subterm");
+  }
+
+  MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
+  MutableTerm suffix(term.end() - step.EndOffset, term.end());
+
+  term = prefix;
+  term.append(rhs);
+  term.append(suffix);
+
+  return {lhs, rhs, prefix, suffix};
 }
 
 void
