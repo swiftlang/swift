@@ -168,6 +168,8 @@ public:
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
+  using TargetClassMetadata =
+      typename Runtime::template TargetClassMetadata<Runtime>;
 
 private:
   /// The maximum number of bytes to read when reading metadata. Anything larger
@@ -502,7 +504,7 @@ public:
     if (!meta || meta->getKind() != MetadataKind::Class)
       return StoredPointer();
 
-    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
+    auto classMeta = cast<TargetClassMetadata>(meta);
     return stripSignedPointer(classMeta->Superclass);
   }
 
@@ -514,39 +516,39 @@ public:
     if (!meta || meta->getKind() != MetadataKind::Class)
       return None;
 
-#if SWIFT_OBJC_INTEROP
-    // The following algorithm only works on the non-fragile Apple runtime.
+    if (Runtime::ObjCInterop) {
+      // The following algorithm only works on the non-fragile Apple runtime.
 
-    // Grab the RO-data pointer.  This part is not ABI.
-    StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
-    if (!roDataPtr)
-      return None;
+      // Grab the RO-data pointer.  This part is not ABI.
+      StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
+      if (!roDataPtr)
+        return None;
 
-    // Get the address of the InstanceStart field.
-    auto address = roDataPtr + sizeof(uint32_t) * 1;
+      // Get the address of the InstanceStart field.
+      auto address = roDataPtr + sizeof(uint32_t) * 1;
 
-    unsigned start;
-    if (!Reader->readInteger(RemoteAddress(address), &start))
-      return None;
+      unsigned start;
+      if (!Reader->readInteger(RemoteAddress(address), &start))
+        return None;
 
-    return start;
-#else
-    // All swift class instances start with an isa pointer,
-    // followed by the retain counts (which are the size of a long long).
-    size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
-    size_t start = isaAndRetainCountSize;
+      return start;
+    } else {
+      // All swift class instances start with an isa pointer,
+      // followed by the retain counts (which are the size of a long long).
+      size_t isaAndRetainCountSize = sizeof(StoredSize) + sizeof(long long);
+      size_t start = isaAndRetainCountSize;
 
-    auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
-    while (stripSignedPointer(classMeta->Superclass)) {
-      classMeta = cast<TargetClassMetadata<Runtime>>(
-          readMetadata(stripSignedPointer(classMeta->Superclass)));
+      auto classMeta = cast<TargetClassMetadata>(meta);
+      while (stripSignedPointer(classMeta->Superclass)) {
+        classMeta = cast<TargetClassMetadata>(
+            readMetadata(stripSignedPointer(classMeta->Superclass)));
 
-      // Subtract the size contribution of the isa and retain counts from 
-      // the super class.
-      start += classMeta->InstanceSize - isaAndRetainCountSize;
+        // Subtract the size contribution of the isa and retain counts from
+        // the super class.
+        start += classMeta->InstanceSize - isaAndRetainCountSize;
+      }
+      return start;
     }
-    return start;
-#endif
   }
 
   /// Given a pointer to the metadata, attempt to read the value
@@ -588,7 +590,7 @@ public:
     if (!Meta)
       return None;
 
-    if (auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta)) {
+    if (auto ClassMeta = dyn_cast<TargetClassMetadata>(Meta)) {
       if (ClassMeta->isPureObjC()) {
         // If we can determine the Objective-C class name, this is probably an
         // error existential with NSError-compatible layout.
@@ -718,37 +720,37 @@ public:
       const TargetProtocolDescriptorRef<Runtime> &ProtocolAddress,
       Demangler &dem,
       Resolver resolver) {
-#if SWIFT_OBJC_INTEROP
-    // Check whether we have an Objective-C protocol.
-    if (ProtocolAddress.isObjC()) {
-      auto Name = readObjCProtocolName(ProtocolAddress.getObjCProtocol());
-      StringRef NameStr(Name);
+    if (Runtime::ObjCInterop) {
+      // Check whether we have an Objective-C protocol.
+      if (ProtocolAddress.isObjC()) {
+        auto Name = readObjCProtocolName(ProtocolAddress.getObjCProtocol());
+        StringRef NameStr(Name);
 
-      // If this is a Swift-defined protocol, demangle it.
-      if (NameStr.startswith("_TtP")) {
-        auto Demangled = dem.demangleSymbol(NameStr);
-        if (!Demangled)
-          return resolver.failure();
-
-        // FIXME: This appears in _swift_buildDemanglingForMetadata().
-        while (Demangled->getKind() == Node::Kind::Global ||
-               Demangled->getKind() == Node::Kind::TypeMangling ||
-               Demangled->getKind() == Node::Kind::Type ||
-               Demangled->getKind() == Node::Kind::ProtocolList ||
-               Demangled->getKind() == Node::Kind::TypeList ||
-               Demangled->getKind() == Node::Kind::Type) {
-          if (Demangled->getNumChildren() != 1)
+        // If this is a Swift-defined protocol, demangle it.
+        if (NameStr.startswith("_TtP")) {
+          auto Demangled = dem.demangleSymbol(NameStr);
+          if (!Demangled)
             return resolver.failure();
-          Demangled = Demangled->getFirstChild();
+
+          // FIXME: This appears in _swift_buildDemanglingForMetadata().
+          while (Demangled->getKind() == Node::Kind::Global ||
+                 Demangled->getKind() == Node::Kind::TypeMangling ||
+                 Demangled->getKind() == Node::Kind::Type ||
+                 Demangled->getKind() == Node::Kind::ProtocolList ||
+                 Demangled->getKind() == Node::Kind::TypeList ||
+                 Demangled->getKind() == Node::Kind::Type) {
+            if (Demangled->getNumChildren() != 1)
+              return resolver.failure();
+            Demangled = Demangled->getFirstChild();
+          }
+
+          return resolver.swiftProtocol(Demangled);
         }
 
-        return resolver.swiftProtocol(Demangled);
+        // Otherwise, this is an imported protocol.
+        return resolver.objcProtocol(NameStr);
       }
-
-      // Otherwise, this is an imported protocol.
-      return resolver.objcProtocol(NameStr);
     }
-#endif
 
     // Swift-native protocol.
     auto Demangled =
@@ -1419,7 +1421,7 @@ public:
           return readMetadataBoundsOfSuperclass(superclass);
         },
         [&](MetadataRef metadata) -> llvm::Optional<ClassMetadataBounds> {
-          auto cls = dyn_cast<TargetClassMetadata<Runtime>>(metadata);
+          auto cls = dyn_cast<TargetClassMetadata>(metadata);
           if (!cls)
             return None;
 
@@ -1659,6 +1661,10 @@ protected:
     return Reader->readString(RemoteAddress(namePtr), className);
   }
 
+  template <typename T>
+  using TargetClassMetadataT =
+      typename Runtime::template TargetClassMetadata<T>;
+
   MetadataRef readMetadata(StoredPointer address) {
     auto cached = MetadataCache.find(address);
     if (cached != MetadataCache.end())
@@ -1672,7 +1678,9 @@ protected:
 
     switch (getEnumeratedMetadataKind(KindValue)) {
       case MetadataKind::Class:
-        return _readMetadata<TargetClassMetadata>(address);
+
+        return _readMetadata<TargetClassMetadataT>(address);
+
       case MetadataKind::Enum:
         return _readMetadata<TargetEnumMetadata>(address);
       case MetadataKind::ErrorObject:
@@ -1779,7 +1787,7 @@ protected:
                                      bool skipArtificialSubclasses = false) {
     switch (metadata->getKind()) {
     case MetadataKind::Class: {
-      auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
+      auto classMeta = cast<TargetClassMetadata>(metadata);
       while (true) {
         if (!classMeta->isTypeMetadata())
           return 0;
@@ -1801,7 +1809,7 @@ protected:
         if (!superMeta)
           return 0;
 
-        auto superclassMeta = dyn_cast<TargetClassMetadata<Runtime>>(superMeta);
+        auto superclassMeta = dyn_cast<TargetClassMetadata>(superMeta);
         if (!superclassMeta)
           return 0;
 
@@ -2692,7 +2700,7 @@ private:
 
   BuiltType readNominalTypeFromClassMetadata(MetadataRef origMetadata,
                                        bool skipArtificialSubclasses = false) {
-    auto classMeta = cast<TargetClassMetadata<Runtime>>(origMetadata);
+    auto classMeta = cast<TargetClassMetadata>(origMetadata);
     if (classMeta->isTypeMetadata())
       return readNominalTypeFromMetadata(origMetadata, skipArtificialSubclasses);
 
@@ -2715,6 +2723,10 @@ private:
     return BuiltObjCClass;
   }
 
+  using TargetClassMetadataObjCInterop =
+      swift::TargetClassMetadata<Runtime,
+                                 TargetAnyClassMetadataObjCInterop<Runtime>>;
+
   /// Given that the remote process is running the non-fragile Apple runtime,
   /// grab the ro-data from a class pointer.
   StoredPointer readObjCRODataPtr(StoredPointer classAddress) {
@@ -2723,9 +2735,10 @@ private:
 
 #if SWIFT_OBJC_INTEROP
     StoredPointer dataPtr;
-    if (!Reader->readInteger(RemoteAddress(classAddress +
-                               TargetClassMetadata<Runtime>::offsetToData()),
-                             &dataPtr))
+    if (!Reader->readInteger(
+            RemoteAddress(classAddress +
+                          TargetClassMetadataObjCInterop::offsetToData()),
+            &dataPtr))
       return StoredPointer();
 
     // Apply the data-pointer mask.
