@@ -1165,8 +1165,33 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
                                    const_cast<ProtocolConformance *>(this),
                                    subMap);
   }
+  case ProtocolConformanceKind::Builtin: {
+    auto origType = getType();
+    if (!origType->hasTypeParameter() &&
+        !origType->hasArchetype())
+      return const_cast<ProtocolConformance *>(this);
+
+    auto substType = origType.subst(subs, conformances, options);
+
+    // We do an exact pointer equality check because subst() can
+    // change sugar.
+    if (substType.getPointer() == origType.getPointer())
+      return const_cast<ProtocolConformance *>(this);
+
+    SmallVector<Requirement, 2> requirements;
+    for (auto req : getConditionalRequirements()) {
+      requirements.push_back(*req.subst(subs, conformances, options));
+    }
+
+    auto kind = cast<BuiltinProtocolConformance>(this)
+        ->getBuiltinConformanceKind();
+
+    return substType->getASTContext()
+        .getBuiltinConformance(substType,
+                               getProtocol(), getGenericSignature(),
+                               requirements, kind);
+  }
   case ProtocolConformanceKind::Self:
-  case ProtocolConformanceKind::Builtin:
     return const_cast<ProtocolConformance*>(this);
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
