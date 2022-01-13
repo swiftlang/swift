@@ -119,6 +119,7 @@ ErrorTests.test("default domain and code") {
 enum SillyError: Error { case JazzHands }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 ErrorTests.test("try!")
   .skip(.custom({ _isFastAssertConfiguration() },
                 reason: "trap is not guaranteed to happen in -Ounchecked"))

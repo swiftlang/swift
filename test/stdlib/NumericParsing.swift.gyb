@@ -109,6 +109,7 @@ tests.test("${Self}/success") {
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 tests.test("${Self}/radixTooLow") {
   ${Self}("0", radix: 2)
   expectCrashLater()

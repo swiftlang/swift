@@ -359,6 +359,7 @@ UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap")
   .skip(.custom(
     { _isFastAssertConfiguration() },

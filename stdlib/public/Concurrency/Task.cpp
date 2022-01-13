@@ -24,6 +24,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "TaskGroupPrivate.h"
 #include "TaskPrivate.h"
+#include "Tracing.h"
 #include "Debug.h"
 #include "Error.h"
 
@@ -102,6 +103,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
   auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
   bool contextIntialized = false;
   while (true) {
+    concurrency::trace::task_wait(
+        waitingTask, this, static_cast<uintptr_t>(queueHead.getStatus()));
     switch (queueHead.getStatus()) {
     case Status::Error:
     case Status::Success:
@@ -245,6 +248,8 @@ AsyncTask::~AsyncTask() {
   }
 
   Private.destroy();
+
+  concurrency::trace::task_destroy(this);
 }
 
 void AsyncTask::setTaskId() {
@@ -258,6 +263,12 @@ void AsyncTask::setTaskId() {
   } while (Id == 0);
 
   _private().Id = (Fetched >> 32) & 0xffffffff;
+}
+
+uint64_t AsyncTask::getTaskId() {
+  // Reconstitute a full 64-bit task ID from the 32-bit job ID and the upper
+  // 32 bits held in _private().
+  return (uint64_t)Id << _private().Id;
 }
 
 SWIFT_CC(swift)
@@ -437,6 +448,26 @@ SWIFT_CC(swiftasync)
 static void
 task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   return _context->ResumeParent(_context->Parent);
+}
+
+const void *AsyncTask::getResumeFunctionForLogging() {
+  if (ResumeTask == non_future_adapter) {
+    auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
+        reinterpret_cast<char *>(ResumeContext) - sizeof(AsyncContextPrefix));
+    return reinterpret_cast<const void *>(asyncContextPrefix->asyncEntryPoint);
+  } else if (ResumeTask == future_adapter) {
+    auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
+        reinterpret_cast<char *>(ResumeContext) -
+        sizeof(FutureAsyncContextPrefix));
+    return reinterpret_cast<const void *>(asyncContextPrefix->asyncEntryPoint);
+  } else if (ResumeTask == task_wait_throwing_resume_adapter) {
+    auto context = static_cast<TaskFutureWaitAsyncContext *>(ResumeContext);
+    return reinterpret_cast<const void *>(context->ResumeParent);
+  } else if (ResumeTask == task_future_wait_resume_adapter) {
+    return reinterpret_cast<const void *>(ResumeContext->ResumeParent);
+  }
+
+  return reinterpret_cast<const void *>(ResumeTask);
 }
 
 /// Implementation of task creation.
@@ -701,6 +732,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
   initialContext->Flags = AsyncContextKind::Ordinary;
+
+  concurrency::trace::task_create(task, parent, group, asyncLet);
 
   // Attach to the group, if needed.
   if (group) {
@@ -1056,19 +1089,27 @@ swift_task_addCancellationHandlerImpl(
   auto *record = new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
-  if (swift_task_addStatusRecord(record))
-    return record;
+  bool fireHandlerNow = false;
 
-  // else, the task was already cancelled, so while the record was added,
-  // we must run it immediately here since no other task will trigger it.
-  record->run();
+  addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+    if (parentStatus.isCancelled()) {
+      fireHandlerNow = true;
+      // We don't fire the cancellation handler here since this function needs
+      // to be idempotent
+    }
+    return true;
+  });
+
+  if (fireHandlerNow) {
+    record->run();
+  }
   return record;
 }
 
 SWIFT_CC(swift)
 static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
-  swift_task_removeStatusRecord(record);
+  removeStatusRecord(record);
   swift_task_dealloc(record);
 }
 

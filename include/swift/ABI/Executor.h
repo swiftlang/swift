@@ -124,6 +124,9 @@ public:
   /// Is this executor the main executor?
   bool isMainExecutor() const;
 
+  /// Get the raw value of the Implementation field, for tracing.
+  uintptr_t getRawImplementation() { return Implementation; }
+
   bool operator==(ExecutorRef other) const {
     return Identity == other.Identity;
   }

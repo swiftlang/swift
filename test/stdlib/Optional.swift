@@ -340,6 +340,7 @@ OptionalTests.test("Casting Optional") {
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 OptionalTests.test("Casting Optional Traps") {
   let nx: C? = nil
   expectCrash { _blackHole(anyToAny(nx, Int.self)) }
@@ -411,6 +412,7 @@ OptionalTests.test("unsafelyUnwrapped") {
 }
 
 #if !os(WASI)
+// Trap tests aren't available on WASI.
 OptionalTests.test("unsafelyUnwrapped nil")
   .xfail(.custom(
     { !_isDebugAssertConfiguration() },
