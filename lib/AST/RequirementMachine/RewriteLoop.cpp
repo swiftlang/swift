@@ -79,13 +79,6 @@ void RewriteStep::dump(llvm::raw_ostream &out,
 
     break;
   }
-  case SameTypeWitness: {
-    evaluator.applySameTypeWitness(*this, system);
-
-    out << (Inverse ? "SameTypeWitness⁻¹"
-                    : "SameTypeWitness");
-    break;
-  }
   }
 }
 
@@ -382,78 +375,6 @@ RewritePathEvaluator::applyRelation(const RewriteStep &step,
   return {lhs, rhs, prefix, suffix};
 }
 
-void RewritePathEvaluator::applySameTypeWitness(const RewriteStep &step,
-                                                const RewriteSystem &system) {
-  checkPrimary();
-  auto &term = Primary.back();
-
-  const auto &witness = system.getTypeWitness(step.Arg);
-  auto fail = [&]() {
-    llvm::errs() << "Bad same-type witness term:\n";
-    llvm::errs() << term << "\n\n";
-    witness.dump(llvm::errs());
-    abort();
-  };
-
-  auto concreteConformanceSymbol = witness.getConcreteConformance();
-
-#ifndef NDEBUG
-  if (witness.getConcreteType().getConcreteType() !=
-      concreteConformanceSymbol.getConcreteType()) {
-    fail();
-  }
-#endif
-
-  auto witnessConcreteType = Symbol::forConcreteType(
-      concreteConformanceSymbol.getConcreteType(),
-      concreteConformanceSymbol.getSubstitutions(),
-      system.getRewriteContext());
-
-  if (!step.Inverse) {
-    // Make sure the term takes the following form, where |V| == EndOffset:
-    //
-    //    U.[concrete: C : P].[P:X].[concrete: C].V
-    if (term.size() <= step.EndOffset + 3 ||
-        *(term.end() - step.EndOffset - 3) != concreteConformanceSymbol ||
-        *(term.end() - step.EndOffset - 2) != witness.getAssocType() ||
-        *(term.end() - step.EndOffset - 1) != witnessConcreteType) {
-      fail();
-    }
-
-    // Get the subterm U.[concrete: C : P].
-    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset - 2);
-
-    // Add the subterm V, to get U.[concrete: C : P].V.
-    newTerm.append(term.end() - step.EndOffset, term.end());
-
-    term = newTerm;
-  } else {
-    // Make sure the term takes the following form, where |V| == EndOffset:
-    //
-    //    U.[concrete: C : P].V
-    if (term.size() <= step.EndOffset + 1 ||
-        *(term.end() - step.EndOffset - 1) != concreteConformanceSymbol) {
-      fail();
-    }
-
-    // Get the subterm U.[concrete: C : P].
-    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset);
-
-    // Add the symbol [P:X].
-    newTerm.add(witness.getAssocType());
-
-    // Add the symbol [concrete: C].
-    newTerm.add(witnessConcreteType);
-
-    // Add the subterm V, to get
-    //
-    //    U.[concrete: C : P].[P:X].[concrete: C].V
-    newTerm.append(term.end() - step.EndOffset, term.end());
-
-    term = newTerm;
-  }
-}
-
 void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
@@ -475,10 +396,6 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
 
   case RewriteStep::Relation:
     applyRelation(step, system);
-    break;
-
-  case RewriteStep::SameTypeWitness:
-    applySameTypeWitness(step, system);
     break;
   }
 }

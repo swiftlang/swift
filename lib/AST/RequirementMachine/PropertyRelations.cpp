@@ -118,6 +118,33 @@ unsigned RewriteSystem::recordConcreteTypeWitnessRelation(
       Term::get(rhsTerm, Context));
 }
 
+/// Record a relation ([concrete: C : P].[P:X].[concrete: C] =>
+/// [concrete: C : P].[P:X]) which "ties off" a nested type C.X that is
+/// equivalent to C.
+unsigned RewriteSystem::recordSameTypeWitnessRelation(
+    Symbol concreteConformanceSymbol,
+    Symbol associatedTypeSymbol) {
+  assert(concreteConformanceSymbol.getKind() ==
+         Symbol::Kind::ConcreteConformance);
+  assert(associatedTypeSymbol.getKind() ==
+         Symbol::Kind::AssociatedType);
+
+  MutableTerm rhsTerm;
+  rhsTerm.add(concreteConformanceSymbol);
+
+  auto concreteSymbol = Symbol::forConcreteType(
+      concreteConformanceSymbol.getConcreteType(),
+      concreteConformanceSymbol.getSubstitutions(),
+      Context);
+  MutableTerm lhsTerm(rhsTerm);
+  lhsTerm.add(associatedTypeSymbol);
+  lhsTerm.add(concreteSymbol);
+
+  return recordRelation(
+      Term::get(lhsTerm, Context),
+      Term::get(rhsTerm, Context));
+}
+
 RewriteSystem::TypeWitness::TypeWitness(
     Term lhs, llvm::PointerUnion<Symbol, Term> rhs)
   : LHS(lhs), RHS(rhs) {

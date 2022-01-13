@@ -98,16 +98,7 @@ struct RewriteStep {
     ///
     /// The Arg field stores the result of calling
     /// RewriteSystem::recordRelation().
-    Relation,
-
-    /// If not inverted: the top of the primary stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P] followed by an associated
-    /// type symbol [P:X]. The associated type symbol is eliminated.
-    ///
-    /// If inverted: the associated type symbol [P:X] is introduced.
-    ///
-    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
-    SameTypeWitness,
+    Relation
   };
 
   /// The rewrite step kind.
@@ -171,11 +162,6 @@ struct RewriteStep {
                                  bool inverse) {
     return RewriteStep(Relation, startOffset, /*endOffset=*/0,
                        /*arg=*/relationID, inverse);
-  }
-
-  static RewriteStep forSameTypeWitness(unsigned witnessID, bool inverse) {
-    return RewriteStep(SameTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/witnessID, inverse);
   }
 
   bool isInContext() const {
@@ -369,9 +355,6 @@ struct RewritePathEvaluator {
 
   void applyConcreteConformance(const RewriteStep &step,
                                 const RewriteSystem &system);
-
-  void applySameTypeWitness(const RewriteStep &step,
-                            const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
 };

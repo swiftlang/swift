@@ -356,6 +356,10 @@ public:
       Symbol associatedTypeSymbol,
       Symbol typeWitnessSymbol);
 
+  unsigned recordSameTypeWitnessRelation(
+      Symbol concreteConformanceSymbol,
+      Symbol associatedTypeSymbol);
+
   /// A type witness has a subject type, stored in LHS, which takes the form:
   ///
   /// T.[concrete: C : P].[P:X]

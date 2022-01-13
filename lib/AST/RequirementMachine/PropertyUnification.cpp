@@ -894,15 +894,11 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   auto typeWitnessSymbol =
       Symbol::forConcreteType(typeWitnessSchema, result, Context);
 
-  RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
-                                     typeWitnessSymbol);
-  unsigned witnessID = System.recordTypeWitness(witness);
-
   auto concreteConformanceSymbol = *(subjectType.end() - 2);
   auto associatedTypeSymbol = *(subjectType.end() - 1);
 
   // Record the relation before simplifying typeWitnessSymbol below.
-  unsigned relationID = System.recordConcreteTypeWitnessRelation(
+  unsigned concreteRelationID = System.recordConcreteTypeWitnessRelation(
       concreteConformanceSymbol,
       associatedTypeSymbol,
       typeWitnessSymbol);
@@ -925,16 +921,21 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     MutableTerm result(key);
     result.add(concreteConformanceSymbol);
 
+    unsigned sameRelationID = System.recordSameTypeWitnessRelation(
+        concreteConformanceSymbol,
+        associatedTypeSymbol);
+
     // ([concrete: C : P] => [concrete: C : P].[P:X].[concrete: C])
-    path.add(RewriteStep::forSameTypeWitness(
-        witnessID, /*inverse=*/true));
+    path.add(RewriteStep::forRelation(
+        /*startOffset=*/key.size(), sameRelationID,
+        /*inverse=*/true));
 
     // [concrete: C : P].[P:X].([concrete: C] => [concrete: C.X])
     path.append(substPath);
 
     // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
     path.add(RewriteStep::forRelation(
-        /*startOffset=*/key.size(), relationID,
+        /*startOffset=*/key.size(), concreteRelationID,
         /*inverse=*/false));
 
     return result;
@@ -955,7 +956,7 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
   // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
   path.add(RewriteStep::forRelation(
-      /*startOffset=*/key.size(), relationID,
+      /*startOffset=*/key.size(), concreteRelationID,
       /*inverse=*/false));
 
   return constraintType;
