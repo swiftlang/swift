@@ -649,13 +649,24 @@ static RemoteASTContextImpl *createImpl(ASTContext &ctx,
                                       std::shared_ptr<MemoryReader> &&reader) {
   auto &target = ctx.LangOpts.Target;
   assert(target.isArch32Bit() || target.isArch64Bit());
+  bool objcInterop = ctx.LangOpts.EnableObjCInterop;
 
   if (target.isArch32Bit()) {
-    using Target = External<RuntimeTarget<4>>;
-    return new RemoteASTContextConcreteImpl<Target>(std::move(reader), ctx);
+    if (objcInterop) {
+      using Target = External<WithObjCInterop<RuntimeTarget<4>>>;
+      return new RemoteASTContextConcreteImpl<Target>(std::move(reader), ctx);
+    } else {
+      using Target = External<NoObjCInterop<RuntimeTarget<4>>>;
+      return new RemoteASTContextConcreteImpl<Target>(std::move(reader), ctx);
+    }
   } else {
-    using Target = External<RuntimeTarget<8>>;
-    return new RemoteASTContextConcreteImpl<Target>(std::move(reader), ctx);
+    if (objcInterop) {
+      using Target = External<WithObjCInterop<RuntimeTarget<8>>>;
+      return new RemoteASTContextConcreteImpl<Target>(std::move(reader), ctx);
+    } else {
+      using Target = External<NoObjCInterop<RuntimeTarget<8>>>;
+      return new RemoteASTContextConcreteImpl<Target>(std::move(reader), ctx);
+    }
   }
 }
 
