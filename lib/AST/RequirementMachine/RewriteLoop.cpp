@@ -79,20 +79,6 @@ void RewriteStep::dump(llvm::raw_ostream &out,
 
     break;
   }
-  case ConcreteConformance: {
-    evaluator.applyConcreteConformance(*this, system);
-
-    out << (Inverse ? "ConcreteConformance⁻¹"
-                    : "ConcreteConformance");
-    break;
-  }
-  case SuperclassConformance: {
-    evaluator.applyConcreteConformance(*this, system);
-
-    out << (Inverse ? "SuperclassConformance⁻¹"
-                    : "SuperclassConformance");
-    break;
-  }
   case ConcreteTypeWitness: {
     evaluator.applyConcreteTypeWitness(*this, system);
 
@@ -411,88 +397,6 @@ RewritePathEvaluator::applyRelation(const RewriteStep &step,
   return {lhs, rhs, prefix, suffix};
 }
 
-void
-RewritePathEvaluator::applyConcreteConformance(const RewriteStep &step,
-                                               const RewriteSystem &system) {
-  checkPrimary();
-  auto &term = Primary.back();
-  Symbol *last = term.end() - step.EndOffset;
-
-  auto &ctx = system.getRewriteContext();
-
-  if (!step.Inverse) {
-    // The input term takes one of the following forms, where |V| == EndOffset:
-    // - U.[concrete: C].[P].V
-    // - U.[superclass: C].[P].V
-    assert(term.size() > step.EndOffset + 2);
-    auto concreteType = *(last - 2);
-    auto proto = *(last - 1);
-    assert(proto.getKind() == Symbol::Kind::Protocol);
-
-    // Get the prefix U.
-    MutableTerm newTerm(term.begin(), last - 2);
-
-    // Build the term U.[concrete: C : P].
-    if (step.Kind == RewriteStep::ConcreteConformance) {
-      assert(concreteType.getKind() == Symbol::Kind::ConcreteType);
-
-      newTerm.add(Symbol::forConcreteConformance(
-          concreteType.getConcreteType(),
-          concreteType.getSubstitutions(),
-          proto.getProtocol(),
-          ctx));
-    } else {
-      assert(step.Kind == RewriteStep::SuperclassConformance);
-      assert(concreteType.getKind() == Symbol::Kind::Superclass);
-
-      newTerm.add(Symbol::forConcreteConformance(
-          concreteType.getSuperclass(),
-          concreteType.getSubstitutions(),
-          proto.getProtocol(),
-          ctx));
-    }
-
-    // Add the suffix V to get the final term U.[concrete: C : P].V.
-    newTerm.append(last, term.end());
-    term = newTerm;
-  } else {
-    // The input term takes the form U.[concrete: C : P].V, where
-    // |V| == EndOffset.
-    assert(term.size() > step.EndOffset + 1);
-    auto concreteConformance = *(last - 1);
-    assert(concreteConformance.getKind() == Symbol::Kind::ConcreteConformance);
-
-    // Build the term U.
-    MutableTerm newTerm(term.begin(), last - 1);
-
-    // Add the symbol [concrete: C] or [superclass: C] to get the term
-    // U.[concrete: C] or U.[superclass: C].
-    if (step.Kind == RewriteStep::ConcreteConformance) {
-      newTerm.add(Symbol::forConcreteType(
-          concreteConformance.getConcreteType(),
-          concreteConformance.getSubstitutions(),
-          ctx));
-    } else {
-      assert(step.Kind == RewriteStep::SuperclassConformance);
-      newTerm.add(Symbol::forSuperclass(
-          concreteConformance.getConcreteType(),
-          concreteConformance.getSubstitutions(),
-          ctx));
-    }
-
-    // Add the symbol [P] to get the term U.[concrete: C].[P] or
-    // U.[superclass: C].[P].
-    newTerm.add(Symbol::forProtocol(
-        concreteConformance.getProtocol(),
-        ctx));
-
-    // Add the suffix V to get the final term U.[concrete: C].[P].V or
-    // U.[superclass: C].[P].V.
-    newTerm.append(last, term.end());
-    term = newTerm;
-  }
-}
-
 void RewritePathEvaluator::applyConcreteTypeWitness(const RewriteStep &step,
                                                   const RewriteSystem &system) {
   checkPrimary();
@@ -680,11 +584,6 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
 
   case RewriteStep::Relation:
     applyRelation(step, system);
-    break;
-
-  case RewriteStep::ConcreteConformance:
-  case RewriteStep::SuperclassConformance:
-    applyConcreteConformance(step, system);
     break;
 
   case RewriteStep::ConcreteTypeWitness:

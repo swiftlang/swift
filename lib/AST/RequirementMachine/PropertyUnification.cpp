@@ -957,23 +957,6 @@ void PropertyMap::recordConcreteConformanceRule(
   const auto &concreteRule = System.getRule(concreteRuleID);
   const auto &conformanceRule = System.getRule(conformanceRuleID);
 
-#ifndef NDEBUG
-  {
-    auto conformanceSymbol = *conformanceRule.isPropertyRule();
-    assert(conformanceSymbol.getKind() == Symbol::Kind::Protocol);
-    assert(conformanceSymbol.getProtocol() ==
-           concreteConformanceSymbol.getProtocol());
-
-    auto concreteSymbol = *concreteRule.isPropertyRule();
-    if (concreteSymbol.getKind() == Symbol::Kind::Superclass)
-      assert(requirementKind == RequirementKind::Superclass);
-    else {
-      assert(concreteSymbol.getKind() == Symbol::Kind::ConcreteType);
-      assert(requirementKind == RequirementKind::SameType);
-    }
-  }
-#endif
-
   RewritePath path;
 
   // We have a pair of rules T.[P] and T'.[concrete: C].
@@ -1000,20 +983,28 @@ void PropertyMap::recordConcreteConformanceRule(
 
   // Apply a concrete type adjustment to the concrete symbol if T' is shorter
   // than T.
+  auto concreteSymbol = *concreteRule.isPropertyRule();
   unsigned adjustment = rhs.size() - concreteRule.getRHS().size();
+
   if (adjustment > 0 &&
       !concreteConformanceSymbol.getSubstitutions().empty()) {
     path.add(RewriteStep::forAdjustment(adjustment, /*endOffset=*/1,
                                         /*inverse=*/false));
+
+    MutableTerm prefix(rhs.begin(), rhs.begin() + adjustment);
+    concreteSymbol = concreteSymbol.prependPrefixToConcreteSubstitutions(
+        prefix, Context);
   }
 
+  auto protocolSymbol = *conformanceRule.isPropertyRule();
+
   // Now, transform T''.[concrete: C].[P] into T''.[concrete: C : P].
-  if (requirementKind == RequirementKind::Superclass) {
-    path.add(RewriteStep::forSuperclassConformance(/*inverse=*/false));
-  } else {
-    assert(requirementKind == RequirementKind::SameType);
-    path.add(RewriteStep::forConcreteConformance(/*inverse=*/false));
-  }
+  unsigned relationID = System.recordConcreteConformanceRelation(
+      concreteSymbol, protocolSymbol, concreteConformanceSymbol);
+
+  path.add(RewriteStep::forRelation(
+      /*startOffset=*/rhs.size(), relationID,
+      /*inverse=*/false));
 
   MutableTerm lhs(rhs);
   lhs.add(concreteConformanceSymbol);

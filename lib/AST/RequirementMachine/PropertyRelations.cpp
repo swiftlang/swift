@@ -65,6 +65,31 @@ unsigned RewriteSystem::recordRelation(Symbol lhsProperty,
       Term::get(rhsTerm, Context));
 }
 
+/// Record a relation ([concrete: C].[P] => [concrete: C : P])
+/// or ([superclass: C].[P] => [concrete: C : P]) which combines a
+/// concrete type symbol (or a superclass symbol) with a protocol
+/// symbol to form a single a concrete conformance symbol.
+unsigned RewriteSystem::recordConcreteConformanceRelation(
+    Symbol concreteSymbol, Symbol protocolSymbol,
+    Symbol concreteConformanceSymbol) {
+  assert(protocolSymbol.getKind() == Symbol::Kind::Protocol);
+  assert(protocolSymbol.getProtocol() ==
+         concreteConformanceSymbol.getProtocol());
+  assert(concreteSymbol.getKind() == Symbol::Kind::Superclass ||
+         concreteSymbol.getKind() == Symbol::Kind::ConcreteType);
+
+  MutableTerm lhsTerm;
+  lhsTerm.add(concreteSymbol);
+  lhsTerm.add(protocolSymbol);
+
+  MutableTerm rhsTerm;
+  rhsTerm.add(concreteConformanceSymbol);
+
+  return recordRelation(
+      Term::get(lhsTerm, Context),
+      Term::get(rhsTerm, Context));
+}
+
 RewriteSystem::TypeWitness::TypeWitness(
     Term lhs, llvm::PointerUnion<Symbol, Term> rhs)
   : LHS(lhs), RHS(rhs) {

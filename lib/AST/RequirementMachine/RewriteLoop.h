@@ -100,28 +100,6 @@ struct RewriteStep {
     /// RewriteSystem::recordRelation().
     Relation,
 
-    /// If not inverted: the top of the primary stack must be a term ending in
-    /// a concrete type symbol [concrete: C] followed by a protocol symbol [P].
-    /// These two symbols are combined into a single concrete conformance
-    /// symbol [concrete: C : P].
-    ///
-    /// If inverted: the top of the primary stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
-    /// with the concrete type symbol [concrete: C] followed by the protocol
-    /// symbol [P].
-    ConcreteConformance,
-
-    /// If not inverted: the top of the primary stack must be a term ending in
-    /// a superclass symbol [superclass: C] followed by a protocol symbol [P].
-    /// These two symbols are combined into a single concrete conformance
-    /// symbol [concrete: C : P].
-    ///
-    /// If inverted: the top of the primary stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
-    /// with the superclass symbol [superclass: C] followed by the protocol
-    /// symbol [P].
-    SuperclassConformance,
-
     /// If not inverted: the top of the primary stack must be a term ending in a
     /// concrete conformance symbol [concrete: C : P] followed by an associated
     /// type symbol [P:X], and the concrete type symbol [concrete: C.X] for the
@@ -213,16 +191,6 @@ struct RewriteStep {
                                  bool inverse) {
     return RewriteStep(Relation, startOffset, /*endOffset=*/0,
                        /*arg=*/relationID, inverse);
-  }
-
-  static RewriteStep forConcreteConformance(bool inverse) {
-    return RewriteStep(ConcreteConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/0, inverse);
-  }
-
-  static RewriteStep forSuperclassConformance(bool inverse) {
-    return RewriteStep(SuperclassConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/0, inverse);
   }
 
   static RewriteStep forConcreteTypeWitness(unsigned witnessID, bool inverse) {
