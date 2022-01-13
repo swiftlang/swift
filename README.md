@@ -2,6 +2,8 @@
 
 ## Compile your Swift code to WebAssembly
 
+[![CI status](https://github.com/swiftwasm/swift/workflows/Build%20Toolchain/badge.svg?branch=swiftwasm)](https://github.com/swiftwasm/swift/actions?query=workflow%3ABuild) [![Discord](https://img.shields.io/discord/780838335798706197?label=Discord)](https://discord.gg/ashJW8T8yp)
+
 This is the main repository for SwiftWasm toolchain and SDK. Please refer to [the 
 SwiftWasm book](https://swiftwasm.github.io/swiftwasm-book/) to get started, and to
 the [`awesome-swiftwasm`](https://github.com/swiftwasm/awesome-swiftwasm) list for
