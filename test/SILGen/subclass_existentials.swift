@@ -132,12 +132,14 @@ func methodCalls(
   // CHECK: store_borrow [[PAYLOAD]] to [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") Base<Int> & P, #P.protocolSelfReturn : <Self where Self : P> (Self) -> () -> Self, [[PAYLOAD]] : $@opened("{{.*}}") Base<Int> & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_box
-  // CHECK: [[RESULT_BUF:%.*]] = project_box [[RESULT_BOX]]
+  // CHECK: [[RESULT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[RESULT_BOX]]
+  // CHECK: [[RESULT_BUF:%.*]] = project_box [[RESULT_LIFETIME]]
   // CHECK: apply [[METHOD]]<@opened("{{.*}}") Base<Int> & P>([[RESULT_BUF]], [[SELF_BOX]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: dealloc_stack [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]] : $Base<Int> & P
+  // CHECK: end_borrow [[RESULT_LIFETIME]]
   // CHECK: dealloc_box [[RESULT_BOX]]
   let _: Base<Int> & P = baseAndP.protocolSelfReturn()
 
@@ -153,11 +155,13 @@ func methodCalls(
   // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") (Base<Int> & P)).Type
   // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") (Base<Int> & P), #P.protocolSelfReturn : <Self where Self : P> (Self.Type) -> () -> Self, [[METATYPE]] : $@thick (@opened("{{.*}}") (Base<Int> & P)).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_box
+  // CHECK: [[RESULT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[RESULT_BOX]]
   // CHECK: [[RESULT_BUF:%.*]] = project_box
   // CHECK: apply [[METHOD]]<@opened("{{.*}}") (Base<Int> & P)>([[RESULT_BUF]], [[METATYPE]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
   // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}") (Base<Int> & P)
   // CHECK: [[RESULT_VALUE:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") (Base<Int> & P) : $@opened("{{.*}}") (Base<Int> & P), $Base<Int> & P
   // CHECK: destroy_value [[RESULT_VALUE]]
+  // CHECK: end_borrow [[RESULT_LIFETIME]]
   // CHECK: dealloc_box [[RESULT_BOX]]
   let _: Base<Int> & P = baseAndPType.protocolSelfReturn()
 

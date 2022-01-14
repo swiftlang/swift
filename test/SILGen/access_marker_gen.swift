@@ -12,7 +12,8 @@ public struct S {
 // CHECK: bb0(%0 : @guaranteed $Optional<AnyObject>):
 // CHECK: [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
 // CHECK: [[MARKED_BOX:%.*]] = mark_uninitialized [var] [[BOX]] : ${ var S }
-// CHECK: [[ADDR:%.*]] = project_box [[MARKED_BOX]] : ${ var S }, 0
+// CHECK: [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_BOX]]
+// CHECK: [[ADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var S }, 0
 // CHECK: cond_br %{{.*}}, bb1, bb2
 // CHECK: bb1:
 // CHECK: [[ACCESS1:%.*]] = begin_access [modify] [unknown] [[ADDR]] : $*S
@@ -45,7 +46,8 @@ func takeS(_ s: S) {}
 // CHECK-LABEL: sil [ossa] @$s17access_marker_gen14modifyAndReadSyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK: %[[BOX:.*]] = alloc_box ${ var S }, var, name "s"
-// CHECK: %[[ADDRS:.*]] = project_box %[[BOX]] : ${ var S }, 0
+// CHECK: %[[BOX_LIFETIME:[^,]+]] = begin_borrow [lexical] %[[BOX]]
+// CHECK: %[[ADDRS:.*]] = project_box %[[BOX_LIFETIME]] : ${ var S }, 0
 // CHECK: %[[ACCESS1:.*]] = begin_access [modify] [unknown] %[[ADDRS]] : $*S
 // CHECK: %[[ADDRI:.*]] = struct_element_addr %[[ACCESS1]] : $*S, #S.i
 // CHECK: assign %{{.*}} to %[[ADDRI]] : $*Int
