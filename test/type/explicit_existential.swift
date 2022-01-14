@@ -193,3 +193,12 @@ extension MyError {
     return true
   }
 }
+
+struct Wrapper {
+  typealias E = Error
+}
+
+func typealiasMemberReferences(metatype: Wrapper.Type) {
+  let _: Wrapper.E.Protocol = metatype.E.self
+  let _: (any Wrapper.E).Type = metatype.E.self
+}
