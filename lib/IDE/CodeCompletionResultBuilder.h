@@ -74,7 +74,7 @@ class CodeCompletionResultBuilder {
   friend CodeCompletionStringPrinter;
   
   CodeCompletionResultSink &Sink;
-  CodeCompletionResult::ResultKind Kind;
+  CodeCompletionResultKind Kind;
   SemanticContextKind SemanticContext;
   CodeCompletionFlair Flair;
   unsigned NumBytesToErase = 0;
@@ -89,8 +89,7 @@ class CodeCompletionResultBuilder {
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::ExpectedTypeRelation::Unknown;
   bool Cancelled = false;
-  CodeCompletionResult::NotRecommendedReason NotRecReason =
-      CodeCompletionResult::NotRecommendedReason::None;
+  NotRecommendedReason NotRecReason = NotRecommendedReason::None;
   StringRef BriefDocComment;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
@@ -117,7 +116,7 @@ class CodeCompletionResultBuilder {
 
 public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
-                              CodeCompletionResult::ResultKind Kind,
+                              CodeCompletionResultKind Kind,
                               SemanticContextKind SemanticContext,
                               const ExpectedTypeContext &declTypeContext)
       : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
@@ -146,9 +145,7 @@ public:
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
-  void setNotRecommended(CodeCompletionResult::NotRecommendedReason Reason) {
-    NotRecReason = Reason;
-  }
+  void setNotRecommended(NotRecommendedReason Reason) { NotRecReason = Reason; }
 
   void setSemanticContext(SemanticContextKind Kind) {
     SemanticContext = Kind;

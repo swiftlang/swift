@@ -197,12 +197,11 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 
   // RESULTS
   while (cursor != resultEnd) {
-    auto kind = static_cast<CodeCompletionResult::ResultKind>(*cursor++);
+    auto kind = static_cast<CodeCompletionResultKind>(*cursor++);
     auto declKind = static_cast<CodeCompletionDeclKind>(*cursor++);
     auto opKind = static_cast<CodeCompletionOperatorKind>(*cursor++);
     auto context = static_cast<SemanticContextKind>(*cursor++);
-    auto notRecommended =
-        static_cast<CodeCompletionResult::NotRecommendedReason>(*cursor++);
+    auto notRecommended = static_cast<NotRecommendedReason>(*cursor++);
     auto diagSeverity =
         static_cast<CodeCompletionDiagnosticSeverity>(*cursor++);
     auto isSystem = static_cast<bool>(*cursor++);
@@ -224,7 +223,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto diagMessage = getString(diagMessageIndex);
 
     CodeCompletionResult *result = nullptr;
-    if (kind == CodeCompletionResult::ResultKind::Declaration) {
+    if (kind == CodeCompletionResultKind::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
           context, CodeCompletionFlair(), numBytesToErase, string, declKind,
           isSystem, moduleName, notRecommended, diagSeverity, diagMessage,
@@ -346,12 +345,12 @@ static void writeCachedModule(llvm::raw_ostream &out,
     for (CodeCompletionResult *R : V.Sink.Results) {
       assert(!R->getFlair().toRaw() && "Any flairs should not be cached");
       assert(R->getNotRecommendedReason() !=
-             CodeCompletionResult::NotRecommendedReason::InvalidAsyncContext &&
+                 NotRecommendedReason::InvalidAsyncContext &&
              "InvalidAsyncContext is decl context specific, cannot be cached");
 
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));
-      if (R->getKind() == CodeCompletionResult::ResultKind::Declaration)
+      if (R->getKind() == CodeCompletionResultKind::Declaration)
         LE.write(static_cast<uint8_t>(R->getAssociatedDeclKind()));
       else
         LE.write(static_cast<uint8_t>(~0u));
