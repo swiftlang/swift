@@ -1488,11 +1488,12 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata) {
+      if (IGM.IRGen.Opts.ReflectionMetadata !=
+          ReflectionMetadataMode::Runtime) {
         B.addInt32(0);
         return;
       }
-    
+
       IGM.IRGen.noteUseOfFieldDescriptor(getType());
 
       B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
@@ -1566,7 +1567,8 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata) {
+      if (IGM.IRGen.Opts.ReflectionMetadata !=
+          ReflectionMetadataMode::Runtime) {
         B.addInt32(0);
         return;
       }
@@ -1723,7 +1725,8 @@ namespace {
     void addReflectionFieldDescriptor() {
       // Classes are always reflectable, unless reflection is disabled or this
       // is a foreign class.
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata ||
+      if ((IGM.IRGen.Opts.ReflectionMetadata !=
+           ReflectionMetadataMode::Runtime) ||
           getType()->isForeign()) {
         B.addInt32(0);
         return;

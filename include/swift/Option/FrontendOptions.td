@@ -455,6 +455,9 @@ def enable_anonymous_context_mangled_names :
 def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
   HelpText<"Disable emission of reflection metadata for nominal types">;
 
+def reflection_metadata_for_debugger_only : Flag<["-"], "reflection-metadata-for-debugger-only">,
+  HelpText<"Emit reflection metadata for debugger only, don't make them available at runtime">;
+
 def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;

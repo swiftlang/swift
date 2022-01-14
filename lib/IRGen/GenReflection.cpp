@@ -623,7 +623,12 @@ protected:
 
     var->setSection(section);
 
-    IGM.addUsedGlobal(var);
+    // Only mark the reflection record as used when emitting for the runtime.
+    // In ReflectionMetadataMode::DebuggerOnly mode we want to allow the linker
+    // to remove/dead-strip these.
+    if (IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::Runtime) {
+      IGM.addUsedGlobal(var);
+    }
 
     disableAddressSanitizer(IGM, var);
 
@@ -1335,7 +1340,7 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
 llvm::Constant *
 IRGenModule::getAddrOfBoxDescriptor(SILType BoxedType,
                                     CanGenericSignature genericSig) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
+  if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
   BoxDescriptorBuilder builder(*this, BoxedType, genericSig);
@@ -1350,7 +1355,7 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
                                         CanSILFunctionType SubstCalleeType,
                                         SubstitutionMap Subs,
                                         const HeapLayout &Layout) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
+  if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
   if (CaptureDescriptorBuilder::hasOpenedExistential(OrigCalleeType, Layout))
@@ -1369,7 +1374,7 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
   if (!normalConf)
     return;
 
-  if (!IRGen.Opts.EnableReflectionMetadata)
+  if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return;
 
   SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
@@ -1428,7 +1433,7 @@ void IRGenerator::emitBuiltinReflectionMetadata() {
 }
 
 void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
+  if (IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::None)
     return;
 
   auto T = D->getDeclaredTypeInContext()->getCanonicalType();
