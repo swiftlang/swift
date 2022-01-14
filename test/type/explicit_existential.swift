@@ -185,3 +185,11 @@ enum E2: RawRepresentable {
     return ConcreteComposition()
   }
 }
+
+public protocol MyError {}
+
+extension MyError {
+  static func ~=(lhs: any Error, rhs: Self) -> Bool {
+    return true
+  }
+}
