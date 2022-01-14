@@ -428,7 +428,7 @@ struct ConformanceState {
 
   ConformanceState() {
     scanSectionsBackwards =
-        runtime::bincompat::workaroundProtocolConformanceReverseIteration();
+        runtime::bincompat::useLegacyProtocolConformanceReverseIteration();
 
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
     if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
