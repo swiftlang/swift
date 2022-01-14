@@ -22,30 +22,25 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
-#if SWIFT_RUNTIME
+#if SWIFT_RUNTIME || defined(NDEBUG)
 
-// In the runtime, DEMANGLER_ASSERT() returns an error
+// In the runtime and non-asserts builds, DEMANGLER_ASSERT() returns an error
 #define DEMANGLER_ASSERT(expr, node)                                           \
   do {                                                                         \
     if (!(expr))                                                               \
       return ManglingError(ManglingError::AssertionFailed, (node), __LINE__);  \
   } while (0)
 
-#elif !defined(NDEBUG)
+#else
 
-// If NDEBUG is not defined, DEMANGLER_ASSERT() works like assert()
+// Except in the runtime, assert builds cause DEMANGLER_ASSERT() to assert()
 #define DEMANGLER_ASSERT(expr, node)                                           \
   do {                                                                         \
     if (!(expr))                                                               \
       swift::Demangle::failAssert(__FILE__, __LINE__, node, #expr);            \
   } while (0)
 
-#else
-
-// Otherwise, DEMANGLER_ASSERT() does nothing
-#define DEMANGLER_ASSERT(expr, node)
-
-#endif // SWIFT_RUNTIME
+#endif // SWIFT_RUNTIME || defined(NDEBUG)
 
 namespace swift {
 namespace Demangle {
