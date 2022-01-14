@@ -1336,7 +1336,8 @@ LookupConformanceInModuleRequest::evaluate(
     auto superclassTy = type->getSuperclassForDecl(conformingClass);
 
     // Compute the conformance for the inherited type.
-    auto inheritedConformance = mod->lookupConformance(superclassTy, protocol);
+    auto inheritedConformance = mod->lookupConformance(
+        superclassTy, protocol, /*allowMissing=*/true);
     assert(inheritedConformance &&
            "We already found the inherited conformance");
 
