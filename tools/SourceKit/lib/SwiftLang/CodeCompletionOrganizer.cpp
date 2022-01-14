@@ -154,11 +154,19 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     auto chunk = Chunk::createWithText(Chunk::ChunkKind::Text, 0, nameCopy);
     auto *completionString =
         CodeCompletionString::create(sink.allocator, chunk);
+    auto *contextFreeResult =
+        new (sink.allocator) ContextFreeCodeCompletionResult(
+            CodeCompletionResultKind::Pattern, completionString,
+            CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
+            ContextFreeNotRecommendedReason::None,
+            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
-        CodeCompletionResultKind::Pattern, SemanticContextKind::Local,
+        *contextFreeResult, SemanticContextKind::Local,
         CodeCompletionFlairBit::ExpressionSpecific,
-        /*NumBytesToErase=*/0, completionString,
-        CodeCompletionResult::ExpectedTypeRelation::Unknown);
+        /*NumBytesToErase=*/0,
+        CodeCompletionResult::ExpectedTypeRelation::Unknown,
+        ContextualNotRecommendedReason::None,
+        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
 
     CompletionBuilder builder(sink, *swiftResult);
     builder.setCustomKind(customCompletion.Kind);
@@ -1176,18 +1184,26 @@ Completion *CompletionBuilder::finish() {
     if (base.isOperator())
       opKind = base.getOperatorKind();
 
-    if (base.getKind() == CodeCompletionResultKind::Declaration) {
-      newBase = new (sink.allocator) SwiftResult(
-          semanticContext, flair, base.getNumBytesToErase(), completionString,
-          base.getAssociatedDeclKind(), base.isSystem(), base.getModuleName(),
-          base.getNotRecommendedReason(), base.getDiagnosticSeverity(),
-          base.getDiagnosticMessage(), base.getBriefDocComment(),
-          base.getAssociatedUSRs(), typeRelation, opKind);
-    } else {
-      newBase = new (sink.allocator) SwiftResult(
-          base.getKind(), semanticContext, flair, base.getNumBytesToErase(),
-          completionString, typeRelation, opKind);
-    }
+    const ContextFreeCodeCompletionResult &contextFreeBase =
+        base.getContextFreeResult();
+
+    ContextFreeCodeCompletionResult *contextFreeResult =
+        new (sink.allocator) ContextFreeCodeCompletionResult(
+            contextFreeBase.getKind(),
+            contextFreeBase.getOpaqueAssociatedKind(), opKind,
+            contextFreeBase.isSystem(), completionString,
+            contextFreeBase.getModuleName(),
+            contextFreeBase.getBriefDocComment(),
+            contextFreeBase.getAssociatedUSRs(),
+            contextFreeBase.getNotRecommendedReason(),
+            contextFreeBase.getDiagnosticSeverity(),
+            contextFreeBase.getDiagnosticMessage());
+
+    newBase = new (sink.allocator) SwiftResult(
+        *contextFreeResult, semanticContext, flair, base.getNumBytesToErase(),
+        typeRelation, base.getContextualNotRecommendedReason(),
+        base.getContextualDiagnosticSeverity(),
+        base.getContextualDiagnosticMessage());
 
     llvm::raw_svector_ostream OSS(nameStorage);
     ide::printCodeCompletionResultFilterName(*newBase, OSS);

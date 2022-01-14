@@ -919,12 +919,20 @@ static void transformAndForwardResults(
   auto buildInnerResult = [&](ArrayRef<CodeCompletionString::Chunk> chunks) {
     auto *completionString =
         CodeCompletionString::create(innerSink.allocator, chunks);
+    ContextFreeCodeCompletionResult *contextFreeResult =
+        new (innerSink.allocator) ContextFreeCodeCompletionResult(
+            CodeCompletionResultKind::BuiltinOperator, completionString,
+            CodeCompletionOperatorKind::None,
+            /*BriefDocComment=*/"", ContextFreeNotRecommendedReason::None,
+            CodeCompletionDiagnosticSeverity::None,
+            /*DiagnosticMessage=*/"");
     auto *paren = new (innerSink.allocator) CodeCompletion::SwiftResult(
-        CodeCompletionResultKind::BuiltinOperator,
-        SemanticContextKind::CurrentNominal,
+        *contextFreeResult, SemanticContextKind::CurrentNominal,
         CodeCompletionFlairBit::ExpressionSpecific,
-        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
-        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+        exactMatch ? exactMatch->getNumBytesToErase() : 0,
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable,
+        ContextualNotRecommendedReason::None,
+        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
 
     SwiftCompletionInfo info;
     std::vector<Completion *> extended = extendCompletions(

@@ -324,7 +324,7 @@ void CodeCompletionString::dump() const {
 }
 
 CodeCompletionDeclKind
-CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
+ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::Extension:
@@ -412,7 +412,7 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   llvm_unreachable("invalid DeclKind");
 }
 
-bool CodeCompletionResult::getDeclIsSystem(const Decl *D) {
+bool ContextFreeCodeCompletionResult::getDeclIsSystem(const Decl *D) {
   return D->getModuleContext()->isSystemModule();
 }
 
@@ -568,8 +568,8 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     break;
   case SemanticContextKind::OtherModule:
     Prefix.append("OtherModule");
-    if (!ModuleName.empty())
-      Prefix.append((Twine("[") + ModuleName + "]").str());
+    if (!getModuleName().empty())
+      Prefix.append((Twine("[") + getModuleName() + "]").str());
     break;
   }
   if (getFlair().toRaw()) {
@@ -590,9 +590,9 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     PRINT_FLAIR(ExpressionAtNonScriptOrMainFileScope, "ExprAtFileScope")
     Prefix.append("]");
   }
-  if (NotRecommended != NotRecommendedReason::None)
+  if (isNotRecommended())
     Prefix.append("/NotRecommended");
-  if (IsSystem)
+  if (isSystem())
     Prefix.append("/IsSystem");
   if (NumBytesToErase != 0) {
     Prefix.append("/Erase[");
@@ -624,27 +624,16 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
 
 void CodeCompletionResult::dump() const {
   printPrefix(llvm::errs());
-  CompletionString->print(llvm::errs());
+  getCompletionString()->print(llvm::errs());
   llvm::errs() << "\n";
 }
 
 CodeCompletionResult *
-CodeCompletionResult::withFlair(CodeCompletionFlair newFlair,
+CodeCompletionResult::withFlair(CodeCompletionFlair NewFlair,
                                 CodeCompletionResultSink &Sink) {
-  if (getKind() == CodeCompletionResultKind::Declaration) {
-    return new (*Sink.Allocator) CodeCompletionResult(
-        getSemanticContext(), newFlair, getNumBytesToErase(),
-        getCompletionString(), getAssociatedDeclKind(), isSystem(),
-        getModuleName(), getNotRecommendedReason(), getDiagnosticSeverity(),
-        getDiagnosticMessage(), getBriefDocComment(), getAssociatedUSRs(),
-        getExpectedTypeRelation(),
-        isOperator() ? getOperatorKind() : CodeCompletionOperatorKind::None);
-  } else {
-    return new (*Sink.Allocator) CodeCompletionResult(
-        getKind(), getSemanticContext(), newFlair, getNumBytesToErase(),
-        getCompletionString(), getExpectedTypeRelation(),
-        isOperator() ? getOperatorKind() : CodeCompletionOperatorKind::None);
-  }
+  return new (*Sink.Allocator) CodeCompletionResult(
+      ContextFree, SemanticContext, NewFlair, NumBytesToErase, TypeDistance,
+      NotRecommended, DiagnosticSeverity, DiagnosticMessage);
 }
 
 void CodeCompletionResultBuilder::withNestedGroup(
@@ -683,9 +672,10 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
   }
 
   if (D->getAttrs().getDeprecated(D->getASTContext()))
-    setNotRecommended(NotRecommendedReason::Deprecated);
+    setContextFreeNotRecommended(ContextFreeNotRecommendedReason::Deprecated);
   else if (D->getAttrs().getSoftDeprecated(D->getASTContext()))
-    setNotRecommended(NotRecommendedReason::SoftDeprecated);
+    setContextFreeNotRecommended(
+        ContextFreeNotRecommendedReason::SoftDeprecated);
 
   if (D->getClangNode()) {
     if (auto *ClangD = D->getClangDecl()) {
@@ -1214,7 +1204,9 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
 }
 
 CodeCompletionOperatorKind
-CodeCompletionResult::getCodeCompletionOperatorKind(StringRef name) {
+ContextFreeCodeCompletionResult::getCodeCompletionOperatorKind(
+    const CodeCompletionString *str) {
+  StringRef name = str->getFirstTextChunk(/*includeLeadingPunctuation=*/true);
   using CCOK = CodeCompletionOperatorKind;
   using OpPair = std::pair<StringRef, CCOK>;
 
@@ -1273,17 +1265,28 @@ CodeCompletionResult::getCodeCompletionOperatorKind(StringRef name) {
   return I->second;
 }
 
-static StringRef getOperatorName(CodeCompletionString *str) {
-  return str->getFirstTextChunk(/*includeLeadingPunctuation=*/true);
-}
-
-CodeCompletionOperatorKind
-CodeCompletionResult::getCodeCompletionOperatorKind(CodeCompletionString *str) {
-  return getCodeCompletionOperatorKind(getOperatorName(str));
-}
-
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   auto *CCS = CodeCompletionString::create(*Sink.Allocator, Chunks);
+
+  CodeCompletionDiagnosticSeverity ContextFreeDiagnosticSeverity =
+      CodeCompletionDiagnosticSeverity::None;
+  StringRef ContextFreeDiagnosticMessage;
+  if (ContextFreeNotRecReason != ContextFreeNotRecommendedReason::None) {
+    // FIXME: We should generate the message lazily.
+    if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
+      CodeCompletionDiagnosticSeverity severity;
+      SmallString<256> message;
+      llvm::raw_svector_ostream messageOS(message);
+      if (!getContextFreeCompletionDiagnostics(ContextFreeNotRecReason, VD,
+                                               severity, messageOS)) {
+        ContextFreeDiagnosticSeverity = severity;
+        ContextFreeDiagnosticMessage = copyString(*Sink.Allocator, message);
+      }
+    }
+  }
+
+  /// This variable should be initialized by all the switch cases below.
+  ContextFreeCodeCompletionResult *ContextFreeResult = nullptr;
 
   switch (Kind) {
   case CodeCompletionResultKind::Declaration: {
@@ -1304,47 +1307,55 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       }
     }
 
-    CodeCompletionResult *result = new (*Sink.Allocator) CodeCompletionResult(
-        SemanticContext, Flair, NumBytesToErase, CCS, AssociatedDecl,
-        ModuleName, NotRecReason, copyString(*Sink.Allocator, BriefDocComment),
+    ContextFreeResult = new (*Sink.Allocator) ContextFreeCodeCompletionResult(
+        CCS, AssociatedDecl, ModuleName,
+        copyString(*Sink.Allocator, BriefDocComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
-        ExpectedTypeRelation);
-    if (NotRecReason != NotRecommendedReason::None) {
-      // FIXME: We should generate the message lazily.
-      if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
-        CodeCompletionDiagnosticSeverity severity;
-        SmallString<256> message;
-        llvm::raw_svector_ostream messageOS(message);
-        if (!getCompletionDiagnostics(NotRecReason, VD, severity, messageOS))
-          result->setDiagnostics(severity,
-                                 copyString(*Sink.Allocator, message));
-      }
-    }
-    return result;
+        ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
+        ContextFreeDiagnosticMessage);
+    break;
   }
 
   case CodeCompletionResultKind::Keyword:
-    return new (*Sink.Allocator)
-        CodeCompletionResult(
-          KeywordKind, SemanticContext, Flair, NumBytesToErase,
-          CCS, ExpectedTypeRelation,
-          copyString(*Sink.Allocator, BriefDocComment));
-
+    ContextFreeResult = new (*Sink.Allocator) ContextFreeCodeCompletionResult(
+        KeywordKind, CCS, copyString(*Sink.Allocator, BriefDocComment));
+    break;
   case CodeCompletionResultKind::BuiltinOperator:
   case CodeCompletionResultKind::Pattern:
-    return new (*Sink.Allocator) CodeCompletionResult(
-        Kind, SemanticContext, Flair, NumBytesToErase, CCS,
-        ExpectedTypeRelation, CodeCompletionOperatorKind::None,
-        copyString(*Sink.Allocator, BriefDocComment));
-
+    ContextFreeResult = new (*Sink.Allocator) ContextFreeCodeCompletionResult(
+        Kind, CCS, CodeCompletionOperatorKind::None,
+        copyString(*Sink.Allocator, BriefDocComment), ContextFreeNotRecReason,
+        ContextFreeDiagnosticSeverity, ContextFreeDiagnosticMessage);
+    break;
   case CodeCompletionResultKind::Literal:
     assert(LiteralKind.hasValue());
-    return new (*Sink.Allocator)
-        CodeCompletionResult(*LiteralKind, SemanticContext, Flair,
-                             NumBytesToErase, CCS, ExpectedTypeRelation);
+    ContextFreeResult = new (*Sink.Allocator)
+        ContextFreeCodeCompletionResult(*LiteralKind, CCS);
+    break;
   }
 
-  llvm_unreachable("Unhandled CodeCompletionResult in switch.");
+  CodeCompletionDiagnosticSeverity ContextualDiagnosticSeverity =
+      CodeCompletionDiagnosticSeverity::None;
+  StringRef ContextualDiagnosticMessage;
+  if (ContextualNotRecReason != ContextualNotRecommendedReason::None) {
+    // FIXME: We should generate the message lazily.
+    if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
+      CodeCompletionDiagnosticSeverity severity;
+      SmallString<256> message;
+      llvm::raw_svector_ostream messageOS(message);
+      if (!getContextualCompletionDiagnostics(ContextualNotRecReason, VD,
+                                              severity, messageOS)) {
+        ContextualDiagnosticSeverity = severity;
+        ContextualDiagnosticMessage = copyString(*Sink.Allocator, message);
+      }
+    }
+  }
+
+  CodeCompletionResult *result = new (*Sink.Allocator) CodeCompletionResult(
+      *ContextFreeResult, SemanticContext, Flair, NumBytesToErase,
+      ExpectedTypeRelation, ContextualNotRecReason,
+      ContextualDiagnosticSeverity, ContextualDiagnosticMessage);
+  return result;
 }
 
 void CodeCompletionResultBuilder::finishResult() {
@@ -2163,7 +2174,8 @@ public:
       Builder.addBaseName(MD->getNameStr());
       Builder.addTypeAnnotation("Module");
       if (Pair.second)
-        Builder.setNotRecommended(NotRecommendedReason::RedundantImport);
+        Builder.setContextualNotRecommended(
+            ContextualNotRecommendedReason::RedundantImport);
     }
   }
 
@@ -2192,7 +2204,8 @@ public:
     }
   }
 
-  void addModuleName(ModuleDecl *MD, Optional<NotRecommendedReason> R = None) {
+  void addModuleName(ModuleDecl *MD,
+                     Optional<ContextualNotRecommendedReason> R = None) {
 
     // Don't add underscored cross-import overlay modules.
     if (MD->getDeclaringModuleIfCrossImportOverlay())
@@ -2216,7 +2229,7 @@ public:
     Builder.addBaseName(moduleName.str());
     Builder.addTypeAnnotation("Module");
     if (R)
-      Builder.setNotRecommended(*R);
+      Builder.setContextualNotRecommended(*R);
   }
 
   void addImportModuleNames() {
@@ -2233,13 +2246,13 @@ public:
         continue;
 
       auto MD = ModuleDecl::create(ModuleName, Ctx);
-      Optional<NotRecommendedReason> Reason = None;
+      Optional<ContextualNotRecommendedReason> Reason = None;
 
       // Imported modules are not recommended.
       if (directImportedModules.contains(MD->getNameStr())) {
-        Reason = NotRecommendedReason::RedundantImport;
+        Reason = ContextualNotRecommendedReason::RedundantImport;
       } else if (allImportedModules.contains(MD->getNameStr())) {
-        Reason = NotRecommendedReason::RedundantImportIndirect;
+        Reason = ContextualNotRecommendedReason::RedundantImportIndirect;
       }
 
       addModuleName(MD, Reason);
@@ -2608,8 +2621,9 @@ public:
     return Type();
   }
 
-  void analyzeActorIsolation(const ValueDecl *VD, Type T, bool &implicitlyAsync,
-                             Optional<NotRecommendedReason> &NotRecommended) {
+  void analyzeActorIsolation(
+      const ValueDecl *VD, Type T, bool &implicitlyAsync,
+      Optional<ContextualNotRecommendedReason> &NotRecommended) {
     auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
 
     switch (isolation.getKind()) {
@@ -2652,19 +2666,20 @@ public:
       auto *M = CurrDeclContext->getParentModule();
       if (isa<VarDecl>(VD)) {
         if (!isSendableType(M, T)) {
-          NotRecommended = NotRecommendedReason::CrossActorReference;
+          NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
         }
       } else {
         assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
         // Check if the result and the param types are all 'Sendable'.
         auto *AFT = T->castTo<AnyFunctionType>();
         if (!isSendableType(M, AFT->getResult())) {
-          NotRecommended = NotRecommendedReason::CrossActorReference;
+          NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
         } else {
           for (auto &param : AFT->getParams()) {
             Type paramType = param.getPlainType();
             if (!isSendableType(M, paramType)) {
-              NotRecommended = NotRecommendedReason::CrossActorReference;
+              NotRecommended =
+                  ContextualNotRecommendedReason::CrossActorReference;
               break;
             }
           }
@@ -2685,19 +2700,20 @@ public:
     if (VD->hasInterfaceType())
       VarType = getTypeOfMember(VD, dynamicLookupInfo);
 
-    Optional<NotRecommendedReason> NotRecommended;
+    Optional<ContextualNotRecommendedReason> NotRecommended;
     // "not recommended" in its own getter.
     if (Kind == LookupKind::ValueInDeclContext) {
       if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
         if (accessor->getStorage() == VD && accessor->isGetter())
-          NotRecommended = NotRecommendedReason::VariableUsedInOwnDefinition;
+          NotRecommended =
+              ContextualNotRecommendedReason::VariableUsedInOwnDefinition;
       }
     }
     bool implicitlyAsync = false;
     analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
     if (!isForCaching() && !NotRecommended && implicitlyAsync &&
         !CanCurrDeclContextHandleAsync) {
-      NotRecommended = NotRecommendedReason::InvalidAsyncContext;
+      NotRecommended = ContextualNotRecommendedReason::InvalidAsyncContext;
     }
 
     CodeCompletionResultBuilder Builder(
@@ -2708,7 +2724,7 @@ public:
     addValueBaseName(Builder, Name);
 
     if (NotRecommended)
-      Builder.setNotRecommended(*NotRecommended);
+      Builder.setContextualNotRecommended(*NotRecommended);
 
     if (!VarType)
       return;
@@ -3028,7 +3044,8 @@ public:
         addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
       if (!isForCaching() && AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
-        Builder.setNotRecommended(NotRecommendedReason::InvalidAsyncContext);
+        Builder.setContextualNotRecommended(
+            ContextualNotRecommendedReason::InvalidAsyncContext);
       }
     };
 
@@ -3137,7 +3154,7 @@ public:
     if (AFT && !IsImplicitlyCurriedInstanceMethod)
       trivialTrailingClosure = hasTrivialTrailingClosure(FD, AFT);
 
-    Optional<NotRecommendedReason> NotRecommended;
+    Optional<ContextualNotRecommendedReason> NotRecommended;
     bool implictlyAsync = false;
     analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
 
@@ -3145,7 +3162,7 @@ public:
         !IsImplicitlyCurriedInstanceMethod &&
         ((AFT && AFT->isAsync()) || implictlyAsync) &&
         !CanCurrDeclContextHandleAsync) {
-      NotRecommended = NotRecommendedReason::InvalidAsyncContext;
+      NotRecommended = ContextualNotRecommendedReason::InvalidAsyncContext;
     }
 
     // Add the method, possibly including any default arguments.
@@ -3162,7 +3179,7 @@ public:
         Builder.addFlair(CodeCompletionFlairBit::SuperChain);
 
       if (NotRecommended)
-        Builder.setNotRecommended(*NotRecommended);
+        Builder.setContextualNotRecommended(*NotRecommended);
 
       addLeadingDot(Builder);
       addValueBaseName(Builder, Name);
@@ -3355,7 +3372,8 @@ public:
 
       if (!isForCaching() && ConstructorType->isAsync() &&
           !CanCurrDeclContextHandleAsync) {
-        Builder.setNotRecommended(NotRecommendedReason::InvalidAsyncContext);
+        Builder.setContextualNotRecommended(
+            ContextualNotRecommendedReason::InvalidAsyncContext);
       }
     };
 
@@ -3401,13 +3419,13 @@ public:
     if (!subscriptType)
       return;
 
-    Optional<NotRecommendedReason> NotRecommended;
+    Optional<ContextualNotRecommendedReason> NotRecommended;
     bool implictlyAsync = false;
     analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
     if (!isForCaching() && !NotRecommended && implictlyAsync &&
         !CanCurrDeclContextHandleAsync) {
-      NotRecommended = NotRecommendedReason::InvalidAsyncContext;
+      NotRecommended = ContextualNotRecommendedReason::InvalidAsyncContext;
     }
 
     CodeCompletionResultBuilder Builder(
@@ -3416,7 +3434,7 @@ public:
     Builder.setAssociatedDecl(SD);
 
     if (NotRecommended)
-      Builder.setNotRecommended(*NotRecommended);
+      Builder.setContextualNotRecommended(*NotRecommended);
 
     // '\TyName#^TOKEN^#' requires leading dot.
     if (!HaveDot && IsAfterSwiftKeyPathRoot)
@@ -7430,66 +7448,75 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
   Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
 
-MutableArrayRef<CodeCompletionResult *>
-swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
-                                      CodeCompletionResultSink &sourceSink,
-                                      bool onlyTypes,
-                                      bool onlyPrecedenceGroups) {
+static MutableArrayRef<CodeCompletionResult *>
+copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
+                          CodeCompletionCache::Value &source, bool onlyTypes,
+                          bool onlyPrecedenceGroups) {
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
   // results alive.
-  targetSink.ForeignAllocators.push_back(sourceSink.Allocator);
+  targetSink.ForeignAllocators.push_back(source.Allocator);
   auto startSize = targetSink.Results.size();
 
+  std::function<bool(const ContextFreeCodeCompletionResult *)>
+      shouldIncludeResult;
   if (onlyTypes) {
-    std::copy_if(sourceSink.Results.begin(), sourceSink.Results.end(),
-                 std::back_inserter(targetSink.Results),
-                 [](CodeCompletionResult *R) -> bool {
-                   if (R->getKind() != CodeCompletionResultKind::Declaration)
-                     return false;
-                   switch (R->getAssociatedDeclKind()) {
-                   case CodeCompletionDeclKind::Module:
-                   case CodeCompletionDeclKind::Class:
-                   case CodeCompletionDeclKind::Struct:
-                   case CodeCompletionDeclKind::Enum:
-                   case CodeCompletionDeclKind::Protocol:
-                   case CodeCompletionDeclKind::TypeAlias:
-                   case CodeCompletionDeclKind::AssociatedType:
-                   case CodeCompletionDeclKind::GenericTypeParam:
-                     return true;
-                   case CodeCompletionDeclKind::PrecedenceGroup:
-                   case CodeCompletionDeclKind::EnumElement:
-                   case CodeCompletionDeclKind::Constructor:
-                   case CodeCompletionDeclKind::Destructor:
-                   case CodeCompletionDeclKind::Subscript:
-                   case CodeCompletionDeclKind::StaticMethod:
-                   case CodeCompletionDeclKind::InstanceMethod:
-                   case CodeCompletionDeclKind::PrefixOperatorFunction:
-                   case CodeCompletionDeclKind::PostfixOperatorFunction:
-                   case CodeCompletionDeclKind::InfixOperatorFunction:
-                   case CodeCompletionDeclKind::FreeFunction:
-                   case CodeCompletionDeclKind::StaticVar:
-                   case CodeCompletionDeclKind::InstanceVar:
-                   case CodeCompletionDeclKind::LocalVar:
-                   case CodeCompletionDeclKind::GlobalVar:
-                     return false;
-                   }
+    shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
+      if (R->getKind() != CodeCompletionResultKind::Declaration)
+        return false;
+      switch (R->getAssociatedDeclKind()) {
+      case CodeCompletionDeclKind::Module:
+      case CodeCompletionDeclKind::Class:
+      case CodeCompletionDeclKind::Struct:
+      case CodeCompletionDeclKind::Enum:
+      case CodeCompletionDeclKind::Protocol:
+      case CodeCompletionDeclKind::TypeAlias:
+      case CodeCompletionDeclKind::AssociatedType:
+      case CodeCompletionDeclKind::GenericTypeParam:
+        return true;
+      case CodeCompletionDeclKind::PrecedenceGroup:
+      case CodeCompletionDeclKind::EnumElement:
+      case CodeCompletionDeclKind::Constructor:
+      case CodeCompletionDeclKind::Destructor:
+      case CodeCompletionDeclKind::Subscript:
+      case CodeCompletionDeclKind::StaticMethod:
+      case CodeCompletionDeclKind::InstanceMethod:
+      case CodeCompletionDeclKind::PrefixOperatorFunction:
+      case CodeCompletionDeclKind::PostfixOperatorFunction:
+      case CodeCompletionDeclKind::InfixOperatorFunction:
+      case CodeCompletionDeclKind::FreeFunction:
+      case CodeCompletionDeclKind::StaticVar:
+      case CodeCompletionDeclKind::InstanceVar:
+      case CodeCompletionDeclKind::LocalVar:
+      case CodeCompletionDeclKind::GlobalVar:
+        return false;
+      }
 
-                   llvm_unreachable(
-                       "Unhandled CodeCompletionDeclKind in switch.");
-                 });
+      llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
+    };
   } else if (onlyPrecedenceGroups) {
-    std::copy_if(sourceSink.Results.begin(), sourceSink.Results.end(),
-                 std::back_inserter(targetSink.Results),
-                 [](CodeCompletionResult *R) -> bool {
+    shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
       return R->getAssociatedDeclKind() ==
-               CodeCompletionDeclKind::PrecedenceGroup;
-    });
+             CodeCompletionDeclKind::PrecedenceGroup;
+    };
   } else {
-    targetSink.Results.insert(targetSink.Results.end(),
-                              sourceSink.Results.begin(),
-                              sourceSink.Results.end());
+    shouldIncludeResult = [](const ContextFreeCodeCompletionResult *R) -> bool {
+      return true;
+    };
+  }
+  for (auto contextFreeResult : source.Results) {
+    if (!shouldIncludeResult(contextFreeResult)) {
+      continue;
+    }
+    auto contextualResult = new (*targetSink.Allocator) CodeCompletionResult(
+        *contextFreeResult, SemanticContextKind::OtherModule,
+        CodeCompletionFlair(),
+        /*numBytesToErase=*/0,
+        CodeCompletionResult::ExpectedTypeRelation::Unknown,
+        ContextualNotRecommendedReason::None,
+        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+    targetSink.Results.push_back(contextualResult);
   }
 
   return llvm::makeMutableArrayRef(targetSink.Results.data() + startSize,
@@ -7515,21 +7542,31 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     if (!V.hasValue()) {
       // No cached results found. Fill the cache.
       V = context.Cache.createValue();
-      CodeCompletionResultSink &Sink = (*V)->Sink;
+      // Temporary sink in which we gather the result. The cache value retains
+      // the sink's allocator.
+      CodeCompletionResultSink Sink;
       Sink.annotateResult = context.getAnnotateResult();
       Sink.addInitsToTopLevel = context.getAddInitsToTopLevel();
       Sink.enableCallPatternHeuristics = context.getCallPatternHeuristics();
       Sink.includeObjectLiterals = context.includeObjectLiterals();
       Sink.addCallWithNoDefaultArgs = context.addCallWithNoDefaultArgs();
-      lookupCodeCompletionResultsFromModule(
-          (*V)->Sink, R.TheModule, R.Key.AccessPath,
-          R.Key.ResultsHaveLeadingDot, SF);
+      lookupCodeCompletionResultsFromModule(Sink, R.TheModule, R.Key.AccessPath,
+                                            R.Key.ResultsHaveLeadingDot, SF);
+      (*V)->Allocator = Sink.Allocator;
+      auto &CachedResults = (*V)->Results;
+      CachedResults.reserve(Sink.Results.size());
+      // Instead of copying the context free results out of the sink's allocator
+      // retain the sink's entire allocator (which also includes the contextual
+      // properities) and simply store pointers to the context free results that
+      // back the contextual results.
+      for (auto Result : Sink.Results) {
+        CachedResults.push_back(Result->getContextFreeResultPtr());
+      }
       context.Cache.set(R.Key, *V);
     }
     assert(V.hasValue());
-    auto newItems =
-        copyCodeCompletionResults(context.getResultSink(), (*V)->Sink,
-                                  R.OnlyTypes, R.OnlyPrecedenceGroups);
+    auto newItems = copyCodeCompletionResults(
+        context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups);
     postProcessResults(newItems, context.CodeCompletionKind, DC,
                        &context.getResultSink());
   }
