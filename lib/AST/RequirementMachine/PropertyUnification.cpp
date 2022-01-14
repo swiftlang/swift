@@ -49,26 +49,6 @@ bool PropertyMap::checkRulePairOnce(unsigned firstRuleID,
       std::make_pair(firstRuleID, secondRuleID)).second;
 }
 
-unsigned RewriteSystem::recordRelation(Symbol lhs, Symbol rhs) {
-  auto key = std::make_pair(lhs, rhs);
-  auto found = RelationMap.find(key);
-  if (found != RelationMap.end())
-    return found->second;
-
-  unsigned index = Relations.size();
-  Relations.push_back(key);
-  auto inserted = RelationMap.insert(std::make_pair(key, index));
-  assert(inserted.second);
-  (void) inserted;
-
-  return index;
-}
-
-RewriteSystem::Relation
-RewriteSystem::getRelation(unsigned index) const {
-  return Relations[index];
-}
-
 /// Given a key T, a rule (V.[p1] => V) where T == U.V, and a property [p2]
 /// where [p1] < [p2], record a rule (T.[p2] => T) that is induced by
 /// the original rule (V.[p1] => V).
@@ -97,30 +77,31 @@ static void recordRelation(Term key,
 
   unsigned relationID = system.recordRelation(lhsProperty, rhsProperty);
 
-  /// Build the following rewrite path:
-  ///
-  ///   U.(V => V.[p1]).[p2] ⊗ U.V.Relation([p1].[p2] => [p1]) ⊗ U.(V.[p1] => V).
-  ///
+  // Build the following rewrite path:
+  //
+  //   U.(V => V.[p1]).[p2] ⊗ U.V.Relation([p1].[p2] => [p1]) ⊗ U.(V.[p1] => V).
+  //
   RewritePath path;
 
-  /// Starting from U.V.[p2], apply the rule in reverse to get U.V.[p1].[p2].
+  // Starting from U.V.[p2], apply the rule in reverse to get U.V.[p1].[p2].
   path.add(RewriteStep::forRewriteRule(
       /*startOffset=*/key.size() - lhsRule.getRHS().size(),
       /*endOffset=*/1,
       /*ruleID=*/lhsRuleID,
       /*inverse=*/true));
 
-  /// U.V.Relation([p1].[p2] => [p1]).
-  path.add(RewriteStep::forRelation(relationID, /*inverse=*/false));
+  // U.V.Relation([p1].[p2] => [p1]).
+  path.add(RewriteStep::forRelation(/*startOffset=*/key.size(),
+                                    relationID, /*inverse=*/false));
 
-  /// U.(V.[p1] => V).
+  // U.(V.[p1] => V).
   path.add(RewriteStep::forRewriteRule(
       /*startOffset=*/key.size() - lhsRule.getRHS().size(),
       /*endOffset=*/0,
       /*ruleID=*/lhsRuleID,
       /*inverse=*/false));
 
-  /// Add the rule (T.[p2] => T) with the above rewrite path.
+  // Add the rule (T.[p2] => T) with the above rewrite path.
   MutableTerm lhs(key);
   lhs.add(rhsProperty);
 
@@ -814,57 +795,6 @@ void PropertyMap::concretizeTypeWitnessInConformance(
   }
 }
 
-RewriteSystem::TypeWitness::TypeWitness(
-    Term lhs, llvm::PointerUnion<Symbol, Term> rhs)
-  : LHS(lhs), RHS(rhs) {
-  assert(LHS.size() >= 2);
-  assert(getConcreteConformance().getKind() ==
-         Symbol::Kind::ConcreteConformance);
-  assert(getAssocType().getKind() == Symbol::Kind::AssociatedType);
-  if (RHS.is<Symbol>())
-    assert(RHS.get<Symbol>().getKind() == Symbol::Kind::ConcreteType);
-  assert(getAssocType().getProtocols().size() == 1);
-  assert(getAssocType().getProtocols()[0] ==
-         getConcreteConformance().getProtocol());
-}
-
-namespace swift {
-namespace rewriting {
-bool operator==(const RewriteSystem::TypeWitness &lhs,
-                const RewriteSystem::TypeWitness &rhs) {
-  return lhs.LHS == rhs.LHS && lhs.RHS == rhs.RHS;
-}
-}
-}
-
-void RewriteSystem::TypeWitness::dump(llvm::raw_ostream &out) const {
-  out << "Subject type: " << LHS << "\n";
-  if (RHS.is<Symbol>())
-    out << "Concrete type witness: " << RHS.get<Symbol>() << "\n";
-  else
-    out << "Abstract type witness: " << RHS.get<Term>() << "\n";
-}
-
-unsigned RewriteSystem::recordTypeWitness(
-    RewriteSystem::TypeWitness witness) {
-  unsigned index = TypeWitnesses.size();
-  auto inserted = TypeWitnessMap.insert(std::make_pair(witness.LHS, index));
-
-  if (!inserted.second) {
-    index = inserted.first->second;
-  } else {
-    TypeWitnesses.push_back(witness);
-  }
-
-  assert(TypeWitnesses[index] == witness);
-  return index;
-}
-
-const RewriteSystem::TypeWitness &
-RewriteSystem::getTypeWitness(unsigned index) const {
-  return TypeWitnesses[index];
-}
-
 /// Given the key of a property bag known to have \p concreteType,
 /// together with a \p typeWitness from a conformance on that concrete
 /// type, return the right hand side of a rewrite rule to relate
@@ -907,13 +837,15 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     //
     // Where S[n] is the nth substitution term.
 
-    auto result = Context.getRelativeTermForType(typeWitness, substitutions);
+    auto result = Context.getRelativeTermForType(
+        typeWitness, substitutions);
 
-    RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
-                                       Term::get(result, Context));
-    unsigned witnessID = System.recordTypeWitness(witness);
-    path.add(RewriteStep::forAbstractTypeWitness(
-        witnessID, /*inverse=*/false));
+    unsigned relationID = System.recordRelation(
+        Term::get(result, Context),
+        Term::get(subjectType, Context));
+    path.add(RewriteStep::forRelation(
+        /*startOffset=*/0, relationID,
+        /*inverse=*/false));
 
     return result;
   }
@@ -932,11 +864,11 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
             props->getConcreteType() == typeWitness) {
           auto result = props->getKey();
 
-          RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
-                                             result);
-          unsigned witnessID = System.recordTypeWitness(witness);
-          path.add(RewriteStep::forAbstractTypeWitness(
-              witnessID, /*inverse=*/false));
+          unsigned relationID = System.recordRelation(
+              result, Term::get(subjectType, Context));
+          path.add(RewriteStep::forRelation(
+              /*startOffset=*/0, relationID,
+              /*inverse=*/false));
 
           if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
              llvm::dbgs() << "^^ Type witness can re-use property bag of "
@@ -962,9 +894,14 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   auto typeWitnessSymbol =
       Symbol::forConcreteType(typeWitnessSchema, result, Context);
 
-  RewriteSystem::TypeWitness witness(Term::get(subjectType, Context),
-                                     typeWitnessSymbol);
-  unsigned witnessID = System.recordTypeWitness(witness);
+  auto concreteConformanceSymbol = *(subjectType.end() - 2);
+  auto associatedTypeSymbol = *(subjectType.end() - 1);
+
+  // Record the relation before simplifying typeWitnessSymbol below.
+  unsigned concreteRelationID = System.recordConcreteTypeWitnessRelation(
+      concreteConformanceSymbol,
+      associatedTypeSymbol,
+      typeWitnessSymbol);
 
   // Simplify the substitution terms in the type witness symbol.
   RewritePath substPath;
@@ -982,18 +919,24 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
     // Add a rule T.[concrete: C : P] => T.[concrete: C : P].[P:X].
     MutableTerm result(key);
-    result.add(witness.getConcreteConformance());
+    result.add(concreteConformanceSymbol);
+
+    unsigned sameRelationID = System.recordSameTypeWitnessRelation(
+        concreteConformanceSymbol,
+        associatedTypeSymbol);
 
     // ([concrete: C : P] => [concrete: C : P].[P:X].[concrete: C])
-    path.add(RewriteStep::forSameTypeWitness(
-        witnessID, /*inverse=*/true));
+    path.add(RewriteStep::forRelation(
+        /*startOffset=*/key.size(), sameRelationID,
+        /*inverse=*/true));
 
     // [concrete: C : P].[P:X].([concrete: C] => [concrete: C.X])
     path.append(substPath);
 
     // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
-    path.add(RewriteStep::forConcreteTypeWitness(
-        witnessID, /*inverse=*/false));
+    path.add(RewriteStep::forRelation(
+        /*startOffset=*/key.size(), concreteRelationID,
+        /*inverse=*/false));
 
     return result;
   }
@@ -1012,8 +955,9 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   path.append(substPath);
 
   // T.([concrete: C : P].[P:X].[concrete: C.X] => [concrete: C : P].[P:X])
-  path.add(RewriteStep::forConcreteTypeWitness(
-      witnessID, /*inverse=*/false));
+  path.add(RewriteStep::forRelation(
+      /*startOffset=*/key.size(), concreteRelationID,
+      /*inverse=*/false));
 
   return constraintType;
 }
@@ -1026,23 +970,6 @@ void PropertyMap::recordConcreteConformanceRule(
     SmallVectorImpl<InducedRule> &inducedRules) const {
   const auto &concreteRule = System.getRule(concreteRuleID);
   const auto &conformanceRule = System.getRule(conformanceRuleID);
-
-#ifndef NDEBUG
-  {
-    auto conformanceSymbol = *conformanceRule.isPropertyRule();
-    assert(conformanceSymbol.getKind() == Symbol::Kind::Protocol);
-    assert(conformanceSymbol.getProtocol() ==
-           concreteConformanceSymbol.getProtocol());
-
-    auto concreteSymbol = *concreteRule.isPropertyRule();
-    if (concreteSymbol.getKind() == Symbol::Kind::Superclass)
-      assert(requirementKind == RequirementKind::Superclass);
-    else {
-      assert(concreteSymbol.getKind() == Symbol::Kind::ConcreteType);
-      assert(requirementKind == RequirementKind::SameType);
-    }
-  }
-#endif
 
   RewritePath path;
 
@@ -1070,20 +997,28 @@ void PropertyMap::recordConcreteConformanceRule(
 
   // Apply a concrete type adjustment to the concrete symbol if T' is shorter
   // than T.
+  auto concreteSymbol = *concreteRule.isPropertyRule();
   unsigned adjustment = rhs.size() - concreteRule.getRHS().size();
+
   if (adjustment > 0 &&
       !concreteConformanceSymbol.getSubstitutions().empty()) {
     path.add(RewriteStep::forAdjustment(adjustment, /*endOffset=*/1,
                                         /*inverse=*/false));
+
+    MutableTerm prefix(rhs.begin(), rhs.begin() + adjustment);
+    concreteSymbol = concreteSymbol.prependPrefixToConcreteSubstitutions(
+        prefix, Context);
   }
 
+  auto protocolSymbol = *conformanceRule.isPropertyRule();
+
   // Now, transform T''.[concrete: C].[P] into T''.[concrete: C : P].
-  if (requirementKind == RequirementKind::Superclass) {
-    path.add(RewriteStep::forSuperclassConformance(/*inverse=*/false));
-  } else {
-    assert(requirementKind == RequirementKind::SameType);
-    path.add(RewriteStep::forConcreteConformance(/*inverse=*/false));
-  }
+  unsigned relationID = System.recordConcreteConformanceRelation(
+      concreteSymbol, protocolSymbol, concreteConformanceSymbol);
+
+  path.add(RewriteStep::forRelation(
+      /*startOffset=*/rhs.size(), relationID,
+      /*inverse=*/false));
 
   MutableTerm lhs(rhs);
   lhs.add(concreteConformanceSymbol);

@@ -86,7 +86,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
 
   for (auto step : Path) {
     switch (step.Kind) {
-    case RewriteStep::ApplyRewriteRule: {
+    case RewriteStep::Rule: {
       if (!step.isInContext() && !evaluator.isInContext())
         rulesInEmptyContext.insert(step.getRuleID());
 
@@ -98,11 +98,6 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
-    case RewriteStep::ConcreteConformance:
-    case RewriteStep::SuperclassConformance:
-    case RewriteStep::ConcreteTypeWitness:
-    case RewriteStep::SameTypeWitness:
-    case RewriteStep::AbstractTypeWitness:
       break;
     }
 
@@ -207,7 +202,7 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
 
   for (auto step : Steps) {
     switch (step.Kind) {
-    case RewriteStep::ApplyRewriteRule: {
+    case RewriteStep::Rule: {
       if (step.getRuleID() != ruleID)
         break;
 
@@ -222,11 +217,6 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
-    case RewriteStep::ConcreteConformance:
-    case RewriteStep::SuperclassConformance:
-    case RewriteStep::ConcreteTypeWitness:
-    case RewriteStep::SameTypeWitness:
-    case RewriteStep::AbstractTypeWitness:
       break;
     }
 
@@ -263,7 +253,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
   bool foundAny = false;
 
   for (const auto &step : Steps) {
-    if (step.Kind == RewriteStep::ApplyRewriteRule &&
+    if (step.Kind == RewriteStep::Rule &&
         step.getRuleID() == ruleID) {
       foundAny = true;
       break;
@@ -283,7 +273,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
   for (const auto &step : Steps) {
     switch (step.Kind) {
-    case RewriteStep::ApplyRewriteRule: {
+    case RewriteStep::Rule: {
       if (step.getRuleID() != ruleID) {
         newSteps.push_back(step);
         break;
@@ -324,11 +314,6 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
-    case RewriteStep::ConcreteConformance:
-    case RewriteStep::SuperclassConformance:
-    case RewriteStep::ConcreteTypeWitness:
-    case RewriteStep::SameTypeWitness:
-    case RewriteStep::AbstractTypeWitness:
       newSteps.push_back(step);
       break;
     }
