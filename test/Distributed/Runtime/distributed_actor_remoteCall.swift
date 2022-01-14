@@ -51,8 +51,8 @@ distributed actor Greeter {
     .init(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
   }
 
-  distributed func echo(name: String) -> String {
-    return "Echo: \(name)"
+  distributed func echo(name: String, age: Int) -> String {
+    return "Echo: name: \(name), age: \(age)"
   }
 
   distributed func enumResult() -> E {
@@ -117,12 +117,13 @@ struct FakeActorSystem: DistributedActorSystem {
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
+  var substitutions: [Any.Type] = []
   var arguments: [Any] = []
   var returnType: Any.Type? = nil
   var errorType: Any.Type? = nil
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
-    fatalError("NOT IMPLEMENTED: \(#function)")
+    substitutions.append(type)
   }
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
     arguments.append(argument)
@@ -138,7 +139,7 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
   // === Receiving / decoding -------------------------------------------------
 
   func decodeGenericSubstitutions() throws -> [Any.Type] {
-    []
+    return substitutions
   }
 
   var argumentIndex: Int = 0
@@ -156,7 +157,7 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
     }
 
     print("  > decode argument: \(argument)")
-    pointer.pointee = argument
+    pointer.initialize(to: argument)
     argumentIndex += 1
   }
 
@@ -190,8 +191,7 @@ let helloName = "$s4main7GreeterC5helloSSyFTE"
 let answerName = "$s4main7GreeterC6answerSiyFTE"
 let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
 let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
-
-let echoName = "$s4main7GreeterC4echo4nameS2S_tFTE"
+let echoName = "$s4main7GreeterC4echo4name3ageS2S_SitFTE"
 
 func test() async throws {
   let system = FakeActorSystem()
@@ -243,6 +243,7 @@ func test() async throws {
 
   var echoInvocation = system.makeInvocationEncoder()
   try echoInvocation.recordArgument("Caplin")
+  try echoInvocation.recordArgument(42)
   try echoInvocation.doneRecording()
   try await system.executeDistributedTarget(
       on: local,
@@ -250,7 +251,7 @@ func test() async throws {
       invocationDecoder: &echoInvocation,
       handler: FakeResultHandler()
   )
-  // CHECK: RETURN: Echo: Caplin
+  // CHECK: RETURN: Echo: name: Caplin, age: 42
 
   print("done")
   // CHECK-NEXT: done
