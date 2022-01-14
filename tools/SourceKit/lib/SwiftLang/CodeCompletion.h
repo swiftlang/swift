@@ -27,6 +27,7 @@ using swift::ide::CodeCompletionFlair;
 using swift::ide::CodeCompletionKeywordKind;
 using swift::ide::CodeCompletionLiteralKind;
 using swift::ide::CodeCompletionOperatorKind;
+using swift::ide::CodeCompletionResultKind;
 using swift::ide::CodeCompletionString;
 using swift::ide::SemanticContextKind;
 using SwiftResult = swift::ide::CodeCompletionResult;
@@ -110,7 +111,9 @@ public:
 
   // MARK: Methods that forward to the SwiftResult
 
-  SwiftResult::ResultKind getKind() const { return getSwiftResult().getKind(); }
+  CodeCompletionResultKind getKind() const {
+    return getSwiftResult().getKind();
+  }
 
   CodeCompletionDeclKind getAssociatedDeclKind() const {
     return getSwiftResult().getAssociatedDeclKind();

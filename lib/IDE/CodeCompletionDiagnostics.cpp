@@ -145,10 +145,8 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
 } // namespace
 
 bool swift::ide::getCompletionDiagnostics(
-    CodeCompletionResult::NotRecommendedReason reason, const ValueDecl *D,
+    NotRecommendedReason reason, const ValueDecl *D,
     CodeCompletionDiagnosticSeverity &severity, llvm::raw_ostream &Out) {
-  using NotRecommendedReason = CodeCompletionResult::NotRecommendedReason;
-
   ASTContext &ctx = D->getASTContext();
 
   CodeCompletionDiagnostics Diag(ctx);
@@ -177,4 +175,3 @@ bool swift::ide::getCompletionDiagnostics(
   }
   return true;
 }
-

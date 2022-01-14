@@ -630,21 +630,36 @@ enum class CodeCompletionDiagnosticSeverity : uint8_t {
   MAX_VALUE = Note
 };
 
+/// Reasons why a code completion item might not be recommended in a certain
+/// context.
+enum class NotRecommendedReason : uint8_t {
+  None = 0,                    // both contextual and context-free
+  RedundantImport,             // contextual
+  RedundantImportIndirect,     // contextual
+  Deprecated,                  // context-free
+  SoftDeprecated,              // context-free
+  InvalidAsyncContext,         // contextual
+  CrossActorReference,         // contextual
+  VariableUsedInOwnDefinition, // contextual
+
+  MAX_VALUE = VariableUsedInOwnDefinition
+};
+
+enum class CodeCompletionResultKind : uint8_t {
+  Declaration,
+  Keyword,
+  Pattern,
+  Literal,
+  BuiltinOperator,
+
+  MAX_VALUE = BuiltinOperator
+};
+
 /// A single code completion result.
 class CodeCompletionResult {
   friend class CodeCompletionResultBuilder;
 
 public:
-  enum class ResultKind : uint8_t {
-    Declaration,
-    Keyword,
-    Pattern,
-    Literal,
-    BuiltinOperator,
-
-    MAX_VALUE = BuiltinOperator
-  };
-
   /// Describes the relationship between the type of the completion results and
   /// the expected type at the code completion position.
   enum class ExpectedTypeRelation : uint8_t {
@@ -670,21 +685,9 @@ public:
     MAX_VALUE = Identical
   };
 
-  enum class NotRecommendedReason : uint8_t {
-    None = 0,
-    RedundantImport,
-    RedundantImportIndirect,
-    Deprecated,
-    SoftDeprecated,
-    InvalidAsyncContext,
-    CrossActorReference,
-    VariableUsedInOwnDefinition,
-
-    MAX_VALUE = VariableUsedInOwnDefinition
-  };
 
 private:
-  ResultKind Kind : 3;
+  CodeCompletionResultKind Kind : 3;
   unsigned AssociatedKind : 8;
   CodeCompletionOperatorKind KnownOperatorKind : 6;
   SemanticContextKind SemanticContext : 3;
@@ -710,7 +713,7 @@ private:
   StringRef DiagnosticMessage;
 
   // Assertions for limiting max values of enums.
-  static_assert(int(ResultKind::MAX_VALUE) < 1 << 3, "");
+  static_assert(int(CodeCompletionResultKind::MAX_VALUE) < 1 << 3, "");
   static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
   static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
   static_assert(int(NotRecommendedReason::MAX_VALUE) < 1 << 4, "");
@@ -721,7 +724,8 @@ public:
   /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
   ///
   /// \note The caller must ensure \c CodeCompletionString outlives this result.
-  CodeCompletionResult(ResultKind Kind, SemanticContextKind SemanticContext,
+  CodeCompletionResult(CodeCompletionResultKind Kind,
+                       SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
@@ -733,7 +737,8 @@ public:
         NotRecommended(NotRecommendedReason::None),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
-    assert(Kind != ResultKind::Declaration && "use the other constructor");
+    assert(Kind != CodeCompletionResultKind::Declaration &&
+           "use the other constructor");
     assert(CompletionString);
     if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None)
       this->KnownOperatorKind = getCodeCompletionOperatorKind(CompletionString);
@@ -753,7 +758,7 @@ public:
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
                        StringRef BriefDocComment = StringRef())
-      : Kind(ResultKind::Keyword),
+      : Kind(CodeCompletionResultKind::Keyword),
         KnownOperatorKind(CodeCompletionOperatorKind::None),
         SemanticContext(SemanticContext), Flair(Flair.toRaw()),
         NotRecommended(NotRecommendedReason::None),
@@ -773,7 +778,7 @@ public:
                        CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance)
-      : Kind(ResultKind::Literal),
+      : Kind(CodeCompletionResultKind::Literal),
         KnownOperatorKind(CodeCompletionOperatorKind::None),
         SemanticContext(SemanticContext), Flair(Flair.toRaw()),
         NotRecommended(NotRecommendedReason::None),
@@ -794,11 +799,11 @@ public:
                        CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl, StringRef ModuleName,
-                       CodeCompletionResult::NotRecommendedReason NotRecReason,
+                       NotRecommendedReason NotRecReason,
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ExpectedTypeRelation TypeDistance)
-      : Kind(ResultKind::Declaration),
+      : Kind(CodeCompletionResultKind::Declaration),
         KnownOperatorKind(CodeCompletionOperatorKind::None),
         SemanticContext(SemanticContext), Flair(Flair.toRaw()),
         NotRecommended(NotRecReason), NumBytesToErase(NumBytesToErase),
@@ -821,16 +826,15 @@ public:
                        CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        CodeCompletionDeclKind DeclKind, bool IsSystem,
-                       StringRef ModuleName,
-                       CodeCompletionResult::NotRecommendedReason NotRecReason,
+                       StringRef ModuleName, NotRecommendedReason NotRecReason,
                        CodeCompletionDiagnosticSeverity diagSeverity,
                        StringRef DiagnosticMessage, StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind)
-      : Kind(ResultKind::Declaration), KnownOperatorKind(KnownOperatorKind),
-        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
-        NotRecommended(NotRecReason), IsSystem(IsSystem),
+      : Kind(CodeCompletionResultKind::Declaration),
+        KnownOperatorKind(KnownOperatorKind), SemanticContext(SemanticContext),
+        Flair(Flair.toRaw()), NotRecommended(NotRecReason), IsSystem(IsSystem),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), BriefDocComment(BriefDocComment),
         AssociatedUSRs(AssociatedUSRs), TypeDistance(TypeDistance),
@@ -847,26 +851,26 @@ public:
   CodeCompletionResult *withFlair(CodeCompletionFlair newFlair,
                                   CodeCompletionResultSink &Sink);
 
-  ResultKind getKind() const { return Kind; }
+  CodeCompletionResultKind getKind() const { return Kind; }
 
   CodeCompletionDeclKind getAssociatedDeclKind() const {
-    assert(getKind() == ResultKind::Declaration);
+    assert(getKind() == CodeCompletionResultKind::Declaration);
     return static_cast<CodeCompletionDeclKind>(AssociatedKind);
   }
 
   CodeCompletionLiteralKind getLiteralKind() const {
-    assert(getKind() == ResultKind::Literal);
+    assert(getKind() == CodeCompletionResultKind::Literal);
     return static_cast<CodeCompletionLiteralKind>(AssociatedKind);
   }
 
   CodeCompletionKeywordKind getKeywordKind() const {
-    assert(getKind() == ResultKind::Keyword);
+    assert(getKind() == CodeCompletionResultKind::Keyword);
     return static_cast<CodeCompletionKeywordKind>(AssociatedKind);
   }
 
   bool isOperator() const {
-    if (getKind() != ResultKind::Declaration)
-      return getKind() == ResultKind::BuiltinOperator;
+    if (getKind() != CodeCompletionResultKind::Declaration)
+      return getKind() == CodeCompletionResultKind::BuiltinOperator;
     switch (getAssociatedDeclKind()) {
     case CodeCompletionDeclKind::PrefixOperatorFunction:
     case CodeCompletionDeclKind::PostfixOperatorFunction:

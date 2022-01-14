@@ -1069,7 +1069,7 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
   unsigned NumResults = 0;
   for (auto Result : Results) {
     if (!IncludeKeywords &&
-        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
+        Result->getKind() == CodeCompletionResultKind::Keyword)
       continue;
     ++NumResults;
   }
@@ -1079,7 +1079,7 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
   OS << "Begin completions, " << NumResults << " items\n";
   for (auto Result : Results) {
     if (!IncludeKeywords &&
-        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
+        Result->getKind() == CodeCompletionResultKind::Keyword)
       continue;
     Result->printPrefix(OS);
     if (PrintAnnotatedDescription) {
