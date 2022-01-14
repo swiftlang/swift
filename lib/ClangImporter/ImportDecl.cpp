@@ -250,6 +250,29 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     }
 #include "MappedTypes.def"
 
+    if (Name.str() == "CGFloat") {
+      SwiftModuleName = StringRef("CoreGraphics");
+ 
+      ModuleDecl *M = Impl.getNamedModule(StringRef("CoreFoundation"));
+      if (M) {
+        Type SwiftType = Impl.getNamedSwiftType(M, "CGFloat");
+        if (SwiftType) {
+          SwiftModuleName = StringRef("CoreFoundation");
+        }
+      }
+ 
+      CTypeKind = MappedCTypeKind::CGFloat;
+      Bitwidth = 0;
+      IsSwiftModule = false;
+      SwiftTypeName = "CGFloat";
+      CanBeMissing = false;
+      NameMapping = MappedTypeNameKind::DoNothing;
+      assert(verifyNameMapping(MappedTypeNameKind::DoNothing,
+                              "CGFloat", "CGFloat") &&
+            "MappedTypes.def: Identical names must use DoNothing");
+      break;
+    }
+
     // We handle `BOOL` as a special case because the selection here is more
     // complicated as the type alias exists on multiple platforms as different
     // types.  It appears in an Objective-C context where it is a `signed char`
