@@ -760,6 +760,15 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const;
 
+  /// Determines whether this module should be recursed into when calling
+  /// \c getDisplayDecls.
+  ///
+  /// Some modules should not call \c getDisplayDecls, due to assertions
+  /// in their implementation. These are usually implicit imports that would be
+  /// recursed into for parsed modules. This function provides a guard against
+  /// recusing into modules that should not have decls collected.
+  bool shouldCollectDisplayDecls() const;
+
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.
   ///
