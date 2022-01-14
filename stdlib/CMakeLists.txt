@@ -9,47 +9,10 @@ project(swift-stdlib LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
-  # All Darwin platforms have ABI stability.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OPENBSD")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
-  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
-  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
-else()
-  # Any new platform should have non-stable ABI to start with.
-  set(SWIFT_STDLIB_STABLE_ABI_default FALSE)
-endif()
-
 if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_INCLUDE_TESTS)
   set(SWIFT_BUILD_TEST_SUPPORT_MODULES_default TRUE)
 else()
   set(SWIFT_BUILD_TEST_SUPPORT_MODULES_default FALSE)
-endif()
-
-if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
-  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
-else()
-  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default FALSE)
 endif()
 
 #
@@ -64,25 +27,9 @@ endif()
 
 # TODO: migrate this section to StdlibOptions.cmake to reduce duplication
 
-option(SWIFT_STDLIB_STABLE_ABI
-       "Should stdlib be built with stable ABI (library evolution, resilience)."
-       "${SWIFT_STDLIB_STABLE_ABI_default}")
-
-option(SWIFT_ENABLE_MODULE_INTERFACES
-       "Generate .swiftinterface files alongside .swiftmodule files"
-       "${SWIFT_STDLIB_STABLE_ABI}")
-
 option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
-
-option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
-       "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on Linux."
-       "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
-       
-option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
-       "Should stdlib be built with full unicode support"
-       TRUE)
 
 # New options should be added to stdlib/cmake/modules/StdlibOptions.cmake,
 # so that they are considered in configurations using StandaloneOverlay.cmake
