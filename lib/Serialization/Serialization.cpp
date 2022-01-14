@@ -4471,8 +4471,11 @@ public:
 
   void visitOpenedArchetypeType(const OpenedArchetypeType *archetypeTy) {
     using namespace decls_block;
-    serializeSimpleWrapper<OpenedArchetypeTypeLayout>(
-        archetypeTy->getOpenedExistentialType());
+    auto existentialTypeID = S.addTypeRef(archetypeTy->getExistentialType());
+    auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
+    unsigned abbrCode = S.DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
+    OpenedArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          existentialTypeID, interfaceTypeID);
   }
 
   void

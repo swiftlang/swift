@@ -3261,19 +3261,24 @@ PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
 {
 }
 
-OpenedArchetypeType::OpenedArchetypeType(const ASTContext &Ctx,
-                                         Type Existential,
-                                         ArrayRef<ProtocolDecl *> ConformsTo,
-                                         Type Superclass,
-                                         LayoutConstraint Layout, UUID uuid)
-  : ArchetypeType(TypeKind::OpenedArchetype, Ctx,
+OpenedArchetypeType::OpenedArchetypeType(
+    GenericEnvironment *environment, Type interfaceType,
+    ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+    LayoutConstraint layout)
+  : ArchetypeType(TypeKind::OpenedArchetype, interfaceType->getASTContext(),
                   RecursiveTypeProperties::HasArchetype
                     | RecursiveTypeProperties::HasOpenedExistential,
-                  Type(), ConformsTo, Superclass, Layout,
-                  /*Environment=*/nullptr),
-    Opened(Existential.getPointer()),
-    ID(uuid)
+                  interfaceType, conformsTo, superclass, layout,
+                  environment)
 {
+}
+
+UUID OpenedArchetypeType::getOpenedExistentialID() const {
+  return getGenericEnvironment()->getOpenedExistentialUUID();
+}
+
+Type OpenedArchetypeType::getOpenedExistentialType() const {
+  return getGenericEnvironment()->getOpenedExistentialType();
 }
 
 NestedArchetypeType::NestedArchetypeType(const ASTContext &Ctx,

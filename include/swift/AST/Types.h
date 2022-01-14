@@ -5566,7 +5566,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpaqueTypeArchetype;
   }
-  
+
 private:
   OpaqueTypeArchetypeType(GenericEnvironment *environment,
                           RecursiveTypeProperties properties,
@@ -5630,21 +5630,49 @@ class OpenedArchetypeType final : public ArchetypeType,
 {
   friend TrailingObjects;
   friend ArchetypeType;
-  
+  friend GenericEnvironment;
+
   TypeBase *Opened;
   UUID ID;
 
+  /// Create a new opened archetype in the given environment representing
+  /// the interface type.
+  ///
+  /// This is only invoked by the generic environment when mapping the
+  /// interface type into context.
+  static CanTypeWrapper<OpenedArchetypeType>
+  getNew(GenericEnvironment *environment, Type interfaceType,
+         ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+         LayoutConstraint layout);
+
 public:
-  /// Create a new archetype that represents the opened type
+  /// Get or create an archetype that represents the opened type
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
   ///
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType>
-                        get(Type existential,
-                            Optional<UUID> knownID = None);
+  static CanTypeWrapper<OpenedArchetypeType> get(
+      Type existential, Optional<UUID> knownID = None);
+
+  /// Get or create an archetype that represents the opened type
+  /// of an existential value.
+  ///
+  /// \param existential The existential type to open.
+  /// \param interfaceType The interface type represented by this archetype.
+  ///
+  /// \param knownID When non-empty, the known ID of the archetype. When empty,
+  /// a fresh archetype with a unique ID will be opened.
+  static CanTypeWrapper<OpenedArchetypeType> get(
+      Type existential, Type interfaceType, Optional<UUID> knownID = None);
+
+  /// Create a new archetype that represents the opened type
+  /// of an existential value.
+  ///
+  /// \param existential The existential type or existential metatype to open.
+  /// \param interfaceType The interface type represented by this archetype.
+  static CanType getAny(Type existential, Type interfaceType);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
@@ -5653,22 +5681,19 @@ public:
   static CanType getAny(Type existential);
 
   /// Retrieve the ID number of this opened existential.
-  UUID getOpenedExistentialID() const { return ID; }
+  UUID getOpenedExistentialID() const;
   
   /// Retrieve the opened existential type
-  Type getOpenedExistentialType() const {
-    return Opened;
-  }
+  Type getOpenedExistentialType() const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpenedArchetype;
   }
   
 private:
-  OpenedArchetypeType(const ASTContext &Ctx,
-                      Type Existential,
-                      ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
-                      LayoutConstraint Layout, UUID uuid);
+  OpenedArchetypeType(GenericEnvironment *environment, Type interfaceType,
+                      ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+                      LayoutConstraint layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)

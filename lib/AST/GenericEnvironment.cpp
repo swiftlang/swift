@@ -17,6 +17,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
 
@@ -42,6 +43,18 @@ size_t GenericEnvironment::numTrailingObjects(
     return 0;
 
   case Kind::Opaque:
+    return 1;
+  }
+}
+
+size_t GenericEnvironment::numTrailingObjects(
+    OverloadToken<OpenedGenericEnvironmentData>) const {
+  switch (getKind()) {
+  case Kind::Normal:
+  case Kind::Opaque:
+    return 0;
+
+  case Kind::OpenedExistential:
     return 1;
   }
 }
@@ -81,9 +94,31 @@ SubstitutionMap GenericEnvironment::getOpaqueSubstitutions() const {
   return *getTrailingObjects<SubstitutionMap>();
 }
 
-GenericEnvironment::GenericEnvironment(GenericSignature signature, Kind kind)
-  : SignatureAndKind(signature, kind)
+Type GenericEnvironment::getOpenedExistentialType() const {
+  assert(getKind() == Kind::OpenedExistential);
+  return getTrailingObjects<OpenedGenericEnvironmentData>()->existential;
+}
+
+UUID GenericEnvironment::getOpenedExistentialUUID() const {
+  assert(getKind() == Kind::OpenedExistential);
+  return getTrailingObjects<OpenedGenericEnvironmentData>()->uuid;
+}
+
+GenericEnvironment::GenericEnvironment(GenericSignature signature)
+  : SignatureAndKind(signature, Kind::Normal)
 {
+  // Clear out the memory that holds the context types.
+  std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
+                          Type());
+}
+
+GenericEnvironment::GenericEnvironment(
+    GenericSignature signature, Type existential, UUID uuid)
+  : SignatureAndKind(signature, Kind::OpenedExistential)
+{
+  new (getTrailingObjects<OpenedGenericEnvironmentData>())
+    OpenedGenericEnvironmentData{ existential, uuid };
+
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
                           Type());
@@ -305,20 +340,32 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     result = NestedArchetypeType::getNew(ctx, depMemTy,
                                          requirements.protos, superclass,
                                          requirements.layout, this);
-    getOrCreateNestedTypeStorage()[nestedDependentMemberType] = result;
   } else if (genericParam->isTypeSequence()) {
     result = SequenceArchetypeType::get(ctx, this, requirements.anchor,
                                         requirements.protos, superclass,
                                         requirements.layout);
-    addMapping(genericParam, result);
   } else {
     switch (getKind()) {
     case Kind::Normal:
-    case Kind::OpenedExistential:
       result = PrimaryArchetypeType::getNew(ctx, this, requirements.anchor,
                                             requirements.protos, superclass,
                                             requirements.layout);
       break;
+
+    case Kind::OpenedExistential: {
+      // FIXME: The existential layout's protocols might differ from the
+      // canonicalized set of protocols determined by the generic signature,
+      // so use the existential layout's version. We should align these at
+      // some point.
+      auto layout = getOpenedExistentialType()->getExistentialLayout();
+      SmallVector<ProtocolDecl *, 4> protos;
+      for (auto protoType : layout.getProtocols())
+        protos.push_back(protoType->getDecl());
+      result = OpenedArchetypeType::getNew(this, requirements.anchor,
+                                           protos, superclass,
+                                           requirements.layout);
+      break;
+    }
 
     case Kind::Opaque:
       result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
@@ -326,9 +373,12 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
                                                requirements.layout);
       break;
     }
-
-    addMapping(genericParam, result);
   }
+
+  if (genericParam)
+    addMapping(genericParam, result);
+  else
+    getOrCreateNestedTypeStorage()[nestedDependentMemberType] = result;
 
   return result;
 }

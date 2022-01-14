@@ -23,6 +23,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -50,6 +51,12 @@ public:
   Type operator()(SubstitutableType *type) const;
 };
 
+/// Extra data in a generic environment for an opened existentiak.
+struct OpenedGenericEnvironmentData {
+  Type existential;
+  UUID uuid;
+};
+
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
 ///
@@ -60,7 +67,8 @@ public:
 ///
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
     : private llvm::TrailingObjects<
-        GenericEnvironment, OpaqueTypeDecl *, SubstitutionMap, Type> {
+        GenericEnvironment, OpaqueTypeDecl *, SubstitutionMap,
+        OpenedGenericEnvironmentData, Type> {
 public:
   enum class Kind {
     /// A normal generic environment, determined only by its generic
@@ -85,6 +93,7 @@ private:
   size_t numTrailingObjects(OverloadToken<OpaqueTypeDecl *>) const;
   size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const;
   size_t numTrailingObjects(OverloadToken<Type>) const;
+  size_t numTrailingObjects(OverloadToken<OpenedGenericEnvironmentData>) const;
 
   /// Retrieve the array containing the context types associated with the
   /// generic parameters, stored in parallel with the generic parameters of the
@@ -99,7 +108,9 @@ private:
   /// Get the nested type storage, allocating it if required.
   NestedTypeStorage &getOrCreateNestedTypeStorage();
 
-  explicit GenericEnvironment(GenericSignature signature, Kind kind);
+  explicit GenericEnvironment(GenericSignature signature);
+  explicit GenericEnvironment(
+      GenericSignature signature, Type existential, UUID uuid);
   explicit GenericEnvironment(
       GenericSignature signature, OpaqueTypeDecl *opaque, SubstitutionMap subs);
 
@@ -122,6 +133,12 @@ public:
 
   TypeArrayView<GenericTypeParamType> getGenericParams() const;
 
+  /// Retrieve the existential type for an opened existential environment.
+  Type getOpenedExistentialType() const;
+
+  /// Retrieve the UUID for an opened existential environment.
+  UUID getOpenedExistentialUUID() const;
+
   /// Retrieve the opaque type declaration for a generic environment describing
   /// opaque types.
   OpaqueTypeDecl *getOpaqueTypeDecl() const;
@@ -136,8 +153,7 @@ public:
   GenericEnvironment *getIncomplete(GenericSignature signature);
 
   /// Create a new generic environment for an opened existential.
-  static GenericEnvironment *forOpenedExistential(
-      GenericSignature signature, const OpenedArchetypeType *type);
+  static GenericEnvironment *forOpenedExistential(Type existential, UUID uuid);
 
   /// Create a new generic environment for an opaque type with the given set of
   /// outer substitutions.

@@ -5505,11 +5505,14 @@ public:
   Expected<Type> deserializeOpenedArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     TypeID existentialID;
+    TypeID interfaceID;
 
     decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
-                                                       existentialID);
+                                                       existentialID,
+                                                       interfaceID);
 
-    return OpenedArchetypeType::get(MF.getType(existentialID));
+    return OpenedArchetypeType::get(MF.getType(existentialID),
+                                    MF.getType(interfaceID));
   }
       
   Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,
