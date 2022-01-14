@@ -74,16 +74,15 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
-  /// Enable experimental support for emitting defined borrow scopes.
-  LexicalLifetimesOption LexicalLifetimes =
-      LexicalLifetimesOption::DiagnosticMarkersOnly;
+  /// Both emit lexical markers and use them to extend object lifetime to the
+  /// observable end of lexical scope.
+  LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::On;
 
   /// Whether to run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
   ///
-  /// When this is 'RequestedPassesOnly' the pipeline has default behavior.
-  CopyPropagationOption CopyPropagation =
-      CopyPropagationOption::RequestedPassesOnly;
+  /// When this is 'On' the pipeline has default behavior.
+  CopyPropagationOption CopyPropagation = CopyPropagationOption::On;
 
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
