@@ -89,7 +89,10 @@ class CodeCompletionResultBuilder {
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::ExpectedTypeRelation::Unknown;
   bool Cancelled = false;
-  NotRecommendedReason NotRecReason = NotRecommendedReason::None;
+  ContextFreeNotRecommendedReason ContextFreeNotRecReason =
+      ContextFreeNotRecommendedReason::None;
+  ContextualNotRecommendedReason ContextualNotRecReason =
+      ContextualNotRecommendedReason::None;
   StringRef BriefDocComment;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
@@ -145,10 +148,11 @@ public:
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
-  void setNotRecommended(NotRecommendedReason Reason) { NotRecReason = Reason; }
-
-  void setSemanticContext(SemanticContextKind Kind) {
-    SemanticContext = Kind;
+  void setContextFreeNotRecommended(ContextFreeNotRecommendedReason Reason) {
+    ContextFreeNotRecReason = Reason;
+  }
+  void setContextualNotRecommended(ContextualNotRecommendedReason Reason) {
+    ContextualNotRecReason = Reason;
   }
 
   void addFlair(CodeCompletionFlair Options) {
