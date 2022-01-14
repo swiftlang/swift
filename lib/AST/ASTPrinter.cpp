@@ -4343,6 +4343,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
         return isSimpleUnderPrintOptions(opaque->getExistentialType());
       }
       llvm_unreachable("bad opaque-return-type printing mode");
+    } else if (auto existential = dyn_cast<ExistentialType>(T.getPointer())) {
+      if (!Options.PrintExplicitAny)
+        return isSimpleUnderPrintOptions(existential->getConstraintType());
     }
     return T->hasSimpleTypeRepr();
   }
@@ -4744,9 +4747,7 @@ public:
       }
     }
 
-    auto &ctx = T->getASTContext();
-    if (T->is<ExistentialMetatypeType>() &&
-        ctx.LangOpts.EnableExplicitExistentialTypes)
+    if (T->is<ExistentialMetatypeType>() && Options.PrintExplicitAny)
       Printer << "any ";
 
     printWithParensIfNotSimple(T->getInstanceType());
@@ -4754,7 +4755,7 @@ public:
     // We spell normal metatypes of existential types as .Protocol.
     if (isa<MetatypeType>(T) &&
         T->getInstanceType()->isAnyExistentialType() &&
-        !ctx.LangOpts.EnableExplicitExistentialTypes) {
+        !Options.PrintExplicitAny) {
       Printer << ".Protocol";
     } else {
       Printer << ".Type";
@@ -5341,7 +5342,9 @@ public:
   }
 
   void visitExistentialType(ExistentialType *T) {
-    Printer << "any ";
+    if (Options.PrintExplicitAny)
+      Printer << "any ";
+
     visit(T->getConstraintType());
   }
 

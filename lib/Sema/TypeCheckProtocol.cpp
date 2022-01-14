@@ -4762,6 +4762,19 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     auto memberType = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
                                                            typeDecl, Adoptee);
 
+    // Type witnesses that resolve to constraint types are always
+    // existential types. This can only happen when the type witness
+    // is explicitly written with a type alias. The type alias itself
+    // is still a constraint type because it can be used as both a
+    // type witness and as a generic constraint.
+    //
+    // With SE-0335, using a type alias as both a type witness and a generic
+    // constraint will be disallowed in Swift 6, because existential types
+    // must be explicit, and a generic constraint isn't a valid type witness.
+    if (memberType->isConstraintType()) {
+      memberType = ExistentialType::get(memberType);
+    }
+
     if (!viableTypes.insert(memberType->getCanonicalType()).second)
       continue;
 
@@ -5232,8 +5245,11 @@ void swift::diagnoseConformanceFailure(Type T,
       TypeChecker::containsProtocol(T, Proto, DC->getParentModule())) {
 
     if (!T->isObjCExistentialType()) {
+      Type constraintType = T;
+      if (auto existential = T->getAs<ExistentialType>())
+        constraintType = existential->getConstraintType();
       diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
-                     T, T->isEqual(Proto->getDeclaredInterfaceType()), 
+                     T, constraintType->isEqual(Proto->getDeclaredInterfaceType()),
                      Proto->getDeclaredInterfaceType());
       diags.diagnose(ComplainLoc,
                      diag::only_concrete_types_conform_to_protocols);
@@ -5365,7 +5381,10 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
   if (T->isExistentialType()) {
     // Handle the special case of the Error protocol, which self-conforms
     // *and* has a witness table.
-    if (T->isEqual(Proto->getDeclaredInterfaceType()) &&
+    auto constraint = T;
+    if (auto existential = T->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
+    if (constraint->isEqual(Proto->getDeclaredInterfaceType()) &&
         Proto->requiresSelfConformanceWitnessTable()) {
       auto &ctx = M->getASTContext();
       return ProtocolConformanceRef(ctx.getSelfConformance(Proto));

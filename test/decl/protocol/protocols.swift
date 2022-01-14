@@ -119,7 +119,7 @@ struct Circle {
 func testCircular(_ circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
-  _ = circle as CircleStart // expected-error{{value of type 'Circle' does not conform to 'CircleStart' in coercion}}
+  _ = circle as any CircleStart // expected-error{{value of type 'Circle' does not conform to 'CircleStart' in coercion}}
 }
 
 // <rdar://problem/14750346>
@@ -439,18 +439,18 @@ func g<T : C2>(_ x : T) {
 
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}
 func h<T : C3>(_ x : T) {
-  _ = x as P1
+  _ = x as any P1
 }
 func i<T : C3>(_ x : T?) -> Bool {
-  return x is P1
+  return x is any P1
   // FIXME: Bogus diagnostic.  See SR-11920.
   // expected-warning@-2 {{checking a value with optional type 'T?' against dynamic type 'P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
 }
 func j(_ x : C1) -> Bool {
-  return x is P1
+  return x is P1 // expected-warning {{protocol 'P1' as a type must be explicitly marked as 'any'}}
 }
 func k(_ x : C1?) -> Bool {
-  return x is P1
+  return x is any P1
 }
 
 

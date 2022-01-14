@@ -70,8 +70,9 @@ TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
   return getTypeDeclForMangling(ctx, mangling);
 }
 
-Type ASTBuilder::decodeMangledType(NodePointer node) {
-  return swift::Demangle::decodeMangledType(*this, node).getType();
+Type ASTBuilder::decodeMangledType(NodePointer node, bool forRequirement) {
+  return swift::Demangle::decodeMangledType(*this, node, forRequirement)
+      .getType();
 }
 
 TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
@@ -583,18 +584,19 @@ Type ASTBuilder::createImplFunctionType(
 Type ASTBuilder::createProtocolCompositionType(
     ArrayRef<ProtocolDecl *> protocols,
     Type superclass,
-    bool isClassBound) {
+    bool isClassBound,
+    bool forRequirement) {
   std::vector<Type> members;
   for (auto protocol : protocols)
     members.push_back(protocol->getDeclaredInterfaceType());
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
+
   Type composition = ProtocolCompositionType::get(Ctx, members, isClassBound);
-  if (Ctx.LangOpts.EnableExplicitExistentialTypes &&
-      !(composition->isAny() || composition->isAnyObject())) {
-    composition = ExistentialType::get(composition);
-  }
-  return composition;
+  if (forRequirement)
+    return composition;
+
+  return ExistentialType::get(composition);
 }
 
 static MetatypeRepresentation

@@ -6128,6 +6128,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(SequenceArchetype)
   CASE(GenericTypeParam)
   CASE(ProtocolComposition)
+  CASE(Existential)
   CASE(DependentMember)
   CASE(BoundGeneric)
   CASE(SILBlockStorage)

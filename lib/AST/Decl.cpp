@@ -5153,7 +5153,10 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
     return SelfReferenceInfo::forSelfRef(SelfReferencePosition::Invariant);
 
   // Protocol compositions preserve variance.
-  if (auto *comp = type->getAs<ProtocolCompositionType>()) {
+  auto constraint = type;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+  if (auto *comp = constraint->getAs<ProtocolCompositionType>()) {
     // 'Self' may be referenced only in a superclass component.
     if (const auto superclass = comp->getSuperclass()) {
       return findProtocolSelfReferences(proto, superclass, position);

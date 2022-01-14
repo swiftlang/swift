@@ -6158,6 +6158,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // Local function to add a known protocol only when the
   // underlying type conforms to it.
   auto computedNominal = computedPropertyUnderlyingType->getAnyNominal();
+  if (auto existential =
+          computedPropertyUnderlyingType->getAs<ExistentialType>())
+    computedNominal = existential->getConstraintType()->getAnyNominal();
   auto transferKnown = [&](KnownProtocolKind kind) {
     if (!computedNominal)
       return false;

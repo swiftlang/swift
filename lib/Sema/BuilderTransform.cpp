@@ -914,14 +914,14 @@ protected:
 
   /// Visit a throw statement, which never produces a result.
   VarDecl *visitThrowStmt(ThrowStmt *throwStmt) {
-    Type exnType = ctx.getErrorDecl()->getDeclaredInterfaceType();
-    if (!exnType) {
+    if (!ctx.getErrorDecl()) {
       hadError = true;
     }
 
     if (cs) {
      SolutionApplicationTarget target(
-         throwStmt->getSubExpr(), dc, CTP_ThrowStmt, exnType,
+         throwStmt->getSubExpr(), dc, CTP_ThrowStmt,
+         ctx.getErrorExistentialType(),
          /*isDiscarded=*/false);
      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
        hadError = true;

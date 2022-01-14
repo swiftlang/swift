@@ -1899,6 +1899,14 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
     }
 
     if (isProtocol) {
+      // FIXME: Source compatibility hack for Swift 5. The compiler
+      // accepts member operators on protocols with existential
+      // type arguments. We should consider banning this in Swift 6.
+      if (auto existential = paramType->getAs<ExistentialType>()) {
+        if (selfNominal == existential->getConstraintType()->getAnyNominal())
+          return true;
+      }
+
       // For a protocol, is it the 'Self' type parameter?
       if (auto genericParam = paramType->getAs<GenericTypeParamType>())
         if (genericParam->isEqual(DC->getSelfInterfaceType()))

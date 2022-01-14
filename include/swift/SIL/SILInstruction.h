@@ -7056,7 +7056,7 @@ public:
     auto exType = getType().getASTType();
     auto concreteType = getOperand()->getType().getASTType();
     while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
-      exType = exMetatype.getInstanceType();
+      exType = exMetatype->getExistentialInstanceType()->getCanonicalType();
       concreteType = cast<MetatypeType>(concreteType).getInstanceType();
     }
     assert(exType.isExistentialType());
