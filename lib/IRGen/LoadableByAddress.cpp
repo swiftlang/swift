@@ -2064,16 +2064,16 @@ static void rewriteFunction(StructLoweringState &pass,
                         applySite.getArgumentOperands());
     }
 
+    while (!pass.modYieldInsts.empty()) {
+      YieldInst *inst = pass.modYieldInsts.pop_back_val();
+      allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
+    }
+
     repeat = !pass.switchEnumInstsToMod.empty() ||
              !pass.structExtractInstsToMod.empty();
     assert(pass.applies.empty());
     pass.applies.append(currentModApplies.begin(), currentModApplies.end());
   } while (repeat);
-
-  while (!pass.modYieldInsts.empty()) {
-    YieldInst *inst = pass.modYieldInsts.pop_back_val();
-    allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
-  }
 
   for (SILInstruction *instr : pass.instsToMod) {
     for (Operand &operand : instr->getAllOperands()) {
