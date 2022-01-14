@@ -4286,6 +4286,10 @@ bool NominalTypeDecl::isAnyActor() const {
   return isActor() || isDistributedActor();
 }
 
+bool NominalTypeDecl::isValueType() const {
+  return isa<StructDecl>(this) || isa<EnumDecl>(this);
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  ArrayRef<InheritedEntry> inherited,
@@ -6278,6 +6282,16 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
 
 bool VarDecl::isAsyncLet() const {
   return getAttrs().hasAttribute<AsyncAttr>();
+}
+
+bool VarDecl::isOrdinaryStoredProperty() const {
+  // we assume if it hasAttachedPropertyWrapper, it has no storage.
+  //
+  // also, we don't expect someone to call this on a local property, so for
+  // efficiency we don't check if it's not async-let. feel free to promote
+  // the assert into a full-fledged part of the condition if needed.
+  assert(!isAsyncLet());
+  return hasStorage() && !hasObservers();
 }
 
 void ParamDecl::setSpecifier(Specifier specifier) {

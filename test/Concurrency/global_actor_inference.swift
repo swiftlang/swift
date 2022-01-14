@@ -263,6 +263,22 @@ func barSync() {
 }
 
 // ----------------------------------------------------------------------
+// Property observers
+// ----------------------------------------------------------------------
+
+@OtherGlobalActor
+struct Observed {
+  var thing: Int = 0 { // expected-note {{property declared here}}
+    didSet {}
+    willSet {}
+  }
+}
+
+func checkObserved(_ o: Observed) { // expected-note {{add '@OtherGlobalActor' to make global function 'checkObserved' part of global actor 'OtherGlobalActor'}}
+  _ = o.thing // expected-error {{property 'thing' isolated to global actor 'OtherGlobalActor' can not be referenced from this synchronous context}}
+}
+
+// ----------------------------------------------------------------------
 // Property wrappers
 // ----------------------------------------------------------------------
 
@@ -318,13 +334,13 @@ actor WrapperActor<Wrapped: Sendable> {
 
 struct HasWrapperOnActor {
   @WrapperOnActor var synced: Int = 0
-  // expected-note@-1 3{{property declared here}}
+  // expected-note@-1 2{{property declared here}}
 
-  // expected-note@+1 3{{to make instance method 'testErrors()'}}
+  // expected-note@+1 2{{to make instance method 'testErrors()'}}
   func testErrors() {
     _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
     _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
-    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from this synchronous context}}
+    _ = _synced
   }
 
   @MainActor mutating func testOnMain() {
@@ -483,7 +499,7 @@ struct WrapperOnUnsafeActor<Wrapped> {
 
 struct HasWrapperOnUnsafeActor {
   @WrapperOnUnsafeActor var synced: Int = 0
-  // expected-note@-1 3{{property declared here}}
+  // expected-note@-1 2{{property declared here}}
 
   func testUnsafeOkay() {
     _ = synced
@@ -494,7 +510,7 @@ struct HasWrapperOnUnsafeActor {
   nonisolated func testErrors() {
     _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from}}
     _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from}}
-    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from}}
+    _ = _synced
   }
 
   @MainActor mutating func testOnMain() {

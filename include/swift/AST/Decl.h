@@ -3538,6 +3538,14 @@ public:
   /// Whether this nominal type qualifies as any actor (plain or distributed).
   bool isAnyActor() const;
 
+  /// Whether this nominal type corresponds to a language-level value type
+  /// (i.e., structs and enums), meaning that a shallow copy is created when
+  /// reassigning an instance member of the type. That is in contrast with
+  /// reference types like classes and actors, where such mutations are
+  /// reflected for all instance holders. A protocol is not considered a
+  /// value type, even though their conformers might be a value type.
+  bool isValueType() const;
+
   /// Return the range of semantics attributes attached to this NominalTypeDecl.
   auto getSemanticsAttrs() const
       -> decltype(getAttrs().getSemanticsAttrs()) {
@@ -5237,6 +5245,10 @@ public:
 
   /// Is this an "async let" property?
   bool isAsyncLet() const;
+
+  /// Is this a stored property that will _not_ trigger any user-defined code
+  /// upon any kind of access?
+  bool isOrdinaryStoredProperty() const;
 
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);

@@ -5605,28 +5605,38 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
     if (var->hasStorage()) {
-      auto nominal = dyn_cast<NominalTypeDecl>(dc);
-
-      // 'nonisolated' can not be applied to stored properties inside
-      // distributed actors. Attempts of nonisolated access would be
-      // cross-actor, and that means they might be accessing on a remote actor,
-      // in which case the stored property storage does not exist.
-      //
-      // The synthesized "id" and "actorSystem" are the only exceptions,
-      // because the implementation mirrors them.
-      if (nominal && nominal->isDistributedActor() &&
-          !(var->isImplicit() &&
-            (var->getName() == Ctx.Id_id ||
-             var->getName() == Ctx.Id_actorSystem))) {
-        diagnoseAndRemoveAttr(attr,
-                              diag::nonisolated_distributed_actor_storage);
-        return;
-      }
 
       // 'nonisolated' can not be applied to mutable stored properties.
       if (var->supportsMutation()) {
         diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
         return;
+      }
+
+      if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+        // 'nonisolated' can not be applied to stored properties inside
+        // distributed actors. Attempts of nonisolated access would be
+        // cross-actor, which means they might be accessing on a remote actor,
+        // in which case the stored property storage does not exist.
+        //
+        // The synthesized "id" and "actorSystem" are the only exceptions,
+        // because the implementation mirrors them.
+        if (nominal->isDistributedActor() &&
+            !(var->isImplicit() &&
+              (var->getName() == Ctx.Id_id ||
+               var->getName() == Ctx.Id_actorSystem))) {
+          diagnoseAndRemoveAttr(attr,
+                                diag::nonisolated_distributed_actor_storage);
+          return;
+        }
+
+        // 'nonisolated' is redundant for the stored properties of a value type.
+        if (nominal->isValueType() && !var->isStatic() &&
+            var->isOrdinaryStoredProperty()) {
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_storage_value_type,
+                                nominal->getDescriptiveKind())
+            .warnUntilSwiftVersion(6);
+          return;
+        }
       }
     }
 
