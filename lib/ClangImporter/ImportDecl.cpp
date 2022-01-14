@@ -251,13 +251,13 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
 #include "MappedTypes.def"
 
     if (Name.str() == "CGFloat") {
-      SwiftModuleName = StringRef("CoreGraphics");
+      SwiftModuleName = "CoreGraphics";
  
-      ModuleDecl *M = Impl.getNamedModule(StringRef("CoreFoundation"));
+      ModuleDecl *M = Impl.getNamedModule("CoreFoundation");
       if (M) {
         Type SwiftType = Impl.getNamedSwiftType(M, "CGFloat");
         if (SwiftType) {
-          SwiftModuleName = StringRef("CoreFoundation");
+          SwiftModuleName = "CoreFoundation";
         }
       }
  
