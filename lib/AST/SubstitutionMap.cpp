@@ -44,6 +44,12 @@ SubstitutionMap::Storage::Storage(
   : genericSig(genericSig),
     numConformanceRequirements(genericSig->getNumConformanceRequirements())
 {
+  if (replacementTypes.size() != getNumReplacementTypes()) {
+    fprintf(stderr, "[%s:%d] (%s) replacementTypes = %d\n", __FILE__, __LINE__,
+            __FUNCTION__, replacementTypes.size());
+    fprintf(stderr, "[%s:%d] (%s) getNumReplacementTypes = %d\n", __FILE__,
+            __LINE__, __FUNCTION__, getNumReplacementTypes());
+  }
   assert(replacementTypes.size() == getNumReplacementTypes());
   assert(conformances.size() == numConformanceRequirements);
 

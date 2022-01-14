@@ -88,7 +88,7 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
     print("resign address:\(id)")
   }
 
-  @inlinable func makeInvocationEncoder() throws -> InvocationEncoder {
+  @inlinable func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 }

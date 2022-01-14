@@ -273,9 +273,12 @@ struct ASTContext::Implementation {
   FuncDecl *ArrayReserveCapacityDecl = nullptr;
 
   /// func _stdlib_isOSVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word)
-  //    -> Builtin.Int1
+  ///    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
-  
+
+  /// func doneRecording() throws
+  FuncDecl *DoneRecordingDistributedInvocationEncoderDecl = nullptr;
+
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -1035,7 +1038,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     break;
   case KnownProtocolKind::DistributedActor:
   case KnownProtocolKind::DistributedActorSystem:
-  case KnownProtocolKind::ActorIdentity:
+  case KnownProtocolKind::DistributedTargetInvocationEncoder:
+  case KnownProtocolKind::DistributedTargetInvocationDecoder:
+  case KnownProtocolKind::DistributedTargetInvocationResultHandler:
     M = getLoadedModule(Id_Distributed);
     break;
   default:
@@ -1264,6 +1269,28 @@ FuncDecl *ASTContext::getLessThanIntDecl() const {
 }
 FuncDecl *ASTContext::getEqualIntDecl() const {
   return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
+}
+
+FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder() const {
+  if (getImpl().DoneRecordingDistributedInvocationEncoderDecl) {
+    return getImpl().DoneRecordingDistributedInvocationEncoderDecl;
+  }
+
+  auto mutableThis = const_cast<ASTContext *>(this);
+  auto module = mutableThis->getModuleByIdentifier(Id_Distributed);
+  if (!module)
+    return nullptr;
+
+  auto encoderProto =
+      getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  assert(encoderProto && "Missing DistributedTargetInvocationEncoder protocol");
+  for (auto result : encoderProto->lookupDirect(Id_doneRecording)) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+  }
+
+  return nullptr;
 }
 
 FuncDecl *ASTContext::getHashValueForDecl() const {

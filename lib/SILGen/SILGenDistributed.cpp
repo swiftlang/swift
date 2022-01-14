@@ -176,7 +176,8 @@ static void emitIdentityInit(SILGenFunction &SGF, ConstructorDecl *ctor,
 
   // --- emit the call itself.
   emitDistributedActorSystemWitnessCall(
-      B, loc, C.Id_assignID, actorSystem, SGF.getLoweredType(selfTy),
+      B, loc, C.Id_assignID,
+      actorSystem, SGF.getLoweredType(selfTy),
       { temp, selfMetatypeValue });
 
   // --- initialize the property.
@@ -262,7 +263,7 @@ static void createDistributedActorFactory_resolve(
   // // ---- actually call system.resolve(id: id, as: Self.self)
   emitDistributedActorSystemWitnessCall(
       B, loc, C.Id_resolve, actorSystemValue, SGF.getLoweredType(selfTy),
-      {idValue, selfMetatypeValue },
+      { idValue, selfMetatypeValue },
       std::make_pair(normalBB, errorBB));
 }
 
@@ -481,7 +482,7 @@ void SILGenFunction::emitDistributedActorSystemMakeInvocationCall(
 
   // Perform the call.
   emitDistributedActorSystemWitnessCall(
-      B, loc, ctx.Id_makeInvocation,
+      B, loc, ctx.Id_makeInvocationEncoder,
       systemRef,
       SILType(),
       {},
@@ -570,14 +571,15 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   Scope scope(Cleanups, CleanupLocation(loc));
 
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  auto OLDSYNTHESIS = true; // FIXME(distributed): remove when ready !!!!!!!!!!!!
+//  auto OLDSYNTHESIS = true; // FIXME(distributed): remove when ready !!!!!!!!!!!!
+  auto OLDSYNTHESIS = false; // FIXME(distributed): remove when ready !!!!!!!!!!!!
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   auto isRemoteBB = createBasicBlock();
   auto isLocalBB = createBasicBlock();
   auto localErrorBB = createBasicBlock();
-  auto makeInvocationNormalBB = OLDSYNTHESIS ? nullptr : createBasicBlock();
-  auto makeInvocationErrorBB = OLDSYNTHESIS ? nullptr : createBasicBlock();
+//  auto makeInvocationNormalBB = OLDSYNTHESIS ? nullptr : createBasicBlock();
+//  auto makeInvocationErrorBB = OLDSYNTHESIS ? nullptr : createBasicBlock();
   auto remoteErrorBB = createBasicBlock();
   auto localReturnBB = createBasicBlock();
   auto remoteReturnBB = createBasicBlock();
@@ -634,6 +636,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   // }
   {
     B.emitBlock(isRemoteBB);
+    fprintf(stderr, "[%s:%d] (%s) remoteBB\n", __FILE__, __LINE__, __FUNCTION__);
 
     auto *selfTyDecl = FunctionDC->getParent()->getSelfNominalTypeDecl();
     assert(selfTyDecl &&
@@ -664,41 +667,69 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto remoteCallFnRef = SILDeclRef(remoteCallFnDecl);
       assert(remoteCallFnDecl && "no remoteCall func found!");
 
-      ProtocolDecl *invocationProto =
-          ctx.getProtocol(KnownProtocolKind::DistributedTargetInvocation);
-
       // === get the actorSystem property
       auto systemRef = emitActorPropertyReference(
           *this, loc, selfValue.getValue(),
           lookupProperty(selfTyDecl, ctx.Id_actorSystem));
-      auto invocationType = fnConv.getSILResultType(getTypeExpansionContext());
 
-//      auto makeInvocationFnDecl =
-//          selfTyDecl->getDistributedActorSystemMakeInvocationFunction();
-//      auto makeInvocationFnRef = SILDeclRef(makeInvocationFnDecl);
-//      assert(makeInvocationFnDecl && "no remoteCall func found!");
+      auto makeInvocationFnDecl =
+          selfTyDecl->getDistributedActorSystemMakeInvocationFunction();
+      auto makeInvocationFnRef = SILDeclRef(makeInvocationFnDecl);
+      assert(makeInvocationFnDecl && "no remoteCall func found!");
+
+      ProtocolDecl *invocationEncoderProto =
+          ctx.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+
+      auto makeInvocationMethodTy = SGM.Types.getConstantOverrideType(getTypeExpansionContext(),
+                                                        makeInvocationFnRef);
+      auto makeInvocationDerivativeFnSILTy = SILType::getPrimitiveObjectType(makeInvocationMethodTy);
+      auto makeInvocationSilFnType = makeInvocationDerivativeFnSILTy.castTo<SILFunctionType>();
+
+      fprintf(stderr, "[%s:%d] (%s) SIL fn type, result:\n", __FILE__, __LINE__, __FUNCTION__);
+      makeInvocationSilFnType->getResults().begin()->dump();
+      auto invocationEncoderResultInfo =
+          makeInvocationSilFnType->getResults().begin();
+      auto invocationEncoderCanTy = invocationEncoderResultInfo->getInterfaceType();
+      auto invocationEncoderTy = getLoweredType(invocationEncoderCanTy);
 
       SILGenFunctionBuilder builder(SGM);
 
       // === -------------------------------------------------------------------
-      // var invocation = try actorSystem.makeInvocation()
-      // invocation is passed to the normalBB that follows this invocation
+      // var encoder = actorSystem.makeInvocationEncoder()
+      auto makeInvocationFnSIL =
+          builder.getOrCreateFunction(loc, makeInvocationFnRef, ForDefinition);
+      SILValue makeInvocationFn = B.createFunctionRefFor(loc, makeInvocationFnSIL);
+
+      ApplyInst *invocationValue;
+      SILValue encoderTemp = emitTemporaryAllocation(loc, invocationEncoderTy);
       {
-        emitDistributedActorSystemWitnessCall(
-              B, loc, ctx.Id_makeInvocation,
-              systemRef, getLoweredType(selfTy),
-              /*args=*/ {},
-              std::make_pair(makeInvocationNormalBB, makeInvocationErrorBB));
-//        auto makeInvocationFnSIL =
-//            builder.getOrCreateFunction(loc, makeInvocationFnRef, ForDefinition);
-//        SILValue makeInvocationFn = B.createFunctionRefFor(loc, makeInvocationFnSIL);
-//
-//        invocationValue = B.createTryApply(
-//            loc, makeInvocationFn,
-//            /*subs=*/F.getForwardingSubstitutionMap(),
-//            /*args=*/{systemRef},
-//            /*normalBB=*/makeInvocationNormalBB,
-//            /*errorBB=*/makeInvocationErrorBB);
+//        emitDistributedActorSystemWitnessCall(
+//              B, loc, ctx.Id_makeInvocationEncoder,
+//              /*base=*/systemRef,
+//              /*actorTypeSub=*/SILType(),
+//              /*args=*/ { });
+
+        invocationValue = B.createApply(
+            loc, makeInvocationFn,
+            /*subs=*/F.getForwardingSubstitutionMap(),
+            /*args=*/{systemRef});
+
+        B.createStore(loc, invocationValue, encoderTemp,
+                      StoreOwnershipQualifier::Trivial);
+
+        auto invocationAccess =
+            B.createBeginAccess(loc, encoderTemp,
+                                SILAccessKind::Modify,
+                                SILAccessEnforcement::Static,
+                                false,
+                                false);
+
+        fprintf(stderr, "[%s:%d] (%s) invocation Value: \n", __FILE__, __LINE__, __FUNCTION__);
+        invocationValue->dump();
+
+        fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+        F.dump();
+        fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
       }
 
       // We need to maintain a "next normal basic block" pointer because
@@ -714,41 +745,38 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // - recordErrorType // TODO(distributed): implement
       // - recordReturnType // TODO(distributed): implement
       {
-        B.emitBlock(makeInvocationNormalBB);
-        SILValue invocationValue = remoteReturnBB->createPhiArgument(
-            resultType, OwnershipKind::Owned);
-
         // === recordGenericSubstitution
         {
           // TODO(distributed): record substitutions
         }
 
-        // === recordArgument(s)
+        // === encoder.recordArgument(s)
         {
-          auto recordArgumentFnDecl =
-              selfTyDecl->getDistributedActorInvocationRecordArgumentFunction();
-          auto recordArgumentFnRef = SILDeclRef(recordArgumentFnDecl);
-          assert(remoteCallFnDecl && "no recordArgument func found!");
-
-          auto recordArgumentFnSIL =
-              builder.getOrCreateFunction(loc, recordArgumentFnRef, ForDefinition);
-          SILValue recordArgumentFn = B.createFunctionRefFor(loc, recordArgumentFnSIL);
-
-          for (const auto &param : params) {
-            if (nextNormalBB)
-              B.emitBlock(nextNormalBB);
-
-            auto recordArgumentNormalBB = createBasicBlock();
-            auto recordArgumentErrorBB = createBasicBlock();
-            nextNormalBB = recordArgumentNormalBB;
-
-            emitDistributedWitnessCall(
-                B, loc, ctx.Id_recordArgument,
-                invocationValue, invocationProto, getLoweredType(selfTy),
-                /*args=*/{},
-                std::make_pair(nextNormalBB, recordArgumentErrorBB)
-                );
-          }
+//          auto recordArgumentFnDecl =
+//              selfTyDecl->getDistributedActorInvocationRecordArgumentFunction();
+//          auto recordArgumentFnRef = SILDeclRef(recordArgumentFnDecl);
+//          assert(remoteCallFnDecl && "no recordArgument func found!");
+//
+//          auto recordArgumentFnSIL =
+//              builder.getOrCreateFunction(loc, recordArgumentFnRef, ForDefinition);
+//          SILValue recordArgumentFn = B.createFunctionRefFor(loc, recordArgumentFnSIL);
+//
+//          for (const auto &param : params) {
+//            if (nextNormalBB)
+//              B.emitBlock(nextNormalBB);
+//
+//            auto recordArgumentNormalBB = createBasicBlock();
+//            auto recordArgumentErrorBB = createBasicBlock();
+//            nextNormalBB = recordArgumentNormalBB;
+//
+//            emitDistributedWitnessCall(
+//                B, loc, ctx.Id_recordArgument,
+//                invocationValue,
+//                invocationEncoderProto, getLoweredType(selfTy),
+//                /*args=*/{},
+//                std::make_pair(nextNormalBB, recordArgumentErrorBB)
+//                );
+//          }
         }
 
         {
@@ -761,20 +789,41 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
 
         // === doneRecording
+        auto doneRecordingNormalBB = createBasicBlock();
+        auto doneRecordingErrorBB = createBasicBlock();
+        dynamicBasicErrorBlocks.push_back(doneRecordingErrorBB);
         {
-          if (nextNormalBB)
+          if (nextNormalBB) {
             B.emitBlock(nextNormalBB);
+          }
+
+//          auto doneRecordingFnDecl =
+//              selfTyDecl->getDistributedActorSystemMakeInvocationFunction();
+          auto doneRecordingFnDecl =
+              ctx.getDoneRecordingOnDistributedInvocationEncoder();
+          auto doneRecordingFnRef = SILDeclRef(doneRecordingFnDecl);
+          auto doneRecordingFnSIL =
+              builder.getOrCreateFunction(loc, doneRecordingFnRef, ForDefinition);
+          SILValue doneRecordingFn = B.createFunctionRefFor(loc, doneRecordingFnSIL);
+
+          B.createTryApply(
+              loc, doneRecordingFn,
+              /*subs=*/F.getForwardingSubstitutionMap(),
+              /*args=*/{}, // FIXME: pass invocation
+              /*normalBB=*/doneRecordingNormalBB,
+              /*errorBB*/doneRecordingErrorBB);
+
+          //          emitDistributedActorSystemWitnessCall(
+//              B, loc, ctx.Id_doneRecording,
+//              encoderTemp, /*actorTypeSubs*/SILType(),
+//              /*args=*/ { encoderTemp },
+//              std::make_pair(doneRecordingNormalBB, doneRecordingErrorBB));
+//          nextNormalBB = doneRecordingNormalBB;
+
+          fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+          F.dump();
+          fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
         }
-      }
-
-      // re-throw error from makeInvocation
-      {
-        B.emitBlock(makeInvocationErrorBB);
-        SILValue error = makeInvocationErrorBB->createPhiArgument(
-            fnConv.getSILErrorType(getTypeExpansionContext()),
-            OwnershipKind::Owned);
-
-        B.createBranch(loc, errorBB, {error});
       }
 
       // Emit all basic error blocks which handle errors thrown by invocation

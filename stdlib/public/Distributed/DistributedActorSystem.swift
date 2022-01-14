@@ -111,7 +111,7 @@ public protocol DistributedActorSystem: Sendable {
   /// arguments, generic substitutions, and specific error and return types
   /// that are associated with this specific invocation.
   @inlinable
-  func makeInvocationEncoder() throws -> InvocationEncoder
+  func makeInvocationEncoder() -> InvocationEncoder
 
   /// Invoked by the Swift runtime when making a remote call.
   ///
@@ -126,7 +126,7 @@ public protocol DistributedActorSystem: Sendable {
 //  func remoteCall<Act, Err, Res>(
 //      on actor: Act,
 //      target: RemoteCallTarget,
-//      invocation: inout InvocationDecoder,
+//      invocationDecoder: inout InvocationDecoder,
 //      throwing: Err.Type,
 //      returning: Res.Type
 //  ) async throws -> Res
@@ -369,6 +369,7 @@ public protocol DistributedTargetInvocationEncoder {
 //  ///
 //  /// Record an argument of `Argument` type in this arguments storage.
 //  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
+  // TODO: offer recordArgument(label:type:)
 
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 

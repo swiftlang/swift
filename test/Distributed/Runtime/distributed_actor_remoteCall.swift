@@ -12,6 +12,9 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
+// FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
+// UNSUPPORTED: linux
+
 import _Distributed
 
 final class Obj: @unchecked Sendable, Codable  {}
@@ -27,9 +30,6 @@ struct LargeStruct: Sendable, Codable {
 enum E : Sendable, Codable {
   case foo, bar
 }
-
-@_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
 
 distributed actor Greeter {
   distributed func empty() {
@@ -58,35 +58,6 @@ distributed actor Greeter {
 
   distributed func test(i: Int, s: String) -> String {
     return s
-  }
-
-  nonisolated func TESTTESTTESTTEST(i: Int, s: String) async throws -> String {
-    // bb0:
-    let remote = __isRemoteActor(self)
-
-    if remote {
-      // bb1:
-      var invocation = try self.actorSystem.makeInvocation()
-      try invocation.recordArgument/*<Int>*/(argument: i)
-      try invocation.recordArgument/*<String>*/(argument: s)
-      try invocation.recordReturnType/*<String>*/(String.self)
-      try invocation.recordErrorType/*<Error>*/(Error.self)
-      try invocation.doneRecording()
-
-      let target = RemoteCallTarget(_mangledName: "MANGLED_NAME")
-
-      return try await self.actorSystem.remoteCall(
-          on: self,
-          target: target,
-          invocation: invocation,
-          throwing: Never.self,
-          returning: String.self
-      )
-
-    } else {
-      // bb2:
-      return try await self.test(i: i, s: s)
-    }
   }
 
 }
@@ -137,8 +108,8 @@ struct FakeActorSystem: DistributedActorSystem {
     returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
-    Act.ID == ActorID,
-    Res: SerializationRequirement {
+          Act.ID == ActorID,
+          Res: SerializationRequirement {
     fatalError("INVOKED REMOTE CALL")
   }
 

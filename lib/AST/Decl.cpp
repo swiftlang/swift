@@ -7407,7 +7407,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall() const {
   auto returnedTypeParam = params->get(4);
   if (actorParam->getArgumentName() != C.Id_on ||
       targetParam->getArgumentName() != C.Id_target ||
-      invocationParam->getArgumentName() != C.Id_invocation ||
+      invocationParam->getArgumentName() != C.Id_invocationDecoder ||
       thrownTypeParam->getArgumentName() != C.Id_throwing ||
       returnedTypeParam->getArgumentName() != C.Id_returning)
     return false;
@@ -7459,13 +7459,15 @@ NominalTypeDecl::getDistributedActorSystemMakeInvocationFunction() const {
   }
 
   // FIXME(distributed): implement more properly...
-  for (auto value : system->lookupDirect(C.Id_makeInvocation)) {
+  for (auto value : system->lookupDirect(C.Id_makeInvocationEncoder)) {
     auto func = dyn_cast<AbstractFunctionDecl>(value);
     if (!func)
       continue;
 
     if (func->getParameters()->size() != 0)
-      return nullptr;
+      continue;
+
+    // TODO(distriuted): return type must conform to our expected protocol
 
     return func;
   }

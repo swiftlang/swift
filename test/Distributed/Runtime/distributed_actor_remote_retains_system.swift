@@ -66,7 +66,7 @@ final class FakeActorSystem: DistributedActorSystem {
     print("assignID id:\(id)")
   }
 
-  func makeInvocationEncoder() throws -> InvocationEncoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 }
