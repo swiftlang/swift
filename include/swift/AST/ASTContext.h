@@ -647,7 +647,12 @@ public:
   FuncDecl *getIsOSVersionAtLeastDecl() const;
 
   // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
-  FuncDecl *getDoneRecordingOnDistributedInvocationEncoder() const;
+  //
+  // \param nominal optionally provide a 'NominalTypeDecl' from which the
+  // function decl shall be extracted. This is useful to avoid witness calls
+  // through the protocol which is looked up when nominal is null.
+  FuncDecl *getDoneRecordingOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal = nullptr) const;
 
   /// Look for the declaration with the given name within the
   /// passed in module.

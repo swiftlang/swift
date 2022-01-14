@@ -672,7 +672,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           *this, loc, selfValue.getValue(),
           lookupProperty(selfTyDecl, ctx.Id_actorSystem));
 
-      auto makeInvocationFnDecl =
+      AbstractFunctionDecl *makeInvocationFnDecl =
           selfTyDecl->getDistributedActorSystemMakeInvocationFunction();
       auto makeInvocationFnRef = SILDeclRef(makeInvocationFnDecl);
       assert(makeInvocationFnDecl && "no remoteCall func found!");
@@ -799,12 +799,21 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
 //          auto doneRecordingFnDecl =
 //              selfTyDecl->getDistributedActorSystemMakeInvocationFunction();
-          auto doneRecordingFnDecl =
-              ctx.getDoneRecordingOnDistributedInvocationEncoder();
+
+          NominalTypeDecl *invocationEncoderNominal =
+              invocationEncoderTy.getNominalOrBoundGenericNominal();
+          assert(invocationEncoderNominal);
+          FuncDecl *doneRecordingFnDecl =
+              ctx.getDoneRecordingOnDistributedInvocationEncoder(
+                  invocationEncoderNominal);
+          assert(doneRecordingFnDecl);
           auto doneRecordingFnRef = SILDeclRef(doneRecordingFnDecl);
+          assert(doneRecordingFnDecl && "no remoteCall func found!");
+
           auto doneRecordingFnSIL =
               builder.getOrCreateFunction(loc, doneRecordingFnRef, ForDefinition);
           SILValue doneRecordingFn = B.createFunctionRefFor(loc, doneRecordingFnSIL);
+          doneRecordingFn->dump();
 
           B.createTryApply(
               loc, doneRecordingFn,

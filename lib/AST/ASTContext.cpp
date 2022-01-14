@@ -1271,23 +1271,33 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
 }
 
-FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder() const {
+FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) const {
   if (getImpl().DoneRecordingDistributedInvocationEncoderDecl) {
     return getImpl().DoneRecordingDistributedInvocationEncoderDecl;
   }
 
-  auto mutableThis = const_cast<ASTContext *>(this);
-  auto module = mutableThis->getModuleByIdentifier(Id_Distributed);
-  if (!module)
-    return nullptr;
+//  auto mutableThis = const_cast<ASTContext *>(this);
+//  auto module = mutableThis->getModuleByIdentifier(Id_Distributed);
+//  if (!module)
+//    return nullptr;
 
-  auto encoderProto =
+  NominalTypeDecl *encoderProto = nominal ?
+      nominal :
       getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
   assert(encoderProto && "Missing DistributedTargetInvocationEncoder protocol");
   for (auto result : encoderProto->lookupDirect(Id_doneRecording)) {
     auto *fd = dyn_cast<FuncDecl>(result);
     if (!fd)
       continue;
+
+    if (fd->getParameters()->size() != 0)
+      continue;
+
+    if (fd->getResultInterfaceType()->isVoid() &&
+        fd->hasThrows() &&
+        !fd->hasAsync())
+      return fd;
   }
 
   return nullptr;
