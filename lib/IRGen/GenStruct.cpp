@@ -81,12 +81,7 @@ static clang::CXXDestructorDecl *getCXXDestructor(SILType type) {
       dyn_cast<clang::CXXRecordDecl>(structDecl->getClangDecl());
   if (!cxxRecordDecl)
     return nullptr;
-  for (auto member : cxxRecordDecl->methods()) {
-    if (auto dest = dyn_cast<clang::CXXDestructorDecl>(member)) {
-      return dest;
-    }
-  }
-  return nullptr;
+  return cxxRecordDecl->getDestructor();
 }
 
 namespace {
