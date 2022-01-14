@@ -600,19 +600,19 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     Prefix.append("]");
   }
   switch (getExpectedTypeRelation()) {
-    case ExpectedTypeRelation::Invalid:
-      Prefix.append("/TypeRelation[Invalid]");
-      break;
-    case ExpectedTypeRelation::Identical:
-      Prefix.append("/TypeRelation[Identical]");
-      break;
-    case ExpectedTypeRelation::Convertible:
-      Prefix.append("/TypeRelation[Convertible]");
-      break;
-    case ExpectedTypeRelation::NotApplicable:
-    case ExpectedTypeRelation::Unknown:
-    case ExpectedTypeRelation::Unrelated:
-      break;
+  case CodeCompletionResultTypeRelation::Invalid:
+    Prefix.append("/TypeRelation[Invalid]");
+    break;
+  case CodeCompletionResultTypeRelation::Identical:
+    Prefix.append("/TypeRelation[Identical]");
+    break;
+  case CodeCompletionResultTypeRelation::Convertible:
+    Prefix.append("/TypeRelation[Convertible]");
+    break;
+  case CodeCompletionResultTypeRelation::NotApplicable:
+  case CodeCompletionResultTypeRelation::Unknown:
+  case CodeCompletionResultTypeRelation::Unrelated:
+    break;
   }
 
   Prefix.append(": ");
@@ -1141,18 +1141,18 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
   return ArrayRef<StringRef>();
 }
 
-static CodeCompletionResult::ExpectedTypeRelation
+static CodeCompletionResultTypeRelation
 calculateTypeRelation(Type Ty, Type ExpectedTy, const DeclContext *DC) {
   if (Ty.isNull() || ExpectedTy.isNull() ||
       Ty->is<ErrorType>() ||
       ExpectedTy->is<ErrorType>())
-    return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
+    return CodeCompletionResultTypeRelation::Unrelated;
 
   // Equality/Conversion of GenericTypeParameterType won't account for
   // requirements – ignore them
   if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter()) {
     if (Ty->isEqual(ExpectedTy))
-      return CodeCompletionResult::ExpectedTypeRelation::Identical;
+      return CodeCompletionResultTypeRelation::Identical;
     bool isAny = false;
     isAny |= ExpectedTy->isAny();
     isAny |= ExpectedTy->is<ArchetypeType>() &&
@@ -1160,25 +1160,25 @@ calculateTypeRelation(Type Ty, Type ExpectedTy, const DeclContext *DC) {
 
     if (!isAny && isConvertibleTo(Ty, ExpectedTy, /*openArchetypes=*/true,
                                   *const_cast<DeclContext *>(DC)))
-      return CodeCompletionResult::ExpectedTypeRelation::Convertible;
+      return CodeCompletionResultTypeRelation::Convertible;
   }
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
     if (FT->getResult()->isVoid())
-      return CodeCompletionResult::ExpectedTypeRelation::Invalid;
+      return CodeCompletionResultTypeRelation::Invalid;
   }
-  return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
+  return CodeCompletionResultTypeRelation::Unrelated;
 }
 
-static CodeCompletionResult::ExpectedTypeRelation
+static CodeCompletionResultTypeRelation
 calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
                          const DeclContext *DC) {
   if (typeContext.empty())
-    return CodeCompletionResult::ExpectedTypeRelation::Unknown;
+    return CodeCompletionResultTypeRelation::Unknown;
 
   if (auto funcTy = Ty->getAs<AnyFunctionType>())
     Ty = funcTy->removeArgumentLabels(1);
 
-  auto Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
+  auto Result = CodeCompletionResultTypeRelation::Unrelated;
   for (auto expectedTy : typeContext.possibleTypes) {
     // Do not use Void type context for a single-expression body, since the
     // implicit return does not constrain the expression.
@@ -1197,8 +1197,8 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
     // Map invalid -> unrelated when in a single-expression body, since the
     // input may be incomplete.
     if (typeContext.isImplicitSingleExpressionReturn &&
-        Result == CodeCompletionResult::ExpectedTypeRelation::Invalid)
-      Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
+        Result == CodeCompletionResultTypeRelation::Invalid)
+      Result = CodeCompletionResultTypeRelation::Unrelated;
   }
   return Result;
 }
@@ -2914,7 +2914,7 @@ public:
     Builder.addTypeAnnotation("Selector");
     // This function is called only if the context type is 'Selector'.
     Builder.setExpectedTypeRelation(
-        CodeCompletionResult::ExpectedTypeRelation::Identical);
+        CodeCompletionResultTypeRelation::Identical);
   }
 
   void addPoundKeyPath(bool needPound) {
@@ -2934,7 +2934,7 @@ public:
     Builder.addTypeAnnotation("String");
     // This function is called only if the context type is 'String'.
     Builder.setExpectedTypeRelation(
-        CodeCompletionResult::ExpectedTypeRelation::Identical);
+        CodeCompletionResultTypeRelation::Identical);
   }
 
   SemanticContextKind getSemanticContextKind(const ValueDecl *VD) {
@@ -3276,7 +3276,7 @@ public:
           expectedTypeContext.requiresNonVoid() &&
           ResultType->isVoid()) {
         Builder.setExpectedTypeRelation(
-            CodeCompletionResult::ExpectedTypeRelation::Invalid);
+            CodeCompletionResultTypeRelation::Invalid);
       }
     };
 
@@ -3655,7 +3655,7 @@ public:
       auto maxRel = calculateMaxTypeRelation(funcTy, expectedTypeContext,
                                              CurrDeclContext);
       useFunctionReference =
-          maxRel >= CodeCompletionResult::ExpectedTypeRelation::Convertible;
+          maxRel >= CodeCompletionResultTypeRelation::Convertible;
     }
     if (!useFunctionReference)
       return false;
@@ -4325,14 +4325,13 @@ public:
       if (!T)
         continue;
 
-      auto typeRelation = CodeCompletionResult::ExpectedTypeRelation::Identical;
+      auto typeRelation = CodeCompletionResultTypeRelation::Identical;
       // Convert through optional types unless we're looking for a protocol
       // that Optional itself conforms to.
       if (kind != CodeCompletionLiteralKind::NilLiteral) {
         if (auto optionalObjT = T->getOptionalObjectType()) {
           T = optionalObjT;
-          typeRelation =
-              CodeCompletionResult::ExpectedTypeRelation::Convertible;
+          typeRelation = CodeCompletionResultTypeRelation::Convertible;
         }
       }
 
@@ -4352,8 +4351,8 @@ public:
       builder.addTypeAnnotation(defaultTy, PrintOptions());
       builder.setExpectedTypeRelation(
           expectedTypeContext.possibleTypes.empty()
-              ? CodeCompletionResult::ExpectedTypeRelation::Unknown
-              : CodeCompletionResult::ExpectedTypeRelation::Unrelated);
+              ? CodeCompletionResultTypeRelation::Unknown
+              : CodeCompletionResultTypeRelation::Unrelated);
     }
   }
 
@@ -4511,7 +4510,7 @@ public:
         if (T && T->is<TupleType>() && !T->isVoid()) {
           addTypeAnnotation(builder, T);
           builder.setExpectedTypeRelation(
-              CodeCompletionResult::ExpectedTypeRelation::Identical);
+              CodeCompletionResultTypeRelation::Identical);
           break;
         }
       }
@@ -4736,7 +4735,7 @@ public:
       }
       addTypeAnnotation(Builder, Ty);
       Builder.setExpectedTypeRelation(
-          CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+          CodeCompletionResultTypeRelation::NotApplicable);
     }
   }
 
@@ -5342,7 +5341,7 @@ public:
                                         CodeCompletionResultKind::Declaration,
                                         SemanticContextKind::Super, {});
     Builder.setExpectedTypeRelation(
-        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+        CodeCompletionResultTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(FD);
     addValueOverride(FD, Reason, dynamicLookupInfo, Builder, hasFuncIntroducer);
     Builder.addBraceStmtWithCursor();
@@ -5371,7 +5370,7 @@ public:
                                         CodeCompletionResultKind::Declaration,
                                         SemanticContextKind::Super, {});
     Builder.setExpectedTypeRelation(
-        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+        CodeCompletionResultTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(SD);
     addValueOverride(SD, Reason, dynamicLookupInfo, Builder, false);
     Builder.addBraceStmtWithCursor();
@@ -5383,7 +5382,7 @@ public:
                                         CodeCompletionResultKind::Declaration,
                                         SemanticContextKind::Super, {});
     Builder.setExpectedTypeRelation(
-        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+        CodeCompletionResultTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(ATD);
     if (!hasTypealiasIntroducer && !hasAccessModifier)
       (void)addAccessControl(ATD, Builder);
@@ -5400,7 +5399,7 @@ public:
                                         CodeCompletionResultKind::Declaration,
                                         SemanticContextKind::Super, {});
     Builder.setExpectedTypeRelation(
-        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+        CodeCompletionResultTypeRelation::NotApplicable);
     Builder.setAssociatedDecl(CD);
 
     CodeCompletionStringPrinter printer(Builder);
@@ -5600,7 +5599,7 @@ public:
                                         SemanticContextKind::CurrentNominal,
                                         {});
     Builder.setExpectedTypeRelation(
-        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+        CodeCompletionResultTypeRelation::NotApplicable);
 
     if (!hasFuncIntroducer) {
       if (!hasAccessModifier &&
@@ -6034,12 +6033,12 @@ static bool isClangSubModule(ModuleDecl *TheModule) {
   return false;
 }
 
-static void
-addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
-           CodeCompletionKeywordKind Kind, StringRef TypeAnnotation = "",
-           CodeCompletionResult::ExpectedTypeRelation TypeRelation =
-               CodeCompletionResult::ExpectedTypeRelation::NotApplicable,
-           CodeCompletionFlair Flair = {}) {
+static void addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
+                       CodeCompletionKeywordKind Kind,
+                       StringRef TypeAnnotation = "",
+                       CodeCompletionResultTypeRelation TypeRelation =
+                           CodeCompletionResultTypeRelation::NotApplicable,
+                       CodeCompletionFlair Flair = {}) {
   CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Keyword,
                                       SemanticContextKind::None, {});
   Builder.setKeywordKind(Kind);
@@ -6178,10 +6177,9 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
         DeclAttribute::isDistributedOnly(*DAK))
       return;
 
-    addKeyword(
-        Sink, Name, Kind, /*TypeAnnotation=*/"",
-        /*TypeRelation=*/CodeCompletionResult::ExpectedTypeRelation::NotApplicable,
-        getFlair(Kind, DAK));
+    addKeyword(Sink, Name, Kind, /*TypeAnnotation=*/"",
+               /*TypeRelation=*/CodeCompletionResultTypeRelation::NotApplicable,
+               getFlair(Kind, DAK));
   };
 
 #define DECL_KEYWORD(kw)                                                       \
@@ -6213,8 +6211,7 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
     if (!MaybeFuncBody && Kind == CodeCompletionKeywordKind::kw_return)
       return;
     addKeyword(Sink, Name, Kind, "",
-               CodeCompletionResult::ExpectedTypeRelation::NotApplicable,
-               flair);
+               CodeCompletionResultTypeRelation::NotApplicable, flair);
   };
 #define STMT_KEYWORD(kw) AddStmtKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
 #include "swift/Syntax/TokenKinds.def"
@@ -6249,13 +6246,13 @@ static void addExprKeywords(CodeCompletionResultSink &Sink, DeclContext *DC) {
 
   // Expr keywords.
   addKeyword(Sink, "try", CodeCompletionKeywordKind::kw_try, "",
-             CodeCompletionResult::ExpectedTypeRelation::NotApplicable, flair);
+             CodeCompletionResultTypeRelation::NotApplicable, flair);
   addKeyword(Sink, "try!", CodeCompletionKeywordKind::kw_try, "",
-             CodeCompletionResult::ExpectedTypeRelation::NotApplicable, flair);
+             CodeCompletionResultTypeRelation::NotApplicable, flair);
   addKeyword(Sink, "try?", CodeCompletionKeywordKind::kw_try, "",
-             CodeCompletionResult::ExpectedTypeRelation::NotApplicable, flair);
+             CodeCompletionResultTypeRelation::NotApplicable, flair);
   addKeyword(Sink, "await", CodeCompletionKeywordKind::None, "",
-             CodeCompletionResult::ExpectedTypeRelation::NotApplicable, flair);
+             CodeCompletionResultTypeRelation::NotApplicable, flair);
 }
 
 static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
@@ -7512,8 +7509,7 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
     auto contextualResult = new (*targetSink.Allocator) CodeCompletionResult(
         *contextFreeResult, SemanticContextKind::OtherModule,
         CodeCompletionFlair(),
-        /*numBytesToErase=*/0,
-        CodeCompletionResult::ExpectedTypeRelation::Unknown,
+        /*numBytesToErase=*/0, CodeCompletionResultTypeRelation::Unknown,
         ContextualNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     targetSink.Results.push_back(contextualResult);

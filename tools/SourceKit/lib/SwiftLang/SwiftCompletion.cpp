@@ -165,7 +165,7 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
         case CodeCompletionLiteralKind::ColorLiteral:
           if (hasRequiredType &&
               Result->getExpectedTypeRelation() <
-                  CodeCompletionResult::ExpectedTypeRelation::Convertible)
+                  CodeCompletionResultTypeRelation::Convertible)
             continue;
           break;
         default:
@@ -526,17 +526,17 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   static UIdent CCTypeRelIdentical("source.codecompletion.typerelation.identical");
 
   switch (Result->getExpectedTypeRelation()) {
-  case CodeCompletionResult::ExpectedTypeRelation::NotApplicable:
+  case CodeCompletionResultTypeRelation::NotApplicable:
     Info.TypeRelation = CCTypeRelNotApplicable; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Unknown:
+  case CodeCompletionResultTypeRelation::Unknown:
     Info.TypeRelation = CCTypeRelUnknown; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Unrelated:
+  case CodeCompletionResultTypeRelation::Unrelated:
     Info.TypeRelation = CCTypeRelUnrelated; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Invalid:
+  case CodeCompletionResultTypeRelation::Invalid:
     Info.TypeRelation = CCTypeRelInvalid; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Convertible:
+  case CodeCompletionResultTypeRelation::Convertible:
     Info.TypeRelation = CCTypeRelConvertible; break;
-  case CodeCompletionResult::ExpectedTypeRelation::Identical:
+  case CodeCompletionResultTypeRelation::Identical:
     Info.TypeRelation = CCTypeRelIdentical; break;
   }
 
@@ -930,7 +930,7 @@ static void transformAndForwardResults(
         *contextFreeResult, SemanticContextKind::CurrentNominal,
         CodeCompletionFlairBit::ExpressionSpecific,
         exactMatch ? exactMatch->getNumBytesToErase() : 0,
-        CodeCompletionResult::ExpectedTypeRelation::NotApplicable,
+        CodeCompletionResultTypeRelation::NotApplicable,
         ContextualNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
 

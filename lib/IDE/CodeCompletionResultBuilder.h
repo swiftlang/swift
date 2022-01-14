@@ -86,8 +86,8 @@ class CodeCompletionResultBuilder {
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
   ExpectedTypeContext declTypeContext;
-  CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
-      CodeCompletionResult::ExpectedTypeRelation::Unknown;
+  CodeCompletionResultTypeRelation ExpectedTypeRelation =
+      CodeCompletionResultTypeRelation::Unknown;
   bool Cancelled = false;
   ContextFreeNotRecommendedReason ContextFreeNotRecReason =
       ContextFreeNotRecommendedReason::None;
@@ -159,8 +159,7 @@ public:
     Flair |= Options;
   }
 
-  void
-  setExpectedTypeRelation(CodeCompletionResult::ExpectedTypeRelation relation) {
+  void setExpectedTypeRelation(CodeCompletionResultTypeRelation relation) {
     ExpectedTypeRelation = relation;
   }
 
