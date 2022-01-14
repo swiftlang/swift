@@ -13,6 +13,7 @@
 #ifndef SWIFT_IDE_CODECOMPLETION_H
 #define SWIFT_IDE_CODECOMPLETION_H
 
+#include "CodeCompletionResultType.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -701,31 +702,6 @@ enum class CodeCompletionResultKind : uint8_t {
   MAX_VALUE = BuiltinOperator
 };
 
-/// Describes the relationship between the type of the completion results and
-/// the expected type at the code completion position.
-enum class CodeCompletionResultTypeRelation : uint8_t {
-  /// The result does not have a type (e.g. keyword).
-  NotApplicable,
-
-  /// The type relation have not been calculated.
-  Unknown,
-
-  /// The relationship of the result's type to the expected type is not
-  /// invalid, not convertible, and not identical.
-  Unrelated,
-
-  /// The result's type is invalid at the expected position.
-  Invalid,
-
-  /// The result's type is convertible to the type of the expected.
-  Convertible,
-
-  /// The result's type is identical to the type of the expected.
-  Identical,
-
-  MAX_VALUE = Identical
-};
-
 /// The parts of a \c CodeCompletionResult that are not dependent on the context
 /// it appears in and can thus be cached.
 class ContextFreeCodeCompletionResult {
@@ -749,6 +725,7 @@ class ContextFreeCodeCompletionResult {
   StringRef ModuleName;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
+  CodeCompletionResultType ResultType;
 
   ContextFreeNotRecommendedReason NotRecommended : 3;
   static_assert(int(ContextFreeNotRecommendedReason::MAX_VALUE) < 1 << 3, "");
@@ -772,13 +749,15 @@ public:
       CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem,
       CodeCompletionString *CompletionString, StringRef ModuleName,
       StringRef BriefDocComment, ArrayRef<StringRef> AssociatedUSRs,
+      CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       StringRef DiagnosticMessage)
       : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
+        ResultType(ResultType), NotRecommended(NotRecommended),
+        DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage) {
     this->AssociatedKind.Opaque = AssociatedKind;
     assert((NotRecommended == ContextFreeNotRecommendedReason::None) ==
@@ -805,13 +784,14 @@ public:
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, CodeCompletionString *CompletionString,
       CodeCompletionOperatorKind KnownOperatorKind, StringRef BriefDocComment,
+      CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       StringRef DiagnosticMessage)
       : ContextFreeCodeCompletionResult(
             Kind, /*AssociatedKind=*/0, KnownOperatorKind,
             /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
-            BriefDocComment, /*AssociatedUSRs=*/{}, NotRecommended,
+            BriefDocComment, /*AssociatedUSRs=*/{}, ResultType, NotRecommended,
             DiagnosticSeverity, DiagnosticMessage) {}
 
   /// Constructs a \c Keyword result.
@@ -821,12 +801,14 @@ public:
   /// same \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(CodeCompletionKeywordKind Kind,
                                   CodeCompletionString *CompletionString,
-                                  StringRef BriefDocComment)
+                                  StringRef BriefDocComment,
+                                  CodeCompletionResultType ResultType)
       : ContextFreeCodeCompletionResult(
             CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
             CodeCompletionOperatorKind::None, /*IsSystem=*/false,
             CompletionString, /*ModuleName=*/"", BriefDocComment,
-            /*AssociatedUSRs=*/{}, ContextFreeNotRecommendedReason::None,
+            /*AssociatedUSRs=*/{}, ResultType,
+            ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
 
   /// Constructs a \c Literal result.
@@ -835,13 +817,15 @@ public:
   /// result, typically by storing them in the same \c CodeCompletionResultSink
   /// as the result itself.
   ContextFreeCodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
-                                  CodeCompletionString *CompletionString)
+                                  CodeCompletionString *CompletionString,
+                                  CodeCompletionResultType ResultType)
       : ContextFreeCodeCompletionResult(
             CodeCompletionResultKind::Literal,
             static_cast<uint8_t>(LiteralKind), CodeCompletionOperatorKind::None,
             /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
             /*BriefDocComment=*/"",
-            /*AssociatedUSRs=*/{}, ContextFreeNotRecommendedReason::None,
+            /*AssociatedUSRs=*/{}, ResultType,
+            ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
 
   /// Constructs a \c Declaration result.
@@ -852,7 +836,7 @@ public:
   ContextFreeCodeCompletionResult(
       CodeCompletionString *CompletionString, const Decl *AssociatedDecl,
       StringRef ModuleName, StringRef BriefDocComment,
-      ArrayRef<StringRef> AssociatedUSRs,
+      ArrayRef<StringRef> AssociatedUSRs, CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       StringRef DiagnosticMessage)
@@ -861,7 +845,7 @@ public:
             static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
             CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
             CompletionString, ModuleName, BriefDocComment, AssociatedUSRs,
-            NotRecommended, DiagnosticSeverity, DiagnosticMessage) {
+            ResultType, NotRecommended, DiagnosticSeverity, DiagnosticMessage) {
     assert(AssociatedDecl && "should have a decl");
   }
 
@@ -898,6 +882,8 @@ public:
   StringRef getBriefDocComment() const { return BriefDocComment; }
 
   ArrayRef<StringRef> getAssociatedUSRs() const { return AssociatedUSRs; }
+
+  const CodeCompletionResultType &getResultType() const { return ResultType; }
 
   ContextFreeNotRecommendedReason getNotRecommendedReason() const {
     return NotRecommended;
@@ -962,9 +948,7 @@ private:
   CodeCompletionResultTypeRelation TypeDistance : 3;
   static_assert(int(CodeCompletionResultTypeRelation::MAX_VALUE) < 1 << 3, "");
 
-public:
-  /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
-  /// information.
+  /// Memberwise initializer
   /// The \c ContextFree result must outlive this result. Typically, this is
   /// done by allocating the two in the same sink or adopting the context free
   /// sink in the sink that allocates this result.
@@ -980,6 +964,23 @@ public:
         DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
         TypeDistance(TypeDistance) {}
+
+public:
+  /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
+  /// information.
+  /// This computes the type relation between the completion item and its
+  /// expected type context.
+  /// The \c ContextFree result must outlive this result. Typically, this is
+  /// done by allocating the two in the same sink or adopting the context free
+  /// sink in the sink that allocates this result.
+  CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
+                       SemanticContextKind SemanticContext,
+                       CodeCompletionFlair Flair, uint8_t NumBytesToErase,
+                       const ExpectedTypeContext *TypeContext,
+                       const DeclContext *DC,
+                       ContextualNotRecommendedReason NotRecommended,
+                       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+                       StringRef DiagnosticMessage);
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;
@@ -997,7 +998,16 @@ public:
   /// context free result outlives the result the result returned by this
   /// method.
   CodeCompletionResult *withFlair(CodeCompletionFlair newFlair,
-                                  CodeCompletionResultSink &Sink);
+                                  CodeCompletionResultSink &Sink) const;
+
+  /// Copy this result to \p Sink with \p newFlair . Note that this does NOT
+  /// copy the context free result. Thus the caller needs to ensure that the
+  /// context free result outlives the result the result returned by this
+  /// method.
+  CodeCompletionResult *withContextFreeResultSemanticContextAndFlair(
+      const ContextFreeCodeCompletionResult &NewContextFree,
+      SemanticContextKind NewSemanticContext, CodeCompletionFlair NewFlair,
+      CodeCompletionResultSink &Sink) const;
 
   CodeCompletionResultKind getKind() const {
     return getContextFreeResult().getKind();
