@@ -4489,15 +4489,6 @@ public:
                                           declID, interfaceTypeID, substMapID);
   }
 
-  void visitNestedArchetypeType(const NestedArchetypeType *archetypeTy) {
-    using namespace decls_block;
-    auto rootTypeID = S.addTypeRef(archetypeTy->getRoot());
-    auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
-    unsigned abbrCode = S.DeclTypeAbbrCodes[NestedArchetypeTypeLayout::Code];
-    NestedArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          rootTypeID, interfaceTypeID);
-  }
-
   void visitSequenceArchetypeType(const SequenceArchetypeType *archetypeTy) {
     using namespace decls_block;
     auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
@@ -4900,7 +4891,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpaqueArchetypeTypeLayout>();
-  registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
   registerDeclTypeAbbr<SequenceArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<ExistentialTypeLayout>();

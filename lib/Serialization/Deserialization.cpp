@@ -5540,17 +5540,6 @@ public:
         opaqueDecl, interfaceTypeOrError.get(), subsOrError.get());
   }
       
-  Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
-                                                StringRef blobData) {
-    TypeID rootID, interfaceTyID;
-    decls_block::NestedArchetypeTypeLayout::readRecord(scratch,
-                                                       rootID, interfaceTyID);
-    
-    auto rootTy = MF.getType(rootID)->castTo<ArchetypeType>();
-    auto interfaceTy = MF.getType(interfaceTyID)->castTo<DependentMemberType>();
-    return rootTy->getGenericEnvironment()->mapTypeIntoContext(interfaceTy);
-  }
-
   Expected<Type> deserializeSequenceArchetypeType(ArrayRef<uint64_t> scratch,
                                                   StringRef blobData) {
     GenericSignatureID sigID;
@@ -6122,7 +6111,6 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(PrimaryArchetype)
   CASE(OpaqueArchetype)
   CASE(OpenedArchetype)
-  CASE(NestedArchetype)
   CASE(SequenceArchetype)
   CASE(GenericTypeParam)
   CASE(ProtocolComposition)

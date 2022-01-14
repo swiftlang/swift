@@ -184,7 +184,6 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   // Archetypes and existentials are only class references if class-bounded.
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
     return cast<ArchetypeType>(type)->requiresClass();
@@ -3281,20 +3280,6 @@ Type OpenedArchetypeType::getOpenedExistentialType() const {
   return getGenericEnvironment()->getOpenedExistentialType();
 }
 
-NestedArchetypeType::NestedArchetypeType(const ASTContext &Ctx,
-                                       Type InterfaceType,
-                                       ArrayRef<ProtocolDecl *> ConformsTo,
-                                       Type Superclass,
-                                       LayoutConstraint Layout,
-                                       GenericEnvironment *Environment)
-  : ArchetypeType(TypeKind::NestedArchetype, Ctx,
-                  Environment->mapTypeIntoContext(
-                      InterfaceType->getRootGenericParam())
-                        ->getRecursiveProperties(),
-                  InterfaceType, ConformsTo, Superclass, Layout, Environment)
-{
-}
-
 OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
     GenericEnvironment *environment,
     RecursiveTypeProperties properties,
@@ -3601,28 +3586,6 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   return substRef;
 }
 
-CanNestedArchetypeType NestedArchetypeType::getNew(
-                                   const ASTContext &Ctx,
-                                   DependentMemberType *InterfaceType,
-                                   SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                                   Type Superclass,
-                                   LayoutConstraint Layout,
-                                   GenericEnvironment *Environment) {
-  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
-
-  // Gather the set of protocol declarations to which this archetype conforms.
-  ProtocolType::canonicalizeProtocols(ConformsTo);
-
-  auto arena = AllocationArena::Permanent;
-  void *mem = Ctx.Allocate(
-    NestedArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
-          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
-      alignof(NestedArchetypeType), arena);
-
-  return CanNestedArchetypeType(::new (mem) NestedArchetypeType(
-      Ctx, InterfaceType, ConformsTo, Superclass, Layout, Environment));
-}
-
 CanPrimaryArchetypeType
 PrimaryArchetypeType::getNew(const ASTContext &Ctx,
                       GenericEnvironment *GenericEnv,
@@ -3717,10 +3680,6 @@ Type ArchetypeType::getNestedTypeByName(Identifier name) {
   }
 
   return Type();
-}
-
-AssociatedTypeDecl *NestedArchetypeType::getAssocType() const {
-  return InterfaceType->castTo<DependentMemberType>()->getAssocType();
 }
 
 Identifier ArchetypeType::getName() const {
@@ -4929,22 +4888,6 @@ case TypeKind::Id:
                                         opaque->getInterfaceType(),
                                         newSubMap);
   }
-  case TypeKind::NestedArchetype: {
-    // Transform the root type of a nested opaque archetype.
-    auto nestedType = cast<NestedArchetypeType>(base);
-    auto root = dyn_cast<OpaqueTypeArchetypeType>(nestedType->getRoot());
-    if (!root)
-      return *this;
-    
-    auto substRoot = Type(root).transformRec(fn);
-    if (substRoot.getPointer() == root) {
-      return *this;
-    }
-    
-    // Substitute the new root into the root of the interface type.
-    return nestedType->getInterfaceType()->substRootParam(substRoot,
-        LookUpConformanceInModule(root->getDecl()->getModuleContext()));
-  }
 
   case TypeKind::ExistentialMetatype: {
     auto meta = cast<ExistentialMetatypeType>(base);
@@ -5568,7 +5511,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype: {
     auto archetype = cast<ArchetypeType>(type);

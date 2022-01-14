@@ -5698,44 +5698,6 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
 
-/// An archetype that is a nested associated type of another archetype.
-class NestedArchetypeType final : public ArchetypeType,
-    private ArchetypeTrailingObjects<NestedArchetypeType>
-{
-  friend TrailingObjects;
-  friend ArchetypeType;
-  
-public:
-  /// getNew - Create a new nested archetype with the given associated type.
-  ///
-  /// The ConformsTo array will be copied into the ASTContext by this routine.
-  static CanTypeWrapper<NestedArchetypeType>
-  getNew(const ASTContext &Ctx,
-         DependentMemberType *InterfaceType,
-         SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-         Type Superclass, LayoutConstraint Layout,
-         GenericEnvironment *Environment);
-
-  AssociatedTypeDecl *getAssocType() const;
-
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::NestedArchetype;
-  }
-  
-  DependentMemberType *getInterfaceType() const {
-    return cast<DependentMemberType>(InterfaceType.getPointer());
-  }
-
-private:
-  NestedArchetypeType(const ASTContext &Ctx,
-                     Type InterfaceType,
-                     ArrayRef<ProtocolDecl *> ConformsTo,
-                     Type Superclass, LayoutConstraint Layout,
-                      GenericEnvironment *Environment);
-};
-BEGIN_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
-END_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
-
 /// An archetype that represents an opaque element of a type sequence in context.
 ///
 /// \code
@@ -5781,9 +5743,6 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
   }
   if (auto openedTy = dyn_cast<OpenedArchetypeType>(this)) {
     return openedTy->getTrailingObjects<Type>();
-  }
-  if (auto childTy = dyn_cast<NestedArchetypeType>(this)) {
-    return childTy->getTrailingObjects<Type>();
   }
   if (auto childTy = dyn_cast<SequenceArchetypeType>(this)) {
     return childTy->getTrailingObjects<Type>();
@@ -6607,9 +6566,6 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   case TypeKind::Existential:
     return false;
 
-  case TypeKind::NestedArchetype:
-    return cast<NestedArchetypeType>(this)->getRoot()->hasSimpleTypeRepr();
-      
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::OpenedArchetype:
     return false;

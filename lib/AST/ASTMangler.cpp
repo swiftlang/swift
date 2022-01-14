@@ -1324,25 +1324,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
           opaqueType, opaqueDecl, opaqueType->getSubstitutions(), sig, forDecl);
     }
       
-    case TypeKind::NestedArchetype: {
-      auto nestedType = cast<NestedArchetypeType>(tybase);
-      
-      // Mangle associated types of opaque archetypes like dependent member
-      // types, so that they can be accurately demangled at runtime.
-      if (auto opaque =
-            dyn_cast<OpaqueTypeArchetypeType>(nestedType->getRoot())) {
-        return appendOpaqueTypeArchetype(
-            nestedType, opaque->getDecl(), opaque->getSubstitutions(), sig,
-            forDecl);
-      }
-
-      // FIXME: Never actually used.
-      appendType(nestedType->getParent(), sig, forDecl);
-      appendIdentifier(nestedType->getName().str());
-      appendOperator("Qa");
-      return;
-    }
-      
     case TypeKind::DynamicSelf: {
       auto dynamicSelf = cast<DynamicSelfType>(tybase);
       if (dynamicSelf->getSelfType()->getAnyNominal()) {

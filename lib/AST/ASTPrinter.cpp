@@ -5926,11 +5926,6 @@ public:
     }
   }
 
-  void visitNestedArchetypeType(NestedArchetypeType *T) {
-    visitParentType(T->getParent());
-    printArchetypeCommon(T, T->getAssocType());
-  }
-
   static AbstractTypeParamDecl *getAbstractTypeParamDecl(ArchetypeType *T) {
     if (auto gp = T->getInterfaceType()->getAs<GenericTypeParamType>()) {
       return gp->getDecl();

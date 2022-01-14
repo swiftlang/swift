@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 659; // opened archetype interface type
+const uint16_t SWIFTMODULE_VERSION_MINOR = 660; // remove nested archetypes
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1088,12 +1088,6 @@ namespace decls_block {
     SubstitutionMapIDField // the arguments
   >;
   
-  using NestedArchetypeTypeLayout = BCRecordLayout<
-    NESTED_ARCHETYPE_TYPE,
-    TypeIDField, // root archetype
-    TypeIDField // interface type relative to root
-  >;
-
   using SequenceArchetypeTypeLayout = BCRecordLayout<
     SEQUENCE_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment

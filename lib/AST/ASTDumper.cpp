@@ -3741,12 +3741,6 @@ namespace {
       OS << "\n";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    void visitNestedArchetypeType(NestedArchetypeType *T, StringRef label) {
-      printArchetypeCommon(T, "nested_archetype_type", label);
-      printField("name", T->getFullName());
-      printField("assoc_type", T->getAssocType()->printRef());
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
-    }
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "opened_archetype_type", label);
       printRec("opened_existential", T->getOpenedExistentialType());
