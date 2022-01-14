@@ -701,6 +701,31 @@ enum class CodeCompletionResultKind : uint8_t {
   MAX_VALUE = BuiltinOperator
 };
 
+/// Describes the relationship between the type of the completion results and
+/// the expected type at the code completion position.
+enum class CodeCompletionResultTypeRelation : uint8_t {
+  /// The result does not have a type (e.g. keyword).
+  NotApplicable,
+
+  /// The type relation have not been calculated.
+  Unknown,
+
+  /// The relationship of the result's type to the expected type is not
+  /// invalid, not convertible, and not identical.
+  Unrelated,
+
+  /// The result's type is invalid at the expected position.
+  Invalid,
+
+  /// The result's type is convertible to the type of the expected.
+  Convertible,
+
+  /// The result's type is identical to the type of the expected.
+  Identical,
+
+  MAX_VALUE = Identical
+};
+
 /// The parts of a \c CodeCompletionResult that are not dependent on the context
 /// it appears in and can thus be cached.
 class ContextFreeCodeCompletionResult {
@@ -910,34 +935,6 @@ public:
 /// A single code completion result enriched with information that depend on
 /// the completion's usage context.
 class CodeCompletionResult {
-public:
-  /// Describes the relationship between the type of the completion results and
-  /// the expected type at the code completion position.
-  enum class ExpectedTypeRelation : uint8_t {
-    /// The result does not have a type (e.g. keyword).
-    NotApplicable,
-
-    /// The type relation have not been calculated.
-    Unknown,
-
-    /// The relationship of the result's type to the expected type is not
-    /// invalid, not convertible, and not identical.
-    Unrelated,
-
-    /// The result's type is invalid at the expected position.
-    Invalid,
-
-    /// The result's type is convertible to the type of the expected.
-    Convertible,
-
-    /// The result's type is identical to the type of the expected.
-    Identical,
-
-    MAX_VALUE = Identical
-  };
-
-
-private:
   const ContextFreeCodeCompletionResult &ContextFree;
   SemanticContextKind SemanticContext : 3;
   static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
@@ -963,7 +960,9 @@ public:
   static const unsigned MaxNumBytesToErase = 127;
 
 private:
-  ExpectedTypeRelation TypeDistance : 3;
+  CodeCompletionResultTypeRelation TypeDistance : 3;
+  static_assert(int(CodeCompletionResultTypeRelation::MAX_VALUE) < 1 << 3, "");
+
 public:
   /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
   /// information.
@@ -973,7 +972,7 @@ public:
   CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
-                       ExpectedTypeRelation TypeDistance,
+                       CodeCompletionResultTypeRelation TypeDistance,
                        ContextualNotRecommendedReason NotRecommended,
                        CodeCompletionDiagnosticSeverity DiagnosticSeverity,
                        StringRef DiagnosticMessage)
@@ -1025,7 +1024,9 @@ public:
 
   bool isSystem() const { return getContextFreeResult().isSystem(); }
 
-  ExpectedTypeRelation getExpectedTypeRelation() const { return TypeDistance; }
+  CodeCompletionResultTypeRelation getExpectedTypeRelation() const {
+    return TypeDistance;
+  }
 
   /// Get the contextual not-recommended reason. This disregards context-free
   /// not recommended reasons.

@@ -28,6 +28,7 @@ using swift::ide::CodeCompletionKeywordKind;
 using swift::ide::CodeCompletionLiteralKind;
 using swift::ide::CodeCompletionOperatorKind;
 using swift::ide::CodeCompletionResultKind;
+using swift::ide::CodeCompletionResultTypeRelation;
 using swift::ide::CodeCompletionString;
 using swift::ide::SemanticContextKind;
 using SwiftResult = swift::ide::CodeCompletionResult;
@@ -135,7 +136,7 @@ public:
 
   bool isSystem() const { return getSwiftResult().isSystem(); }
 
-  SwiftResult::ExpectedTypeRelation getExpectedTypeRelation() const {
+  CodeCompletionResultTypeRelation getExpectedTypeRelation() const {
     return getSwiftResult().getExpectedTypeRelation();
   }
 
@@ -190,7 +191,7 @@ class CompletionBuilder {
   CompletionSink &sink;
   const SwiftResult &base;
   bool modified = false;
-  SwiftResult::ExpectedTypeRelation typeRelation;
+  CodeCompletionResultTypeRelation typeRelation;
   SemanticContextKind semanticContext;
   CodeCompletionFlair flair;
   CodeCompletionString *completionString;
@@ -209,7 +210,7 @@ public:
     moduleImportDepth = value;
   }
 
-  void setExpectedTypeRelation(SwiftResult::ExpectedTypeRelation Relation) {
+  void setExpectedTypeRelation(CodeCompletionResultTypeRelation Relation) {
     modified = true;
     typeRelation = Relation;
   }
