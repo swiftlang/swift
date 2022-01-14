@@ -119,6 +119,10 @@ private:
 
   Type getOrCreateArchetypeFromInterfaceType(Type depType);
 
+  /// Add a mapping of a generic parameter to a specific type (which may be
+  /// an archetype)
+  void addMapping(GenericParamKey key, Type contextType);
+
   /// Retrieve the mapping for the given generic parameter, if present.
   ///
   /// This is only useful when lazily populating a generic environment.
@@ -159,10 +163,6 @@ public:
   /// outer substitutions.
   static GenericEnvironment *forOpaqueType(
       OpaqueTypeDecl *opaque, SubstitutionMap subs, AllocationArena arena);
-
-  /// Add a mapping of a generic parameter to a specific type (which may be
-  /// an archetype)
-  void addMapping(GenericParamKey key, Type contextType);
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
