@@ -780,15 +780,23 @@ void SourceFile::lookupObjCMethods(
   results.append(known->second.begin(), known->second.end());
 }
 
+bool ModuleDecl::shouldCollectDisplayDecls() const {
+  for (const FileUnit *file : Files) {
+    if (!file->shouldCollectDisplayDecls())
+      return false;
+  }
+  return true;
+}
+
 static void collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
   for (const FileUnit *file : M->getFiles()) {
     if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
       if (source->hasImports()) {
         for (auto import : source->getImports()) {
-          if (import.options.contains(ImportFlags::Exported)) {
-            if (!Imports.contains(import.module.importedModule)) {
-              Imports.insert(import.module.importedModule);
-            }
+          if (import.options.contains(ImportFlags::Exported) &&
+              !Imports.contains(import.module.importedModule) &&
+              import.module.importedModule->shouldCollectDisplayDecls()) {
+            Imports.insert(import.module.importedModule);
           }
         }
       }
