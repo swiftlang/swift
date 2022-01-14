@@ -363,7 +363,17 @@ bool MoveKillsCopyableValuesChecker::check() {
 
     // Before we do anything, see if we can find a name for our value. We do
     // this early since we need this for all of our diagnostics below.
-    StringRef varName = getDebugVarName(lexicalValue);
+    StringRef varName = "unknown";
+    if (auto *use = getSingleDebugUse(lexicalValue)) {
+      DebugVarCarryingInst debugVar(use->getUser());
+      if (auto varInfo = debugVar.getVarInfo()) {
+        varName = varInfo->Name;
+      } else {
+        if (auto *decl = debugVar.getDecl()) {
+          varName = decl->getBaseName().userFacingName();
+        }
+      }
+    }
 
     // Then compute liveness.
     SWIFT_DEFER { livenessInfo.clear(); };
@@ -410,18 +420,6 @@ bool MoveKillsCopyableValuesChecker::check() {
 }
 
 //===----------------------------------------------------------------------===//
-//                        Unsupported Use Case Errors
-//===----------------------------------------------------------------------===//
-
-static void emitUnsupportedUseCaseError(MoveValueInst *mvi) {
-  auto &astContext = mvi->getModule().getASTContext();
-  auto diag = diag::
-    sil_movekillscopyablevalue_move_applied_to_unsupported_move;
-  diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
-  mvi->setAllowsDiagnostics(false);
-}
-
-//===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
@@ -457,7 +455,10 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
       for (auto &inst : block) {
         if (auto *mvi = dyn_cast<MoveValueInst>(&inst)) {
           if (mvi->getAllowDiagnostics()) {
-            emitUnsupportedUseCaseError(mvi);
+            auto diag = diag::
+                sil_movekillscopyablevalue_move_applied_to_unsupported_move;
+            diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+            mvi->setAllowsDiagnostics(false);
           }
         }
       }

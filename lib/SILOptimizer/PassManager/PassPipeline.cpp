@@ -149,10 +149,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
-  // Before we promote any loads, perform _move checking for addresses.
-  P.addMoveFunctionCanonicalization();
-  P.addMoveKillsCopyableAddressesChecker();
-
   // Promote loads as necessary to ensure we have enough SSA formation to emit
   // SSA based diagnostics.
   P.addPredictableMemoryAccessOptimizations();
@@ -172,11 +168,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Now that we have emitted constant propagation diagnostics, try to eliminate
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
-
-  // Now perform move semantic checking.
-  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
-                                         //   value.
-  P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
 
   // Now that we have finished performing diagnostics that rely on lexical
   // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.

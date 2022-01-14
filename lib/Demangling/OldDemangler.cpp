@@ -645,11 +645,6 @@ private:
         if (!result)
           return nullptr;
         param->addChild(result, Factory);
-      } else if (Mangled.nextIf("r_")) {
-        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(InOutToOut);
-        if (!result)
-          return nullptr;
-        param->addChild(result, Factory);
       } else {
         // Otherwise handle option sets.
         unsigned Value = 0;

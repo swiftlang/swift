@@ -1029,19 +1029,6 @@ public:
   /// generic.
   SubstitutionMap getForwardingSubstitutionMap();
 
-  /// Returns true if this SILFunction must be a defer statement.
-  ///
-  /// NOTE: This may return false for defer statements that have been
-  /// deserialized without a DeclContext. This means that this is guaranteed to
-  /// be correct for SILFunctions in Raw SIL that were not deserialized as
-  /// canonical. Thus one can use it for diagnostics.
-  bool isDefer() const {
-    if (auto *dc = getDeclContext())
-      if (auto *decl = dyn_cast_or_null<FuncDecl>(dc->getAsDecl()))
-        return decl->isDeferBody();
-    return false;
-  }
-
   //===--------------------------------------------------------------------===//
   // Block List Access
   //===--------------------------------------------------------------------===//
