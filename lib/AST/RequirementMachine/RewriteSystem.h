@@ -329,84 +329,36 @@ private:
 
   //////////////////////////////////////////////////////////////////////////////
   ///
-  /// "Pseudo-rules" for the property map
+  /// Relations are "pseudo-rules" introduced by the property map
   ///
   //////////////////////////////////////////////////////////////////////////////
 
 public:
   /// The left hand side is known to be smaller than the right hand side.
-  using Relation = std::pair<Symbol, Symbol>;
+  using Relation = std::pair<Term, Term>;
 
 private:
   llvm::DenseMap<Relation, unsigned> RelationMap;
   std::vector<Relation> Relations;
 
 public:
-  unsigned recordRelation(Symbol lhs, Symbol rhs);
+  unsigned recordRelation(Term lhs, Term rhs);
   Relation getRelation(unsigned index) const;
 
-  /// A type witness has a subject type, stored in LHS, which takes the form:
-  ///
-  /// T.[concrete: C : P].[P:X]
-  ///
-  /// For some concrete type C, protocol P and associated type X.
-  ///
-  /// The type witness of X in the conformance C : P is either a concrete type,
-  /// or an abstract type parameter.
-  ///
-  /// If it is a concrete type, then RHS stores the concrete type symbol.
-  ///
-  /// If it is an abstract type parameter, then RHS stores the type term.
-  ///
-  /// Think of these as rewrite rules which are lazily created, but always
-  /// "there" -- they encode information about concrete conformances, which
-  /// are solved outside of the requirement machine itself.
-  ///
-  /// We don't want to eagerly pull in all concrete conformances and walk
-  /// them recursively introducing rewrite rules.
-  ///
-  /// The RewriteStep::{Concrete,Same,Abstract}TypeWitness rewrite step kinds
-  /// reference TypeWitnesses via their RuleID field.
-  ///
-  /// Type witnesses are recorded lazily in property map construction, in
-  /// PropertyMap::computeConstraintTermForTypeWitness().
-  struct TypeWitness {
-    Term LHS;
-    llvm::PointerUnion<Symbol, Term> RHS;
+  unsigned recordRelation(Symbol lhs, Symbol rhs);
 
-    TypeWitness(Term lhs, llvm::PointerUnion<Symbol, Term> rhs);
+  unsigned recordConcreteConformanceRelation(
+      Symbol concreteSymbol, Symbol protocolSymbol,
+      Symbol concreteConformanceSymbol);
 
-    friend bool operator==(const TypeWitness &lhs,
-                           const TypeWitness &rhs);
+  unsigned recordConcreteTypeWitnessRelation(
+      Symbol concreteConformanceSymbol,
+      Symbol associatedTypeSymbol,
+      Symbol typeWitnessSymbol);
 
-    Symbol getConcreteConformance() const {
-      return *(LHS.end() - 2);
-    }
-
-    Symbol getAssocType() const {
-      return *(LHS.end() - 1);
-    }
-
-    Symbol getConcreteType() const {
-      return RHS.get<Symbol>();
-    }
-
-    Term getAbstractType() const {
-      return RHS.get<Term>();
-    }
-
-    void dump(llvm::raw_ostream &out) const;
-  };
-
-private:
-  /// Cache for concrete type witnesses. The value in the map is an index
-  /// into the vector.
-  llvm::DenseMap<Term, unsigned> TypeWitnessMap;
-  std::vector<TypeWitness> TypeWitnesses;
-
-public:
-  unsigned recordTypeWitness(TypeWitness witness);
-  const TypeWitness &getTypeWitness(unsigned index) const;
+  unsigned recordSameTypeWitnessRelation(
+      Symbol concreteConformanceSymbol,
+      Symbol associatedTypeSymbol);
 
 private:
   //////////////////////////////////////////////////////////////////////////////
