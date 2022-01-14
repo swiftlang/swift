@@ -23,11 +23,12 @@ namespace SourceKit {
 namespace CodeCompletion {
 
 using swift::ide::CodeCompletionDeclKind;
+using swift::ide::CodeCompletionFlair;
 using swift::ide::CodeCompletionKeywordKind;
 using swift::ide::CodeCompletionLiteralKind;
-using swift::ide::SemanticContextKind;
-using swift::ide::CodeCompletionFlair;
+using swift::ide::CodeCompletionOperatorKind;
 using swift::ide::CodeCompletionString;
+using swift::ide::SemanticContextKind;
 using SwiftResult = swift::ide::CodeCompletionResult;
 using swift::ide::CompletionKind;
 
@@ -75,7 +76,8 @@ struct NameStyle {
 ///
 /// Extends a \c swift::ide::CodeCompletionResult with extra fields that are
 /// filled in by SourceKit. Generally stored in an \c CompletionSink.
-class Completion : public SwiftResult {
+class Completion {
+  const SwiftResult &base;
   void *opaqueCustomKind = nullptr;
   Optional<uint8_t> moduleImportDepth;
   PopularityFactor popularityFactor;
@@ -89,9 +91,12 @@ public:
 
   /// Wraps \p base with an \c Completion.  The \p name and \p description
   /// should outlive the result, generally by being stored in the same
-  /// \c CompletionSink.
-  Completion(SwiftResult base, StringRef name, StringRef description)
-      : SwiftResult(base), name(name), description(description) {}
+  /// \c CompletionSink or in a sink that was adopted by the sink that this
+  /// \c Compleiton is being stored in.
+  Completion(const SwiftResult &base, StringRef name, StringRef description)
+      : base(base), name(name), description(description) {}
+
+  const SwiftResult &getSwiftResult() const { return base; }
 
   bool hasCustomKind() const { return opaqueCustomKind; }
   void *getCustomKind() const { return opaqueCustomKind; }
@@ -102,6 +107,63 @@ public:
   /// A popularity factory in the range [-1, 1]. The higher the value, the more
   /// 'popular' this result is.  0 indicates unknown.
   PopularityFactor getPopularityFactor() const { return popularityFactor; }
+
+  // MARK: Methods that forward to the SwiftResult
+
+  SwiftResult::ResultKind getKind() const { return getSwiftResult().getKind(); }
+
+  CodeCompletionDeclKind getAssociatedDeclKind() const {
+    return getSwiftResult().getAssociatedDeclKind();
+  }
+
+  CodeCompletionLiteralKind getLiteralKind() const {
+    return getSwiftResult().getLiteralKind();
+  }
+
+  CodeCompletionKeywordKind getKeywordKind() const {
+    return getSwiftResult().getKeywordKind();
+  }
+
+  bool isOperator() const { return getSwiftResult().isOperator(); }
+
+  CodeCompletionOperatorKind getOperatorKind() const {
+    return getSwiftResult().getOperatorKind();
+  }
+
+  bool isSystem() const { return getSwiftResult().isSystem(); }
+
+  SwiftResult::ExpectedTypeRelation getExpectedTypeRelation() const {
+    return getSwiftResult().getExpectedTypeRelation();
+  }
+
+  SemanticContextKind getSemanticContext() const {
+    return getSwiftResult().getSemanticContext();
+  }
+
+  CodeCompletionFlair getFlair() const { return getSwiftResult().getFlair(); }
+
+  bool isNotRecommended() const { return getSwiftResult().isNotRecommended(); }
+
+  unsigned getNumBytesToErase() const {
+    return getSwiftResult().getNumBytesToErase();
+  }
+
+  CodeCompletionString *getCompletionString() const {
+    return getSwiftResult().getCompletionString();
+  }
+
+  StringRef getModuleName() const { return getSwiftResult().getModuleName(); }
+
+  StringRef getBriefDocComment() const {
+    return getSwiftResult().getBriefDocComment();
+  }
+
+  ArrayRef<StringRef> getAssociatedUSRs() const {
+    return getSwiftResult().getAssociatedUSRs();
+  }
+
+  /// Allow "upcasting" the completion result to a SwiftResult.
+  operator const SwiftResult &() const { return getSwiftResult(); }
 };
 
 /// Storage sink for \c Completion objects.
@@ -123,9 +185,9 @@ struct CompletionSink {
 
 class CompletionBuilder {
   CompletionSink &sink;
-  SwiftResult &current;
+  const SwiftResult &base;
   bool modified = false;
-  Completion::ExpectedTypeRelation typeRelation;
+  SwiftResult::ExpectedTypeRelation typeRelation;
   SemanticContextKind semanticContext;
   CodeCompletionFlair flair;
   CodeCompletionString *completionString;
@@ -135,7 +197,7 @@ class CompletionBuilder {
   PopularityFactor popularityFactor;
 
 public:
-  CompletionBuilder(CompletionSink &sink, SwiftResult &base);
+  CompletionBuilder(CompletionSink &sink, const SwiftResult &base);
 
   void setCustomKind(void *opaqueCustomKind) { customKind = opaqueCustomKind; }
 
@@ -144,7 +206,7 @@ public:
     moduleImportDepth = value;
   }
 
-  void setExpectedTypeRelation(Completion::ExpectedTypeRelation Relation) {
+  void setExpectedTypeRelation(SwiftResult::ExpectedTypeRelation Relation) {
     modified = true;
     typeRelation = Relation;
   }
@@ -233,8 +295,8 @@ struct FilterRules {
   llvm::StringMap<bool> hideByFilterName;
   llvm::StringMap<bool> hideByDescription;
 
-  bool hideCompletion(Completion *completion) const;
-  bool hideCompletion(SwiftResult *completion, StringRef name,
+  bool hideCompletion(const Completion &completion) const;
+  bool hideCompletion(const SwiftResult &completion, StringRef name,
                       StringRef description, void *customKind = nullptr) const;
   bool hideFilterName(StringRef name) const;
 };
