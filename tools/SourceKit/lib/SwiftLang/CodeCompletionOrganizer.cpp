@@ -93,30 +93,6 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
       if (info.completionContext->typeContextKind ==
               TypeContextKind::Required &&
           result->getKind() == CodeCompletionResultKind::Declaration) {
-        // FIXME: because other-module results are cached, they will not be
-        // given a type-relation of invalid.  As a hack, we look at the text of
-        // the result type and look for 'Void'.
-        bool isVoid = false;
-        auto chunks = result->getCompletionString()->getChunks();
-        for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
-          using ChunkKind = ide::CodeCompletionString::Chunk::ChunkKind;
-          bool isVoid = false;
-          if (i->is(ChunkKind::TypeAnnotation)) {
-            isVoid = i->getText() == "Void";
-            break;
-          } else if (i->is(ChunkKind::TypeAnnotationBegin)) {
-            auto n = i + 1, t = i + 2;
-            isVoid =
-                // i+1 has text 'Void'.
-                n != e && n->hasText() && n->getText() == "Void" &&
-                // i+2 terminates the group.
-                (t == e || t->endsPreviousNestedGroup(i->getNestingLevel()));
-            break;
-          }
-        }
-        if (isVoid)
-          builder.setExpectedTypeRelation(
-              CodeCompletionResultTypeRelation::Invalid);
       }
     }
 
@@ -158,6 +134,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
         new (sink.allocator) ContextFreeCodeCompletionResult(
             CodeCompletionResultKind::Pattern, completionString,
             CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
+            CodeCompletionResultType::unknown(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
@@ -1138,7 +1115,6 @@ bool LimitedResultView::walk(CodeCompletionView::Walker &walker) const {
 CompletionBuilder::CompletionBuilder(CompletionSink &sink,
                                      const SwiftResult &base)
     : sink(sink), base(base) {
-  typeRelation = base.getExpectedTypeRelation();
   semanticContext = base.getSemanticContext();
   flair = base.getFlair();
   completionString =
@@ -1194,15 +1170,16 @@ Completion *CompletionBuilder::finish() {
             contextFreeBase.getModuleName(),
             contextFreeBase.getBriefDocComment(),
             contextFreeBase.getAssociatedUSRs(),
+            contextFreeBase.getResultType(),
             contextFreeBase.getNotRecommendedReason(),
             contextFreeBase.getDiagnosticSeverity(),
             contextFreeBase.getDiagnosticMessage());
-
-    newBase = new (sink.allocator) SwiftResult(
-        *contextFreeResult, semanticContext, flair, base.getNumBytesToErase(),
-        typeRelation, base.getContextualNotRecommendedReason(),
-        base.getContextualDiagnosticSeverity(),
-        base.getContextualDiagnosticMessage());
+    newBase = new (sink.allocator)
+        SwiftResult(*contextFreeResult, semanticContext, flair,
+                    base.getNumBytesToErase(), base.getExpectedTypeRelation(),
+                    base.getContextualNotRecommendedReason(),
+                    base.getContextualDiagnosticSeverity(),
+                    base.getContextualDiagnosticMessage());
 
     llvm::raw_svector_ostream OSS(nameStorage);
     ide::printCodeCompletionResultFilterName(*newBase, OSS);

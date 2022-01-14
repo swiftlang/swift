@@ -923,7 +923,8 @@ static void transformAndForwardResults(
         new (innerSink.allocator) ContextFreeCodeCompletionResult(
             CodeCompletionResultKind::BuiltinOperator, completionString,
             CodeCompletionOperatorKind::None,
-            /*BriefDocComment=*/"", ContextFreeNotRecommendedReason::None,
+            /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
+            ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None,
             /*DiagnosticMessage=*/"");
     auto *paren = new (innerSink.allocator) CodeCompletion::SwiftResult(
