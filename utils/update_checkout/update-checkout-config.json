@@ -127,7 +127,7 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/20211026"],
+            "aliases": ["rebranch"],
             "repos": {
                 "llvm-project": "stable/20211026",
                 "swift": "rebranch",
