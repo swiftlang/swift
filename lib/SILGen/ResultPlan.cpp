@@ -66,7 +66,13 @@ public:
   void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
   override {
     assert(box && "buffer never emitted before activating cleanup?!");
-    SGF.B.createDeallocBox(loc, box);
+    auto theBox = box;
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
+      auto *bbi = cast<BeginBorrowInst>(theBox);
+      SGF.B.createEndBorrow(loc, bbi);
+      theBox = bbi->getOperand();
+    }
+    SGF.B.createDeallocBox(loc, theBox);
   }
   
   void dump(SILGenFunction &SGF) const override {
@@ -160,7 +166,10 @@ public:
       SILBoxType::get(SGF.getASTContext(),
                       boxLayout,
                       layoutSubs));
-    
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
+      resultBox = SGF.B.createBeginBorrow(loc, resultBox, /*isLexical=*/true);
+    }
+
     // Complete the cleanup to deallocate this buffer later, after we're
     // finished with the argument.
     static_cast<IndirectOpenedSelfCleanup&>(SGF.Cleanups.getCleanup(handle))
