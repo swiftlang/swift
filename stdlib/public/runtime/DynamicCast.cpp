@@ -129,13 +129,7 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
   const char * const msg = "Found unexpected null pointer value"
                     " while trying to cast value of type '%s' (%p)"
                     " to '%s' (%p)%s\n";
-  if (runtime::bincompat::unexpectedObjCNullWhileCastingIsFatal()) {
-    // By default, Swift 5.4 and later issue a fatal error.
-    swift::fatalError(/* flags = */ 0, msg,
-                      srcTypeName.c_str(), srcType,
-                      destTypeName.c_str(), destType,
-                      "");
-  } else {
+  if (runtime::bincompat::useLegacyPermissiveObjCNullSemanticsInCasting()) {
     // In backwards compatibility mode, this code will warn and return the null
     // reference anyway: If you examine the calls to the function, you'll see
     // that most callers fail the cast in that case, but a few casts (e.g., with
@@ -145,6 +139,12 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
                    srcTypeName.c_str(), srcType,
                    destTypeName.c_str(), destType,
                    ": Continuing with null object, but expect problems later.");
+  } else {
+    // By default, Swift 5.4 and later issue a fatal error.
+    swift::fatalError(/* flags = */ 0, msg,
+                      srcTypeName.c_str(), srcType,
+                      destTypeName.c_str(), destType,
+                      "");
   }
   return object;
 }
@@ -1092,7 +1092,7 @@ tryCastUnwrappingOptionalBoth(
     srcValue, /*emptyCases=*/1);
   auto sourceIsNil = (sourceEnumCase != 0);
   if (sourceIsNil) {
-    if (runtime::bincompat::useLegacyOptionalNilInjection()) {
+    if (runtime::bincompat::useLegacyOptionalNilInjectionInCasting()) {
       auto destInnerType = cast<EnumMetadata>(destType)->getGenericArgs()[0];
       // Set .none at the outer level
       destInnerType->vw_storeEnumTagSinglePayload(destLocation, 1, 1);
@@ -1554,30 +1554,47 @@ tryCastToClassExistentialViaSwiftValue(
   }
 
   default: {
+    // We can always box when the destination is a simple
+    // (unconstrained) `AnyObject`.
     if (destExistentialType->NumProtocols != 0) {
-      // The destination is a class-constrained protocol type
-      // and the source is not a class, so....
-      return DynamicCastResult::Failure;
-    } else {
-      // This is a simple (unconstrained) `AnyObject` so we can populate
-      // it by stuffing a non-class instance into a __SwiftValue box
-#if SWIFT_OBJC_INTEROP
-      auto object = bridgeAnythingToSwiftValueObject(
-        srcValue, srcType, takeOnSuccess);
-      destExistentialLocation->Value = object;
-      if (takeOnSuccess) {
-        return DynamicCastResult::SuccessViaTake;
-      } else {
-        return DynamicCastResult::SuccessViaCopy;
+      // But if there are constraints...
+      if (!runtime::bincompat::useLegacyObjCBoxingInCasting()) {
+        // ... never box if we're not supporting legacy semantics.
+        return DynamicCastResult::Failure;
       }
-# else
-      // Note: Code below works correctly on both Obj-C and non-Obj-C platforms,
-      // but the code above is slightly faster on Obj-C platforms.
-      auto object = _bridgeAnythingToObjectiveC(srcValue, srcType);
-      destExistentialLocation->Value = object;
-      return DynamicCastResult::SuccessViaCopy;
+      // Legacy behavior: We used to permit casts to a constrained (existential)
+      // type if the resulting `__SwiftValue` box conformed to the target type.
+      // This is no longer supported, since it caused `x is NSCopying` to be
+      // true even when x does not in fact implement the requirements of
+      // `NSCopying`.
+#if SWIFT_OBJC_INTEROP
+      if (!findSwiftValueConformances(
+            destExistentialType, destExistentialLocation->getWitnessTables())) {
+        return DynamicCastResult::Failure;
+      }
+#else
+      if (!swift_swiftValueConformsTo(destType, destType)) {
+        return DynamicCastResult::Failure;
+      }
 #endif
     }
+
+#if SWIFT_OBJC_INTEROP
+    auto object = bridgeAnythingToSwiftValueObject(
+      srcValue, srcType, takeOnSuccess);
+    destExistentialLocation->Value = object;
+    if (takeOnSuccess) {
+      return DynamicCastResult::SuccessViaTake;
+    } else {
+      return DynamicCastResult::SuccessViaCopy;
+    }
+# else
+    // Note: Code below works correctly on both Obj-C and non-Obj-C platforms,
+    // but the code above is slightly faster on Obj-C platforms.
+    auto object = _bridgeAnythingToObjectiveC(srcValue, srcType);
+    destExistentialLocation->Value = object;
+    return DynamicCastResult::SuccessViaCopy;
+#endif
   }
   }
 }
