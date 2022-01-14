@@ -4841,17 +4841,19 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
         return isSimpleUnderPrintOptions(typealias->getSinglyDesugaredType());
     } else if (auto opaque =
                  dyn_cast<OpaqueTypeArchetypeType>(T.getPointer())) {
-      switch (Options.OpaqueReturnTypePrinting) {
-      case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
-      case PrintOptions::OpaqueReturnTypePrintingMode::Description:
-        return true;
-      case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
-        return opaque->getDecl()->hasExplicitGenericParams();
-      case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
-        return opaque->getDecl()->hasExplicitGenericParams() ||
-            isSimpleUnderPrintOptions(opaque->getExistentialType());
+      if (opaque->isRoot()) {
+        switch (Options.OpaqueReturnTypePrinting) {
+        case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
+        case PrintOptions::OpaqueReturnTypePrintingMode::Description:
+          return true;
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+          return opaque->getDecl()->hasExplicitGenericParams();
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
+          return opaque->getDecl()->hasExplicitGenericParams() ||
+              isSimpleUnderPrintOptions(opaque->getExistentialType());
+        }
+        llvm_unreachable("bad opaque-return-type printing mode");
       }
-      llvm_unreachable("bad opaque-return-type printing mode");
     } else if (auto existential = dyn_cast<ExistentialType>(T.getPointer())) {
       if (!Options.PrintExplicitAny)
         return isSimpleUnderPrintOptions(existential->getConstraintType());

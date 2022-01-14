@@ -340,7 +340,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     result = NestedArchetypeType::getNew(ctx, depMemTy,
                                          requirements.protos, superclass,
                                          requirements.layout, this);
-  } else if (genericParam->isTypeSequence()) {
+  } else if (requirements.anchor->getRootGenericParam()->isTypeSequence()) {
     result = SequenceArchetypeType::get(ctx, this, requirements.anchor,
                                         requirements.protos, superclass,
                                         requirements.layout);
