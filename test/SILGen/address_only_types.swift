@@ -166,7 +166,8 @@ func address_only_assignment_from_lv(_ dest: inout Unloadable, v: Unloadable) {
   var v = v
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable, [[VARG:%[0-9]+]] : $*Unloadable):
   // CHECK: [[VBOX:%.*]] = alloc_box ${ var Unloadable }
-  // CHECK: [[PBOX:%[0-9]+]] = project_box [[VBOX]]
+  // CHECK: [[V_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[VBOX]]
+  // CHECK: [[PBOX:%[0-9]+]] = project_box [[V_LIFETIME]]
   // CHECK: copy_addr [[VARG]] to [initialization] [[PBOX]] : $*Unloadable
   dest = v
   // CHECK: [[READBOX:%.*]] = begin_access [read] [unknown] [[PBOX]] :
@@ -211,7 +212,8 @@ func address_only_var() -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*Unloadable):
   var x = some_address_only_function_1()
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Unloadable }
-  // CHECK: [[XPB:%.*]] = project_box [[XBOX]]
+  // CHECK: [[XBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
+  // CHECK: [[XPB:%.*]] = project_box [[XBOX_LIFETIME]]
   // CHECK: apply {{%.*}}([[XPB]])
   return x
   // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[XPB]] :

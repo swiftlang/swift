@@ -3505,7 +3505,13 @@ public:
   DeallocateUninitializedBox(SILValue box) : box(box) {}
 
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
-    SGF.B.createDeallocBox(l, box);
+    auto theBox = box;
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
+      auto *bbi = cast<BeginBorrowInst>(theBox);
+      SGF.B.createEndBorrow(l, bbi);
+      theBox = bbi->getOperand();
+    }
+    SGF.B.createDeallocBox(l, theBox);
   }
 
   void dump(SILGenFunction &SGF) const override {

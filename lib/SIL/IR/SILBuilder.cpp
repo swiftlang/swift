@@ -285,6 +285,10 @@ SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand) {
     if (isa<DeallocStackInst>(Inst))
       continue;
 
+    // end_borrow insts also don't affect take-ability
+    if (isa<EndBorrowInst>(Inst))
+      continue;
+
     // An end_access of the same address may be able to be rewritten as a
     // [deinit] access.
     if (auto endAccess = dyn_cast<EndAccessInst>(Inst)) {

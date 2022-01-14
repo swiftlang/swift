@@ -33,7 +33,8 @@ struct DidSetWillSetTests: ForceAccessors {
       var unrelatedValue = DidSetWillSetTests.defaultValue
 
       // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "unrelatedValue"
-      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var DidSetWillSetTests }, 0
+      // CHECK: [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var DidSetWillSetTests }, 0
       // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin DidSetWillSetTests.Type
       // CHECK-NEXT: // function_ref static properties.DidSetWillSetTests.defaultValue.getter : properties.DidSetWillSetTests
       // CHECK-NEXT: [[DEFAULTVALUE_FN:%.*]] = function_ref @$s10properties{{[_0-9a-zA-Z]*}}vgZ : $@convention(method) (@thin DidSetWillSetTests.Type) -> DidSetWillSetTests
@@ -75,7 +76,8 @@ struct DidSetWillSetTests: ForceAccessors {
       var unrelatedValue = DidSetWillSetTests.defaultValue
 
       // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "unrelatedValue"
-      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var DidSetWillSetTests }, 0
+      // CHECK: [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var DidSetWillSetTests }, 0
       // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin DidSetWillSetTests.Type
       // CHECK-NEXT: // function_ref static properties.DidSetWillSetTests.defaultValue.getter : properties.DidSetWillSetTests
       // CHECK-NEXT: [[DEFAULTVALUE_FN:%.*]] = function_ref @$s10properties{{[_0-9a-zA-Z]*}}vgZ : $@convention(method) (@thin DidSetWillSetTests.Type) -> DidSetWillSetTests
@@ -102,7 +104,8 @@ struct DidSetWillSetTests: ForceAccessors {
       var other = self
 
       // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "other"
-      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX]] : ${ var DidSetWillSetTests }, 0
+      // CHECK: [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
+      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var DidSetWillSetTests }, 0
       // CHECK-NEXT: [[READ_SELF:%.*]] = begin_access [read] [unknown] %0 : $*DidSetWillSetTests
       // CHECK-NEXT: copy_addr [[READ_SELF]] to [initialization] [[BOXADDR]] : $*DidSetWillSetTests
       // CHECK-NEXT: end_access [[READ_SELF]] : $*DidSetWillSetTests
