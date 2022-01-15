@@ -1996,7 +1996,7 @@ public:
 
   ParameterTypeFlags withCompileTimeConst(bool isConst) const {
     return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeConst
-                                      : value | ParameterTypeFlags::CompileTimeConst);
+                                      : value - ParameterTypeFlags::CompileTimeConst);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
