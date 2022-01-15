@@ -780,12 +780,46 @@ void SourceFile::lookupObjCMethods(
   results.append(known->second.begin(), known->second.end());
 }
 
+static void collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
+  for (const FileUnit *file : M->getFiles()) {
+    if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
+      if (source->hasImports()) {
+        for (auto import : source->getImports()) {
+          if (import.options.contains(ImportFlags::Exported)) {
+            if (!Imports.contains(import.module.importedModule)) {
+              Imports.insert(import.module.importedModule);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 void ModuleDecl::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   FORWARD(getLocalTypeDecls, (Results));
 }
 
 void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
+}
+
+void ModuleDecl::dumpDisplayDecls() const {
+  SmallVector<Decl *, 32> Decls;
+  getDisplayDecls(Decls);
+  for (auto *D : Decls) {
+    D->dump(llvm::errs());
+    llvm::errs() << "\n";
+  }
+}
+
+void ModuleDecl::dumpTopLevelDecls() const {
+  SmallVector<Decl *, 32> Decls;
+  getTopLevelDecls(Decls);
+  for (auto *D : Decls) {
+    D->dump(llvm::errs());
+    llvm::errs() << "\n";
+  }
 }
 
 void ModuleDecl::getExportedPrespecializations(
@@ -908,8 +942,23 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
 }
 
 void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
+  if (isParsedModule(this)) {
+    SmallPtrSet<ModuleDecl *, 4> Modules;
+    collectParsedExportedImports(this, Modules);
+    for (const ModuleDecl *import : Modules) {
+      import->getDisplayDecls(Results);
+    }
+  }
   // FIXME: Should this do extra access control filtering?
   FORWARD(getDisplayDecls, (Results));
+
+#ifndef NDEBUG
+  llvm::DenseSet<Decl *> visited;
+  for (auto *D : Results) {
+    auto inserted = visited.insert(D).second;
+    assert(inserted && "there should be no duplicate decls");
+  }
+#endif
 }
 
 ProtocolConformanceRef
@@ -929,13 +978,17 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // existential to an archetype parameter, so for now we restrict this to
   // @objc protocols and marker protocols.
   if (!layout.isObjC() && !protocol->isMarkerProtocol()) {
+    auto constraint = type;
+    if (auto existential = constraint->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
+
     // There's a specific exception for protocols with self-conforming
     // witness tables, but the existential has to be *exactly* that type.
     // TODO: synthesize witness tables on-demand for protocol compositions
     // that can satisfy the requirement.
     if (protocol->requiresSelfConformanceWitnessTable() &&
-        type->is<ProtocolType>() &&
-        type->castTo<ProtocolType>()->getDecl() == protocol)
+        constraint->is<ProtocolType>() &&
+        constraint->castTo<ProtocolType>()->getDecl() == protocol)
       return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
     return ProtocolConformanceRef::forInvalid();
@@ -3060,6 +3113,22 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
       return !matchAttributes(D->getAttrs());
     });
   Results.erase(newEnd, Results.end());
+}
+
+void FileUnit::dumpDisplayDecls() const {
+  SmallVector<Decl *, 32> Decls;
+  getDisplayDecls(Decls);
+  for (auto *D : Decls) {
+    D->dump(llvm::errs());
+  }
+}
+
+void FileUnit::dumpTopLevelDecls() const {
+  SmallVector<Decl *, 32> Decls;
+  getTopLevelDecls(Decls);
+  for (auto *D : Decls) {
+    D->dump(llvm::errs());
+  }
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const FileUnit *file) {

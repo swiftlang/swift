@@ -220,7 +220,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
     fromInstanceType = cast<MetatypeType>(fromInstanceType)
       .getInstanceType();
     toInstanceType = cast<ExistentialMetatypeType>(toInstanceType)
-      .getInstanceType();
+      ->getExistentialInstanceType()->getCanonicalType();
   }
 
   ArrayRef<ProtocolConformanceRef> conformances =
@@ -3052,8 +3052,13 @@ buildThunkSignature(SILGenFunction &SGF,
   // Add a new generic parameter to replace the opened existential.
   auto *newGenericParam =
       GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
+
+  auto constraint = openedExistential->getOpenedExistentialType();
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
-                             openedExistential->getOpenedExistentialType());
+                             constraint);
 
   auto genericSig = buildGenericSignature(ctx, baseGenericSig,
                                           { newGenericParam },

@@ -101,7 +101,7 @@ public func _stdlib_thread_create_block<Argument, Result>(
     return (0, ThreadHandle(bitPattern: threadID))
   }
 #elseif os(WASI)
-  // WASI environment has a only single thread
+  // WASI environment is single-threaded
   return (0, nil)
 #else
   var threadID = _make_pthread_t()

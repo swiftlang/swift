@@ -698,7 +698,7 @@ RewriteContext::~RewriteContext() {
     PropertyTrieRootHistogram.dump(llvm::dbgs());
     llvm::dbgs() << "\n* Conformance rules:\n";
     ConformanceRulesHistogram.dump(llvm::dbgs());
-    llvm::dbgs() << "\n* Generating conformance equations:\n";
+    llvm::dbgs() << "\n* Minimal conformance equations:\n";
     MinimalConformancesHistogram.dump(llvm::dbgs());
   }
 }

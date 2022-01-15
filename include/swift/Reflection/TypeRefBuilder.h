@@ -289,7 +289,7 @@ public:
 
   void clearNodeFactory() { Dem.clear(); }
 
-  BuiltType decodeMangledType(Node *node);
+  BuiltType decodeMangledType(Node *node, bool forRequirement = true);
 
   ///
   /// Factory methods for all TypeRef kinds
@@ -492,7 +492,8 @@ public:
 
   const ProtocolCompositionTypeRef *
   createProtocolCompositionType(llvm::ArrayRef<BuiltProtocolDecl> protocols,
-                                BuiltType superclass, bool isClassBound) {
+                                BuiltType superclass, bool isClassBound,
+                                bool forRequirement = true) {
     std::vector<const TypeRef *> protocolRefs;
     for (const auto &protocol : protocols) {
       if (!protocol)

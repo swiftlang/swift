@@ -21,11 +21,14 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1105,6 +1108,30 @@ FixedSizeSlab *SwiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
   return prev;
 }
 
+BasicBlockSet *SwiftPassInvocation::allocBlockSet() {
+  assert(numBlockSetsAllocated < BlockSetCapacity - 1 &&
+         "too many BasicBlockSets allocated");
+
+  auto *storage = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated;
+  BasicBlockSet *set = new (storage) BasicBlockSet(function);
+  aliveBlockSets[numBlockSetsAllocated] = true;
+  ++numBlockSetsAllocated;
+  return set;
+}
+
+void SwiftPassInvocation::freeBlockSet(BasicBlockSet *set) {
+  int idx = set - (BasicBlockSet *)blockSetStorage;
+  assert(idx >= 0 && idx < numBlockSetsAllocated);
+  assert(aliveBlockSets[idx] && "double free of BasicBlockSet");
+  aliveBlockSets[idx] = false;
+
+  while (numBlockSetsAllocated > 0 && !aliveBlockSets[numBlockSetsAllocated - 1]) {
+    auto *set = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated - 1;
+    set->~BasicBlockSet();
+    --numBlockSetsAllocated;
+  }
+}
+
 void SwiftPassInvocation::startFunctionPassRun(SILFunction *function) {
   assert(!this->function && "a pass is already running");
   this->function = function;
@@ -1127,6 +1154,7 @@ void SwiftPassInvocation::finishedInstructionPassRun() {
 
 void SwiftPassInvocation::endPassRunChecks() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
+  assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1153,9 +1181,16 @@ inline BridgedSlab toBridgedSlab(FixedSizeSlab *slab) {
   return {nullptr};
 }
 
+inline BasicBlockSet *castToBlockSet(BridgedBasicBlockSet blockSet) {
+  return static_cast<BasicBlockSet *>(blockSet.bbs);
+}
 
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab) {
   return toBridgedSlab(&*std::next(castToSlab(slab)->getIterator()));
+}
+
+BridgedSlab PassContext_getPreviousSlab(BridgedSlab slab) {
+  return toBridgedSlab(&*std::prev(castToSlab(slab)->getIterator()));
 }
 
 BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
@@ -1191,6 +1226,20 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
   castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
 }
 
+void PassContext_fixStackNesting(BridgedPassContext passContext,
+                                 BridgedFunction function) {
+  switch (StackNesting::fixNesting(castToFunction(function))) {
+    case StackNesting::Changes::None:
+      break;
+    case StackNesting::Changes::Instructions:
+      PassContext_notifyChanges(passContext, instructionsChanged);
+      break;
+    case StackNesting::Changes::CFG:
+      PassContext_notifyChanges(passContext, branchesChanged);
+      break;
+  }
+}
+
 SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context) {
   SILPassManager *pm = castToPassInvocation(context)->getPassManager();
   ASTContext &ctxt = pm->getModule()->getASTContext();
@@ -1207,4 +1256,66 @@ BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
 BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context) {
   SILPassManager *pm = castToPassInvocation(context)->getPassManager();
   return {pm->getAnalysis<BasicCalleeAnalysis>()};
+}
+
+BridgedDeadEndBlocksAnalysis
+PassContext_getDeadEndBlocksAnalysis(BridgedPassContext context) {
+  SwiftPassInvocation *invocation = castToPassInvocation(context);
+  SILPassManager *pm = invocation->getPassManager();
+  return {pm->getAnalysis<DeadEndBlocksAnalysis>(invocation->getFunction())};
+}
+
+BridgedDomTree PassContext_getDomTree(BridgedPassContext context) {
+  SwiftPassInvocation *invocation = castToPassInvocation(context);
+  SILPassManager *pm = invocation->getPassManager();
+  return {pm->getAnalysis<DominanceAnalysis>(invocation->getFunction())};
+}
+
+SwiftInt DominatorTree_dominates(BridgedDomTree domTree,
+                                 BridgedBasicBlock dominating,
+                                 BridgedBasicBlock dominated) {
+  DominanceInfo *di = static_cast<DominanceInfo *>(domTree.dt);
+  return di->dominates(castToBasicBlock(dominating), castToBasicBlock(dominated)) ? 1 : 0;
+}
+
+BridgedPostDomTree PassContext_getPostDomTree(BridgedPassContext context) {
+  SwiftPassInvocation *invocation = castToPassInvocation(context);
+  SILPassManager *pm = invocation->getPassManager();
+  return {pm->getAnalysis<PostDominanceAnalysis>(invocation->getFunction())};
+}
+
+SwiftInt PostDominatorTree_postDominates(BridgedPostDomTree pdomTree,
+                                         BridgedBasicBlock dominating,
+                                         BridgedBasicBlock dominated) {
+  auto *pdi = static_cast<PostDominanceInfo *>(pdomTree.pdt);
+  return pdi->dominates(castToBasicBlock(dominating), castToBasicBlock(dominated)) ? 1 : 0;
+}
+
+BridgedBasicBlockSet PassContext_allocBasicBlockSet(BridgedPassContext context) {
+  return {castToPassInvocation(context)->allocBlockSet()};
+}
+
+void PassContext_freeBasicBlockSet(BridgedPassContext context,
+                                   BridgedBasicBlockSet set) {
+  castToPassInvocation(context)->freeBlockSet(castToBlockSet(set));
+}
+
+SwiftInt BasicBlockSet_contains(BridgedBasicBlockSet set, BridgedBasicBlock block) {
+  return castToBlockSet(set)->contains(castToBasicBlock(block)) ? 1 : 0;
+}
+
+void BasicBlockSet_insert(BridgedBasicBlockSet set, BridgedBasicBlock block) {
+  castToBlockSet(set)->insert(castToBasicBlock(block));
+}
+
+void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block) {
+  castToBlockSet(set)->erase(castToBasicBlock(block));
+}
+
+BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set) {
+  return {castToBlockSet(set)->getFunction()};
+}
+
+void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
+  castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
 }

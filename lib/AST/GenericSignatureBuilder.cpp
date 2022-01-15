@@ -703,12 +703,6 @@ struct GenericSignatureBuilder::Implementation {
 
   llvm::DenseSet<ExplicitRequirement> ExplicitConformancesImpliedByConcrete;
 
-  llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
-                 ConformanceAccessPath> ConformanceAccessPaths;
-
-  std::vector<std::pair<CanType, ConformanceAccessPath>>
-      CurrentConformanceAccessPaths;
-
 #ifndef NDEBUG
   /// Whether we've already computed redundant requiremnts.
   bool computedRedundantRequirements = false;
@@ -3776,127 +3770,6 @@ Type GenericSignatureBuilder::getCanonicalTypeInContext(Type type,
   });
 }
 
-ConformanceAccessPath
-GenericSignatureBuilder::getConformanceAccessPath(Type type,
-                                                  ProtocolDecl *protocol,
-                                                  GenericSignature sig) {
-  auto canType = getCanonicalTypeInContext(type, { })->getCanonicalType();
-  assert(canType->isTypeParameter());
-
-  // Check if we've already cached the result before doing anything else.
-  auto found = Impl->ConformanceAccessPaths.find(
-      std::make_pair(canType, protocol));
-  if (found != Impl->ConformanceAccessPaths.end()) {
-    return found->second;
-  }
-
-  auto *Stats = Context.Stats;
-
-  FrontendStatsTracer tracer(Stats, "get-conformance-access-path");
-
-  auto recordPath = [&](CanType type, ProtocolDecl *proto,
-                        ConformanceAccessPath path) {
-    // Add the path to the buffer.
-    Impl->CurrentConformanceAccessPaths.emplace_back(type, path);
-
-    // Add the path to the map.
-    auto key = std::make_pair(type, proto);
-    auto inserted = Impl->ConformanceAccessPaths.insert(
-        std::make_pair(key, path));
-    assert(inserted.second);
-    (void) inserted;
-
-    if (Stats)
-      ++Stats->getFrontendCounters().NumConformanceAccessPathsRecorded;
-  };
-
-  // If this is the first time we're asked to look up a conformance access path,
-  // visit all of the root conformance requirements in our generic signature and
-  // add them to the buffer.
-  if (Impl->ConformanceAccessPaths.empty()) {
-    for (const auto &req : sig.getRequirements()) {
-      // We only care about conformance requirements.
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
-
-      auto rootType = req.getFirstType()->getCanonicalType();
-      auto *rootProto = req.getProtocolDecl();
-
-      ConformanceAccessPath::Entry root(rootType, rootProto);
-      ArrayRef<ConformanceAccessPath::Entry> path(root);
-      ConformanceAccessPath result(Context.AllocateCopy(path));
-
-      recordPath(rootType, rootProto, result);
-    }
-  }
-
-  // We enumerate conformance access paths in lexshort order until we find the
-  // path whose corresponding type canonicalizes to the one we are looking for.
-  while (true) {
-    auto found = Impl->ConformanceAccessPaths.find(
-        std::make_pair(canType, protocol));
-    if (found != Impl->ConformanceAccessPaths.end()) {
-      return found->second;
-    }
-
-    assert(Impl->CurrentConformanceAccessPaths.size() > 0);
-
-    // The buffer consists of all conformance access paths of length N.
-    // Swap it out with an empty buffer, and fill it with all paths of
-    // length N+1.
-    std::vector<std::pair<CanType, ConformanceAccessPath>> oldPaths;
-    std::swap(Impl->CurrentConformanceAccessPaths, oldPaths);
-
-    for (const auto &pair : oldPaths) {
-      const auto &lastElt = pair.second.back();
-      auto *lastProto = lastElt.second;
-
-      // A copy of the current path, populated as needed.
-      SmallVector<ConformanceAccessPath::Entry, 4> entries;
-
-      for (const auto &req : lastProto->getRequirementSignature()) {
-        // We only care about conformance requirements.
-        if (req.getKind() != RequirementKind::Conformance)
-          continue;
-
-        auto nextSubjectType = req.getFirstType()->getCanonicalType();
-        auto *nextProto = req.getProtocolDecl();
-
-        // Compute the canonical anchor for this conformance requirement.
-        auto nextType = replaceSelfWithType(pair.first, nextSubjectType);
-        auto nextCanType = getCanonicalTypeInContext(nextType, { })
-            ->getCanonicalType();
-
-        // Skip "derived via concrete" sources.
-        if (!nextCanType->isTypeParameter())
-          continue;
-
-        // If we've already seen a path for this conformance, skip it and
-        // don't add it to the buffer. Note that because we iterate over
-        // conformance access paths in lexshort order, the existing
-        // conformance access path is shorter than the one we found just now.
-        if (Impl->ConformanceAccessPaths.count(
-                std::make_pair(nextCanType, nextProto)))
-          continue;
-
-        if (entries.empty()) {
-          // Fill our temporary vector.
-          entries.insert(entries.begin(),
-                         pair.second.begin(),
-                         pair.second.end());
-        }
-
-        // Add the next entry.
-        entries.emplace_back(nextSubjectType, nextProto);
-        ConformanceAccessPath result = Context.AllocateCopy(entries);
-        entries.pop_back();
-
-        recordPath(nextCanType, nextProto, result);
-      }
-    }
-  }
-}
-
 TypeArrayView<GenericTypeParamType>
 GenericSignatureBuilder::getGenericParams() const {
   return TypeArrayView<GenericTypeParamType>(Impl->GenericParams);
@@ -4627,7 +4500,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   }
 
   // Check whether we have a reasonable constraint type at all.
-  if (!constraintType->isExistentialType() &&
+  if (!constraintType->is<ProtocolType>() &&
+      !constraintType->is<ProtocolCompositionType>() &&
       !constraintType->getClassOrBoundGenericClass()) {
     if (source.getLoc().isValid() && !constraintType->hasError()) {
       Impl->HadAnyError = true;
@@ -6419,8 +6293,16 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
       auto source = constraint.source;
       auto loc = source->getLoc();
 
+      // FIXME: The constraint string is printed directly here because
+      // the current default is to not print `any` for existential
+      // types, but this error message is super confusing without `any`
+      // if the user wrote it explicitly.
+      PrintOptions options;
+      options.PrintExplicitAny = true;
+      auto constraintString = constraintType.getString(options);
+
       Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
-                     subjectType, constraintType);
+                     subjectType, constraintString);
       
       auto getNameWithoutSelf = [&](std::string subjectTypeName) {
         std::string selfSubstring = "Self.";
@@ -6438,7 +6320,7 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
         auto subjectTypeName = subjectType.getString();
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
         Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
-                       subjectTypeNameWithoutSelf, constraintType.getString())
+                       subjectTypeNameWithoutSelf, constraintString)
              .fixItReplace(loc, " == ");
       }
     }
@@ -8321,20 +8203,6 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   auto sig = GenericSignature::get(getGenericParams(), requirements);
 
   bool hadAnyError = Impl->HadAnyError;
-
-  // When we can, move this generic signature builder to make it the canonical
-  // builder, rather than constructing a new generic signature builder that
-  // will produce the same thing.
-  //
-  // We cannot do this when there were errors.
-  //
-  // Also, we cannot do this when building a requirement signature.
-  if (requirementSignatureSelfProto == nullptr &&
-      !hadAnyError) {
-    // Register this generic signature builder as the canonical builder for the
-    // given signature.
-    Context.registerGenericSignatureBuilder(sig, std::move(*this));
-  }
 
   // Wipe out the internal state, ensuring that nobody uses this builder for
   // anything more.

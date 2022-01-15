@@ -168,6 +168,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
 
 #define REQUIRED(X) Types.get##X##Type()
 #define OPTIONAL(X) OptionalType::get(Types.get##X##Type())
+#define EXISTENTIAL(X) getASTContext().get##X##ExistentialType()
 
 #define GET_BRIDGING_FN(Module, FromKind, FromTy, ToKind, ToTy) \
   SILDeclRef SILGenModule::get##FromTy##To##ToTy##Fn() { \
@@ -182,8 +183,8 @@ GET_BRIDGING_FN(Darwin, REQUIRED, Bool, REQUIRED, DarwinBoolean)
 GET_BRIDGING_FN(Darwin, REQUIRED, DarwinBoolean, REQUIRED, Bool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
-GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, Error)
-GET_BRIDGING_FN(Foundation, REQUIRED, Error, REQUIRED, NSError)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, EXISTENTIAL, Error)
+GET_BRIDGING_FN(Foundation, EXISTENTIAL, Error, REQUIRED, NSError)
 GET_BRIDGING_FN(WinSDK, REQUIRED, Bool, REQUIRED, WindowsBool)
 GET_BRIDGING_FN(WinSDK, REQUIRED, WindowsBool, REQUIRED, Bool)
 

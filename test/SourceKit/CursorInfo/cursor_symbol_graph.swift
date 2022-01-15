@@ -182,15 +182,6 @@ enum MyEnum {
 // CHECKY:   "symbols": [
 // CHECKY:     {
 // CHECKY:       "accessLevel": "private",
-// CHECKY:       "declarationFragments": [
-// CHECKY:         {
-// CHECKY:           "kind": "keyword",
-// CHECKY:           "spelling": "private"
-// CHECKY:         },
-// CHECKY:         {
-// CHECKY:           "kind": "text",
-// CHECKY:           "spelling": " "
-// CHECKY:         },
 // CHECKY:         {
 // CHECKY:           "kind": "keyword",
 // CHECKY:           "spelling": "var"

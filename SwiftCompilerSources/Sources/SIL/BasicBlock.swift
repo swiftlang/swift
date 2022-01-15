@@ -12,9 +12,14 @@
 
 import SILBridging
 
-final public class BasicBlock : ListNode, CustomStringConvertible {
+final public class BasicBlock : ListNode, CustomStringConvertible, HasName {
   public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
   public var previous: BasicBlock? { SILBasicBlock_previous(bridged).block }
+
+  // Needed for ReverseList<BasicBlock>.reversed(). Never use directly.
+  public var _firstInList: BasicBlock { SILFunction_firstBlock(function.bridged).block! }
+  // Needed for List<BasicBlock>.reversed(). Never use directly.
+  public var _lastInList: BasicBlock { SILFunction_lastBlock(function.bridged).block! }
 
   public var function: Function { SILBasicBlock_getFunction(bridged).function }
 
@@ -25,11 +30,7 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
 
   public var instructions: List<Instruction> {
-    List(startAt: SILBasicBlock_firstInst(bridged).instruction)
-  }
-
-  public var reverseInstructions: ReverseList<Instruction> {
-    ReverseList(startAt: SILBasicBlock_lastInst(bridged).instruction)
+    List(first: SILBasicBlock_firstInst(bridged).instruction)
   }
 
   public var terminator: TermInst {
@@ -51,6 +52,8 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
     }
     return nil
   }
+  
+  public var hasSinglePredecessor: Bool { singlePredecessor != nil }
 
   /// The index of the basic block in its function.
   /// This has O(n) complexity. Only use it for debugging
@@ -60,10 +63,10 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
     }
     fatalError()
   }
+ 
+  public var name: String { "bb\(index)" }
 
-  public var label: String { "bb\(index)" }
-
-  var bridged: BridgedBasicBlock { BridgedBasicBlock(obj: SwiftObject(self)) }
+  public var bridged: BridgedBasicBlock { BridgedBasicBlock(obj: SwiftObject(self)) }
 }
 
 public func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
@@ -80,7 +83,7 @@ public struct ArgumentArray : RandomAccessCollection {
   }
 }
 
-public struct SuccessorArray : RandomAccessCollection, CustomReflectable {
+public struct SuccessorArray : RandomAccessCollection, FormattedLikeArray {
   private let succArray: BridgedArrayRef
 
   init(succArray: BridgedArrayRef) {
@@ -95,14 +98,9 @@ public struct SuccessorArray : RandomAccessCollection, CustomReflectable {
     let s = BridgedSuccessor(succ: succArray.data + index &* BridgedSuccessorSize);
     return SILSuccessor_getTargetBlock(s).block
   }
-
-  public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: nil, value: $0.label) }
-    return Mirror(self, children: c)
-  }
 }
 
-public struct PredecessorList : Sequence, IteratorProtocol, CustomReflectable {
+public struct PredecessorList : CollectionLikeSequence, IteratorProtocol {
   private var currentSucc: OptionalBridgedSuccessor
 
   public init(startAt: OptionalBridgedSuccessor) { currentSucc = startAt }
@@ -114,11 +112,6 @@ public struct PredecessorList : Sequence, IteratorProtocol, CustomReflectable {
       return SILSuccessor_getContainingInst(succ).instruction.block
     }
     return nil
-  }
-
-  public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: nil, value: $0) }
-    return Mirror(self, children: c)
   }
 }
 

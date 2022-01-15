@@ -19,6 +19,5 @@ add_swift_compiler_module(SIL
   Registration.swift
   Type.swift
   Utils.swift
-  StackList.swift
   Value.swift)
 

@@ -855,10 +855,11 @@ public:
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
-    Type exnType = getASTContext().getErrorDecl()->getDeclaredInterfaceType();
-    if (!exnType) return TS;
+    if (!getASTContext().getErrorDecl())
+      return TS;
 
-    TypeChecker::typeCheckExpression(E, DC, {exnType, CTP_ThrowStmt});
+    Type errorType = getASTContext().getErrorExistentialType();
+    TypeChecker::typeCheckExpression(E, DC, {errorType, CTP_ThrowStmt});
     TS->setSubExpr(E);
 
     return TS;
@@ -1205,7 +1206,7 @@ public:
     auto catches = S->getCatches();
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,
-                          getASTContext().getExceptionType());
+                          getASTContext().getErrorExistentialType());
 
     return S;
   }

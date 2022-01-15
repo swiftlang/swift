@@ -169,6 +169,6 @@ Some performance considerations:
 
 * Memory is managed on the C++ side. On the Swift side, SIL objects are treated as "immortal" objects, which avoids (most of) ARC overhead. ARC runtime functions are still being called, but no atomic reference counting operations are done. In future we could add a compiler feature to mark classes as immortal to avoid the runtime calls at all.
 
-* Minimizing memory allocations by using data structures which are malloc-free. For example `StackList` can be used in optimizations to implement work lists without any memory allocations. (Not yet done: `BasicBlockSet`, `BasicBlockData`)
+* Minimizing memory allocations by using data structures which are malloc-free, e.g. `Stack`
 
 * The Swift modules are compiled with `-cross-module-optimization`. This enables the compiler to optimize the Swift code across module boundaries.

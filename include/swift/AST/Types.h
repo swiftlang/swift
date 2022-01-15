@@ -727,6 +727,9 @@ public:
     return getRecursiveProperties().hasDependentMember();
   }
 
+  /// Whether this type represents a generic constraint.
+  bool isConstraintType() const;
+
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
   /// some set of protocols. Protocol and protocol-conformance types are
@@ -2020,7 +2023,7 @@ public:
 
   ParameterTypeFlags withCompileTimeConst(bool isConst) const {
     return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeConst
-                                      : value | ParameterTypeFlags::CompileTimeConst);
+                                      : value - ParameterTypeFlags::CompileTimeConst);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
@@ -2731,6 +2734,8 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ExistentialMetatype;
   }
+
+  Type getExistentialInstanceType();
   
 private:
   ExistentialMetatypeType(Type T, const ASTContext *C,
@@ -5243,7 +5248,7 @@ class ExistentialType final : public TypeBase {
         ConstraintType(constraintType) {}
 
 public:
-  static ExistentialType *get(Type constraint);
+  static Type get(Type constraint);
 
   Type getConstraintType() const { return ConstraintType; }
 
@@ -6335,6 +6340,15 @@ inline GenericTypeParamType *TypeBase::getRootGenericParam() {
   return t->castTo<GenericTypeParamType>();
 }
 
+inline bool TypeBase::isConstraintType() const {
+  return getCanonicalType().isConstraintType();
+}
+
+inline bool CanType::isConstraintTypeImpl(CanType type) {
+  return (isa<ProtocolType>(type) ||
+          isa<ProtocolCompositionType>(type));
+}
+
 inline bool TypeBase::isExistentialType() {
   return getCanonicalType().isExistentialType();
 }
@@ -6441,6 +6455,8 @@ inline NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
 inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
   if (auto Ty = dyn_cast<NominalOrBoundGenericNominalType>(*this))
     return Ty->getDecl();
+  if (auto Ty = dyn_cast<ExistentialType>(*this))
+    return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
   return nullptr;
 }
 
@@ -6449,6 +6465,9 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 }
 
 inline Type TypeBase::getNominalParent() {
+  if (auto existential = getAs<ExistentialType>())
+    return existential->getConstraintType()->getNominalParent();
+
   return castTo<AnyGenericType>()->getParent();
 }
 

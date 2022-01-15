@@ -1003,8 +1003,7 @@ public:
 class CodeCompletionContext {
   friend class CodeCompletionResultBuilder;
 
-  /// A set of current completion results, not yet delivered to the
-  /// consumer.
+  /// A set of current completion results.
   CodeCompletionResultSink CurrentResults;
 
 public:
@@ -1072,13 +1071,10 @@ public:
   /// Allocate a string owned by the code completion context.
   StringRef copyString(StringRef Str);
 
-  /// Return current code completion results.
-  MutableArrayRef<CodeCompletionResult *> takeResults();
-
   /// Sort code completion results in an implementation-defined order
   /// in place.
-  static void sortCompletionResults(
-      MutableArrayRef<CodeCompletionResult *> Results);
+  static std::vector<CodeCompletionResult *>
+  sortCompletionResults(ArrayRef<CodeCompletionResult *> Results);
 
   CodeCompletionResultSink &getResultSink() {
     return CurrentResults;

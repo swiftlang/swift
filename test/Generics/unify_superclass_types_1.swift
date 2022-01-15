@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine=verify -dump-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
 
 class Base {}
 class Derived : Base {
@@ -23,9 +23,7 @@ extension P where Self : Derived {
 // CHECK-NEXT: - [P].[layout: _NativeClass] => [P]
 // CHECK-NEXT: - τ_0_0.[layout: _NativeClass] => τ_0_0
 // CHECK-NEXT: }
-// CHECK-NEXT: Rewrite loops: {
-// CHECK:      }
-// CHECK-NEXT: Property map: {
-// CHECK-NEXT:   [P] => { layout: _NativeClass superclass: [superclass: Base] }
+// CHECK: Property map: {
+// CHECK-NEXT:   [P] => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Base] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Derived] }
 // CHECK-NEXT: }

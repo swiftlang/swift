@@ -1767,6 +1767,13 @@ ConstraintSystem::getTypeOfMemberReference(
     auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
                                                          typeDecl, baseObjTy);
 
+    // If the member type is a constraint, e.g. because the
+    // reference is to a typealias with an underlying protocol
+    // or composition type, the member reference has existential
+    // type.
+    if (memberTy->isConstraintType())
+      memberTy = ExistentialType::get(memberTy);
+
     checkNestedTypeConstraints(*this, memberTy, locator);
 
     // Convert any placeholders and open any generics.
@@ -1995,8 +2002,12 @@ ConstraintSystem::getTypeOfMemberReference(
         if (t->isEqual(selfTy))
           return baseObjTy;
       if (auto *metatypeTy = t->getAs<MetatypeType>())
-        if (metatypeTy->getInstanceType()->isEqual(selfTy))
-          return ExistentialMetatypeType::get(baseObjTy);
+        if (metatypeTy->getInstanceType()->isEqual(selfTy)) {
+          auto constraint = baseObjTy;
+          if (auto existential = baseObjTy->getAs<ExistentialType>())
+            constraint = existential->getConstraintType();
+          return ExistentialMetatypeType::get(constraint);
+        }
       return t;
     });
   }
@@ -2146,7 +2157,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
-           !overload.getBaseType()->getAnyNominal()))
+           (!overload.getBaseType()->getAnyNominal() &&
+            !overload.getBaseType()->is<ExistentialType>())))
         return Type();
 
       // Cope with 'Self' returns.
@@ -2506,14 +2518,16 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       // Okay, now it should be safe to coerce the pattern.
       // Pull the top-level pattern back out.
       pattern = LabelItem.getPattern();
-      Type exnType = DC->getASTContext().getErrorDecl()->getDeclaredInterfaceType();
 
-      if (!exnType)
+      auto &ctx = DC->getASTContext();
+      if (!ctx.getErrorDecl())
         return false;
+
       auto contextualPattern =
           ContextualPattern::forRawPattern(pattern, DC);
       pattern = TypeChecker::coercePatternToType(
-        contextualPattern, exnType, TypeResolverContext::InExpression);
+        contextualPattern, ctx.getErrorExistentialType(),
+        TypeResolverContext::InExpression);
       if (!pattern)
         return false;
 

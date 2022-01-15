@@ -178,9 +178,9 @@ public:
       : Completions(Completions) {}
 
   void handleResults(CodeCompletionContext &context) override {
-    MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
-    CodeCompletionContext::sortCompletionResults(Results);
-    for (auto Result : Results) {
+    auto SortedResults = CodeCompletionContext::sortCompletionResults(
+        context.getResultSink().Results);
+    for (auto Result : SortedResults) {
       std::string InsertableString = toInsertableString(Result);
       if (StringRef(InsertableString).startswith(Completions.Prefix)) {
         llvm::SmallString<128> PrintedResult;

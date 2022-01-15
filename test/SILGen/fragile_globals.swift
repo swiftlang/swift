@@ -11,7 +11,7 @@ var mygg = 29
 // Check if we have one token: from mygg.
 // Initializers from other modules are never fragile.
 
-// CHECK: sil_global private{{.*}} @[[T3:.*]]Wz
+// CHECK: sil_global {{.*}} @[[T3:.*]]Wz
 
 //@inlinable
 public func sum() -> Int {

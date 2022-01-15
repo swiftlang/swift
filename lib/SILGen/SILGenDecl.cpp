@@ -297,7 +297,13 @@ public:
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
-    SGF.B.createDeallocBox(l, Box);
+    auto box = Box;
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
+      auto *bbi = cast<BeginBorrowInst>(box);
+      SGF.B.createEndBorrow(l, bbi);
+      box = bbi->getOperand();
+    }
+    SGF.B.createDeallocBox(l, box);
   }
 
   void dump(SILGenFunction &) const override {
@@ -359,6 +365,10 @@ public:
     // Mark the memory as uninitialized, so DI will track it for us.
     if (kind)
       Box = SGF.B.createMarkUninitialized(decl, Box, kind.getValue());
+
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
+      Box = SGF.B.createBeginBorrow(decl, Box, /*isLexical=*/true);
+    }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
 
@@ -1751,7 +1761,15 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   if (loc.box) {
-    B.emitDestroyValueOperation(silLoc, loc.box);
+    if (!getASTContext().SILOpts.supportsLexicalLifetimes(getModule())) {
+      B.emitDestroyValueOperation(silLoc, loc.box);
+      return;
+    }
+
+    auto *bbi = cast<BeginBorrowInst>(loc.box);
+    B.createEndBorrow(silLoc, bbi);
+    B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+
     return;
   }
 
