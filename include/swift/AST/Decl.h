@@ -4363,6 +4363,11 @@ public:
   /// not exist.
   AssociatedTypeDecl *getAssociatedType(Identifier name) const;
 
+  /// Returns the existential type for this protocol.
+  Type getExistentialType() const {
+    return ExistentialType::get(getDeclaredInterfaceType());
+  }
+
   /// Walk this protocol and all of the protocols inherited by this protocol,
   /// transitively, invoking the callback function for each protocol.
   ///

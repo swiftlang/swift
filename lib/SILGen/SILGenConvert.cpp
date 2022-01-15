@@ -913,8 +913,11 @@ ManagedValue SILGenFunction::emitExistentialMetatypeToObject(SILLocation loc,
 ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
                                                           CanType inputTy,
                                                           SILType resultTy) {
-  ProtocolDecl *protocol = inputTy->castTo<MetatypeType>()
-    ->getInstanceType()->castTo<ProtocolType>()->getDecl();
+  auto protocolType = inputTy->castTo<MetatypeType>()->getInstanceType();
+  if (auto existential = protocolType->getAs<ExistentialType>())
+    protocolType = existential->getConstraintType();
+
+  ProtocolDecl *protocol = protocolType->castTo<ProtocolType>()->getDecl();
 
   SILValue value = B.createObjCProtocol(loc, protocol, resultTy);
   

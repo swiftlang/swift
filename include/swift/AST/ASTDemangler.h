@@ -66,7 +66,7 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
 
-  Type decodeMangledType(NodePointer node);
+  Type decodeMangledType(NodePointer node, bool forRequirement = true);
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);
 
   TypeDecl *createTypeDecl(NodePointer node);
@@ -109,7 +109,8 @@ public:
 
   Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
                                      Type superclass,
-                                     bool isClassBound);
+                                     bool isClassBound,
+                                     bool forRequirement = true);
 
   Type createExistentialMetatypeType(Type instance,
                      Optional<Demangle::ImplMetatypeRepresentation> repr=None);

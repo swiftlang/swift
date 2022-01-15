@@ -315,7 +315,7 @@ namespace swift {
 
     /// Enable support for explicit existential types via the \c any
     /// keyword.
-    bool EnableExplicitExistentialTypes = false;
+    bool EnableExplicitExistentialTypes = true;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;

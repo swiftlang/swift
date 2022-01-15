@@ -149,9 +149,9 @@ func testInvalidAny() {
   let _: any ((S) -> Void) = generic // expected-error{{'any' has no effect on concrete type '(S) -> Void'}}
 }
 
-func testRedundantAnyWarning() {
-  let _: any Any // expected-warning {{'any' is redundant on type 'Any'}}
-  let _: any AnyObject // expected-warning {{'any' is redundant on type 'AnyObject'}}
+func anyAny() {
+  let _: any Any
+  let _: any AnyObject
 }
 
 protocol P1 {}
@@ -161,4 +161,44 @@ struct ConcreteComposition: P1, P2 {}
 func testMetatypes() {
   let _: any P1.Type = ConcreteComposition.self
   let _: any (P1 & P2).Type = ConcreteComposition.self
+}
+
+func generic<T: any P1>(_ t: T) {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'any P1'}}
+
+protocol RawRepresentable {
+  associatedtype RawValue
+  var rawValue: RawValue { get }
+}
+
+enum E1: RawRepresentable {
+  typealias RawValue = P1
+
+  var rawValue: P1 {
+    return ConcreteComposition()
+  }
+}
+
+enum E2: RawRepresentable {
+  typealias RawValue = any P1
+
+  var rawValue: any P1 {
+    return ConcreteComposition()
+  }
+}
+
+public protocol MyError {}
+
+extension MyError {
+  static func ~=(lhs: any Error, rhs: Self) -> Bool {
+    return true
+  }
+}
+
+struct Wrapper {
+  typealias E = Error
+}
+
+func typealiasMemberReferences(metatype: Wrapper.Type) {
+  let _: Wrapper.E.Protocol = metatype.E.self
+  let _: (any Wrapper.E).Type = metatype.E.self
 }
