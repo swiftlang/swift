@@ -72,9 +72,9 @@
 #include "swift/Runtime/SwiftDtoa.h"
 #include "swift/Basic/Lazy.h"
 
-#include "../SwiftShims/LibcShims.h"
-#include "../SwiftShims/RuntimeShims.h"
-#include "../SwiftShims/RuntimeStubs.h"
+#include "SwiftShims/LibcShims.h"
+#include "SwiftShims/RuntimeShims.h"
+#include "SwiftShims/RuntimeStubs.h"
 
 #include "llvm/ADT/StringExtras.h"
 
