@@ -881,7 +881,7 @@ private:
     auto *newElements = ElementStorage::allocate(newCapacity);
 
     if (elements) {
-      if constexpr (std::is_trivially_copyable<ElemTy>::value) {
+      if (std::is_trivially_copyable<ElemTy>::value) {
         memcpy(newElements->data(), elements->data(),
                elementCount * sizeof(ElemTy));
       } else {
