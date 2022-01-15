@@ -30,8 +30,10 @@
 using namespace swift;
 using namespace reflection;
 
-TypeRefBuilder::BuiltType TypeRefBuilder::decodeMangledType(Node *node) {
-  return swift::Demangle::decodeMangledType(*this, node).getType();
+TypeRefBuilder::BuiltType
+TypeRefBuilder::decodeMangledType(Node *node, bool forRequirement) {
+  return swift::Demangle::decodeMangledType(*this, node, forRequirement)
+      .getType();
 }
 
 RemoteRef<char> TypeRefBuilder::readTypeRef(uint64_t remoteAddr) {

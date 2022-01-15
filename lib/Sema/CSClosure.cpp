@@ -621,13 +621,12 @@ private:
     assert(isSupportedMultiStatementClosure() &&
            "Unsupported statement: Throw");
 
-    Type errType =
-        cs.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
-    if (!errType) {
+    if (!cs.getASTContext().getErrorDecl()) {
       hadError = true;
       return;
     }
 
+    auto errType = cs.getASTContext().getErrorExistentialType();
     auto *errorExpr = throwStmt->getSubExpr();
 
     createConjunction(
@@ -739,7 +738,7 @@ private:
         auto *switchStmt = cast<SwitchStmt>(parent.get<Stmt *>());
         contextualTy = cs.getType(switchStmt->getSubjectExpr());
       } else if (parent.isStmt(StmtKind::DoCatch)) {
-        contextualTy = cs.getASTContext().getExceptionType();
+        contextualTy = cs.getASTContext().getErrorExistentialType();
       } else {
         hadError = true;
         return;

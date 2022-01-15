@@ -144,8 +144,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     case 1: {
       assert(AACI->getErrorBB());
       auto &C = AACI->getFunction()->getASTContext();
-      auto errorTy = C.getErrorDecl()->getDeclaredType();
-      auto errorSILTy = SILType::getPrimitiveObjectType(errorTy->getCanonicalType());
+      auto errorTy = C.getErrorExistentialType();
+      auto errorSILTy = SILType::getPrimitiveObjectType(errorTy);
       // error BB. this takes the error value argument
       args.push_back(
           newEdgeBB->createPhiArgument(errorSILTy, OwnershipKind::Owned));

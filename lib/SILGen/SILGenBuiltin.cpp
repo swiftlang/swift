@@ -1564,8 +1564,7 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
 
     Scope errorScope(SGF, loc);
 
-    auto errorTy = SGF.getASTContext().getErrorDecl()->getDeclaredType()
-      ->getCanonicalType();
+    auto errorTy = SGF.getASTContext().getErrorExistentialType();
     auto errorVal = SGF.B.createTermResult(
         SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
 

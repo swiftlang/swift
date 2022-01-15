@@ -806,7 +806,8 @@ bool swift::isRepresentableInObjC(
     Optional<unsigned> completionHandlerErrorParamIndex;
     if (FD->hasThrows()) {
       completionHandlerErrorParamIndex = completionHandlerParams.size();
-      addCompletionHandlerParam(OptionalType::get(ctx.getExceptionType()));
+      auto errorType = ctx.getErrorExistentialType();
+      addCompletionHandlerParam(OptionalType::get(errorType));
     }
 
     Type completionHandlerType = FunctionType::get(

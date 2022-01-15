@@ -66,6 +66,7 @@ struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
   CanType visitBoundGenericStructType(CanType second);
   CanType visitMetatypeType(CanType second);
   CanType visitExistentialMetatypeType(CanType second);
+  CanType visitExistentialType(CanType second);
   CanType visitModuleType(CanType second);
   CanType visitDynamicSelfType(CanType second);
   CanType visitArchetypeType(CanType second);
@@ -269,6 +270,24 @@ CanType TypeJoin::visitExistentialMetatypeType(CanType second) {
     return CanType();
 
   return ExistentialMetatypeType::get(joinInstance)->getCanonicalType();
+}
+
+CanType TypeJoin::visitExistentialType(CanType second) {
+  assert(First != second);
+
+  if (First->getKind() != second->getKind())
+    return TheAnyType;
+
+  auto firstConstraint = First->castTo<ExistentialType>()
+      ->getConstraintType()->getCanonicalType();
+  auto secondConstraint = second->castTo<ExistentialType>()
+      ->getConstraintType()->getCanonicalType();
+
+  auto joinInstance = join(firstConstraint, secondConstraint);
+  if (!joinInstance)
+    return CanType();
+
+  return ExistentialType::get(joinInstance)->getCanonicalType();
 }
 
 CanType TypeJoin::visitModuleType(CanType second) {
