@@ -258,19 +258,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         return nullptr;
       }
 
-      if (constraintType->hasArchetype())
-        constraintType = constraintType->mapTypeOutOfContext();
-
-      if (constraintType->getClassOrBoundGenericClass()) {
-        requirements.push_back(
-            Requirement(RequirementKind::Superclass, paramType,
-                        constraintType));
-      } else {
-        // In this case, the constraint type is an existential
-        requirements.push_back(
-            Requirement(RequirementKind::Conformance, paramType,
-                        constraintType));
-      }
+      assert(!constraintType->hasArchetype());
+      requirements.emplace_back(RequirementKind::Conformance, paramType,
+                                constraintType);
     }
 
     interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
