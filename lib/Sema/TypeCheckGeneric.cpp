@@ -250,7 +250,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
 
       // Error out if the constraint type isn't a class or existential type.
       if (!constraintType->getClassOrBoundGenericClass() &&
-          !constraintType->isExistentialType()) {
+          !constraintType->is<ProtocolType>() &&
+          !constraintType->is<ProtocolCompositionType>() &&
+          !constraintType->is<ParametrizedProtocolType>()) {
         ctx.Diags.diagnose(currentRepr->getLoc(),
                            diag::opaque_type_invalid_constraint);
         return nullptr;
