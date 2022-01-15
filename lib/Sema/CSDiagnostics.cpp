@@ -221,6 +221,10 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     // diagnostic directly to its declaration without desugaring.
     if (auto *alias = dyn_cast<TypeAliasType>(type.getPointer()))
       return alias->getDecl();
+
+    if (auto existential = type->getAs<ExistentialType>())
+      return existential->getConstraintType()->getAnyGeneric();
+
     return type->getAnyGeneric();
   };
 
@@ -531,10 +535,14 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
     return false;
   }
 
+  Type constraintType = nonConformingType;
+  if (auto existential = constraintType->getAs<ExistentialType>())
+    constraintType = existential->getConstraintType();
+
   emitDiagnostic(diag::type_cannot_conform,
                  nonConformingType->isExistentialType(), 
                  nonConformingType, 
-                 nonConformingType->isEqual(protocolType),
+                 constraintType->isEqual(protocolType),
                  protocolType);
 
   bool emittedSpecializedNote = false;
@@ -2328,9 +2336,13 @@ bool ContextualFailure::diagnoseAsError() {
 
     if (CTP == CTP_ForEachStmt || CTP == CTP_ForEachSequence) {
       if (fromType->isAnyExistentialType()) {
+        Type constraintType = fromType;
+        if (auto existential = constraintType->getAs<ExistentialType>())
+          constraintType = existential->getConstraintType();
+
         emitDiagnostic(diag::type_cannot_conform,
                        /*isExistentialType=*/true, fromType, 
-                       fromType->isEqual(toType), toType);
+                       constraintType->isEqual(toType), toType);
         emitDiagnostic(diag::only_concrete_types_conform_to_protocols);
         return true;
       }
@@ -3063,7 +3075,10 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   // the protocols of the composition, then store the composition directly.
   // This is because we need to append 'Foo & Bar' instead of 'Foo, Bar' in
   // order to match the written type.
-  if (auto compositionTy = unwrappedToType->getAs<ProtocolCompositionType>()) {
+  auto constraint = unwrappedToType;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+  if (auto compositionTy = constraint->getAs<ProtocolCompositionType>()) {
     if (compositionTy->getMembers().size() == missingProtoTypeStrings.size()) {
       missingProtoTypeStrings = {compositionTy->getString()};
     }
@@ -3651,7 +3666,8 @@ bool MissingMemberFailure::diagnoseAsError() {
       diagnostic.highlight(getSourceRange())
           .highlight(nameLoc.getSourceRange());
       correction->addFixits(diagnostic);
-    } else if (instanceTy->getAnyNominal() &&
+    } else if ((instanceTy->getAnyNominal() ||
+                instanceTy->is<ExistentialType>()) &&
                getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto &cs = getConstraintSystem();
 
@@ -4123,7 +4139,11 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
           // If we are in a protocol extension of 'Proto' and we see
           // 'Proto.static', suggest 'Self.static'
           if (auto extensionContext = parent->getExtendedProtocolDecl()) {
-            if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
+            auto constraint = instanceTy;
+            if (auto existential = constraint->getAs<ExistentialType>())
+              constraint = existential->getConstraintType();
+
+            if (extensionContext->getDeclaredType()->isEqual(constraint)) {
               Diag->fixItReplace(getSourceRange(), "Self");
             }
           }
@@ -6838,10 +6858,14 @@ bool AssignmentTypeMismatchFailure::diagnoseMissingConformance() const {
 
   auto retrieveProtocols = [](Type type,
                               llvm::SmallPtrSetImpl<ProtocolDecl *> &members) {
-    if (auto *protocol = type->getAs<ProtocolType>())
+    auto constraint = type;
+    if (auto existential = constraint->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
+
+    if (auto *protocol = constraint->getAs<ProtocolType>())
       members.insert(protocol->getDecl());
 
-    if (auto *composition = type->getAs<ProtocolCompositionType>()) {
+    if (auto *composition = constraint->getAs<ProtocolCompositionType>()) {
       for (auto member : composition->getMembers()) {
         if (auto *protocol = member->getAs<ProtocolType>())
           members.insert(protocol->getDecl());

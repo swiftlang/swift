@@ -2960,8 +2960,19 @@ public:
             "value_metatype instruction must have a metatype representation");
     require(MI->getOperand()->getType().isAnyExistentialType(),
             "existential_metatype operand must be of protocol type");
+
+    // The result of an existential_metatype instruction is an existential
+    // metatype with the same constraint type as its existential operand.
     auto formalInstanceTy
       = MI->getType().castTo<ExistentialMetatypeType>().getInstanceType();
+    if (M->getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+        formalInstanceTy->isConstraintType() &&
+        !(formalInstanceTy->isAny() || formalInstanceTy->isAnyObject())) {
+      require(MI->getOperand()->getType().is<ExistentialType>(),
+              "existential_metatype operand must be an existential type");
+      formalInstanceTy =
+          ExistentialType::get(formalInstanceTy)->getCanonicalType();
+    }
     require(isLoweringOf(MI->getOperand()->getType(), formalInstanceTy),
             "existential_metatype result must be formal metatype of "
             "lowered operand type");
@@ -5252,7 +5263,7 @@ public:
       require(AACI->getErrorBB()->getNumArguments() == 1,
               "error successor must take one argument");
       auto arg = AACI->getErrorBB()->getArgument(0);
-      auto errorType = C.getErrorDecl()->getDeclaredType()->getCanonicalType();
+      auto errorType = C.getErrorExistentialType();
       requireSameType(arg->getType(),
                       SILType::getPrimitiveObjectType(errorType),
               "error successor argument must have Error type");

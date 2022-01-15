@@ -4500,7 +4500,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   }
 
   // Check whether we have a reasonable constraint type at all.
-  if (!constraintType->isExistentialType() &&
+  if (!constraintType->is<ProtocolType>() &&
+      !constraintType->is<ProtocolCompositionType>() &&
       !constraintType->getClassOrBoundGenericClass()) {
     if (source.getLoc().isValid() && !constraintType->hasError()) {
       Impl->HadAnyError = true;
@@ -6292,8 +6293,16 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
       auto source = constraint.source;
       auto loc = source->getLoc();
 
+      // FIXME: The constraint string is printed directly here because
+      // the current default is to not print `any` for existential
+      // types, but this error message is super confusing without `any`
+      // if the user wrote it explicitly.
+      PrintOptions options;
+      options.PrintExplicitAny = true;
+      auto constraintString = constraintType.getString(options);
+
       Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
-                     subjectType, constraintType);
+                     subjectType, constraintString);
       
       auto getNameWithoutSelf = [&](std::string subjectTypeName) {
         std::string selfSubstring = "Self.";
@@ -6311,7 +6320,7 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
         auto subjectTypeName = subjectType.getString();
         auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
         Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
-                       subjectTypeNameWithoutSelf, constraintType.getString())
+                       subjectTypeNameWithoutSelf, constraintString)
              .fixItReplace(loc, " == ");
       }
     }

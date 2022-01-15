@@ -517,7 +517,7 @@ public:
     auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
 
     auto errorTy = throws
-      ? SGF.getASTContext().getExceptionType()
+      ? SGF.getASTContext().getErrorExistentialType()
       : SGF.getASTContext().getNeverType();
     auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
                                                 { calleeTypeInfo.substResultType, errorTy })
@@ -627,7 +627,7 @@ public:
 
         auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
 
-        auto errorTy = SGF.getASTContext().getExceptionType();
+        auto errorTy = SGF.getASTContext().getErrorExistentialType();
         auto continuationBGT =
             BoundGenericType::get(continuationDecl, Type(),
                                   {calleeTypeInfo.substResultType, errorTy});
@@ -675,9 +675,8 @@ public:
       SGF.B.emitBlock(errorBlock);
       
       Scope errorScope(SGF, loc);
-      
-      auto errorTy = SGF.getASTContext().getErrorDecl()->getDeclaredType()
-        ->getCanonicalType();
+
+      auto errorTy = SGF.getASTContext().getErrorExistentialType();
       auto errorVal = SGF.B.createTermResult(
         SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
 

@@ -104,6 +104,8 @@ NominalTypeDecl *CanType::getAnyNominal() const {
 }
 
 GenericTypeDecl *CanType::getAnyGeneric() const {
+  if (auto existential = dyn_cast<ExistentialType>(*this))
+    return existential->getConstraintType()->getAnyGeneric();
   if (auto Ty = dyn_cast<AnyGenericType>(*this))
     return Ty->getDecl();
   return nullptr;
@@ -464,6 +466,8 @@ Type TypeBase::eraseOpenedExistential(OpenedArchetypeType *opened) {
       auto instanceType = metatypeType->getInstanceType();
       if (instanceType->hasOpenedExistential()) {
         instanceType = instanceType->eraseOpenedExistential(opened);
+        if (auto existential = instanceType->getAs<ExistentialType>())
+          instanceType = existential->getConstraintType();
         return ExistentialMetatypeType::get(instanceType);
       }
     }
@@ -1199,6 +1203,9 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
 /// Look through a metatype, or just return the original type if it is
 /// not a metatype.
 Type TypeBase::getMetatypeInstanceType() {
+  if (auto existentialMetaType = getAs<ExistentialMetatypeType>())
+    return existentialMetaType->getExistentialInstanceType();
+
   if (auto metaTy = getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
@@ -1494,7 +1501,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::Existential: {
     auto *existential = cast<ExistentialType>(this);
     auto constraint = existential->getConstraintType()->getCanonicalType();
-    Result = ExistentialType::get(constraint);
+    Result = ExistentialType::get(constraint).getPointer();
     break;
   }
   case TypeKind::ExistentialMetatype: {
@@ -2638,13 +2645,16 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // If type has an error let's fail early.
   if (type->hasError())
     return failure();
-  
+
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
   if (auto valueType = type->getOptionalObjectType()) {
     type = valueType;
     wasOptional = true;
   }
+
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
 
   // Objective-C object types, including metatypes.
   if (language == ForeignLanguage::ObjectiveC) {
@@ -3237,9 +3247,11 @@ Type ArchetypeType::getExistentialType() const {
   for (auto proto : getConformsTo()) {
     constraintTypes.push_back(proto->getDeclaredInterfaceType());
   }
-  return ProtocolCompositionType::get(
-     const_cast<ArchetypeType*>(this)->getASTContext(), constraintTypes,
-                                      requiresClass());
+  auto &ctx = const_cast<ArchetypeType*>(this)->getASTContext();
+  auto constraint = ProtocolCompositionType::get(
+     ctx, constraintTypes, requiresClass());
+
+  return ExistentialType::get(constraint);
 }
 
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
@@ -5550,6 +5562,10 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
   if (!Ty)
     return false;
 
+  if (auto existential = dyn_cast<ExistentialType>(Ty.getPointer()))
+    return existential->getConstraintType()
+        .isPrivateStdlibType(treatNonBuiltinProtocolsAsPublic);
+
   // A 'public' typealias can have an 'internal' type.
   if (auto *NAT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
     auto *AliasDecl = NAT->getDecl();
@@ -5734,7 +5750,7 @@ SILBoxType::SILBoxType(ASTContext &C,
 Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
   assert(isAnyExistentialType());
   if (auto metaty = getAs<ExistentialMetatypeType>()) {
-    opened = OpenedArchetypeType::get(metaty->getInstanceType());
+    opened = OpenedArchetypeType::get(metaty->getExistentialInstanceType());
     if (metaty->hasRepresentation())
       return MetatypeType::get(opened, metaty->getRepresentation());
     else
