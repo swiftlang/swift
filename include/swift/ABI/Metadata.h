@@ -3096,6 +3096,8 @@ public:
   }
 };
 
+using GenericEnvironmentDescriptor = TargetGenericEnvironment<InProcess>;
+
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.
 template<class Self,
@@ -5144,6 +5146,10 @@ public:
   /// The name of the function, which is a unique string assigned to the
   /// function so it can be looked up later.
   RelativeDirectPointer<const char, /*nullable*/ false> Name;
+
+  /// The generic environment associated with this accessor function.
+  RelativeDirectPointer<GenericEnvironmentDescriptor, /*nullable*/ true>
+      GenericEnvironment;
 
   /// The Swift function type, encoded as a mangled name.
   RelativeDirectPointer<const char, /*nullable*/ false> FunctionType;
