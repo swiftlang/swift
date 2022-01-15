@@ -4,7 +4,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
-// REQUIRES: rdar87568630
+
+// rdar://87568630 - segmentation fault on 32-bit WatchOS simulator
+// UNSUPPORTED: OS=watchos && CPU=i386
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
