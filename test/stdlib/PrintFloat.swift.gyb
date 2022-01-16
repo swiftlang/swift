@@ -3,7 +3,6 @@
 // RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-build-swift %t/FloatingPointPrinting.swift -o %t/main.out
 // RUN: %target-codesign %t/main.out
 // RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-run %t/main.out
-// RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-run %t/main.out --locale ru_RU.UTF-8
 // REQUIRES: executable_test
 
 // rdar://77087867
@@ -15,6 +14,8 @@ import SwiftPrivateLibcExtras
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif os(WASI)
+  import WASILibc
 #elseif os(Windows)
   import CRT
 #else

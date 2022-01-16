@@ -1,8 +1,8 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
+// RUN: %target-sil-opt -enable-copy-propagation=requested-passes-only -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-copy-propagation=requested-passes-only -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
 //
 // FIXME: check copy-propagation output instead once it is the default mode
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation | %FileCheck %s --check-prefix=CHECK_COPYPROP
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation -enable-lexical-lifetimes=false | %FileCheck %s --check-prefix=CHECK_COPYPROP
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -2383,7 +2383,8 @@ bb0:
   %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
   %3a = copy_value %3 : $B
   %r = apply %f(%3a) : $@convention(thin) (@owned B) -> @owned B
-  dealloc_ref [stack] %3 : $B
+  dealloc_ref %3 : $B
+  dealloc_stack_ref %3 : $B
   destroy_value %r : $B
   %10 = tuple ()
   return %10 : $()
@@ -2391,9 +2392,9 @@ bb0:
 
 // CHECK-LABEL: sil [ossa] @dont_delete_readonly_function_dealloc_ref_multibb :
 // CHECK:      apply
-// CHECK:      dealloc_ref
+// CHECK:      dealloc_stack_ref
 // CHECK-NEXT: destroy_value
-// CHECK:      dealloc_ref
+// CHECK:      dealloc_stack_ref
 // CHECK-NEXT: destroy_value
 // CHECK:      return
 // CHECK: } // end sil function 'dont_delete_readonly_function_dealloc_ref_multibb'
@@ -2406,12 +2407,14 @@ bb0:
   cond_br undef, bb1, bb2
 
 bb1:
-  dealloc_ref [stack] %3 : $B
+  dealloc_ref %3 : $B
+  dealloc_stack_ref %3 : $B
   destroy_value %r : $B
   br bb3
 
 bb2:
-  dealloc_ref [stack] %3 : $B
+  dealloc_ref %3 : $B
+  dealloc_stack_ref %3 : $B
   destroy_value %r : $B
   br bb3
 
@@ -2430,7 +2433,8 @@ bb0:
   %3a = copy_value %3 : $B
   %r = apply %f(%3a) : $@convention(thin) (@owned B) -> @owned B
   destroy_value %r : $B
-  dealloc_ref [stack] %3 : $B
+  dealloc_ref %3 : $B
+  dealloc_stack_ref %3 : $B
   %10 = tuple ()
   return %10 : $()
 }
@@ -2448,12 +2452,14 @@ bb0:
 
 bb1:
   destroy_value %r : $B
-  dealloc_ref [stack] %3 : $B
+  dealloc_ref %3 : $B
+  dealloc_stack_ref %3 : $B
   br bb3
 
 bb2:
   destroy_value %r : $B
-  dealloc_ref [stack] %3 : $B
+  dealloc_ref %3 : $B
+  dealloc_stack_ref %3 : $B
   br bb3
 
 bb3:
@@ -3943,7 +3949,8 @@ sil [ossa] @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_ref [stack] $B
   set_deallocating %1 : $B
-  dealloc_ref [stack] %1 : $B
+  dealloc_ref %1 : $B
+  dealloc_stack_ref %1 : $B
   %3 = tuple ()
   return %3 : $()
 }

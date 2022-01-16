@@ -58,3 +58,5 @@ struct not_importable;
 
 void opaque_pointer_param(struct not_importable *);
 
+int unsupported_parameter_type(int param1, _Complex int param2);
+_Complex int unsupported_return_type();

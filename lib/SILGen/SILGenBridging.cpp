@@ -1252,7 +1252,7 @@ ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
   // FIXME: maybe we should use a different entrypoint for this case, to
   // avoid the code size and performance overhead of forming the box?
   nativeError = emitUnabstractedCast(*this, loc, nativeError, nativeType,
-                                     getASTContext().getExceptionType());
+                                     getASTContext().getErrorExistentialType());
 
   auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getErrorToNSErrorFn());
   auto bridgeFnType = bridgeFn->getType().castTo<SILFunctionType>();
@@ -1523,7 +1523,8 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
                                               F.isSerialized(),
                                               ProfileCounter(),
                                               IsThunk,
-                                              IsNotDynamic);
+                                              IsNotDynamic,
+                                              IsNotDistributed);
   
   auto closureRef = B.createFunctionRef(loc, closure);
   

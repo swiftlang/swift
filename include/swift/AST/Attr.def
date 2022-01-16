@@ -150,7 +150,7 @@ SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
   OnNominalType |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   6)
-SIMPLE_DECL_ATTR(main, MainType,
+DECL_ATTR(main, MainType,
   OnClass | OnStruct | OnEnum | OnExtension |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   7)
@@ -690,7 +690,7 @@ SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
 
 SIMPLE_DECL_ATTR(_predatesConcurrency, PredatesConcurrency,
   OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript |
-  OnEnumElement | UserInaccessible |
+  OnEnumElement | OnImport | UserInaccessible |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   125)
 
@@ -699,7 +699,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   126)
 
-SIMPLE_DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
+DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
   OnFunc | OnConstructor | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIStableToRemove,

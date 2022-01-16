@@ -52,6 +52,10 @@ static llvm::cl::opt<bool> SILPrintCanonicalModule(
     "sil-print-canonical-module", llvm::cl::init(false),
     llvm::cl::desc("Print the textual SIL module after diagnostics"));
 
+static llvm::cl::opt<bool> SILPrintFinalOSSAModule(
+    "sil-print-final-ossa-module", llvm::cl::init(false),
+    llvm::cl::desc("Print the textual SIL module before lowering from OSSA"));
+
 static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
@@ -139,12 +143,15 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addSILSkippingChecker();
 #endif
 
-  if (Options.shouldOptimize() &&
-      Options.LexicalLifetimes != LexicalLifetimesOption::ExperimentalLate) {
+  if (Options.shouldOptimize()) {
     P.addDestroyHoisting();
   }
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
+
+  // Before we promote any loads, perform _move checking for addresses.
+  P.addMoveFunctionCanonicalization();
+  P.addMoveKillsCopyableAddressesChecker();
 
   // Promote loads as necessary to ensure we have enough SSA formation to emit
   // SSA based diagnostics.
@@ -173,7 +180,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Now that we have finished performing diagnostics that rely on lexical
   // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.
-  if (Options.LexicalLifetimes != LexicalLifetimesOption::ExperimentalLate) {
+  if (Options.LexicalLifetimes != LexicalLifetimesOption::On) {
     P.addLexicalLifetimeEliminator();
   }
 
@@ -187,10 +194,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Only issue weak lifetime warnings for users who select object lifetime
   // optimization. The risk of spurious warnings outweighs the benefits.
-  if (P.getOptions().EnableCopyPropagation) {
+  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
     P.addDiagnoseLifetimeIssues();
   }
-  
+
   P.addGlobalOpt();
   P.addPerformanceDiagnostics();
   
@@ -355,6 +362,16 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addSROA();
   }
 
+  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
+    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+      return;
+
+    if (SILPrintFinalOSSAModule) {
+      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+    }
+    P.addNonTransparentFunctionOwnershipModelEliminator();
+  }
+
   // Promote stack allocations to values.
   P.addMem2Reg();
 
@@ -405,7 +422,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   if (P.getOptions().EnableOSSAModules) {
     // We earlier eliminated ownership if we are not compiling the stdlib. Now
     // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
-    if (!P.getOptions().DisableCopyPropagation) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
@@ -429,7 +446,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Clean up Semantic ARC before we perform additional post-inliner opts.
   if (P.getOptions().EnableOSSAModules) {
-    if (!P.getOptions().DisableCopyPropagation) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
@@ -496,7 +513,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Run a final round of ARC opts when ownership is enabled.
   if (P.getOptions().EnableOSSAModules) {
-    if (!P.getOptions().DisableCopyPropagation) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
@@ -532,7 +549,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
   // Cleanup after SILGen: remove unneeded borrows/copies.
-  if (P.getOptions().EnableCopyPropagation) {
+  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
@@ -546,6 +563,9 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
       return;
 
+    if (SILPrintFinalOSSAModule) {
+      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+    }
     P.addNonTransparentFunctionOwnershipModelEliminator();
   }
 
@@ -561,23 +581,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // optimization.
   P.addGlobalOpt();
 
-  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
-    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-      return;
-
-    P.addNonTransparentFunctionOwnershipModelEliminator();
-  }
-
   // Add the outliner pass (Osize).
   P.addOutliner();
-
-  P.addCrossModuleSerializationSetup();
-  
-  // In case of cross-module-optimization, we need to serialize right after
-  // CrossModuleSerializationSetup. Eventually we want to serialize early
-  // anyway, but for now keep the SerializeSILPass at the later stage of the
-  // pipeline in case cross-module-optimization is not enabled.
-  P.addCMOSerializeSILPass();
 }
 
 // The "high-level" pipeline serves two purposes:
@@ -616,19 +621,6 @@ static void addHighLevelModulePipeline(SILPassPipelinePlan &P) {
 
   P.addGlobalOpt();
   P.addLetPropertiesOpt();
-}
-
-static void addSerializePipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("Serialize");
-  // It is important to serialize before any of the @_semantics
-  // functions are inlined, because otherwise the information about
-  // uses of such functions inside the module is lost,
-  // which reduces the ability of the compiler to optimize clients
-  // importing this module.
-  P.addSerializeSILPass();
-
-  // Strip any transparent functions that still have ownership.
-  P.addOwnershipModelEliminator();
 }
 
 static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
@@ -774,7 +766,9 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 #endif
 
   // Only has an effect if the -assume-single-thread option is specified.
-  P.addAssumeSingleThreaded();
+  if (P.getOptions().AssumeSingleThreaded) {
+    P.addAssumeSingleThreaded();
+  }
 
   // Emits remarks on all functions with @_assemblyVision attribute.
   P.addAssemblyVisionRemarkGenerator();
@@ -834,29 +828,40 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // This also performs early OSSA based optimizations on *all* swift code.
   addPerfEarlyModulePassPipeline(P);
 
-  // Then if we were asked to stop optimization before lowering OSSA (causing us
-  // to exit early from addPerfEarlyModulePassPipeline), exit early.
-  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-    return P;
-
   // Then run an iteration of the high-level SSA passes.
   //
   // FIXME: When *not* emitting a .swiftmodule, skip the high-level function
   // pipeline to save compile time.
   addHighLevelFunctionPipeline(P);
 
+  // Then if we were asked to stop optimization before lowering OSSA (causing us
+  // to exit early from addHighLevelFunctionPipeline), exit early.
+  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+    return P;
+
   addHighLevelModulePipeline(P);
 
   // Run one last copy propagation/semantic arc opts run before serialization/us
   // lowering ownership.
   if (P.getOptions().EnableOSSAModules) {
-    if (!P.getOptions().DisableCopyPropagation) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
   }
 
-  addSerializePipeline(P);
+  P.addCrossModuleOptimization();
+
+  // It is important to serialize before any of the @_semantics
+  // functions are inlined, because otherwise the information about
+  // uses of such functions inside the module is lost,
+  // which reduces the ability of the compiler to optimize clients
+  // importing this module.
+  P.addSerializeSILPass();
+
+  // Strip any transparent functions that still have ownership.
+  P.addOwnershipModelEliminator();
+
   if (Options.StopOptimizationAfterSerialization)
     return P;
 
@@ -902,7 +907,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
-  if (P.getOptions().EnableCopyPropagation) {
+  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
     // MandatoryCopyPropagation should only be run at -Onone, not -O.
     P.addMandatoryCopyPropagation();
   }
@@ -922,7 +927,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.addUsePrespecialized();
 
   // Has only an effect if the -assume-single-thread option is specified.
-  P.addAssumeSingleThreaded();
+  if (P.getOptions().AssumeSingleThreaded) {
+    P.addAssumeSingleThreaded();
+  }
 
   // Create pre-specializations.
   P.addOnonePrespecializations();

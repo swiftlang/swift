@@ -304,12 +304,17 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
     auto &param = params[Idx];
     auto PType = param.getArgumentType(M, FTy, F->getTypeExpansionContext());
     assert(PType.isExistentialType());
+
+    CanType constraint = PType;
+    if (auto existential = PType->getAs<ExistentialType>())
+      constraint = existential->getConstraintType()->getCanonicalType();
+
     /// Generate new generic parameter.
     auto *NewGenericParam =
         GenericTypeParamType::get(/*type sequence*/ false, Depth, GPIdx++, Ctx);
     genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
-                               PType);
+                               constraint);
     requirements.push_back(NewRequirement);
     ArgToGenericTypeMap.insert(
         std::pair<int, GenericTypeParamType *>(Idx, NewGenericParam));
@@ -631,9 +636,9 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
 
     NewF = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), IsNotDynamic, F->getEntryCount(),
-      F->isThunk(), F->getClassSubclassScope(), F->getInlineStrategy(),
-      F->getEffectsKind(), nullptr, F->getDebugScope());
+      F->isTransparent(), F->isSerialized(), IsNotDynamic, IsNotDistributed,
+      F->getEntryCount(), F->isThunk(), F->getClassSubclassScope(),
+      F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
 
     /// Set the semantics attributes for the new function.
     for (auto &Attr : F->getSemanticsAttrs())

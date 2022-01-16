@@ -914,14 +914,14 @@ protected:
 
   /// Visit a throw statement, which never produces a result.
   VarDecl *visitThrowStmt(ThrowStmt *throwStmt) {
-    Type exnType = ctx.getErrorDecl()->getDeclaredInterfaceType();
-    if (!exnType) {
+    if (!ctx.getErrorDecl()) {
       hadError = true;
     }
 
     if (cs) {
      SolutionApplicationTarget target(
-         throwStmt->getSubExpr(), dc, CTP_ThrowStmt, exnType,
+         throwStmt->getSubExpr(), dc, CTP_ThrowStmt,
+         ctx.getErrorExistentialType(),
          /*isDiscarded=*/false);
      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
        hadError = true;
@@ -1109,26 +1109,6 @@ private:
     elements.push_back(pbd);
   }
 
-  /// Produce a final type-checked pattern binding.
-  void finishPatternBindingDecl(PatternBindingDecl *patternBinding) {
-    for (unsigned index : range(patternBinding->getNumPatternEntries())) {
-      // Find the solution application target for this.
-      auto knownTarget =
-          *solution.getConstraintSystem().getSolutionApplicationTarget(
-            {patternBinding, index});
-
-      // Rewrite the target.
-      auto resultTarget = rewriteTarget(knownTarget);
-      if (!resultTarget)
-        continue;
-
-      patternBinding->setPattern(
-          index, resultTarget->getInitializationPattern(),
-          resultTarget->getDeclContext());
-      patternBinding->setInit(index, resultTarget->getAsExpr());
-    }
-  }
-
 public:
   BuilderClosureRewriter(
       const Solution &solution,
@@ -1226,14 +1206,18 @@ public:
       // Skip variable declarations; they're always part of a pattern
       // binding.
       if (isa<VarDecl>(decl)) {
+        TypeChecker::typeCheckDecl(decl);
         newElements.push_back(decl);
         continue;
       }
 
       // Handle pattern bindings.
       if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-        finishPatternBindingDecl(patternBinding);
-        newElements.push_back(decl);
+        auto resultTarget = rewriteTarget(SolutionApplicationTarget{patternBinding});
+        assert(resultTarget.hasValue()
+               && "Could not rewrite pattern binding entries!");
+        TypeChecker::typeCheckDecl(resultTarget->getAsPatternBinding());
+        newElements.push_back(resultTarget->getAsPatternBinding());
         continue;
       }
 

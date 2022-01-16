@@ -465,7 +465,7 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
   auto *fn = functionBuilder.createFunction(
       orig->getLinkage(), clonedName, clonedTy, orig->getGenericEnvironment(),
       orig->getLocation(), orig->isBare(), IsNotTransparent, serialized,
-      IsNotDynamic, orig->getEntryCount(), orig->isThunk(),
+      IsNotDynamic, IsNotDistributed, orig->getEntryCount(), orig->isThunk(),
       orig->getClassSubclassScope(), orig->getInlineStrategy(),
       orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
@@ -1040,6 +1040,7 @@ public:
   ALWAYS_NON_ESCAPING_INST(Load)
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
   ALWAYS_NON_ESCAPING_INST(DestroyValue)
+  ALWAYS_NON_ESCAPING_INST(EndBorrow)
 #undef ALWAYS_NON_ESCAPING_INST
 
   bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
@@ -1108,7 +1109,14 @@ public:
 #undef RECURSIVE_INST_VISITOR
 
   bool visitCopyAddrInst(CopyAddrInst *cai) {
-    if (currentOp.get()->getOperandNumber() == 1 || cai->isTakeOfSrc())
+    if (currentOp.get()->getOperandNumber() == CopyAddrInst::Dest ||
+        cai->isTakeOfSrc())
+      markCurrentOpAsMutation();
+    return true;
+  }
+
+  bool visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *mai) {
+    if (currentOp.get()->getOperandNumber() == MarkUnresolvedMoveAddrInst::Dest)
       markCurrentOpAsMutation();
     return true;
   }
@@ -1206,7 +1214,8 @@ static bool findEscapeOrMutationUses(Operand *op,
   // we want to be more conservative around non-top level copies (i.e. a copy
   // derived from a projection like instruction). In fact such a thing may not
   // even make any sense!
-  if (isa<CopyValueInst>(user) || isa<MarkUninitializedInst>(user)) {
+  if (isa<CopyValueInst>(user) || isa<MarkUninitializedInst>(user) ||
+      isa<BeginBorrowInst>(user)) {
     bool foundSomeMutations = false;
     for (auto *use : cast<SingleValueInstruction>(user)->getUses()) {
       foundSomeMutations |= findEscapeOrMutationUses(use, state);

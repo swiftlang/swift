@@ -1078,7 +1078,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 
         const auto &PathRemapper = options.DebuggingOptionsPrefixMap;
         const auto &PathObfuscator = options.PathObfuscator;
-        auto sdkPath = M->getASTContext().SearchPathOpts.SDKPath;
+        auto sdkPath = M->getASTContext().SearchPathOpts.getSDKPath();
         SDKPath.emit(
             ScratchRecord,
             PathObfuscator.obfuscate(PathRemapper.remapPath(sdkPath)));
@@ -1164,10 +1164,10 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.
-    for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
+    for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths())
       SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
                       PathObfuscator.obfuscate(PathMapper.remapPath(framepath.Path)));
-    for (auto &path : searchPathOpts.ImportSearchPaths)
+    for (const auto &path : searchPathOpts.getImportSearchPaths())
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
                       PathObfuscator.obfuscate(PathMapper.remapPath(path)));
   }
@@ -2590,6 +2590,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_MainType: {
+      auto abbrCode = S.DeclTypeAbbrCodes[MainTypeDeclAttrLayout::Code];
+      MainTypeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                         DA->isImplicit());
+      return;
+    }
+
     case DAK_Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
       auto attr = cast<SpecializeAttr>(DA);
@@ -2752,6 +2759,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_TypeSequence: {
       auto abbrCode = S.DeclTypeAbbrCodes[TypeSequenceDeclAttrLayout::Code];
       TypeSequenceDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
+      return;
+    }
+
+    case DAK_UnavailableFromAsync: {
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[UnavailableFromAsyncDeclAttrLayout::Code];
+      auto *theAttr = cast<UnavailableFromAsyncAttr>(DA);
+      UnavailableFromAsyncDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          theAttr->Message);
       return;
     }
     }
@@ -3278,10 +3295,6 @@ public:
         binding->getNumPatternEntries(),
         initContextIDs);
 
-    DeclContext *owningDC = nullptr;
-    if (binding->getDeclContext()->isTypeContext())
-      owningDC = binding->getDeclContext();
-
     for (auto entryIdx : range(binding->getNumPatternEntries())) {
       writePattern(binding->getPattern(entryIdx));
       // Ignore initializer; external clients don't need to know about it.
@@ -3620,6 +3633,7 @@ public:
                                const_cast<ProtocolDecl *>(proto)
                                  ->requiresClass(),
                                proto->isObjC(),
+                               proto->existentialRequiresAny(),
                                rawAccessLevel, numInherited,
                                inheritedAndDependencyTypes);
 
@@ -3806,21 +3820,20 @@ public:
     auto contextID = S.addDeclContextRef(opaqueDecl->getDeclContext());
     auto interfaceSigID = S.addGenericSignatureRef(
         opaqueDecl->getOpaqueInterfaceGenericSignature());
-    auto interfaceTypeID =
-      S.addTypeRef(opaqueDecl->getUnderlyingInterfaceType());
+    auto interfaceTypeID = S.addTypeRef(opaqueDecl->getDeclaredInterfaceType());
 
     auto genericSigID = S.addGenericSignatureRef(opaqueDecl->getGenericSignature());
 
-    SubstitutionMapID underlyingTypeID = 0;
+    SubstitutionMapID underlyingSubsID = 0;
     if (auto underlying = opaqueDecl->getUnderlyingTypeSubstitutions())
-      underlyingTypeID = S.addSubstitutionMapRef(*underlying);
+      underlyingSubsID = S.addSubstitutionMapRef(*underlying);
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(opaqueDecl->getFormalAccess());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
     OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
-                                 underlyingTypeID, rawAccessLevel);
+                                 underlyingSubsID, rawAccessLevel);
     writeGenericParams(opaqueDecl->getGenericParams());
   }
 
@@ -4162,6 +4175,7 @@ static uint8_t getRawStableSILFunctionTypeRepresentation(
   SIMPLE_CASE(SILFunctionTypeRepresentation, ObjCMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, WitnessMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, Closure)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, CXXMethod)
   }
   llvm_unreachable("bad calling convention");
 }
@@ -4373,6 +4387,18 @@ public:
                        S.addTypeRef(wrappedTy));
   }
 
+  void visitPackType(const PackType *pack) {
+    using namespace decls_block;
+//    serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
+    llvm_unreachable("Unimplemented!");
+  }
+
+  void visitPackExpansionType(const PackExpansionType *pack) {
+    using namespace decls_block;
+//    serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
+    llvm_unreachable("Unimplemented!");
+  }
+
   void visitParenType(const ParenType *parenTy) {
     using namespace decls_block;
     assert(parenTy->getParameterFlags().isNone());
@@ -4459,7 +4485,8 @@ public:
     auto substMapID = S.addSubstitutionMapRef(archetypeTy->getSubstitutions());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
     OpaqueArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          declID, substMapID);
+                                          declID, archetypeTy->getOrdinal(),
+                                          substMapID);
   }
 
   void visitNestedArchetypeType(const NestedArchetypeType *archetypeTy) {
@@ -4696,6 +4723,12 @@ public:
         protocols);
   }
 
+  void
+  visitExistentialType(const ExistentialType *existential) {
+    using namespace decls_block;
+    serializeSimpleWrapper<ExistentialTypeLayout>(existential->getConstraintType());
+  }
+
   void visitReferenceStorageType(const ReferenceStorageType *refTy) {
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
@@ -4872,6 +4905,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
   registerDeclTypeAbbr<SequenceArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
+  registerDeclTypeAbbr<ExistentialTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();

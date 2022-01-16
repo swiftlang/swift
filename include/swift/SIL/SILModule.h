@@ -38,6 +38,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -58,8 +59,8 @@ class Output;
 namespace swift {
 
 /// The payload for the FixedSizeSlab.
-/// This is a super-class rather than a member of FixedSizeSlab to make bridging
-/// with libswift easier.
+/// This is a super-class rather than a member of FixedSizeSlab to make swift
+/// bridging easier.
 class FixedSizeSlabPayload {
 public:
   /// The capacity of the payload.
@@ -367,6 +368,10 @@ private:
 
   /// Folding set for key path patterns.
   llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
+  
+  /// Symbols (e.g. function names) which are made public by the
+  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
+  TBDSymbolSetPtr publicCMOSymbols;
 
 public:
   ~SILModule();
@@ -505,6 +510,12 @@ public:
   bool isOptimizedOnoneSupportModule() const;
 
   const SILOptions &getOptions() const { return Options; }
+
+  /// Return the symbols (e.g. function names) which are made public by the
+  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
+  TBDSymbolSetPtr getPublicCMOSymbols() { return publicCMOSymbols; }
+
+  void addPublicCMOSymbol(StringRef symbol);
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
@@ -911,14 +922,17 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {
   case SILStage::Raw:
-    // In Raw SIL, we support lexical lifetimes as long as lexical lifetimes is
-    // not turned off all the way. This means lexical lifetimes is set to either
-    // early or experimental late.
+    // In raw SIL, lexical markers are used for diagnostics.  These markers are
+    // present as long as the lexical lifetimes feature is not disabled
+    // entirely.
     return LexicalLifetimes != LexicalLifetimesOption::Off;
   case SILStage::Canonical:
-    // In Canonical SIL, we only support lexical lifetimes when in experimental
-    // late mode.
-    return LexicalLifetimes == LexicalLifetimesOption::ExperimentalLate;
+    // In Canonical SIL, lexical markers are used to ensure that object
+    // lifetimes do not get observably shortened from the end of a lexical
+    // scope.  That behavior only occurs when lexical lifetimes is (fully)
+    // enabled.  (When only diagnostic markers are enabled, the markers are
+    // stripped as part of lowering from raw to canonical SIL.)
+    return LexicalLifetimes == LexicalLifetimesOption::On;
   case SILStage::Lowered:
     // We do not support OSSA in Lowered SIL, so this is always false.
     return false;

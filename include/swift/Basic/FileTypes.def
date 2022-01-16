@@ -95,4 +95,6 @@ TYPE("pcm",                 ClangModuleFile,           "pcm",             "")
 TYPE("pch",                 PCH,                       "pch",             "")
 TYPE("none",                Nothing,                   "",                "")
 
+TYPE("abi-baseline-json",   SwiftABIDescriptor,        "abi.json",        "")
+
 #undef TYPE

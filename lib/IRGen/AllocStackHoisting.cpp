@@ -118,7 +118,8 @@ insertDeallocStackAtEndOf(SmallVectorImpl<SILInstruction *> &FunctionExits,
   // Insert dealloc_stack in the exit blocks.
   for (auto *Exit : FunctionExits) {
     SILBuilderWithScope Builder(Exit);
-    Builder.createDeallocStack(AllocStack->getLoc(), AllocStack);
+    Builder.createDeallocStack(CleanupLocation(AllocStack->getLoc()),
+                               AllocStack);
   }
 }
 
@@ -347,14 +348,12 @@ private:
 } // end anonymous namespace
 
 bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
-  auto *Apply = dyn_cast<ApplyInst>(I);
-  if (!Apply)
-    return false;
-  if (Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION))
-    return true;
-  auto *FunRef = Apply->getReferencedFunctionOrNull();
-  if (!FunRef)
-    return false;
+  if (auto *Apply = dyn_cast<ApplyInst>(I)) {
+    return Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION);
+  }
+  if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast;
+  }
   return false;
 }
 

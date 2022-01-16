@@ -240,6 +240,7 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
     case Symbol::Kind::Layout:
     case Symbol::Kind::Superclass:
     case Symbol::Kind::ConcreteType:
+    case Symbol::Kind::ConcreteConformance:
       llvm_unreachable("Property symbol cannot appear in a type term");
     }
 
@@ -259,26 +260,38 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
 /// concrete type).
 bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
   // Look for non-canonical type parameters.
-  return !type.findIf([&](Type component) -> bool {
-    if (!component->isTypeParameter())
-      return false;
+  class Walker : public TypeWalker {
+    const RequirementMachine &Self;
 
-    auto term = Context.getMutableTermForType(component->getCanonicalType(),
-                                              /*proto=*/nullptr);
+  public:
+    explicit Walker(const RequirementMachine &self) : Self(self) {}
 
-    System.simplify(term);
-    verify(term);
+    Action walkToTypePre(Type component) override {
+      if (!component->isTypeParameter())
+        return Action::Continue;
 
-    auto *props = Map.lookUpProperties(term);
-    if (!props)
-      return false;
+      auto term = Self.Context.getMutableTermForType(
+          component->getCanonicalType(),
+          /*proto=*/nullptr);
 
-    if (props->isConcreteType())
-      return true;
+      Self.System.simplify(term);
+      Self.verify(term);
 
-    auto anchor = Context.getTypeForTerm(term, {});
-    return CanType(anchor) != CanType(component);
-  });
+      auto anchor = Self.Context.getTypeForTerm(term, {});
+      if (CanType(anchor) != CanType(component))
+        return Action::Stop;
+
+      auto *props = Self.Map.lookUpProperties(term);
+      if (props && props->isConcreteType())
+        return Action::Stop;
+
+      // The parent of a canonical type parameter might be non-canonical
+      // because it is concrete.
+      return Action::SkipChildren;
+    }
+  };
+
+  return !type.walk(Walker(*this));
 }
 
 /// Unlike most other queries, the input type can be any type, not just a
@@ -662,4 +675,86 @@ RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
   }
 
   return nullptr;
+}
+
+void RequirementMachine::verify(const MutableTerm &term) const {
+#ifndef NDEBUG
+  // If the term is in the generic parameter domain, ensure we have a valid
+  // generic parameter.
+  if (term.begin()->getKind() == Symbol::Kind::GenericParam) {
+    auto *genericParam = term.begin()->getGenericParam();
+    TypeArrayView<GenericTypeParamType> genericParams = getGenericParams();
+    auto found = std::find(genericParams.begin(),
+                           genericParams.end(),
+                           genericParam);
+    if (found == genericParams.end()) {
+      llvm::errs() << "Bad generic parameter in " << term << "\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
+
+  MutableTerm erased;
+
+  // First, "erase" resolved associated types from the term, and try
+  // to simplify it again.
+  for (auto symbol : term) {
+    if (erased.empty()) {
+      switch (symbol.getKind()) {
+      case Symbol::Kind::Protocol:
+      case Symbol::Kind::GenericParam:
+        erased.add(symbol);
+        continue;
+
+      case Symbol::Kind::AssociatedType:
+        erased.add(Symbol::forProtocol(symbol.getProtocols()[0], Context));
+        break;
+
+      case Symbol::Kind::Name:
+      case Symbol::Kind::Layout:
+      case Symbol::Kind::Superclass:
+      case Symbol::Kind::ConcreteType:
+      case Symbol::Kind::ConcreteConformance:
+        llvm::errs() << "Bad initial symbol in " << term << "\n";
+        abort();
+        break;
+      }
+    }
+
+    switch (symbol.getKind()) {
+    case Symbol::Kind::Name:
+      assert(!erased.empty());
+      erased.add(symbol);
+      break;
+
+    case Symbol::Kind::AssociatedType:
+      erased.add(Symbol::forName(symbol.getName(), Context));
+      break;
+
+    case Symbol::Kind::Protocol:
+    case Symbol::Kind::GenericParam:
+    case Symbol::Kind::Layout:
+    case Symbol::Kind::Superclass:
+    case Symbol::Kind::ConcreteType:
+    case Symbol::Kind::ConcreteConformance:
+      llvm::errs() << "Bad interior symbol " << symbol << " in " << term << "\n";
+      abort();
+      break;
+    }
+  }
+
+  MutableTerm simplified = erased;
+  System.simplify(simplified);
+
+  // We should end up with the same term.
+  if (simplified != term) {
+    llvm::errs() << "Term verification failed\n";
+    llvm::errs() << "Initial term:    " << term << "\n";
+    llvm::errs() << "Erased term:     " << erased << "\n";
+    llvm::errs() << "Simplified term: " << simplified << "\n";
+    llvm::errs() << "\n";
+    dump(llvm::errs());
+    abort();
+  }
+#endif
 }

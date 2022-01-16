@@ -71,6 +71,7 @@ CONTEXT_NODE(Destructor)
 CONTEXT_NODE(DidSet)
 NODE(Directness)
 NODE(DistributedThunk)
+NODE(DistributedAccessor)
 NODE(DynamicAttribute)
 NODE(DirectMethodReferenceAttribute)
 NODE(DynamicSelf)
@@ -324,6 +325,12 @@ NODE(NoDerivative)
 NODE(IndexSubset)
 NODE(AsyncAwaitResumePartialFunction)
 NODE(AsyncSuspendResumePartialFunction)
+
+// Added in Swift 5.6
+NODE(AccessibleFunctionRecord)
+
+// Added in Swift 5.7
+NODE(OpaqueReturnTypeIndexed)
 
 #undef CONTEXT_NODE
 #undef NODE

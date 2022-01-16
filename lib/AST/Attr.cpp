@@ -356,7 +356,7 @@ DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
 
 void DeclAttributes::dump(const Decl *D) const {
   StreamPrinter P(llvm::errs());
-  PrintOptions PO = PrintOptions::printEverything();
+  PrintOptions PO = PrintOptions::printDeclarations();
   print(P, PO, D);
 }
 
@@ -895,6 +895,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     return true;
 
+  case DAK_MainType: {
+    // Don't print into SIL. Necessary bits have already been generated.
+    if (Options.PrintForSIL)
+      return false;
+    Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
+    return true;
+  }
+
   case DAK_SetterAccess:
     Printer.printKeyword(getAttrName(), Options, "(set)");
     return true;
@@ -1164,6 +1172,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_UnavailableFromAsync: {
+    Printer.printAttrName("@_unavailableFromAsync");
+    const UnavailableFromAsyncAttr *attr = cast<UnavailableFromAsyncAttr>(this);
+    if (attr->hasMessage()) {
+      Printer << "(message: \"";
+      Printer << attr->Message;
+      Printer << "\")";
+    }
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1230,6 +1249,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
+  case DAK_MainType:
+    return "main";
   case DAK_DynamicReplacement:
     return "_dynamicReplacement";
   case DAK_TypeEraser:
@@ -1317,6 +1338,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "transpose";
   case DAK_TypeSequence:
     return "_typeSequence";
+  case DAK_UnavailableFromAsync:
+    return "_unavailableFromAsync";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

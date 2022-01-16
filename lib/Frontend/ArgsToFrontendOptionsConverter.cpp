@@ -253,8 +253,9 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.ModuleLinkName = A->getValue();
 
   // This must be called after computing module name, module abi name,
-  // and module link name.
-  if (computeModuleAliases())
+  // and module link name. If computing module aliases is unsuccessful,
+  // return early.
+  if (!computeModuleAliases())
     return true;
 
   if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
@@ -477,6 +478,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::DumpTypeInfo;
   if (Opt.matches(OPT_print_ast))
     return FrontendOptions::ActionType::PrintAST;
+  if (Opt.matches(OPT_print_ast_decl))
+    return FrontendOptions::ActionType::PrintASTDecl;
   if (Opt.matches(OPT_emit_pcm))
     return FrontendOptions::ActionType::EmitPCM;
   if (Opt.matches(OPT_dump_pcm))
@@ -521,58 +524,7 @@ bool ArgsToFrontendOptionsConverter::setUpImmediateArgs() {
 
 bool ArgsToFrontendOptionsConverter::computeModuleAliases() {
   auto list = Args.getAllArgValues(options::OPT_module_alias);
-  if (!list.empty()) {
-    auto validate = [this](StringRef value, bool allowModuleName) -> bool
-    {
-      if (!allowModuleName) {
-        if (value == Opts.ModuleName ||
-            value == Opts.ModuleABIName ||
-            value == Opts.ModuleLinkName) {
-          Diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
-          return false;
-        }
-      }
-      if (value == STDLIB_NAME) {
-        Diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
-        return false;
-      }
-      if (!Lexer::isIdentifier(value)) {
-        Diags.diagnose(SourceLoc(), diag::error_bad_module_name, value, false);
-        return false;
-      }
-      return true;
-    };
-
-    for (auto item: list) {
-      auto str = StringRef(item);
-      // splits to an alias and the underlying name
-      auto pair = str.split('=');
-      auto lhs = pair.first;
-      auto rhs = pair.second;
-      
-      if (rhs.empty()) { // '=' is missing
-          Diags.diagnose(SourceLoc(), diag::error_module_alias_invalid_format, str);
-          return true;
-      }
-      if (!validate(lhs, false) || !validate(rhs, true)) {
-          return true;
-      }
-      
-      // First, add the underlying name as a key to prevent it from being
-      // used as an alias
-      if (!Opts.ModuleAliasMap.insert({rhs, StringRef()}).second) {
-        Diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, rhs);
-        return true;
-      }
-      // Next, add the alias as a key and the underlying name as a value to the map
-      auto underlyingName = Opts.ModuleAliasMap.find(rhs)->first();
-      if (!Opts.ModuleAliasMap.insert({lhs, underlyingName}).second) {
-          Diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, lhs);
-          return true;
-      }
-    }
-  }
-  return false;
+  return ModuleAliasesConverter::computeModuleAliases(list, Opts, Diags);
 }
 
 bool ArgsToFrontendOptionsConverter::computeModuleName() {
@@ -752,4 +704,65 @@ void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
   for (const Arg *A : Args.filtered(OPT_Xllvm)) {
     Opts.LLVMArgs.push_back(A->getValue());
   }
+}
+
+bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
+                                                  FrontendOptions &options,
+                                                  DiagnosticEngine &diags) {
+  if (!args.empty()) {
+    // ModuleAliasMap should initially be empty as setting
+    // it should be called only once
+    options.ModuleAliasMap.clear();
+    
+    auto validate = [&options, &diags](StringRef value, bool allowModuleName) -> bool
+    {
+      if (!allowModuleName) {
+        if (value == options.ModuleName ||
+            value == options.ModuleABIName ||
+            value == options.ModuleLinkName) {
+          diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
+          return false;
+        }
+      }
+      if (value == STDLIB_NAME) {
+        diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
+        return false;
+      }
+      if (!Lexer::isIdentifier(value)) {
+        diags.diagnose(SourceLoc(), diag::error_bad_module_name, value, false);
+        return false;
+      }
+      return true;
+    };
+    
+    for (auto item: args) {
+      auto str = StringRef(item);
+      // splits to an alias and the underlying name
+      auto pair = str.split('=');
+      auto lhs = pair.first;
+      auto rhs = pair.second;
+      
+      if (rhs.empty()) { // '=' is missing
+        diags.diagnose(SourceLoc(), diag::error_module_alias_invalid_format, str);
+        return false;
+      }
+      if (!validate(lhs, false) || !validate(rhs, true)) {
+        return false;
+      }
+      
+      // First, add the underlying name as a key to prevent it from being
+      // used as an alias
+      if (!options.ModuleAliasMap.insert({rhs, StringRef()}).second) {
+        diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, rhs);
+        return false;
+      }
+      // Next, add the alias as a key and the underlying name as a value to the map
+      auto underlyingName = options.ModuleAliasMap.find(rhs)->first();
+      if (!options.ModuleAliasMap.insert({lhs, underlyingName}).second) {
+        diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, lhs);
+        return false;
+      }
+    }
+  }
+  return true;
 }

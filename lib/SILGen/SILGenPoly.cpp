@@ -220,7 +220,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
     fromInstanceType = cast<MetatypeType>(fromInstanceType)
       .getInstanceType();
     toInstanceType = cast<ExistentialMetatypeType>(toInstanceType)
-      .getInstanceType();
+      ->getExistentialInstanceType()->getCanonicalType();
   }
 
   ArrayRef<ProtocolConformanceRef> conformances =
@@ -3052,8 +3052,13 @@ buildThunkSignature(SILGenFunction &SGF,
   // Add a new generic parameter to replace the opened existential.
   auto *newGenericParam =
       GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
+
+  auto constraint = openedExistential->getOpenedExistentialType();
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
-                             openedExistential->getOpenedExistentialType());
+                             constraint);
 
   auto genericSig = buildGenericSignature(ctx, baseGenericSig,
                                           { newGenericParam },
@@ -3692,7 +3697,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   SILGenFunctionBuilder fb(SGM);
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
-      ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed);
 
   // Partially-apply the thunk to `linearMap` and return the thunked value.
   auto getThunkedResult = [&]() {
@@ -3961,6 +3966,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
       customDerivativeFn->isSerialized(),
       customDerivativeFn->isDynamicallyReplaceable(),
+      customDerivativeFn->isDistributed(),
       customDerivativeFn->getEntryCount(), IsThunk,
       customDerivativeFn->getClassSubclassScope());
   // This thunk may be publicly exposed and cannot be transparent.
@@ -4716,6 +4722,17 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                          origParams.back(),
                                          witnessUnsubstTy->getSelfParameter());
   }
+
+  // For static C++ methods and constructors, we need to drop the (metatype)
+  // "self" param. The "native" SIL representation will look like this:
+  //    @convention(method) (@thin Foo.Type) -> () but the "actual" SIL function
+  // looks like this:
+  //    @convention(c) () -> ()
+  // . We do this by simply omiting the last params.
+  // TODO: fix this for static C++ methods.
+  if (witness.getDecl()->getClangDecl() &&
+      isa<clang::CXXConstructorDecl>(witness.getDecl()->getClangDecl()))
+    reqtSubstParams = reqtSubstParams.drop_back();
 
   // For a free function witness, discard the 'self' parameter of the
   // requirement.

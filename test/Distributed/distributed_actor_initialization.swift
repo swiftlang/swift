@@ -1,11 +1,16 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
+import FakeDistributedActorSystems
 
-/// Use the existential wrapper as the default actor transport.
-typealias DefaultActorTransport = AnyActorTransport
+@available(SwiftStdlib 5.5, *)
+typealias DefaultDistributedActorSystem = FakeActorSystem
+
+// ==== ----------------------------------------------------------------------------------------------------------------
 
 distributed actor OK0 { }
 
@@ -18,20 +23,20 @@ distributed actor OK1 {
 
 distributed actor Bad1 {
   init() {
-    // expected-error@-1 {{designated distributed actor initializer 'init()' is missing required ActorTransport parameter}}
+    // expected-error@-1 {{designated distributed actor initializer 'init()' is missing required DistributedActorSystem parameter}}
   }
 }
 
 distributed actor Bad12 {
   init(x: String) {
-    // expected-error@-1 {{designated distributed actor initializer 'init(x:)' is missing required ActorTransport parameter}}
+    // expected-error@-1 {{designated distributed actor initializer 'init(x:)' is missing required DistributedActorSystem parameter}}
   }
 }
 
 distributed actor OK2 {
   var x: Int
 
-  init(x: Int, transport: AnyActorTransport) { // ok
+  init(x: Int, system: FakeActorSystem) { // ok
     self.x = x
   }
 }
@@ -39,73 +44,32 @@ distributed actor OK2 {
 distributed actor Bad2 {
   var x: Int = 1
 
-  init(transport: AnyActorTransport, too many: AnyActorTransport) {
-    // expected-error@-1{{designated distributed actor initializer 'init(transport:too:)' must accept exactly one ActorTransport parameter, found 2}}
+  init(system: FakeActorSystem, too many: FakeActorSystem) {
+    // expected-error@-1{{designated distributed actor initializer 'init(system:too:)' must accept exactly one DistributedActorSystem parameter, found 2}}
   }
 }
 
 distributed actor OK3 {
   var x: Int
 
-  init(y: Int, transport: AnyActorTransport) {
+  init(y: Int, system: FakeActorSystem) {
     self.x = y
   }
 }
 
 distributed actor OKMulti {
 
-  convenience init(y: Int, transport: AnyActorTransport) { // ok
-    self.init(transport: transport)
+  convenience init(y: Int, system: FakeActorSystem) { // ok
+    self.init(system: system)
   }
 
 }
 
 distributed actor OKMultiDefaultValues {
 
-  convenience init(y: Int, transport: AnyActorTransport, x: Int = 1234) { // ok
-    self.init(transport: transport)
+  convenience init(y: Int, system: FakeActorSystem, x: Int = 1234) { // ok
+    self.init(system: system)
   }
 
 }
 
-// ==== ------------------------------------------------------------------------
-// MARK: Specific transport
-
-struct ActorAddress: ActorIdentity {
-  let address: String
-  init(parse address : String) {
-    self.address = address
-  }
-}
-
-struct FakeTransport: ActorTransport {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented \(#function)")
-  }
-
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
-          where Act: DistributedActor {
-    return nil
-  }
-
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
-          where Act: DistributedActor {
-    .init(ActorAddress(parse: ""))
-  }
-
-  public func actorReady<Act>(_ actor: Act)
-          where Act: DistributedActor {
-    print("\(#function):\(actor)")
-  }
-
-  func resignIdentity(_ id: AnyActorIdentity) {}
-}
-
-distributed actor OKSpecificTransportType {
-  typealias Transport = FakeTransport
-
-  init(y: Int, transport fake: FakeTransport) { // ok
-    // nothing
-  }
-
-}

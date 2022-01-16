@@ -97,6 +97,22 @@ public:
   };
 };
 
+static bool equalWithoutExistentialTypes(Type t1, Type t2) {
+  if (!t1->getASTContext().LangOpts.EnableExplicitExistentialTypes)
+    return false;
+
+  auto withoutExistentialTypes = [](Type type) -> Type {
+    return type.transform([](Type type) -> Type {
+      if (auto existential = type->getAs<ExistentialType>())
+        return existential->getConstraintType();
+      return type;
+    });
+  };
+
+  return withoutExistentialTypes(t1)
+      ->isEqual(withoutExistentialTypes(t2));
+}
+
 class IRGenDebugInfoImpl : public IRGenDebugInfo {
   friend class IRGenDebugInfoImpl;
   const IRGenOptions &Opts;
@@ -736,9 +752,7 @@ private:
     // but LLVM detects skeleton CUs by looking for a non-zero DWO id.
     // We use the lower 64 bits for debug info.
     uint64_t Signature =
-        Desc.getSignature()
-            ? (uint64_t)Desc.getSignature()[1] << 32 | Desc.getSignature()[0]
-            : ~1ULL;
+      Desc.getSignature() ? Desc.getSignature().truncatedValue() : ~1ULL;
 
     // Handle Clang modules.
     if (ClangModule) {
@@ -902,6 +916,9 @@ private:
         Ty->dump(llvm::errs());
         abort();
       } else if (!Reconstructed->isEqual(Ty) &&
+                 // FIXME: Some existential types are reconstructed without
+                 // an explicit ExistentialType wrapping the constraint.
+                 !equalWithoutExistentialTypes(Reconstructed, Ty) &&
                  !EqualUpToClangTypes().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
@@ -1458,6 +1475,7 @@ private:
                                 Flags, MangledName);
     }
 
+    case TypeKind::Existential:
     case TypeKind::ProtocolComposition: {
       auto *Decl = DbgTy.getDecl();
       auto L = getFilenameAndLocation(*this, Decl);
@@ -1505,6 +1523,10 @@ private:
                                       Decl ? Decl->getNameStr() : MangledName,
                                       File, FwdDeclLine, Flags, MangledName);
     }
+
+    case TypeKind::Pack:
+    case TypeKind::PackExpansion:
+      llvm_unreachable("Unimplemented!");
 
     case TypeKind::Tuple: {
       // Tuples are also represented as structs.  Since tuples are ephemeral
@@ -1894,7 +1916,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                  ? createFile(SourcePath, {}, {})
                  : DBuilder.createFile(RemappedFile, RemappedDir);
 
-  StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
+  StringRef Sysroot = IGM.Context.SearchPathOpts.getSDKPath();
   StringRef SDK;
   {
     auto B = llvm::sys::path::rbegin(Sysroot);

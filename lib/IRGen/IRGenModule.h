@@ -401,6 +401,10 @@ public:
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
 
+  /// Emit type metadata records for functions that can be looked up by name at
+  /// runtime.
+  void emitAccessibleFunctions();
+
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
   void emitBuiltinReflectionMetadata();
@@ -728,6 +732,8 @@ public:
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
+  llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32}
+
   llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
   llvm::StructType *SwiftContextTy;
   llvm::StructType *SwiftTaskTy;
@@ -823,6 +829,7 @@ public:
     case ReferenceCounting::Unknown:
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
+    case ReferenceCounting::None:
       return true;
 
     case ReferenceCounting::Bridge:
@@ -1007,9 +1014,9 @@ private:
   
 //--- Globals ---------------------------------------------------------------
 public:
-  std::pair<llvm::GlobalVariable *, llvm::Constant *>
-  createStringConstant(StringRef Str, bool willBeRelativelyAddressed = false,
-                       StringRef sectionName = "");
+  std::pair<llvm::GlobalVariable *, llvm::Constant *> createStringConstant(
+      StringRef Str, bool willBeRelativelyAddressed = false,
+      StringRef sectionName = "", StringRef name = "");
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
                                         bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
@@ -1034,11 +1041,13 @@ public:
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
+  void addAccessibleFunction(SILFunction *func);
 
   llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
   llvm::Constant *emitProtocolConformances(bool asContiguousArray);
   llvm::Constant *emitTypeMetadataRecords(bool asContiguousArray);
-  llvm::Constant *emitFieldDescriptors();
+
+  void emitAccessibleFunctions();
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
                                                    CanSILFunctionType fnType);
@@ -1167,6 +1176,9 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
+  /// List of all of the functions, which can be lookup by name
+  /// up at runtime.
+  SmallVector<SILFunction *, 4> AccessibleFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.
@@ -1204,6 +1216,9 @@ private:
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
+
+  llvm::SmallVector<llvm::MDNode *> UsedConditionals;
+  void emitUsedConditionals();
 
   void emitGlobalLists();
   void emitAutolinkInfo();
@@ -1629,6 +1644,12 @@ public:
                                     ConstantInit definition = ConstantInit());
 
   Address getAddrOfObjCISAMask();
+
+  llvm::Function *
+  getAddrOfDistributedTargetAccessor(SILFunction *F,
+                                     ForDefinition_t forDefinition);
+
+  void emitDistributedTargetAccessor(SILFunction *method);
 
   /// Retrieve the generic signature for the current generic context, or null if no
   /// generic environment is active.

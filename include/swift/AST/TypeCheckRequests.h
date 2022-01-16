@@ -287,6 +287,32 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Determine whether an existential type conforming to this protocol
+/// requires the \c any syntax.
+class ExistentialRequiresAnyRequest :
+    public SimpleRequest<ExistentialRequiresAnyRequest,
+                         bool(ProtocolDecl *),
+                         RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 class PolymorphicEffectRequirementsRequest :
     public SimpleRequest<PolymorphicEffectRequirementsRequest,
                          PolymorphicEffectRequirementList(EffectKind, ProtocolDecl *),
@@ -1003,6 +1029,24 @@ private:
   friend SimpleRequest;
 
   AbstractFunctionDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'id' property of a 'distributed actor'.
+class GetDistributedActorIDPropertyRequest :
+    public SimpleRequest<GetDistributedActorIDPropertyRequest,
+                         ValueDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ValueDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
 
 public:
     // Caching
@@ -2189,8 +2233,8 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveEncodable,
   ResolveDecodable,
   ResolveDistributedActor,
-  ResolveDistributedActorIdentity,
-  ResolveDistributedActorTransport,
+  ResolveDistributedActorID,
+  ResolveDistributedActorSystem,
 };
 
 class ResolveImplicitMemberRequest
@@ -3095,7 +3139,7 @@ public:
 /// the Sendable protocol.
 class GetImplicitSendableRequest :
     public SimpleRequest<GetImplicitSendableRequest,
-                         NormalProtocolConformance *(NominalTypeDecl *),
+                         ProtocolConformance *(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3103,7 +3147,7 @@ public:
 private:
   friend SimpleRequest;
 
-  NormalProtocolConformance *evaluate(
+  ProtocolConformance *evaluate(
       Evaluator &evaluator, NominalTypeDecl *nominal) const;
 
 public:
@@ -3142,6 +3186,23 @@ private:
 
   ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *attached,
                       const AvailableAttr *attr) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class ClosureEffectsRequest
+    : public SimpleRequest<ClosureEffectsRequest,
+                           FunctionType::ExtInfo(ClosureExpr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FunctionType::ExtInfo evaluate(
+      Evaluator &evaluator, ClosureExpr *closure) const;
 
 public:
   bool isCached() const { return true; }

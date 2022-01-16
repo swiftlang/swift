@@ -15,39 +15,42 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_ENABLE_REFLECTION
+
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
+#include <iostream>
 
 using namespace swift;
 using namespace reflection;
 
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
-  FILE *file;
+  std::ostream &stream;
   unsigned Indent;
 
-  FILE * &indent(unsigned Amount) {
+  std::ostream &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
-      fprintf(file, " ");
-    return file;
+      stream << " ";
+    return stream;
   }
 
-  FILE * &printHeader(std::string Name) {
-    fprintf(indent(Indent), "(%s", Name.c_str());
-    return file;
+  std::ostream &printHeader(std::string Name) {
+    indent(Indent) << "(" << Name;
+    return stream;
   }
 
-  FILE * &printField(std::string name, std::string value) {
+  std::ostream &printField(std::string name, std::string value) {
     if (!name.empty())
-      fprintf(file, " %s=%s", name.c_str(), value.c_str());
+      stream << " " << name << "=" << value;
     else
-      fprintf(file, " %s", value.c_str());
-    return file;
+      stream << " " << value;
+    return stream;
   }
 
   void printRec(const TypeRef *typeRef) {
-    fprintf(file, "\n");
+    stream << "\n";
 
     Indent += 2;
     visit(typeRef);
@@ -55,14 +58,14 @@ class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   }
 
 public:
-  PrintTypeRef(FILE *file, unsigned Indent)
-    : file(file), Indent(Indent) {}
+  PrintTypeRef(std::ostream &stream, unsigned Indent)
+      : stream(stream), Indent(Indent) {}
 
   void visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     printHeader("builtin");
     auto demangled = Demangle::demangleTypeAsString(B->getMangledName());
     printField("", demangled);
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitNominalTypeRef(const NominalTypeRef *N) {
@@ -76,8 +79,7 @@ public:
     else if (N->isProtocol()) {
       printHeader("protocol");
       mangledName = Demangle::dropSwiftManglingPrefix(mangledName);
-    }
-    else if (N->isAlias())
+    } else if (N->isAlias())
       printHeader("alias");
     else
       printHeader("nominal");
@@ -85,7 +87,7 @@ public:
     printField("", demangled);
     if (auto parent = N->getParent())
       printRec(parent);
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
@@ -104,7 +106,7 @@ public:
       printRec(param);
     if (auto parent = BG->getParent())
       printRec(parent);
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitTupleTypeRef(const TupleTypeRef *T) {
@@ -114,10 +116,10 @@ public:
     for (auto NameElement : llvm::zip_first(Labels, T->getElements())) {
       auto Label = std::get<0>(NameElement);
       if (!Label.empty())
-        fprintf(file, "%s = ", Label.str().c_str());
+        stream << Label.str() << " = ";
       printRec(std::get<1>(NameElement));
     }
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -159,19 +161,19 @@ public:
     }
 
     if (auto globalActor = F->getGlobalActor()) {
-      fprintf(file, "\n");
+      stream << "\n";
       Indent += 2;
       printHeader("global-actor");
       {
         Indent += 2;
         printRec(globalActor);
-        fprintf(file, ")");
+        stream << ")";
         Indent -= 2;
       }
       Indent += 2;
     }
 
-    fprintf(file, "\n");
+    stream << "\n";
     Indent += 2;
     printHeader("parameters");
 
@@ -181,7 +183,7 @@ public:
 
       if (!flags.isNone()) {
         Indent += 2;
-        fprintf(file, "\n");
+        stream << "\n";
       }
 
       switch (flags.getValueOwnership()) {
@@ -209,17 +211,17 @@ public:
 
       if (!flags.isNone()) {
         Indent -= 2;
-        fprintf(file, ")");
+        stream << ")";
       }
     }
 
     if (parameters.empty())
-      fprintf(file, ")");
+      stream << ")";
 
-    fprintf(file, "\n");
+    stream << "\n";
     printHeader("result");
     printRec(F->getResult());
-    fprintf(file, ")");
+    stream << ")";
 
     Indent -= 2;
   }
@@ -227,12 +229,12 @@ public:
   void visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     printHeader("protocol_composition");
     if (PC->hasExplicitAnyObject())
-      fprintf(file, " any_object");
+      stream << " any_object";
     if (auto superclass = PC->getSuperclass())
       printRec(superclass);
     for (auto protocol : PC->getProtocols())
       printRec(protocol);
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitMetatypeTypeRef(const MetatypeTypeRef *M) {
@@ -240,20 +242,21 @@ public:
     if (M->wasAbstract())
       printField("", "was_abstract");
     printRec(M->getInstanceType());
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     printHeader("existential_metatype");
     printRec(EM->getInstanceType());
-    fprintf(file, ")");
+    stream << ")";
   }
 
-  void visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP){
+  void
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     printHeader("generic_type_parameter");
     printField("depth", std::to_string(GTP->getDepth()));
     printField("index", std::to_string(GTP->getIndex()));
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
@@ -261,41 +264,42 @@ public:
     printField("protocol", DM->getProtocol());
     printRec(DM->getBase());
     printField("member", DM->getMember());
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitForeignClassTypeRef(const ForeignClassTypeRef *F) {
     printHeader("foreign");
     if (!F->getName().empty())
       printField("name", F->getName());
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
     printHeader("objective_c_class");
     if (!OC->getName().empty())
       printField("name", OC->getName());
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OC) {
     printHeader("objective_c_protocol");
     if (!OC->getName().empty())
       printField("name", OC->getName());
-    fprintf(file, ")");
+    stream << ")";
   }
 
-#define REF_STORAGE(Name, name, ...) \
-  void visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
-    printHeader(#name "_storage"); \
-    printRec(US->getType()); \
-    fprintf(file, ")"); \
+#define REF_STORAGE(Name, name, ...)                                           \
+  void visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) {           \
+    printHeader(#name "_storage");                                             \
+    printRec(US->getType());                                                   \
+    stream << ")";                                                             \
   }
 #include "swift/AST/ReferenceStorage.def"
 
   void visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
-    printHeader("sil_box");  printRec(SB->getBoxedType());
-    fprintf(file, ")");
+    printHeader("sil_box");
+    printRec(SB->getBoxedType());
+    stream << ")";
   }
 
   void visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
@@ -306,17 +310,17 @@ public:
     for (auto &f : SB->getFields()) {
       printHeader(f.isMutable() ? "var" : "let");
       printRec(f.getType());
-      fprintf(file, ")");
+      stream << ")";
     }
     Indent -= 2;
-    fprintf(file, ")\n");
+    stream << ")\n";
     printHeader("generic_signature\n");
     Indent += 2;
     for (auto &subst : SB->getSubstitutions()) {
       printHeader("substitution");
       printRec(subst.first);
       printRec(subst.second);
-      fprintf(file, ")");
+      stream << ")";
     }
     Indent -= 2;
     for (auto &req : SB->getRequirements()) {
@@ -325,43 +329,43 @@ public:
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
         printRec(req.getFirstType());
-        fprintf(file, " : ");
+        stream << " : ";
         printRec(req.getSecondType());
         break;
       case RequirementKind::SameType:
         printRec(req.getFirstType());
-        fprintf(file, " == ");
+        stream << " == ";
         printRec(req.getSecondType());
         break;
       case RequirementKind::Layout:
-        fprintf(file, "layout requirement");
+        stream << "layout requirement";
         break;
       }
-      fprintf(file, ")");
+      stream << ")";
     }
-    fprintf(file, ")");
-    fprintf(file, ")");
+    stream << ")";
+    stream << ")";
   }
 
   void visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     printHeader("opaque_archetype");
     printField("id", O->getID().str());
     printField("description", O->getDescription().str());
-    fprintf(file, " ordinal %u ", O->getOrdinal());
+    stream << " ordinal " << O->getOrdinal() << " ";
     for (auto argList : O->getArgumentLists()) {
-      fprintf(file, "\n");
-      fprintf(indent(Indent + 2), "args: <");
+      stream << "\n";
+      indent(Indent + 2) << "args: <";
       for (auto arg : argList) {
         printRec(arg);
       }
-      fprintf(file, ">");
+      stream << ">";
     }
-    fprintf(file, ")");
+    stream << ")";
   }
 
   void visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     printHeader("opaque");
-    fprintf(file, ")");
+    stream << ")";
   }
 };
 
@@ -478,13 +482,11 @@ const OpaqueTypeRef *OpaqueTypeRef::get() {
   return Singleton;
 }
 
-void TypeRef::dump() const {
-  dump(stderr);
-}
+void TypeRef::dump() const { dump(std::cerr); }
 
-void TypeRef::dump(FILE *file, unsigned Indent) const {
-  PrintTypeRef(file, Indent).visit(this);
-  fprintf(file, "\n");
+void TypeRef::dump(std::ostream &stream, unsigned Indent) const {
+  PrintTypeRef(stream, Indent).visit(this);
+  stream << "\n";
 }
 
 class DemanglingForTypeRef
@@ -1478,3 +1480,5 @@ bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
   // exactly.
   return (OrigTR == SubstTR);
 }
+
+#endif

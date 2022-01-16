@@ -659,38 +659,18 @@ void SILInlineCloner::visitBuiltinInst(BuiltinInst *Inst) {
       if (*kind == BuiltinValueKind::Move) {
         auto otherResultAddr = getOpValue(Inst->getOperand(0));
         auto otherSrcAddr = getOpValue(Inst->getOperand(1));
-        auto otherType = otherSrcAddr->getType();
-
-        if (!otherType.isLoadable(*Inst->getFunction())) {
-          // If otherType is not loadable, emit a diagnostic since it was used
-          // on a generic or existential value.
-          diagnose(Inst->getModule().getASTContext(),
-                   getOpLocation(Inst->getLoc()).getSourceLoc(),
-                   diag::move_operator_used_on_generic_or_existential_value);
-          return SILCloner<SILInlineCloner>::visitBuiltinInst(Inst);
-        }
-
-        // If our otherType is loadable, convert it to move_value.
-        getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-        // We stash otherValue in originalOtherValue in case we need to
-        // perform a writeback.
         auto opLoc = getOpLocation(Inst->getLoc());
 
-        assert(otherType.isAddress());
+        getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
 
-        SILValue otherValue = getBuilder().emitLoadValueOperation(
-            opLoc, otherSrcAddr, LoadOwnershipQualifier::Take);
-
-        // Create a move_value and set that we want it to be used for diagnostic
-        // emission.
-        auto *mvi = getBuilder().createMoveValue(opLoc, otherValue);
-        mvi->setAllowsDiagnostics(true);
-        getBuilder().emitStoreValueOperation(opLoc, mvi, otherResultAddr,
-                                             StoreOwnershipQualifier::Init);
-
-        // We know that Inst returns a tuple value that isn't used by anything
-        // else, so this /should/ be safe.
-        return recordClonedInstruction(Inst, mvi);
+        // Convert the builtin to a mark_unresolved_move_addr. This builtin is a
+        // +1, but mark_unresolved_move_addr simulates a +0, so we put in our
+        // own destroy_addr.
+        getBuilder().createMarkUnresolvedMoveAddr(opLoc, otherSrcAddr,
+                                                  otherResultAddr);
+        getBuilder().createDestroyAddr(opLoc, otherSrcAddr);
+        auto *tup = getBuilder().createTuple(opLoc, {});
+        return recordFoldedValue(Inst, tup);
       }
 
       if (*kind == BuiltinValueKind::Copy) {
@@ -904,6 +884,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyAddrInst:
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::RetainValueAddrInst:
   case SILInstructionKind::UnmanagedRetainValueInst:
@@ -911,6 +892,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::DeallocBoxInst:
   case SILInstructionKind::DeallocExistentialBoxInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::DeallocStackInst:

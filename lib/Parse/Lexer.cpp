@@ -20,6 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/ExperimentalRegexBridging.h"
 #include "swift/Syntax/Trivia.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
@@ -30,14 +31,14 @@
 // FIXME: Figure out if this can be migrated to LLVM.
 #include "clang/Basic/CharInfo.h"
 
-// Regex parser delivered via libSwift
-#include "swift/Parse/ExperimentalRegexBridging.h"
-static ParseRegexStrawperson parseRegexStrawperson = nullptr;
-void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn) {
-  parseRegexStrawperson = fn;
-}
-
 #include <limits>
+
+// Regex lexing delivered via libSwift.
+#include "swift/Parse/ExperimentalRegexBridging.h"
+static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
+void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
+  regexLiteralLexingFn = fn;
+}
 
 using namespace swift;
 using namespace swift::syntax;
@@ -1795,9 +1796,6 @@ static void validateMultilineIndents(const Token &Str,
 
 /// Emit diagnostics for single-quote string and suggest replacement
 /// with double-quoted equivalent.
-///
-/// Or, if we're in experimental regex mode, we will emit a custom
-/// error message instead, determined by the Swift library.
 void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
                                              const char *TokEnd) {
   assert(*TokStart == '\'' && TokEnd[-1] == '\'');
@@ -1806,15 +1804,6 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
 
   auto startLoc = Lexer::getSourceLoc(TokStart);
   auto endLoc = Lexer::getSourceLoc(TokEnd);
-
-  if (LangOpts.EnableExperimentalStringProcessing) {
-    if (parseRegexStrawperson) {
-      auto copy = std::string(TokStart, TokEnd-TokStart);
-      auto msg = parseRegexStrawperson(copy.c_str());
-      assert(msg != nullptr);
-      Diags->diagnose(startLoc, diag::lex_experimental_regex_strawperson, msg);
-    }
-  }
 
   SmallString<32> replacement;
   replacement.push_back('"');
@@ -1969,6 +1958,47 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
   }
 }
 
+bool Lexer::tryLexRegexLiteral(const char *TokStart) {
+  assert(*TokStart == '\'');
+
+  // We need to have experimental string processing enabled, and have the
+  // parsing logic for regex literals available.
+  if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
+    return false;
+
+  // Ask libswift to try and lex a regex literal.
+  // - Ptr will not be advanced if this is not for a regex literal.
+  // - ErrStr will be set if there is any error to emit.
+  // - CompletelyErroneous will be set if there was an error that cannot be
+  //   recovered from.
+  auto *Ptr = TokStart;
+  const char *ErrStr = nullptr;
+  bool CompletelyErroneous = regexLiteralLexingFn(&Ptr, BufferEnd, &ErrStr);
+  if (ErrStr)
+    diagnose(TokStart, diag::regex_literal_parsing_error, ErrStr);
+
+  // If we didn't make any lexing progress, this isn't a regex literal and we
+  // should fallback to lexing as something else.
+  if (Ptr == TokStart)
+    return false;
+
+  // Update to point to where we ended regex lexing.
+  assert(Ptr > TokStart && Ptr <= BufferEnd);
+  CurPtr = Ptr;
+
+  // If the lexing was completely erroneous, form an unknown token.
+  if (CompletelyErroneous) {
+    assert(ErrStr);
+    formToken(tok::unknown, TokStart);
+    return true;
+  }
+
+  // Otherwise, we either had a successful lex, or something that was
+  // recoverable.
+  assert(ErrStr || CurPtr[-1] == '\'');
+  formToken(tok::regex_literal, TokStart);
+  return true;
+}
 
 /// lexEscapedIdentifier:
 ///   identifier ::= '`' identifier '`'
@@ -2513,8 +2543,16 @@ void Lexer::lexImpl() {
   case '5': case '6': case '7': case '8': case '9':
     return lexNumber();
 
-  case '"':
   case '\'':
+    // If we have experimental string processing enabled, and have the parsing
+    // logic for regex literals, try to lex a single quoted string as a regex
+    // literal.
+    if (tryLexRegexLiteral(TokStart))
+      return;
+
+    // Otherwise lex as a string literal and emit a diagnostic.
+    LLVM_FALLTHROUGH;
+  case '"':
     return lexStringLiteral();
       
   case '`':

@@ -85,10 +85,13 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
   // providing failure status instead of just returning the original string like
   // swift demangle.
 #if defined(_WIN32)
-  static StaticMutex mutex;
-
   char szUndName[1024];
-  DWORD dwResult = mutex.withLock([&syminfo, &szUndName]() {
+  DWORD dwResult;
+  dwResult = _swift_withWin32DbgHelpLibrary([&] (bool isInitialized) -> DWORD {
+    if (!isInitialized) {
+      return 0;
+    }
+
     DWORD dwFlags = UNDNAME_COMPLETE;
 #if !defined(_WIN64)
     dwFlags |= UNDNAME_32_BIT_DECODE;
@@ -98,7 +101,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
                                 sizeof(szUndName), dwFlags);
   });
 
-  if (dwResult == TRUE) {
+  if (dwResult) {
     symbolName += szUndName;
     return true;
   }
@@ -454,4 +457,11 @@ void swift::swift_abortDynamicReplacementDisabling() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
                     "Fatal error: trying to disable a dynamic replacement "
                     "that is already disabled");
+}
+
+/// Halt due to trying to use unicode data on platforms that don't have it.
+void swift::swift_abortDisabledUnicodeSupport() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "Unicode normalization data is disabled on this platform");
+
 }

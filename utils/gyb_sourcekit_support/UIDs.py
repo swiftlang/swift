@@ -264,6 +264,8 @@ UID_REQUESTS = [
     REQUEST('GlobalConfiguration', 'source.request.configuration.global'),
     REQUEST('DependencyUpdated', 'source.request.dependency_updated'),
     REQUEST('Diagnostics', 'source.request.diagnostics'),
+    REQUEST('Compile', 'source.request.compile'),
+    REQUEST('CompileClose', 'source.request.compile.close'),
 ]
 
 

@@ -178,93 +178,111 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
           ? outerGenericSignature.getGenericParams().back()->getDepth() + 1
           : 0;
 
-  SmallVector<GenericTypeParamType *, 2> genericParamTypes;
-  SmallVector<Requirement, 2> requirements;
-
-  auto opaqueReprs = collectOpaqueReturnTypeReprs(repr);
-  if (opaqueReprs.size() > 1) {
-    ctx.Diags.diagnose(repr->getLoc(), diag::more_than_one_opaque_type, repr);
-    return nullptr;
-  }
-
-  // TODO [OPAQUE SUPPORT]: right now we only allow one structural 'some' type,
-  // but *very* soon we will allow more than one such type.
-  for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
-    auto *currentRepr = opaqueReprs[i];
-
-    // Usually, we resolve the opaque constraint and bail if it isn't a class or
-    // existential type (see below). However, in this case we know we will fail,
-    // so we can bail early and provide a better diagnostic.
-    if (auto *optionalRepr =
-            dyn_cast<OptionalTypeRepr>(currentRepr->getConstraint())) {
-      std::string buf;
-      llvm::raw_string_ostream stream(buf);
-      stream << "(some " << optionalRepr->getBase() << ")?";
-
-      ctx.Diags.diagnose(currentRepr->getLoc(),
-                         diag::opaque_type_invalid_constraint);
-      ctx.Diags
-          .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
-          .fixItReplaceChars(currentRepr->getStartLoc(),
-                             currentRepr->getEndLoc(), stream.str());
-      return nullptr;
-    }
-
-    auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
-                                                opaqueSignatureDepth, i, ctx);
-    genericParamTypes.push_back(paramType);
-
-    // Try to resolve the constraint repr in the parent decl context. It should
-    // be some kind of existential type. Pass along the error type if resolving
-    // the repr failed.
-    auto constraintType = TypeResolution::forInterface(
-                              dc, TypeResolverContext::GenericRequirement,
-                              // Unbound generics and placeholders are
-                              // meaningless in opaque types.
-                              /*unboundTyOpener*/ nullptr,
-                              /*placeholderHandler*/ nullptr)
-                              .resolveType(currentRepr->getConstraint());
-
-    if (constraintType->hasError())
-      return nullptr;
-
-    // Error out if the constraint type isn't a class or existential type.
-    if (!constraintType->getClassOrBoundGenericClass() &&
-        !constraintType->isExistentialType()) {
-      ctx.Diags.diagnose(currentRepr->getLoc(),
-                         diag::opaque_type_invalid_constraint);
-      return nullptr;
-    }
-
-    if (constraintType->hasArchetype())
-      constraintType = constraintType->mapTypeOutOfContext();
-
-    if (constraintType->getClassOrBoundGenericClass()) {
-      requirements.push_back(
-          Requirement(RequirementKind::Superclass, paramType, constraintType));
-    } else {
-      // In this case, the constraint type is an existential
-      requirements.push_back(
-          Requirement(RequirementKind::Conformance, paramType, constraintType));
-    }
-  }
-
-  auto interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
-                                                  genericParamTypes,
-                                                  std::move(requirements));
-
-  // Create the OpaqueTypeDecl for the result type.
-  // It has the same parent context and generic environment as the originating
-  // decl.
+  // Determine the context of the opaque type declaration we'll be creating.
   auto parentDC = originatingDecl->getDeclContext();
   auto originatingGenericContext = originatingDecl->getAsGenericContext();
-  GenericParamList *genericParams = originatingGenericContext
-    ? originatingGenericContext->getGenericParams()
-    : nullptr;
+  GenericParamList *genericParams;
+  GenericSignature interfaceSignature;
+  CollectedOpaqueReprs opaqueReprs;
+  if (auto namedOpaque = dyn_cast<NamedOpaqueReturnTypeRepr>(repr)) {
+    // Produce the generic signature for the opaque type.
+    genericParams = namedOpaque->getGenericParams();
+    genericParams->setDepth(opaqueSignatureDepth);
 
-  auto opaqueDecl = new (ctx)
-      OpaqueTypeDecl(originatingDecl, genericParams, parentDC,
-                     interfaceSignature, opaqueReprs[0], genericParamTypes[0]);
+    InferredGenericSignatureRequest request{
+        originatingDC->getParentModule(),
+        outerGenericSignature.getPointer(),
+        genericParams,
+        WhereClauseOwner(originatingDC, genericParams),
+        /*addedRequirements=*/{},
+        /*inferenceSources=*/{},
+        /*allowConcreteGenericParams=*/false};
+
+    interfaceSignature = evaluateOrDefault(
+        ctx.evaluator, request, GenericSignatureWithError())
+          .getPointer();
+    if (!interfaceSignature) {
+      // Already produced an error.
+      return nullptr;
+    }
+  } else {
+    opaqueReprs = collectOpaqueReturnTypeReprs(repr);
+    SmallVector<GenericTypeParamType *, 2> genericParamTypes;
+    SmallVector<Requirement, 2> requirements;
+    for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
+      auto *currentRepr = opaqueReprs[i];
+
+      // Usually, we resolve the opaque constraint and bail if it isn't a class
+      // or existential type (see below). However, in this case we know we will
+      // fail, so we can bail early and provide a better diagnostic.
+      if (auto *optionalRepr =
+              dyn_cast<OptionalTypeRepr>(currentRepr->getConstraint())) {
+        std::string buf;
+        llvm::raw_string_ostream stream(buf);
+        stream << "(some " << optionalRepr->getBase() << ")?";
+
+        ctx.Diags.diagnose(currentRepr->getLoc(),
+                           diag::opaque_type_invalid_constraint);
+        ctx.Diags
+            .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
+            .fixItReplaceChars(currentRepr->getStartLoc(),
+                               currentRepr->getEndLoc(), stream.str());
+        return nullptr;
+      }
+
+      auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
+                                                  opaqueSignatureDepth, i, ctx);
+      genericParamTypes.push_back(paramType);
+
+      // Try to resolve the constraint repr in the parent decl context. It
+      // should be some kind of existential type. Pass along the error type if
+      // resolving the repr failed.
+      auto constraintType = TypeResolution::forInterface(
+                                dc, TypeResolverContext::GenericRequirement,
+                                // Unbound generics and placeholders are
+                                // meaningless in opaque types.
+                                /*unboundTyOpener*/ nullptr,
+                                /*placeholderHandler*/ nullptr)
+                                .resolveType(currentRepr->getConstraint());
+
+      if (constraintType->hasError())
+        return nullptr;
+
+      // Error out if the constraint type isn't a class or existential type.
+      if (!constraintType->getClassOrBoundGenericClass() &&
+          !constraintType->isExistentialType()) {
+        ctx.Diags.diagnose(currentRepr->getLoc(),
+                           diag::opaque_type_invalid_constraint);
+        return nullptr;
+      }
+
+      if (constraintType->hasArchetype())
+        constraintType = constraintType->mapTypeOutOfContext();
+
+      if (constraintType->getClassOrBoundGenericClass()) {
+        requirements.push_back(
+            Requirement(RequirementKind::Superclass, paramType,
+                        constraintType));
+      } else {
+        // In this case, the constraint type is an existential
+        requirements.push_back(
+            Requirement(RequirementKind::Conformance, paramType,
+                        constraintType));
+      }
+    }
+
+    interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
+                                               genericParamTypes,
+                                               std::move(requirements));
+    genericParams = originatingGenericContext
+        ? originatingGenericContext->getGenericParams()
+        : nullptr;
+  }
+
+  // Create the OpaqueTypeDecl for the result type.
+  auto opaqueDecl = OpaqueTypeDecl::get(
+      originatingDecl, genericParams, parentDC, interfaceSignature,
+      opaqueReprs);
   opaqueDecl->copyFormalAccessFrom(originatingDecl);
   if (auto originatingSig = originatingDC->getGenericSignatureOfContext()) {
     opaqueDecl->setGenericSignature(originatingSig);
@@ -742,7 +760,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
           return nullptr;
         }
       }();
-      if (resultTypeRepr && !isa<OpaqueReturnTypeRepr>(resultTypeRepr)) {
+      if (resultTypeRepr && !resultTypeRepr->hasOpaque()) {
         const auto resultType =
             resolution.withOptions(TypeResolverContext::FunctionResult)
                 .resolveType(resultTypeRepr);
@@ -962,8 +980,16 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                              WhereClauseOwner owner,
                              unsigned index,
                              TypeResolutionStage stage) const {
+  auto &reqRepr = getRequirement();
+
   // Figure out the type resolution.
-  auto options = TypeResolutionOptions(TypeResolverContext::GenericRequirement);
+  TypeResolverContext context;
+  if (reqRepr.getKind() == RequirementReprKind::SameType) {
+    context = TypeResolverContext::SameTypeRequirement;
+  } else {
+    context = TypeResolverContext::GenericRequirement;
+  }
+  auto options = TypeResolutionOptions(context);
   if (owner.dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
   Optional<TypeResolution> resolution;
@@ -981,7 +1007,6 @@ RequirementRequest::evaluate(Evaluator &evaluator,
     break;
   }
 
-  auto &reqRepr = getRequirement();
   switch (reqRepr.getKind()) {
   case RequirementReprKind::TypeConstraint: {
     Type subject = resolution->resolveType(reqRepr.getSubjectRepr());

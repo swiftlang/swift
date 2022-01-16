@@ -600,6 +600,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
 
+  AccessibleFunctionRecordTy = createStructType(
+      *this, "swift.accessible_function",
+      {RelativeAddressTy, RelativeAddressTy, RelativeAddressTy, Int32Ty});
+
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
   SwiftContextTy = llvm::StructType::create(getLLVMContext(), "swift.context");
@@ -995,13 +999,13 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #include "swift/Runtime/RuntimeFunctions.def"
 
 std::pair<llvm::GlobalVariable *, llvm::Constant *>
-IRGenModule::createStringConstant(StringRef Str,
-  bool willBeRelativelyAddressed, StringRef sectionName) {
+IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
+                                  StringRef sectionName, StringRef name) {
   // If not, create it.  This implicitly adds a trailing null.
   auto init = llvm::ConstantDataArray::getString(getLLVMContext(), Str);
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
-                                         init);
+                                         init, name);
   // FIXME: ld64 crashes resolving relative references to coalesceable symbols.
   // rdar://problem/22674524
   // If we intend to relatively address this string, don't mark it with
@@ -1686,6 +1690,7 @@ bool IRGenModule::finalize() {
   emitSwiftAsyncExtendedFrameInfoWeakRef();
   emitAutolinkInfo();
   emitGlobalLists();
+  emitUsedConditionals();
   if (DebugInfo)
     DebugInfo->finalize();
   cleanupClangCodeGenMetadata();

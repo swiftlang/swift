@@ -439,7 +439,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
     // FIXME: Substitution map?
     diagnoseNonSendableTypesInReference(
         const_cast<ValueDecl *>(VD), VD->getDeclContext(),
-        VD->getLoc(), ConcurrentReferenceKind::CrossActor);
+        VD->getLoc(), SendableCheckReason::ObjC);
     return false;
   case ActorIsolationRestriction::ActorSelf:
     // Actor-isolated functions cannot be @objc.
@@ -806,7 +806,8 @@ bool swift::isRepresentableInObjC(
     Optional<unsigned> completionHandlerErrorParamIndex;
     if (FD->hasThrows()) {
       completionHandlerErrorParamIndex = completionHandlerParams.size();
-      addCompletionHandlerParam(OptionalType::get(ctx.getExceptionType()));
+      auto errorType = ctx.getErrorExistentialType();
+      addCompletionHandlerParam(OptionalType::get(errorType));
     }
 
     Type completionHandlerType = FunctionType::get(

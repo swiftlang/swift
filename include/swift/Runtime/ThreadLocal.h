@@ -23,13 +23,13 @@
 
 /// SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL - Does the current configuration
 /// allow the use of SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL?
-#if defined(__APPLE__)
-// The pthread TLS APIs work better than C++ TLS on Apple platforms.
-#define SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL 0
-#elif defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
 // We define SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL to nothing in this
 // configuration and just use a global variable, so this is okay.
 #define SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL 1
+#elif defined(__APPLE__)
+// The pthread TLS APIs work better than C++ TLS on Apple platforms.
+#define SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL 0
 #elif __has_feature(tls)
 // If __has_feature reports that TLS is available, use it.
 #define SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL 1
@@ -43,7 +43,7 @@
 
 /// SWIFT_RUNTIME_THREAD_LOCAL - Declare that something is a
 /// thread-local variable in the runtime.
-#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
 // In a single-threaded runtime, thread-locals are global.
 #define SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL
 #elif defined(__GNUC__)

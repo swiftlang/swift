@@ -56,6 +56,7 @@
 #endif
 
 using namespace swift;
+using namespace hashable_support;
 
 #if SWIFT_HAS_ISA_MASKING
 OBJC_EXPORT __attribute__((__weak_import__))
@@ -1598,6 +1599,24 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
 const Metadata *swift::getNSObjectMetadata() {
   return SWIFT_LAZY_CONSTANT(
       swift_getObjCClassMetadata((const ClassMetadata *)[NSObject class]));
+}
+
+const Metadata *swift::getNSStringMetadata() {
+  return SWIFT_LAZY_CONSTANT(swift_getObjCClassMetadata(
+    (const ClassMetadata *)objc_lookUpClass("NSString")
+  ));
+}
+
+const HashableWitnessTable *
+swift::hashable_support::getNSStringHashableConformance() {
+  return SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<const HashableWitnessTable *>(
+      swift_conformsToProtocol(
+        getNSStringMetadata(),
+        &HashableProtocolDescriptor
+      )
+    )
+  );
 }
 
 #endif

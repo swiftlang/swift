@@ -257,10 +257,6 @@ cmake^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^
     -DSWIFT_INCLUDE_DOCS:BOOL=NO^
-    -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE:PATH=%source_root%\icu-%icu_version%\include\unicode^
-    -DSWIFT_WINDOWS_x86_64_ICU_UC:PATH=%source_root%\icu-%icu_version%\lib64\icuuc.lib^
-    -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE:PATH=%source_root%\icu-%icu_version%\include^
-    -DSWIFT_WINDOWS_x86_64_ICU_I18N:PATH=%source_root%\icu-%icu_version%\lib64\icuin.lib^
     -DSWIFT_BUILD_DYNAMIC_STDLIB:BOOL=YES^
     -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL=YES^
     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=NO^
@@ -272,6 +268,7 @@ cmake^
     -DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING=YES^
+    -DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%source_root%\swift-experimental-string-processing^
     -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;testsuite-tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
     -DPYTHON_EXECUTABLE:PATH=%PYTHON_HOME%\python.exe^

@@ -16,11 +16,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -30,6 +30,8 @@
 #include "swift/Config.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "swift/Parse/Lexer.h" // bad dependency
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
@@ -547,6 +549,24 @@ static bool typeSpellingIsAmbiguous(Type type,
       auto argType = arg.getAsType();
       if (argType && argType->getWithoutParens().getPointer() != type.getPointer() &&
           argType->getWithoutParens().getString(PO) == type.getString(PO)) {
+        // Currently, existential types are spelled the same way
+        // as protocols and compositions. We can remove this once
+        // existenials are printed with 'any'.
+        if (type->is<ExistentialType>() || argType->isExistentialType()) {
+          auto constraint = type;
+          if (auto existential = type->getAs<ExistentialType>())
+            constraint = existential->getConstraintType();
+
+          auto argConstraint = argType;
+          if (auto existential = argType->getAs<ExistentialType>())
+            argConstraint = existential->getConstraintType();
+
+          if (constraint.getPointer() != argConstraint.getPointer())
+            return true;
+
+          continue;
+        }
+
         return true;
       }
     }
@@ -564,6 +584,15 @@ static bool isMainActor(Type type) {
   }
 
   return false;
+}
+
+void swift::printClangDeclName(const clang::NamedDecl *ND,
+                               llvm::raw_ostream &os) {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return; // not needed for the parser library.
+#endif
+
+  ND->getNameForDiagnostic(os, ND->getASTContext().getPrintingPolicy(), false);
 }
 
 /// Format a single diagnostic argument and write it to the given
@@ -832,6 +861,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
                                            diagArg->FormatArgs);
     break;
   }
+
+  case DiagnosticArgumentKind::ClangDecl:
+    assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
+    Out << FormatOpts.OpeningQuotationMark;
+    printClangDeclName(Arg.getAsClangDecl(), Out);
+    Out << FormatOpts.ClosingQuotationMark;
+    break;
   }
 }
 

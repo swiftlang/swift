@@ -330,9 +330,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 
 /// Copy an address-discriminated signed pointer from the source to the dest.
 template <class T>
-SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
-static inline void swift_ptrauth_copy(T *dest, const T *src, unsigned extra) {
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline void
+swift_ptrauth_copy(T *dest, const T *src, unsigned extra, bool allowNull) {
 #if SWIFT_PTRAUTH
+  if (allowNull && *src == nullptr) {
+    *dest = nullptr;
+    return;
+  }
+
   *dest = ptrauth_auth_and_resign(*src,
                                   ptrauth_key_function_pointer,
                                   ptrauth_blend_discriminator(src, extra),
@@ -348,8 +353,13 @@ static inline void swift_ptrauth_copy(T *dest, const T *src, unsigned extra) {
 template <class T>
 SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 static inline void swift_ptrauth_copy_data(T *dest, const T *src,
-                                           unsigned extra) {
+                                           unsigned extra, bool allowNull) {
 #if SWIFT_PTRAUTH
+  if (allowNull && *src == nullptr) {
+    *dest = nullptr;
+    return;
+  }
+
   *dest = ptrauth_auth_and_resign(*src,
                                   ptrauth_key_process_independent_data,
                                   ptrauth_blend_discriminator(src, extra),
@@ -365,11 +375,11 @@ static inline void swift_ptrauth_copy_data(T *dest, const T *src,
 template <class T>
 SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline void
 swift_ptrauth_copy_code_or_data(T *dest, const T *src, unsigned extra,
-                                bool isCode) {
+                                bool isCode, bool allowNull) {
   if (isCode) {
-    return swift_ptrauth_copy(dest, src, extra);
+    return swift_ptrauth_copy(dest, src, extra, allowNull);
   } else {
-    return swift_ptrauth_copy_data(dest, src, extra);
+    return swift_ptrauth_copy_data(dest, src, extra, allowNull);
   }
 }
 

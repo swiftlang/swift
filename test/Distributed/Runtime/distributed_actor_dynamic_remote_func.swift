@@ -10,9 +10,9 @@
 import _Distributed
 
 distributed actor LocalWorker {
-  typealias Transport = FakeTransport
+  typealias Transport = FakeActorSystem
 
-  init(transport: FakeTransport) {}
+  init(system: FakeActorSystem) {}
 
   distributed func function() async throws -> String {
     "local:"
@@ -39,61 +39,94 @@ extension LocalWorker {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address
   }
 }
 
-struct FakeTransport: ActorTransport {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented:\(#function)")
-  }
+struct FakeActorSystem: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias InvocationDecoder = FakeInvocation
+  typealias InvocationEncoder = FakeInvocation
+  typealias SerializationRequirement = Codable
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
-  throws -> Act?
-      where Act: DistributedActor {
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
-      where Act: DistributedActor {
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     let id = ActorAddress(parse: "xxx")
     print("assign type:\(actorType), id:\(id)")
-    return .init(id)
+    return id
   }
 
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     print("ready actor:\(actor), id:\(actor.id)")
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {
+  func resignID(_ id: ActorID) {
     print("ready id:\(id)")
+  }
+
+  func makeInvocationEncoder() -> InvocationDecoder {
+    .init()
   }
 }
 
+struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func decodeNextArgument<Argument>(
+    _ argumentType: Argument.Type,
+    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
+  ) throws { /* ... */ }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
+
+  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+    typealias SerializationRequirement = Codable
+  }
+}
+
+
 @available(SwiftStdlib 5.5, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
 func test_local() async throws {
-  let transport = FakeTransport()
+  let system = FakeActorSystem()
 
-  let worker = LocalWorker(transport: transport)
+  let worker = LocalWorker(system: system)
   let x = try await worker.function()
   print("call: \(x)")
   // CHECK: assign type:LocalWorker, id:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.LocalWorker, id:AnyActorIdentity([[ADDRESS]])
+  // CHECK: ready actor:main.LocalWorker, id:[[ADDRESS]]
   // CHECK: call: local:
 }
 
 func test_remote() async throws {
   let address = ActorAddress(parse: "")
-  let transport = FakeTransport()
+  let system = FakeActorSystem()
 
-  let worker = try LocalWorker.resolve(.init(address), using: transport)
+  let worker = try LocalWorker.resolve(id: address, using: system)
   let x = try await worker.function()
   print("call: \(x)")
   // CHECK: call: _cluster_remote_function():

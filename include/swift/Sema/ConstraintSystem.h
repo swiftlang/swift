@@ -363,6 +363,8 @@ public:
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
 
+  bool isTypeSequence() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -2217,6 +2219,13 @@ enum class SolutionApplicationToFunctionResult {
   Delay,
 };
 
+/// Retrieve the closure type from the constraint system.
+struct GetClosureType {
+  ConstraintSystem &cs;
+
+  Type operator()(const AbstractClosureExpr *expr) const;
+};
+
 /// Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -2442,9 +2451,6 @@ private:
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
-
-  /// Cache of the effects any closures visited.
-  llvm::SmallDenseMap<ClosureExpr *, FunctionType::ExtInfo, 4> closureEffectsCache;
 
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
@@ -3099,9 +3105,16 @@ public:
   }
 
   FunctionType *getClosureType(const ClosureExpr *closure) const {
+    auto result = getClosureTypeIfAvailable(closure);
+    assert(result);
+    return result;
+  }
+
+  FunctionType *getClosureTypeIfAvailable(const ClosureExpr *closure) const {
     auto result = ClosureTypes.find(closure);
-    assert(result != ClosureTypes.end());
-    return result->second;
+    if (result != ClosureTypes.end())
+      return result->second;
+    return nullptr;
   }
 
   TypeBase* getFavoredType(Expr *E) {
@@ -3302,6 +3315,11 @@ public:
   getConstraintLocator(ASTNode anchor,
                        ArrayRef<ConstraintLocator::PathElement> path,
                        unsigned summaryFlags);
+
+  /// Retrieve a locator for opening the opaque archetype for the given
+  /// opaque type.
+  ConstraintLocator *getOpenOpaqueLocator(
+      ConstraintLocatorBuilder locator, OpaqueTypeDecl *opaqueDecl);
 
   /// Retrive the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags
@@ -4058,6 +4076,8 @@ public:
   /// parameter types and dependent member types with fresh type variables.
   ///
   /// \param type The type to open.
+  /// \param replacements The mapping from generic type parameters to their
+  ///                     corresponding opened type variables.
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type, OpenedTypeMap &replacements);
@@ -4119,6 +4139,12 @@ public:
          ConstraintLocatorBuilder locator,
          const OpenedTypeMap &replacements);
 
+  /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
+  /// the appropriate closure-type extraction function.
+  AnyFunctionType *adjustFunctionTypeForConcurrency(
+    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue);
+
   /// Retrieve the type of a reference to the given value declaration.
   ///
   /// For references to polymorphic function types, this routine "opens up"
@@ -4167,10 +4193,15 @@ public:
   ///
   /// \param getType Optional callback to extract a type for given declaration.
   static Type
-  getUnopenedTypeOfReference(VarDecl *value, Type baseType, DeclContext *UseDC,
-                             llvm::function_ref<Type(VarDecl *)> getType,
-                             ConstraintLocator *memberLocator = nullptr,
-                             bool wantInterfaceType = false);
+  getUnopenedTypeOfReference(
+      VarDecl *value, Type baseType, DeclContext *UseDC,
+      llvm::function_ref<Type(VarDecl *)> getType,
+      ConstraintLocator *memberLocator = nullptr,
+      bool wantInterfaceType = false,
+      llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
+        [](const AbstractClosureExpr *) {
+          return Type();
+        });
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -4459,6 +4490,11 @@ public:
   bool repairFailures(Type lhs, Type rhs, ConstraintKind matchKind,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
+
+  TypeMatchResult
+  matchPackTypes(PackType *pack1, PackType *pack2,
+                 ConstraintKind kind, TypeMatchOptions flags,
+                 ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
@@ -5179,7 +5215,7 @@ public:
     if (isExpressionAlreadyTooComplex)
       return true;
 
-    auto CancellationFlag = getASTContext().TypeCheckerOpts.CancellationFlag;
+    auto CancellationFlag = getASTContext().CancellationFlag;
     if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
       return true;
 
@@ -5255,6 +5291,10 @@ public:
   /// of the given expression, including those in closure bodies that will be
   /// part of the constraint system.
   void forEachExpr(Expr *expr, llvm::function_ref<Expr *(Expr *)> callback);
+
+  /// Determine whether one of the parent closures the given one is nested
+  /// in (if any) has a result builder applied to its body.
+  bool isInResultBuilderContext(ClosureExpr *closure) const;
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));

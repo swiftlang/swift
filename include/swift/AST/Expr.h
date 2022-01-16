@@ -348,6 +348,10 @@ protected:
     IsPlaceholder : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(PackExpr, Expr, 32,
+    : NumPadBits,
+    NumElements : 32
+  );
   } Bits;
 
 private:
@@ -961,7 +965,50 @@ public:
     return E->getKind() == ExprKind::InterpolatedStringLiteral;
   }
 };
-  
+
+/// A regular expression literal e.g '(a|c)*'.
+class RegexLiteralExpr : public LiteralExpr {
+  SourceLoc Loc;
+  StringRef RegexText;
+  unsigned Version;
+  ArrayRef<uint8_t> SerializedCaptureStructure;
+
+  RegexLiteralExpr(SourceLoc loc, StringRef regexText, unsigned version,
+                   ArrayRef<uint8_t> serializedCaps,
+                   bool isImplicit)
+      : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Loc(loc),
+        RegexText(regexText), Version(version),
+        SerializedCaptureStructure(serializedCaps) {}
+
+public:
+  static RegexLiteralExpr *createParsed(
+      ASTContext &ctx, SourceLoc loc, StringRef regexText, unsigned version,
+      ArrayRef<uint8_t> serializedCaptureStructure);
+
+  typedef uint16_t CaptureStructureSerializationVersion;
+
+  static unsigned getCaptureStructureSerializationAllocationSize(
+      unsigned regexLength) {
+    return sizeof(CaptureStructureSerializationVersion) + regexLength + 1;
+  }
+
+  /// Retrieve the raw regex text.
+  StringRef getRegexText() const { return RegexText; }
+
+  /// Retrieve the version of the regex string.
+  unsigned getVersion() const { return Version; }
+
+  ArrayRef<uint8_t> getSerializedCaptureStructure() {
+    return SerializedCaptureStructure;
+  }
+
+  SourceRange getSourceRange() const { return Loc; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::RegexLiteral;
+  }
+};
+
 /// MagicIdentifierLiteralExpr - A magic identifier like #file which expands
 /// out to a literal at SILGen time.
 class MagicIdentifierLiteralExpr : public BuiltinLiteralExpr {
@@ -1216,7 +1263,7 @@ public:
 
   /// Set whether this reference must account for a `throw` occurring for reasons
   /// other than the function implementation itself throwing, e.g. an
-  /// `ActorTransport` implementing a `distributed func` call throwing a
+  /// `DistributedActorSystem` implementing a `distributed func` call throwing a
   /// networking error.
   void setImplicitlyThrows(bool isImplicitlyThrows) {
     Bits.DeclRefExpr.IsImplicitlyThrows = isImplicitlyThrows;
@@ -1596,7 +1643,7 @@ public:
 
   /// Set whether this reference must account for a `throw` occurring for reasons
   /// other than the function implementation itself throwing, e.g. an
-  /// `ActorTransport` implementing a `distributed func` call throwing a
+  /// `DistributedActorSystem` implementing a `distributed func` call throwing a
   /// networking error.
   void setImplicitlyThrows(bool isImplicitlyThrows) {
     Bits.LookupExpr.IsImplicitlyThrows = isImplicitlyThrows;
@@ -2971,8 +3018,13 @@ public:
 /// (opaque type)" and "S<T> ---> S<(opaque type)>".
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
 public:
-  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty) {}
+  /// The substitutions to be applied to the opaque type declaration to
+  /// produce the resulting type.
+  const SubstitutionMap substitutions;
+
+  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty, SubstitutionMap substitutions)
+    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty),
+      substitutions(substitutions) {}
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnderlyingToOpaque;
@@ -3291,6 +3343,18 @@ public:
   }
 };
 
+/// ReifyPackExpr - Drop the pack structure and reify it either as a tuple or
+/// single value.
+class ReifyPackExpr : public ImplicitConversionExpr {
+public:
+  ReifyPackExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::ReifyPack, subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ReifyPack;
+  }
+};
+
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
@@ -3390,9 +3454,12 @@ public:
 class VarargExpansionExpr : public Expr {
   Expr *SubExpr;
 
-public:
   VarargExpansionExpr(Expr *subExpr, bool implicit, Type type = Type())
     : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {}
+
+public:
+  static VarargExpansionExpr *createParamExpansion(ASTContext &ctx, Expr *E);
+  static VarargExpansionExpr *createArrayExpansion(ASTContext &ctx, ArrayExpr *AE);
 
   SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
 
@@ -3591,6 +3658,9 @@ public:
 
   /// \brief Return whether this closure is async when fully applied.
   bool isBodyAsync() const;
+
+  /// Whether this closure is Sendable.
+  bool isSendable() const;
 
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
@@ -5730,6 +5800,56 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OneWay;
   }
+};
+
+/// An expression node that aggregates a set of heterogeneous arguments into a
+/// parameter pack suitable for passing off to a variadic generic function
+/// argument.
+///
+/// There is no user-visible way to spell a pack expression, they are always
+/// implicitly created at applies. As such, any appearance of pack types outside
+/// of applies are illegal. In general, packs appearing in such positions should
+/// have a \c ReifyPackExpr to convert them to a user-available AST type.
+class PackExpr final : public Expr,
+    private llvm::TrailingObjects<PackExpr, Expr *> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects() const {
+    return getNumElements();
+  }
+
+  PackExpr(ArrayRef<Expr *> SubExprs, Type Ty);
+
+public:
+  /// Create a pack.
+  static PackExpr *create(ASTContext &ctx, ArrayRef<Expr *> SubExprs, Type Ty);
+
+  /// Create an empty pack.
+  static PackExpr *createEmpty(ASTContext &ctx);
+
+  SourceLoc getLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  /// Retrieve the elements of this pack.
+  MutableArrayRef<Expr *> getElements() {
+    return { getTrailingObjects<Expr *>(), getNumElements() };
+  }
+
+  /// Retrieve the elements of this pack.
+  ArrayRef<Expr *> getElements() const {
+    return { getTrailingObjects<Expr *>(), getNumElements() };
+  }
+
+  unsigned getNumElements() const { return Bits.PackExpr.NumElements; }
+
+  Expr *getElement(unsigned i) const {
+    return getElements()[i];
+  }
+  void setElement(unsigned i, Expr *e) {
+    getElements()[i] = e;
+  }
+
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Pack; }
 };
 
 inline bool Expr::isInfixOperator() const {

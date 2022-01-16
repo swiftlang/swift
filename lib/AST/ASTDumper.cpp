@@ -129,6 +129,8 @@ getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
   case SILFunctionType::Representation::Thick: return "thick";
   case SILFunctionType::Representation::Block: return "block";
   case SILFunctionType::Representation::CFunctionPointer: return "c";
+  case SILFunctionType::Representation::CXXMethod:
+    return "cxx_method";
   case SILFunctionType::Representation::Thin: return "thin";
   case SILFunctionType::Representation::Method: return "method";
   case SILFunctionType::Representation::ObjCMethod: return "objc_method";
@@ -567,7 +569,7 @@ namespace {
       OS << " naming_decl=";
       printDeclName(OTD->getNamingDecl());
       PrintWithColorRAII(OS, TypeColor) << " opaque_interface="
-        << Type(OTD->getUnderlyingInterfaceType()).getString();
+        << OTD->getDeclaredInterfaceType().getString();
       OS << " in "
          << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
       if (auto underlyingSubs = OTD->getUnderlyingTypeSubstitutions()) {
@@ -1907,6 +1909,14 @@ public:
     E->getInitializer().dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitRegexLiteralExpr(RegexLiteralExpr *E) {
+    printCommon(E, "regex_literal_expr");
+    PrintWithColorRAII(OS, LiteralValueColor)
+        << " text=" << QuotedString(E->getRegexText())
+        << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal") 
@@ -2066,6 +2076,15 @@ public:
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitPackExpr(PackExpr *E) {
+    printCommon(E, "pack_expr");
+
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
+      OS << '\n';
+      printRec(E->getElement(i));
+    }
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
     PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
@@ -2209,6 +2228,11 @@ public:
   }
   void visitBridgeToObjCExpr(BridgeToObjCExpr *E) {
     printCommon(E, "bridge_to_objc_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitReifyPackExpr(ReifyPackExpr *E) {
+    printCommon(E, "reify_pack") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -3090,6 +3114,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitExistentialTypeRepr(ExistentialTypeRepr *T) {
+    printCommon("type_existential");
+    printRec(T->getConstraint());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {
     printCommon("type_placeholder");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3574,6 +3604,25 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void visitPackType(PackType *T, StringRef label) {
+      printCommon(label, "pack_type");
+      printField("num_elements", T->getNumElements());
+      Indent += 2;
+      for (Type elt : T->getElementTypes()) {
+        OS.indent(Indent) << "(";
+        printRec(elt);
+        OS << ")";
+      }
+      Indent -= 2;
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitPackExpansionType(PackExpansionType *T, StringRef label) {
+      printCommon(label, "pack_expansion_type");
+      printField("pattern", T->getPatternType());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
     void visitParenType(ParenType *T, StringRef label) {
       printCommon(label, "paren_type");
       dumpParameterFlags(T->getParameterFlags());
@@ -3729,6 +3778,7 @@ namespace {
                                       StringRef label) {
       printArchetypeCommon(T, "opaque_type", label);
       printField("decl", T->getDecl()->getNamingDecl()->printRef());
+      printField("ordinal", T->getOrdinal());
       if (!T->getSubstitutions().empty()) {
         OS << '\n';
         SmallPtrSet<const ProtocolConformance *, 4> Dumped;
@@ -3919,6 +3969,13 @@ namespace {
       for (auto proto : T->getMembers()) {
         printRec(proto);
       }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitExistentialType(ExistentialType *T,
+                              StringRef label) {
+      printCommon(label, "existential_type");
+      printRec(T->getConstraintType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

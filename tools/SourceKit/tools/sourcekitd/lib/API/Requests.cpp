@@ -30,6 +30,7 @@
 #include "SourceKit/SwiftLang/Factory.h"
 
 #include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
@@ -107,6 +108,7 @@ static SourceKit::Context *GlobalCtx = nullptr;
 void sourcekitd::initializeService(
     StringRef runtimeLibPath, StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification) {
+  INITIALIZE_LLVM();
   llvm::EnablePrettyStackTrace();
   GlobalCtx =
       new SourceKit::Context(runtimeLibPath, diagnosticDocumentationPath,
@@ -215,34 +217,34 @@ static void findRelatedIdents(StringRef Filename, int64_t Offset,
 
 static sourcekitd_response_t
 codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
-             Optional<RequestDict> optionsDict,
-             ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions);
+             Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+             Optional<VFSOptions> vfsOptions,
+             SourceKitCancellationToken CancellationToken);
 
-static sourcekitd_response_t codeCompleteOpen(StringRef name,
-                                              llvm::MemoryBuffer *InputBuf,
-                                              int64_t Offset,
-                                              Optional<RequestDict> optionsDict,
-                                              ArrayRef<const char *> Args,
-                                              Optional<VFSOptions> vfsOptions);
+static sourcekitd_response_t
+codeCompleteOpen(StringRef name, llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                 Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+                 Optional<VFSOptions> vfsOptions,
+                 SourceKitCancellationToken CancellationToken);
 
 static sourcekitd_response_t
 codeCompleteUpdate(StringRef name, int64_t Offset,
-                   Optional<RequestDict> optionsDict);
+                   Optional<RequestDict> optionsDict,
+                   SourceKitCancellationToken CancellationToken);
 
 static sourcekitd_response_t codeCompleteClose(StringRef name, int64_t Offset);
 
-static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
-                                             int64_t Offset,
-                                             Optional<RequestDict> optionsDict,
-                                             ArrayRef<const char *> Args,
-                                             Optional<VFSOptions> vfsOptions);
-
 static sourcekitd_response_t
-conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
-                     Optional<RequestDict> optionsDict,
-                     ArrayRef<const char *> Args,
-                     ArrayRef<const char *> ExpectedTypes,
-                     Optional<VFSOptions> vfsOptions);
+typeContextInfo(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+                Optional<VFSOptions> vfsOptions,
+                SourceKitCancellationToken CancellationToken);
+
+static sourcekitd_response_t conformingMethodList(
+    llvm::MemoryBuffer *InputBuf, int64_t Offset,
+    Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+    ArrayRef<const char *> ExpectedTypes, Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken);
 
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
@@ -972,6 +974,46 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
     return;
   }
 
+  if (ReqUID == RequestCompile) {
+    Optional<StringRef> Name = Req.getString(KeyName);
+    if (!Name.hasValue())
+      return Rec(createErrorRequestInvalid("missing 'key.name'"));
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.performCompile(
+        *Name, Args, std::move(vfsOptions), CancellationToken,
+        [Rec](const RequestResult<CompilationResult> &result) {
+          if (result.isCancelled())
+            return Rec(createErrorRequestCancelled());
+          if (result.isError())
+            return Rec(createErrorRequestFailed(result.getError()));
+
+          const CompilationResult &info = result.value();
+
+          ResponseBuilder builder;
+
+          builder.getDictionary().set(KeyValue, info.ResultStatus);
+          auto diagsArray = builder.getDictionary().setArray(KeyDiagnostics);
+          for (auto diagInfo : info.Diagnostics) {
+            auto elem = diagsArray.appendDictionary();
+            fillDictionaryForDiagnosticInfo(elem, diagInfo);
+          }
+          Rec(builder.createResponse());
+        });
+    return;
+  }
+
+  if (ReqUID == RequestCompileClose) {
+    Optional<StringRef> Name = Req.getString(KeyName);
+    if (!Name.hasValue())
+      return Rec(createErrorRequestInvalid("missing 'key.name'"));
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.closeCompile(*Name);
+
+    return Rec(ResponseBuilder().createResponse());
+  }
+
   if (!SourceFile.hasValue() && !SourceText.hasValue() &&
       ReqUID != RequestCodeCompleteUpdate)
     return Rec(createErrorRequestInvalid(
@@ -1017,7 +1059,7 @@ static void handleSemanticRequest(
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
     Optional<RequestDict> options = Req.getDictionary(KeyCodeCompleteOptions);
     return Rec(codeComplete(InputBuf.get(), Offset, options, Args,
-                            std::move(vfsOptions)));
+                            std::move(vfsOptions), CancellationToken));
   }
 
   if (ReqUID == RequestCodeCompleteOpen) {
@@ -1033,7 +1075,7 @@ static void handleSemanticRequest(
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
     Optional<RequestDict> options = Req.getDictionary(KeyCodeCompleteOptions);
     return Rec(codeCompleteOpen(*Name, InputBuf.get(), Offset, options, Args,
-                                std::move(vfsOptions)));
+                                std::move(vfsOptions), CancellationToken));
   }
 
   if (ReqUID == RequestCodeCompleteUpdate) {
@@ -1044,7 +1086,7 @@ static void handleSemanticRequest(
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
     Optional<RequestDict> options = Req.getDictionary(KeyCodeCompleteOptions);
-    return Rec(codeCompleteUpdate(*Name, Offset, options));
+    return Rec(codeCompleteUpdate(*Name, Offset, options, CancellationToken));
   }
 
   if (ReqUID == RequestTypeContextInfo) {
@@ -1058,7 +1100,7 @@ static void handleSemanticRequest(
     Optional<RequestDict> options =
         Req.getDictionary(KeyTypeContextInfoOptions);
     return Rec(typeContextInfo(InputBuf.get(), Offset, options, Args,
-                               std::move(vfsOptions)));
+                               std::move(vfsOptions), CancellationToken));
   }
 
   if (ReqUID == RequestConformingMethodList) {
@@ -1074,9 +1116,9 @@ static void handleSemanticRequest(
       return Rec(createErrorRequestInvalid("invalid 'key.expectedtypes'"));
     Optional<RequestDict> options =
         Req.getDictionary(KeyConformingMethodListOptions);
-    return Rec(
-        conformingMethodList(InputBuf.get(), Offset, options, Args,
-                             ExpectedTypeNames, std::move(vfsOptions)));
+    return Rec(conformingMethodList(InputBuf.get(), Offset, options, Args,
+                                    ExpectedTypeNames, std::move(vfsOptions),
+                                    CancellationToken));
   }
 
   if (!SourceFile.hasValue())
@@ -2177,9 +2219,9 @@ public:
 
 static sourcekitd_response_t
 codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
-             Optional<RequestDict> optionsDict,
-             ArrayRef<const char *> Args,
-             Optional<VFSOptions> vfsOptions) {
+             Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+             Optional<VFSOptions> vfsOptions,
+             SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
   SKCodeCompletionConsumer CCC(RespBuilder);
 
@@ -2189,7 +2231,7 @@ codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeComplete(InputBuf, Offset, options.get(), CCC, Args,
-                    std::move(vfsOptions));
+                    std::move(vfsOptions), CancellationToken);
   return CCC.createResponse();
 }
 
@@ -2282,12 +2324,11 @@ public:
 };
 } // end anonymous namespace
 
-static sourcekitd_response_t codeCompleteOpen(StringRef Name,
-                                              llvm::MemoryBuffer *InputBuf,
-                                              int64_t Offset,
-                                              Optional<RequestDict> optionsDict,
-                                              ArrayRef<const char *> Args,
-                                              Optional<VFSOptions> vfsOptions) {
+static sourcekitd_response_t
+codeCompleteOpen(StringRef Name, llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                 Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+                 Optional<VFSOptions> vfsOptions,
+                 SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
@@ -2369,7 +2410,7 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
   }
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeCompleteOpen(Name, InputBuf, Offset, options.get(), filterRules, CCC,
-                        Args, std::move(vfsOptions));
+                        Args, std::move(vfsOptions), CancellationToken);
   return CCC.createResponse();
 }
 
@@ -2383,14 +2424,15 @@ static sourcekitd_response_t codeCompleteClose(StringRef Name, int64_t Offset) {
 
 static sourcekitd_response_t
 codeCompleteUpdate(StringRef name, int64_t offset,
-                   Optional<RequestDict> optionsDict) {
+                   Optional<RequestDict> optionsDict,
+                   SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
   if (optionsDict)
     options = std::make_unique<SKOptionsDictionary>(*optionsDict);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.codeCompleteUpdate(name, offset, options.get(), CCC);
+  Lang.codeCompleteUpdate(name, offset, options.get(), CancellationToken, CCC);
   return CCC.createResponse();
 }
 
@@ -2491,11 +2533,11 @@ void SKGroupedCodeCompletionConsumer::setAnnotatedTypename(bool flag) {
 // Type Context Info
 //===----------------------------------------------------------------------===//
 
-static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
-                                             int64_t Offset,
-                                             Optional<RequestDict> optionsDict,
-                                             ArrayRef<const char *> Args,
-                                             Optional<VFSOptions> vfsOptions) {
+static sourcekitd_response_t
+typeContextInfo(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+                Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+                Optional<VFSOptions> vfsOptions,
+                SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
 
   class Consumer : public TypeContextInfoConsumer {
@@ -2547,7 +2589,8 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
     options = std::make_unique<SKOptionsDictionary>(*optionsDict);
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getExpressionContextInfo(InputBuf, Offset, options.get(), Args, Consumer,
+  Lang.getExpressionContextInfo(InputBuf, Offset, options.get(), Args,
+                                CancellationToken, Consumer,
                                 std::move(vfsOptions));
 
   if (Consumer.wasCancelled()) {
@@ -2563,12 +2606,11 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
 // Conforming Method List
 //===----------------------------------------------------------------------===//
 
-static sourcekitd_response_t
-conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
-                     Optional<RequestDict> optionsDict,
-                     ArrayRef<const char *> Args,
-                     ArrayRef<const char *> ExpectedTypes,
-                     Optional<VFSOptions> vfsOptions) {
+static sourcekitd_response_t conformingMethodList(
+    llvm::MemoryBuffer *InputBuf, int64_t Offset,
+    Optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
+    ArrayRef<const char *> ExpectedTypes, Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken) {
   ResponseBuilder RespBuilder;
 
   class Consumer : public ConformingMethodListConsumer {
@@ -2619,7 +2661,8 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.getConformingMethodList(InputBuf, Offset, options.get(), Args,
-                               ExpectedTypes, Consumer, std::move(vfsOptions));
+                               ExpectedTypes, CancellationToken, Consumer,
+                               std::move(vfsOptions));
 
   if (Consumer.wasCancelled()) {
     return createErrorRequestCancelled();
@@ -2663,18 +2706,7 @@ public:
   sourcekitd_response_t createResponse();
 
   bool needsSemanticInfo() override {
-    if (Opts.SyntacticOnly) {
-      return false;
-    } else if (isSemanticEditorDisabled()) {
-      return false;
-    } else if (!documentStructureEnabled() &&
-               !syntaxMapEnabled() &&
-               !diagnosticsEnabled() &&
-               !syntaxTreeEnabled()) {
-      return false;
-    } else {
-      return true;
-    }
+    return !Opts.SyntacticOnly && !isSemanticEditorDisabled();
   }
 
   void handleRequestError(const char *Description) override;

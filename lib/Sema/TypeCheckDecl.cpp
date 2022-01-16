@@ -667,6 +667,34 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
 }
 
 bool
+ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *decl) const {
+  // ObjC protocols do not require `any`.
+  if (decl->isObjC())
+    return false;
+
+  for (auto member : decl->getMembers()) {
+    // Existential types require `any` if the protocol has an associated type.
+    if (isa<AssociatedTypeDecl>(member))
+      return true;
+
+    // For value members, look at their type signatures.
+    if (auto valueMember = dyn_cast<ValueDecl>(member)) {
+      if (!decl->isAvailableInExistential(valueMember))
+        return true;
+    }
+  }
+
+  // Check whether any of the inherited protocols require `any`.
+  for (auto proto : decl->getInheritedProtocols()) {
+    if (proto->existentialRequiresAny())
+      return true;
+  }
+
+  return false;
+}
+
+bool
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<ClassDecl>(decl))
     return decl->getAttrs().hasAttribute<FinalAttr>();
@@ -1871,6 +1899,14 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
     }
 
     if (isProtocol) {
+      // FIXME: Source compatibility hack for Swift 5. The compiler
+      // accepts member operators on protocols with existential
+      // type arguments. We should consider banning this in Swift 6.
+      if (auto existential = paramType->getAs<ExistentialType>()) {
+        if (selfNominal == existential->getConstraintType()->getAnyNominal())
+          return true;
+      }
+
       // For a protocol, is it the 'Self' type parameter?
       if (auto genericParam = paramType->getAs<GenericTypeParamType>())
         if (genericParam->isEqual(DC->getSelfInterfaceType()))
@@ -2082,7 +2118,14 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (decl->isVariadic()) {
-    Ty = VariadicSequenceType::get(Ty);
+    // Handle the monovariadic/polyvariadic interface type split.
+    if (Ty->hasTypeSequence()) {
+      // Polyvariadic types (T...) for <T...> resolve to pack expansions.
+      Ty = PackExpansionType::get(Ty);
+    } else {
+      // Monovariadic types (T...) for <T> resolve to [T].
+      Ty = VariadicSequenceType::get(Ty);
+    }
     if (!ctx.getArrayDecl()) {
       ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
                          diag::sugar_type_not_found, 0);

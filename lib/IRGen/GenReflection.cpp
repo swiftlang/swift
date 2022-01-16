@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -560,6 +561,8 @@ protected:
                   CanGenericSignature sig,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
+    assert(!type->isForeignReferenceType());
+
     B.addRelativeAddress(IGM.getTypeRef(type, sig, role).first);
     addBuiltinTypeRefs(type);
   }
@@ -707,6 +710,15 @@ private:
     if (!type) {
       B.addInt32(0);
     } else {
+      if (type->isForeignReferenceType()) {
+        type->getASTContext().Diags.diagnose(
+            type->lookThroughAllOptionalTypes()
+                ->getClassOrBoundGenericClass()
+                ->getLoc(),
+            diag::foreign_reference_types_unsupported.ID, {});
+        exit(1);
+      }
+
       auto genericSig = NTD->getGenericSignature();
 
       // The standard library's Mirror demangles metadata from field

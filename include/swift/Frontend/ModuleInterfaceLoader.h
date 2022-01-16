@@ -151,7 +151,7 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
                   bool skipBuildingInterface, bool IsFramework) override;
 
-  bool canImportModule(ImportPath::Element mID, llvm::VersionTuple version,
+  bool canImportModule(ImportPath::Module named, llvm::VersionTuple version,
                        bool underlyingVersion) override;
 
   bool isCached(StringRef DepPath) override { return false; };
@@ -312,6 +312,9 @@ struct ModuleInterfaceLoaderOptions {
     switch (Opts.RequestedAction) {
     case FrontendOptions::ActionType::TypecheckModuleFromInterface:
       requestedAction = FrontendOptions::ActionType::Typecheck;
+      break;
+    case FrontendOptions::ActionType::ScanDependencies:
+      requestedAction = Opts.RequestedAction;
       break;
     default:
       requestedAction = FrontendOptions::ActionType::EmitModuleOnly;

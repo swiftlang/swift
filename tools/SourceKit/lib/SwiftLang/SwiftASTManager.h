@@ -78,6 +78,7 @@
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/CancellationToken.h"
 #include "SwiftInvocation.h"
+#include "swift/Frontend/FrontendOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -145,6 +146,8 @@ class SwiftASTConsumer : public std::enable_shared_from_this<SwiftASTConsumer> {
   Optional<std::function<void(std::shared_ptr<SwiftASTConsumer>)>>
       CancellationRequestCallback;
 
+  bool IsCancelled = false;
+
 public:
   virtual ~SwiftASTConsumer() { }
 
@@ -157,6 +160,7 @@ public:
   /// depending on it.
   void requestCancellation() {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
+    IsCancelled = true;
     if (CancellationRequestCallback.hasValue()) {
       (*CancellationRequestCallback)(shared_from_this());
       CancellationRequestCallback = None;
@@ -168,12 +172,18 @@ public:
   /// currently no callback set.
   /// The cancellation request callback will automatically be removed when the
   /// SwiftASTManager is cancelled.
+  /// If this \c SwiftASTConsumer has already been cancelled when this method is
+  /// called, \c NewCallback will be called immediately.
   void setCancellationRequestCallback(
       std::function<void(std::shared_ptr<SwiftASTConsumer>)> NewCallback) {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
     assert(!CancellationRequestCallback.hasValue() &&
            "Can't set two cancellation callbacks on a SwiftASTConsumer");
-    CancellationRequestCallback = NewCallback;
+    if (IsCancelled) {
+      NewCallback(shared_from_this());
+    } else {
+      CancellationRequestCallback = NewCallback;
+    }
   }
 
   /// Removes the cancellation request callback previously set by \c
@@ -229,12 +239,13 @@ public:
                            StringRef DiagnosticDocumentationPath);
   ~SwiftASTManager();
 
-  SwiftInvocationRef getInvocation(
-      ArrayRef<const char *> Args, StringRef PrimaryFile, std::string &Error);
+  SwiftInvocationRef getTypecheckInvocation(ArrayRef<const char *> Args,
+                                            StringRef PrimaryFile,
+                                            std::string &Error);
 
   /// Same as the previous `getInvocation`, but allows the caller to specify a
   /// custom `FileSystem` to be used throughout the invocation.
-  SwiftInvocationRef getInvocation(
+  SwiftInvocationRef getTypecheckInvocation(
       ArrayRef<const char *> Args, StringRef PrimaryFile,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       std::string &Error);
@@ -248,29 +259,30 @@ public:
   processASTAsync(SwiftInvocationRef Invok, SwiftASTConsumerRef ASTConsumer,
                   const void *OncePerASTToken,
                   SourceKitCancellationToken CancellationToken,
-                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
-                  ArrayRef<ImmutableTextSnapshotRef> Snapshots =
-                      ArrayRef<ImmutableTextSnapshotRef>());
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem);
 
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
                                                       std::string &Error);
 
-  bool initCompilerInvocation(
-      swift::CompilerInvocation &Invocation, ArrayRef<const char *> Args,
-      swift::DiagnosticEngine &Diags, StringRef PrimaryFile, std::string &Error);
+  bool initCompilerInvocation(swift::CompilerInvocation &Invocation,
+                              ArrayRef<const char *> Args,
+                              swift::FrontendOptions::ActionType Action,
+                              swift::DiagnosticEngine &Diags,
+                              StringRef PrimaryFile, std::string &Error);
 
   /// Same as the previous `initCompilerInvocation`, but allows the caller to
   /// specify a custom `FileSystem` to be used throughout the invocation.
   bool initCompilerInvocation(
       swift::CompilerInvocation &Invocation, ArrayRef<const char *> Args,
-      swift::DiagnosticEngine &Diags, StringRef PrimaryFile,
+      swift::FrontendOptions::ActionType Action, swift::DiagnosticEngine &Diags,
+      StringRef PrimaryFile,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       std::string &Error);
 
   bool initCompilerInvocation(swift::CompilerInvocation &CompInvok,
                               ArrayRef<const char *> OrigArgs,
-                              StringRef PrimaryFile,
-                              std::string &Error);
+                              swift::FrontendOptions::ActionType Action,
+                              StringRef PrimaryFile, std::string &Error);
 
   /// Initializes \p Invocation as if for typechecking, but with no inputs.
   ///
@@ -278,6 +290,7 @@ public:
   /// input files.
   bool initCompilerInvocationNoInputs(swift::CompilerInvocation &Invocation,
                                       ArrayRef<const char *> OrigArgs,
+                                      swift::FrontendOptions::ActionType Action,
                                       swift::DiagnosticEngine &Diags,
                                       std::string &Error,
                                       bool AllowInputs = true);

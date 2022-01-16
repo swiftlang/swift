@@ -882,7 +882,8 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
                 file_types::TY_Swift));
-  return CI.setup(Invocation);
+  std::string InstanceSetupError;
+  return CI.setup(Invocation, InstanceSetupError);
 }
 
 static void collectFuncEntities(std::vector<TextEntity> &Ents,
@@ -1076,8 +1077,11 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    Consumer.failed(InstanceSetupError);
     return true;
+  }
 
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
@@ -1200,8 +1204,11 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   CI.addDiagnosticConsumer(&DiagConsumer);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    Consumer.failed(InstanceSetupError);
     return true;
+  }
   DiagConsumer.setInputBufferIDs(CI.getInputBufferIDs());
 
   ASTContext &Ctx = CI.getASTContext();
@@ -1410,7 +1417,8 @@ void SwiftLangSupport::findLocalRenameRanges(
     ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
     CategorizedRenameRangesReceiver Receiver) {
   std::string Error;
-  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, Filename, Error);
+  SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, Filename, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
@@ -1458,7 +1466,8 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   CompilerInvocation Invocation;
 
   bool Failed = getASTManager()->initCompilerInvocationNoInputs(
-      Invocation, Args, ParseCI.getDiags(), Error);
+      Invocation, Args, FrontendOptions::ActionType::Parse, ParseCI.getDiags(),
+      Error);
   if (Failed) {
     Error = "Compiler invocation init failed";
     return nullptr;
@@ -1467,8 +1476,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
       InputFile(InputBuf->getBufferIdentifier(), /*isPrimary*/false, InputBuf,
                 file_types::TY_Swift));
 
-  if (ParseCI.setup(Invocation)) {
-    Error = "Compiler invocation set up failed";
+  if (ParseCI.setup(Invocation, Error)) {
     return nullptr;
   }
 
@@ -1512,7 +1520,8 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
   CompilerInvocation Invocation;
   std::string Error;
   bool Failed = getASTManager()->initCompilerInvocationNoInputs(
-      Invocation, Args, CI.getDiags(), Error, /*AllowInputs=*/false);
+      Invocation, Args, FrontendOptions::ActionType::Typecheck, CI.getDiags(),
+      Error, /*AllowInputs=*/false);
 
   if (Failed) {
     Consumer.failed(Error);
@@ -1545,25 +1554,19 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
   std::string Error;
-  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
-                                                     CI.getDiags(), Error)) {
+  if (getASTManager()->initCompilerInvocationNoInputs(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), Error)) {
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
-  if (CI.setup(Invocation)) {
-    Error = "Compiler invocation set up fails.";
+  if (CI.setup(Invocation, Error)) {
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
 
   // Load standard library so that Clang importer can use it.
   ASTContext &Ctx = CI.getASTContext();
-  auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
-  if (!Stdlib) {
-    Error = "Cannot load stdlib.";
-    Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
-    return;
-  }
   auto *M = Ctx.getModuleByName(ModuleName);
   if (!M) {
     Error = "Cannot find the module.";

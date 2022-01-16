@@ -159,7 +159,11 @@ public:
     /// This type contains a type placeholder.
     HasPlaceholder       = 0x800,
 
-    Last_Property = HasPlaceholder
+    /// This type contains a generic type parameter that is declared as a
+    /// type sequence
+    HasTypeSequence = 0x1000,
+
+    Last_Property = HasTypeSequence
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -216,6 +220,8 @@ public:
 
   /// Does a type with these properties structurally contain a placeholder?
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
+
+  bool hasTypeSequence() const { return Bits & HasTypeSequence; }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -419,6 +425,13 @@ protected:
     Count : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
+    : NumPadBits,
+
+    /// The number of elements of the tuple.
+    Count : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(BoundGenericType, TypeBase, 32,
     : NumPadBits,
 
@@ -598,6 +611,10 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
+  bool hasTypeSequence() const {
+    return getRecursiveProperties().hasTypeSequence();
+  }
+
   /// Determine whether the type involves the given opened existential
   /// archetype.
   bool hasOpenedExistential(OpenedArchetypeType *opened);
@@ -647,6 +664,13 @@ public:
   /// \c X<T> is not a type parameter. Use \c hasTypeParameter to determine
   /// whether a type parameter exists at any position.
   bool isTypeParameter();
+
+  /// Determine whether this type is a type sequence parameter, which is
+  /// either a GenericTypeParamType or a DependentMemberType.
+  ///
+  /// Like \c isTypeParameter, this routine will return \c false for types that
+  /// include type parameters in nested positions e.g. \c X<T...>.
+  bool isTypeSequenceParameter();
 
   /// Determine whether this type can dynamically be an optional type.
   ///
@@ -702,6 +726,9 @@ public:
   bool hasDependentMember() const {
     return getRecursiveProperties().hasDependentMember();
   }
+
+  /// Whether this type represents a generic constraint.
+  bool isConstraintType() const;
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
@@ -811,8 +838,8 @@ public:
 
   /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
-  ClassDecl *getClassOrBoundGenericClass();
-  
+  ClassDecl *getClassOrBoundGenericClass() const;
+
   /// If this is a struct type or a bound generic struct type, returns
   /// the (possibly generic) class.
   StructDecl *getStructOrBoundGenericStruct();
@@ -820,7 +847,10 @@ public:
   /// If this is an enum or a bound generic enum type, returns the
   /// (possibly generic) enum.
   EnumDecl *getEnumOrBoundGenericEnum();
-  
+
+  /// If this is a class, check if this class is a foreign reference type.
+  bool isForeignReferenceType();
+
   /// Determine whether this type may have a superclass, which holds for
   /// classes, bound generic classes, and archetypes that are only instantiable
   /// with a class type.
@@ -1993,7 +2023,7 @@ public:
 
   ParameterTypeFlags withCompileTimeConst(bool isConst) const {
     return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeConst
-                                      : value | ParameterTypeFlags::CompileTimeConst);
+                                      : value - ParameterTypeFlags::CompileTimeConst);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
@@ -2704,6 +2734,8 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ExistentialMetatype;
   }
+
+  Type getExistentialInstanceType();
   
 private:
   ExistentialMetatypeType(Type T, const ASTContext *C,
@@ -3421,6 +3453,7 @@ struct ParameterListInfo {
   SmallBitVector propertyWrappers;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
+  SmallBitVector variadicGenerics;
 
 public:
   ParameterListInfo() { }
@@ -3449,6 +3482,8 @@ public:
 
   /// Whether there is any contextual information set on this parameter list.
   bool anyContextualInfo() const;
+
+  bool isVariadicGenericParameter(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
@@ -5199,6 +5234,42 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
+/// An existential type, spelled with \c any .
+///
+/// In Swift 5 mode, a plain protocol name in type
+/// context is an implicit existential type.
+class ExistentialType final : public TypeBase {
+  Type ConstraintType;
+
+  ExistentialType(Type constraintType,
+                  const ASTContext *canonicalContext,
+                  RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Existential, canonicalContext, properties),
+        ConstraintType(constraintType) {}
+
+public:
+  static Type get(Type constraint);
+
+  Type getConstraintType() const { return ConstraintType; }
+
+  bool requiresClass() const {
+    if (auto protocol = ConstraintType->getAs<ProtocolType>())
+      return protocol->requiresClass();
+
+    if (auto composition = ConstraintType->getAs<ProtocolCompositionType>())
+      return composition->requiresClass();
+
+    return false;
+  }
+
+  static bool classof(const TypeBase *type) {
+    return type->getKind() == TypeKind::Existential;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(ExistentialType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getConstraintType)
+END_CAN_TYPE_WRAPPER(ExistentialType, Type)
+
 /// LValueType - An l-value is a handle to a physical object.  The
 /// type of that object uniquely determines the type of an l-value
 /// for it.
@@ -5482,48 +5553,43 @@ END_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
 
 /// An archetype that represents an opaque type.
 class OpaqueTypeArchetypeType final : public ArchetypeType,
-    public llvm::FoldingSetNode,
     private ArchetypeTrailingObjects<OpaqueTypeArchetypeType>
 {
   friend TrailingObjects;
   friend ArchetypeType;
   friend GenericSignatureBuilder;
 
-  /// The declaration that defines the opaque type.
-  OpaqueTypeDecl *OpaqueDecl;
-  /// The substitutions into the interface signature of the opaque type.
-  SubstitutionMap Substitutions;
-  
   /// A GenericEnvironment with this opaque archetype bound to the interface
   /// type of the output type from the OpaqueDecl.
-  GenericEnvironment *Environment;
-  
+  GenericEnvironment *Environment = nullptr;
+
+  friend class GenericEnvironment;
+
+  static OpaqueTypeArchetypeType *getNew(
+      GenericEnvironment *environment, Type interfaceType,
+      ArrayRef<ProtocolDecl*> conformsTo, Type superclass,
+      LayoutConstraint layout);
+
 public:
   /// Get an opaque archetype representing the underlying type of the given
   /// opaque type decl's opaque param with ordinal `ordinal`. For example, in
   /// `(some P, some Q)`, `some P`'s type param would have ordinal 0 and `some
   /// Q`'s type param would have ordinal 1.
-  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl, unsigned ordinal,
-                                      SubstitutionMap Substitutions);
+  static Type get(OpaqueTypeDecl *decl, unsigned ordinal, SubstitutionMap subs);
 
-  OpaqueTypeDecl *getDecl() const {
-    return OpaqueDecl;
-  }
-  SubstitutionMap getSubstitutions() const {
-    return Substitutions;
-  }
-  
-  /// Get the generic signature used to build out this archetype. This is
-  /// equivalent to the OpaqueTypeDecl's interface generic signature, with
-  /// all of the generic parameters aside from the opaque type's interface
-  /// type same-type-constrained to their substitutions for this type.
-  GenericSignature getBoundSignature() const;
-  
+  /// Retrieve the opaque type declaration.
+  OpaqueTypeDecl *getDecl() const;
+
+  /// Retrieve the set of substitutions applied to the opaque type.
+  SubstitutionMap getSubstitutions() const;
+
   /// Get a generic environment that has this opaque archetype bound within it.
-  GenericEnvironment *getGenericEnvironment() const {
-    return Environment;
-  }
-  
+  GenericEnvironment *getGenericEnvironment() const;
+
+  /// Compute the canonical interface type within the environment of this
+  /// opaque type archetype.
+  CanType getCanonicalInterfaceType(Type interfaceType);
+
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpaqueTypeArchetype;
   }
@@ -5535,26 +5601,14 @@ public:
   ///   func foo() -> (some P, some Q)
   ///
   /// then the underlying type of `some P` would be ordinal 0, and `some Q` would be ordinal 1.
-  unsigned getOrdinal() const {
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
-    return 0;
-  }
-  
-  static void Profile(llvm::FoldingSetNodeID &ID,
-                      OpaqueTypeDecl *OpaqueDecl,
-                      SubstitutionMap Substitutions);
-  
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getDecl(), getSubstitutions());
-  };
+  unsigned getOrdinal() const;
   
 private:
-  OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
-                          SubstitutionMap Substitutions,
-                          RecursiveTypeProperties Props,
-                          Type InterfaceType,
-                          ArrayRef<ProtocolDecl*> ConformsTo,
-                          Type Superclass, LayoutConstraint Layout);
+  OpaqueTypeArchetypeType(GenericEnvironment *environment,
+                          RecursiveTypeProperties properties,
+                          Type interfaceType,
+                          ArrayRef<ProtocolDecl*> conformsTo,
+                          Type superclass, LayoutConstraint layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
@@ -5837,15 +5891,15 @@ public:
 private:
   friend class GenericTypeParamDecl;
 
-  explicit GenericTypeParamType(GenericTypeParamDecl *param)
-    : SubstitutableType(TypeKind::GenericTypeParam, nullptr,
-                        RecursiveTypeProperties::HasTypeParameter),
+  explicit GenericTypeParamType(GenericTypeParamDecl *param,
+                                RecursiveTypeProperties props)
+    : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
       ParamOrDepthIndex(param) { }
 
   explicit GenericTypeParamType(bool isTypeSequence, unsigned depth,
-                                unsigned index, const ASTContext &ctx)
-      : SubstitutableType(TypeKind::GenericTypeParam, &ctx,
-                          RecursiveTypeProperties::HasTypeParameter),
+                                unsigned index, RecursiveTypeProperties props,
+                                const ASTContext &ctx)
+      : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
         ParamOrDepthIndex(depth << 16 | index |
                           ((isTypeSequence ? 1 : 0) << 30)) {}
 };
@@ -6087,6 +6141,139 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
 
+/// PackType - The type of a pack of arguments provided to a
+/// \c PackExpansionType to guide the pack expansion process.
+///
+/// A pack type looks a lot like a tuple in the surface language, except there
+/// is no way for the user to spell a pack. Pack types are created by the solver
+/// when it encounters an apply of a variadic generic function, as in
+///
+/// \code
+/// func print<T...>(_ xs: T...) {}
+/// // Creates a pack type <String, Int, String>
+/// print("Macs say Hello in", 42, " different languages")
+/// \endcode
+///
+/// Pack types substituted into the variadic generic arguments of a
+/// \c PackExpansionType "trip" the pack expansion and cause it to produce a
+/// new pack type with the pack expansion pattern applied.
+///
+/// \code
+/// typealias Foo<T...> = (T?...)
+/// Foo<Int, String, Int> // Forces expansion to (Int?, String?, Int?)
+/// \endcode
+class PackType final : public TypeBase, public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<PackType, Type> {
+  friend class ASTContext;
+  friend TrailingObjects;
+
+public:
+  /// Creates a new, empty pack.
+  static PackType *getEmpty(const ASTContext &C);
+  /// Creates a pack from the types in \p elements.
+  static PackType *get(const ASTContext &C, ArrayRef<Type> elements);
+
+public:
+  /// Retrieves the number of elements in this pack.
+  unsigned getNumElements() const { return Bits.PackType.Count; }
+
+  /// Retrieves the type of the elements in the pack.
+  ArrayRef<Type> getElementTypes() const {
+    return {getTrailingObjects<Type>(), getNumElements()};
+  }
+
+  /// Returns the type of the element at the given \p index.
+  Type getElementType(unsigned index) const {
+    return getTrailingObjects<Type>()[index];
+  }
+
+public:
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getElementTypes());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Elements);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Pack;
+  }
+
+private:
+  PackType(ArrayRef<Type> elements, const ASTContext *CanCtx,
+           RecursiveTypeProperties properties)
+     : TypeBase(TypeKind::Pack, CanCtx, properties) {
+     Bits.PackType.Count = elements.size();
+     std::uninitialized_copy(elements.begin(), elements.end(),
+                             getTrailingObjects<Type>());
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
+  CanType getElementType(unsigned elementNo) const {
+    return CanType(getPointer()->getElementType(elementNo));
+  }
+
+  CanTypeArrayRef getElementTypes() const {
+    return CanTypeArrayRef(getPointer()->getElementTypes());
+  }
+END_CAN_TYPE_WRAPPER(PackType, Type)
+
+/// PackExpansionType - The interface type of the explicit expansion of a
+/// corresponding set of variadic generic parameters.
+///
+/// Pack expansions are spelled as single-element tuples with a single variadic
+/// component in most contexts except functions where they are allowed to appear
+/// without parentheses to match normal variadic declaration syntax.
+///
+/// \code
+/// func expand<T...>(_ xs: T...) -> (T...)
+///                         ~~~~     ~~~~~~
+/// \endcode
+///
+/// A pack expansion type comes equipped with a pattern type spelled before
+/// the ellipses - \c T in the examples above. This pattern type is the subject
+/// of the expansion of the pack that is tripped when its variadic generic
+/// parameter is substituted for a \c PackType.
+class PackExpansionType : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  Type patternType;
+
+public:
+  /// Create a pack expansion type from the given pattern type.
+  ///
+  /// It is not required that the pattern type actually contain a reference to
+  /// a variadic generic parameter.
+  static PackExpansionType *get(Type pattern);
+
+public:
+  /// Retrieves the pattern type of this pack expansion.
+  Type getPatternType() const { return patternType; }
+
+public:
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getPatternType());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &ID, Type patternType);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::PackExpansion;
+  }
+
+private:
+  PackExpansionType(Type patternType, const ASTContext *CanCtx)
+    : TypeBase(TypeKind::PackExpansion, CanCtx,
+               patternType->getRecursiveProperties()), patternType(patternType) {
+      assert(patternType);
+    }
+};
+BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+  CanType getPatternType() const {
+    return CanType(getPointer()->getPatternType());
+  }
+END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
+
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() {
   // If this type is canonical, it has the ASTContext in it.
@@ -6104,23 +6291,31 @@ inline ASTContext &TypeBase::getASTContext() {
 }
 
 inline bool TypeBase::isTypeVariableOrMember() {
-  if (is<TypeVariableType>())
-    return true;
+  Type t(this);
 
-  if (auto depMemTy = getAs<DependentMemberType>())
-    return depMemTy->getBase()->isTypeVariableOrMember();
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
 
-  return false;
+  return t->is<TypeVariableType>();
 }
 
 inline bool TypeBase::isTypeParameter() {
-  if (is<GenericTypeParamType>())
-    return true;
+  Type t(this);
 
-  if (auto depMemTy = getAs<DependentMemberType>())
-    return depMemTy->getBase()->isTypeParameter();
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
 
-  return false;
+  return t->is<GenericTypeParamType>();
+}
+
+inline bool TypeBase::isTypeSequenceParameter() {
+  Type t(this);
+
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
+
+  return t->is<GenericTypeParamType>() &&
+         t->castTo<GenericTypeParamType>()->isTypeSequence();
 }
 
 inline bool TypeBase::isMaterializable() {
@@ -6145,6 +6340,15 @@ inline GenericTypeParamType *TypeBase::getRootGenericParam() {
   return t->castTo<GenericTypeParamType>();
 }
 
+inline bool TypeBase::isConstraintType() const {
+  return getCanonicalType().isConstraintType();
+}
+
+inline bool CanType::isConstraintTypeImpl(CanType type) {
+  return (isa<ProtocolType>(type) ||
+          isa<ProtocolCompositionType>(type));
+}
+
 inline bool TypeBase::isExistentialType() {
   return getCanonicalType().isExistentialType();
 }
@@ -6154,7 +6358,9 @@ inline bool TypeBase::isAnyExistentialType() {
 }
 
 inline bool CanType::isExistentialTypeImpl(CanType type) {
-  return isa<ProtocolType>(type) || isa<ProtocolCompositionType>(type);
+  return (isa<ProtocolType>(type) ||
+          isa<ProtocolCompositionType>(type) ||
+          isa<ExistentialType>(type));
 }
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
@@ -6167,6 +6373,8 @@ inline bool TypeBase::isClassExistentialType() {
     return pt->requiresClass();
   if (auto pct = dyn_cast<ProtocolCompositionType>(T))
     return pct->requiresClass();
+  if (auto existential = dyn_cast<ExistentialType>(T))
+    return existential->requiresClass();
   return false;
 }
 
@@ -6198,7 +6406,7 @@ inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
   return isArchetypeOrExistential && !T.isAnyClassReferenceType();
 }
 
-inline ClassDecl *TypeBase::getClassOrBoundGenericClass() {
+inline ClassDecl *TypeBase::getClassOrBoundGenericClass() const {
   return getCanonicalType().getClassOrBoundGenericClass();
 }
 
@@ -6247,6 +6455,8 @@ inline NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
 inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
   if (auto Ty = dyn_cast<NominalOrBoundGenericNominalType>(*this))
     return Ty->getDecl();
+  if (auto Ty = dyn_cast<ExistentialType>(*this))
+    return Ty->getConstraintType()->getNominalOrBoundGenericNominal();
   return nullptr;
 }
 
@@ -6255,6 +6465,9 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 }
 
 inline Type TypeBase::getNominalParent() {
+  if (auto existential = getAs<ExistentialType>())
+    return existential->getConstraintType()->getNominalParent();
+
   return castTo<AnyGenericType>()->getParent();
 }
 
@@ -6262,8 +6475,6 @@ inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
 
-  
-  
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))
     return intTy->getWidth().isFixedWidth()
@@ -6426,6 +6637,9 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   case TypeKind::Metatype:
   case TypeKind::ExistentialMetatype:
     return !cast<const AnyMetatypeType>(this)->hasRepresentation();
+
+  case TypeKind::Existential:
+    return false;
 
   case TypeKind::NestedArchetype:
     return cast<NestedArchetypeType>(this)->getParent()->hasSimpleTypeRepr();

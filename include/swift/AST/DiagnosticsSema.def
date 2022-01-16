@@ -1108,7 +1108,7 @@ WARNING(conditional_downcast_same_type,none,
         "bridging conversion; did you mean to use 'as'?}2",
         (Type, Type, unsigned))
 WARNING(is_expr_same_type,none,
-        "checking a value with optional type %0 against dynamic type %1 "
+        "checking a value with optional type %0 against type %1 "
         "succeeds whenever the value is non-nil; did you mean to use "
         "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
@@ -1514,6 +1514,9 @@ ERROR(access_control_extension_open,none,
 ERROR(access_control_open_bad_decl,none,
       "only classes and overridable class members can be declared 'open';"
       " use 'public'", ())
+WARNING(access_control_non_objc_open_member,none,
+      "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
+      (DescriptiveDeclKind))
 
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
@@ -1876,9 +1879,6 @@ ERROR(opaque_type_invalid_constraint,none,
       "and/or a base class", ())
 NOTE(opaque_of_optional_rewrite,none,
       "did you mean to write an optional of an 'opaque' type?", ())
-ERROR(more_than_one_opaque_type,none,
-      "%0 contains multiple 'opaque' types, but only one 'opaque' type is "
-      "supported", (TypeRepr*))
 ERROR(inferred_opaque_type,none,
       "property definition has inferred type %0, involving the 'some' "
       "return type of another declaration", (Type))
@@ -1952,6 +1952,12 @@ NOTE(non_sendable_nominal,none,
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
+REMARK(add_predates_concurrency_import,none,
+     "add '@_predatesConcurrency' to %select{suppress|treat}0 "
+     "'Sendable'-related %select{warnings|errors}0 from module %1"
+     "%select{| as warnings}0", (bool, Identifier))
+REMARK(remove_predates_concurrency_import,none,
+     "'@_predatesConcurrency' attribute on module %0 is unused", (Identifier))
 WARNING(public_decl_needs_sendable,none,
         "public %0 %1 does not specify whether it is 'Sendable' or not",
         (DescriptiveDeclKind, DeclName))
@@ -2435,8 +2441,8 @@ ERROR(protocol_composition_one_class,none,
       "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
-      "type %0 constrained to non-protocol, non-class type %1",
-      (Type, Type))
+      "type %0 constrained to non-protocol, non-class type '%1'",
+      (Type, StringRef))
 NOTE(requires_conformance_nonprotocol_fixit,none,
      "use '%0 == %1' to require '%0' to be '%1'",
      (StringRef, StringRef))
@@ -2532,6 +2538,11 @@ WARNING(typealias_override_associated_type,none,
 WARNING(associated_type_override_typealias,none,
         "associated type %0 is redundant with type %0 declared in inherited "
         "%1 %2", (Identifier, DescriptiveDeclKind, Type))
+
+ERROR(requirement_machine_completion_failed,none,
+      "cannot build rewrite system for %select{generic signature|protocol}0; "
+      "%select{step|depth}1 limit exceeded",
+      (unsigned, unsigned))
 
 ERROR(associated_type_objc,none,
       "associated type %0 cannot be declared inside '@objc' protocol %1",
@@ -3180,6 +3191,7 @@ ERROR(nscopying_doesnt_conform,none,
 #define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
 #define SELECT_APPLICATION_TYPE "select{class|class|type}"
 #define SELECT_APPLICATION_TYPES "select{classes|classes|types}"
+#define SELECT_APPLICATION_MAIN_TYPES "select{() -> Void or () throws -> Void|() -> Void, () throws -> Void, () async -> Void, or () async throws -> Void}"
 
 ERROR(attr_ApplicationMain_not_ApplicationDelegate,none,
       "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
@@ -3199,9 +3211,11 @@ NOTE(attr_ApplicationMain_script_here,none,
      ())
 
 ERROR(attr_MainType_without_main,none,
-      "%0 is annotated with @main and must provide a main static function of type () -> Void or () throws -> Void.",
-      (DeclName))
+      "%0 is annotated with @main and must provide a main static function of type %"
+      SELECT_APPLICATION_MAIN_TYPES "1",
+      (DeclName, bool))
 
+#undef SELECT_APPLICATION_MAIN_TYPES
 #undef SELECT_APPLICATION_MAIN
 #undef SELECT_APPLICATION_DELEGATE
 
@@ -3695,8 +3709,8 @@ NOTE(specialize_explicit_type_instead,none,
      "did you mean to explicitly reference %0 instead?", (Type))
 ERROR(type_parameter_count_mismatch,none,
       "generic type %0 specialized with %select{too many|too few}3 type "
-      "parameters (got %2, but expected %1)",
-      (Identifier, unsigned, unsigned, bool))
+      "parameters (got %2, but expected %select{%1|at least %1}4)",
+      (Identifier, unsigned, unsigned, bool, bool))
 ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(descriptive_generic_type_declared_here,none,
@@ -4121,8 +4135,11 @@ ERROR(opaque_type_no_underlying_type_candidates,none,
       "function declares an opaque return type, but has no return statements "
       "in its body from which to infer an underlying type", ())
 ERROR(opaque_type_mismatched_underlying_type_candidates,none,
-      "function declares an opaque return type, but the return statements "
-      "in its body do not have matching underlying types", ())
+      "function declares an opaque return type %0, but the return statements "
+      "in its body do not have matching underlying types", (TypeRepr *))
+ERROR(opaque_type_mismatched_underlying_type_candidates_named,none,
+      "function declares an opaque return type %0, but the return statements "
+      "in its body do not have matching underlying types", (Identifier))
 NOTE(opaque_type_underlying_type_candidate_here,none,
      "return statement has underlying type %0", (Type))
 ERROR(opaque_type_self_referential_underlying_type,none,
@@ -4425,9 +4442,6 @@ ERROR(distributed_actor_protocol_illegal_inheritance,none,
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
 
-ERROR(unowned_executor_outside_actor,none,
-      "'unownedExecutor' can only be implemented within the main "
-      "definition of an actor", ())
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
@@ -4570,17 +4584,36 @@ NOTE(protocol_isolated_to_global_actor_here,none,
 
 ERROR(isolated_parameter_not_actor,none,
       "'isolated' parameter has non-actor type %0", (Type))
-      
+
 WARNING(non_sendable_param_type,none,
-        "cannot pass argument of non-sendable type %0 across actors",
-        (Type))
+        "non-sendable type %0 %select{passed in call to %4 %2 %3|"
+        "passed in implicitly asynchronous call to %4 %2 %3|"
+        "in parameter of %4 %2 %3 satisfying non-isolated protocol "
+        "requirement|"
+        "in parameter of %4 '@objc' %2 %3}1 cannot cross actor boundary",
+        (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
+WARNING(non_sendable_call_param_type,none,
+        "non-sendable type %0 passed in %select{implicitly asynchronous |}1"
+        "call to %2 function cannot cross actor boundary",
+        (Type, bool, ActorIsolation))
 WARNING(non_sendable_result_type,none,
-        "cannot call function returning non-sendable type %0 across "
-        "actors", (Type))
+        "non-sendable type %0 returned by %select{call to %4 %2 %3|"
+        "implicitly asynchronous call to %4 %2 %3|"
+        "%4 %2 %3 satisfying non-isolated protocol requirement|"
+        "%4 '@objc' %2 %3}1 cannot cross actor boundary",
+        (Type, unsigned, DescriptiveDeclKind, DeclName, ActorIsolation))
+WARNING(non_sendable_call_result_type,none,
+        "non-sendable type %0 returned by %select{implicitly asynchronous |}1"
+        "call to %2 function cannot cross actor boundary",
+        (Type, bool, ActorIsolation))
 WARNING(non_sendable_property_type,none,
-        "cannot use %1 %2 with a non-sendable type %0 "
-        "%select{across actors|from concurrently-executed code}3",
-        (Type, DescriptiveDeclKind, DeclName, bool))
+        "non-sendable type %0 in %select{"
+        "%select{asynchronous access to %5 %1 %2|"
+        "implicitly asynchronous access to %5 %1 %2|"
+        "conformance of %5 %1 %2 to non-isolated protocol requirement|"
+        "%5 '@objc' %1 %2}4|captured local %1 %2}3 cannot "
+        "cross %select{actor|task}3 boundary",
+        (Type, DescriptiveDeclKind, DeclName, bool, unsigned, ActorIsolation))
 WARNING(non_sendable_keypath_capture,none,
         "cannot form key path that captures non-sendable type %0",
         (Type))
@@ -4614,6 +4647,17 @@ ERROR(unchecked_not_inheritance_clause,none,
       "'unchecked' attribute only applies in inheritance clauses", ())
 ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
+
+ERROR(any_not_existential,none,
+       "'any' has no effect on %select{concrete type|type parameter}0 %1",
+       (bool, Type))
+ERROR(existential_requires_any,none,
+      "protocol %0 as a type must be explicitly marked as 'any'",
+      (Identifier))
+ERROR(explicit_existential_not_supported,none,
+       "explicit 'any' not supported; use frontend flag "
+       "-enable-explicit-existential-types to enable this feature",
+       ())
 
 ERROR(nonisolated_let,none,
       "'nonisolated' is meaningless on 'let' declarations because "
@@ -4663,13 +4707,13 @@ ERROR(distributed_actor_func_static,none,
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
       "'distributed' method can only be declared within 'distributed actor'",
       ())
-ERROR(distributed_actor_designated_ctor_must_have_one_transport_param,none,
+ERROR(distributed_actor_designated_ctor_must_have_one_distributedactorsystem_param,none,
       "designated distributed actor initializer %0 must accept exactly one "
-      "ActorTransport parameter, found %1",
+      "DistributedActorSystem parameter, found %1",
       (DeclName, int))
 ERROR(distributed_actor_designated_ctor_missing_transport_param,none,
       "designated distributed actor initializer %0 is missing required "
-      "ActorTransport parameter",
+      "DistributedActorSystem parameter",
       (DeclName))
 ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
@@ -4716,7 +4760,22 @@ ERROR(async_named_decl_must_be_available_from_async,none,
         "asynchronous %0 %1 must be available from asynchronous contexts",
         (DescriptiveDeclKind, DeclName))
 ERROR(async_unavailable_decl,none,
-      "%0 %1 is unavailable from asynchronous contexts", (DescriptiveDeclKind, DeclBaseName))
+      "%0 %1 is unavailable from asynchronous contexts%select{|; %3}2",
+      (DescriptiveDeclKind, DeclBaseName, bool, StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: String Processing
+//------------------------------------------------------------------------------
+
+ERROR(string_processing_lib_missing,none,
+      "missing '%0' declaration, probably because the '_StringProcessing' "
+      "module was not imported properly", (StringRef))
+ERROR(regex_capture_types_failed_to_decode,none,
+      "failed to decode capture types for regular expression literal; this may "
+      "be a compiler bug", ())
+ERROR(regex_too_many_captures,none,
+      "too many captures in regular expression literal; the current limit is "
+      "%0", (unsigned))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
@@ -4786,6 +4845,8 @@ ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
+ERROR(expansion_not_variadic,none,
+      "cannot create expansion with non-variadic type %0", (Type))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
 ERROR(enum_element_ellipsis,none,

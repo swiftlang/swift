@@ -60,7 +60,8 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateFunction(
       constant.getDecl(), name, SILLinkage::Shared, constantTy, IsBare,
-      IsTransparent, IsSerializable, IsNotDynamic, ProfileCounter(), IsThunk);
+      IsTransparent, IsSerializable, IsNotDynamic, IsNotDistributed,
+      ProfileCounter(), IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -257,7 +258,8 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                            IsBare, IsTransparent, IsSerializable,
                                            ProfileCounter(),
                                            IsThunk,
-                                           IsNotDynamic);
+                                           IsNotDynamic,
+                                           IsNotDistributed);
   
   if (F->empty()) {
     // Emit the implementation.
@@ -516,7 +518,7 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   SILGenFunctionBuilder builder(*this);
   return builder.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, serializable,
-      ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed);
 }
 
 SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
@@ -538,7 +540,7 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
   auto *thunk = builder.getOrCreateFunction(
       derivativeFnDecl, name, SILLinkage::Private, constantTy, IsBare,
       IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
-      ProfileCounter(), IsThunk);
+      IsNotDistributed, ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
 

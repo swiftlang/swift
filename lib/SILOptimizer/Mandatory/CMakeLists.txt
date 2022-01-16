@@ -18,8 +18,10 @@ target_sources(swiftSILOptimizer PRIVATE
   LexicalLifetimeEliminator.cpp
   LowerHopToActor.cpp
   MandatoryInlining.cpp
-  MoveOnlyChecker.cpp
+  MoveFunctionCanonicalization.cpp
+  MoveKillsCopyableAddressesChecker.cpp
   MoveKillsCopyableValuesChecker.cpp
+  MoveOnlyChecker.cpp
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
   PerformanceDiagnostics.cpp

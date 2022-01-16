@@ -94,6 +94,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-profdata
       llvm-readelf
       llvm-readobj
+      llvm-size
       llvm-strings
       not
       split-file)
@@ -173,9 +174,9 @@ if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
-if (LIBSWIFT_BUILD_MODE)
+if (BOOTSTRAPPING_MODE)
   list(APPEND SWIFT_LIT_ARGS
-       "--param" "libswift_build_mode=${LIBSWIFT_BUILD_MODE}")
+       "--param" "bootstrapping_mode=${BOOTSTRAPPING_MODE}")
 endif()
 
 if (LLVM_USE_SANITIZER STREQUAL "Address")
@@ -199,10 +200,14 @@ normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
 normalize_boolean_spelling(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
 normalize_boolean_spelling(SWIFT_OPTIMIZED)
 normalize_boolean_spelling(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+normalize_boolean_spelling(SWIFT_ENABLE_REFLECTION)
 normalize_boolean_spelling(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
 normalize_boolean_spelling(SWIFT_HAVE_LIBXML2)
 normalize_boolean_spelling(SWIFT_INCLUDE_TOOLS)
 normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
+normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
+normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
+normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
@@ -338,13 +343,7 @@ foreach(SDK ${SWIFT_SDKS})
                 --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
                 --destination-arch "${ARCH}"
                 # Build products like libswiftCore.so.
-                "${SWIFTLIB_DIR}/android"
-                # These two directories may contain the same libraries,
-                # but upload both to device just in case. Duplicates will be
-                # overwritten, and uploading doesn't take very long anyway.
-                "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
-                "${SWIFT_ANDROID_${ARCH}_ICU_I18N}"
-                "${SWIFT_ANDROID_${ARCH}_ICU_DATA}")
+                "${SWIFTLIB_DIR}/android")
       endif()
       add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
           ${command_upload_stdlib}

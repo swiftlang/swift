@@ -3,7 +3,7 @@
 // RUN: %target-typecheck-verify-swift -I %t  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
-import OtherActors
+import OtherActors // expected-remark{{add '@_predatesConcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@_predatesConcurrency }}
 
 let immutableGlobal: String = "hello"
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
@@ -106,7 +106,7 @@ func checkAsyncPropertyAccess() async {
 
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a non-isolated context}}
 
-  _ = act.point  // expected-warning{{cannot use property 'point' with a non-sendable type 'Point' across actors}}
+  _ = act.point  // expected-warning{{non-sendable type 'Point' in asynchronous access to actor-isolated property 'point' cannot cross actor boundary}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -593,6 +593,35 @@ func f() {
 // Local function isolation restrictions
 // ----------------------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
+actor AnActorWithClosures {
+  var counter: Int = 0 // expected-note 2 {{mutation of this property is only permitted within the actor}}
+  func exec() {
+    acceptEscapingClosure { [unowned self] in
+      self.counter += 1
+
+      acceptEscapingClosure {
+        self.counter += 1
+
+        acceptEscapingClosure { [self] in
+          self.counter += 1
+        }
+
+        acceptConcurrentClosure { [self] in
+          self.counter += 1 // expected-error{{actor-isolated property 'counter' can not be mutated from a Sendable closure}}
+
+          acceptEscapingClosure {
+            self.counter += 1 // expected-error{{actor-isolated property 'counter' can not be mutated from a non-isolated context}}
+          }
+        }
+      }
+    }
+  }
+}
+
+// ----------------------------------------------------------------------
+// Local function isolation restrictions
+// ----------------------------------------------------------------------
+@available(SwiftStdlib 5.1, *)
 func checkLocalFunctions() async {
   var i = 0
   var j = 0
@@ -637,6 +666,27 @@ func checkLocalFunctions() async {
   }
 
   print(k)
+}
+
+@available(SwiftStdlib 5.1, *)
+actor LocalFunctionIsolatedActor {
+  func a() -> Bool { // expected-note{{calls to instance method 'a()' from outside of its actor context are implicitly asynchronous}}
+    return true
+  }
+
+  func b() -> Bool {
+    func c() -> Bool {
+      return true && a() // okay, c is isolated
+    }
+    return c()
+  }
+
+  func b2() -> Bool {
+    @Sendable func c() -> Bool {
+      return true && a() // expected-error{{actor-isolated instance method 'a()' can not be referenced from a non-isolated context}}
+    }
+    return c()
+  }
 }
 
 // ----------------------------------------------------------------------
@@ -822,8 +872,8 @@ func testCrossModuleLets(actor: OtherModuleActor) async {
   _ = actor.b         // okay
   _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{property access is 'async'}}
-  // expected-warning@-2{{cannot use property 'c' with a non-sendable type 'SomeClass' across actors}}
-  _ = await actor.c // expected-warning{{cannot use property 'c' with a non-sendable type 'SomeClass' across actors}}
+  // expected-warning@-2{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
+  _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
   _ = await actor.d // okay
 }
 
@@ -917,13 +967,13 @@ func testCrossActorProtocol<T: P>(t: T) async {
 
 @available(SwiftStdlib 5.1, *)
 protocol Server {
-  func send<Message: Codable>(message: Message) async throws -> String
+  func send<Message: Codable & Sendable>(message: Message) async throws -> String
 }
 
 @available(SwiftStdlib 5.1, *)
 actor MyServer : Server {
   // okay, asynchronously accessed from clients of the protocol
-  func send<Message: Codable>(message: Message) throws -> String { "" }
+  func send<Message: Codable & Sendable>(message: Message) throws -> String { "" }
 }
 
 // ----------------------------------------------------------------------

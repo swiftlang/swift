@@ -35,7 +35,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
-      .Case("generating-conformances", DebugFlags::GeneratingConformances)
+      .Case("minimal-conformances", DebugFlags::MinimalConformances)
       .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
       .Case("minimization", DebugFlags::Minimization)
       .Default(None);
@@ -59,7 +59,9 @@ RewriteContext::RewriteContext(ASTContext &ctx)
       RuleTrieHistogram(16, /*Start=*/1),
       RuleTrieRootHistogram(16),
       PropertyTrieHistogram(16, /*Start=*/1),
-      PropertyTrieRootHistogram(16) {
+      PropertyTrieRootHistogram(16),
+      ConformanceRulesHistogram(16),
+      MinimalConformancesHistogram(8, /*Start=*/2) {
   auto debugFlags = StringRef(ctx.LangOpts.DebugRequirementMachine);
   if (!debugFlags.empty())
     Debug = parseDebugFlags(debugFlags);
@@ -349,6 +351,7 @@ Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
       case Symbol::Kind::Layout:
       case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType:
+      case Symbol::Kind::ConcreteConformance:
         llvm_unreachable("Term has invalid root symbol");
       }
     }
@@ -550,7 +553,7 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
 
 /// Implement Tarjan's algorithm to compute strongly-connected components in
 /// the protocol dependency graph.
-void RewriteContext::getRequirementMachineRec(
+void RewriteContext::getProtocolComponentRec(
     const ProtocolDecl *proto,
     SmallVectorImpl<const ProtocolDecl *> &stack) {
   assert(Protos.count(proto) == 0);
@@ -572,7 +575,7 @@ void RewriteContext::getRequirementMachineRec(
     auto found = Protos.find(depProto);
     if (found == Protos.end()) {
       // Successor has not yet been visited. Recurse.
-      getRequirementMachineRec(depProto, stack);
+      getProtocolComponentRec(depProto, stack);
 
       auto &entry = Protos[proto];
       assert(Protos.count(depProto) != 0);
@@ -617,18 +620,21 @@ void RewriteContext::getRequirementMachineRec(
       llvm::dbgs() << "]\n";
     }
 
-    Components[id] = {Context.AllocateCopy(protos), nullptr};
+    Components[id].Protos = Context.AllocateCopy(protos);
   }
 }
 
 /// Lazily construct a requirement machine for the given protocol's strongly
 /// connected component (SCC) in the protocol dependency graph.
-RequirementMachine *RewriteContext::getRequirementMachine(
+///
+/// This can only be called once, to prevent multiple requirement machines
+/// for being built with the same component.
+ArrayRef<const ProtocolDecl *> RewriteContext::getProtocolComponent(
     const ProtocolDecl *proto) {
   auto found = Protos.find(proto);
   if (found == Protos.end()) {
     SmallVector<const ProtocolDecl *, 3> stack;
-    getRequirementMachineRec(proto, stack);
+    getProtocolComponentRec(proto, stack);
     assert(stack.empty());
 
     found = Protos.find(proto);
@@ -638,36 +644,44 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   assert(Components.count(found->second.ComponentID) != 0);
   auto &component = Components[found->second.ComponentID];
 
-  auto *&machine = component.Machine;
-
-  if (machine) {
-    // If this component has a machine already, make sure it is ready
-    // for use.
-    if (!machine->isComplete()) {
-      llvm::errs() << "Re-entrant construction of requirement "
-                   << "machine for:";
-      for (auto *proto : component.Protos)
-        llvm::errs() << " " << proto->getName();
-      abort();
-    }
-
-    return machine;
+  if (component.InProgress) {
+    llvm::errs() << "Re-entrant construction of requirement "
+                 << "machine for:";
+    for (auto *proto : component.Protos)
+      llvm::errs() << " " << proto->getName();
+    llvm::errs() << "\n";
+    abort();
   }
 
-  // Construct a requirement machine from the structural requirements of
-  // the given set of protocols.
-  auto *newMachine = new RequirementMachine(*this);
-  machine = newMachine;
+  component.InProgress = true;
 
-  // This might re-entrantly invalidate 'machine', which is a reference
-  // into Protos.
-  newMachine->initWithProtocols(component.Protos);
-  return newMachine;
+  return component.Protos;
+}
+
+bool RewriteContext::isRecursivelyConstructingRequirementMachine(
+    const ProtocolDecl *proto) {
+  if (proto->isRequirementSignatureComputed())
+    return false;
+
+  auto found = Protos.find(proto);
+  if (found == Protos.end())
+    return false;
+
+  auto component = Components.find(found->second.ComponentID);
+  if (component == Components.end())
+    return false;
+
+  return component->second.InProgress;
 }
 
 /// We print stats in the destructor, which should get executed at the end of
 /// a compilation job.
 RewriteContext::~RewriteContext() {
+  for (const auto &pair : Machines)
+    delete pair.second;
+
+  Machines.clear();
+
   if (Context.LangOpts.AnalyzeRequirementMachine) {
     llvm::dbgs() << "--- Requirement Machine Statistics ---\n";
     llvm::dbgs() << "\n* Symbol kind:\n";
@@ -682,15 +696,9 @@ RewriteContext::~RewriteContext() {
     PropertyTrieHistogram.dump(llvm::dbgs());
     llvm::dbgs() << "\n* Property trie root fanout:\n";
     PropertyTrieRootHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Conformance rules:\n";
+    ConformanceRulesHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Minimal conformance equations:\n";
+    MinimalConformancesHistogram.dump(llvm::dbgs());
   }
-
-  for (const auto &pair : Machines)
-    delete pair.second;
-
-  Machines.clear();
-
-  for (const auto &pair : Components)
-    delete pair.second.Machine;
-
-  Components.clear();
 }

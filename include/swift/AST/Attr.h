@@ -491,7 +491,7 @@ public:
       Name(Name) {}
 
   SILGenNameAttr(StringRef Name, bool Implicit)
-    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -509,7 +509,7 @@ public:
       Name(Name) {}
 
   CDeclAttr(StringRef Name, bool Implicit)
-    : CDeclAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+    : CDeclAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -528,7 +528,7 @@ public:
   Value(Value) {}
 
   SemanticsAttr(StringRef Value, bool Implicit)
-  : SemanticsAttr(Value, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+  : SemanticsAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The semantics tag value.
   const StringRef Value;
@@ -912,6 +912,25 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjC;
+  }
+};
+
+class MainTypeAttr final : public DeclAttribute {
+public:
+  MainTypeAttr(bool isImplicit)
+      : DeclAttribute(DAK_MainType, SourceLoc(), SourceLoc(), isImplicit) {}
+
+  MainTypeAttr(SourceLoc AtLoc, SourceLoc NameLoc)
+      : DeclAttribute(DAK_MainType, AtLoc,
+                      SourceRange(AtLoc.isValid() ? AtLoc : NameLoc, NameLoc),
+                      /*Implicit=*/false) {}
+
+  MainTypeAttr(SourceLoc NameLoc)
+      : DeclAttribute(DAK_MainType, SourceLoc(), SourceRange(NameLoc, NameLoc),
+                      /*Implicit=*/false) {}
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_MainType;
   }
 };
 
@@ -2082,6 +2101,26 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_TypeSequence;
+  }
+};
+
+/// The @_unavailableFromAsync attribute, used to make function declarations
+/// unavailable from async contexts.
+class UnavailableFromAsyncAttr : public DeclAttribute {
+public:
+  UnavailableFromAsyncAttr(StringRef Message, SourceLoc AtLoc,
+                           SourceRange Range, bool Implicit)
+      : DeclAttribute(DAK_UnavailableFromAsync, AtLoc, Range, Implicit),
+        Message(Message) {}
+  UnavailableFromAsyncAttr(StringRef Message, bool Implicit)
+      : UnavailableFromAsyncAttr(Message, SourceLoc(), SourceRange(),
+                                 Implicit) {}
+  const StringRef Message;
+
+  bool hasMessage() const { return !Message.empty(); }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_UnavailableFromAsync;
   }
 };
 

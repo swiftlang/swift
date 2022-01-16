@@ -268,7 +268,7 @@ extension P10 {
   typealias U = Float
 }
 
-extension P10 where T == Int { } // expected-warning{{neither type in same-type constraint ('Self.T' (aka 'Int') or 'Int') refers to a generic parameter or associated type}}
+extension P10 where T == Int { } // expected-warning{{neither type in same-type constraint ('Int' or 'Int') refers to a generic parameter or associated type}}
 
 extension P10 where A == X<T> { }
 
@@ -277,7 +277,7 @@ extension P10 where A == X<U> { }
 extension P10 where A == X<Self.U> { }
 
 extension P10 where V == Int { } // expected-warning {{'V' is deprecated: just use Int, silly}}
-// expected-warning@-1{{neither type in same-type constraint ('Self.V' (aka 'Int') or 'Int') refers to a generic parameter or associated type}}
+// expected-warning@-1{{neither type in same-type constraint ('Int' or 'Int') refers to a generic parameter or associated type}}
 
 // rdar://problem/36003312
 protocol P11 {

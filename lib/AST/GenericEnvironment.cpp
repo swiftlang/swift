@@ -22,8 +22,32 @@
 
 using namespace swift;
 
+size_t GenericEnvironment::numTrailingObjects(
+    OverloadToken<OpaqueTypeDecl *>) const {
+  switch (getKind()) {
+  case Kind::Normal:
+  case Kind::OpenedExistential:
+    return 0;
+
+  case Kind::Opaque:
+    return 1;
+  }
+}
+
+size_t GenericEnvironment::numTrailingObjects(
+    OverloadToken<SubstitutionMap>) const {
+  switch (getKind()) {
+  case Kind::Normal:
+  case Kind::OpenedExistential:
+    return 0;
+
+  case Kind::Opaque:
+    return 1;
+  }
+}
+
 size_t GenericEnvironment::numTrailingObjects(OverloadToken<Type>) const {
-  return Signature.getGenericParams().size();
+  return getGenericParams().size();
 }
 
 /// Retrieve the array containing the context types associated with the
@@ -31,7 +55,7 @@ size_t GenericEnvironment::numTrailingObjects(OverloadToken<Type>) const {
 /// generic signature.
 MutableArrayRef<Type> GenericEnvironment::getContextTypes() {
   return MutableArrayRef<Type>(getTrailingObjects<Type>(),
-                               Signature.getGenericParams().size());
+                               getGenericParams().size());
 }
 
 /// Retrieve the array containing the context types associated with the
@@ -39,17 +63,39 @@ MutableArrayRef<Type> GenericEnvironment::getContextTypes() {
 /// generic signature.
 ArrayRef<Type> GenericEnvironment::getContextTypes() const {
   return ArrayRef<Type>(getTrailingObjects<Type>(),
-                        Signature.getGenericParams().size());
+                        getGenericParams().size());
 }
 
 TypeArrayView<GenericTypeParamType>
 GenericEnvironment::getGenericParams() const {
-  return Signature.getGenericParams();
+  return getGenericSignature().getGenericParams();
 }
 
-GenericEnvironment::GenericEnvironment(GenericSignature signature)
-  : Signature(signature)
+OpaqueTypeDecl *GenericEnvironment::getOpaqueTypeDecl() const {
+  assert(getKind() == Kind::Opaque);
+  return *getTrailingObjects<OpaqueTypeDecl *>();
+}
+
+SubstitutionMap GenericEnvironment::getOpaqueSubstitutions() const {
+  assert(getKind() == Kind::Opaque);
+  return *getTrailingObjects<SubstitutionMap>();
+}
+
+GenericEnvironment::GenericEnvironment(GenericSignature signature, Kind kind)
+  : SignatureAndKind(signature, kind)
 {
+  // Clear out the memory that holds the context types.
+  std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
+                          Type());
+}
+
+GenericEnvironment::GenericEnvironment(
+      GenericSignature signature, OpaqueTypeDecl *opaque, SubstitutionMap subs)
+  : SignatureAndKind(signature, Kind::Opaque)
+{
+  *getTrailingObjects<OpaqueTypeDecl *>() = opaque;
+  new (getTrailingObjects<SubstitutionMap>()) SubstitutionMap(subs);
+
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
                           Type());
@@ -59,7 +105,7 @@ void GenericEnvironment::addMapping(GenericParamKey key,
                                     Type contextType) {
   // Find the index into the parallel arrays of generic parameters and
   // context types.
-  auto genericParams = Signature.getGenericParams();
+  auto genericParams = getGenericParams();
   unsigned index = key.findIndexIn(genericParams);
   assert(genericParams[index] == key && "Bad generic parameter");
 
@@ -74,7 +120,7 @@ Optional<Type> GenericEnvironment::getMappingIfPresent(
                                                     GenericParamKey key) const {
   // Find the index into the parallel arrays of generic parameters and
   // context types.
-  auto genericParams = Signature.getGenericParams();
+  auto genericParams = getGenericParams();
   unsigned index = key.findIndexIn(genericParams);
   assert(genericParams[index] == key && "Bad generic parameter");
 
@@ -82,6 +128,65 @@ Optional<Type> GenericEnvironment::getMappingIfPresent(
     return type;
 
   return None;
+}
+
+namespace {
+
+/// Substitute the outer generic parameters from a substitution map, ignoring
+/// innter generic parameters with a given depth.
+struct SubstituteOuterFromSubstitutionMap {
+  SubstitutionMap subs;
+  unsigned depth;
+
+  /// Whether this is a type parameter that should not be substituted.
+  bool isUnsubstitutedTypeParameter(Type type) const {
+    if (!type->isTypeParameter())
+      return false;
+
+    if (auto depMemTy = type->getAs<DependentMemberType>())
+      return isUnsubstitutedTypeParameter(depMemTy->getBase());
+
+    if (auto genericParam = type->getAs<GenericTypeParamType>())
+      return genericParam->getDepth() >= depth;
+
+    return false;
+  }
+
+  Type operator()(SubstitutableType *type) const {
+    if (isUnsubstitutedTypeParameter(type))
+      return Type(type);
+
+    return QuerySubstitutionMap{subs}(type);
+  }
+
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const {
+    if (isUnsubstitutedTypeParameter(dependentType))
+      return ProtocolConformanceRef(conformedProtocol);
+
+    return LookUpConformanceInSubstitutionMap(subs)(
+        dependentType, conformingReplacementType, conformedProtocol);
+  }
+};
+
+}
+
+Type GenericEnvironment::maybeApplyOpaqueTypeSubstitutions(Type type) const {
+  switch (getKind()) {
+  case Kind::Normal:
+  case Kind::OpenedExistential:
+    return type;
+
+  case Kind::Opaque: {
+    // Substitute outer generic parameters of an opaque archetype environment.
+    unsigned opaqueDepth =
+      getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
+    SubstituteOuterFromSubstitutionMap replacer{
+        getOpaqueSubstitutions(), opaqueDepth};
+    return type.subst(replacer, replacer);
+  }
+  }
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
@@ -120,9 +225,20 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
   auto requirements = genericSig->getLocalRequirements(depType);
 
+  /// Substitute a type for the purpose of requirements.
+  auto substForRequirements = [&](Type type) {
+    switch (getKind()) {
+    case Kind::Normal:
+    case Kind::OpenedExistential:
+      return mapTypeIntoContext(type, conformanceLookupFn);
+
+    case Kind::Opaque:
+      return maybeApplyOpaqueTypeSubstitutions(type);
+    }
+  };
+
   if (requirements.concreteType) {
-    return mapTypeIntoContext(requirements.concreteType,
-                              conformanceLookupFn);
+    return substForRequirements(requirements.concreteType);
   }
 
   assert(requirements.anchor && "No anchor or concrete type?");
@@ -154,8 +270,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   // Substitute into the superclass.
   Type superclass = requirements.superclass;
   if (superclass && superclass->hasTypeParameter()) {
-    superclass = mapTypeIntoContext(superclass,
-                                    conformanceLookupFn);
+    superclass = substForRequirements(superclass);
     if (superclass->is<ErrorType>())
       superclass = Type();
   }
@@ -174,9 +289,21 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
                                         requirements.layout);
     addMapping(genericParam, result);
   } else {
-    result = PrimaryArchetypeType::getNew(ctx, this, genericParam,
-                                          requirements.protos, superclass,
-                                          requirements.layout);
+    switch (getKind()) {
+    case Kind::Normal:
+    case Kind::OpenedExistential:
+      result = PrimaryArchetypeType::getNew(ctx, this, genericParam,
+                                            requirements.protos, superclass,
+                                            requirements.layout);
+      break;
+
+    case Kind::Opaque:
+      result = OpaqueTypeArchetypeType::getNew(this, genericParam,
+                                               requirements.protos, superclass,
+                                               requirements.layout);
+      break;
+    }
+
     addMapping(genericParam, result);
   }
 
@@ -202,7 +329,7 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
   if (auto gp = type->getAs<GenericTypeParamType>()) {
     // Find the index into the parallel arrays of generic parameters and
     // context types.
-    auto genericParams = self->Signature.getGenericParams();
+    auto genericParams = self->getGenericParams();
     GenericParamKey key(gp);
 
     // Make sure that this generic parameter is from this environment.
@@ -234,10 +361,12 @@ Type GenericEnvironment::mapTypeIntoContext(
   assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
          "already have a contextual type");
 
+  type = maybeApplyOpaqueTypeSubstitutions(type);
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
                            SubstFlags::AllowLoweredTypes);
-  assert((!result->hasTypeParameter() || result->hasError()) &&
+  assert((!result->hasTypeParameter() || result->hasError() ||
+          getKind() == Kind::Opaque) &&
          "not fully substituted");
   return result;
 

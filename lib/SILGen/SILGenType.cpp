@@ -193,7 +193,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       SILLinkage::Private, name, overrideInfo.SILFnType,
       genericEnv, loc,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
-      ProfileCounter(), IsThunk);
+      IsNotDistributed, ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
@@ -415,8 +415,19 @@ public:
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(reqDecl)) {
+        auto newDecl = requirementRef.withDecl(witness.getDecl());
+        // Only import C++ methods as foreign. If the following
+        // Objective-C function is imported as foreign:
+        //   () -> String
+        // It will be imported as the following type:
+        //   () -> NSString
+        // But the first is correct, so make sure we don't mark this witness
+        // as foreign.
+        if (dyn_cast_or_null<clang::CXXMethodDecl>(
+                witness.getDecl()->getClangDecl()))
+          newDecl = newDecl.asForeign();
         return addMethodImplementation(
-            requirementRef, getWitnessRef(requirementRef, witness),
+            requirementRef, getWitnessRef(newDecl, witness),
             witness);
       }
 
@@ -784,8 +795,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
       SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent, isSerialized,
-      IsNotDynamic, ProfileCounter(), IsThunk, SubclassScope::NotApplicable,
-      InlineStrategy);
+      IsNotDynamic, IsNotDistributed, ProfileCounter(), IsThunk,
+      SubclassScope::NotApplicable, InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
@@ -831,7 +842,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                           ProtocolConformanceRef(conformance));
 
   // Open the protocol type.
-  auto openedType = OpenedArchetypeType::get(protocolType);
+  auto openedType = OpenedArchetypeType::get(protocol->getExistentialType());
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
@@ -856,7 +867,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   auto *f = builder.createFunction(
       linkage, name, witnessSILFnType, genericEnv,
       SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
-      IsSerialized, IsNotDynamic, ProfileCounter(), IsThunk,
+      IsSerialized, IsNotDynamic, IsNotDistributed, ProfileCounter(), IsThunk,
       SubclassScope::NotApplicable, InlineDefault);
 
   f->setDebugScope(new (SGM.M)

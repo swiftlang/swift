@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -sil-verify-all  -disable-availability-checking -emit-sil -disable-copy-propagation -I %t -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all  -disable-availability-checking -emit-sil -enable-copy-propagation=false -I %t -o - | %FileCheck %s
 // REQUIRES: concurrency
 
 // CHECK-LABEL: sil @$s34closure_lifetime_fixup_concurrency12testAsyncLetyS2SYaF : $@convention(thin) @async (@guaranteed String) -> @owned String {

@@ -4,6 +4,7 @@
 // REQUIRES: concurrency
 import Foundation
 import ObjCConcurrency
+// expected-remark@-1{{add '@_predatesConcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
 
 if #available(SwiftStdlib 5.5, *) {
 
@@ -45,7 +46,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.bestName("hello")
   let _: Int = await slowServer.customize("hello")
 
-  slowServer.unavailableMethod() // expected-warning{{'unavailableMethod' is unavailable from asynchronous contexts}}
+  slowServer.unavailableMethod() // expected-warning{{instance method 'unavailableMethod' is unavailable from asynchronous contexts}}
+  slowServer.unavailableMethodWithMessage() // expected-warning{{instance method 'unavailableMethodWithMessage' is unavailable from asynchronous contexts; Blarpy!}}
 
   let _: String = await slowServer.dance("slide")
   let _: String = await slowServer.__leap(17)
@@ -216,6 +218,16 @@ func testMirrored(instance: ClassWithAsync) async {
       print(c)
     }
   }
+}
+
+@MainActor class MyView: NXView {
+  func f() {
+    Task {
+      await self.g()
+    }
+  }
+
+  func g() async { }
 }
 
 } // SwiftStdlib 5.5

@@ -22,29 +22,34 @@
 #include "ImportEnumInfo.h"
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
-#include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclVisitor.h"
+#include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
+#include <functional>
 #include <set>
+#include <unordered_set>
+#include <vector>
 
 namespace llvm {
 
@@ -179,6 +184,21 @@ enum class ImportTypeKind {
   ///
   /// This provides special treatment for 'NSUInteger'.
   Enum
+};
+
+struct ImportDiagnostic {
+  ImportDiagnosticTarget target;
+  Diagnostic diag;
+  clang::SourceLocation loc;
+
+  ImportDiagnostic(ImportDiagnosticTarget target, const Diagnostic &diag,
+                   clang::SourceLocation loc)
+      : target(target), diag(diag), loc(loc) {}
+
+  bool operator==(const ImportDiagnostic &other) const {
+    return target == other.target && loc == other.loc &&
+           diag.getID() == other.diag.getID();
+  }
 };
 
 /// Controls whether \p decl, when imported, should name the fully-bridged
@@ -330,6 +350,19 @@ struct HeaderLoc {
     : clangLoc(clangLoc), fallbackLoc(fallbackLoc), sourceMgr(sourceMgr) {}
 };
 
+struct ImportDiagnosticTargetHasher {
+  std::size_t operator()(const ImportDiagnosticTarget &target) const {
+    return std::hash<void *>()(target.getOpaqueValue());
+  }
+};
+
+struct ImportDiagnosticHasher {
+  std::size_t operator()(const ImportDiagnostic &diag) const {
+    return llvm::hash_combine(diag.target.getOpaqueValue(), diag.diag.getID(),
+                              diag.loc.getHashValue());
+  }
+};
+
 /// Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader,
@@ -343,8 +376,38 @@ public:
                  DWARFImporterDelegate *dwarfImporterDelegate);
   ~Implementation();
 
+  class DiagnosticWalker : public clang::RecursiveASTVisitor<DiagnosticWalker> {
+  public:
+    DiagnosticWalker(ClangImporter::Implementation &Impl);
+    bool TraverseDecl(clang::Decl *D);
+    bool TraverseParmVarDecl(clang::ParmVarDecl *D);
+    bool VisitDecl(clang::Decl *D);
+    bool VisitMacro(const clang::MacroInfo *MI);
+    bool VisitObjCObjectPointerType(clang::ObjCObjectPointerType *T);
+    bool VisitType(clang::Type *T);
+
+  private:
+    Implementation &Impl;
+    clang::SourceLocation TypeReferenceSourceLocation;
+  };
+
   /// Swift AST context.
   ASTContext &SwiftContext;
+
+  // Associates a vector of import diagnostics with a ClangNode
+  std::unordered_map<ImportDiagnosticTarget, std::vector<ImportDiagnostic>,
+                     ImportDiagnosticTargetHasher>
+      ImportDiagnostics;
+
+  // Tracks the set of import diagnostics already produced for deduplication
+  // purposes.
+  std::unordered_set<ImportDiagnostic, ImportDiagnosticHasher>
+      CollectedDiagnostics;
+
+  // ClangNodes for which all import diagnostics have been both collected and
+  // emitted.
+  std::unordered_set<ImportDiagnosticTarget, ImportDiagnosticTargetHasher>
+      DiagnosedValues;
 
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;
@@ -363,6 +426,11 @@ public:
     "<bridging-header-import>";
 
 private:
+  DiagnosticWalker Walker;
+
+  /// The Swift lookup table for the bridging header.
+  std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
+
   /// The Swift lookup tables, per module.
   ///
   /// Annoyingly, we list this table early so that it gets torn down after
@@ -426,9 +494,6 @@ private:
   llvm::SmallDenseMap<ModuleDecl *, SourceFile *> ClangSwiftAttrSourceFiles;
 
 public:
-  /// The Swift lookup table for the bridging header.
-  std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
-
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
 
@@ -816,6 +881,10 @@ public:
     SwiftContext.Diags.diagnose(swiftLoc, std::forward<Args>(args)...);
   }
 
+  void addImportDiagnostic(
+      ImportDiagnosticTarget target, Diagnostic &&diag,
+      const clang::SourceLocation &loc = clang::SourceLocation());
+
   /// Import the given Clang identifier into Swift.
   ///
   /// \param identifier The Clang identifier to map into Swift.
@@ -898,7 +967,7 @@ public:
                    bool UseCanonicalDecl = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/true,
-                                  /*UseCanonicalDecl*/UseCanonicalDecl);
+                                  /*UseCanonicalDecl*/ UseCanonicalDecl);
   }
 
   /// Import the given Clang declaration into Swift.  Use this function
@@ -1386,11 +1455,14 @@ public:
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
+  virtual void diagnoseMissingNamedMember(const IterableDeclContext *IDC,
+                                          DeclName name) override;
+
 private:
   void
   loadAllMembersOfObjcContainer(Decl *D,
                                 const clang::ObjCContainerDecl *objcContainer);
-  void loadAllMembersOfRecordDecl(StructDecl *recordDecl);
+  void loadAllMembersOfRecordDecl(NominalTypeDecl *recordDecl);
 
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,
@@ -1501,7 +1573,7 @@ public:
 
   /// Look for namespace-scope values with the given name in the given
   /// Swift lookup table.
-  void lookupValue(SwiftLookupTable &table, DeclName name,
+  bool lookupValue(SwiftLookupTable &table, DeclName name,
                    VisibleDeclConsumer &consumer);
 
   /// Look for namespace-scope values with the given name using the
@@ -1528,6 +1600,21 @@ public:
   void lookupAllObjCMembers(SwiftLookupTable &table,
                             VisibleDeclConsumer &consumer);
 
+  /// Emit any import diagnostics associated with the given name.
+  void diagnoseValue(SwiftLookupTable &table, DeclName name);
+
+  /// Emit any import diagnostics associated with the given Clang node.
+  void diagnoseTargetDirectly(ImportDiagnosticTarget target);
+
+private:
+  ImportDiagnosticTarget importDiagnosticTargetFromLookupTableEntry(
+      SwiftLookupTable::SingleEntry entry);
+
+  bool emitDiagnosticsForTarget(
+      ImportDiagnosticTarget target,
+      clang::SourceLocation fallbackLoc = clang::SourceLocation());
+
+public:
   /// Determine the effective Clang context for the given Swift nominal type.
   EffectiveClangContext
   getEffectiveClangContext(const NominalTypeDecl *nominal);

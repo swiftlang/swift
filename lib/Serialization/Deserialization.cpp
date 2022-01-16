@@ -3447,59 +3447,49 @@ public:
     GenericSignatureID interfaceSigID;
     TypeID interfaceTypeID;
     GenericSignatureID genericSigID;
-    SubstitutionMapID underlyingTypeID;
+    SubstitutionMapID underlyingTypeSubsID;
     uint8_t rawAccessLevel;
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
                                               namingDeclID, interfaceSigID,
                                               interfaceTypeID, genericSigID,
-                                              underlyingTypeID, rawAccessLevel);
+                                              underlyingTypeSubsID,
+                                              rawAccessLevel);
     
     auto declContext = MF.getDeclContext(contextID);
     auto interfaceSig = MF.getGenericSignature(interfaceSigID);
-    auto interfaceType = MF.getType(interfaceTypeID)
-                            ->castTo<GenericTypeParamType>();
-    
+
     // Check for reentrancy.
     if (declOrOffset.isComplete())
       return cast<OpaqueTypeDecl>(declOrOffset.get());
-      
+
+    auto genericParams = MF.maybeReadGenericParams(declContext);
+
     // Create the decl.
-    auto opaqueDecl = new (ctx)
-        OpaqueTypeDecl(/*NamingDecl*/ nullptr,
-                       /*GenericParams*/ nullptr, declContext, interfaceSig,
-                       /*UnderlyingInterfaceTypeRepr*/ nullptr, interfaceType);
+    auto opaqueDecl = OpaqueTypeDecl::get(
+        /*NamingDecl=*/ nullptr, genericParams, declContext,
+        interfaceSig, /*OpaqueReturnTypeReprs*/ { });
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     opaqueDecl->setNamingDecl(namingDecl);
+
+    auto interfaceType = MF.getType(interfaceTypeID);
+    opaqueDecl->setInterfaceType(MetatypeType::get(interfaceType));
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       opaqueDecl->setAccess(*accessLevel);
     else
       MF.fatal();
 
-    if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl)) {
-      ctx.evaluator.cacheOutput(GenericParamListRequest{opaqueDecl},
-                                std::move(genericParams));
-    }
-
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
       opaqueDecl->setGenericSignature(genericSig);
-    if (underlyingTypeID) {
-      auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeID);
+    if (underlyingTypeSubsID) {
+      auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError)
         return subMapOrError.takeError();
       opaqueDecl->setUnderlyingTypeSubstitutions(subMapOrError.get());
     }
-    SubstitutionMap subs;
-    if (genericSig) {
-      subs = genericSig->getIdentitySubstitutionMap();
-    }
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
-    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, 0, subs);
-    auto metatype = MetatypeType::get(opaqueTy);
-    opaqueDecl->setInterfaceType(metatype);
     return opaqueDecl;
   }
 
@@ -3564,13 +3554,14 @@ public:
                                        StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isClassBounded, isObjC;
+    bool isImplicit, isClassBounded, isObjC, existentialRequiresAny;
     uint8_t rawAccessLevel;
     unsigned numInheritedTypes;
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
+                                            existentialRequiresAny,
                                             rawAccessLevel, numInheritedTypes,
                                             rawInheritedAndDependencyIDs);
 
@@ -3596,6 +3587,8 @@ public:
 
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
                               std::move(isClassBounded));
+    ctx.evaluator.cacheOutput(ExistentialRequiresAnyRequest{proto},
+                              std::move(existentialRequiresAny));
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       proto->setAccess(*accessLevel);
@@ -4482,6 +4475,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::MainType_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::MainTypeDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) MainTypeAttr(isImplicit);
+        break;
+      }
+
       case decls_block::Specialize_DECL_ATTR: {
         unsigned exported;
         SpecializeAttr::SpecializationKind specializationKind;
@@ -4744,6 +4745,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         Attr = SPIAccessControlAttr::create(ctx, SourceLoc(),
                                             SourceRange(), spis);
+        break;
+      }
+
+      case decls_block::UnavailableFromAsync_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::UnavailableFromAsyncDeclAttrLayout::
+            readRecord(scratch, isImplicit);
+        Attr = new (ctx) UnavailableFromAsyncAttr(blobData, isImplicit);
         break;
       }
 
@@ -5504,9 +5513,10 @@ public:
   Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     DeclID opaqueDeclID;
+    unsigned ordinal;
     SubstitutionMapID subsID;
-    decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
-                                                       opaqueDeclID, subsID);
+    decls_block::OpaqueArchetypeTypeLayout::readRecord(
+        scratch, opaqueDeclID, ordinal, subsID);
 
     auto opaqueTypeOrError = MF.getDeclChecked(opaqueDeclID);
     if (!opaqueTypeOrError)
@@ -5517,9 +5527,7 @@ public:
     if (!subsOrError)
       return subsOrError.takeError();
 
-    // TODO [OPAQUE SUPPORT]: to support multiple opaque types we will probably
-    // have to serialize the ordinal, which is always 0 for now
-    return OpaqueTypeArchetypeType::get(opaqueDecl, 0, subsOrError.get());
+    return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subsOrError.get());
   }
       
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
@@ -5596,6 +5604,18 @@ public:
     }
 
     return ProtocolCompositionType::get(ctx, protocols, hasExplicitAnyObject);
+  }
+
+  Expected<Type> deserializeExistentialType(ArrayRef<uint64_t> scratch,
+                                            StringRef blobData) {
+    TypeID constraintID;
+    decls_block::ExistentialTypeLayout::readRecord(scratch, constraintID);
+
+    auto constraintType = MF.getTypeChecked(constraintID);
+    if (!constraintType)
+      return constraintType.takeError();
+
+    return ExistentialType::get(constraintType.get());
   }
 
   Expected<Type> deserializeDependentMemberType(ArrayRef<uint64_t> scratch,
@@ -6097,6 +6117,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(SequenceArchetype)
   CASE(GenericTypeParam)
   CASE(ProtocolComposition)
+  CASE(Existential)
   CASE(DependentMember)
   CASE(BoundGeneric)
   CASE(SILBlockStorage)
@@ -6346,6 +6367,13 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
     assert(!Err && "unable to read default witness table");
     (void)Err;
   }
+}
+
+void ModuleFile::diagnoseMissingNamedMember(const IterableDeclContext *IDC,
+                                            DeclName name) {
+  // TODO: Implement diagnostics for failed member lookups from module files.
+  llvm_unreachable(
+      "Missing member diangosis is not implemented for module files.");
 }
 
 static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error) {

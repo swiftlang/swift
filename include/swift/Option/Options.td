@@ -616,10 +616,6 @@ def no_emit_module_separately:
   Flags<[NoInteractiveOption, HelpHidden]>,
   HelpText<"Force using merge-module as the incremental build mode (new Driver only)">;
 
-def requirement_machine_EQ : Joined<["-"], "requirement-machine=">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
-  HelpText<"Control usage of experimental generics implementation: 'on', 'off', or 'verify'">;
-
 def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-machine-protocol-signatures=">,
   Flags<[FrontendOption]>,
   HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', or 'verify'">;
@@ -1049,6 +1045,10 @@ def dump_type_info : Flag<["-"], "dump-type-info">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def print_ast_decl : Flag<["-"], "print-ast-decl">,
+  HelpText<"Parse and type-check input file(s) and pretty print declarations from AST(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_pcm : Flag<["-"], "dump-pcm">,

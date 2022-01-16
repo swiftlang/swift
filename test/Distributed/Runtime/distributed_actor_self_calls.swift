@@ -32,46 +32,76 @@ distributed actor Philosopher {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address
   }
 }
 
-struct FakeTransport: ActorTransport {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented \(#function)")
-  }
+struct FakeActorSystem: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias InvocationDecoder = FakeInvocation
+  typealias InvocationEncoder = FakeInvocation
+  typealias SerializationRequirement = Codable
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor {
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+            Act.ID == ActorID {
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor {
-    .init(ActorAddress(parse: ""))
+    ActorAddress(parse: "")
   }
 
-  public func actorReady<Act>(_ actor: Act)
+  func actorReady<Act>(_ actor: Act)
       where Act: DistributedActor {
     print("\(#function):\(actor)")
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {}
+  func resignID(_ id: ActorID) {}
+
+  func makeInvocationEncoder() -> InvocationDecoder {
+    .init()
+  }
 }
 
-typealias DefaultActorTransport = FakeTransport
+struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func decodeNextArgument<Argument>(
+    _ argumentType: Argument.Type,
+    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
+  ) throws { /* ... */ }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
+
+  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+    typealias SerializationRequirement = Codable
+  }
+}
+
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
-func test(transport: FakeTransport) async {
-  _ = Philosopher(transport: transport)
+func test(system: FakeActorSystem) async {
+  _ = Philosopher(system: system)
 }
 
 @main struct Main {
   static func main() async {
-    await test(transport: FakeTransport())
+    await test(system: FakeActorSystem())
   }
 }

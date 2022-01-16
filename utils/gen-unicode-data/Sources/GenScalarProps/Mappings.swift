@@ -466,8 +466,16 @@ func emitSpecialMappings(
   }
 }
 
-func generateMappingProps(into result: inout String) {
-  let unicodeData = readFile("Data/UnicodeData.txt")
+func generateMappingProps(for platform: String, into result: inout String) {
+  let unicodeData: String
+  
+  switch platform {
+  case "Apple":
+    unicodeData = readFile("Data/Apple/UnicodeData.txt")
+  default:
+    unicodeData = readFile("Data/UnicodeData.txt")
+  }
+  
   let specialCasing = readFile("Data/SpecialCasing.txt")
   
   var data: [UInt32: (Int?, Int?, Int?)] = [:]

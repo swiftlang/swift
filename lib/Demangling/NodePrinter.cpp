@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/AST/Ownership.h"
@@ -559,12 +561,14 @@ private:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
     case Node::Kind::DistributedThunk:
+    case Node::Kind::DistributedAccessor:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
     case Node::Kind::OpaqueType:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     case Node::Kind::OpaqueReturnType:
+    case Node::Kind::OpaqueReturnTypeIndexed:
     case Node::Kind::OpaqueReturnTypeOf:
     case Node::Kind::CanonicalSpecializedGenericMetaclass:
     case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
@@ -585,6 +589,7 @@ private:
     case Node::Kind::IndexSubset:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
+    case Node::Kind::AccessibleFunctionRecord:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1012,6 +1017,7 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
     switch (K) {
     case FunctionSigSpecializationParamKind::BoxToValue:
     case FunctionSigSpecializationParamKind::BoxToStack:
+    case FunctionSigSpecializationParamKind::InOutToOut:
       print(Node->getChild(Idx++), depth + 1);
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
@@ -1582,6 +1588,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     case FunctionSigSpecializationParamKind::BoxToStack:
       Printer << "Stack Promoted from Box";
       return nullptr;
+    case FunctionSigSpecializationParamKind::InOutToOut:
+      Printer << "InOut Converted to Out";
+      return nullptr;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
       Printer << "Constant Propagated Function";
       return nullptr;
@@ -1995,6 +2004,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::DistributedThunk:
     if (!Options.ShortenThunk) {
       Printer << "distributed thunk for ";
+    }
+    return nullptr;
+  case Node::Kind::DistributedAccessor:
+    if (!Options.ShortenThunk) {
+      Printer << "distributed accessor for ";
+    }
+    return nullptr;
+  case Node::Kind::AccessibleFunctionRecord:
+    if (!Options.ShortenThunk) {
+      Printer << "accessible function runtime record for ";
     }
     return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
@@ -2803,6 +2822,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << ")";
     return nullptr;
   case Node::Kind::OpaqueReturnType:
+  case Node::Kind::OpaqueReturnTypeIndexed:
     Printer << "some";
     return nullptr;
   case Node::Kind::OpaqueReturnTypeOf:
@@ -3081,3 +3101,5 @@ std::string Demangle::nodeToString(NodePointer root,
 
   return NodePrinter(options).printRoot(root);
 }
+
+#endif

@@ -108,6 +108,7 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   ClosureProp = 5,
   BoxToValue = 6,
   BoxToStack = 7,
+  InOutToOut = 8,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.
@@ -144,6 +145,7 @@ enum class SpecializationPass : uint8_t {
   CapturePropagation,
   FunctionSignatureOpts,
   GenericSpecializer,
+  MoveDiagnosticInOutToOut,
 };
 
 static inline char encodeSpecializationPass(SpecializationPass Pass) {
@@ -255,6 +257,10 @@ public:
 
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
+
+  // Find a node by its kind, traversing the node depth-first,
+  // and bailing out early if not found at the 'maxDepth'.
+  NodePointer findByKind(Node::Kind kind, int maxDepth);
 
   /// Prints the whole node tree in readable form to stderr.
   ///

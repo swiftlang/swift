@@ -74,6 +74,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureType:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentTypeBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentDefaultBegin:
     case CodeCompletionString::Chunk::ChunkKind::ParameterDeclBegin:
     case CodeCompletionString::Chunk::ChunkKind::ParameterDeclExternalName:
     case CodeCompletionString::Chunk::ChunkKind::ParameterDeclLocalName:
@@ -177,9 +178,9 @@ public:
       : Completions(Completions) {}
 
   void handleResults(CodeCompletionContext &context) override {
-    MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
-    CodeCompletionContext::sortCompletionResults(Results);
-    for (auto Result : Results) {
+    auto SortedResults = CodeCompletionContext::sortCompletionResults(
+        context.getResultSink().Results);
+    for (auto Result : SortedResults) {
       std::string InsertableString = toInsertableString(Result);
       if (StringRef(InsertableString).startswith(Completions.Prefix)) {
         llvm::SmallString<128> PrintedResult;

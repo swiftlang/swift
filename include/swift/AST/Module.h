@@ -26,6 +26,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
@@ -856,6 +857,9 @@ public:
   /// transferred from module files to the dSYMs, remove this.
   bool isExternallyConsumed() const;
 
+  SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
+  SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
+
   SourceRange getSourceRange() const { return SourceRange(); }
 
   static bool classof(const DeclContext *DC) {
@@ -882,8 +886,19 @@ public:
   ModuleEntity(const ModuleDecl *Mod) : Mod(Mod) {}
   ModuleEntity(const clang::Module *Mod) : Mod(static_cast<const void *>(Mod)){}
 
-  StringRef getName() const;
-  std::string getFullName() const;
+  /// @param useRealNameIfAliased Whether to use the module's real name in case
+  ///                             module aliasing is used. For example, if a file
+  ///                             has `import Foo` and `-module-alias Foo=Bar` is
+  ///                             passed, treat Foo as an alias and Bar as the real
+  ///                             module name as its dependency. This only applies
+  ///                             to Swift modules.
+  /// @return The module name; for Swift modules, the real module name could be
+  ///         different from the name if module aliasing is used.
+  StringRef getName(bool useRealNameIfAliased = false) const;
+
+  /// For Swift modules, it returns the same result as \c ModuleEntity::getName(bool).
+  /// For Clang modules, it returns the result of \c clang::Module::getFullModuleName.
+  std::string getFullName(bool useRealNameIfAliased = false) const;
 
   bool isSystemModule() const;
   bool isBuiltinModule() const;

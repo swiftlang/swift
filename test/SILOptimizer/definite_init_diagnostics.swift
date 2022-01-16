@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -emit-sil -primary-file %s -o /dev/null -verify
 
 import Swift
 

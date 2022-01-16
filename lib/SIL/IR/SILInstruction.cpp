@@ -103,6 +103,16 @@ SILModule &SILInstruction::getModule() const {
   return getFunction()->getModule();
 }
 
+SILInstruction *SILInstruction::getPreviousInstruction() {
+  auto pos = getIterator();
+  return pos == getParent()->begin() ? nullptr : &*std::prev(pos);
+}
+
+SILInstruction *SILInstruction::getNextInstruction() {
+  auto nextPos = std::next(getIterator());
+  return nextPos == getParent()->end() ? nullptr : &*nextPos;
+}
+
 void SILInstruction::removeFromParent() {
 #ifndef NDEBUG
   for (auto result : getResults()) {
@@ -358,6 +368,10 @@ namespace {
     }
 
     bool visitDeallocStackInst(const DeallocStackInst *RHS) {
+      return true;
+    }
+
+    bool visitDeallocStackRefInst(const DeallocStackRefInst *RHS) {
       return true;
     }
 
@@ -1102,10 +1116,7 @@ bool SILInstruction::mayHaveSideEffects() const {
   if (mayTrap())
     return true;
 
-  MemoryBehavior B = getMemoryBehavior();
-  return B == MemoryBehavior::MayWrite ||
-    B == MemoryBehavior::MayReadWrite ||
-    B == MemoryBehavior::MayHaveSideEffects;
+  return mayWriteToMemory();
 }
 
 bool SILInstruction::mayRelease() const {
@@ -1167,6 +1178,10 @@ bool SILInstruction::mayRelease() const {
     return CopyAddr->isInitializationOfDest() ==
            IsInitialization_t::IsNotInitialization;
   }
+  // mark_unresolved_move_addr is equivalent to a copy_addr [init], so a release
+  // does not occur.
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst:
+    return false;
 
   case SILInstructionKind::BuiltinInst: {
     auto *BI = cast<BuiltinInst>(this);
@@ -1274,13 +1289,8 @@ bool SILInstruction::isAllocatingStack() const {
 }
 
 bool SILInstruction::isDeallocatingStack() const {
-  if (isa<DeallocStackInst>(this))
+  if (isa<DeallocStackInst>(this) || isa<DeallocStackRefInst>(this))
     return true;
-
-  if (auto *DRI = dyn_cast<DeallocRefInst>(this)) {
-    if (DRI->canAllocOnStack())
-      return true;
-  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     if (BI->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
@@ -1367,6 +1377,12 @@ bool SILInstruction::mayTrap() const {
   default:
     return false;
   }
+}
+
+bool SILInstruction::maySynchronize() const {
+  // TODO: We need side-effect analysis and library annotation for this to be
+  //       a reasonable API.  For now, this is just a placeholder.
+  return isa<FullApplySite>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {

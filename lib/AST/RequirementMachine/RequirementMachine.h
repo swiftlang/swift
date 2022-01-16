@@ -36,6 +36,7 @@ class InferredGenericSignatureRequestRQM;
 class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
+class RequirementSignatureRequestRQM;
 class Type;
 class UnifiedStatsReporter;
 
@@ -47,12 +48,12 @@ class RewriteContext;
 class RequirementMachine final {
   friend class swift::ASTContext;
   friend class swift::rewriting::RewriteContext;
+  friend class swift::RequirementSignatureRequestRQM;
   friend class swift::AbstractGenericSignatureRequestRQM;
   friend class swift::InferredGenericSignatureRequestRQM;
 
   CanGenericSignature Sig;
   SmallVector<Type, 2> Params;
-  ArrayRef<const ProtocolDecl *> Protos;
 
   RewriteContext &Context;
   RewriteSystem System;
@@ -84,17 +85,17 @@ class RequirementMachine final {
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
   void initWithGenericSignature(CanGenericSignature sig);
-  void initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
+  CompletionResult initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
   void initWithAbstractRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements);
-  void initWithWrittenRequirements(
+  CompletionResult initWithWrittenRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<StructuralRequirement> requirements);
 
   bool isComplete() const;
 
-  void computeCompletion(RewriteSystem::ValidityPolicy policy);
+  CompletionResult computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
@@ -136,6 +137,8 @@ public:
   computeMinimalProtocolRequirements();
 
   std::vector<Requirement> computeMinimalGenericSignatureRequirements();
+
+  bool hadError() const;
 
   void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;

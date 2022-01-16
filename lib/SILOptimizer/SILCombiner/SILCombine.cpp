@@ -468,23 +468,22 @@ void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
   eraseInstFromFunction(*inst);
 }
 
-/// Runs an instruction pass in libswift.
+/// Runs a Swift instruction pass.
 void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
                               void (*runFunction)(BridgedInstructionPassCtxt)) {
-  Worklist.setLibswiftPassInvocation(&libswiftPassInvocation);
-  runFunction({ {inst->asSILNode()}, {&libswiftPassInvocation} });
-  Worklist.setLibswiftPassInvocation(nullptr);
-  libswiftPassInvocation.finishedPassRun();
+  swiftPassInvocation.startInstructionPassRun(inst);
+  runFunction({ {inst->asSILNode()}, {&swiftPassInvocation} });
+  swiftPassInvocation.finishedInstructionPassRun();
 }
 
 /// Registered briged instruction pass run functions.
-static llvm::StringMap<BridgedInstructionPassRunFn> libswiftInstPasses;
+static llvm::StringMap<BridgedInstructionPassRunFn> swiftInstPasses;
 static bool passesRegistered = false;
 
-// Called from libswift's initializeLibSwift().
+// Called from initializeSwiftModules().
 void SILCombine_registerInstructionPass(BridgedStringRef name,
                                         BridgedInstructionPassRunFn runFn) {
-  libswiftInstPasses[getStringRef(name)] = runFn;
+  swiftInstPasses[getStringRef(name)] = runFn;
   passesRegistered = true;
 }
 
@@ -493,7 +492,7 @@ SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   static BridgedInstructionPassRunFn runFunction = nullptr;                \
   static bool runFunctionSet = false;                                      \
   if (!runFunctionSet) {                                                   \
-    runFunction = libswiftInstPasses[TAG];                                 \
+    runFunction = swiftInstPasses[TAG];                                    \
     if (!runFunction && passesRegistered) {                                \
       llvm::errs() << "Swift pass " << TAG << " is not registered\n";      \
       abort();                                                             \
@@ -537,9 +536,11 @@ class SILCombine : public SILFunctionTransform {
     auto *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
     auto *NLABA = PM->getAnalysis<NonLocalAccessBlockAnalysis>();
 
-    bool enableCopyPropagation = getOptions().EnableCopyPropagation;
+    bool enableCopyPropagation =
+        getOptions().CopyPropagation == CopyPropagationOption::On;
     if (getOptions().EnableOSSAModules) {
-      enableCopyPropagation = !getOptions().DisableCopyPropagation;
+      enableCopyPropagation =
+          getOptions().CopyPropagation != CopyPropagationOption::Off;
     }
 
     SILOptFunctionBuilder FuncBuilder(*this);
@@ -570,7 +571,7 @@ SILTransform *swift::createSILCombine() {
 //                          SwiftFunctionPassContext
 //===----------------------------------------------------------------------===//
 
-void LibswiftPassInvocation::eraseInstruction(SILInstruction *inst) {
+void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
   if (silCombiner) {
     silCombiner->eraseInstFromFunction(*inst);
   } else {

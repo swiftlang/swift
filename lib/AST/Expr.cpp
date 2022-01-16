@@ -282,6 +282,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(BooleanLiteral);
   NO_REFERENCE(StringLiteral);
   NO_REFERENCE(InterpolatedStringLiteral);
+  NO_REFERENCE(RegexLiteral);
   NO_REFERENCE(ObjectLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
@@ -396,6 +397,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
+  PASS_THROUGH_REFERENCE(ReifyPack, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -413,6 +415,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(KeyPathDot);
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
+  NO_REFERENCE(Pack);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -590,6 +593,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::BooleanLiteral:
   case ExprKind::StringLiteral:
   case ExprKind::InterpolatedStringLiteral:
+  case ExprKind::RegexLiteral:
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
@@ -721,6 +725,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::BridgeFromObjC:
   case ExprKind::BridgeToObjC:
   case ExprKind::UnderlyingToOpaque:
+  case ExprKind::ReifyPack:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
@@ -738,6 +743,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
+  case ExprKind::Pack:
     return false;
 
   case ExprKind::Tap:
@@ -815,6 +821,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::StringLiteral:
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::InterpolatedStringLiteral:
+  case ExprKind::RegexLiteral:
   case ExprKind::ObjectLiteral:
   case ExprKind::DiscardAssignment:
   case ExprKind::DeclRef:
@@ -903,6 +910,8 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::KeyPathDot:
   case ExprKind::OneWay:
   case ExprKind::Tap:
+  case ExprKind::ReifyPack:
+  case ExprKind::Pack:
     return false;
   }
 
@@ -1112,6 +1121,16 @@ InOutExpr::InOutExpr(SourceLoc operLoc, Expr *subExpr, Type baseType,
   : Expr(ExprKind::InOut, isImplicit,
          baseType.isNull() ? baseType : InOutType::get(baseType)),
     SubExpr(subExpr), OperLoc(operLoc) {}
+
+VarargExpansionExpr *VarargExpansionExpr::createParamExpansion(ASTContext &ctx, Expr *E) {
+  assert(E->getType() && "Expansion must have fully-resolved type!");
+  return new (ctx) VarargExpansionExpr(E, /*implicit*/ true, E->getType());
+}
+
+VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, ArrayExpr *AE) {
+  assert(AE->getType() && "Expansion must have fully-resolved type!");
+  return new (ctx) VarargExpansionExpr(AE, /*implicit*/ true, AE->getType());
+}
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   assert(elements.size() & 1 && "even number of elements in sequence");
@@ -1705,15 +1724,49 @@ Type AbstractClosureExpr::getResultType(
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
-  if (getType()->hasError())
+  if (!getType() || getType()->hasError()) {
+    // Scan the closure body to infer effects.
+    if (auto closure = dyn_cast<ClosureExpr>(this)) {
+      return evaluateOrDefault(
+          getASTContext().evaluator,
+          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
+          FunctionType::ExtInfo()).isThrowing();
+    }
+
     return false;
+  }
   
   return getType()->castTo<FunctionType>()->getExtInfo().isThrowing();
 }
 
-bool AbstractClosureExpr::isBodyAsync() const {
-  if (getType()->hasError())
+bool AbstractClosureExpr::isSendable() const {
+  if (!getType() || getType()->hasError()) {
+    // Scan the closure body to infer effects.
+    if (auto closure = dyn_cast<ClosureExpr>(this)) {
+      return evaluateOrDefault(
+          getASTContext().evaluator,
+          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
+          FunctionType::ExtInfo()).isSendable();
+    }
+
     return false;
+  }
+
+  return getType()->castTo<FunctionType>()->getExtInfo().isSendable();
+}
+
+bool AbstractClosureExpr::isBodyAsync() const {
+  if (!getType() || getType()->hasError()) {
+    // Scan the closure body to infer effects.
+    if (auto closure = dyn_cast<ClosureExpr>(this)) {
+      return evaluateOrDefault(
+          getASTContext().evaluator,
+          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
+          FunctionType::ExtInfo()).isAsync();
+    }
+
+    return false;
+  }
 
   return getType()->castTo<FunctionType>()->getExtInfo().isAsync();
 }
@@ -2205,6 +2258,38 @@ SourceLoc TapExpr::getEndLoc() const {
   if (auto *const se = getSubExpr())
     return se->getEndLoc();
   return SourceLoc();
+}
+
+RegexLiteralExpr *
+RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
+                               StringRef regexText, unsigned version,
+                               ArrayRef<uint8_t> serializedCaps) {
+  return new (ctx) RegexLiteralExpr(loc, regexText, version, serializedCaps,
+                                    /*implicit*/ false);
+}
+
+PackExpr::PackExpr(ArrayRef<Expr *> SubExprs, Type Ty)
+  : Expr(ExprKind::Pack, /*implicit*/ true, Ty) {
+  Bits.PackExpr.NumElements = SubExprs.size();
+
+  // Copy elements.
+  std::uninitialized_copy(SubExprs.begin(), SubExprs.end(),
+                          getTrailingObjects<Expr *>());
+}
+
+PackExpr *PackExpr::create(ASTContext &ctx,
+                           ArrayRef<Expr *> SubExprs,
+                           Type Ty) {
+  assert(Ty->castTo<PackType>());
+
+  size_t size =
+      totalSizeToAlloc<Expr *>(SubExprs.size());
+  void *mem = ctx.Allocate(size, alignof(PackExpr));
+  return new (mem) PackExpr(SubExprs, Ty);
+}
+
+PackExpr *PackExpr::createEmpty(ASTContext &ctx) {
+  return create(ctx, {}, PackType::getEmpty(ctx));
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {

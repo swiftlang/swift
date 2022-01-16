@@ -1,13 +1,15 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
+import FakeDistributedActorSystems
 
-/// Use the existential wrapper as the default actor transport.
-typealias DefaultActorTransport = AnyActorTransport
+@available(SwiftStdlib 5.5, *)
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
-@available(SwiftStdlib 5.6, *)
 distributed actor D {
 
   func hello() {} // expected-note{{distributed actor-isolated instance method 'hello()' declared here}}
@@ -20,7 +22,6 @@ distributed actor D {
   distributed func distHelloAsyncThrows() async throws { } // ok
 }
 
-@available(SwiftStdlib 5.6, *)
 func test_not_distributed_funcs(distributed: D) async {
   distributed.hello() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   distributed.helloAsync() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
@@ -33,7 +34,6 @@ func test_not_distributed_funcs(distributed: D) async {
   // expected-error@-3{{call can throw, but it is not marked with 'try' and the error is not handled}} // TODO: no need to diagnose this, it is impossible to call anyway
 }
 
-@available(SwiftStdlib 5.6, *)
 func test_outside(distributed: D) async throws {
   distributed.distHello() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
@@ -93,6 +93,6 @@ func test_outside(distributed: D) async throws {
 
   // special: the actorAddress may always be referred to
   _ = distributed.id // ok
-  _ = distributed.actorTransport // ok
+  _ = distributed.actorSystem // ok
 }
 

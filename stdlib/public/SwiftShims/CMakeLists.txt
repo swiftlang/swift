@@ -20,7 +20,6 @@ set(sources
   Target.h
   ThreadLocalStorage.h
   UnicodeData.h
-  UnicodeShims.h
   Visibility.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
@@ -156,7 +155,7 @@ if(NOT SWIFT_BUILT_STANDALONE)
   endforeach()
 endif()
 
-if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
+if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
   foreach(bootstrapping "0" "1")
     get_bootstrapping_path(outdir ${SWIFTLIB_DIR} ${bootstrapping})
     set(target_name "symlink-headers-bootstrapping${bootstrapping}")
@@ -204,16 +203,23 @@ if(SWIFT_BUILD_STATIC_STDLIB)
                              PATTERN "*.h")
 endif()
 
+if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG)
+  # This will still link against the Swift-forked clang headers if the Swift
+  # toolchain was built with SWIFT_INCLUDE_TOOLS.
+  set(symlink_dir ${clang_headers_location})
+else()
+  set(symlink_dir "../clang/${CLANG_VERSION}")
+endif()
 
 swift_install_symlink_component(clang-resource-dir-symlink
   LINK_NAME clang
-  TARGET ../clang/${CLANG_VERSION}
+  TARGET ${symlink_dir}
   DESTINATION "lib/swift")
 
 if(SWIFT_BUILD_STATIC_STDLIB)
   swift_install_symlink_component(clang-resource-dir-symlink
     LINK_NAME clang
-    TARGET ../clang/${CLANG_VERSION}
+    TARGET ${symlink_dir}
     DESTINATION "lib/swift_static")
 endif()
 

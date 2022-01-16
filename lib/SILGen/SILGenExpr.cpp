@@ -427,9 +427,6 @@ namespace {
     RValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
     RValue visitBooleanLiteralExpr(BooleanLiteralExpr *E, SGFContext C);
 
-    RValue emitStringLiteral(Expr *E, StringRef Str, SGFContext C,
-                             StringLiteralExpr::Encoding encoding);
-        
     RValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
     RValue visitLoadExpr(LoadExpr *E, SGFContext C);
     RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
@@ -439,6 +436,7 @@ namespace {
              CollectionUpcastConversionExpr *E,
              SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
+    RValue visitReifyPackExpr(ReifyPackExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                               SGFContext C);
@@ -463,6 +461,7 @@ namespace {
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
     RValue visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
+    RValue visitPackExpr(PackExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
     RValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
@@ -478,6 +477,7 @@ namespace {
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
+    RValue visitRegexLiteralExpr(RegexLiteralExpr *E, SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
@@ -1037,8 +1037,7 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
   if (auto *DRE = loc.getAsASTNode<DeclRefExpr>())
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
       if (!isa<ParamDecl>(VD) && VD->isImplicit() &&
-          (VD->getType()->is<ProtocolType>() ||
-           VD->getType()->is<ProtocolCompositionType>()) &&
+          VD->getType()->isExistentialType() &&
           VD->getType()->getExistentialLayout().isErrorExistential()) {
         DbgVar = SILDebugVariable(VD->isLet(), 0);
         loc = SILLocation(VD);
@@ -1490,6 +1489,11 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
   return RValue(SGF, E, result);
 }
 
+RValue
+RValueEmitter::visitReifyPackExpr(ReifyPackExpr *E, SGFContext C) {
+  llvm_unreachable("Unimplemented!");
+}
+
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
                                                 SGFContext C) {
   ManagedValue archetype = SGF.emitRValueAsSingleValue(E->getSubExpr());
@@ -1666,6 +1670,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::CXXMethod:
       llvm_unreachable("should not do function conversion from method rep");
     }
     llvm_unreachable("bad representation");
@@ -1695,6 +1700,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
+    case SILFunctionType::Representation::CXXMethod:
       llvm_unreachable("should not do function conversion from method rep");
     }
     llvm_unreachable("bad representation");
@@ -2185,6 +2191,10 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   return result;
 }
 
+RValue RValueEmitter::visitPackExpr(PackExpr *E, SGFContext C) {
+  llvm_unreachable("Unimplemented!");
+}
+
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
                                          SGFContext resultCtx) {
   assert(!e->getType()->is<LValueType>() &&
@@ -2529,6 +2539,10 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
       E, E->getInitializer(), std::move(resultInitArgs), Type(), C);
 }
 
+RValue RValueEmitter::visitRegexLiteralExpr(RegexLiteralExpr *E, SGFContext C) {
+  return SGF.emitLiteral(E, C);
+}
+
 RValue RValueEmitter::
 visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   ConcreteDeclRef init = E->getInitializer();
@@ -2777,7 +2791,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
       (expansion == ResilienceExpansion::Minimal
        ? IsSerializable
        : IsNotSerialized),
-      ProfileCounter(), IsThunk, IsNotDynamic);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
   if (!thunk->empty())
     return thunk;
   
@@ -2925,7 +2939,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
       (expansion == ResilienceExpansion::Minimal
        ? IsSerializable
        : IsNotSerialized),
-      ProfileCounter(), IsThunk, IsNotDynamic);
+      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
   if (!thunk->empty())
     return thunk;
   
@@ -3103,7 +3117,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         (expansion == ResilienceExpansion::Minimal
          ? IsSerializable
          : IsNotSerialized),
-        ProfileCounter(), IsThunk, IsNotDynamic);
+        ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
     if (!equals->empty()) {
       return;
     }
@@ -3280,7 +3294,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         (expansion == ResilienceExpansion::Minimal
          ? IsSerializable
          : IsNotSerialized),
-        ProfileCounter(), IsThunk, IsNotDynamic);
+        ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed);
     if (!hash->empty()) {
       return;
     }

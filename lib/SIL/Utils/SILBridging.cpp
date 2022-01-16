@@ -15,21 +15,18 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILBuilder.h"
 
-#include <string>
-
 using namespace swift;
 
 namespace {
 
 bool nodeMetatypesInitialized = false;
 
-// Filled in by class registration in initializeLibSwift().
+// Filled in by class registration in initializeSwiftModules().
 SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
 
 }
 
-// Does return null, if libswift is not used, i.e. initializeLibSwift() is
-// never called.
+// Does return null if initializeSwiftModules() is never called.
 SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
   SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];
   assert((!nodeMetatypesInitialized || metatype) &&
@@ -73,8 +70,8 @@ static void setUnimplementedRange(SwiftMetatype metatype,
   }
 }
 
-/// Registers the metatype of a libswift class.
-/// Called by initializeLibSwift().
+/// Registers the metatype of a swift SIL class.
+/// Called by initializeSwiftModules().
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   nodeMetatypesInitialized = true;
 
@@ -96,10 +93,10 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
   }
 
   // Pre-populate the "unimplemented" ranges of metatypes.
-  // If a specifc class is not implemented yet in libswift, it bridges to an
+  // If a specifc class is not implemented in Swift yet, it bridges to an
   // "unimplemented" class. This ensures that optimizations handle _all_ kind of
   // instructions gracefully, without the need to define the not-yet-used
-  // classes in libswift.
+  // classes in Swift.
 #define VALUE_RANGE(ID) SILNodeKind::First_##ID, SILNodeKind::Last_##ID
   if (clName == "UnimplementedRefCountingInst")
     return setUnimplementedRange(metatype, VALUE_RANGE(RefCountingInst));
@@ -165,12 +162,11 @@ BridgedStringRef SILFunction_getName(BridgedFunction function) {
   return getBridgedStringRef(castToFunction(function)->getName());
 }
 
-std::string SILFunction_debugDescription(BridgedFunction function) {
+BridgedStringRef SILFunction_debugDescription(BridgedFunction function) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToFunction(function)->print(os);
-  str.pop_back(); // Remove trailing newline.
-  return str;
+  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
 }
 
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function) {
@@ -226,12 +222,11 @@ BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block) {
   return {castToBasicBlock(block)->getParent()};
 }
 
-std::string SILBasicBlock_debugDescription(BridgedBasicBlock block) {
+BridgedStringRef SILBasicBlock_debugDescription(BridgedBasicBlock block) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToBasicBlock(block)->print(os);
-  str.pop_back(); // Remove trailing newline.
-  return str;
+  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
 }
 
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block) {
@@ -291,12 +286,11 @@ BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
 static_assert(BridgedOperandSize == sizeof(Operand),
               "wrong bridged Operand size");
 
-std::string SILNode_debugDescription(BridgedNode node) {
+BridgedStringRef SILNode_debugDescription(BridgedNode node) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToSILNode(node)->print(os);
-  str.pop_back(); // Remove trailing newline.
-  return str;
+  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
 }
 
 static Operand *castToOperand(BridgedOperand operand) {
@@ -347,12 +341,11 @@ BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
   return getBridgedStringRef(castToGlobal(global)->getName());
 }
 
-std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
+BridgedStringRef SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToGlobal(global)->print(os);
-  str.pop_back(); // Remove trailing newline.
-  return str;
+  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -426,8 +419,16 @@ BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi) {
   return getBridgedStringRef(castToInst<CondFailInst>(cfi)->getMessage());
 }
 
+BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi) {
+  return (BridgedBuiltinID)castToInst<BuiltinInst>(bi)->getBuiltinInfo().ID;
+}
+
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst) {
   return {castToInst<GlobalAccessInst>(globalInst)->getReferencedGlobal()};
+}
+
+BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri) {
+  return {castToInst<FunctionRefInst>(fri)->getReferencedFunction()};
 }
 
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei) {
@@ -466,6 +467,14 @@ SwiftInt ApplyInst_numArguments(BridgedInstruction ai) {
   return castToInst<ApplyInst>(ai)->getNumArguments();
 }
 
+SwiftInt AllocRefInstBase_isObjc(BridgedInstruction arb) {
+  return castToInst<AllocRefInstBase>(arb)->isObjC();
+}
+
+SwiftInt AllocRefInstBase_canAllocOnStack(BridgedInstruction arb) {
+  return castToInst<AllocRefInstBase>(arb)->canAllocOnStack();
+}
+
 SwiftInt BeginApplyInst_numArguments(BridgedInstruction tai) {
   return castToInst<BeginApplyInst>(tai)->getNumArguments();
 }
@@ -490,6 +499,11 @@ SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {
   return (SwiftInt)castToInst<StoreInst>(store)->getOwnershipQualifier();
 }
 
+void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic) {
+  castToInst<RefCountingInst>(rc)->setAtomicity(
+      isAtomic ? RefCountingInst::Atomicity::Atomic
+               : RefCountingInst::Atomicity::NonAtomic);
+}
 
 //===----------------------------------------------------------------------===//
 //                                SILBuilder
@@ -521,3 +535,9 @@ BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionP
                                        getSILType(type), value)};
 }
 
+BridgedInstruction SILBuilder_createDeallocStackRef(BridgedInstruction insertionPoint,
+          BridgedLocation loc, BridgedValue operand) {
+  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+  return {builder.createDeallocStackRef(getRegularLocation(loc),
+                                        castToSILValue(operand))};
+}

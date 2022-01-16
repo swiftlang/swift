@@ -2603,13 +2603,14 @@ public:
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
-  using Candidate = std::pair<Expr *, Type>;
+  using Candidate = std::pair<Expr *, SubstitutionMap>;
 
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
   OpaqueTypeDecl *OpaqueDecl;
   BraceStmt *Body;
   SmallVector<Candidate, 4> Candidates;
+  SmallPtrSet<const void *, 4> KnownCandidates;
 
   bool HasInvalidReturn = false;
 
@@ -2642,20 +2643,48 @@ public:
     }
 
     // Check whether all of the underlying type candidates match up.
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
-    Type underlyingType = Candidates.front().second;
-    bool mismatch =
-        std::any_of(Candidates.begin() + 1, Candidates.end(),
-                    [&](Candidate &otherCandidate) {
-                      return !underlyingType->isEqual(otherCandidate.second);
-                    });
-    if (mismatch) {
-      Implementation->diagnose(
-          diag::opaque_type_mismatched_underlying_type_candidates);
+    // TODO [OPAQUE SUPPORT]: diagnose multiple opaque types
+    SubstitutionMap underlyingSubs = Candidates.front().second;
+    if (Candidates.size() > 1) {
+      unsigned mismatchIndex = OpaqueDecl->getOpaqueGenericParams().size();
+      for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
+        unsigned index = genericParam->getIndex();
+        Type underlyingType = Candidates[0].second.getReplacementTypes()[index];
+        bool found = false;
+        for (const auto &candidate : Candidates) {
+          Type otherType = candidate.second.getReplacementTypes()[index];
+          if (!underlyingType->isEqual(otherType)) {
+            mismatchIndex = index;
+            found = true;
+            break;
+          }
+        }
+
+        if (found)
+          break;
+      }
+      assert(mismatchIndex < OpaqueDecl->getOpaqueGenericParams().size());
+
+      if (auto genericParam =
+              OpaqueDecl->getExplicitGenericParam(mismatchIndex)) {
+        Implementation->diagnose(
+            diag::opaque_type_mismatched_underlying_type_candidates_named,
+            genericParam->getName())
+          .highlight(genericParam->getLoc());
+      } else {
+        TypeRepr *opaqueRepr =
+            OpaqueDecl->getOpaqueReturnTypeReprs()[mismatchIndex];
+        Implementation->diagnose(
+            diag::opaque_type_mismatched_underlying_type_candidates,
+            opaqueRepr)
+          .highlight(opaqueRepr->getSourceRange());
+      }
+
       for (auto candidate : Candidates) {
-        Ctx.Diags.diagnose(candidate.first->getLoc(),
-                           diag::opaque_type_underlying_type_candidate_here,
-                           candidate.second);
+        Ctx.Diags.diagnose(
+           candidate.first->getLoc(),
+           diag::opaque_type_underlying_type_candidate_here,
+           candidate.second.getReplacementTypes()[mismatchIndex]);
       }
       return;
     }
@@ -2664,39 +2693,35 @@ public:
     // in terms of the opaque type itself.
     auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
         OpaqueDecl->getDeclaredInterfaceType());
-    auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
-      return t->isEqual(opaqueTypeInContext);
-    });
-    
-    if (isSelfReferencing) {
-      Ctx.Diags.diagnose(Candidates.front().first->getLoc(),
-                         diag::opaque_type_self_referential_underlying_type,
-                         underlyingType);
-      return;
+    for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
+      auto underlyingType = Type(genericParam).subst(underlyingSubs);
+      auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
+        return t->isEqual(opaqueTypeInContext);
+      });
+
+      if (isSelfReferencing) {
+        unsigned index = genericParam->getIndex();
+        Ctx.Diags.diagnose(Candidates.front().first->getLoc(),
+                           diag::opaque_type_self_referential_underlying_type,
+                           underlyingSubs.getReplacementTypes()[index]);
+        return;
+      }
     }
-    
-    // If we have one successful candidate, then save it as the underlying type
-    // of the opaque decl.
-    // Form a substitution map that defines it in terms of the other context
-    // generic parameters.
-    underlyingType = underlyingType->mapTypeOutOfContext();
-    auto underlyingSubs = SubstitutionMap::get(
-      OpaqueDecl->getOpaqueInterfaceGenericSignature(),
-      [&](SubstitutableType *t) -> Type {
-        if (t->isEqual(OpaqueDecl->getUnderlyingInterfaceType())) {
-          return underlyingType;
-        }
-        return Type(t);
-      },
-      LookUpConformanceInModule(OpaqueDecl->getModuleContext()));
-    
-    OpaqueDecl->setUnderlyingTypeSubstitutions(underlyingSubs);
+
+    // If we have one successful candidate, then save it as the underlying
+    // substitutions of the opaque decl.
+    OpaqueDecl->setUnderlyingTypeSubstitutions(
+        underlyingSubs.mapReplacementTypesOutOfContext());
   }
   
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
-      Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
-                                  underlyingToOpaque->getSubExpr()->getType()));
+      auto key =
+          underlyingToOpaque->substitutions.getCanonical().getOpaqueValue();
+      if (KnownCandidates.insert(key).second) {
+        Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
+                                            underlyingToOpaque->substitutions));
+      }
       return {false, E};
     }
     return {true, E};
@@ -3361,6 +3386,8 @@ static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt) {
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
   for (auto cs : stmt->getCases()) {
+    TypeChecker::checkExistentialTypes(ctx, cs);
+
     // The case statement can have multiple case items, each can have a where.
     // If we find a "where", and there is a preceding item without a where, and
     // if they are on the same source line, then warn.
@@ -4839,6 +4866,8 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
   auto &ctx = DC->getASTContext();
 
+  TypeChecker::checkExistentialTypes(ctx, const_cast<Stmt *>(S));
+    
   if (auto switchStmt = dyn_cast<SwitchStmt>(S))
     checkSwitch(ctx, switchStmt);
 

@@ -250,6 +250,31 @@ void ExistentialConformsToSelfRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// existentialRequiresAny computation.
+//----------------------------------------------------------------------------//
+
+void ExistentialRequiresAnyRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void ExistentialRequiresAnyRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto requirement = std::get<0>(getStorage());
+  diags.diagnose(requirement, diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::Protocol, requirement->getName());
+}
+
+Optional<bool> ExistentialRequiresAnyRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getCachedExistentialRequiresAny();
+}
+
+void ExistentialRequiresAnyRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setCachedExistentialRequiresAny(value);
+}
+
+//----------------------------------------------------------------------------//
 // isFinal computation.
 //----------------------------------------------------------------------------//
 
@@ -1030,11 +1055,11 @@ void swift::simple_display(llvm::raw_ostream &out,
   case ImplicitMemberAction::ResolveDistributedActor:
     out << "resolve DistributedActor";
     break;
-  case ImplicitMemberAction::ResolveDistributedActorIdentity:
+  case ImplicitMemberAction::ResolveDistributedActorID:
     out << "resolve DistributedActor.id";
     break;
-  case ImplicitMemberAction::ResolveDistributedActorTransport:
-    out << "resolve DistributedActor.actorTransport";
+  case ImplicitMemberAction::ResolveDistributedActorSystem:
+    out << "resolve DistributedActor.actorSystem";
     break;
   }
 }
@@ -1322,7 +1347,7 @@ Optional<BraceStmt *> TypeCheckFunctionBodyRequest::getCachedResult() const {
     return nullptr;
 
   case BodyKind::TypeChecked:
-    return afd->Body;
+    return afd->BodyAndFP.getBody();
 
   case BodyKind::Synthesize:
   case BodyKind::Parsed:

@@ -178,10 +178,127 @@ bool swift::findInnerTransitiveGuaranteedUses(
       break;
     }
     case OperandOwnership::Borrow:
-      BorrowingOperand(use).visitExtendedScopeEndingUses([&](Operand *endUse) {
-        leafUse(endUse);
+      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
+      // borrows are disallowed.
+      if (!BorrowingOperand(use).visitExtendedScopeEndingUses(
+            [&](Operand *endUse) {
+              leafUse(endUse);
+              return true;
+            })) {
+        // Special case for dead borrows. This is dangerous because clients
+        // don't expect a begin_borrow to be in the use list.
+        leafUse(use);
+      }
+      break;
+    }
+  }
+  return true;
+}
+
+/// Find all uses in the extended lifetime (i.e. including copies) of a simple
+/// (i.e. not reborrowed) borrow scope and its transitive uses.
+bool swift::findExtendedUsesOfSimpleBorrowedValue(
+    BorrowedValue borrowedValue, SmallVectorImpl<Operand *> *usePoints) {
+
+  auto recordUse = [&](Operand *use) {
+    if (usePoints && use->getOperandOwnership() != OperandOwnership::NonUse) {
+      usePoints->push_back(use);
+    }
+  };
+
+  // Push the value's immediate uses.
+  //
+  // TODO: The worklist can be a simple vector without any a membership check if
+  // destructures are changed to be represented as reborrows. Currently a
+  // destructure forwards multiple results! This means that the worklist could
+  // grow exponentially without the membership check. It's fine to do this
+  // membership check locally in this function (within a borrow scope) because
+  // it isn't needed for the immediate uses, only the transitive uses.
+  GraphNodeWorklist<Operand *, 8> worklist;
+  auto addUsesToWorklist = [&worklist](SILValue value) {
+    for (Operand *use : value->getUses()) {
+      if (use->getOperandOwnership() != OperandOwnership::NonUse)
+        worklist.insert(use);
+    }
+  };
+
+  addUsesToWorklist(borrowedValue.value);
+
+  // --- Transitively follow forwarded uses and look for escapes.
+
+  // usePoints grows in this loop.
+  while (Operand *use = worklist.pop()) {
+    if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
+      addUsesToWorklist(cvi);
+    }
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::NonUse:
+      break;
+
+    case OperandOwnership::TrivialUse:
+    case OperandOwnership::ForwardingConsume:
+    case OperandOwnership::DestroyingConsume:
+      recordUse(use);
+      break;
+
+    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::PointerEscape:
+      return false;
+
+    case OperandOwnership::InstantaneousUse:
+    case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::BitwiseEscape:
+    // Reborrow only happens when this is called on a value that creates a
+    // borrow scope.
+    case OperandOwnership::Reborrow:
+    // EndBorrow either happens when this is called on a value that creates a
+    // borrow scope, or when it is pushed as a use when processing a nested
+    // borrow.
+    case OperandOwnership::EndBorrow:
+      recordUse(use);
+      break;
+
+    case OperandOwnership::InteriorPointer:
+      if (InteriorPointerOperandKind::get(use) ==
+          InteriorPointerOperandKind::Invalid)
+        return false;
+      // If our base guaranteed value does not have any consuming uses (consider
+      // function arguments), we need to be sure to include interior pointer
+      // operands since we may not get a use from a end_scope instruction.
+      if (InteriorPointerOperand(use).findTransitiveUses(usePoints) !=
+          AddressUseKind::NonEscaping) {
+        return false;
+      }
+      recordUse(use);
+      break;
+
+    case OperandOwnership::ForwardingBorrow: {
+      ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+        // Do not include transitive uses with 'none' ownership
+        if (result.getOwnershipKind() == OwnershipKind::None)
+          return true;
+        for (auto *resultUse : result->getUses()) {
+          if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
+            worklist.insert(resultUse);
+          }
+        }
         return true;
       });
+      recordUse(use);
+      break;
+    }
+    case OperandOwnership::Borrow:
+      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
+      // borrows are disallowed.
+      if (!BorrowingOperand(use).visitExtendedScopeEndingUses(
+            [&](Operand *endUse) {
+              recordUse(endUse);
+              return true;
+            })) {
+        // Special case for dead borrows. This is dangerous because clients
+        // don't expect a begin_borrow to be in the use list.
+        recordUse(use);
+      }
       break;
     }
   }
@@ -330,21 +447,29 @@ bool BorrowingOperand::visitScopeEndingUses(
   switch (kind) {
   case BorrowingOperandKind::Invalid:
     llvm_unreachable("Using invalid case");
-  case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BeginBorrow: {
+    bool deadBorrow = true;
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
+        deadBorrow = false;
         if (!func(use))
           return false;
       }
     }
-    return true;
+    // FIXME: special case for dead borrows. This is dangerous because clients
+    // only expect visitScopeEndingUses to return false if the visitor returned
+    // false.
+    return !deadBorrow;
+  }
   case BorrowingOperandKind::BeginApply: {
+    bool deadApply = true;
     auto *user = cast<BeginApplyInst>(op->getUser());
     for (auto *use : user->getTokenResult()->getUses()) {
+      deadApply = false;
       if (!func(use))
         return false;
     }
-    return true;
+    return !deadApply;
   }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
@@ -353,12 +478,16 @@ bool BorrowingOperand::visitScopeEndingUses(
   case BorrowingOperandKind::Yield:
     return true;
   case BorrowingOperandKind::Branch: {
+    bool deadBranch = true;
     auto *br = cast<BranchInst>(op->getUser());
-    for (auto *use : br->getArgForOperand(op)->getUses())
-      if (use->isLifetimeEnding())
+    for (auto *use : br->getArgForOperand(op)->getUses()) {
+      if (use->isLifetimeEnding()) {
+        deadBranch = false;
         if (!func(use))
           return false;
-    return true;
+      }
+    }
+    return !deadBranch;
   }
   }
   llvm_unreachable("Covered switch isn't covered");
@@ -425,10 +554,15 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
 void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *errorFunction) const {
-  visitScopeEndingUses([&](Operand *op) {
-    foundUses.push_back(op);
+  // FIXME: this visitScopeEndingUses should never return false once dead
+  // borrows are disallowed.
+  if (!visitScopeEndingUses([&](Operand *endOp) {
+    foundUses.push_back(endOp);
     return true;
-  });
+  })) {
+    // Special-case for dead borrows.
+    foundUses.push_back(op);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -530,7 +664,7 @@ void BorrowedValue::computeLiveness(PrunedLiveness &liveness) const {
 }
 
 bool BorrowedValue::areUsesWithinLocalScope(
-    ArrayRef<Operand *> uses, DeadEndBlocks &deadEndBlocks) const {
+    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   // First make sure that we actually have a local scope. If we have a non-local
   // scope, then we have something (like a SILFunctionArgument) where a larger
   // semantic construct (in the case of SILFunctionArgument, the function
@@ -701,17 +835,18 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
     }
     // First, eliminate "end point uses" that we just need to check liveness at
     // and do not need to check transitive uses of.
-    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) || isIncidentalUse(user)
-        || isa<StoreInst>(user) || isa<DestroyAddrInst>(user)
-        || isa<AssignInst>(user) || isa<YieldInst>(user)
-        || isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user)
-        || isa<EndApplyInst>(user) || isa<LoadWeakInst>(user)
-        || isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user)
-        || isa<BeginUnpairedAccessInst>(user)
-        || isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user)
-        || isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user)
-        || isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)
-        || isa<IsUniqueInst>(user)) {
+    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
+        isa<MarkUnresolvedMoveAddrInst>(user) || isIncidentalUse(user) ||
+        isa<StoreInst>(user) || isa<DestroyAddrInst>(user) ||
+        isa<AssignInst>(user) || isa<YieldInst>(user) ||
+        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
+        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
+        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
+        isa<BeginUnpairedAccessInst>(user) ||
+        isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
+        isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
+        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
+        isa<IsUniqueInst>(user)) {
       leafUse(op);
       continue;
     }
@@ -808,14 +943,14 @@ bool AddressOwnership::areUsesWithinLifetime(
   SILValue root = base.getOwnershipReferenceRoot();
   BorrowedValue borrow(root);
   if (borrow)
-    return borrow.areUsesWithinLocalScope(uses, deadEndBlocks);
+    return borrow.areUsesWithinLocalScope(uses, &deadEndBlocks);
 
   // --- A reference no borrow scope. Currently happens for project_box.
 
   // Compute the reference value's liveness.
   PrunedLiveness liveness;
   liveness.computeSSALiveness(root);
-  return liveness.areUsesWithinBoundary(uses, deadEndBlocks);
+  return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1388,4 +1523,22 @@ void swift::visitTransitiveEndBorrows(
       }
     }
   }
+}
+
+/// Whether the specified lexical begin_borrow instruction is nested.
+///
+/// A begin_borrow [lexical] is nested if the borrowed value's lifetime is
+/// guaranteed by another lexical scope.  That happens if:
+/// - the value is a guaranteed argument to the function
+/// - the value is itself a begin_borrow [lexical]
+bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
+  assert(bbi->isLexical());
+  auto value = bbi->getOperand();
+  if (auto *outerBBI = dyn_cast<BeginBorrowInst>(value)) {
+    return outerBBI->isLexical();
+  }
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
+    return arg->getOwnershipKind() == OwnershipKind::Guaranteed;
+  }
+  return false;
 }

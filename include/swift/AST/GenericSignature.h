@@ -30,7 +30,6 @@
 
 namespace swift {
 
-class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
 class SubstitutionMap;
@@ -84,7 +83,6 @@ private:
   ConformanceAccessPath(ArrayRef<Entry> path) : path(path) {}
 
   friend class GenericSignatureImpl;
-  friend class GenericSignatureBuilder;
   friend class rewriting::RequirementMachine;
 
 public:
@@ -217,6 +215,12 @@ public:
 
   /// Check invariants.
   void verify() const;
+
+  /// Check invariants for a list of requirements that are understood to
+  /// be valid in the given signature; used to verify a protocol's
+  /// requirement signature against the protocol generic signature
+  /// <Self where Self : P>.
+  void verify(ArrayRef<Requirement> reqts) const;
 };
 
 /// A reference to a canonical generic signature.
@@ -332,9 +336,6 @@ public:
   
   ASTContext &getASTContext() const;
 
-  /// Retrieve the generic signature builder for the given generic signature.
-  GenericSignatureBuilder *getGenericSignatureBuilder() const;
-
   /// Retrieve the requirement machine for the given generic signature.
   rewriting::RequirementMachine *getRequirementMachine() const;
 
@@ -379,8 +380,6 @@ public:
   ///
   /// The type parameters must be known to not be concrete within the context.
   bool areSameTypeParameterInContext(Type type1, Type type2) const;
-  bool areSameTypeParameterInContext(Type type1, Type type2,
-                                     GenericSignatureBuilder &builder) const;
 
   /// Determine if \c sig can prove \c requirement, meaning that it can deduce
   /// T: Foo or T == U (etc.) with the information it knows. This includes
@@ -390,8 +389,6 @@ public:
       Requirement requirement, bool allowMissing = false) const;
 
   bool isCanonicalTypeInContext(Type type) const;
-  bool isCanonicalTypeInContext(Type type,
-                                GenericSignatureBuilder &builder) const;
 
   /// Retrieve the conformance access path used to extract the conformance of
   /// interface \c type to the given \c protocol.

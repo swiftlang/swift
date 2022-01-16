@@ -109,8 +109,8 @@ ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
     if (param->isInOut()) {
       ref = new (ctx) InOutExpr(SourceLoc(), ref, type, /*isImplicit=*/true);
     } else if (param->isVariadic()) {
-      ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
-      ref->setType(type);
+      assert(ref->getType()->isEqual(type));
+      ref = VarargExpansionExpr::createParamExpansion(ctx, ref);
     }
     args.emplace_back(SourceLoc(), param->getArgumentName(), ref);
   }
@@ -186,7 +186,7 @@ enum class ImplicitConstructorKind {
   Default,
   /// The default constructor of a distributed actor.
   /// Similarly to a Default one it initializes each of the instance variables,
-  /// however it also implicitly gains an ActorTransport parameter.
+  /// however it also implicitly gains an DistributedActorSystem parameter.
   DefaultDistributedActor,
   /// The memberwise constructor, which initializes each of
   /// the instance variables from a parameter of the same type and
@@ -295,15 +295,16 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
     assert(decl->isDistributedActor() &&
            "Only 'distributed actor' type can gain implicit distributed actor init");
 
+    /// Add 'system' parameter to default init of distributed actors.
     if (swift::ensureDistributedModuleLoaded(decl)) {
       // copy access level of distributed actor init from the nominal decl
       accessLevel = decl->getEffectiveAccess();
 
       // Create the parameter.
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_transport, Loc,
-                                      ctx.Id_transport, decl);
+      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_system, Loc,
+                                      ctx.Id_system, decl);
       arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(getDistributedActorTransportType(decl));
+      arg->setInterfaceType(getDistributedActorSystemType(decl));
       arg->setImplicit();
 
       params.push_back(arg);
@@ -1286,8 +1287,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   }
     break;
   case ImplicitMemberAction::ResolveDistributedActor:
-  case ImplicitMemberAction::ResolveDistributedActorTransport:
-  case ImplicitMemberAction::ResolveDistributedActorIdentity: {
+  case ImplicitMemberAction::ResolveDistributedActorSystem:
+  case ImplicitMemberAction::ResolveDistributedActorID: {
     // init(transport:) and init(resolve:using:) may be synthesized as part of
     // derived conformance to the DistributedActor protocol.
     // If the target should conform to the DistributedActor protocol, check the

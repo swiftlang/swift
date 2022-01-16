@@ -385,6 +385,7 @@ class CanType : public Type {
 
   static bool isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
                                   bool functionsCount);
+  static bool isConstraintTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
@@ -457,6 +458,10 @@ public:
                                /*functions count*/ false);
   }
 
+  bool isConstraintType() const {
+    return isConstraintTypeImpl(*this);
+  }
+
   /// Is this type existential?
   bool isExistentialType() const {
     return isExistentialTypeImpl(*this);
@@ -487,6 +492,8 @@ public:
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
+
+  bool isForeignReferenceType(); // in Types.h
 
   CanType getOptionalObjectType() const {
     return getOptionalObjectTypeImpl(*this);

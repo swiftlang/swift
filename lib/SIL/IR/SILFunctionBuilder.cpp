@@ -21,7 +21,8 @@ using namespace swift;
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
     SILLocation loc, StringRef name, SILLinkage linkage, CanSILFunctionType type, IsBare_t isBareSILFunction,
     IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-    IsDynamicallyReplaceable_t isDynamic, ProfileCounter entryCount,
+    IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed,
+    ProfileCounter entryCount,
     IsThunk_t isThunk, SubclassScope subclassScope) {
   assert(!type->isNoEscape() && "Function decls always have escaping types.");
   if (auto fn = mod.lookUpFunction(name)) {
@@ -33,8 +34,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
                                 isBareSILFunction, isTransparent, isSerialized,
-                                entryCount, isDynamic, IsNotExactSelfClass,
-                                isThunk, subclassScope);
+                                entryCount, isDynamic, isDistributed,
+                                IsNotExactSelfClass, isThunk, subclassScope);
   fn->setDebugScope(new (mod) SILDebugScope(loc, fn));
   return fn;
 }
@@ -229,9 +230,15 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     IsTrans = IsNotTransparent;
   }
 
+  IsDistributed_t IsDistributed = IsDistributed_t::IsNotDistributed;
+  // Mark both distributed thunks and methods as distributed.
+  if (constant.hasFuncDecl() && constant.getFuncDecl()->isDistributed()) {
+    IsDistributed = IsDistributed_t::IsDistributed;
+  }
+
   auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
-                                IsNotExactSelfClass,
+                                IsDistributed, IsNotExactSelfClass,
                                 IsNotThunk, constant.getSubclassScope(),
                                 inlineStrategy, EK);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
@@ -280,10 +287,10 @@ SILFunction *SILFunctionBuilder::getOrCreateSharedFunction(
     SILLocation loc, StringRef name, CanSILFunctionType type,
     IsBare_t isBareSILFunction, IsTransparent_t isTransparent,
     IsSerialized_t isSerialized, ProfileCounter entryCount, IsThunk_t isThunk,
-    IsDynamicallyReplaceable_t isDynamic) {
+    IsDynamicallyReplaceable_t isDynamic, IsDistributed_t isDistributed) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared, type,
                              isBareSILFunction, isTransparent, isSerialized,
-                             isDynamic, entryCount, isThunk,
+                             isDynamic, isDistributed, entryCount, isThunk,
                              SubclassScope::NotApplicable);
 }
 
@@ -292,12 +299,13 @@ SILFunction *SILFunctionBuilder::createFunction(
     GenericEnvironment *genericEnv, Optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
     IsSerialized_t isSerialized, IsDynamicallyReplaceable_t isDynamic,
-    ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope,
+    IsDistributed_t isDistributed, ProfileCounter entryCount,
+    IsThunk_t isThunk, SubclassScope subclassScope,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
                              isBareSILFunction, isTrans, isSerialized,
-                             entryCount, isDynamic, IsNotExactSelfClass,
-                             isThunk, subclassScope,
+                             entryCount, isDynamic, isDistributed,
+                             IsNotExactSelfClass, isThunk, subclassScope,
                              inlineStrategy, EK, InsertBefore, DebugScope);
 }

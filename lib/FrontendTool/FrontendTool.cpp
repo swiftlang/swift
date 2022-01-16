@@ -692,15 +692,10 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
     return false;
   }
 
-  if (Invocation.getSILOptions().CrossModuleOptimization) {
-    Instance.getDiags().diagnose(SourceLoc(),
-                                 diag::tbd_not_supported_with_cmo);
-    return false;
-  }
-
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
-  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
+  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts,
+                  Instance.getPublicCMOSymbols());
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
@@ -710,7 +705,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
 
-static bool performCompileStepsPostSema(CompilerInstance &Instance,
+bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
                                         FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
@@ -997,6 +992,30 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     }
   }
 
+  if (Invocation.getLangOptions()
+          .EnableExperimentalEagerClangModuleDiagnostics) {
+
+    // A consumer meant to import all visible declarations.
+    class EagerConsumer : public VisibleDeclConsumer {
+    public:
+      virtual void
+      foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                DynamicLookupInfo dynamicLookupInfo = {}) override {
+        if (auto *IDC = dyn_cast<IterableDeclContext>(VD)) {
+          (void)IDC->getMembers();
+        }
+      }
+    };
+
+    EagerConsumer consumer;
+    for (auto module : ctx.getLoadedModules()) {
+      // None of the passed parameter have an effect, we just need to trigger
+      // imports.
+      module.second->lookupVisibleDecls(/*Access Path*/ {}, consumer,
+                                        NLKind::QualifiedLookup);
+    }
+  }
+
   // FIXME: This predicate matches the status quo, but there's no reason
   // indexing cannot run for actions that do not require stdlib e.g. to better
   // facilitate tests.
@@ -1178,6 +1197,13 @@ static bool performAction(CompilerInstance &Instance,
               llvm::outs(), PrintOptions::printEverything());
           return Instance.getASTContext().hadError();
         });
+  case FrontendOptions::ActionType::PrintASTDecl:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          getPrimaryOrMainSourceFile(Instance).print(
+              llvm::outs(), PrintOptions::printDeclarations());
+          return Instance.getASTContext().hadError();
+        });
   case FrontendOptions::ActionType::DumpScopeMaps:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
@@ -1253,17 +1279,6 @@ static bool performCompile(CompilerInstance &Instance,
   // To compile LLVM IR, just pass it off unmodified.
   if (opts.InputsAndOutputs.shouldTreatAsLLVM())
     return compileLLVMIR(Instance);
-
-  // If we aren't in a parse-only context and expect an implicit stdlib import,
-  // load in the standard library. If we either fail to find it or encounter an
-  // error while loading it, bail early. Continuing the compilation will at best
-  // trigger a bunch of other errors due to the stdlib being missing, or at
-  // worst crash downstream as many call sites don't currently handle a missing
-  // stdlib.
-  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(Action)) {
-    if (Instance.loadStdlibIfNeeded())
-      return true;
-  }
 
   assert([&]() -> bool {
     if (FrontendOptions::shouldActionOnlyParse(Action)) {
@@ -1364,16 +1379,16 @@ static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
 
 static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
                                 ModuleOrSourceFile MSF,
-                                const llvm::Module &IRModule) {
-  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+                                const llvm::Module &IRModule,
+                                TBDSymbolSetPtr publicCMOSymbols) {
+  auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+  if (mode == FrontendOptions::TBDValidationMode::All &&
+      Invocation.getSILOptions().CrossModuleOptimization)
+    mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
+
   const bool canPerformTBDValidation = [&]() {
     // If the user has requested we skip validation, honor it.
     if (mode == FrontendOptions::TBDValidationMode::None) {
-      return false;
-    }
-
-    // Cross-module optimization does not support TBD.
-    if (Invocation.getSILOptions().CrossModuleOptimization) {
       return false;
     }
 
@@ -1390,10 +1405,14 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
     // may have serialized hand-crafted SIL definitions that are invisible to
     // TBDGen as it is an AST-only traversal.
     if (auto *mod = MSF.dyn_cast<ModuleDecl *>()) {
-      return llvm::none_of(mod->getFiles(), [](const FileUnit *File) -> bool {
+      bool hasSIB = llvm::any_of(mod->getFiles(), [](const FileUnit *File) -> bool {
         auto SASTF = dyn_cast<SerializedASTFile>(File);
         return SASTF && SASTF->isSIB();
       });
+
+      if (hasSIB) {
+        return false;
+      }
     }
 
     // "Default" mode's behavior varies if using a debug compiler.
@@ -1433,9 +1452,10 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
   // noise from e.g. statically-linked libraries.
   Opts.embedSymbolsFromModules.clear();
   if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
-    return validateTBD(SF, IRModule, Opts, diagnoseExtraSymbolsInTBD);
+    return validateTBD(SF, IRModule, Opts, publicCMOSymbols,
+                       diagnoseExtraSymbolsInTBD);
   } else {
-    return validateTBD(MSF.get<ModuleDecl *>(), IRModule, Opts,
+    return validateTBD(MSF.get<ModuleDecl *>(), IRModule, Opts, publicCMOSymbols,
                        diagnoseExtraSymbolsInTBD);
   }
 }
@@ -1444,6 +1464,14 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // If the stats reporter is installed, we need the ASTContext to live through
   // the entire compilation process.
   if (Instance.getASTContext().Stats) {
+    return;
+  }
+
+  // If this instance is used for multiple compilations, we need the ASTContext
+  // to live.
+  if (Instance.getInvocation()
+          .getFrontendOptions()
+          .ReuseFrontendForMutipleCompilations) {
     return;
   }
 
@@ -1628,6 +1656,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return processCommandLineAndRunImmediately(
         Instance, std::move(SM), MSF, observer, ReturnValue);
 
+  TBDSymbolSetPtr publicCMOSymbols = SM->getPublicCMOSymbols();
+
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
       opts.InputsAndOutputs.copyOutputFilenames();
@@ -1642,7 +1672,8 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (!IRModule)
     return Instance.getDiags().hadAnyError();
 
-  if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
+  if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule(),
+                          publicCMOSymbols))
     return true;
 
   return generateCode(Instance, OutputFilename, IRModule.getModule(),
@@ -2044,7 +2075,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
-  if (Instance->setup(Invocation)) {
+  std::string InstanceSetupError;
+  if (Instance->setup(Invocation, InstanceSetupError)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 

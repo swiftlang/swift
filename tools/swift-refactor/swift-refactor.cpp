@@ -307,6 +307,7 @@ int main(int argc, char *argv[]) {
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
+  Invocation.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getLangOptions().BuildSyntaxTree = true;
@@ -325,8 +326,11 @@ int main(int argc, char *argv[]) {
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   switch (options::Action) {
     case RefactoringKind::GlobalRename:

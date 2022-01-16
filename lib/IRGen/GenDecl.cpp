@@ -1272,6 +1272,11 @@ void IRGenerator::emitTypeMetadataRecords() {
   }
 }
 
+void IRGenerator::emitAccessibleFunctions() {
+  for (auto &m : *this)
+    m.second->emitAccessibleFunctions();
+}
+
 static void
 deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
     IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
@@ -2843,7 +2848,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     unsigned argIdx = 0;
     for (auto arg : forwardedArgs) {
       // Replace the context argument.
-      if (argIdx == asyncContextIndex)
+      if (argIdx == asyncFnPtr.getSignature().getAsyncContextIndex())
         arguments.push_back(Builder.CreateBitOrPointerCast(
             calleeContextBuffer.getAddress(), IGM.SwiftContextPtrTy));
       else
@@ -3663,7 +3668,7 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     auto clas = dyn_cast<ClassDecl>(decl);
-    if (!clas) {
+    if (!clas || clas->isForeignReferenceType()) {
       return getTypeContextDescriptorEntityReference(*this, nominal);
     }
 
@@ -3761,9 +3766,7 @@ void IRGenModule::appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
                             llvm::ConstantAsMetadata::get(dependsOn),
                         }),
   };
-  auto *usedConditional =
-      Module.getOrInsertNamedMetadata("llvm.used.conditional");
-  usedConditional->addOperand(llvm::MDNode::get(Module.getContext(), metadata));
+  UsedConditionals.push_back(llvm::MDNode::get(Module.getContext(), metadata));
 }
 
 /// Expresses that `var` is removable (dead-strippable) when either the protocol
@@ -3790,9 +3793,32 @@ void IRGenModule::appendLLVMUsedConditionalEntry(
                             llvm::ConstantAsMetadata::get(type),
                         }),
   };
+  UsedConditionals.push_back(llvm::MDNode::get(Module.getContext(), metadata));
+}
+
+void IRGenModule::emitUsedConditionals() {
+  if (UsedConditionals.empty())
+    return;
+
   auto *usedConditional =
       Module.getOrInsertNamedMetadata("llvm.used.conditional");
-  usedConditional->addOperand(llvm::MDNode::get(Module.getContext(), metadata));
+
+  for (auto *M : UsedConditionals) {
+    // Process the dependencies ("edges") and strip any pointer casts on them.
+    // Those might appear when a dependency is originally added against a
+    // declaration only, and later the declaration is RAUW'd with a definition
+    // causing a bitcast to get added to the metadata entry in the dependency.
+    auto *DependenciesMD =
+        dyn_cast_or_null<llvm::MDNode>(M->getOperand(2).get());
+    for (unsigned int I = 0; I < DependenciesMD->getNumOperands(); I++) {
+      auto *Dependency = DependenciesMD->getOperand(I).get();
+      auto *C = llvm::mdconst::extract_or_null<llvm::Constant>(Dependency)
+                    ->stripPointerCasts();
+      DependenciesMD->replaceOperandWith(I, llvm::ConstantAsMetadata::get(C));
+    }
+
+    usedConditional->addOperand(M);
+  }
 }
 
 /// Emit the protocol descriptors list and return it (if asContiguousArray is
@@ -3887,6 +3913,10 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
 
   // Add this conformance to the conformance list.
   ProtocolConformances.push_back(std::move(record));
+}
+
+void IRGenModule::addAccessibleFunction(SILFunction *func) {
+  AccessibleFunctions.push_back(func);
 }
 
 /// Emit the protocol conformance list and return it (if asContiguousArray is
@@ -4088,6 +4118,85 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   }
 
   return nullptr;
+}
+
+void IRGenModule::emitAccessibleFunctions() {
+  if (AccessibleFunctions.empty())
+    return;
+
+  StringRef sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::GOFF:
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit accessible functions for "
+                     "the selected object format.");
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift5_acfuncs, regular";
+    break;
+  case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
+    sectionName = "swift5_accessible_functions";
+    break;
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    sectionName = ".sw5acfn$B";
+    break;
+  }
+
+  for (auto *func : AccessibleFunctions) {
+    auto mangledRecordName =
+        LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
+
+    auto var = new llvm::GlobalVariable(
+        Module, AccessibleFunctionRecordTy, /*isConstant*/ true,
+        llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
+        mangledRecordName);
+
+    std::string mangledFunctionName =
+        LinkEntity::forSILFunction(func).mangleAsString();
+    llvm::Constant *name = getAddrOfGlobalString(
+        mangledFunctionName, /*willBeRelativelyAddressed*/ true);
+    llvm::Constant *relativeName = emitDirectRelativeReference(name, var, {});
+
+    GenericSignature signature;
+    if (auto *env = func->getGenericEnvironment()) {
+      signature = env->getGenericSignature();
+    }
+
+    llvm::Constant *type = getTypeRef(func->getLoweredFunctionType(), signature,
+                                      MangledTypeRefRole::Metadata)
+                               .first;
+    llvm::Constant *relativeType = emitDirectRelativeReference(type, var, {1});
+
+    llvm::Constant *funcAddr = nullptr;
+    if (func->isDistributed()) {
+      funcAddr = getAddrOfAsyncFunctionPointer(
+          LinkEntity::forDistributedTargetAccessor(func));
+    } else if (func->isAsync()) {
+      funcAddr = getAddrOfAsyncFunctionPointer(func);
+    } else {
+      funcAddr = getAddrOfSILFunction(func, NotForDefinition);
+    }
+
+    llvm::Constant *relativeFuncAddr =
+        emitDirectRelativeReference(funcAddr, var, {2});
+
+    AccessibleFunctionFlags flagsVal;
+    flagsVal.setDistributed(func->isDistributed());
+
+    llvm::Constant *flags =
+        llvm::ConstantInt::get(Int32Ty, flagsVal.getOpaqueValue());
+
+    llvm::Constant *recordFields[] = {relativeName, relativeType,
+                                      relativeFuncAddr, flags};
+    auto record =
+        llvm::ConstantStruct::get(AccessibleFunctionRecordTy, recordFields);
+    var->setInitializer(record);
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+  }
 }
 
 /// Fetch a global reference to a reference to the given Objective-C class.
@@ -5166,7 +5275,9 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     return entry.second;
   }
 
-  entry = createStringConstant(data, willBeRelativelyAddressed);
+  entry = createStringConstant(data, willBeRelativelyAddressed,
+                               /*sectionName*/ "",
+                               ".str" /* match how Clang creates strings */);
   return entry.second;
 }
 
@@ -5195,9 +5306,9 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   ArrayRef<llvm::UTF16> utf16(&buffer[0], utf16Length + 1);
 
   auto init = llvm::ConstantDataArray::get(getLLVMContext(), utf16);
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::PrivateLinkage,
-                                         init);
+  auto global = new llvm::GlobalVariable(
+      Module, init->getType(), true, llvm::GlobalValue::PrivateLinkage, init,
+      ".str" /* match how Clang creates strings */);
   global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   // Drill down to make an i16*.

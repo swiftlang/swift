@@ -53,6 +53,7 @@
 
 namespace swift {
 
+class FrontendObserver;
 class SerializedModuleLoaderBase;
 class MemoryBufferSerializedModuleLoader;
 class SILModule;
@@ -170,20 +171,20 @@ public:
   }
 
   void setImportSearchPaths(const std::vector<std::string> &Paths) {
-    SearchPathOpts.ImportSearchPaths = Paths;
+    SearchPathOpts.setImportSearchPaths(Paths);
   }
 
   ArrayRef<std::string> getImportSearchPaths() const {
-    return SearchPathOpts.ImportSearchPaths;
+    return SearchPathOpts.getImportSearchPaths();
   }
 
   void setFrameworkSearchPaths(
              const std::vector<SearchPathOptions::FrameworkSearchPath> &Paths) {
-    SearchPathOpts.FrameworkSearchPaths = Paths;
+    SearchPathOpts.setFrameworkSearchPaths(Paths);
   }
 
   ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
-    return SearchPathOpts.FrameworkSearchPaths;
+    return SearchPathOpts.getFrameworkSearchPaths();
   }
 
   void setExtraClangArgs(const std::vector<std::string> &Args) {
@@ -229,9 +230,7 @@ public:
 
   void setSDKPath(const std::string &Path);
 
-  StringRef getSDKPath() const {
-    return SearchPathOpts.SDKPath;
-  }
+  StringRef getSDKPath() const { return SearchPathOpts.getSDKPath(); }
 
   LangOptions &getLangOptions() {
     return LangOpts;
@@ -309,6 +308,16 @@ public:
     return FrontendOpts.ModuleName;
   }
 
+  /// Sets the module alias map with string args passed in via `-module-alias`.
+  /// \param args The arguments to `-module-alias`. If input has `-module-alias Foo=Bar
+  ///             -module-alias Baz=Qux`, the args are ['Foo=Bar', 'Baz=Qux'].  The name
+  ///             Foo is the name that appears in source files, while it maps to Bar, the name
+  ///             of the binary on disk, /path/to/Bar.swiftmodule(interface), under the hood.
+  /// \param diags Used to print diagnostics in case validation of the string args fails.
+  ///        See \c ModuleAliasesConverter::computeModuleAliases on validation details.
+  /// \return Whether setting module alias map succeeded; false if args validation fails.
+  bool setModuleAliasMap(std::vector<std::string> args, DiagnosticEngine &diags);
+
   std::string getOutputFilename() const {
     return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
@@ -341,6 +350,9 @@ public:
     if (FrontendOpts.InputMode == FrontendOptions::ParseInputMode::SIL) {
       return ImplicitStdlibKind::None;
     }
+    if (FrontendOpts.InputsAndOutputs.shouldTreatAsLLVM()) {
+      return ImplicitStdlibKind::None;
+    }
     if (getParseStdlib()) {
       return ImplicitStdlibKind::Builtin;
     }
@@ -353,6 +365,10 @@ public:
   /// Whether the Swift Concurrency support library should be implicitly
   /// imported.
   bool shouldImportSwiftConcurrency() const;
+
+  /// Whether the Swift String Processing support library should be implicitly
+  /// imported.
+  bool shouldImportSwiftStringProcessing() const;
 
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
@@ -415,6 +431,7 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
+  TBDSymbolSetPtr publicCMOSymbols;
 
   /// A cache describing the set of inter-module dependencies that have been queried.
   /// Null if not present.
@@ -533,6 +550,14 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftConcurrency() const;
 
+  /// Verify that if an implicit import of the `StringProcessing` module if
+  /// expected, it can actually be imported. Emit a warning, otherwise.
+  void verifyImplicitStringProcessingImport();
+
+  /// Whether the Swift String Processing support library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftStringProcessing() const;
+
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
   /// if there are _multiple_ primary inputs, fails with an assertion.
@@ -550,13 +575,17 @@ public:
   }
 
   /// Returns true if there was an error during setup.
-  bool setup(const CompilerInvocation &Invocation);
+  bool setup(const CompilerInvocation &Invocation, std::string &Error);
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
   /// If a code completion buffer has been set, returns the corresponding source
   /// file.
   SourceFile *getCodeCompletionFile() const;
+
+  /// Return the symbols (e.g. function names) which are made public by the
+  /// CrossModuleOptimization pass and therefore must be included in the TBD file.
+  TBDSymbolSetPtr getPublicCMOSymbols() const { return publicCMOSymbols; }
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
@@ -638,6 +667,9 @@ public:
   /// library, returning \c false if we should continue, i.e. no error.
   bool loadStdlibIfNeeded();
 
+  /// If \p fn returns true, exits early and returns true.
+  bool forEachFileToTypeCheck(llvm::function_ref<bool(SourceFile &)> fn);
+
 private:
   /// Compute the parsing options for a source file in the main module.
   SourceFile::ParsingOptions getSourceFileParsingOptions(bool forPrimary) const;
@@ -650,8 +682,6 @@ private:
   /// \c true.
   bool loadPartialModulesAndImplicitImports(
       ModuleDecl *mod, SmallVectorImpl<FileUnit *> &partialModules) const;
-
-  void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
   void finishTypeChecking();
 

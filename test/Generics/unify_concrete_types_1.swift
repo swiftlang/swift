@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine=verify -dump-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
 
 struct Foo<A, B> {}
 
@@ -28,5 +28,5 @@ struct MergeTest<G : P1 & P2> {
 // CHECK:  [P1:X] => { concrete_type: [concrete: Foo<τ_0_0, τ_0_1> with <[P1:Y1], [P1:Z1]>] }
 // CHECK:  [P2:X] => { concrete_type: [concrete: Foo<τ_0_0, τ_0_1> with <[P2:Y2], [P2:Z2]>] }
 // CHECK:  τ_0_0 => { conforms_to: [P1 P2] }
-// CHECK:  τ_0_0.[P1&P2:X] => { concrete_type: [concrete: Foo<τ_0_0, τ_0_1> with <τ_0_0.[P2:Y2], τ_0_0.[P2:Z2]>] }
+// CHECK:  τ_0_0.[P1&P2:X] => { concrete_type: [concrete: Foo<τ_0_0, τ_0_1> with <τ_0_0.[P1:Y1], τ_0_0.[P1:Z1]>] }
 // CHECK: }

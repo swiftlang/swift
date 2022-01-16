@@ -25,6 +25,16 @@ using namespace swift::constraints;
 
 namespace {
 
+// Produce an implicit empty tuple expression.
+Expr *getVoidExpr(ASTContext &ctx) {
+  auto *voidExpr = TupleExpr::createEmpty(ctx,
+                                          /*LParenLoc=*/SourceLoc(),
+                                          /*RParenLoc=*/SourceLoc(),
+                                          /*Implicit=*/true);
+  voidExpr->setType(ctx.TheEmptyTupleType);
+  return voidExpr;
+}
+
 /// Find any type variable references inside of an AST node.
 class TypeVariableRefFinder : public ASTWalker {
   ConstraintSystem &CS;
@@ -502,28 +512,28 @@ private:
   }
 
   void visitBreakStmt(BreakStmt *breakStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Break");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Break");
   }
 
   void visitContinueStmt(ContinueStmt *continueStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Continue");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Continue");
   }
 
   void visitDeferStmt(DeferStmt *deferStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Defer");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Defer");
   }
 
   void visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Fallthrough");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Fallthrough");
   }
 
   void visitIfStmt(IfStmt *ifStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: If");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: If");
 
     SmallVector<ElementInfo, 4> elements;
 
@@ -552,8 +562,8 @@ private:
   }
 
   void visitGuardStmt(GuardStmt *guardStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Guard");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Guard");
 
     createConjunction(cs,
                       {makeElement(guardStmt->getCondPointer(),
@@ -564,8 +574,8 @@ private:
   }
 
   void visitWhileStmt(WhileStmt *whileStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Guard");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: While");
 
     createConjunction(cs,
                       {makeElement(whileStmt->getCondPointer(),
@@ -576,15 +586,15 @@ private:
   }
 
   void visitDoStmt(DoStmt *doStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Do");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Do");
 
     visitBraceStmt(doStmt->getBody());
   }
 
   void visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: RepeatWhile");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: RepeatWhile");
 
     createConjunction(cs,
                       {makeElement(repeatWhileStmt->getCond(),
@@ -596,8 +606,8 @@ private:
   }
 
   void visitPoundAssertStmt(PoundAssertStmt *poundAssertStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: PoundAssert");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: PoundAssert");
 
     createConjunction(cs,
                       {makeElement(poundAssertStmt->getCondition(),
@@ -608,16 +618,15 @@ private:
   }
 
   void visitThrowStmt(ThrowStmt *throwStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Throw");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Throw");
 
-    Type errType =
-        cs.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
-    if (!errType) {
+    if (!cs.getASTContext().getErrorDecl()) {
       hadError = true;
       return;
     }
 
+    auto errType = cs.getASTContext().getErrorExistentialType();
     auto *errorExpr = throwStmt->getSubExpr();
 
     createConjunction(
@@ -631,8 +640,8 @@ private:
   }
 
   void visitForEachStmt(ForEachStmt *forEachStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: ForEach");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: ForEach");
 
     auto *stmtLoc = cs.getConstraintLocator(locator);
 
@@ -669,8 +678,8 @@ private:
   }
 
   void visitSwitchStmt(SwitchStmt *switchStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Switch");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Switch");
 
     auto *switchLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::ClosureBodyElement(switchStmt));
@@ -695,8 +704,8 @@ private:
   }
 
   void visitDoCatchStmt(DoCatchStmt *doStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: DoCatch");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: DoCatch");
 
     auto *doLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::ClosureBodyElement(doStmt));
@@ -715,8 +724,8 @@ private:
   }
 
   void visitCaseStmt(CaseStmt *caseStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Case");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Case");
 
     Type contextualTy;
 
@@ -729,7 +738,7 @@ private:
         auto *switchStmt = cast<SwitchStmt>(parent.get<Stmt *>());
         contextualTy = cs.getType(switchStmt->getSubjectExpr());
       } else if (parent.isStmt(StmtKind::DoCatch)) {
-        contextualTy = cs.getASTContext().getExceptionType();
+        contextualTy = cs.getASTContext().getErrorExistentialType();
       } else {
         hadError = true;
         return;
@@ -829,14 +838,9 @@ private:
       resultExpr = returnStmt->getResult();
       assert(resultExpr && "non-empty result without expression?");
     } else {
-      auto &ctx = closure->getASTContext();
       // If this is simplify `return`, let's create an empty tuple
       // which is also useful if contextual turns out to be e.g. `Void?`.
-      resultExpr = TupleExpr::createEmpty(ctx,
-                                          /*LParenLoc=*/SourceLoc(),
-                                          /*RParenLoc=*/SourceLoc(),
-                                          /*Implicit=*/true);
-      resultExpr->setType(ctx.TheEmptyTupleType);
+      resultExpr = getVoidExpr(closure->getASTContext());
     }
 
     SolutionApplicationTarget target(resultExpr, closure, CTP_ReturnStmt,
@@ -911,6 +915,19 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
         getConstraintLocator(closure, ConstraintLocator::ClosureResult));
   }
 
+  return false;
+}
+
+bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
+  if (!closure->hasSingleExpressionBody()) {
+    auto *DC = closure->getParent();
+    do {
+      if (auto *parentClosure = dyn_cast<ClosureExpr>(DC)) {
+        if (resultBuilderTransformed.count(parentClosure))
+          return true;
+      }
+    } while ((DC = DC->getParent()));
+  }
   return false;
 }
 
@@ -1283,7 +1300,64 @@ private:
       }
     }
 
+    // Source compatibility workaround.
+    //
+    // func test<T>(_: () -> T?) {
+    //   ...
+    // }
+    //
+    // A multi-statement closure passed to `test` that has an optional
+    // `Void` result type inferred from the body allows:
+    //   - empty `return`(s);
+    //   - to skip `return nil` or `return ()` at the end.
+    //
+    // Implicit `return ()` has to be inserted as the last element
+    // of the body if there is none. This wasn't needed before SE-0326
+    // because result type was (incorrectly) inferred as `Void` due to
+    // the body being skipped.
+    if (!closure->hasSingleExpressionBody() &&
+        closure->getBody() == braceStmt) {
+      if (resultType->getOptionalObjectType() &&
+          resultType->lookThroughAllOptionalTypes()->isVoid() &&
+          !braceStmt->getLastElement().isStmt(StmtKind::Return)) {
+        return addImplicitVoidReturn(braceStmt);
+      }
+    }
+
     return braceStmt;
+  }
+
+  ASTNode addImplicitVoidReturn(BraceStmt *braceStmt) {
+    auto &ctx = closure->getASTContext();
+    auto &cs = solution.getConstraintSystem();
+
+    auto *resultExpr = getVoidExpr(ctx);
+    cs.cacheExprTypes(resultExpr);
+
+    auto *returnStmt = new (ctx) ReturnStmt(SourceLoc(), resultExpr,
+                                            /*implicit=*/true);
+
+    // For a target for newly created result and apply a solution
+    // to it, to make sure that optional injection happens required
+    // number of times.
+    {
+      SolutionApplicationTarget target(resultExpr, closure, CTP_ReturnStmt,
+                                       resultType,
+                                       /*isDiscarded=*/false);
+      cs.setSolutionApplicationTarget(returnStmt, target);
+
+      visitReturnStmt(returnStmt);
+    }
+
+    // Re-create brace statement with an additional `return` at the end.
+
+    SmallVector<ASTNode, 4> elements;
+    elements.append(braceStmt->getElements().begin(),
+                    braceStmt->getElements().end());
+    elements.push_back(returnStmt);
+
+    return BraceStmt::create(ctx, braceStmt->getLBraceLoc(), elements,
+                             braceStmt->getRBraceLoc());
   }
 
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
@@ -1473,11 +1547,13 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   auto closureType = cs.getType(closure)->castTo<FunctionType>();
   ClosureConstraintApplication application(
       solution, closure, closureType->getResult(), rewriteTarget);
-  application.visit(closure->getBody());
+  auto body = application.visit(closure->getBody());
 
-  if (application.hadError)
+  if (!body || application.hadError)
     return true;
 
+  closure->setBody(cast<BraceStmt>(body.get<Stmt *>()),
+                   closure->hasSingleExpressionBody());
   closure->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
   return false;
 }

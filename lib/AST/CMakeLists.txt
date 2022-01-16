@@ -74,11 +74,12 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   RawComment.cpp
   RequirementEnvironment.cpp
-  RequirementMachine/GeneratingConformances.cpp
   RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/HomotopyReduction.cpp
   RequirementMachine/KnuthBendix.cpp
+  RequirementMachine/MinimalConformances.cpp
   RequirementMachine/PropertyMap.cpp
+  RequirementMachine/PropertyRelations.cpp
   RequirementMachine/PropertyUnification.cpp
   RequirementMachine/RequirementLowering.cpp
   RequirementMachine/RequirementMachine.cpp
@@ -88,6 +89,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/RewriteSystem.cpp
   RequirementMachine/Symbol.cpp
   RequirementMachine/Term.cpp
+  SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
   SubstitutionMap.cpp

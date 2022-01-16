@@ -143,6 +143,7 @@ OPERAND_OWNERSHIP(TrivialUse, CheckedCastAddrBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondFail)
 OPERAND_OWNERSHIP(TrivialUse, CopyAddr)
+OPERAND_OWNERSHIP(TrivialUse, MarkUnresolvedMoveAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
@@ -182,6 +183,10 @@ OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedRefCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
 OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
+
+// The dealloc_stack_ref operand needs to have NonUse ownership because
+// this use comes after the last consuming use (which is usually a dealloc_ref).
+OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
 
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
@@ -855,9 +860,8 @@ BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
 
-// FIXME: Why do these reqiuire a borrowed value at all?
-BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffAllocateSubcontext)
-BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffProjectTopLevelSubcontext)
+BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffAllocateSubcontext)
+BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffProjectTopLevelSubcontext)
 
 // FIXME: ConvertTaskToJob is documented as taking NativePointer. It's operand's
 // ownership should be 'TrivialUse'.

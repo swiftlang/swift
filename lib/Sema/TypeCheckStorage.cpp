@@ -97,8 +97,12 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
 }
 
 static bool hasStoredProperties(NominalTypeDecl *decl) {
+  bool isForeignReferenceTy =
+      isa<ClassDecl>(decl) && cast<ClassDecl>(decl)->isForeignReferenceType();
+
   return (isa<StructDecl>(decl) ||
-          (isa<ClassDecl>(decl) && !decl->hasClangNode()));
+          (isa<ClassDecl>(decl) &&
+           (!decl->hasClangNode() || isForeignReferenceTy)));
 }
 
 static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
@@ -2264,6 +2268,9 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   } else if (auto *structDecl = dyn_cast<StructDecl>(dc)) {
     if (structDecl->hasClangNode())
       return false;
+  } else if (isa<ClassDecl>(dc) &&
+             cast<ClassDecl>(dc)->isForeignReferenceType()) {
+    return false;
   }
 
   // Stored properties in SIL mode don't get accessors.
@@ -3319,6 +3326,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
 
+  auto *DC = storage->getDeclContext();
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {
@@ -3347,10 +3355,10 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readImpl = ReadImplKind::Stored;
     }
 
-  // Extensions can't have stored properties. If there are braces, assume
-  // this is an incomplete computed property. This avoids an "extensions
-  // must not contain stored properties" error later on.
-  } else if (isa<ExtensionDecl>(storage->getDeclContext()) &&
+  // Extensions and enums can't have stored properties. If there are braces,
+  // assume this is an incomplete computed property. This avoids an
+  // "extensions|enums must not contain stored properties" error later on.
+  } else if ((isa<ExtensionDecl>(DC) || isa<EnumDecl>(DC)) &&
              storage->getBracesRange().isValid()) {
     readImpl = ReadImplKind::Get;
 

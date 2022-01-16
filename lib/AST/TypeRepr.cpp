@@ -98,9 +98,8 @@ bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
 // TODO [OPAQUE SUPPORT]: We should probably use something like `Type`'s
 // `RecursiveProperties` to track this instead of computing it.
 bool TypeRepr::hasOpaque() {
-  // TODO [OPAQUE SUPPORT]: In the future we will also need to check if `this`
-  // is a `NamedOpaqueReturnTypeRepr`.
-  return findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
+  return isa<NamedOpaqueReturnTypeRepr>(this) ||
+    findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
 }
 
 SourceLoc TypeRepr::findUncheckedAttrLoc() const {
@@ -476,6 +475,12 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
 void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
                                      const PrintOptions &Opts) const {
   Printer.printKeyword("some", Opts, /*Suffix=*/" ");
+  printTypeRepr(Constraint, Printer, Opts);
+}
+
+void ExistentialTypeRepr::printImpl(ASTPrinter &Printer,
+                                    const PrintOptions &Opts) const {
+  Printer.printKeyword("any", Opts, /*Suffix=*/" ");
   printTypeRepr(Constraint, Printer, Opts);
 }
 

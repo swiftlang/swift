@@ -1017,6 +1017,12 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty,
   if (auto *NAT = dyn_cast<TypeAliasType>(Ty.getPointer())) {
     return NAT->getDecl()->getNameStr();
   }
+
+  if (auto existential = Ty->getAs<ExistentialType>()) {
+    return getTypeName(Ctx, existential->getConstraintType(),
+                       IsImplicitlyUnwrappedOptional);
+  }
+
   if (Ty->getAnyNominal()) {
     if (IsImplicitlyUnwrappedOptional) {
       assert(Ty->getOptionalObjectType());
@@ -1510,18 +1516,18 @@ SDKNode *swift::ide::api::
 SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   if (Ctx.checkingABI()) {
     T = T->getCanonicalType();
-    // If the type is a opaque result type (some Type) and we're in the ABI mode,
-    // we should substitute the opaque result type to its underlying type.
-    // Notice this only works if the opaque result type is from an inlinable
-    // function where the function body is present in the swift module file, thus
-    // allowing us to know the concrete type.
-    if (auto OTA = T->getAs<OpaqueTypeArchetypeType>()) {
-      if (auto *D = OTA->getDecl()) {
-        if (auto SubMap = D->getUnderlyingTypeSubstitutions()) {
-          T = Type(D->getUnderlyingInterfaceType()).
-            subst(*SubMap)->getCanonicalType();
-        }
-      }
+
+    if (T->hasOpaqueArchetype()) {
+      // When the type contains an opaque result type and we're in the ABI mode,
+      // we should substitute the opaque result type to its underlying type.
+      // Notice this only works if the opaque result type is from an inlinable
+      // function where the function body is present in the swift module file,
+      // thus allowing us to know the concrete type.
+      ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+          /*inContext=*/nullptr, ResilienceExpansion::Maximal,
+          /*isWholeModuleContext=*/false);
+      T = T.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+          ->getCanonicalType();
     }
   }
 
@@ -1906,10 +1912,11 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
   for (auto *D: KnownDecls) {
     if (auto *Ext = dyn_cast<ExtensionDecl>(D)) {
       if (HandledExtensions.find(Ext) == HandledExtensions.end()) {
-        auto *NTD = Ext->getExtendedNominal();
-        // Check if the extension is from other modules.
-        if (!llvm::is_contained(Modules, NTD->getModuleContext())) {
-          ExtensionMap[NTD].push_back(Ext);
+        if (auto *NTD = Ext->getExtendedNominal()) {
+          // Check if the extension is from other modules.
+          if (!llvm::is_contained(Modules, NTD->getModuleContext())) {
+            ExtensionMap[NTD].push_back(Ext);
+          }
         }
       }
     }
@@ -2247,8 +2254,9 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
   // The PrintDiags is only responsible compiler errors, we should remove the
   // consumer immediately after importing is done.
   SWIFT_DEFER { CI.getDiags().removeConsumer(PrintDiags); };
-  if (CI.setup(Invocation)) {
-    llvm::errs() << "Failed to setup the compiler instance\n";
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return nullptr;
   }
 

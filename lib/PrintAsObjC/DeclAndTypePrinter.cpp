@@ -1028,6 +1028,9 @@ private:
   /// annotations like \c strong and \c weak.
   bool isObjCReferenceCountableObjectType(Type ty) {
     if (auto classDecl = ty->getClassOrBoundGenericClass()) {
+      if (classDecl->isForeignReferenceType())
+        return false;
+
       switch (classDecl->getForeignClassKind()) {
       case ClassDecl::ForeignKind::Normal:
       case ClassDecl::ForeignKind::RuntimeOnly:
@@ -1830,6 +1833,12 @@ private:
     visitExistentialType(PCT, optionalKind, /*isMetatype=*/false);
   }
 
+  void visitExistentialType(ExistentialType *ET,
+                            Optional<OptionalTypeKind> optionalKind) {
+    visitExistentialType(ET, optionalKind,
+        /*isMetatype=*/ET->getConstraintType()->is<AnyMetatypeType>());
+  }
+
   void visitExistentialMetatypeType(ExistentialMetatypeType *MT,
                                     Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();
@@ -1936,6 +1945,15 @@ private:
 
   void visitTupleType(TupleType *TT, Optional<OptionalTypeKind> optionalKind) {
     assert(TT->getNumElements() == 0);
+    os << "void";
+  }
+
+  void visitPackType(PackType *PT, Optional<OptionalTypeKind> optionalKind) {
+    assert(PT->getNumElements() == 0);
+    os << "void";
+  }
+
+  void visitPackExpansionType(PackExpansionType *PET, Optional<OptionalTypeKind> optionalKind) {
     os << "void";
   }
 

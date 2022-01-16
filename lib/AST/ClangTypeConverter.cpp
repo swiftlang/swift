@@ -212,6 +212,7 @@ const clang::Type *ClangTypeConverter::getFunctionType(
     return nullptr;
 
   switch (repr) {
+  case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::CFunctionPointer:
     return ClangASTContext.getPointerType(fn).getTypePtr();
   case SILFunctionType::Representation::Block:
@@ -545,7 +546,8 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
     auto args = type->getGenericArgs();
     assert((args.size() == 1) && "Optional should have 1 generic argument.");
     clang::QualType innerTy = convert(args[0]);
-    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()))
+    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
+        args[0]->isForeignReferenceType())
       return innerTy;
     return clang::QualType();
   }
@@ -749,6 +751,11 @@ ClangTypeConverter::visitProtocolCompositionType(ProtocolCompositionType *type) 
 }
 
 clang::QualType
+ClangTypeConverter::visitExistentialType(ExistentialType *type) {
+  return visit(type->getConstraintType());
+}
+
+clang::QualType
 ClangTypeConverter::visitBuiltinRawPointerType(BuiltinRawPointerType *type) {
   return ClangASTContext.VoidPtrTy;
 }
@@ -788,6 +795,10 @@ clang::QualType ClangTypeConverter::visitArchetypeType(ArchetypeType *type) {
   return getClangIdType(ClangASTContext);
 }
 
+clang::QualType ClangTypeConverter::visitDependentMemberType(DependentMemberType *type) {
+  return convert(type->getBase());
+}
+
 clang::QualType ClangTypeConverter::visitDynamicSelfType(DynamicSelfType *type) {
   // Dynamic Self is equivalent to 'instancetype', which is treated as
   // 'id' within the Objective-C type system.
@@ -822,6 +833,9 @@ clang::QualType ClangTypeConverter::convert(Type type) {
     return it->second;
 
   // Try to do this without making cache entries for obvious cases.
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
+
   if (auto nominal = type->getAs<NominalType>()) {
     auto decl = nominal->getDecl();
     if (auto clangDecl = decl->getClangDecl()) {

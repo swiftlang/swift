@@ -283,6 +283,9 @@ namespace swift {
     /// Whether to dump debug info for request evaluator cycles.
     bool DebugDumpCycles = false;
 
+    /// Disable SIL substituted function types.
+    bool DisableSubstSILFunctionTypes = false;
+
     /// Whether to diagnose an ephemeral to non-ephemeral conversion as an
     /// error.
     bool DiagnoseInvalidEphemeralnessAsError = false;
@@ -310,8 +313,18 @@ namespace swift {
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;
 
+    /// Enable support for explicit existential types via the \c any
+    /// keyword.
+    bool EnableExplicitExistentialTypes = true;
+
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
+
+    /// Enable experimental ClangImporter diagnostics.
+    bool EnableExperimentalClangImporterDiagnostics = false;
+
+    /// Enable experimental eager Clang module diagnostics.
+    bool EnableExperimentalEagerClangModuleDiagnostics = false;
 
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
@@ -464,9 +477,8 @@ namespace swift {
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
 
-    /// Whether the new experimental generics implementation is enabled.
-    RequirementMachineMode EnableRequirementMachine =
-        RequirementMachineMode::Enabled;
+    /// Enables merged associated type support, which might go away.
+    bool RequirementMachineMergedAssociatedTypes = true;
 
     /// Enables dumping rewrite systems from the requirement machine.
     bool DumpRequirementMachine = false;
@@ -612,12 +624,6 @@ namespace swift {
     /// If non-zero, abort the expression type checker if it takes more
     /// than this many seconds.
     unsigned ExpressionTimeoutThreshold = 600;
-
-    /// If the shared pointer is not a \c nullptr and the pointee is \c true,
-    /// typechecking should be aborted at the next possible opportunity.
-    /// This is used by SourceKit to cancel requests for which the result is no
-    /// longer of interest.
-    std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
 
     /// If non-zero, abort the switch statement exhaustiveness checker if
     /// the Space::minus function is called more than this many times.

@@ -91,6 +91,9 @@ ERROR(forbidden_interpolated_string,none,
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
 
+ERROR(regex_literal_parsing_error,none,
+      "%0", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -107,9 +110,6 @@ ERROR(lex_unprintable_ascii_character,none,
       "unprintable ASCII character found in source file", ())
 ERROR(lex_invalid_utf8,none,
       "invalid UTF-8 found in source file", ())
-
-NOTE(lex_experimental_regex_strawperson,none,
-     "'%0'", (StringRef))
 
 ERROR(lex_single_quote_string,none,
       "single-quoted string literal found, use '\"'", ())
@@ -139,6 +139,9 @@ ERROR(lex_invalid_escape_delimiter,none,
       "too many '#' characters in delimited escape", ())
 ERROR(lex_invalid_closing_delimiter,none,
       "too many '#' characters in closing delimiter", ())
+
+ERROR(lex_unterminated_regex,none,
+      "unterminated regex literal", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
       "invalid unicode scalar", ())
@@ -248,8 +251,11 @@ ERROR(enum_case_dot_prefix,none,
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(computed_property_no_accessors, none,
-      "%select{computed property|subscript}0 must have accessors specified", (bool))
+ERROR(unexpected_curly_braces_in_decl, none,
+      "unexpected '{' in declaration", ())
+ERROR(missing_accessor_return_decl,none,
+      "missing return in %select{accessor|subscript}0 expected to return %1",
+      (bool, TypeRepr*))
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
 ERROR(unexpected_getset_implementation_in_protocol,none,
@@ -362,6 +368,12 @@ ERROR(expected_rbrace_class,none,
       "expected '}' in class", ())
 ERROR(expected_colon_class, PointsToFirstBadToken,
       "expected ':' to begin inheritance clause",())
+
+// Actor
+ERROR(expected_lbrace_actor,PointsToFirstBadToken,
+      "expected '{' in actor", ())
+ERROR(expected_rbrace_actor,none,
+      "expected '}' in actor", ())
 
 // Protocol
 ERROR(generic_arguments_protocol,PointsToFirstBadToken,
@@ -870,7 +882,8 @@ ERROR(sil_function_subs_without_generics,none,
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
-      "'some' should appear at the beginning of a composition", ())
+      "'%0' should appear at the beginning of a composition",
+      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Layout constraint diagnostics
@@ -1432,6 +1445,8 @@ ERROR(attr_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
 ERROR(attr_expected_label,none,
       "expected label '%0:' in '@%1' attribute", (StringRef, StringRef))
+ERROR(attr_expected_colon_after_label,none,
+      "expected ':' after label '%0'", (StringRef))
 
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())

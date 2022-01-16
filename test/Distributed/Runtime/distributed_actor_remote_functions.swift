@@ -21,7 +21,6 @@ struct Boom: Error {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor SomeSpecificDistributedActor {
   let state: String = "hi there"
 
@@ -77,7 +76,6 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 extension SomeSpecificDistributedActor {
   @_dynamicReplacement(for:_remote_helloAsyncThrows())
   nonisolated func _remote_impl_helloAsyncThrows() async throws -> String {
@@ -123,7 +121,7 @@ extension SomeSpecificDistributedActor {
 
   @_dynamicReplacement(for:_remote_helloThrowsTransportBoom())
   nonisolated func _remote_impl_helloThrowsTransportBoom() async throws -> String {
-    throw Boom("transport")
+    throw Boom("system")
   }
 }
 
@@ -138,41 +136,70 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
 }
 
-@available(SwiftStdlib 5.6, *)
-struct FakeTransport: ActorTransport {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented:\(#function)")
-  }
+struct FakeActorSystem: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias InvocationDecoder = FakeInvocation
+  typealias InvocationEncoder = FakeInvocation
+  typealias SerializationRequirement = Codable
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor {
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+            Act.ID == ActorID {
     nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor {
-    .init(ActorAddress(address: ""))
+    ActorAddress(address: "")
   }
 
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {
+  func resignID(_ id: ActorID) {
+  }
+
+  func makeInvocationEncoder() -> InvocationDecoder {
+    .init()
+  }
+}
+
+struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func decodeNextArgument<Argument>(
+    _ argumentType: Argument.Type,
+    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
+  ) throws { /* ... */ }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
+
+  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+    typealias SerializationRequirement = Codable
   }
 }
 
 @available(SwiftStdlib 5.5, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
-func test_remote_invoke(address: ActorAddress, transport: FakeTransport) async {
+func test_remote_invoke(address: ActorAddress, system: FakeActorSystem) async {
   func check(actor: SomeSpecificDistributedActor) async {
     let personality = __isRemoteActor(actor) ? "remote" : "local"
 
@@ -212,10 +239,10 @@ func test_remote_invoke(address: ActorAddress, transport: FakeTransport) async {
     }
   }
 
-  let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
+  let remote = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
   assert(__isRemoteActor(remote) == true, "should be remote")
 
-  let local = SomeSpecificDistributedActor(transport: transport)
+  let local = SomeSpecificDistributedActor(system: system)
   assert(__isRemoteActor(local) == false, "should be local")
 
   print("local isRemote: \(__isRemoteActor(local))")
@@ -238,18 +265,17 @@ func test_remote_invoke(address: ActorAddress, transport: FakeTransport) async {
   // CHECK: remote - hello: remote(_remote_impl_hello())
   // CHECK: remote - callTaskSelf: remote(_remote_impl_callTaskSelf())
   // CHECK: remote - callDetachedSelf: remote(_remote_impl_callDetachedSelf())
-  // CHECK: remote - helloThrowsTransportBoom: Boom(whoFailed: "transport")
+  // CHECK: remote - helloThrowsTransportBoom: Boom(whoFailed: "system")
 
   print(local)
   print(remote)
 }
 
-@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     let address = ActorAddress(address: "")
-    let transport = FakeTransport()
+    let system = FakeActorSystem()
 
-    await test_remote_invoke(address: address, transport: transport)
+    await test_remote_invoke(address: address, system: system)
   }
 }

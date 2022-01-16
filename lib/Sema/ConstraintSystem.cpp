@@ -542,6 +542,14 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   return getConstraintLocator(anchor);
 }
 
+ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
+    ConstraintLocatorBuilder locator, OpaqueTypeDecl *opaqueDecl) {
+  // Use only the opaque type declaration.
+  return getConstraintLocator(
+      ASTNode(opaqueDecl),
+      { LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl) }, 0);
+}
+
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
 static void extendDepthMap(
@@ -829,25 +837,48 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
 
 Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
                                       ConstraintLocatorBuilder locator) {
-  auto opaqueLocator = locator.withPathElement(
-      LocatorPathElt::OpenedOpaqueArchetype(opaque->getDecl()));
+  auto opaqueDecl = opaque->getDecl();
+  auto opaqueLocatorKey = getOpenOpaqueLocator(locator, opaqueDecl);
+
+  // If we have already opened this opaque type, look in the known set of
+  // replacements.
+  auto knownReplacements = OpenedTypes.find(
+      getConstraintLocator(opaqueLocatorKey));
+  if (knownReplacements != OpenedTypes.end()) {
+    auto param = opaque->getInterfaceType()->castTo<GenericTypeParamType>();
+    for (const auto &replacement : knownReplacements->second) {
+      if (replacement.first->isEqual(param))
+        return replacement.second;
+    }
+
+    llvm_unreachable("Missing opaque type replacement");
+  }
 
   // Open the generic signature of the opaque decl, and bind the "outer" generic
   // params to our context. The remaining axes of freedom on the type variable
   // corresponding to the underlying type should be the constraints on the
   // underlying return type.
+  auto opaqueLocator = locator.withPathElement(
+      LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl));
   OpenedTypeMap replacements;
-  openGeneric(DC, opaque->getBoundSignature(), opaqueLocator, replacements);
+  openGeneric(DC, opaqueDecl->getOpaqueInterfaceGenericSignature(),
+              opaqueLocator, replacements);
 
-  auto underlyingTyVar = openType(opaque->getInterfaceType(), replacements);
-  assert(underlyingTyVar);
-
-  for (auto param : DC->getGenericSignatureOfContext().getGenericParams()) {
-    addConstraint(ConstraintKind::Bind, openType(param, replacements),
-                  DC->mapTypeIntoContext(param), opaqueLocator);
+  // If there is an outer generic signature, bind the outer parameters based
+  // on the substitutions in the opaque type.
+  auto subs = opaque->getSubstitutions();
+  if (auto genericSig = subs.getGenericSignature()) {
+    for (auto *genericParamPtr : genericSig.getGenericParams()) {
+      Type genericParam(genericParamPtr);
+      addConstraint(
+          ConstraintKind::Bind, openType(genericParam, replacements),
+          genericParam.subst(subs), opaqueLocator);
+    }
   }
 
-  return underlyingTyVar;
+  recordOpenedTypes(opaqueLocatorKey, replacements);
+
+  return openType(opaque->getInterfaceType(), replacements);
 }
 
 Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
@@ -1098,6 +1129,21 @@ doesStorageProduceLValue(AbstractStorageDecl *storage, Type baseType,
           !storage->isSetterMutating());
 }
 
+Type GetClosureType::operator()(const AbstractClosureExpr *expr) const {
+  if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+    // Look through type bindings, if we have them.
+    auto mutableClosure = const_cast<ClosureExpr *>(closure);
+    if (cs.hasType(mutableClosure)) {
+      return cs.getFixedTypeRecursive(
+          cs.getType(mutableClosure), /*wantRValue=*/true);
+    }
+
+    return cs.getClosureTypeIfAvailable(closure);
+  }
+
+  return Type();
+}
+
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     ConstraintLocator *memberLocator, bool wantInterfaceType) {
@@ -1113,18 +1159,20 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      memberLocator, wantInterfaceType);
+      memberLocator, wantInterfaceType, GetClosureType{*this});
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     llvm::function_ref<Type(VarDecl *)> getType,
-    ConstraintLocator *memberLocator, bool wantInterfaceType) {
+    ConstraintLocator *memberLocator, bool wantInterfaceType,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // Adjust the type for concurrency.
-  requestedType = adjustVarTypeForConcurrency(requestedType, value, UseDC);
+  requestedType = adjustVarTypeForConcurrency(
+      requestedType, value, UseDC, getClosureType);
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -1298,6 +1346,13 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
+AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
+    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue) {
+  return swift::adjustFunctionTypeForConcurrency(
+      fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this});
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
@@ -1314,7 +1369,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         ->castTo<AnyFunctionType>();
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(value, false, functionRefKind);
-      funcType = adjustFunctionTypeForConcurrency(funcType, func, useDC, numApplies, false);
+      funcType = adjustFunctionTypeForConcurrency(
+          funcType, func, useDC, numApplies, false);
     }
     auto openedType = openFunctionType(
         funcType, locator, replacements, func->getDeclContext());
@@ -1711,6 +1767,13 @@ ConstraintSystem::getTypeOfMemberReference(
     auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
                                                          typeDecl, baseObjTy);
 
+    // If the member type is a constraint, e.g. because the
+    // reference is to a typealias with an underlying protocol
+    // or composition type, the member reference has existential
+    // type.
+    if (memberTy->isConstraintType())
+      memberTy = ExistentialType::get(memberTy);
+
     checkNestedTypeConstraints(*this, memberTy, locator);
 
     // Convert any placeholders and open any generics.
@@ -1939,8 +2002,12 @@ ConstraintSystem::getTypeOfMemberReference(
         if (t->isEqual(selfTy))
           return baseObjTy;
       if (auto *metatypeTy = t->getAs<MetatypeType>())
-        if (metatypeTy->getInstanceType()->isEqual(selfTy))
-          return ExistentialMetatypeType::get(baseObjTy);
+        if (metatypeTy->getInstanceType()->isEqual(selfTy)) {
+          auto constraint = baseObjTy;
+          if (auto existential = baseObjTy->getAs<ExistentialType>())
+            constraint = existential->getConstraintType();
+          return ExistentialMetatypeType::get(constraint);
+        }
       return t;
     });
   }
@@ -2085,11 +2152,13 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       } else if (type->hasDynamicSelfType()) {
         type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
       }
-      type = adjustVarTypeForConcurrency(type, var, useDC);
+      type = adjustVarTypeForConcurrency(
+          type, var, useDC, GetClosureType{*this});
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
-           !overload.getBaseType()->getAnyNominal()))
+           (!overload.getBaseType()->getAnyNominal() &&
+            !overload.getBaseType()->is<ExistentialType>())))
         return Type();
 
       // Cope with 'Self' returns.
@@ -2252,6 +2321,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
                                              .withThrows(true)
+                                             .withAsync(true)
                                              .build());
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
@@ -2261,6 +2331,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
                                          .withThrows(true)
+                                         .withAsync(true)
                                          .build());
     return {refType, refType};
   }
@@ -2339,20 +2410,18 @@ isInvalidPartialApplication(ConstraintSystem &cs,
   return {true, level};
 }
 
-/// Walk a closure AST to determine its effects.
-///
-/// \returns a function's extended info describing the effects, as
-/// determined syntactically.
 FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
-  auto known = closureEffectsCache.find(expr);
-  if (known != closureEffectsCache.end())
-    return known->second;
+  return evaluateOrDefault(
+      getASTContext().evaluator, ClosureEffectsRequest{expr},
+      FunctionType::ExtInfo());
+}
 
+FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
+  Evaluator &evaluator, ClosureExpr *expr) const {
   // A walker that looks for 'try' and 'throw' expressions
   // that aren't nested within closures, nested declarations,
   // or exhaustive catches.
   class FindInnerThrows : public ASTWalker {
-    ConstraintSystem &CS;
     DeclContext *DC;
     bool FoundThrow = false;
 
@@ -2449,14 +2518,16 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
       // Okay, now it should be safe to coerce the pattern.
       // Pull the top-level pattern back out.
       pattern = LabelItem.getPattern();
-      Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
 
-      if (!exnType)
+      auto &ctx = DC->getASTContext();
+      if (!ctx.getErrorDecl())
         return false;
+
       auto contextualPattern =
           ContextualPattern::forRawPattern(pattern, DC);
       pattern = TypeChecker::coercePatternToType(
-        contextualPattern, exnType, TypeResolverContext::InExpression);
+        contextualPattern, ctx.getErrorExistentialType(),
+        TypeResolverContext::InExpression);
       if (!pattern)
         return false;
 
@@ -2501,8 +2572,8 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
     }
 
   public:
-    FindInnerThrows(ConstraintSystem &cs, DeclContext *dc)
-        : CS(cs), DC(dc) {}
+    FindInnerThrows(DeclContext *dc)
+        : DC(dc) {}
 
     bool foundThrow() { return FoundThrow; }
   };
@@ -2525,23 +2596,27 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   if (!body)
     return ASTExtInfoBuilder().withConcurrent(concurrent).build();
 
-  auto throwFinder = FindInnerThrows(*this, expr);
+  auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
-  auto result = ASTExtInfoBuilder()
-                    .withThrows(throwFinder.foundThrow())
-                    .withAsync(bool(findAsyncNode(expr)))
-                    .withConcurrent(concurrent)
-                    .build();
-  closureEffectsCache[expr] = result;
-  return result;
+  return ASTExtInfoBuilder()
+      .withThrows(throwFinder.foundThrow())
+      .withAsync(bool(findAsyncNode(expr)))
+      .withConcurrent(concurrent)
+      .build();
 }
 
 bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
     return func->isAsyncContext();
 
-  if (auto closure = dyn_cast<ClosureExpr>(dc))
-    return closureEffects(closure).isAsync();
+  if (auto abstractClosure = dyn_cast<AbstractClosureExpr>(dc)) {
+    if (Type type = GetClosureType{*this}(abstractClosure)) {
+      if (auto fnType = type->getAs<AnyFunctionType>())
+        return fnType->isAsync();
+    }
+
+    return abstractClosure->isBodyAsync();
+  }
 
   return false;
 }
@@ -5245,6 +5320,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
   case ConversionRestrictionKind::CGFloatToDouble:
   case ConversionRestrictionKind::DoubleToCGFloat:
+  case ConversionRestrictionKind::ReifyPackToType:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.
@@ -5882,8 +5958,13 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
     return false;
 
   auto &ctx = closure->getASTContext();
-  return !closure->hasEmptyBody() &&
-         ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
+  if (closure->hasEmptyBody() ||
+      !ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
+    return false;
+
+  // If body is nested in a parent that has a function builder applied,
+  // let's prevent inference until result builders.
+  return !isInResultBuilderContext(closure);
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)

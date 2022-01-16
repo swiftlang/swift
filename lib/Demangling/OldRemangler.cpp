@@ -736,6 +736,12 @@ Remangler::mangleDistributedThunk(Node *node, unsigned depth) {
 }
 
 ManglingError
+Remangler::mangleDistributedAccessor(Node *node, unsigned depth) {
+  Buffer << "TF";
+  return ManglingError::Success;
+}
+
+ManglingError
 Remangler::mangleDynamicallyReplaceableFunctionImpl(Node *node,
                                                     unsigned depth) {
   Buffer << "TI";
@@ -2637,6 +2643,11 @@ ManglingError Remangler::mangleOpaqueReturnType(Node *node, unsigned depth) {
   Buffer << "Qu";
   return ManglingError::Success;
 }
+ManglingError Remangler::mangleOpaqueReturnTypeIndexed(Node *node, unsigned depth) {
+  Buffer << "QU";
+  mangleIndex(node->getIndex());
+  return ManglingError::Success;
+}
 ManglingError Remangler::mangleOpaqueReturnTypeOf(Node *node,
                                                   EntityContext &ctx,
                                                   unsigned depth) {
@@ -2777,4 +2788,10 @@ Demangle::mangleNodeAsObjcCString(NodePointer node,
   remangler.append(StringRef("_", 2)); // Include the trailing 0 char.
 
   return remangler.getBufferStr().data();
+}
+
+ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
+                                                        unsigned depth) {
+  Buffer << "HF";
+  return ManglingError::Success;
 }

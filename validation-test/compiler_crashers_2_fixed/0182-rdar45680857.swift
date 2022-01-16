@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir %s -requirement-machine-protocol-signatures=on
 
 public protocol Graph: class, Collection {
     associatedtype V

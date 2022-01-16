@@ -94,7 +94,7 @@ class RewriteContext final {
     ArrayRef<const ProtocolDecl *> Protos;
 
     /// Each connected component has a lazily-created requirement machine.
-    RequirementMachine *Machine = nullptr;
+    bool InProgress = false;
   };
 
   /// The protocol dependency graph.
@@ -116,8 +116,8 @@ class RewriteContext final {
   RewriteContext &operator=(const RewriteContext &) = delete;
   RewriteContext &operator=(RewriteContext &&) = delete;
 
-  void getRequirementMachineRec(const ProtocolDecl *proto,
-                                SmallVectorImpl<const ProtocolDecl *> &stack);
+  void getProtocolComponentRec(const ProtocolDecl *proto,
+                               SmallVectorImpl<const ProtocolDecl *> &stack);
 
 public:
   /// Statistics.
@@ -130,6 +130,8 @@ public:
   Histogram RuleTrieRootHistogram;
   Histogram PropertyTrieHistogram;
   Histogram PropertyTrieRootHistogram;
+  Histogram ConformanceRulesHistogram;
+  Histogram MinimalConformancesHistogram;
 
   explicit RewriteContext(ASTContext &ctx);
 
@@ -177,7 +179,8 @@ public:
   RequirementMachine *getRequirementMachine(CanGenericSignature sig);
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
 
-  RequirementMachine *getRequirementMachine(const ProtocolDecl *proto);
+  ArrayRef<const ProtocolDecl *> getProtocolComponent(const ProtocolDecl *proto);
+  bool isRecursivelyConstructingRequirementMachine(const ProtocolDecl *proto);
 
   ~RewriteContext();
 };

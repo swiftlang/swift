@@ -122,7 +122,8 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
           return true;
 
         // Foreign class types can be symbolically referenced.
-        if (clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
+        if (clas->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
+            const_cast<ClassDecl *>(clas)->isForeignReferenceType())
           return true;
 
         // Otherwise no.
@@ -215,6 +216,8 @@ std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {
   // To make LLVM IR more readable we always add a 'T' prefix so that type names
   // don't start with a digit and don't need to be quoted.
   Buffer << 'T';
+  if (auto existential = Ty->getAs<ExistentialType>())
+    Ty = existential->getConstraintType()->getCanonicalType();
   if (auto P = dyn_cast<ProtocolType>(Ty)) {
     appendProtocolName(P->getDecl(), /*allowStandardSubstitution=*/false);
     appendOperator("P");

@@ -80,6 +80,8 @@ ERROR(error_unknown_arg,none,
       "unknown argument: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
       "invalid value '%1' in '%0'", (StringRef, StringRef))
+ERROR(error_invalid_arg_combination,none,
+      "unsupported argument combination: '%0' and '%1'", (StringRef, StringRef))
 WARNING(warning_invalid_locale_code,none,
       "unsupported locale code; supported locale codes are: '%0'", (StringRef))
 WARNING(warning_locale_path_not_found,none,
@@ -100,6 +102,8 @@ ERROR(error_immediate_mode_primary_file,none,
       "immediate mode is incompatible with -primary-file", ())
 ERROR(error_missing_frontend_action,none,
       "no frontend action was selected", ())
+ERROR(error_unsupported_frontend_action, none,
+      "unsupported action: %0", (StringRef))
 ERROR(error_invalid_source_location_str,none,
       "invalid source location string '%0'", (StringRef))
 ERROR(error_no_source_location_scope_map,none,
@@ -145,6 +149,8 @@ WARNING(emit_reference_dependencies_without_primary_file,none,
 
 WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
+WARNING(warn_implicit_string_processing_import_failed,none,
+        "unable to perform implicit import of \"_StringProcessing\" module: no such module found", ())
 
 ERROR(error_module_name_required,none, "-module-name is required", ())
 ERROR(error_bad_module_name,none,
@@ -230,8 +236,6 @@ ERROR(error_index_failed_status_check,none,
       "failed file status check: %0", (StringRef))
 ERROR(error_index_inputs_more_than_outputs,none,
       "index output filenames do not match input source files", ())
-WARNING(warn_index_unit_output_path_without_index_store,none,
-      "-index-unit-output-path is ignored without -index-store-path", ())
 
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",

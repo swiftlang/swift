@@ -1928,6 +1928,9 @@ static CanSILFunctionType getSILFunctionType(
   }
 
   bool shouldBuildSubstFunctionType = [&]{
+    if (TC.Context.LangOpts.DisableSubstSILFunctionTypes)
+      return false;
+
     // If there is no genericity in the abstraction pattern we're lowering
     // against, we don't need to introduce substitutions into the lowered
     // type.
@@ -2300,6 +2303,7 @@ static CanSILFunctionType getNativeSILFunctionType(
   switch (extInfoBuilder.getRepresentation()) {
   case SILFunctionType::Representation::Block:
   case SILFunctionType::Representation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::CXXMethod:
     return getSILFunctionTypeForAbstractCFunction(
         TC, origType, substInterfaceType, extInfoBuilder, constant);
 
@@ -2599,6 +2603,8 @@ public:
       return ResultConvention::Unowned;
     if (FnType->getExtInfo().getProducesResult())
       return ResultConvention::Owned;
+    if (tl.getLoweredType().isForeignReferenceType())
+      return ResultConvention::Unowned;
     return ResultConvention::Autoreleased;
   }
 
@@ -3105,25 +3111,46 @@ CanSILFunctionType TypeConverter::getUncachedSILFunctionTypeForConstant(
                                                  bridgedTypes);
 }
 
-static bool isClassOrProtocolMethod(ValueDecl *vd) {
+static bool isObjCMethod(ValueDecl *vd) {
   if (!vd->getDeclContext())
     return false;
+
   Type contextType = vd->getDeclContext()->getDeclaredInterfaceType();
   if (!contextType)
     return false;
-  return contextType->getClassOrBoundGenericClass()
-    || contextType->isClassExistentialType();
+
+  bool isRefCountedClass = contextType->getClassOrBoundGenericClass() &&
+                           !contextType->isForeignReferenceType();
+  return isRefCountedClass || contextType->isClassExistentialType();
 }
 
 SILFunctionTypeRepresentation
 TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   // If this is a foreign thunk, it always has the foreign calling convention.
   if (c.isForeign) {
-    if (!c.hasDecl() ||
-        c.getDecl()->isImportAsMember())
+    if (!c.hasDecl())
       return SILFunctionTypeRepresentation::CFunctionPointer;
 
-    if (isClassOrProtocolMethod(c.getDecl()) ||
+    // TODO: Is this correct for operators?
+    if (auto method =
+            dyn_cast_or_null<clang::CXXMethodDecl>(c.getDecl()->getClangDecl())) {
+      // Subscripts and call operators are imported as normal methods.
+      bool staticOperator = method->isOverloadedOperator() &&
+                            method->getOverloadedOperator() != clang::OO_Call &&
+                            method->getOverloadedOperator() != clang::OO_Subscript;
+      return isa<clang::CXXConstructorDecl>(method) ||
+                     method->isStatic() ||
+                     staticOperator
+          ? SILFunctionTypeRepresentation::CFunctionPointer
+          : SILFunctionTypeRepresentation::CXXMethod;
+    }
+
+
+    // For example, if we have a function in a namespace:
+    if (c.getDecl()->isImportAsMember())
+      return SILFunctionTypeRepresentation::CFunctionPointer;
+
+    if (isObjCMethod(c.getDecl()) ||
         c.kind == SILDeclRef::Kind::IVarInitializer ||
         c.kind == SILDeclRef::Kind::IVarDestroyer)
       return SILFunctionTypeRepresentation::ObjCMethod;
@@ -3785,6 +3812,23 @@ public:
                             orig.getConvention(), orig.getDifferentiability());
   }
 
+  CanType visitPackType(CanPackType origType) {
+    // Fast-path the empty pack.
+    if (origType->getNumElements() == 0) return origType;
+
+    SmallVector<Type, 8> substElts;
+    substElts.reserve(origType->getNumElements());
+    for (Type origTy : origType->getElementTypes()) {
+      auto substEltType = visit(CanType(origTy));
+      substElts.push_back(substEltType);
+    }
+    return CanType(PackType::get(TC.Context, substElts));
+  }
+
+  CanType visitPackExpansionType(CanPackExpansionType origType) {
+    llvm_unreachable("Unimplemented!");
+  }
+
   /// Tuples need to have their component types substituted by these
   /// same rules.
   CanType visitTupleType(CanTupleType origType) {
@@ -4112,6 +4156,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     bridgedResultType = resultType;
     break;
 
+  case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer: {
     if (rep == SILFunctionTypeRepresentation::ObjCMethod) {

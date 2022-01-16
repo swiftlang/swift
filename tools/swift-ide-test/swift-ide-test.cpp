@@ -338,6 +338,10 @@ EnableCrossImportOverlays("enable-cross-import-overlays",
                           llvm::cl::desc("Automatically import declared cross-import overlays."),
                           llvm::cl::cat(Category),
                           llvm::cl::init(false));
+static llvm::cl::list<std::string>
+ModuleAliases("module-alias",
+            llvm::cl::desc("Use '-module-alias <name>=<binary_name>' to map a module of <name> that appears in source code to <binary_name>"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 SkipDeinit("skip-deinit",
@@ -482,6 +486,12 @@ DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
   llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool> CodeCompletionAddCallWithNoDefaultArgs(
+    "code-complete-add-call-with-no-default-args",
+    llvm::cl::desc("Whether to include a function completion that contains no "
+                   "default arguments"),
+    llvm::cl::cat(Category), llvm::cl::init(true));
+
 // '-conforming-methods' options.
 
 static llvm::cl::list<std::string>
@@ -515,6 +525,12 @@ FunctionDefinitions("function-definitions",
                     llvm::cl::desc("Print function bodies"),
                     llvm::cl::cat(Category),
                     llvm::cl::init(true));
+
+static llvm::cl::opt<bool>
+Expressions("expressions",
+            llvm::cl::desc("Print expressions"),
+            llvm::cl::cat(Category),
+            llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 AbstractAccessors("abstract-accessors",
@@ -965,6 +981,7 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
         CompletionInst.typeContextInfo(
             Params.Invocation, Params.Args, Params.FileSystem,
             Params.CompletionBuffer, Params.Offset, Params.DiagC,
+            /*CancellationFlag=*/nullptr,
             [&](CancellableResult<TypeContextInfoResult> Result) {
               ExitCode = printTypeContextInfo(Result);
             });
@@ -1036,6 +1053,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
         CompletionInst.conformingMethodList(
             Params.Invocation, Params.Args, Params.FileSystem,
             Params.CompletionBuffer, Params.Offset, Params.DiagC, typeNames,
+            /*CancellationFlag=*/nullptr,
             [&](CancellableResult<ConformingMethodListResults> Result) {
               ExitCode = printConformingMethodList(Result);
             });
@@ -1044,7 +1062,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
 }
 
 static void
-printCodeCompletionResultsImpl(MutableArrayRef<CodeCompletionResult *> Results,
+printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
                                llvm::raw_ostream &OS, bool IncludeKeywords,
                                bool IncludeComments, bool IncludeSourceText,
                                bool PrintAnnotatedDescription) {
@@ -1125,23 +1143,22 @@ static int printCodeCompletionResults(
   return printResult<CodeCompleteResult>(
       CancellableResult, [&](CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
-            Result.Results, llvm::outs(), IncludeKeywords, IncludeComments,
-            IncludeSourceText, PrintAnnotatedDescription);
+            Result.ResultSink.Results, llvm::outs(), IncludeKeywords,
+            IncludeComments, IncludeSourceText, PrintAnnotatedDescription);
         return 0;
       });
 }
 
-static int doCodeCompletion(const CompilerInvocation &InitInvok,
-                            StringRef SourceFilename,
-                            StringRef SecondSourceFileName,
-                            StringRef CodeCompletionToken,
-                            bool CodeCompletionDiagnostics,
-                            bool CodeCompletionKeywords,
-                            bool CodeCompletionComments,
-                            bool CodeCompletionAnnotateResults,
-                            bool CodeCompletionAddInitsToTopLevel,
-                            bool CodeCompletionCallPatternHeuristics,
-                            bool CodeCompletionSourceText) {
+static int
+doCodeCompletion(const CompilerInvocation &InitInvok, StringRef SourceFilename,
+                 StringRef SecondSourceFileName, StringRef CodeCompletionToken,
+                 bool CodeCompletionDiagnostics, bool CodeCompletionKeywords,
+                 bool CodeCompletionComments,
+                 bool CodeCompletionAnnotateResults,
+                 bool CodeCompletionAddInitsToTopLevel,
+                 bool CodeCompletionCallPatternHeuristics,
+                 bool CodeCompletionAddCallWithNoDefaultArgs,
+                 bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -1152,6 +1169,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
   CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
+  CompletionContext.setAddCallWithNoDefaultArgs(
+      CodeCompletionAddCallWithNoDefaultArgs);
 
   return performWithCompletionLikeOperationParams(
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
@@ -1162,7 +1181,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
         Inst.codeComplete(
             Params.Invocation, Params.Args, Params.FileSystem,
             Params.CompletionBuffer, Params.Offset, Params.DiagC,
-            CompletionContext,
+            CompletionContext, /*CancellationFlag=*/nullptr,
             [&](CancellableResult<CodeCompleteResult> Result) {
               ExitCode = printCodeCompletionResults(
                   Result, CodeCompletionKeywords, CodeCompletionComments,
@@ -1353,6 +1372,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionAnnotateResults,
                                  bool CodeCompletionAddInitsToTopLevel,
                                  bool CodeCompletionCallPatternHeuristics,
+                                 bool CodeCompletionAddCallWithNoDefaultArgs,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -1482,6 +1502,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
     CompletionContext.setCallPatternHeuristics(
         CodeCompletionCallPatternHeuristics);
+    CompletionContext.setAddCallWithNoDefaultArgs(
+        CodeCompletionAddCallWithNoDefaultArgs);
 
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
@@ -1491,14 +1513,16 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     CompletionInst.codeComplete(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
         CodeCompletionDiagnostics ? &PrintDiags : nullptr, CompletionContext,
+        /*CancellationFlag=*/nullptr,
         [&](CancellableResult<CodeCompleteResult> Result) {
           CallbackCalled = true;
           switch (Result.getKind()) {
           case CancellableResultKind::Success: {
             wasASTContextReused =
                 Result->Info.completionContext->ReusingASTContext;
-            printCodeCompletionResultsImpl(Result->Results, OS, IncludeKeywords,
-                                           IncludeComments, IncludeSourceText,
+            printCodeCompletionResultsImpl(Result->ResultSink.Results, OS,
+                                           IncludeKeywords, IncludeComments,
+                                           IncludeSourceText,
                                            CodeCompletionAnnotateResults);
             break;
           }
@@ -1633,8 +1657,11 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   auto &ctx = CI.getASTContext();
   registerIDERequestFunctions(ctx.evaluator);
 
@@ -1844,8 +1871,11 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
   if (RunTypeChecker) {
     CompilerInstance CI;
     CI.addDiagnosticConsumer(&PrintDiags);
-    if (CI.setup(Invocation))
+    std::string InstanceSetupError;
+    if (CI.setup(Invocation, InstanceSetupError)) {
+      llvm::errs() << InstanceSetupError << '\n';
       return 1;
+    }
     CI.performSema();
 
     unsigned BufID = CI.getInputBufferIDs().back();
@@ -1919,8 +1949,11 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
@@ -2384,8 +2417,11 @@ static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
@@ -2448,8 +2484,11 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   std::unique_ptr<DebuggerClient> DebuggerClient;
   if (!DebugClientDiscriminator.empty()) {
@@ -2491,8 +2530,11 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return EXIT_FAILURE;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   std::vector<ExpressionTypeInfo> Scratch;
@@ -2546,8 +2588,11 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
@@ -2557,7 +2602,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
   int ExitCode = 0;
 
-  PrintOptions Options = PrintOptions::printEverything();
+  PrintOptions Options = PrintOptions::printDeclarations();
 
   for (StringRef ModuleName : ModulesToPrint) {
     auto *M = getModuleByFullName(Context, ModuleName);
@@ -2649,7 +2694,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
       llvm::outs() << remangled << "\n";
 
-      auto Options = PrintOptions::printEverything();
+      auto Options = PrintOptions::printDeclarations();
       Options.PrintAccess = false;
       LTD->print(llvm::outs(), Options);
       llvm::outs() << "\n";
@@ -2769,8 +2814,11 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
@@ -2836,8 +2884,11 @@ static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
@@ -2903,8 +2954,11 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
@@ -2968,8 +3022,11 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
@@ -3021,8 +3078,11 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
@@ -3054,8 +3114,11 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
@@ -3170,12 +3233,15 @@ static int doPrintTypes(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
-  PrintOptions Options = PrintOptions::printEverything();
+  PrintOptions Options = PrintOptions::printDeclarations();
   Options.FullyQualifiedTypes = FullyQualifiedTypes;
   ASTTypePrinter Printer(CI.getSourceMgr(), Options);
 
@@ -3395,8 +3461,11 @@ static int doDumpComments(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
@@ -3420,8 +3489,11 @@ static int doPrintComments(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
@@ -3444,8 +3516,11 @@ static int doPrintModuleComments(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
@@ -3482,8 +3557,11 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
 
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
@@ -3541,8 +3619,11 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   CompilerInstance CI;
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   SourceFile *SF = nullptr;
@@ -3590,8 +3671,11 @@ static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
   CompilerInstance CI;
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   DeclContext *DC = CI.getMainModule()->getModuleContext();
@@ -3758,8 +3842,11 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   SourceFile *SF = nullptr;
@@ -3795,8 +3882,11 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   SourceFile *SF = nullptr;
@@ -3898,8 +3988,11 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   SourceFile *SF = nullptr;
@@ -3927,8 +4020,11 @@ static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
@@ -3963,8 +4059,11 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
+  }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
@@ -4112,6 +4211,8 @@ int main(int argc, char *argv[]) {
 
   CompilerInvocation InitInvok;
 
+  InitInvok.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
+
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
@@ -4249,6 +4350,17 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().AllowModuleWithCompilerErrors = true;
   }
 
+  if (!options::ModuleAliases.empty()) {
+    PrintingDiagnosticConsumer PDC;
+    SourceManager SM;
+    DiagnosticEngine Diags(SM);
+    Diags.addConsumer(PDC);
+    if (!InitInvok.setModuleAliasMap(options::ModuleAliases, Diags)) {
+      llvm::errs() << "invalid module alias arguments\n";
+      return 1;
+    }
+  }
+
   // Process the clang arguments last and allow them to override previously
   // set options.
   if (!CCArgs.empty()) {
@@ -4274,6 +4386,7 @@ int main(int argc, char *argv[]) {
     PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;
     PrintOpts.AbstractAccessors = options::AbstractAccessors;
     PrintOpts.FunctionDefinitions = options::FunctionDefinitions;
+    PrintOpts.PrintExprs = options::Expressions;
     PrintOpts.PreferTypeRepr = options::PreferTypeRepr;
     PrintOpts.ExplodePatternBindingDecls = options::ExplodePatternBindingDecls;
     PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;
@@ -4320,15 +4433,14 @@ int main(int argc, char *argv[]) {
                    << "'-skip-filecheck'\n";
       return 1;
     }
-    ExitCode = doBatchCodeCompletion(InitInvok,
-                                     options::SourceFilename,
-                                     options::CodeCompletionDiagnostics,
-                                     options::CodeCompletionKeywords,
-                                     options::CodeCompletionComments,
-                                     options::CodeCompletionAnnotateResults,
-                                     options::CodeCompleteInitsInPostfixExpr,
-                                     options::CodeCompleteCallPatternHeuristics,
-                                     options::CodeCompletionSourceText);
+    ExitCode = doBatchCodeCompletion(
+        InitInvok, options::SourceFilename, options::CodeCompletionDiagnostics,
+        options::CodeCompletionKeywords, options::CodeCompletionComments,
+        options::CodeCompletionAnnotateResults,
+        options::CodeCompleteInitsInPostfixExpr,
+        options::CodeCompleteCallPatternHeuristics,
+        options::CodeCompletionAddCallWithNoDefaultArgs,
+        options::CodeCompletionSourceText);
     break;
 
   case ActionType::CodeCompletion:
@@ -4336,17 +4448,15 @@ int main(int argc, char *argv[]) {
       llvm::errs() << "code completion token name required\n";
       return 1;
     }
-    ExitCode = doCodeCompletion(InitInvok,
-                                options::SourceFilename,
-                                options::SecondSourceFilename,
-                                options::CodeCompletionToken,
-                                options::CodeCompletionDiagnostics,
-                                options::CodeCompletionKeywords,
-                                options::CodeCompletionComments,
-                                options::CodeCompletionAnnotateResults,
-                                options::CodeCompleteInitsInPostfixExpr,
-                                options::CodeCompleteCallPatternHeuristics,
-                                options::CodeCompletionSourceText);
+    ExitCode = doCodeCompletion(
+        InitInvok, options::SourceFilename, options::SecondSourceFilename,
+        options::CodeCompletionToken, options::CodeCompletionDiagnostics,
+        options::CodeCompletionKeywords, options::CodeCompletionComments,
+        options::CodeCompletionAnnotateResults,
+        options::CodeCompleteInitsInPostfixExpr,
+        options::CodeCompleteCallPatternHeuristics,
+        options::CodeCompletionAddCallWithNoDefaultArgs,
+        options::CodeCompletionSourceText);
     break;
 
   case ActionType::REPLCodeCompletion:

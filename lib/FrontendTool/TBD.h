@@ -14,6 +14,7 @@
 #define SWIFT_FRONTENDTOOL_TBD_H
 
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/TBDGen/TBDGen.h"
 
 namespace llvm {
 class StringRef;
@@ -26,14 +27,16 @@ class FrontendOptions;
 struct TBDGenOptions;
 
 bool writeTBD(ModuleDecl *M, StringRef OutputFilename,
-              const TBDGenOptions &Opts);
+              const TBDGenOptions &Opts, TBDSymbolSetPtr publicCMOSymbols);
 bool validateTBD(ModuleDecl *M,
                  const llvm::Module &IRModule,
                  const TBDGenOptions &opts,
+                 TBDSymbolSetPtr publicCMOSymbols,
                  bool diagnoseExtraSymbolsInTBD);
 bool validateTBD(FileUnit *M,
                  const llvm::Module &IRModule,
                  const TBDGenOptions &opts,
+                 TBDSymbolSetPtr publicCMOSymbols,
                  bool diagnoseExtraSymbolsInTBD);
 }
 

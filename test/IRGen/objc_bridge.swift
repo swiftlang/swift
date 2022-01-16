@@ -11,7 +11,7 @@ import Foundation
 // CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 // CHECK: [[DEALLOC_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 
-// CHECK: @_INSTANCE_METHODS__TtC11objc_bridge3Bas = weak hidden constant { i32, i32, [17 x { i8*, i8*, i8* }] } {
+// CHECK: @_INSTANCE_METHODS__TtC11objc_bridge3Bas = internal constant { i32, i32, [17 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24,
 // CHECK:   i32 17,
 // CHECK:   [17 x { i8*, i8*, i8* }] [
@@ -101,7 +101,7 @@ import Foundation
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0),
-// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @{{[0-9]+}}, i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @.str.{{[0-9]+}}, i64 0, i64 0),
 // CHECK-noptrauth: i8* bitcast (void (%3*, i8*, %4*)* @"$s11objc_bridge3BasC9acceptSetyyShyACGFTo" to i8*)
 // CHECK-ptrauth:   i8* bitcast ({ i8*, i32, i64, i64 }* @"$s11objc_bridge3BasC9acceptSetyyShyACGFTo.ptrauth" to i8*)
 // CHECK:     }
@@ -114,10 +114,10 @@ import Foundation
 // CHECK:   ]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
-// CHECK: @_PROPERTIES__TtC11objc_bridge3Bas = weak hidden constant { i32, i32, [5 x { i8*, i8* }] } {
+// CHECK: @_PROPERTIES__TtC11objc_bridge3Bas = internal constant { i32, i32, [5 x { i8*, i8* }] } {
 
 // CHECK: [[OBJC_BLOCK_PROPERTY:@.*]] = private unnamed_addr constant [8 x i8] c"T@?,N,C\00"
-// CHECK: @_PROPERTIES__TtC11objc_bridge21OptionalBlockProperty = weak hidden constant {{.*}} [[OBJC_BLOCK_PROPERTY]]
+// CHECK: @_PROPERTIES__TtC11objc_bridge21OptionalBlockProperty = internal constant {{.*}} [[OBJC_BLOCK_PROPERTY]]
 
 func getDescription(_ o: NSObject) -> String {
   return o.description

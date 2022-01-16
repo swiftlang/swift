@@ -70,8 +70,6 @@ private:
         IncludeDerivedRequirements(0), IncludeProtocolExtensionMembers(0) {}
 
 public:
-  LookupState(const LookupState &) = default;
-
   static LookupState makeQualified() {
     LookupState Result;
     Result.IsQualified = 1;
@@ -666,6 +664,13 @@ static void lookupVisibleMemberDeclsImpl(
     for (auto Member : PC->getMembers())
       lookupVisibleMemberDeclsImpl(Member, Consumer, CurrDC, LS, Reason,
                                    Sig, Visited);
+    return;
+  }
+
+  if (auto *existential = BaseTy->getAs<ExistentialType>()) {
+    auto constraint = existential->getConstraintType();
+    lookupVisibleMemberDeclsImpl(constraint, Consumer, CurrDC, LS, Reason,
+                                 Sig, Visited);
     return;
   }
 

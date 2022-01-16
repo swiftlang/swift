@@ -38,8 +38,10 @@ class FullApplySite;
 
 struct ApplySiteKind {
   enum innerty : std::underlying_type<SILInstructionKind>::type {
-#define APPLYSITE_INST(ID, PARENT) ID = unsigned(SILInstructionKind::ID),
-#include "swift/SIL/SILNodes.def"
+    ApplyInst = unsigned(SILInstructionKind::ApplyInst),
+    PartialApplyInst = unsigned(SILInstructionKind::PartialApplyInst),
+    TryApplyInst = unsigned(SILInstructionKind::TryApplyInst),
+    BeginApplyInst = unsigned(SILInstructionKind::BeginApplyInst),
   } value;
 
   explicit ApplySiteKind(SILInstructionKind kind) {
@@ -60,10 +62,14 @@ struct ApplySiteKind {
 private:
   static Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
-#define APPLYSITE_INST(ID, PARENT)                                             \
-  case SILInstructionKind::ID:                                                 \
-    return ApplySiteKind::ID;
-#include "swift/SIL/SILNodes.def"
+    case SILInstructionKind::ApplyInst:
+      return ApplySiteKind::ApplyInst;
+    case SILInstructionKind::PartialApplyInst:
+      return ApplySiteKind::PartialApplyInst;
+    case SILInstructionKind::TryApplyInst:
+      return ApplySiteKind::TryApplyInst;
+    case SILInstructionKind::BeginApplyInst:
+      return ApplySiteKind::BeginApplyInst;
     default:
       return None;
     }
@@ -237,6 +243,7 @@ public:
   bool isCalleeThin() const {
     switch (getSubstCalleeType()->getRepresentation()) {
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::ObjCMethod:
@@ -496,8 +503,9 @@ public:
 
 struct FullApplySiteKind {
   enum innerty : std::underlying_type<SILInstructionKind>::type {
-#define FULLAPPLYSITE_INST(ID, PARENT) ID = unsigned(SILInstructionKind::ID),
-#include "swift/SIL/SILNodes.def"
+    ApplyInst = unsigned(SILInstructionKind::ApplyInst),
+    TryApplyInst = unsigned(SILInstructionKind::TryApplyInst),
+    BeginApplyInst = unsigned(SILInstructionKind::BeginApplyInst),
   } value;
 
   explicit FullApplySiteKind(SILInstructionKind kind) {
@@ -518,10 +526,12 @@ struct FullApplySiteKind {
 private:
   static Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
     switch (kind) {
-#define FULLAPPLYSITE_INST(ID, PARENT)                                         \
-  case SILInstructionKind::ID:                                                 \
-    return FullApplySiteKind::ID;
-#include "swift/SIL/SILNodes.def"
+    case SILInstructionKind::ApplyInst:
+      return FullApplySiteKind::ApplyInst;
+    case SILInstructionKind::TryApplyInst:
+      return FullApplySiteKind::TryApplyInst;
+    case SILInstructionKind::BeginApplyInst:
+      return FullApplySiteKind::BeginApplyInst;
     default:
       return None;
     }

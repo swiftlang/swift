@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 -emit-sil -primary-file %s -Xllvm -sil-print-after=OSLogOptimization -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -swift-version 5 -emit-sil -primary-file %s -Xllvm -sil-print-after=OSLogOptimization -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 //
 // REQUIRES: VENDOR=apple
 

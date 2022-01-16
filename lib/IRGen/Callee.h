@@ -176,6 +176,7 @@ namespace irgen {
       AsyncLetGetThrowing,
       AsyncLetFinish,
       TaskGroupWaitNext,
+      DistributedExecuteTarget,
     };
 
     class Kind {
@@ -221,6 +222,7 @@ namespace irgen {
         case SpecialKind::AsyncLetWait:
         case SpecialKind::AsyncLetWaitThrowing:
         case SpecialKind::TaskGroupWaitNext:
+        case SpecialKind::DistributedExecuteTarget:
           return false;
         }
         
@@ -243,6 +245,7 @@ namespace irgen {
         case SpecialKind::AsyncLetGetThrowing:
         case SpecialKind::AsyncLetFinish:
         case SpecialKind::TaskGroupWaitNext:
+        case SpecialKind::DistributedExecuteTarget:
           return true;
         }
         llvm_unreachable("covered switch");
@@ -461,6 +464,9 @@ namespace irgen {
 
     /// Given that this callee is a block, return the block pointer.
     llvm::Value *getBlockObject() const;
+
+    /// Given that this callee is a C++ method, return the self argument.
+    llvm::Value *getCXXMethodSelf() const;
 
     /// Given that this callee is an ObjC method, return the receiver
     /// argument.  This might not be 'self' anymore.

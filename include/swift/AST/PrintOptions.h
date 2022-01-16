@@ -95,7 +95,6 @@ public:
     static_assert(DAK_Count < UINT_MAX, "DeclAttrKind is > 31 bits");
   }
   AnyAttrKind() : kind(TAK_Count), isType(1) {}
-  AnyAttrKind(const AnyAttrKind &) = default;
 
   /// Returns the TypeAttrKind, or TAK_Count if this is not a type attribute.
   TypeAttrKind type() const {
@@ -129,6 +128,9 @@ struct PrintOptions {
   /// Whether to print function definitions.
   bool FunctionDefinitions = false;
 
+  /// Whether to print expressions.
+  bool PrintExprs = false;
+  
   /// Whether to print '{ get set }' on readwrite computed properties.
   bool PrintGetSetOnRWProperties = true;
 
@@ -275,6 +277,10 @@ struct PrintOptions {
   bool PrintLongAttrsOnSeparateLines = false;
 
   bool PrintImplicitAttrs = true;
+
+  /// Whether to print the \c any keyword for existential
+  /// types.
+  bool PrintExplicitAny = false;
 
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
@@ -645,6 +651,13 @@ struct PrintOptions {
   ///
   /// This is only intended for debug output.
   static PrintOptions printEverything() {
+    PrintOptions result = printDeclarations();
+    result.FunctionDefinitions = true;
+    result.PrintExprs = true;
+    return result;
+  }
+
+  static PrintOptions printDeclarations() {
     PrintOptions result = printVerbose();
     result.ExcludeAttrList.clear();
     result.ExcludeAttrList.push_back(DAK_FixedLayout);

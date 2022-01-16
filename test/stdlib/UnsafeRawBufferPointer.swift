@@ -128,6 +128,8 @@ UnsafeRawBufferPointerTestSuite.test("initFromArray") {
   expectEqual(array2, array1)
 }
 
+#if !os(WASI)
+// Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).underflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 30, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
@@ -159,6 +161,7 @@ UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).overflow") {
   expected.withUnsafeBytes { expectEqualSequence($0,buffer[0..<idx]) }
   expectEqualSequence([5, 4, 3],bound)
 }
+#endif
 
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).exact") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 24, alignment: MemoryLayout<UInt>.alignment)
@@ -172,12 +175,15 @@ UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).exact") {
   expectEqualSequence([5, 4, 3],bound)
 }
 
+#if !os(WASI)
+// Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).invalidNilPtr") {
   let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
   let source: [Int64] = [5, 4, 3, 2, 1]
   expectCrashLater()
   _ = buffer.initializeMemory(as: Int64.self, from: source)
 }
+#endif
 
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).validNilPtr") {
   let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
@@ -280,6 +286,8 @@ UnsafeRawBufferPointerTestSuite.test("inBounds") {
   expectEqualSequence(firstHalf, secondHalf)
 }
 
+#if !os(WASI)
+// Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("subscript.get.underflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 2, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
@@ -406,6 +414,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.wide") {
   // Performs a valid byte-wise copy but triggers a debug bounds check.
   buffer[0..<2] = buffer[0..<3]
 }
+#endif
 
 UnsafeRawBufferPointerTestSuite.test("_copyContents") {
   let a = Array<UInt8>(0..<20)
@@ -419,6 +428,8 @@ UnsafeRawBufferPointerTestSuite.test("_copyContents") {
   expectEqual(written, a.count)
 }
 
+#if !os(WASI)
+// Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
   var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
@@ -432,6 +443,7 @@ UnsafeRawBufferPointerTestSuite.test("copyMemory.overflow") {
   UnsafeMutableRawBufferPointer(rebasing: bytes).copyMemory(
       from: UnsafeRawBufferPointer(buffer))
 }
+#endif
 
 // Use copyBytes without contiguous storage
 UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguouseStorage") {
@@ -446,6 +458,8 @@ UnsafeRawBufferPointerTestSuite.test("copyBytes.withoutContiguouseStorage") {
   }
 }
 
+#if !os(WASI)
+// Trap tests aren't available on WASI.
 UnsafeRawBufferPointerTestSuite.test("copyBytes.sequence.overflow") {
   var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 3, alignment: MemoryLayout<UInt>.alignment)
   defer { buffer.deallocate() }
@@ -537,6 +551,7 @@ UnsafeRawBufferPointerTestSuite.test("copy.sequence.overflow")
     }
   }
 }
+#endif
 
 UnsafeRawBufferPointerTestSuite.test("copy.overlap") {
   let bytes = UnsafeMutableRawBufferPointer.allocate(byteCount: 4, alignment: MemoryLayout<UInt>.alignment)

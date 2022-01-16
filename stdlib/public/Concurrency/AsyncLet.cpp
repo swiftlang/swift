@@ -26,7 +26,7 @@
 #include "TaskPrivate.h"
 #include "Debug.h"
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__wasi__)
 #include <dlfcn.h>
 #endif
 
@@ -142,8 +142,14 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
   auto record = impl->getTaskRecord();
   assert(impl == record && "the async-let IS the task record");
 
-  // ok, now that the group actually is initialized: attach it to the task
-  swift_task_addStatusRecord(record);
+  // ok, now that the async let task actually is initialized: attach it to the
+  // current task
+  bool addedRecord =
+      addStatusRecord(record, [&](ActiveTaskStatus parentStatus) {
+        updateNewChildWithParentAndGroupState(task, parentStatus, NULL);
+        return true;
+      });
+  assert(addedRecord);
 }
 
 // =============================================================================
@@ -309,7 +315,7 @@ static void swift_asyncLet_endImpl(AsyncLet *alet) {
 
   // Remove the child record from the parent task
   auto record = asImpl(alet)->getTaskRecord();
-  swift_task_removeStatusRecord(record);
+  removeStatusRecord(record);
 
   // TODO: we need to implicitly await either before the end or here somehow.
 
@@ -337,7 +343,7 @@ static void asyncLet_finish_after_task_completion(SWIFT_ASYNC_CONTEXT AsyncConte
 
   // Remove the child record from the parent task
   auto record = asImpl(alet)->getTaskRecord();
-  swift_task_removeStatusRecord(record);
+  removeStatusRecord(record);
 
   // and finally, release the task and destroy the async-let
   assert(swift_task_getCurrent() && "async-let must have a parent task");

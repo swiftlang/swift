@@ -592,6 +592,11 @@ struct ImmutableAddressUseVerifier {
         break;
       case SILInstructionKind::EndAccessInst:
         break;
+      case SILInstructionKind::MarkUnresolvedMoveAddrInst:
+        // We model mark_unresolved_move_addr as a copy_addr [init]. So no
+        // mutation can happen. The checker will prove eventually that we can
+        // convert it to a copy_addr [take] [init].
+        break;
       case SILInstructionKind::CopyAddrInst:
         if (isConsumingOrMutatingCopyAddrUse(use))
           return true;
@@ -821,8 +826,10 @@ public:
   // Require that the operand is a non-optional, non-unowned reference-counted
   // type.
   void requireReferenceValue(SILValue value, const Twine &valueDescription) {
-    require(value->getType().isObject(), valueDescription +" must be an object");
-    require(value->getType().isReferenceCounted(F.getModule()),
+    require(value->getType().isObject(),
+            valueDescription + " must be an object");
+    require(value->getType().isReferenceCounted(F.getModule()) ||
+                value->getType().isForeignReferenceType(),
             valueDescription + " must have reference semantics");
     forbidObjectType(UnownedStorageType, value, valueDescription);
   }
@@ -2637,6 +2644,18 @@ public:
             "cannot directly copy type with inaccessible ABI");
   }
 
+  void checkMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *SI) {
+    require(F.hasOwnership(), "Only valid in OSSA.");
+    require(F.getModule().getStage() == SILStage::Raw, "Only valid in Raw SIL");
+    require(SI->getSrc()->getType().isAddress(), "Src value should be lvalue");
+    require(SI->getDest()->getType().isAddress(),
+            "Dest address should be lvalue");
+    requireSameType(SI->getDest()->getType(), SI->getSrc()->getType(),
+                    "Store operand type and dest type mismatch");
+    require(F.isTypeABIAccessible(SI->getDest()->getType()),
+            "cannot directly copy type with inaccessible ABI");
+  }
+
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
@@ -2941,8 +2960,19 @@ public:
             "value_metatype instruction must have a metatype representation");
     require(MI->getOperand()->getType().isAnyExistentialType(),
             "existential_metatype operand must be of protocol type");
+
+    // The result of an existential_metatype instruction is an existential
+    // metatype with the same constraint type as its existential operand.
     auto formalInstanceTy
       = MI->getType().castTo<ExistentialMetatypeType>().getInstanceType();
+    if (M->getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+        formalInstanceTy->isConstraintType() &&
+        !(formalInstanceTy->isAny() || formalInstanceTy->isAnyObject())) {
+      require(MI->getOperand()->getType().is<ExistentialType>(),
+              "existential_metatype operand must be an existential type");
+      formalInstanceTy =
+          ExistentialType::get(formalInstanceTy)->getCanonicalType();
+    }
     require(isLoweringOf(MI->getOperand()->getType(), formalInstanceTy),
             "existential_metatype result must be formal metatype of "
             "lowered operand type");
@@ -2973,11 +3003,9 @@ public:
     auto *cd = DI->getOperand()->getType().getClassOrBoundGenericClass();
     require(cd, "Operand of dealloc_ref must be of class type");
 
-    if (!DI->canAllocOnStack()) {
-      require(!checkResilience(cd, F.getModule().getSwiftModule(),
-                               F.getResilienceExpansion()),
-              "cannot directly deallocate resilient class");
-    }
+    require(!checkResilience(cd, F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot directly deallocate resilient class");
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),
@@ -3430,9 +3458,11 @@ public:
             "foreign method cannot be dispatched natively");
     require(!isa<ExtensionDecl>(member.getDecl()->getDeclContext()),
             "extension method cannot be dispatched natively");
-    
-    // The method ought to appear in the class vtable.
-    require(VerifyClassMethodVisitor(member).Seen,
+
+    // The method ought to appear in the class vtable unless it's a foreign
+    // reference type.
+    require(VerifyClassMethodVisitor(member).Seen ||
+            operandType.isForeignReferenceType(),
             "method does not appear in the class's vtable");
   }
 
@@ -5233,7 +5263,7 @@ public:
       require(AACI->getErrorBB()->getNumArguments() == 1,
               "error successor must take one argument");
       auto arg = AACI->getErrorBB()->getArgument(0);
-      auto errorType = C.getErrorDecl()->getDeclaredType()->getCanonicalType();
+      auto errorType = C.getErrorExistentialType();
       requireSameType(arg->getType(),
                       SILType::getPrimitiveObjectType(errorType),
               "error successor argument must have Error type");

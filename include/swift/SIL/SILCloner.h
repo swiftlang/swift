@@ -128,6 +128,14 @@ public:
                          ArrayRef<SILValue> entryArgs,
                          bool replaceOriginalFunctionInPlace = false);
 
+  /// The same as clone function body, except the caller can provide a callback
+  /// that allows for an entry arg to be assigned to a custom old argument. This
+  /// is useful if one re-arranges parameters when converting from inout to out.
+  void
+  cloneFunctionBody(SILFunction *F, SILBasicBlock *clonedEntryBB,
+                    ArrayRef<SILValue> entryArgs,
+                    llvm::function_ref<SILValue(SILValue)> entryArgToOldArgMap);
+
   /// MARK: Callback utilities used from CRTP extensions during cloning.
   /// These should only be called from within an instruction cloning visitor.
 
@@ -602,6 +610,29 @@ void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F,
   assert(entryArgs.size() == F->getArguments().size());
   for (unsigned i = 0, e = entryArgs.size(); i != e; ++i)
     ValueMap[F->getArgument(i)] = entryArgs[i];
+
+  BBMap.insert(std::make_pair(&*F->begin(), clonedEntryBB));
+
+  Builder.setInsertionPoint(clonedEntryBB);
+
+  // This will layout all newly cloned blocks immediate after clonedEntryBB.
+  visitBlocksDepthFirst(&*F->begin());
+
+  commonFixUp(F);
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::cloneFunctionBody(
+    SILFunction *F, SILBasicBlock *clonedEntryBB, ArrayRef<SILValue> entryArgs,
+    llvm::function_ref<SILValue(SILValue)> entryArgIndexToOldArgIndex) {
+  assert(F != clonedEntryBB->getParent() && "Must clone into a new function.");
+  assert(BBMap.empty() && "This API does not allow clients to map blocks.");
+  assert(ValueMap.empty() && "Stale ValueMap.");
+
+  assert(entryArgs.size() == F->getArguments().size());
+  for (unsigned i = 0, e = entryArgs.size(); i != e; ++i) {
+    ValueMap[entryArgIndexToOldArgIndex(entryArgs[i])] = entryArgs[i];
+  }
 
   BBMap.insert(std::make_pair(&*F->begin(), clonedEntryBB));
 
@@ -1339,6 +1370,16 @@ SILCloner<ImplClass>::visitCopyAddrInst(CopyAddrInst *Inst) {
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
                 getOpValue(Inst->getDest()), Inst->isTakeOfSrc(),
                 Inst->isInitializationOfDest()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitMarkUnresolvedMoveAddrInst(
+    MarkUnresolvedMoveAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto *MVI = getBuilder().createMarkUnresolvedMoveAddr(
+      getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
+      getOpValue(Inst->getDest()));
+  recordClonedInstruction(Inst, MVI);
 }
 
 template<typename ImplClass>
@@ -2179,7 +2220,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
   auto openedType = Inst->getType().getASTType();
   auto exType = Inst->getOperand()->getType().getASTType();
   while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
-    exType = exMetatype.getInstanceType();
+    exType = exMetatype->getExistentialInstanceType()->getCanonicalType();
     openedType = cast<MetatypeType>(openedType).getInstanceType();
   }
   remapOpenedType(cast<OpenedArchetypeType>(openedType));
@@ -2478,8 +2519,16 @@ SILCloner<ImplClass>::visitDeallocRefInst(DeallocRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createDeallocRef(getOpLocation(Inst->getLoc()),
-                                          getOpValue(Inst->getOperand()),
-                                          Inst->canAllocOnStack()));
+                                          getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitDeallocStackRefInst(DeallocStackRefInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createDeallocStackRef(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

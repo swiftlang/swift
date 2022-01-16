@@ -97,6 +97,11 @@ option(SWIFT_BUILD_STATIC_STDLIB
 option(SWIFT_STDLIB_STATIC_PRINT
     "Build compile-time evaluated vprintf()"
     FALSE)
+    
+option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
+    "Include Unicode data files in the standard library.
+    NOTE: Disabling this will cause many String methods to crash."
+    TRUE)
 
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
@@ -187,18 +192,19 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
     option only affects the tools that run on the host (the compiler), and has
     no effect on the target libraries (the standard library and the runtime).")
 
-# NOTE: We do not currently support building libswift with the Xcode generator.
-cmake_dependent_option(LIBSWIFT_BUILD_MODE "How to build libswift. Possible values are
-    OFF:           the compiler is built without libswift
-    HOSTTOOLS:     libswift is built with a pre-installed toolchain
-    BOOTSTRAPPING: libswift is built with a 2-stage bootstrapping process
-    BOOTSTRAPPING-WITH-HOSTLIBS:   libswift is built with a 2-stage bootstrapping process,
+# NOTE: We do not currently support building the swift compiler modules with the Xcode generator.
+cmake_dependent_option(BOOTSTRAPPING_MODE [=[
+How to build the swift compiler modules. Possible values are
+    OFF:           build without swift modules
+    HOSTTOOLS:     build with a pre-installed toolchain
+    BOOTSTRAPPING: build with a 2-stage bootstrapping process
+    BOOTSTRAPPING-WITH-HOSTLIBS:   build with a 2-stage bootstrapping process,
                    but the compiler links against the host system swift libs (macOS only)
-    CROSSCOMPILE:  libswift is cross-compiled with a native host compiler, provided in
+    CROSSCOMPILE:  cross-compiledwith a native host compiler, provided in
                    `SWIFT_NATIVE_SWIFT_TOOLS_PATH` (non-Darwin only)
-    CROSSCOMPILE-WITH-HOSTLIBS:    libswift is built with a bootstrapping-with-hostlibs compiled
-                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`"
-  OFF "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" OFF)
+    CROSSCOMPILE-WITH-HOSTLIBS:    build with a bootstrapping-with-hostlibs compiled
+                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
+]=]  OFF "NOT XCODE" OFF)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
@@ -303,23 +309,6 @@ set(SWIFT_ANDROID_NDK_CLANG_VERSION "12.0.8" CACHE STRING
   "The Clang version to use when building for Android.")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
-
-#
-# User-configurable ICU specific options for Android, FreeBSD, Linux, Haiku, and WASI.
-#
-
-foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS;HAIKU;WASI)
-  foreach(arch aarch64;armv6;armv7;i686;powerpc64;powerpc64le;s390x;wasm32;x86_64)
-    set(SWIFT_${sdk}_${arch}_ICU_UC "" CACHE STRING
-        "Path to a directory containing the icuuc library for ${sdk}")
-    set(SWIFT_${sdk}_${arch}_ICU_UC_INCLUDE "" CACHE STRING
-        "Path to a directory containing headers for icuuc for ${sdk}")
-    set(SWIFT_${sdk}_${arch}_ICU_I18N "" CACHE STRING
-        "Path to a directory containing the icui18n library for ${sdk}")
-    set(SWIFT_${sdk}_${arch}_ICU_I18N_INCLUDE "" CACHE STRING
-        "Path to a directory containing headers icui18n for ${sdk}")
-  endforeach()
-endforeach()
 
 #
 # User-configurable Darwin-specific options.
@@ -614,24 +603,24 @@ set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-  set(SWIFT_EXEC_FOR_LIBSWIFT "${CMAKE_Swift_COMPILER}")
-elseif(LIBSWIFT_BUILD_MODE MATCHES "BOOTSTRAPPING.*")
-  # If cross-compiling we don't have to bootstrap. We can just use the previously
-  # built native swiftc to build libswift.
-  message(STATUS "Building libswift with previously built tools instead of bootstrapping")
-  set(SWIFT_EXEC_FOR_LIBSWIFT "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
-  if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-    set(LIBSWIFT_BUILD_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
-  elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
-    set(LIBSWIFT_BUILD_MODE "CROSSCOMPILE")
+  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
+elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+  # If cross-compiling, we don't have to bootstrap. We can just use the previously
+  # built native swiftc to build the swift compiler modules.
+  message(STATUS "Building swift modules with previously built tools instead of bootstrapping")
+  set(SWIFT_EXEC_FOR_SWIFT_MODULES "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
+  if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+    set(BOOTSTRAPPING_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
+  elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
+    set(BOOTSTRAPPING_MODE "CROSSCOMPILE")
   else()
-    set(LIBSWIFT_BUILD_MODE "HOSTTOOLS")
+    set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
 endif()
 
-if(LIBSWIFT_BUILD_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
+if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
   if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
-    message(STATUS "array COW checks disabled when building libswift with host libraries")
+    message(STATUS "array COW checks disabled when building the swift modules with host libraries")
     set(SWIFT_ENABLE_ARRAY_COW_CHECKS FALSE)
   endif()
 endif()
@@ -669,6 +658,9 @@ set(SWIFT_DARWIN_PLATFORMS "IOS" "IOS_SIMULATOR" "TVOS" "TVOS_SIMULATOR" "WATCHO
 set(SWIFT_APPLE_PLATFORMS ${SWIFT_DARWIN_PLATFORMS})
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple")
   list(APPEND SWIFT_APPLE_PLATFORMS "FREESTANDING")
+  if(SWIFT_FREESTANDING_IS_DARWIN)
+    list(APPEND SWIFT_DARWIN_PLATFORMS "FREESTANDING")
+  endif()
 endif()
 
 # Configuration flags passed to all of our invocations of gyb.  Try to
@@ -995,7 +987,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
-  message(STATUS "  libswift:       ${LIBSWIFT_BUILD_MODE}")
+  message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
@@ -1016,6 +1008,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Concurrency Support: ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support: ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
   message(STATUS "String Processing Support: ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
+  message(STATUS "Unicode Support: ${SWIFT_STDLIB_ENABLE_UNICODE_DATA}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -1025,37 +1018,6 @@ endif()
 #
 # Find required dependencies.
 #
-
-function(swift_icu_variables_set sdk arch result)
-  string(TOUPPER "${sdk}" sdk)
-
-  set(icu_var_ICU_UC_INCLUDE ${SWIFT_${sdk}_${arch}_ICU_UC_INCLUDE})
-  set(icu_var_ICU_UC ${SWIFT_${sdk}_${arch}_ICU_UC})
-  set(icu_var_ICU_I18N_INCLUDE ${SWIFT_${sdk}_${arch}_ICU_I18N_INCLUDE})
-  set(icu_var_ICU_I18N ${SWIFT_${sdk}_${arch}_ICU_I18N})
-
-  if(icu_var_ICU_UC_INCLUDE AND icu_var_ICU_UC AND
-     icu_var_ICU_I18N_INCLUDE AND icu_var_ICU_I18N)
-    set(${result} TRUE PARENT_SCOPE)
-  else()
-    set(${result} FALSE PARENT_SCOPE)
-  endif()
-endfunction()
-
-# ICU is provided through CoreFoundation on Darwin.  On other hosts, if the ICU
-# unicode and i18n include and library paths are not defined, perform a standard
-# package lookup.  Otherwise, rely on the paths specified by the user.  These
-# need to be defined when cross-compiling.
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
-    swift_icu_variables_set("${SWIFT_PRIMARY_VARIANT_SDK}"
-                            "${SWIFT_PRIMARY_VARIANT_ARCH}"
-                            ICU_CONFIGURED)
-    if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
-      find_package(ICU REQUIRED COMPONENTS uc i18n)
-    endif()
-  endif()
-endif()
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
@@ -1145,12 +1107,12 @@ add_subdirectory(include)
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(lib)
 
-  # "libswift" must come before "tools".
-  # It adds libswift module names to the global property "libswift_modules"
+  # SwiftCompilerSources must come before "tools".
+  # It adds swift module names to the global property "swift_compiler_modules"
   # which is used in add_swift_host_tool for the lldb workaround.
   #
-  # NOTE: We do not currently support libswift with the Xcode generator.
-  add_subdirectory(libswift)
+  # NOTE: We do not currently support SwiftCompilerSources with the Xcode generator.
+  add_subdirectory(SwiftCompilerSources)
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.
@@ -1179,7 +1141,6 @@ endif()
 
 if(SWIFT_INCLUDE_TESTS)
   add_subdirectory(test)
-  add_subdirectory(validation-test)
   add_subdirectory(unittests)
 endif()
 if(SWIFT_INCLUDE_DOCS)

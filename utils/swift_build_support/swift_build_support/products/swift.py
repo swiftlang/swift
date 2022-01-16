@@ -13,7 +13,6 @@
 from . import cmark
 from . import earlyswiftdriver
 from . import libcxx
-from . import libicu
 from . import llvm
 from . import product
 from ..cmake import CMakeOptions
@@ -59,8 +58,12 @@ class Swift(product.Product):
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
 
-        # Add experimental string processing flag.
-        self.cmake_options.extend(self._enable_experimental_string_processing)
+        # Add freestanding related flags.
+        self.cmake_options.extend(self._freestanding_is_darwin)
+
+        self.cmake_options.extend(self._build_swift_private_stdlib)
+
+        self.cmake_options.extend(self._enable_stdlib_unicode_data)
 
     @classmethod
     def is_build_script_impl_product(cls):
@@ -167,14 +170,23 @@ updated without updating swift.py?")
                  self.args.build_swift_stdlib_static_print)]
 
     @property
-    def _enable_experimental_string_processing(self):
-        return [('SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL',
-                 self.args.enable_experimental_string_processing)]
+    def _enable_stdlib_unicode_data(self):
+        return [('SWIFT_STDLIB_ENABLE_UNICODE_DATA',
+                 self.args.build_swift_stdlib_unicode_data)]
+
+    @property
+    def _freestanding_is_darwin(self):
+        return [('SWIFT_FREESTANDING_IS_DARWIN:BOOL',
+                 self.args.swift_freestanding_is_darwin)]
+
+    @property
+    def _build_swift_private_stdlib(self):
+        return [('SWIFT_STDLIB_BUILD_PRIVATE:BOOL',
+                 self.args.build_swift_private_stdlib)]
 
     @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
                 earlyswiftdriver.EarlySwiftDriver,
                 llvm.LLVM,
-                libcxx.LibCXX,
-                libicu.LibICU]
+                libcxx.LibCXX]

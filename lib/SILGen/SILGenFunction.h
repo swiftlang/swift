@@ -704,7 +704,9 @@ public:
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
 
-  ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var);
+  /// Generate code to obtain the address of the given global variable.
+  ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var,
+                                     Optional<ActorIsolation> actorIso);
 
   /// Generate a lazy global initializer.
   void emitLazyGlobalInitializer(PatternBindingDecl *binding,
@@ -2028,19 +2030,19 @@ public:
       SILLocation loc, ConstructorDecl *ctor, ManagedValue actorSelf);
   
   /// For a distributed actor, emits code to invoke the transport's
-  /// resignIdentity function.
+  /// resignID function.
   ///
   /// Specifically, this code emits SIL that performs the call
   ///
   /// \verbatim
-  ///   self.transport.resignIdentity(self.id)
+  ///   self.system.resignID(self.id)
   /// \endverbatim
   ///
   /// using the current builder's state as the injection point.
   ///
   /// \param actorDecl the declaration corresponding to the actor
   /// \param actorSelf the SIL value representing the distributed actor instance
-  void emitResignIdentityCall(SILLocation loc,
+  void emitResignIDCall(SILLocation loc,
                               ClassDecl *actorDecl, ManagedValue actorSelf);
   
   /// Emit code that tests whether the distributed actor is local, and if so,

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P {
@@ -88,6 +88,8 @@ protocol P11 {
 // Redundances within a requirement signature.
 protocol P12 { }
 
+// CHECK-LABEL: .P13@
+// CHECK: Requirement signature: <Self where Self.AT1 : P12, Self.AT1 == Self.AT2.AT1, Self.AT2 : P13>
 protocol P13 {
   associatedtype AT1 : P12
   associatedtype AT2: P13 where AT2.AT1 == AT1

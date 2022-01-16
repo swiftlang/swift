@@ -87,6 +87,9 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs,
     }
   } matcher(result);
 
+  if (lhs->hasError() || rhs->hasError())
+    return;
+
   // FIXME: Record redundancy and diagnose upstream
   (void) matcher.match(lhs, rhs);
 }
@@ -130,22 +133,18 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
     return;
   }
 
-  auto layout = constraintType->getExistentialLayout();
+  auto *compositionType = constraintType->castTo<ProtocolCompositionType>();
+  if (compositionType->hasExplicitAnyObject()) {
+    desugarLayoutRequirement(subjectType,
+                             LayoutConstraint::getLayoutConstraint(
+                                 LayoutConstraintKind::Class), result);
+  }
 
-  if (auto layoutConstraint = layout.getLayoutConstraint())
-    desugarLayoutRequirement(subjectType, layoutConstraint, result);
-
-  if (auto superclass = layout.explicitSuperclass)
-    desugarSuperclassRequirement(subjectType, superclass, result);
-
-  for (auto *proto : layout.getProtocols()) {
-    if (!subjectType->isTypeParameter()) {
-      // FIXME: Check conformance, diagnose redundancy or conflict upstream
-      return;
-    }
-
-    result.emplace_back(RequirementKind::Conformance, subjectType,
-                        proto);
+  for (auto memberType : compositionType->getMembers()) {
+    if (memberType->isExistentialType())
+      desugarConformanceRequirement(subjectType, memberType, result);
+    else
+      desugarSuperclassRequirement(subjectType, memberType, result);
   }
 }
 
@@ -346,12 +345,6 @@ void swift::rewriting::realizeRequirement(
     ModuleDecl *moduleForInference,
     SmallVectorImpl<StructuralRequirement> &result) {
   auto firstType = req.getFirstType();
-  if (moduleForInference) {
-    auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
-                             : SourceLoc());
-    inferRequirements(firstType, firstLoc, moduleForInference, result);
-  }
-
   auto loc = (reqRepr ? reqRepr->getSeparatorLoc() : SourceLoc());
 
   switch (req.getKind()) {
@@ -359,7 +352,11 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::Conformance: {
     auto secondType = req.getSecondType();
     if (moduleForInference) {
-      auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
+      auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
+                               : SourceLoc());
+      inferRequirements(firstType, firstLoc, moduleForInference, result);
+
+      auto secondLoc = (reqRepr ? reqRepr->getConstraintRepr()->getStartLoc()
                                 : SourceLoc());
       inferRequirements(secondType, secondLoc, moduleForInference, result);
     }
@@ -369,6 +366,12 @@ void swift::rewriting::realizeRequirement(
   }
 
   case RequirementKind::Layout: {
+    if (moduleForInference) {
+      auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
+                               : SourceLoc());
+      inferRequirements(firstType, firstLoc, moduleForInference, result);
+    }
+
     SmallVector<Requirement, 2> reqs;
     desugarLayoutRequirement(firstType, req.getLayoutConstraint(), reqs);
 
@@ -381,6 +384,10 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::SameType: {
     auto secondType = req.getSecondType();
     if (moduleForInference) {
+      auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
+                               : SourceLoc());
+      inferRequirements(firstType, firstLoc, moduleForInference, result);
+
       auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
                                 : SourceLoc());
       inferRequirements(secondType, secondLoc, moduleForInference, result);
@@ -501,9 +508,9 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
     for (auto req : inheritedProto->getMembers()) {
       if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
-        // Ignore generic typealiases.
-        if (auto typeAliasReq = dyn_cast<TypeAliasDecl>(typeReq))
-          if (typeAliasReq->isGeneric())
+        // Ignore generic types.
+        if (auto genReq = dyn_cast<GenericTypeDecl>(req))
+          if (genReq->getGenericParams())
             continue;
 
         inheritedTypeDecls[typeReq->getName()].push_back(typeReq);
@@ -920,27 +927,6 @@ void RuleBuilder::addRequirement(const Requirement &req,
     auto superclassSymbol = Symbol::forSuperclass(otherType, substitutions,
                                                   Context);
 
-    {
-      // Build the symbol [layout: L].
-      auto layout =
-        LayoutConstraint::getLayoutConstraint(
-          otherType->getClassOrBoundGenericClass()->usesObjCObjectModel()
-            ? LayoutConstraintKind::Class
-            : LayoutConstraintKind::NativeClass,
-          Context.getASTContext());
-      auto layoutSymbol = Symbol::forLayout(layout, Context);
-
-      MutableTerm layoutSubjectTerm;
-      layoutSubjectTerm.add(superclassSymbol);
-
-      MutableTerm layoutConstraintTerm = layoutSubjectTerm;
-      layoutConstraintTerm.add(layoutSymbol);
-
-      // Add the rule [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>].
-      PermanentRules.emplace_back(layoutConstraintTerm,
-                                  layoutSubjectTerm);
-    }
-
     // Build the term T.[superclass: C<X, Y>].
     constraintTerm = subjectTerm;
     constraintTerm.add(superclassSymbol);
@@ -1017,6 +1003,7 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
+    // Add the identity conformance rule [P].[P] => [P].
     MutableTerm lhs;
     lhs.add(Symbol::forProtocol(proto, Context));
     lhs.add(Symbol::forProtocol(proto, Context));

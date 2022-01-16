@@ -746,8 +746,8 @@ sil @test_stack_flag : $@convention(thin) () -> () {
 bb0:
   // CHECK: alloc_ref [stack] $Class1
   %0 = alloc_ref [stack] $Class1
-  // CHECK: dealloc_ref [stack] %0 : $Class1
-  dealloc_ref [stack] %0 : $Class1
+  // CHECK: dealloc_stack_ref %0 : $Class1
+  dealloc_stack_ref  %0 : $Class1
   %2 = tuple ()
   return %2 : $()
 }
@@ -1720,6 +1720,13 @@ bb0:
 
 // CHECK-LABEL: sil [lazy_getter] @test_lazy_getter
 sil [lazy_getter] @test_lazy_getter : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil hidden [distributed] @test_distributed_method
+sil hidden [distributed] @test_distributed_method : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()

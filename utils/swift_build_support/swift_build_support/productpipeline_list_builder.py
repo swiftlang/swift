@@ -141,7 +141,7 @@ class ProductPipelineListBuilder(object):
 
             # Filter out any of the pipelines that before inference were not
             # selected.
-            enabled_pipeline = filter(lambda x: x is not None, pipeline)
+            enabled_pipeline = [p for p in pipeline if p is not None]
 
             if self.args.verbose_build:
                 print("-- Build Graph Inference --")

@@ -1,11 +1,14 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
+import FakeDistributedActorSystems
 
-/// Use the existential wrapper as the default actor transport.
-typealias DefaultActorTransport = AnyActorTransport
+@available(SwiftStdlib 5.5, *)
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 struct SomeLogger {}
 struct Logger {
@@ -21,7 +24,7 @@ distributed actor Philosopher {
   let INITIALIZED: Int
   let outside: Int = 1
 
-  init(transport: AnyActorTransport) {
+  init(system: FakeActorSystem) {
     self.log = Logger(label: "name")
     self.INITIALIZED = 1
   }
@@ -30,10 +33,10 @@ distributed actor Philosopher {
 
   func test() {
     _ = self.id
-    _ = self.actorTransport
+    _ = self.actorSystem
     Task {
       _ = self.id
-      _ = self.actorTransport
+      _ = self.actorSystem
 
       self.log.info("READY!")
       _ = self.variable
@@ -42,12 +45,12 @@ distributed actor Philosopher {
 
     Task.detached {
       _ = self.id
-      _ = self.actorTransport
+      _ = self.actorSystem
 
       // This is an interesting case, since we have a real local `self` and
       // yet are not isolated to the same actor in this detached task...
       // the call to it is implicitly async, however it is NOT implicitly throwing
-      // because we KNOW this is a local call -- and there is no transport in
+      // because we KNOW this is a local call -- and there is no system in
       // between that will throw.
       _ = await self.dist() // notice lack of 'try' even though 'distributed func'
       _ = self.variable_fromDetach // expected-error{{expression is 'async' but is not marked with 'await'}}
@@ -57,12 +60,12 @@ distributed actor Philosopher {
   }
 }
 
-func test_outside(transport: AnyActorTransport) async throws {
-  _ = try await Philosopher(transport: transport).dist()
-  _ = Philosopher(transport: transport).log // expected-error{{distributed actor-isolated property 'log' can only be referenced inside the distributed actor}}
+func test_outside(system: FakeActorSystem) async throws {
+  _ = try await Philosopher(system: system).dist()
+  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can only be referenced inside the distributed actor}}
 
-  _ = Philosopher(transport: transport).id
-  _ = Philosopher(transport: transport).actorTransport
+  _ = Philosopher(system: system).id
+  _ = Philosopher(system: system).actorSystem
 }
 
 func test_outside_isolated(phil: isolated Philosopher) async throws {

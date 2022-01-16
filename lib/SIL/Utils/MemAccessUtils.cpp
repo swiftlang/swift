@@ -394,6 +394,43 @@ bool swift::isLetAddress(SILValue address) {
 }
 
 //===----------------------------------------------------------------------===//
+//                      MARK: Deinitialization barriers.
+//===----------------------------------------------------------------------===//
+
+static bool isBarrierApply(FullApplySite) {
+  // TODO: check side effect analysis
+  return true;
+}
+
+static bool mayAccessPointer(SILInstruction *instruction) {
+  if (!instruction->mayReadOrWriteMemory())
+    return false;
+  bool fail = false;
+  visitAccessedAddress(instruction, [&fail](Operand *operand) {
+    auto accessStorage = AccessStorage::compute(operand->get());
+    if (accessStorage.getKind() != AccessRepresentation::Kind::Unidentified)
+      fail = true;
+  });
+  return fail;
+}
+
+static bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
+  // TODO: It is possible to do better here by looking at the address that is
+  //       being loaded.
+  return isa<LoadWeakInst>(instruction) || isa<LoadUnownedInst>(instruction);
+}
+
+bool swift::isDeinitBarrier(SILInstruction *instruction) {
+  if (instruction->maySynchronize()) {
+    if (auto apply = FullApplySite::isa(instruction)) {
+      return isBarrierApply(apply);
+    }
+    return true;
+  }
+  return mayLoadWeakOrUnowned(instruction) || mayAccessPointer(instruction);
+}
+
+//===----------------------------------------------------------------------===//
 //                         MARK: AccessRepresentation
 //===----------------------------------------------------------------------===//
 
@@ -1412,7 +1449,7 @@ namespace {
 //   load %elt1                             // non-use (unseen)
 //   %elt2 = struct_element_addr %base, #2  // outer projection (followed)
 //   load %elt2                             // exact use
-//   %sub = struct_element_addr %elt2,  #i  // inner projection (followed)
+//   %sub = struct_element_addr %elt2,  %i  // inner projection (followed)
 //   load %sub                              // inner use
 //
 // A use may be a BranchInst if the corresponding phi does not have common
@@ -1430,8 +1467,12 @@ class AccessPathDefUseTraversal {
   // The origin of the def-use traversal.
   AccessStorage storage;
 
-  // Remaining access path indices from the most recently visited def to any
-  // exact use in def-use order.
+  // Indices of the path to match from inner to outer component.
+  // A cursor is used to represent the most recently visited def.
+  // During def-use traversal, the cursor starts at the end of pathIndicies and
+  // decrements with each projection.
+  // The first index represents an exact match.
+  // Index < 0 represents some subobject of the requested path.
   SmallVector<AccessPath::Index, 4> pathIndices;
 
   // A point in the def-use traversal. isRef() is true only for object access
@@ -1847,8 +1888,8 @@ bool swift::visitAccessPathUses(AccessUseVisitor &visitor,
 }
 
 bool swift::visitAccessStorageUses(AccessUseVisitor &visitor,
-                                     AccessStorage storage,
-                                     SILFunction *function) {
+                                   AccessStorage storage,
+                                   SILFunction *function) {
   IndexTrieNode *emptyPath = function->getModule().getIndexTrieRoot();
   return visitAccessPathUses(visitor, AccessPath(storage, emptyPath, 0),
                              function);
@@ -1883,6 +1924,110 @@ bool AccessPath::collectUses(SmallVectorImpl<Operand *> &uses,
 }
 
 //===----------------------------------------------------------------------===//
+//                      MARK: UniqueStorageUseVisitor
+//===----------------------------------------------------------------------===//
+
+struct GatherUniqueStorageUses : public AccessUseVisitor {
+  UniqueStorageUseVisitor &visitor;
+
+  GatherUniqueStorageUses(UniqueStorageUseVisitor &visitor)
+      : AccessUseVisitor(AccessUseType::Overlapping,
+                         NestedAccessType::IgnoreAccessBegin),
+        visitor(visitor) {}
+
+  bool visitUse(Operand *use, AccessUseType useTy) override;
+};
+
+bool UniqueStorageUseVisitor::findUses(UniqueStorageUseVisitor &visitor) {
+  assert(visitor.storage.isUniquelyIdentified());
+
+  GatherUniqueStorageUses gather(visitor);
+  return visitAccessStorageUses(gather, visitor.storage, visitor.function);
+}
+
+bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
+  unsigned operIdx = use->getOperandNumber();
+  auto *user = use->getUser();
+  assert(!user->isTypeDependentOperand(*use));
+
+  // TODO: handle non-escaping partial-applies just like a full apply. The
+  // address uses are the points where the partial apply is invoked.
+  if (FullApplySite apply = FullApplySite::isa(user)) {
+    switch (apply.getArgumentConvention(*use)) {
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_Out:
+      visitor.visitStore(use);
+      break;
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+      visitor.visitLoad(use);
+      break;
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Direct_Guaranteed:
+      // most likely an escape of a box
+      visitor.visitUnknownUse(use);
+      break;
+    }
+    return true;
+  }
+  switch (user->getKind()) {
+  case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::DestroyValueInst:
+    if (useTy == AccessUseType::Exact) {
+      visitor.visitDestroy(use);
+      return true;
+    }
+    visitor.visitUnknownUse(use);
+    return true;
+
+  case SILInstructionKind::DebugValueInst:
+    visitor.visitDebugUse(use);
+    return true;
+
+  case SILInstructionKind::LoadInst:
+  case SILInstructionKind::LoadWeakInst:
+  case SILInstructionKind::LoadUnownedInst:
+  case SILInstructionKind::ExistentialMetatypeInst:
+    visitor.visitLoad(use);
+    return true;
+
+  case SILInstructionKind::StoreInst:
+  case SILInstructionKind::StoreWeakInst:
+  case SILInstructionKind::StoreUnownedInst:
+    if (operIdx == CopyLikeInstruction::Dest) {
+      visitor.visitStore(use);
+      return true;
+    }
+    break;
+
+  case SILInstructionKind::InjectEnumAddrInst:
+    visitor.visitStore(use);
+    return true;
+
+  case SILInstructionKind::CopyAddrInst:
+    if (operIdx == CopyLikeInstruction::Dest) {
+      visitor.visitStore(use);
+      return true;
+    }
+    assert(operIdx == CopyLikeInstruction::Src);
+    visitor.visitLoad(use);
+    return true;
+
+  case SILInstructionKind::DeallocStackInst:
+    visitor.visitDealloc(use);
+    return true;
+
+  default:
+    break;
+  }
+  visitor.visitUnknownUse(use);
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 //             MARK: Helper API for specific formal access patterns
 //===----------------------------------------------------------------------===//
 
@@ -1903,6 +2048,9 @@ bool swift::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::CopyAddrInst: {
     auto *CAI = cast<CopyAddrInst>(memInst);
     return CAI->getDest() == address && CAI->isInitializationOfDest();
+  }
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
+    return cast<MarkUnresolvedMoveAddrInst>(memInst)->getDest() == address;
   }
   case SILInstructionKind::InitExistentialAddrInst:
   case SILInstructionKind::InitEnumDataAddrInst:
@@ -2344,6 +2492,11 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::CopyAddrInst:
     visitor(&I->getAllOperands()[CopyAddrInst::Src]);
     visitor(&I->getAllOperands()[CopyAddrInst::Dest]);
+    return;
+
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst:
+    visitor(&I->getAllOperands()[MarkUnresolvedMoveAddrInst::Src]);
+    visitor(&I->getAllOperands()[MarkUnresolvedMoveAddrInst::Dest]);
     return;
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \

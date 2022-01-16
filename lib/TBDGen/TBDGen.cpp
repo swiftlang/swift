@@ -77,7 +77,7 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
     return;
 
 #ifndef NDEBUG
-  if (kind == SymbolKind::GlobalSymbol) {
+  if (kind == SymbolKind::GlobalSymbol && !source.isFromCrossModuleOptimization()) {
     if (!DuplicateSymbolChecker.insert(name).second) {
       llvm::dbgs() << "TBDGen duplicate symbol: " << name << '\n';
       assert(false && "TBDGen symbol appears twice");
@@ -1196,7 +1196,13 @@ void TBDGenVisitor::visitFile(FileUnit *file) {
 void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
   // Add any autolinking force_load symbols.
   addFirstFileSymbols();
-  
+
+  if (desc.getPublicCMOSymbols()) {
+    for (const std::string &sym : *desc.getPublicCMOSymbols()) {
+      addSymbol(sym, SymbolSource::forCrossModuleOptimization());
+    }
+  }
+
   if (auto *singleFile = desc.getSingleFile()) {
     assert(SwiftModule == singleFile->getParentModule() &&
            "mismatched file and module");
@@ -1340,9 +1346,9 @@ std::vector<std::string> swift::getPublicSymbols(TBDGenDescriptor desc) {
   return llvm::cantFail(evaluator(PublicSymbolsRequest{desc}));
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                         const TBDGenOptions &opts) {
+                const TBDGenOptions &opts, TBDSymbolSetPtr publicCMOSymbols) {
   auto &evaluator = M->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forModule(M, opts);
+  auto desc = TBDGenDescriptor::forModule(M, opts, publicCMOSymbols);
   auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc}));
   llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
                  "YAML writing should be error-free");
@@ -1485,10 +1491,10 @@ apigen::API APIGenRequest::evaluate(Evaluator &evaluator,
 }
 
 void swift::writeAPIJSONFile(ModuleDecl *M, llvm::raw_ostream &os,
-                             bool PrettyPrint) {
+                             bool PrettyPrint, TBDSymbolSetPtr publicCMOSymbols) {
   TBDGenOptions opts;
   auto &evaluator = M->getASTContext().evaluator;
-  auto desc = TBDGenDescriptor::forModule(M, opts);
+  auto desc = TBDGenDescriptor::forModule(M, opts, publicCMOSymbols);
   auto api = llvm::cantFail(evaluator(APIGenRequest{desc}));
   api.writeAPIJSONFile(os, PrettyPrint);
 }

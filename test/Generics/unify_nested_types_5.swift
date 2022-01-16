@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine=verify
+// RUN: %target-typecheck-verify-swift
 
 protocol P {
   associatedtype A : P

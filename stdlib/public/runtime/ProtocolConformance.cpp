@@ -428,7 +428,7 @@ struct ConformanceState {
 
   ConformanceState() {
     scanSectionsBackwards =
-        runtime::bincompat::workaroundProtocolConformanceReverseIteration();
+        runtime::bincompat::useLegacyProtocolConformanceReverseIteration();
 
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
     if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
@@ -530,6 +530,7 @@ static void _registerProtocolConformances(ConformanceState &C,
 }
 
 void swift::addImageProtocolConformanceBlockCallbackUnsafe(
+    const void *baseAddress,
     const void *conformances, uintptr_t conformancesSize) {
   assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0 &&
          "conformances section not a multiple of ProtocolConformanceRecord");
@@ -574,9 +575,11 @@ void swift::addImageProtocolConformanceBlockCallbackUnsafe(
 }
 
 void swift::addImageProtocolConformanceBlockCallback(
+    const void *baseAddress,
     const void *conformances, uintptr_t conformancesSize) {
   Conformances.get();
-  addImageProtocolConformanceBlockCallbackUnsafe(conformances,
+  addImageProtocolConformanceBlockCallbackUnsafe(baseAddress,
+                                                 conformances,
                                                  conformancesSize);
 }
 

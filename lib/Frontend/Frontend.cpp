@@ -357,30 +357,49 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-bool CompilerInstance::setup(const CompilerInvocation &Invok) {
+bool CompilerInstance::setup(const CompilerInvocation &Invok,
+                             std::string &Error) {
   Invocation = Invok;
 
   setupDependencyTrackerIfNeeded();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
-  if (setUpVirtualFileSystemOverlays())
+  if (setUpVirtualFileSystemOverlays()) {
+    Error = "Setting up virtual file system overlays failed";
     return true;
+  }
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
-  if (setUpInputs())
+  if (setUpInputs()) {
+    Error = "Setting up inputs failed";
     return true;
+  }
 
-  if (setUpASTContextIfNeeded())
+  if (setUpASTContextIfNeeded()) {
+    Error = "Setting up ASTContext failed";
     return true;
+  }
 
   setupStatsReporter();
 
-  if (setupDiagnosticVerifierIfNeeded())
+  if (setupDiagnosticVerifierIfNeeded()) {
+    Error = "Setting up diagnostics verified failed";
     return true;
+  }
+
+  // If we expect an implicit stdlib import, load in the standard library. If we
+  // either fail to find it or encounter an error while loading it, bail early. Continuing will at best
+  // trigger a bunch of other errors due to the stdlib being missing, or at
+  // worst crash downstream as many call sites don't currently handle a missing
+  // stdlib.
+  if (loadStdlibIfNeeded()) {
+    Error = "Loading the standard library failed";
+    return true;
+  }
 
   return false;
 }
@@ -793,6 +812,10 @@ bool CompilerInvocation::shouldImportSwiftConcurrency() const {
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
+bool CompilerInvocation::shouldImportSwiftStringProcessing() const {
+  return getLangOptions().EnableExperimentalStringProcessing;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -829,8 +852,25 @@ void CompilerInstance::verifyImplicitConcurrencyImport() {
 }
 
 bool CompilerInstance::canImportSwiftConcurrency() const {
-  return getASTContext().canImportModule(
-      {getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME), SourceLoc()});
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath);
+}
+
+void CompilerInstance::verifyImplicitStringProcessingImport() {
+  if (Invocation.shouldImportSwiftStringProcessing() &&
+      !canImportSwiftStringProcessing()) {
+    Diagnostics.diagnose(SourceLoc(),
+                         diag::warn_implicit_string_processing_import_failed);
+  }
+}
+
+bool CompilerInstance::canImportSwiftStringProcessing() const {
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath);
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
@@ -844,7 +884,8 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     ImportPath::Builder importPath(Context->getIdentifier(moduleStr));
     UnloadedImportedModule import(importPath.copyTo(*Context),
                                   /*isScoped=*/false);
-    imports.AdditionalUnloadedImports.emplace_back(import, options);
+    imports.AdditionalUnloadedImports.emplace_back(
+        import, SourceLoc(), options);
   };
 
   for (auto &moduleStrAndTestable : frontendOpts.getImplicitImportModuleNames()) {
@@ -869,6 +910,19 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     case ImplicitStdlibKind::Stdlib:
       if (canImportSwiftConcurrency())
         pushImport(SWIFT_CONCURRENCY_NAME);
+      break;
+    }
+  }
+
+  if (Invocation.shouldImportSwiftStringProcessing()) {
+    switch (imports.StdlibKind) {
+    case ImplicitStdlibKind::Builtin:
+    case ImplicitStdlibKind::None:
+      break;
+
+    case ImplicitStdlibKind::Stdlib:
+      if (canImportSwiftStringProcessing())
+        pushImport(SWIFT_STRING_PROCESSING_NAME);
       break;
     }
   }
@@ -1064,12 +1118,17 @@ void CompilerInstance::performSema() {
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF);
+    return false;
   });
 
   finishTypeChecking();
 }
 
 bool CompilerInstance::loadStdlibIfNeeded() {
+  if (!FrontendOptions::doesActionRequireSwiftStandardLibrary(
+          Invocation.getFrontendOptions().RequestedAction)) {
+    return false;
+  }
   // If we aren't expecting an implicit stdlib import, there's nothing to do.
   if (getImplicitImportInfo().StdlibKind != ImplicitStdlibKind::Stdlib)
     return false;
@@ -1084,6 +1143,7 @@ bool CompilerInstance::loadStdlibIfNeeded() {
   }
 
   verifyImplicitConcurrencyImport();
+  verifyImplicitStringProcessingImport();
 
   // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {
@@ -1123,26 +1183,31 @@ bool CompilerInstance::loadPartialModulesAndImplicitImports(
   return hadLoadError;
 }
 
-void CompilerInstance::forEachFileToTypeCheck(
-    llvm::function_ref<void(SourceFile &)> fn) {
+bool CompilerInstance::forEachFileToTypeCheck(
+    llvm::function_ref<bool(SourceFile &)> fn) {
   if (isWholeModuleCompilation()) {
     for (auto fileName : getMainModule()->getFiles()) {
       auto *SF = dyn_cast<SourceFile>(fileName);
       if (!SF) {
         continue;
       }
-      fn(*SF);
+      if (fn(*SF))
+        return true;
+      ;
     }
   } else {
     for (auto *SF : getPrimarySourceFiles()) {
-      fn(*SF);
+      if (fn(*SF))
+        return true;
     }
   }
+  return false;
 }
 
 void CompilerInstance::finishTypeChecking() {
   forEachFileToTypeCheck([](SourceFile &SF) {
     performWholeModuleTypeChecking(SF);
+    return false;
   });
 }
 
@@ -1182,7 +1247,9 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
   // Enable interface hash computation for primaries or emit-module-separately,
   // but not in WMO, as it's only currently needed for incremental mode.
   if (forPrimary ||
-      typeOpts.SkipFunctionBodies == FunctionBodySkipping::NonInlinableWithoutTypes) {
+      typeOpts.SkipFunctionBodies ==
+          FunctionBodySkipping::NonInlinableWithoutTypes ||
+      frontendOpts.ReuseFrontendForMutipleCompilations) {
     opts |= SourceFile::ParsingFlags::EnableInterfaceHash;
   }
   return opts;
@@ -1280,6 +1347,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
   }
 
   performSILOptimizations(Invocation, silModule);
+
+  publicCMOSymbols = silModule->getPublicCMOSymbols();
 
   if (auto *stats = getStatsReporter())
     countStatsPostSILOpt(*stats, *silModule);

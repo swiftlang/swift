@@ -143,12 +143,7 @@ CharacterPropertiesTests.test("Casing") {
 
   expectEqual("SS", Character("ß").uppercased())
 
-// Some versions of ICU on Linux (62.1) have a bug producing the wrong value
-// when lowercasing "ẞ". Darwin platforms never shipped this version, so
-// conditionally test based on platform.
-#if canImport(Darwin)
   expectEqual("ß", Character("ẞ").lowercased())
-#endif
 
   expectEqual("и", Character("И").lowercased())
   expectEqual("И", Character("и").uppercased())

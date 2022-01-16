@@ -53,6 +53,7 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::DynamicSelf:
+  case TypeKind::PackExpansion:
     llvm_unreachable("these types do not have metadata");
 
   // All the builtin types are leaves.
@@ -77,6 +78,9 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Tuple:
     return cast<TupleType>(type)->getNumElements() == 0;
 
+  case TypeKind::Pack:
+    return cast<PackType>(type)->getNumElements() == 0;
+
   // Nominal types might have generic parents.
   case TypeKind::Class:
   case TypeKind::Enum:
@@ -97,6 +101,10 @@ static bool isLeafTypeMetadata(CanType type) {
 
   // Protocol compositions have component types.
   case TypeKind::ProtocolComposition:
+    return false;
+
+  // Existential types have constraint types.
+  case TypeKind::Existential:
     return false;
 
   // Metatypes have instance types.

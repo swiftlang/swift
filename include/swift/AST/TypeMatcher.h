@@ -143,6 +143,42 @@ class TypeMatcher {
       return mismatch(firstTuple.getPointer(), secondType, sugaredFirstType);
     }
 
+    bool visitPackType(CanPackType firstTuple, Type secondType,
+                       Type sugaredFirstType) {
+      if (auto secondTuple = secondType->getAs<PackType>()) {
+        auto sugaredFirstTuple = sugaredFirstType->getAs<PackType>();
+        if (firstTuple->getNumElements() != secondTuple->getNumElements())
+          return mismatch(firstTuple.getPointer(), secondTuple,
+                          sugaredFirstType);
+
+        for (unsigned i = 0, n = firstTuple->getNumElements(); i != n; ++i) {
+          Type secondElt = secondTuple->getElementType(i);
+
+          // Recurse on the pack elements.
+          if (!this->visit(firstTuple.getElementType(i), secondElt,
+                           sugaredFirstTuple->getElementType(i)))
+            return false;
+        }
+
+        return true;
+      }
+
+      // Pack/non-pack mismatch.
+      return mismatch(firstTuple.getPointer(), secondType, sugaredFirstType);
+    }
+
+    bool visitPackExpansionType(CanPackExpansionType firstPE, Type secondType,
+                                Type sugaredFirstType) {
+      if (auto secondInOut = secondType->getAs<PackExpansionType>()) {
+        return this->visit(firstPE.getPatternType(),
+                           secondInOut->getPatternType(),
+                           sugaredFirstType->castTo<PackExpansionType>()
+                             ->getPatternType());
+      }
+
+      return mismatch(firstPE.getPointer(), secondType, sugaredFirstType);
+    }
+
     bool visitReferenceStorageType(CanReferenceStorageType firstStorage,
                                    Type secondType, Type sugaredFirstType) {
       auto _secondStorage = secondType->getCanonicalType();
@@ -268,6 +304,20 @@ class TypeMatcher {
     TRIVIAL_CASE(SILBlockStorageType)
     TRIVIAL_CASE(SILBoxType)
     TRIVIAL_CASE(ProtocolCompositionType)
+
+    bool visitExistentialType(CanExistentialType firstExistential,
+                              Type secondType,
+                              Type sugaredFirstType) {
+      if (auto secondExistential = secondType->getAs<ExistentialType>()) {
+        return this->visit(firstExistential.getConstraintType(),
+                           secondExistential->getConstraintType(),
+                           sugaredFirstType->castTo<ExistentialType>()
+                               ->getConstraintType());
+      }
+
+      return mismatch(firstExistential.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitLValueType(CanLValueType firstLValue, Type secondType,
                          Type sugaredFirstType) {

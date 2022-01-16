@@ -548,7 +548,7 @@ public:
       auto newCapacity = std::max((size_t)16, count * 2);
       auto *newStorage = Storage::allocate(newCapacity);
       if (storage) {
-        std::copy(storage->data(), storage->data() + count, newStorage->data());
+        std::uninitialized_copy_n(storage->data(), count, newStorage->data());
         newStorage->Count.store(count, std::memory_order_release);
         ConcurrentFreeListNode::add(&FreeList, storage);
       }
@@ -622,10 +622,7 @@ using llvm::hash_value;
 /// outstanding readers, but this won't destroy the static mutex it uses.
 template <class ElemTy, class MutexTy = StaticMutex>
 struct ConcurrentReadableHashMap {
-  // We use memcpy and don't call destructors. Make sure the elements will put
-  // up with this.
-  static_assert(std::is_trivially_copyable<ElemTy>::value,
-                "Elements must be trivially copyable.");
+  // We don't call destructors. Make sure the elements will put up with this.
   static_assert(std::is_trivially_destructible<ElemTy>::value,
                 "Elements must not have destructors (they won't be called).");
 
@@ -884,8 +881,13 @@ private:
     auto *newElements = ElementStorage::allocate(newCapacity);
 
     if (elements) {
-      memcpy(newElements->data(), elements->data(),
-             elementCount * sizeof(ElemTy));
+      if (std::is_trivially_copyable<ElemTy>::value) {
+        memcpy(newElements->data(), elements->data(),
+               elementCount * sizeof(ElemTy));
+      } else {
+        std::uninitialized_copy_n(elements->data(), elementCount,
+                                  newElements->data());
+      }
       ConcurrentFreeListNode::add(&FreeList, elements);
     }
 

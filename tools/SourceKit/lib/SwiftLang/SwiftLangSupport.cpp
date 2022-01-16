@@ -273,7 +273,8 @@ configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
-      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache) {
+      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache),
+      CompileManager(RuntimeResourcePath, DiagnosticDocumentationPath) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
@@ -286,6 +287,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
       RuntimeResourcePath, DiagnosticDocumentationPath);
 
   CompletionInst = std::make_shared<CompletionInstance>();
+
   configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
 
   // By default, just use the in-memory cache.
@@ -999,6 +1001,7 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    SourceKitCancellationToken CancellationToken,
     llvm::function_ref<void(CancellableResult<CompletionLikeOperationParams>)>
         PerformOperation) {
   assert(FileSystem);
@@ -1042,8 +1045,8 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   CompilerInvocation Invocation;
   std::string CompilerInvocationError;
   bool CreatingInvocationFailed = getASTManager()->initCompilerInvocation(
-      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
-      CompilerInvocationError);
+      Invocation, Args, FrontendOptions::ActionType::Typecheck, Diags,
+      newBuffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
   if (CreatingInvocationFailed) {
     PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
         CompilerInvocationError));
@@ -1058,8 +1061,13 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   // Pin completion instance.
   auto CompletionInst = getCompletionInstance();
 
-  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(),
-                                          &CIDiags};
+  auto CancellationFlag = std::make_shared<std::atomic<bool>>(false);
+  ReqTracker->setCancellationHandler(CancellationToken, [CancellationFlag] {
+    CancellationFlag->store(true, std::memory_order_relaxed);
+  });
+
+  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(), &CIDiags,
+                                          CancellationFlag};
   PerformOperation(
       CancellableResult<CompletionLikeOperationParams>::success(Params));
 }

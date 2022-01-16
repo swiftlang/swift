@@ -17,7 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(__APPLE__) && defined(__MACH__) && SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
 #include <Availability.h>
 #include <TargetConditionals.h>

@@ -50,12 +50,6 @@ bool ArgsToFrontendOutputsConverter::convert(
   Optional<std::vector<std::string>> indexMains;
   if (Args.hasArg(options::OPT_index_unit_output_path,
                   options::OPT_index_unit_output_path_filelist)) {
-
-    if (!Args.hasArg(options::OPT_index_store_path)) {
-      Diags.diagnose(SourceLoc(),
-                     diag::warn_index_unit_output_path_without_index_store);
-    }
-
     Optional<OutputFilesComputer> iuofc =
         OutputFilesComputer::create(Args, Diags, InputsAndOutputs, {
           "index unit output path", options::OPT_index_unit_output_path,
@@ -599,6 +593,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
        paths.PrivateModuleInterfaceOutputPath},
       {file_types::TY_YAMLOptRecord, paths.YAMLOptRecordPath},
       {file_types::TY_BitstreamOptRecord, paths.BitstreamOptRecordPath},
+      {file_types::TY_SwiftABIDescriptor, paths.ABIDescriptorOutputPath},
   };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {

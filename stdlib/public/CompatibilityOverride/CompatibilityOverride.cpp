@@ -16,7 +16,7 @@
 
 #include "CompatibilityOverride.h"
 
-#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+#ifdef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
 #include "../runtime/ImageInspection.h"
 #include "swift/Runtime/Once.h"
@@ -91,4 +91,4 @@ static OverrideSection *getOverrideSectionPtr() {
   }
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
-#endif // #ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+#endif // #ifdef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT

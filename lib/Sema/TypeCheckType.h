@@ -125,6 +125,16 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are in a requirement of a generic declaration
   GenericRequirement,
 
+  /// Whether we are in a same-type requirement of a generic
+  /// declaration.
+  SameTypeRequirement,
+
+  /// Whether this is the base type of .Protocol
+  ProtocolMetatypeBase,
+
+  /// Whether this is the base type of .Type
+  MetatypeBase,
+
   /// Whether we are in a type argument for an optional
   ImmediateOptionalTypeArgument,
 
@@ -215,6 +225,9 @@ public:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
+    case Context::SameTypeRequirement:
+    case Context::ProtocolMetatypeBase:
+    case Context::MetatypeBase:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::Inherited:
@@ -222,6 +235,40 @@ public:
       return false;
     }
     llvm_unreachable("unhandled kind");
+  }
+
+  /// Whether a generic constraint type is implicitly an
+  /// existential type in this context.
+  bool isConstraintImplicitExistential() const {
+    switch (context) {
+    case Context::Inherited:
+    case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::GenericRequirement:
+    case Context::MetatypeBase:
+      return false;
+    case Context::None:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::FunctionInput:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::EnumPatternPayload:
+    case Context::SameTypeRequirement:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+      return true;
+    }
   }
 
   /// Determine whether all of the given options are set.
@@ -274,6 +321,13 @@ public:
     copy.setContext(None);
     // FIXME: Move SILType to TypeResolverContext.
     if (!preserveSIL) copy -= TypeResolutionFlags::SILType;
+    return copy;
+  }
+
+  inline
+  TypeResolutionOptions withContext(TypeResolverContext context) const {
+    auto copy = *this;
+    copy.setContext(context);
     return copy;
   }
 };
@@ -397,11 +451,6 @@ public:
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
                                   ComponentIdentTypeRepr *ref) const;
-
-  /// Resolve an unqualified reference to an associated type or type alias
-  /// in a protocol.
-  Type resolveSelfAssociatedType(Type baseTy, DeclContext *DC,
-                                 Identifier name) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.

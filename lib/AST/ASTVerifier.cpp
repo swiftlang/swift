@@ -2067,7 +2067,10 @@ public:
         abort();
       }
 
-      checkSameType(E->getBase()->getType(), metatype->getInstanceType(),
+      auto instance = metatype->getInstanceType();
+      if (auto existential = metatype->getAs<ExistentialMetatypeType>())
+        instance = existential->getExistentialInstanceType();
+      checkSameType(E->getBase()->getType(), instance,
                     "base type of .Type expression");
       verifyCheckedBase(E);
     }
@@ -3422,11 +3425,12 @@ public:
     }
 
     Type checkExceptionTypeExists(const char *where) {
-      auto exn = Ctx.getErrorDecl();
-      if (exn) return exn->getDeclaredInterfaceType();
+      if (!Ctx.getErrorDecl()) {
+        Out << "exception type does not exist in " << where << "\n";
+        abort();
+      }
 
-      Out << "exception type does not exist in " << where << "\n";
-      abort();
+      return Ctx.getErrorExistentialType();
     }
 
     bool isGoodSourceRange(SourceRange SR) {

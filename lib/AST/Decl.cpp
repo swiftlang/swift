@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/CaptureInfo.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -1957,7 +1958,11 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
     return true;
 
   if (auto *classDecl = dyn_cast<ClassDecl>(storage->getDeclContext())) {
-    if (storage->isFinal() || classDecl->isFinal())
+    // Accesses to members of foreign reference types should be made directly
+    // to storage as these are references to clang records which are not allowed
+    // to have dynamic dispatch.
+    if (storage->isFinal() || classDecl->isFinal() ||
+        classDecl->isForeignReferenceType())
       return false;
 
     return true;
@@ -2938,7 +2943,9 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
   if (getOpaqueResultTypeRepr() == nullptr) {
-    if (isa<ModuleDecl>(this))
+    if (!isa<VarDecl>(this) &&
+        !isa<FuncDecl>(this) &&
+        !isa<SubscriptDecl>(this))
       return nullptr;
     auto file = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
     // Don't look up when the decl is from source, otherwise a cycle will happen.
@@ -4102,7 +4109,10 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
   Bits.GenericTypeParamDecl.TypeSequence = isTypeSequence;
   auto &ctx = dc->getASTContext();
-  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
+  RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
+  if (this->isTypeSequence())
+    props |= RecursiveTypeProperties::HasTypeSequence;
+  auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this, props);
   setInterfaceType(MetatypeType::get(type, ctx));
 }
 
@@ -4327,8 +4337,8 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
       if (baseName == DeclBaseName::createConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
-        } else if (argumentNames.front() == Context.Id_transport) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActorTransport);
+        } else if (argumentNames.front() == Context.Id_system) {
+          action.emplace(ImplicitMemberAction::ResolveDistributedActorSystem);
         }
       } else if (!baseName.isSpecial() &&
            baseName.getIdentifier() == Context.Id_encode &&
@@ -4735,6 +4745,10 @@ bool ClassDecl::walkSuperclasses(
   }
 
   return false;
+}
+
+bool ClassDecl::isForeignReferenceType() {
+  return getClangDecl() && isa<clang::RecordDecl>(getClangDecl());
 }
 
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
@@ -5150,7 +5164,10 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
     return SelfReferenceInfo::forSelfRef(SelfReferencePosition::Invariant);
 
   // Protocol compositions preserve variance.
-  if (auto *comp = type->getAs<ProtocolCompositionType>()) {
+  auto constraint = type;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+  if (auto *comp = constraint->getAs<ProtocolCompositionType>()) {
     // 'Self' may be referenced only in a superclass component.
     if (const auto superclass = comp->getSuperclass()) {
       return findProtocolSelfReferences(proto, superclass, position);
@@ -5256,6 +5273,11 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
   }
 
   return true;
+}
+
+bool ProtocolDecl::existentialRequiresAny() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    ExistentialRequiresAnyRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
 StringRef ProtocolDecl::getObjCRuntimeName(
@@ -6532,7 +6554,7 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc,
               /*IsStatic*/ false,
               VarDecl::Introducer::Let, parameterNameLoc, parameterName, dc,
               StorageIsNotMutable),
-      ArgumentNameAndDestructured(argumentName, false),
+      ArgumentNameAndFlags(argumentName, None),
       ParameterNameLoc(parameterNameLoc),
       ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
   Bits.ParamDecl.SpecifierComputed = false;
@@ -7386,6 +7408,18 @@ AbstractFunctionDecl::getDistributedActorRemoteFuncDecl() const {
       nullptr);
 }
 
+ValueDecl*
+NominalTypeDecl::getDistributedActorIDProperty() const {
+  if (!this->isDistributedActor())
+    return nullptr;
+
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedActorIDPropertyRequest{mutableThis},
+      nullptr);
+}
+
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   if ((getBodyKind() == BodyKind::Synthesize ||
        getBodyKind() == BodyKind::Unparsed) &&
@@ -7403,8 +7437,8 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           ParseAbstractFunctionBodyRequest{mutableThis},
-                           nullptr);
+                           ParseAbstractFunctionBodyRequest{mutableThis}, {})
+      .getBody();
 }
 
 BraceStmt *AbstractFunctionDecl::getTypecheckedBody() const {
@@ -7418,7 +7452,12 @@ void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
   assert(getBodyKind() != BodyKind::Skipped &&
          "cannot set a body if it was skipped");
 
-  Body = S;
+  Optional<Fingerprint> fp = None;
+  if (getBodyKind() == BodyKind::TypeChecked ||
+      getBodyKind() == BodyKind::Parsed) {
+    fp = BodyAndFP.getFingerprint();
+  }
+  BodyAndFP = BodyAndFingerprint(S, fp);
   setBodyKind(NewBodyKind);
 
   // Need to recompute init body kind.
@@ -7433,13 +7472,18 @@ void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
   assert(getBodyKind() == BodyKind::Unparsed ||
          getBodyKind() == BodyKind::Parsed ||
          getBodyKind() == BodyKind::TypeChecked);
-  assert(getASTContext().SourceMgr.rangeContainsTokenLoc(
-             bodyRange, getASTContext().SourceMgr.getCodeCompletionLoc()) &&
-         "This function is only intended to be used for code completion");
 
   keepOriginalBodySourceRange();
   BodyRange = bodyRange;
   setBodyKind(BodyKind::Unparsed);
+
+  // Remove local type decls from the source file.
+  if (auto SF = getParentSourceFile()) {
+    SF->LocalTypeDecls.remove_if([&](TypeDecl *TD) {
+      auto dc = TD->getDeclContext();
+      return dc == this || dc->isChildContextOf(this);
+    });
+  }
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -7475,6 +7519,54 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
     return SourceRange(getNameLoc(), endLoc);
 
   return getNameLoc();
+}
+
+Optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
+  ASTContext &ctx = getASTContext();
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ParseAbstractFunctionBodyRequest{mutableThis}, {})
+      .getFingerprint();
+}
+
+Optional<Fingerprint>
+AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
+
+  class HashCombiner : public ASTWalker {
+    StableHasher &hasher;
+
+  public:
+    HashCombiner(StableHasher &hasher) : hasher(hasher) {}
+
+    bool walkToDeclPre(Decl *D) override {
+      if (D->isImplicit())
+        return false;
+
+      if (auto *idc = dyn_cast<IterableDeclContext>(D)) {
+        if (auto fp = idc->getBodyFingerprint())
+          hasher.combine(*fp);
+
+        // Since ASTWalker calls 'getMembers()' which might tries to synthesize
+        // members etc., manually recurse into `getParsedMembers()`.
+        for (auto *d : idc->getParsedMembers())
+          const_cast<Decl *>(d)->walk(*this);
+
+        return false;
+      }
+
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+        if (auto fp = afd->getBodyFingerprint())
+          hasher.combine(*fp);
+      }
+
+      return true;
+    }
+  };
+
+  StableHasher hasher = StableHasher::defaultHasher();
+  HashCombiner combiner(hasher);
+  const_cast<AbstractFunctionDecl *>(this)->walk(combiner);
+  return Fingerprint(std::move(hasher));
 }
 
 ObjCSelector
@@ -7693,16 +7785,38 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                                GenericParamList *GenericParams, DeclContext *DC,
                                GenericSignature OpaqueInterfaceGenericSignature,
-                               OpaqueReturnTypeRepr *UnderlyingInterfaceRepr,
-                               GenericTypeParamType *UnderlyingInterfaceType)
+                               ArrayRef<OpaqueReturnTypeRepr *>
+                                   OpaqueReturnTypeReprs)
     : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
                       GenericParams),
-      NamingDecl(NamingDecl),
-      OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature),
-      UnderlyingInterfaceRepr(UnderlyingInterfaceRepr),
-      UnderlyingInterfaceType(UnderlyingInterfaceType) {
+      NamingDeclAndHasOpaqueReturnTypeRepr(
+        NamingDecl, !OpaqueReturnTypeReprs.empty()),
+      OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature) {
   // Always implicit.
   setImplicit();
+
+  /// We either have no opaque return type representations ('some P'), or we
+  /// have one for each opaque generic parameter.
+  assert(OpaqueReturnTypeReprs.empty() ||
+         OpaqueReturnTypeReprs.size() ==
+            OpaqueInterfaceGenericSignature.getInnermostGenericParams().size());
+  std::uninitialized_copy(
+      OpaqueReturnTypeReprs.begin(), OpaqueReturnTypeReprs.end(),
+      getTrailingObjects<OpaqueReturnTypeRepr *>());
+}
+
+OpaqueTypeDecl *OpaqueTypeDecl::get(
+      ValueDecl *NamingDecl, GenericParamList *GenericParams,
+      DeclContext *DC,
+      GenericSignature OpaqueInterfaceGenericSignature,
+      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs) {
+  ASTContext &ctx = DC->getASTContext();
+  auto size = totalSizeToAlloc<OpaqueReturnTypeRepr *>(
+      OpaqueReturnTypeReprs.size());
+  auto mem = ctx.Allocate(size, alignof(OpaqueTypeDecl));
+  return new (mem) OpaqueTypeDecl(
+      NamingDecl, GenericParams, DC, OpaqueInterfaceGenericSignature,
+      OpaqueReturnTypeReprs);
 }
 
 bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
@@ -7720,13 +7834,28 @@ bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
   return false;
 }
 
+bool OpaqueTypeDecl::hasExplicitGenericParams() const {
+  return getExplicitGenericParam(0) != nullptr;
+}
+
+GenericTypeParamDecl *OpaqueTypeDecl::getExplicitGenericParam(
+    unsigned ordinal) const {
+  if (ordinal >= getOpaqueGenericParams().size())
+    return nullptr;
+
+  auto genericParamType = getOpaqueGenericParams()[ordinal];
+  return genericParamType->getDecl();
+}
+
 unsigned OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
     OpaqueReturnTypeRepr *repr) const {
-  // TODO [OPAQUE SUPPORT]: we will need to generalize here when we allow
-  // multiple "some" types.
-  assert(UnderlyingInterfaceRepr &&
+  assert(NamingDeclAndHasOpaqueReturnTypeRepr.getInt() &&
          "can't do opaque param lookup without underlying interface repr");
-  return repr == UnderlyingInterfaceRepr ? 0 : -1;
+  auto opaqueReprs = getOpaqueReturnTypeReprs();
+  auto found = std::find(opaqueReprs.begin(), opaqueReprs.end(), repr);
+  if (found != opaqueReprs.end())
+    return found - opaqueReprs.begin();
+  return -1;
 }
 
 Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
@@ -8583,7 +8712,8 @@ bool ClassDecl::isNSObject() const {
   if (!getName().is("NSObject")) return false;
   ASTContext &ctx = getASTContext();
   return (getModuleContext()->getName() == ctx.Id_Foundation ||
-          getModuleContext()->getName() == ctx.Id_ObjectiveC);
+          getModuleContext()->getName() == ctx.Id_ObjectiveC ||
+          getModuleContext()->getName().is("SwiftFoundation"));
 }
 
 Type ClassDecl::getSuperclass() const {
@@ -8609,6 +8739,41 @@ void ClassDecl::setSuperclass(Type superclass) {
     true);
 }
 
+bool VarDecl::isSelfParamCaptureIsolated() const {
+  assert(isSelfParamCapture());
+
+  // Find the "self" parameter that we captured and determine whether
+  // it is potentially isolated.
+  for (auto dc = getDeclContext(); dc; dc = dc->getParent()) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+      if (auto selfDecl = func->getImplicitSelfDecl()) {
+        return selfDecl->isIsolated();
+      }
+
+      if (auto capture = func->getCaptureInfo().getIsolatedParamCapture())
+        return capture->isSelfParameter() || capture->isSelfParamCapture();
+    }
+
+    if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+      switch (auto isolation = closure->getActorIsolation()) {
+      case ClosureActorIsolation::Independent:
+      case ClosureActorIsolation::GlobalActor:
+        return false;
+
+      case ClosureActorIsolation::ActorInstance:
+        auto isolatedVar = isolation.getActorInstance();
+        return isolatedVar->isSelfParameter() ||
+            isolatedVar-isSelfParamCapture();
+      }
+    }
+
+    if (dc->isModuleScopeContext() || dc->isTypeContext())
+      break;
+  }
+
+  return false;
+}
+
 ActorIsolation swift::getActorIsolation(ValueDecl *value) {
   auto &ctx = value->getASTContext();
   return evaluateOrDefault(
@@ -8620,10 +8785,23 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dc->getAsDecl()))
     return getActorIsolation(vd);
 
+  // In the context of the initializing or default-value expression of a
+  // stored property, the isolation varies between global and type members:
+  //   - For a static stored property, the isolation matches the VarDecl.
+  //   - For a field of a nominal type, the expression is not isolated.
+  // Without this distinction, a nominal can have non-async initializers
+  // with various kinds of isolation, so an impossible constraint can be
+  // created. See SE-0327 for details.
   if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
-    if (auto *var = init->getBinding()->getAnchoringVarDecl(
-            init->getBindingIndex()))
+    if (auto *var =
+          init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
+
+      if (var->isInstanceMember() &&
+          !var->getAttrs().hasAttribute<LazyAttr>())
+        return ActorIsolation::forUnspecified();
+
       return getActorIsolation(var);
+    }
   }
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
@@ -8638,7 +8816,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
 
     case ClosureActorIsolation::ActorInstance: {
       auto selfDecl = isolation.getActorInstance();
-      auto actorClass = selfDecl->getType()->getRValueType()
+      auto actorClass = selfDecl->getType()->getReferenceStorageReferent()
           ->getClassOrBoundGenericClass();
       // FIXME: Doesn't work properly with generics
       assert(actorClass && "Bad closure actor isolation?");
@@ -8788,7 +8966,7 @@ SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
   return extractNearestSourceLoc(decl->getDeclContext());
 }
 
-Optional<BraceStmt *>
+Optional<BodyAndFingerprint>
 ParseAbstractFunctionBodyRequest::getCachedResult() const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
   auto afd = std::get<0>(getStorage());
@@ -8797,11 +8975,11 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   case BodyKind::SILSynthesize:
   case BodyKind::None:
   case BodyKind::Skipped:
-    return nullptr;
+    return BodyAndFingerprint{};
 
   case BodyKind::TypeChecked:
   case BodyKind::Parsed:
-    return afd->Body;
+    return afd->BodyAndFP;
 
   case BodyKind::Synthesize:
   case BodyKind::Unparsed:
@@ -8810,7 +8988,8 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   llvm_unreachable("Unhandled BodyKing in switch");
 }
 
-void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
+void ParseAbstractFunctionBodyRequest::cacheResult(
+    BodyAndFingerprint value) const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
   auto afd = std::get<0>(getStorage());
   switch (afd->getBodyKind()) {
@@ -8819,12 +8998,12 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
   case BodyKind::None:
   case BodyKind::Skipped:
     // The body is always empty, so don't cache anything.
-    assert(value == nullptr);
+    assert(!value.getFingerprint().hasValue() && value.getBody() == nullptr);
     return;
 
   case BodyKind::Parsed:
   case BodyKind::TypeChecked:
-    afd->Body = value;
+    afd->BodyAndFP = value;
     return;
 
   case BodyKind::Synthesize:
@@ -8832,7 +9011,14 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
     llvm_unreachable("evaluate() did not set the body kind");
     return;
   }
+}
 
+void swift::simple_display(llvm::raw_ostream &out, BodyAndFingerprint value) {
+  out << "(";
+  simple_display(out, value.getBody());
+  out << ", ";
+  simple_display(out, value.getFingerprint());
+  out << ")";
 }
 
 void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
