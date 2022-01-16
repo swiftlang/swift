@@ -328,8 +328,8 @@ namespace swift {
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
-    /// Enable experimental ClangImporter diagnostics.
-    bool EnableExperimentalClangImporterDiagnostics = false;
+    /// Disable experimental ClangImporter diagnostics.
+    bool DisableExperimentalClangImporterDiagnostics = false;
 
     /// Enable experimental eager Clang module diagnostics.
     bool EnableExperimentalEagerClangModuleDiagnostics = false;

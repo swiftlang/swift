@@ -3627,7 +3627,7 @@ bool MissingMemberFailure::diagnoseAsError() {
         .highlight(getSourceRange())
         .highlight(nameLoc.getSourceRange());
     const auto &ctx = getSolution().getDC()->getASTContext();
-    if (ctx.LangOpts.EnableExperimentalClangImporterDiagnostics) {
+    if (!ctx.LangOpts.DisableExperimentalClangImporterDiagnostics) {
       ctx.getClangModuleLoader()->diagnoseMemberValue(getName().getFullName(),
                                                       baseType);
     }
