@@ -474,6 +474,55 @@ do {
   }
 }
 
+protocol UnfulfillableGenericRequirements {
+  associatedtype A
+}
+extension UnfulfillableGenericRequirements {
+  func method1() where A : C<Self> {}
+  // expected-note@-1 {{where 'Self.A' = '(UnfulfillableGenericRequirements).A', 'C<Self>' = 'C<UnfulfillableGenericRequirements>'}}
+  func method2() where A: Sequence, A.Element == Self {}
+  // expected-note@-1 {{where 'Self' = 'UnfulfillableGenericRequirements', 'Self.A.Element' = '(UnfulfillableGenericRequirements).A.Element'}}
+  // expected-note@-2 {{where 'Self.A' = '(UnfulfillableGenericRequirements).A'}}
+  func method3<U>(_: U) -> U {}
+  func method4<U>(_: U) where U : C<Self> {}
+  // expected-note@-1 {{where 'U' = 'Bool', 'C<Self>' = 'C<UnfulfillableGenericRequirements>'}}
+  func method5<U>(_: U) where U: Sequence, Self == U.Element {}
+  // expected-note@-1 {{where 'U' = 'Bool'}}
+
+  // expected-note@+3 {{where 'Self.A' = '(UnfulfillableGenericRequirements).A'}}
+  // expected-note@+2 {{where 'Self.A.Element' = '(UnfulfillableGenericRequirements).A.Element'}}
+  // expected-note@+1 {{where 'U' = 'Bool'}}
+  func method6<U>(_: U) where U: UnfulfillableGenericRequirements,
+                              A: Sequence, A.Element: Sequence,
+                              U.A == A.Element.Element {}
+  func method7<U>(_: U) where U: UnfulfillableGenericRequirements & C<Self> {}
+  // expected-note@-1 {{where 'U' = 'C<UnfulfillableGenericRequirements>'}}
+}
+do {
+  let exist: any UnfulfillableGenericRequirements
+
+  exist.method1() // expected-error {{instance method 'method1()' requires that '(UnfulfillableGenericRequirements).A' inherit from 'C<UnfulfillableGenericRequirements>'}}
+  exist.method2()
+  // expected-error@-1 {{instance method 'method2()' requires the types 'UnfulfillableGenericRequirements' and '(UnfulfillableGenericRequirements).A.Element' be equivalent}}
+  // expected-error@-2 {{instance method 'method2()' requires that '(UnfulfillableGenericRequirements).A' conform to 'Sequence'}}
+  _ = exist.method3(false)
+  exist.method4(false)
+  // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'C<UnfulfillableGenericRequirements>'}}
+  // expected-error@-2 {{member 'method4' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; use a generic constraint instead}}
+  exist.method5(false)
+  // expected-error@-1 {{instance method 'method5' requires that 'Bool' conform to 'Sequence'}}
+  // expected-error@-2 {{member 'method5' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; use a generic constraint instead}}
+  exist.method6(false)
+  // expected-error@-1 {{instance method 'method6' requires that '(UnfulfillableGenericRequirements).A.Element' conform to 'Sequence'}}
+  // expected-error@-2 {{instance method 'method6' requires that '(UnfulfillableGenericRequirements).A' conform to 'Sequence'}}
+  // expected-error@-3 {{instance method 'method6' requires that 'Bool' conform to 'UnfulfillableGenericRequirements'}}
+  // expected-error@-4 {{member 'method6' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; use a generic constraint instead}}
+  exist.method7(false)
+  // expected-error@-1 {{instance method 'method7' requires that 'C<UnfulfillableGenericRequirements>' conform to 'UnfulfillableGenericRequirements'}}
+  // expected-error@-2 {{member 'method7' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; use a generic constraint instead}}
+  // expected-error@-3 {{cannot convert value of type 'Bool' to expected argument type 'C<UnfulfillableGenericRequirements>'}}
+}
+
 // Settable storage members with a 'Self' result type may not be used with an
 // existential base.
 protocol P2 {

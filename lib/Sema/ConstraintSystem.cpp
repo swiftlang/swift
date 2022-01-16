@@ -5789,6 +5789,68 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
   ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
 }
 
+/// A protocol member accessed with an existential value might have generic
+/// constraints that require the ability to spell an opened archetype in order
+/// to be satisfied. Such are
+/// - superclass requirements, when the object is a non-'Self'-rooted type
+///   parameter, and the subject is dependent on 'Self', e.g. U : G<Self.A>
+/// - same-type requirements, when one side is dependent on 'Self', and the
+///   other is a non-'Self'-rooted type parameter, e.g. U.Element == Self.
+///
+/// Because opened archetypes are not part of the surface language, these
+/// constraints render the member inaccessible.
+static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
+    const ValueDecl *member) {
+  const auto sig =
+      member->getInnermostDeclContext()->getGenericSignatureOfContext();
+
+  // Fast path: the member is generic only over 'Self'.
+  if (sig.getGenericParams().size() == 1) {
+    return false;
+  }
+
+  const auto selfTy = sig.getGenericParams().front();
+
+  const auto isDependentOnSelf = [&](Type ty) {
+    return ty.findIf([&](Type ty) {
+      return ty->is<GenericTypeParamType>() && ty->isEqual(selfTy);
+    });
+  };
+
+  for (const auto &req : sig.getRequirements()) {
+    switch (req.getKind()) {
+    case RequirementKind::Superclass: {
+      if (!req.getFirstType()->getRootGenericParam()->isEqual(selfTy) &&
+          isDependentOnSelf(req.getSecondType())) {
+        return true;
+      }
+
+      break;
+    }
+    case RequirementKind::SameType: {
+      const auto isNonSelfRootedTypeParam = [&](Type ty) {
+        return ty->isTypeParameter() &&
+               !ty->getRootGenericParam()->isEqual(selfTy);
+      };
+
+      const auto lhs = req.getFirstType();
+      const auto rhs = req.getSecondType();
+      if ((isNonSelfRootedTypeParam(lhs) && isDependentOnSelf(rhs)) ||
+          (isNonSelfRootedTypeParam(rhs) && isDependentOnSelf(lhs))) {
+        return true;
+      }
+
+      break;
+    }
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+      break;
+    }
+  }
+
+  return false;
+}
+
 bool ConstraintSystem::isAvailableInExistential(const ProtocolDecl *proto,
                                                 const ValueDecl *member) const {
   // If the type of the member references 'Self' in non-covariant position, or
@@ -5803,6 +5865,10 @@ bool ConstraintSystem::isAvailableInExistential(const ProtocolDecl *proto,
   if (auto *const storageDecl = dyn_cast<AbstractStorageDecl>(member)) {
     if (info.hasCovariantSelfResult && storageDecl->supportsMutation())
       return false;
+  }
+
+  if (doesMemberHaveUnfulfillableConstraintsWithExistentialBase(member)) {
+    return false;
   }
 
   return true;
