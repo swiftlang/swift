@@ -1709,6 +1709,14 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
   return nullptr;
 }
 
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+void *swift_distributed_get_generic_environment(const char *targetNameStart,
+                                                size_t targetNameLength) {
+  auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
+  return accessor ? accessor->GenericEnvironment.get() : nullptr;
+}
+
 /// func _executeDistributedTarget(
 ///    on: AnyObject,
 ///    _ targetName: UnsafePointer<UInt8>,
@@ -1766,7 +1774,7 @@ void ::swift_distributed_execute_target(
     AsyncContext *callContext) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
-    assert(false && "no distributed accessor accessor");
+    assert(false && "no distributed accessor");
     return; // FIXME(distributed): return -1 here so the lib can fail the call
   }
 
