@@ -1913,54 +1913,90 @@ cstrToStringRef(const char *typeNameStart, size_t typeNameLength) {
   return typeName;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
-unsigned
-swift_func_getParameterCount(const char *typeNameStart, size_t typeNameLength) {
+/// Given mangling for a method, extract its function type in demangled
+/// representation.
+static NodePointer extractFunctionTypeFromMethod(Demangler &demangler,
+                                                 const char *typeNameStart,
+                                                 size_t typeNameLength) {
   llvm::Optional<llvm::StringRef> typeName =
       cstrToStringRef(typeNameStart, typeNameLength);
   if (!typeName)
-    return -1;
-
-  StackAllocatedDemangler<1024> demangler;
+    return nullptr;
 
   auto node = demangler.demangleSymbol(*typeName);
-  if (!node) return -2;
+  if (!node)
+    return nullptr;
 
   node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
-  if (!node) return -3;
+  if (!node)
+    return nullptr;
 
   node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
-  if (!node) return -4;
+  if (!node)
+    return nullptr;
 
-  node = node->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/3);
-  // Get the "deepest" Tuple from the ArgumentTuple, that's the arguments
-  while (node && node->getKind() != Node::Kind::Tuple) {
-    node = node->getFirstChild();
+  // If this is a generic function, it requires special handling.
+  if (auto genericType =
+          node->findByKind(Node::Kind::DependentGenericType, /*maxDepth=*/1)) {
+    node = genericType->findByKind(Node::Kind::Type, /*maxDepth=*/1);
+    return node->findByKind(Node::Kind::FunctionType, /*maxDepth=*/1);
   }
 
-  if (node) {
-    return node->getNumChildren();
-  }
+  auto funcType = node->getFirstChild();
+  assert(funcType->getKind() == Node::Kind::FunctionType);
+  return funcType;
+}
 
-  return -5;
+/// For a single unlabeled parameter this function returns whole
+/// `ArgumentTuple`, for everything else a `Tuple` element inside it.
+static NodePointer getParameterList(NodePointer funcType) {
+  assert(funcType->getKind() == Node::Kind::FunctionType);
+
+  auto parameterContainer =
+      funcType->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/1);
+  assert(parameterContainer->getNumChildren() > 0);
+
+  // This is a type that convers entire parameter list.
+  auto parameterList = parameterContainer->getFirstChild();
+  assert(parameterList->getKind() == Node::Kind::Type);
+
+  auto parameters = parameterList->getFirstChild();
+  if (parameters->getKind() == Node::Kind::Tuple)
+    return parameters;
+
+  return parameterContainer;
+}
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+unsigned swift_func_getParameterCount(const char *typeNameStart,
+                                      size_t typeNameLength) {
+  StackAllocatedDemangler<1024> demangler;
+
+  auto funcType =
+      extractFunctionTypeFromMethod(demangler, typeNameStart, typeNameLength);
+  if (!funcType)
+    return -1;
+
+  auto parameterList = getParameterList(funcType);
+  return parameterList->getNumChildren();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 const Metadata *_Nullable
 swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength) {
-  llvm::Optional<llvm::StringRef> typeName =
-      cstrToStringRef(typeNameStart, typeNameLength);
-  if (!typeName) return nullptr;
-
   StackAllocatedDemangler<1024> demangler;
-  auto node = demangler.demangleSymbol(*typeName);
-  if (!node) return nullptr;
 
-  node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
-  if (!node) return nullptr;
+  auto *funcType =
+      extractFunctionTypeFromMethod(demangler, typeNameStart, typeNameLength);
+  if (!funcType)
+    return nullptr;
 
-  node = node->findByKind(Node::Kind::ReturnType, /*maxDepth=*/4);
-  if (!node) return nullptr;
+  auto resultType = funcType->getLastChild();
+  if (!resultType)
+    return nullptr;
+
+  assert(resultType->getKind() == Node::Kind::ReturnType);
 
   DecodedMetadataBuilder builder(
       demangler,
@@ -1970,7 +2006,8 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength) {
       [](const Metadata *, unsigned) { return nullptr; });
 
   TypeDecoder<DecodedMetadataBuilder> decoder(builder);
-  auto builtTypeOrError = decoder.decodeMangledType(node);
+  auto builtTypeOrError =
+      decoder.decodeMangledType(resultType->getFirstChild());
   if (builtTypeOrError.isError()) {
     auto err = builtTypeOrError.getError();
     char *errStr = err->copyErrorString();
@@ -1988,31 +2025,19 @@ swift_func_getParameterTypeInfo(
     Metadata const **types, unsigned typesLength) {
   if (typesLength < 0) return -1;
 
-  llvm::Optional<llvm::StringRef> typeName =
-      cstrToStringRef(typeNameStart, typeNameLength);
-  if (!typeName) return -1;
-
   StackAllocatedDemangler<1024> demangler;
-  auto node = demangler.demangleSymbol(*typeName);
-  if (!node) return -1;
 
-  node = node->findByKind(Node::Kind::Function, /*maxDepth=*/2);
-  if (!node) return -3;
+  auto *funcType =
+      extractFunctionTypeFromMethod(demangler, typeNameStart, typeNameLength);
+  if (!funcType)
+    return -1;
 
-  node = node->findByKind(Node::Kind::Type, /*maxDepth=*/2);
-  if (!node) return -4;
-
-  node = node->findByKind(Node::Kind::ArgumentTuple, /*maxDepth=*/3);
-  // Get the "deepest" Tuple from the ArgumentTuple, that's the arguments
-  while (node && node->getKind() != Node::Kind::Tuple) {
-    node = node->getFirstChild();
-  }
+  auto parameterList = getParameterList(funcType);
 
   // Only successfully return if the expected parameter count is the same
   // as space prepared for it in the buffer.
-  if (!node || (node && node->getNumChildren() != typesLength)) {
-    return -5;
-  }
+  if (!(parameterList && parameterList->getNumChildren() == typesLength))
+    return -2;
 
   DecodedMetadataBuilder builder(
       demangler,
@@ -2024,14 +2049,15 @@ swift_func_getParameterTypeInfo(
 
   auto typeIdx = 0;
   // for each parameter (TupleElement), store it into the provided buffer
-  for (auto tupleElement : *node) {
-    assert(tupleElement->getKind() == Node::Kind::TupleElement);
-    assert(tupleElement->getNumChildren() == 1);
+  for (auto *parameter : *parameterList) {
+    if (parameter->getKind() == Node::Kind::TupleElement) {
+      assert(parameter->getNumChildren() == 1);
+      parameter = parameter->getFirstChild();
+    }
 
-    auto typeNode = tupleElement->getFirstChild();
-    assert(typeNode->getKind() == Node::Kind::Type);
+    assert(parameter->getKind() == Node::Kind::Type);
 
-    auto builtTypeOrError = decoder.decodeMangledType(tupleElement);
+    auto builtTypeOrError = decoder.decodeMangledType(parameter);
     if (builtTypeOrError.isError()) {
       auto err = builtTypeOrError.getError();
       char *errStr = err->copyErrorString();
@@ -2041,14 +2067,10 @@ swift_func_getParameterTypeInfo(
     }
 
     types[typeIdx] = builtTypeOrError.getType();
-    typeIdx += 1;
+    ++typeIdx;
   } // end foreach parameter
 
-  if (node) {
-    return node->getNumChildren();
-  }
-
-  return -9;
+  return typesLength;
 }
 
 // ==== End of Function metadata functions ---------------------------------------
