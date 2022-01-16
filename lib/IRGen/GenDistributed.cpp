@@ -107,7 +107,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
                                           SILFunction *Target) {
   auto &Context = IGM.Context;
 
-  auto getRawPointerParmeter = [&]() {
+  auto getRawPointerParameter = [&]() {
     auto ptrType = Context.getUnsafeRawPointerType();
     return SILParameterInfo(ptrType->getCanonicalType(),
                             ParameterConvention::Direct_Guaranteed);
@@ -131,8 +131,8 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   return SILFunctionType::get(
       /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Guaranteed,
-      {/*argumentBuffer=*/getRawPointerParmeter(),
-       /*resultBuffer=*/getRawPointerParmeter(),
+      {/*argumentBuffer=*/getRawPointerParameter(),
+       /*resultBuffer=*/getRawPointerParameter(),
        /*actor=*/targetTy->getParameters().back()},
       /*Yields=*/{},
       /*Results=*/{},
