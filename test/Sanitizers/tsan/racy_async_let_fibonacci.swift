@@ -17,6 +17,7 @@
 // rdar://86825277
 // UNSUPPORTED: CPU=arm64e
 
+#if 0
 func fib(_ n: Int) -> Int {
   var first = 0
   var second = 1
@@ -66,6 +67,7 @@ func runFibonacci(_ n: Int) async {
     await runFibonacci(10)
   }
 }
+#endif
 
 // CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is global 'racyCounter'
