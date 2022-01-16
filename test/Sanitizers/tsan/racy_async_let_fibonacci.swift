@@ -17,7 +17,7 @@
 // rdar://86825277
 // UNSUPPORTED: CPU=arm64e
 
-#if 0
+#if false
 func fib(_ n: Int) -> Int {
   var first = 0
   var second = 1
