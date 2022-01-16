@@ -20,7 +20,7 @@
 
 #if SWIFT_OBJC_INTEROP
 #import <CoreFoundation/CoreFoundation.h>
-#include "../SwiftShims/CoreFoundationShims.h"
+#include "SwiftShims/CoreFoundationShims.h"
 #import <objc/runtime.h>
 #include "swift/Runtime/Once.h"
 #include <dlfcn.h>

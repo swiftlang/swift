@@ -16,7 +16,7 @@
 #ifndef SCALAR_PROP_DATA_H
 #define SCALAR_PROP_DATA_H
 
-#include "../SwiftShims/SwiftStdint.h"
+#include "SwiftShims/SwiftStdint.h"
 
 #define BIN_PROPS_COUNT 4855
 
