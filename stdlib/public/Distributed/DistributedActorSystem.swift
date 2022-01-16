@@ -168,6 +168,13 @@ extension DistributedActorSystem {
 
     // Get the expected parameter count of the func
     let nameUTF8 = Array(mangledTargetName.utf8)
+
+    // Gen the generic environment (if any) associated with the target.
+    let genericEnv = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
+      _getGenericEnvironmentOfDistributedTarget(nameUTF8.baseAddress!,
+                                                UInt(nameUTF8.endIndex))
+    }
+
     let paramCount = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
       __getParameterCount(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
     }
@@ -193,6 +200,7 @@ extension DistributedActorSystem {
     let decodedNum = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
       __getParameterTypeInfo(
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
+        genericEnv,
         paramTypesBuffer.baseAddress!._rawValue, Int(paramCount))
     }
 
@@ -220,7 +228,8 @@ extension DistributedActorSystem {
       return UnsafeRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
     }
 
-    guard let returnTypeFromTypeInfo: Any.Type = _getReturnTypeInfo(mangledMethodName: mangledTargetName) else {
+    guard let returnTypeFromTypeInfo: Any.Type = _getReturnTypeInfo(mangledMethodName: mangledTargetName,
+                                                                    genericEnv: genericEnv) else {
       throw ExecuteDistributedTargetError(
         message: "Failed to decode distributed target return type")
     }

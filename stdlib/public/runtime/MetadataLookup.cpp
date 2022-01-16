@@ -1984,7 +1984,8 @@ unsigned swift_func_getParameterCount(const char *typeNameStart,
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 const Metadata *_Nullable
-swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength) {
+swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
+                             GenericEnvironmentDescriptor *genericEnv) {
   StackAllocatedDemangler<1024> demangler;
 
   auto *funcType =
@@ -2022,6 +2023,7 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 unsigned
 swift_func_getParameterTypeInfo(
     const char *typeNameStart, size_t typeNameLength,
+    GenericEnvironmentDescriptor *genericEnv,
     Metadata const **types, unsigned typesLength) {
   if (typesLength < 0) return -1;
 

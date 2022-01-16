@@ -41,14 +41,15 @@ func __getParameterCount(
 @available(SwiftStdlib 5.6, *)
 public // SPI _Distributed
 func _getParameterTypeInfo(
-    mangledMethodName name: String,
-    into typesBuffer: Builtin.RawPointer, length typesLength: Int
+  mangledMethodName name: String,
+  genericEnv: UnsafeRawPointer?, // GenericEnvironmentDescriptor *
+  into typesBuffer: Builtin.RawPointer, length typesLength: Int
 ) -> Int32 {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { nameUTF8 in
     return __getParameterTypeInfo(
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
-        typesBuffer, typesLength)
+        genericEnv, typesBuffer, typesLength)
   }
 }
 
@@ -59,15 +60,20 @@ func _getParameterTypeInfo(
 public // SPI _Distributed
 func __getParameterTypeInfo(
     _ typeNameStart: UnsafePointer<UInt8>, _ typeNameLength: UInt,
+    _ genericEnv: UnsafeRawPointer?, // GenericEnvironmentDescriptor *
     _ types: Builtin.RawPointer, _ typesLength: Int
 ) -> Int32
 
 @available(SwiftStdlib 5.6, *)
 public // SPI _Distributed
-func _getReturnTypeInfo(mangledMethodName name: String) -> Any.Type? {
+func _getReturnTypeInfo(
+  mangledMethodName name: String,
+  genericEnv: UnsafeRawPointer? // GenericEnvironmentDescriptor *
+) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { nameUTF8 in
-    return __getReturnTypeInfo(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
+    return __getReturnTypeInfo(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
+                               genericEnv)
   }
 }
 
@@ -76,7 +82,8 @@ func _getReturnTypeInfo(mangledMethodName name: String) -> Any.Type? {
 public // SPI _Distributed
 func __getReturnTypeInfo(
     _ typeNameStart: UnsafePointer<UInt8>,
-    _ typeNameLength: UInt
+    _ typeNameLength: UInt,
+    _ genericEnv: UnsafeRawPointer? // GenericEnvironmentDescriptor *
 ) -> Any.Type?
 
 
