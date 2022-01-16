@@ -315,6 +315,8 @@ extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
   /// For example, passing a closed range with an upper bound of `Int.max`
   /// triggers a runtime error, because the resulting half-open range would
   /// require an upper bound of `Int.max + 1`, which is not representable as
+  /// an `Int`.
+  @inlinable // trivial-implementation
   public init(_ other: ClosedRange<Bound>) {
     let upperBound = other.upperBound.advanced(by: 1)
     self.init(_uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
