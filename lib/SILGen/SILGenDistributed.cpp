@@ -26,6 +26,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
@@ -121,6 +122,19 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF,
       SGF.emitUnwrapIntegerResult(Loc, isRemoteResult);
 
   B.createCondBranch(Loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
+}
+
+/// Emit a value of `RemoteCallTarget' with the appropriate information for this
+/// distributed method.
+static SILValue *emitDistributedRemoteCallTargetValue(SILGenFunction &SGF,
+                                                      SILLocation loc) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto &B = SGF.B;
+
+  auto &F = SGF.F;
+  assert(false); // FIXME(!!)!!!!(!!)!!!!(!!)!!!!(!!)!!!!(!!)!!!!(!!)!!!!
+//
+//  F.decl
 }
 
 // MARK: local instance initialization
@@ -562,6 +576,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   auto fd = cast<AbstractFunctionDecl>(thunk.getDecl());
 
   ASTContext &ctx = getASTContext();
+  auto &M = getModule();
 
   // Use the same generic environment as the native entry point.
   F.setGenericEnvironment(SGM.Types.getConstantGenericEnvironment(native));
@@ -685,8 +700,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto makeInvocationDerivativeFnSILTy = SILType::getPrimitiveObjectType(makeInvocationMethodTy);
       auto makeInvocationSilFnType = makeInvocationDerivativeFnSILTy.castTo<SILFunctionType>();
 
-      fprintf(stderr, "[%s:%d] (%s) SIL fn type, result:\n", __FILE__, __LINE__, __FUNCTION__);
-      makeInvocationSilFnType->getResults().begin()->dump();
       auto invocationEncoderResultInfo =
           makeInvocationSilFnType->getResults().begin();
       auto invocationEncoderCanTy = invocationEncoderResultInfo->getInterfaceType();
@@ -701,6 +714,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       SILValue makeInvocationFn = B.createFunctionRefFor(loc, makeInvocationFnSIL);
 
       ApplyInst *invocationValue;
+      BeginAccessInst *invocationValueAccess;
       SILValue encoderTemp = emitTemporaryAllocation(loc, invocationEncoderTy);
       {
 //        emitDistributedActorSystemWitnessCall(
@@ -717,7 +731,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         B.createStore(loc, invocationValue, encoderTemp,
                       StoreOwnershipQualifier::Trivial);
 
-        auto invocationAccess =
+        invocationValueAccess =
             B.createBeginAccess(loc, encoderTemp,
                                 SILAccessKind::Modify,
                                 SILAccessEnforcement::Static,
@@ -726,10 +740,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
         fprintf(stderr, "[%s:%d] (%s) invocation Value: \n", __FILE__, __LINE__, __FUNCTION__);
         invocationValue->dump();
-
-        fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-        F.dump();
-        fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+        fprintf(stderr, "[%s:%d] (%s) invocation Value access: \n", __FILE__, __LINE__, __FUNCTION__);
+        invocationValueAccess->dump();
       }
 
       // We need to maintain a "next normal basic block" pointer because
@@ -744,14 +756,13 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // - recordArgument // TODO(distributed): implement
       // - recordErrorType // TODO(distributed): implement
       // - recordReturnType // TODO(distributed): implement
+      // === recordGenericSubstitution
       {
-        // === recordGenericSubstitution
-        {
-          // TODO(distributed): record substitutions
-        }
+        // TODO(distributed): record substitutions
+      }
 
-        // === encoder.recordArgument(s)
-        {
+      // === encoder.recordArgument(s)
+      {
 //          auto recordArgumentFnDecl =
 //              selfTyDecl->getDistributedActorInvocationRecordArgumentFunction();
 //          auto recordArgumentFnRef = SILDeclRef(recordArgumentFnDecl);
@@ -777,63 +788,166 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 //                std::make_pair(nextNormalBB, recordArgumentErrorBB)
 //                );
 //          }
+      }
+
+      {
+        // TODO(distributed): record error type
+      }
+
+      {
+        // TODO(distributed): record return type
+      }
+
+
+      // === doneRecording
+      auto doneRecordingNormalBB = createBasicBlock();
+      auto doneRecordingErrorBB = createBasicBlock();
+      dynamicBasicErrorBlocks.push_back(doneRecordingErrorBB);
+      {
+        if (nextNormalBB) {
+          B.emitBlock(nextNormalBB);
         }
-
-        {
-          // TODO(distributed): record error type
-        }
-
-        {
-          // TODO(distributed): record return type
-        }
-
-
-        // === doneRecording
-        auto doneRecordingNormalBB = createBasicBlock();
-        auto doneRecordingErrorBB = createBasicBlock();
-        dynamicBasicErrorBlocks.push_back(doneRecordingErrorBB);
-        {
-          if (nextNormalBB) {
-            B.emitBlock(nextNormalBB);
-          }
+        nextNormalBB = doneRecordingNormalBB;
 
 //          auto doneRecordingFnDecl =
 //              selfTyDecl->getDistributedActorSystemMakeInvocationFunction();
 
-          NominalTypeDecl *invocationEncoderNominal =
-              invocationEncoderTy.getNominalOrBoundGenericNominal();
-          assert(invocationEncoderNominal);
-          FuncDecl *doneRecordingFnDecl =
-              ctx.getDoneRecordingOnDistributedInvocationEncoder(
-                  invocationEncoderNominal);
-          assert(doneRecordingFnDecl);
-          auto doneRecordingFnRef = SILDeclRef(doneRecordingFnDecl);
-          assert(doneRecordingFnDecl && "no remoteCall func found!");
+        NominalTypeDecl *invocationEncoderNominal =
+            invocationEncoderTy.getNominalOrBoundGenericNominal();
+        assert(invocationEncoderNominal);
+        FuncDecl *doneRecordingFnDecl =
+            ctx.getDoneRecordingOnDistributedInvocationEncoder(
+                invocationEncoderNominal);
+        assert(doneRecordingFnDecl);
+        auto doneRecordingFnRef = SILDeclRef(doneRecordingFnDecl);
+        assert(doneRecordingFnDecl && "no remoteCall func found!");
 
-          auto doneRecordingFnSIL =
-              builder.getOrCreateFunction(loc, doneRecordingFnRef, ForDefinition);
-          SILValue doneRecordingFn = B.createFunctionRefFor(loc, doneRecordingFnSIL);
-          doneRecordingFn->dump();
+        auto doneRecordingFnSIL =
+            builder.getOrCreateFunction(loc, doneRecordingFnRef, ForDefinition);
+        SILValue doneRecordingFn = B.createFunctionRefFor(loc, doneRecordingFnSIL);
+        doneRecordingFn->dump();
 
-          B.createTryApply(
-              loc, doneRecordingFn,
-              /*subs=*/F.getForwardingSubstitutionMap(),
-              /*args=*/{}, // FIXME: pass invocation
-              /*normalBB=*/doneRecordingNormalBB,
-              /*errorBB*/doneRecordingErrorBB);
+        B.createTryApply(
+            loc, doneRecordingFn,
+            /*subs=*/F.getForwardingSubstitutionMap(),
+            /*args=*/{invocationValueAccess},
+            /*normalBB=*/doneRecordingNormalBB,
+            /*errorBB*/doneRecordingErrorBB);
 
-          //          emitDistributedActorSystemWitnessCall(
+        //          emitDistributedActorSystemWitnessCall(
 //              B, loc, ctx.Id_doneRecording,
 //              encoderTemp, /*actorTypeSubs*/SILType(),
 //              /*args=*/ { encoderTemp },
 //              std::make_pair(doneRecordingNormalBB, doneRecordingErrorBB));
 //          nextNormalBB = doneRecordingNormalBB;
-
-          fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-          F.dump();
-          fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-        }
       }
+
+      // === create the RemoteCallTarget
+      {
+        B.emitBlock(nextNormalBB);
+        B.createEndAccess(loc, invocationValueAccess, /*aborted=*/false);
+
+        // ---------------------------------------------------------------------
+        // ---------------------------------------------------------------------
+        // ---------------------------------------------------------------------
+        auto mangledName = thunk.mangle(SILDeclRef::ManglingKind::Default);
+        auto mangledNameRef = llvm::StringRef(mangledName.c_str(), mangledName.size()); // FIXME(distributed): can just pass the mangledName?
+
+        // --- Get the `RemoteCallTarget` type
+//        auto remoteCallTargetDecl = ctx.getRemoteCallTargetDecl();
+//        auto remoteCallTargetTy =
+//            getLoweredType(remoteCallTargetDecl->getInterfaceType());
+
+//        auto remoteCallTargetTy = getLoweredType(ctx.getRemoteCallTargetType()); // WAS OK
+
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+        auto remoteCallTargetDecl = ctx.getRemoteCallTargetDecl();
+        auto remoteCallTargetTy = F.mapTypeIntoContext(remoteCallTargetDecl->getDeclaredInterfaceType());
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+        // %28 = alloc_stack $RemoteCallTarget, let, name "target" // users: %58, %57, %50, %77, %76, %37
+        auto remoteCallTargetValue = B.createAllocStack(loc, getLoweredType(remoteCallTargetTy));
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+//        // %29 = metatype $@thin RemoteCallTarget.Type // user: %37
+//        auto remoteCallTargetMetaTy = B.createMetatype(loc, remoteCallTargetTy);
+//
+        auto remoteCallTargetMetatype = getLoweredType(MetatypeType::get(remoteCallTargetTy));
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+        auto remoteCallTargetMetatypeValue = B.createMetatype(loc, remoteCallTargetMetatype);
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+        // %30 = string_literal utf8 "MANGLED_NAME" // user: %35
+        auto mangledNameLiteral = B.createStringLiteral(loc, mangledNameRef, StringLiteralInst::Encoding::UTF8);
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+        // %31 = integer_literal $Builtin.Word, 12 // user: %35
+        auto codeUnitCountLiteral =
+            B.createIntegerLiteral(loc,
+                                   SILType::getBuiltinWordType(ctx),
+                                   mangledName.size());
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+        // %32 = integer_literal $Builtin.Int1, -1 // user: %35
+        auto isAsciiLiteral =
+            B.createIntegerLiteral(loc,
+                                   SILType::getBuiltinIntegerType(1, ctx),
+                                   -1);
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+        // %33 = metatype $@thin String.Type // user: %35
+        auto StringNominalTy = ctx.getStringDecl();
+//        auto StringTy = getLoweredType(ctx.getStringType());
+//        auto StringMetaTy = B.createMetatype(loc, StringTy);
+        auto StringMetaTy = CanMetatypeType::get(CanType(ctx.getStringType()), MetatypeRepresentation::Thin);
+        auto stringSelf =
+            B.createMetatype(loc,
+                             SILType::getPrimitiveObjectType(StringMetaTy));
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+        fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+        F.dump();
+        fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+
+
+        // // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+        // %34 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %35
+        fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
+        auto stringInitDeclRef = ctx.getStringBuiltinInitDecl(StringNominalTy); // FIXME ????
+        fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
+        auto stringInitRef = SILDeclRef(stringInitDeclRef.getDecl(), SILDeclRef::Kind::Allocator);
+        fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
+        auto stringInitFn = M.findFunction(stringInitRef.mangle(), SILLinkage::PublicExternal);
+        fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
+        auto stringInitFnRef = B.createFunctionRef(loc, stringInitFn);
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+        // %35 = apply %34(%30, %31, %32, %33) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %37
+        auto mangledNameString =
+            B.createApply(loc, stringInitFnRef, {},
+                          /*args*/{mangledNameLiteral, codeUnitCountLiteral,
+                           isAsciiLiteral, stringSelf});
+        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
+
+
+        fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+        F.dump();
+        fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+
+        // ---------------------------------------------------------------------
+        // ---------------------------------------------------------------------
+        // ---------------------------------------------------------------------
+      }
+
+      // === Call the remoteCall on the actor system
+      {
+
+      }
+
+      fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+      F.dump();
+      fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
 
       // Emit all basic error blocks which handle errors thrown by invocation
       // preparing calls; All those blocks just branch to errorBB.
@@ -846,13 +960,22 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         B.createBranch(loc, errorBB, {error});
       }
     }
-  }
+  } // end of `if isRemote { ... }`
+
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  F.dump();
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
 
   // // else
   // {
   //   return (try)? (await)? self.X(...)
   // }
   {
+    B.setInsertionPoint(isLocalBB);
     B.emitBlock(isLocalBB);
 
     auto nativeMethodTy = SGM.Types.getConstantOverrideType(getTypeExpansionContext(),
@@ -936,4 +1059,12 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
     B.createThrow(loc, error);
   }
+
+  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  F.dump();
+  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
 }
