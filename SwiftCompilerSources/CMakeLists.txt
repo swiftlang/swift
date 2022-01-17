@@ -89,8 +89,7 @@ function(add_swift_compiler_modules_library name)
   set(sdk_option "")
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-    set(deployment_version "10.15") # TODO: once #38675 lands, replace this with
-#   set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
+    set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
     set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
     if(${BOOTSTRAPPING_MODE} STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
       # Let the cross-compiled compile don't pick up the compiled stdlib by providing
@@ -158,6 +157,15 @@ function(add_swift_compiler_modules_library name)
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
   set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+
+  # Xcode does not compile libraries that contain only object files.
+  # Therefore, it fails to create the static library. As a workaround,
+  # we add a dummy script phase to the target.
+  if (XCODE)
+    add_custom_command(TARGET ${name} POST_BUILD 
+      COMMAND ""
+      COMMENT "Dummy script phase to force building this target")
+  endif()
 endfunction()
 
 
