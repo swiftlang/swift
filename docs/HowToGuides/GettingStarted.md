@@ -457,7 +457,7 @@ There are two main ways to run tests:
    The `-s` and `-vv` flags print a progress bar and the executed commands
    respectively.
 
-If you making small changes to the compiler or some other component, you'll
+If you are making small changes to the compiler or some other component, you'll
 likely want to [incrementally rebuild](#editing-code) only the relevant
 Ninja/Xcode target and use `lit.py` with `--filter`. One potential failure
 mode with this approach is accidental use of stale binaries. For example, say
