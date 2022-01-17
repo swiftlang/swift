@@ -237,6 +237,14 @@ extension Parent {
 // PRIVATE:        "declarationFragments": [
 // PRIVATE-NEXT:     {
 // PRIVATE-NEXT:       "kind": "keyword",
+// PRIVATE-NEXT:       "spelling": "private"
+// PRIVATE-NEXT:     },
+// PRIVATE-NEXT:     {
+// PRIVATE-NEXT:       "kind": "text",
+// PRIVATE-NEXT:       "spelling": " "
+// PRIVATE-NEXT:     },
+// PRIVATE-NEXT:     {
+// PRIVATE-NEXT:       "kind": "keyword",
 // PRIVATE-NEXT:       "spelling": "func"
 // PRIVATE-NEXT:     },
 // PRIVATE-NEXT:     {
@@ -292,6 +300,14 @@ extension Parent {
 //
 // SPI:      SYMBOL GRAPH BEGIN
 // SPI:        "declarationFragments": [
+// SPI-NEXT:     {
+// SPI-NEXT:       "kind": "keyword",
+// SPI-NEXT:       "spelling": "internal"
+// SPI-NEXT:     },
+// SPI-NEXT:     {
+// SPI-NEXT:       "kind": "text",
+// SPI-NEXT:       "spelling": " "
+// SPI-NEXT:     },
 // SPI-NEXT:     {
 // SPI-NEXT:       "kind": "keyword",
 // SPI-NEXT:       "spelling": "func"
