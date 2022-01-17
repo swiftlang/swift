@@ -879,7 +879,9 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
         // %30 = string_literal utf8 "MANGLED_NAME" // user: %35
-        auto mangledNameLiteral = B.createStringLiteral(loc, mangledNameRef, StringLiteralInst::Encoding::UTF8);
+        auto mangledNameLiteral =
+            B.createStringLiteral(loc, mangledNameRef,
+                                  StringLiteralInst::Encoding::UTF8);
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
         // %31 = integer_literal $Builtin.Word, 12 // user: %35
@@ -915,12 +917,15 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         // %34 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %35
         fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
         auto stringInitDeclRef = ctx.getStringBuiltinInitDecl(StringNominalTy); // FIXME ????
+        stringInitDeclRef.dump();
         fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
         auto stringInitRef = SILDeclRef(stringInitDeclRef.getDecl(), SILDeclRef::Kind::Allocator);
+        stringInitRef.dump();
         fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
-        auto stringInitFn = M.findFunction(stringInitRef.mangle(), SILLinkage::PublicExternal);
+         auto stringInitFn = M.findFunction(stringInitRef.mangle(), SILLinkage::PublicExternal);
         fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
         auto stringInitFnRef = B.createFunctionRef(loc, stringInitFn);
+        stringInitFnRef->dump();
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
         // %35 = apply %34(%30, %31, %32, %33) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %37
