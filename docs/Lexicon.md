@@ -137,7 +137,7 @@ the AST level. See also [witness table](#witness-table).
 An edge in a control flow graph where the destination has multiple predecessors
 and the source has multiple successors.
 
-## currency
+## currency type
 
 Aa type that's meant to be commonly passed around and stored, like `Array`, as opposed to a type that's useful for temporary/internal purposes but which you wouldn't normally use in an external interface, like `ArraySlice`. Having broad agreement about the currency type you use for a particular kind of data (e.g. using `Array` to pass around sequential collections) generally makes the whole ecosystem better by reducing artificial barriers to passing data from one system to another, and it gives algorithm writers an obvious target to ensure they optimize for. That's where the analogy to currency comes from: agreeing on a currency type improves the flow of information in a program in some of the same ways that agreeing on a currency improves the flow of trade in an economy.
 
