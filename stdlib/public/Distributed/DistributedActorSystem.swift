@@ -175,6 +175,24 @@ extension DistributedActorSystem {
                                                 UInt(nameUTF8.endIndex))
     }
 
+    var substitutionsBuffer: UnsafeMutablePointer<Any.Type>? = nil
+
+    if genericEnv != nil {
+      let subs = try invocationDecoder.decodeGenericSubstitutions()
+
+      if subs.isEmpty {
+        throw ExecuteDistributedTargetError(
+          message: "Cannot call generic method without generic argument substitutions")
+      }
+
+      substitutionsBuffer = .allocate(capacity: subs.count)
+
+      for (offset, substitution) in subs.enumerated() {
+        let element = substitutionsBuffer?.advanced(by: offset)
+        element?.initialize(to: substitution)
+      }
+    }
+
     let paramCount = nameUTF8.withUnsafeBufferPointer { nameUTF8 in
       __getParameterCount(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
     }
@@ -201,6 +219,7 @@ extension DistributedActorSystem {
       __getParameterTypeInfo(
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
         genericEnv,
+        substitutionsBuffer,
         paramTypesBuffer.baseAddress!._rawValue, Int(paramCount))
     }
 
@@ -229,7 +248,8 @@ extension DistributedActorSystem {
     }
 
     guard let returnTypeFromTypeInfo: Any.Type = _getReturnTypeInfo(mangledMethodName: mangledTargetName,
-                                                                    genericEnv: genericEnv) else {
+                                                                    genericEnv: genericEnv,
+                                                                    genericArguments: substitutionsBuffer) else {
       throw ExecuteDistributedTargetError(
         message: "Failed to decode distributed target return type")
     }

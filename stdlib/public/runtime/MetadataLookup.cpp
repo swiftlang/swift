@@ -1967,6 +1967,22 @@ static NodePointer getParameterList(NodePointer funcType) {
   return parameterContainer;
 }
 
+static const Metadata *decodeType(TypeDecoder<DecodedMetadataBuilder> &decoder,
+                                  NodePointer type) {
+  assert(type->getKind() == Node::Kind::Type);
+
+  auto builtTypeOrError = decoder.decodeMangledType(type);
+
+  if (builtTypeOrError.isError()) {
+    auto err = builtTypeOrError.getError();
+    char *errStr = err->copyErrorString();
+    err->freeErrorString(errStr);
+    return nullptr;
+  }
+
+  return builtTypeOrError.getType();
+}
+
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_SPI
 unsigned swift_func_getParameterCount(const char *typeNameStart,
@@ -1985,7 +2001,8 @@ unsigned swift_func_getParameterCount(const char *typeNameStart,
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 const Metadata *_Nullable
 swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
-                             GenericEnvironmentDescriptor *genericEnv) {
+                             GenericEnvironmentDescriptor *genericEnv,
+                             const void * const *genericArguments) {
   StackAllocatedDemangler<1024> demangler;
 
   auto *funcType =
@@ -1999,24 +2016,22 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
 
   assert(resultType->getKind() == Node::Kind::ReturnType);
 
+  SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
+
   DecodedMetadataBuilder builder(
       demangler,
       /*substGenericParam=*/
-      [](unsigned, unsigned) { return nullptr; },
+      [&substFn](unsigned depth, unsigned index) {
+        return substFn.getMetadata(depth, index);
+      },
       /*SubstDependentWitnessTableFn=*/
-      [](const Metadata *, unsigned) { return nullptr; });
+      [&substFn](const Metadata *type, unsigned index) {
+        return substFn.getWitnessTable(type, index);
+      });
 
   TypeDecoder<DecodedMetadataBuilder> decoder(builder);
-  auto builtTypeOrError =
-      decoder.decodeMangledType(resultType->getFirstChild());
-  if (builtTypeOrError.isError()) {
-    auto err = builtTypeOrError.getError();
-    char *errStr = err->copyErrorString();
-    err->freeErrorString(errStr);
-    return nullptr;
-  }
 
-  return builtTypeOrError.getType();
+  return decodeType(decoder, resultType->getFirstChild());
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
@@ -2024,6 +2039,7 @@ unsigned
 swift_func_getParameterTypeInfo(
     const char *typeNameStart, size_t typeNameLength,
     GenericEnvironmentDescriptor *genericEnv,
+    const void * const *genericArguments,
     Metadata const **types, unsigned typesLength) {
   if (typesLength < 0) return -1;
 
@@ -2041,17 +2057,24 @@ swift_func_getParameterTypeInfo(
   if (!(parameterList && parameterList->getNumChildren() == typesLength))
     return -2;
 
+  SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
+
   DecodedMetadataBuilder builder(
       demangler,
       /*substGenericParam=*/
-      [](unsigned, unsigned) { return nullptr; },
+      [&substFn](unsigned depth, unsigned index) {
+        return substFn.getMetadata(depth, index);
+      },
       /*SubstDependentWitnessTableFn=*/
-      [](const Metadata *, unsigned) { return nullptr; });
+      [&substFn](const Metadata *type, unsigned index) {
+        return substFn.getWitnessTable(type, index);
+      });
   TypeDecoder<DecodedMetadataBuilder> decoder(builder);
 
-  auto typeIdx = 0;
   // for each parameter (TupleElement), store it into the provided buffer
-  for (auto *parameter : *parameterList) {
+  for (unsigned index = 0; index != typesLength; ++index) {
+    auto *parameter = parameterList->getChild(index);
+
     if (parameter->getKind() == Node::Kind::TupleElement) {
       assert(parameter->getNumChildren() == 1);
       parameter = parameter->getFirstChild();
@@ -2059,17 +2082,11 @@ swift_func_getParameterTypeInfo(
 
     assert(parameter->getKind() == Node::Kind::Type);
 
-    auto builtTypeOrError = decoder.decodeMangledType(parameter);
-    if (builtTypeOrError.isError()) {
-      auto err = builtTypeOrError.getError();
-      char *errStr = err->copyErrorString();
-      err->freeErrorString(errStr);
-      typeIdx += 1;
-      continue;
-    }
+    auto type = decodeType(decoder, parameter);
+    if (!type)
+      return -3; // Failed to decode a type.
 
-    types[typeIdx] = builtTypeOrError.getType();
-    ++typeIdx;
+    types[index] = type;
   } // end foreach parameter
 
   return typesLength;
