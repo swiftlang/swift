@@ -253,6 +253,12 @@ optimizeInst(SILInstruction *inst, SILOptFunctionBuilder &funcBuilder,
     if (!callee || callee->isTransparent() == IsNotTransparent)
       return true;
 
+    if (callee->isExternalDeclaration())
+      getModule()->loadFunction(callee);
+
+    if (callee->isExternalDeclaration())
+      return true;
+
     // If the de-virtualized callee is a transparent function, inline it.
     SILInliner::inlineFullApply(newFAS, SILInliner::InlineKind::MandatoryInline,
                                 funcBuilder, deleter);

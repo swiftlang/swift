@@ -588,6 +588,7 @@ int main(int argc, char **argv) {
   SILOpts.OptRecordFile = RemarksFilename;
   SILOpts.OptRecordPasses = RemarksPasses;
   SILOpts.checkSILModuleLeaks = true;
+  SILOpts.EnablePerformanceAnnotations = true;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
