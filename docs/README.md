@@ -131,7 +131,7 @@ documentation, please create a thread on the Swift forums under the
     Describes the design of the optimizer pipeline.
   - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
     Describes how the optimizer understands the semantics of high-level
-    operations on [currency](/docs/Lexicon.md#currency) data types and optimizes accordingly.
+    operations on [currency](/docs/Lexicon.md#currency-types) data types and optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.
 
 ### SourceKit subsystems
