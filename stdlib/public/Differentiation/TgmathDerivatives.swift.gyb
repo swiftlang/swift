@@ -26,15 +26,15 @@ import Swift
 #error("Unsupported platform")
 #endif
 
-@usableFromInline
-@derivative(of: fma)
-func _jvpFma<T: FloatingPoint & Differentiable> (
-  _ x: T,
-  _ y: T,
-  _ z: T
-) -> (value: T, differential: (T, T, T) -> T) where T == T.TangentVector {
-  return (fma(x, y, z), { (dx, dy, dz) in dx * y + dy * x + dz })
-}
+//@usableFromInline
+//@derivative(of: fma)
+//func _jvpFma<T: FloatingPoint & Differentiable> (
+//  _ x: T,
+//  _ y: T,
+//  _ z: T
+//) -> (value: T, differential: (T, T, T) -> T) where T == T.TangentVector {
+//  return (fma(x, y, z), { (dx, dy, dz) in dx * y + dy * x + dz })
+//}
 
 @usableFromInline
 @derivative(of: fma)
@@ -46,17 +46,17 @@ func _vjpFma<T: FloatingPoint & Differentiable> (
   return (fma(x, y, z), { v in (v * y, v * x, v) })
 }
 
-@usableFromInline
-@derivative(of: remainder)
-func _jvpRemainder<T: FloatingPoint & Differentiable> (
-  _ x: T,
-  _ y: T
-) -> (value: T, differential: (T, T) -> T) where T == T.TangentVector {
-  fatalError("""
-    Unimplemented JVP for 'remainder(_:)'. \
-    https://bugs.swift.org/browse/TF-1108 tracks this issue
-    """)
-}
+//@usableFromInline
+//@derivative(of: remainder)
+//func _jvpRemainder<T: FloatingPoint & Differentiable> (
+//  _ x: T,
+//  _ y: T
+//) -> (value: T, differential: (T, T) -> T) where T == T.TangentVector {
+//  fatalError("""
+//    Unimplemented JVP for 'remainder(_:)'. \
+//    https://bugs.swift.org/browse/TF-1108 tracks this issue
+//    """)
+//}
 
 @usableFromInline
 @derivative(of: remainder)
@@ -67,17 +67,17 @@ func _vjpRemainder<T: FloatingPoint & Differentiable> (
   return (remainder(x, y), { v in (v, -v * ((x / y).rounded(.toNearestOrEven))) })
 }
 
-@usableFromInline
-@derivative(of: fmod)
-func _jvpFmod<T: FloatingPoint & Differentiable> (
-  _ x: T,
-  _ y: T
-) -> (value: T, differential: (T, T) -> T) where T == T.TangentVector {
-  fatalError("""
-    Unimplemented JVP for 'fmod(_:)'. \
-    https://bugs.swift.org/browse/TF-1108 tracks this issue
-    """)
-}
+//@usableFromInline
+//@derivative(of: fmod)
+//func _jvpFmod<T: FloatingPoint & Differentiable> (
+//  _ x: T,
+//  _ y: T
+//) -> (value: T, differential: (T, T) -> T) where T == T.TangentVector {
+//  fatalError("""
+//    Unimplemented JVP for 'fmod(_:)'. \
+//    https://bugs.swift.org/browse/TF-1108 tracks this issue
+//    """)
+//}
 
 @usableFromInline
 @derivative(of: fmod)
@@ -88,7 +88,7 @@ func _vjpFmod<T: FloatingPoint & Differentiable> (
   return (fmod(x, y), { v in (v, -v * ((x / y).rounded(.towardZero))) })
 }
 
-%for derivative_kind in ['jvp', 'vjp']:
+%for derivative_kind in ['vjp']:
 %  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
 @usableFromInline
 @derivative(of: sqrt)
@@ -130,10 +130,10 @@ func _${derivative_kind}Trunc<T: FloatingPoint & Differentiable> (
 ) -> (value: T, ${linear_map_kind}: (T) -> T) where T == T.TangentVector {
   return (trunc(x), { v in 0 })
 }
-%end # for derivative_kind in ['jvp', 'vjp']:
+%end # for derivative_kind in ['vjp']:
 
 // Unary functions
-%for derivative_kind in ['jvp', 'vjp']:
+%for derivative_kind in ['vjp']:
 %  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
 %  for T in ['Float', 'Double', 'Float80']:
 %    if T == 'Float80':
@@ -273,7 +273,7 @@ func _${derivative_kind}Erfc(_ x: ${T}) -> (value: ${T}, ${linear_map_kind}: (${
 #endif
 %    end # if T == 'Float80':
 %  end # for T in ['Float', 'Double', 'Float80']:
-%end # for derivative_kind in ['jvp', 'vjp']:
+%end # for derivative_kind in ['vjp']:
 
 // Binary functions
 %for T in ['Float', 'Float80']:
@@ -289,14 +289,14 @@ func _vjpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, pullback: (${T}) -> (${T}, $
   ) })
 }
 
-@inlinable
-@derivative(of: pow)
-func _jvpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, differential: (${T}, ${T}) -> ${T}) {
-  let value = pow(x, y)
-  return (value, { (dx, dy) in
-    dx * y * pow(x, y - 1) + dy * value * log(x.isLessThanOrEqualTo(0) ? ${T}(1) : x)
-  })
-}
+//@inlinable
+//@derivative(of: pow)
+//func _jvpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, differential: (${T}, ${T}) -> ${T}) {
+//  let value = pow(x, y)
+//  return (value, { (dx, dy) in
+//    dx * y * pow(x, y - 1) + dy * value * log(x.isLessThanOrEqualTo(0) ? ${T}(1) : x)
+//  })
+//}
 %  if T == 'Float80':
 #endif
 %  end # if T == 'Float80':

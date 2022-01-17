@@ -42,13 +42,13 @@ where Element: Differentiable {
     return (base, { $0 })
   }
 
-  @usableFromInline
-  @derivative(of: base)
-  func _jvpBase() -> (
-    value: [Element], differential: (Array<Element>.TangentVector) -> TangentVector
-  ) {
-    return (base, { $0 })
-  }
+//  @usableFromInline
+//  @derivative(of: base)
+//  func _jvpBase() -> (
+//    value: [Element], differential: (Array<Element>.TangentVector) -> TangentVector
+//  ) {
+//    return (base, { $0 })
+//  }
 
   /// Creates a differentiable view of the given array.
   public init(_ base: [Element]) { self._base = base }
@@ -61,13 +61,13 @@ where Element: Differentiable {
     return (Array.DifferentiableView(base), { $0 })
   }
 
-  @usableFromInline
-  @derivative(of: init(_:))
-  static func _jvpInit(_ base: [Element]) -> (
-    value: Array.DifferentiableView, differential: (TangentVector) -> TangentVector
-  ) {
-    return (Array.DifferentiableView(base), { $0 })
-  }
+//  @usableFromInline
+//  @derivative(of: init(_:))
+//  static func _jvpInit(_ base: [Element]) -> (
+//    value: Array.DifferentiableView, differential: (TangentVector) -> TangentVector
+//  ) {
+//    return (Array.DifferentiableView(base), { $0 })
+//  }
 
   public typealias TangentVector =
     Array<Element.TangentVector>.DifferentiableView
@@ -202,16 +202,16 @@ extension Array where Element: Differentiable {
     return (self[index], pullback)
   }
 
-  @usableFromInline
-  @derivative(of: subscript)
-  func _jvpSubscript(index: Int) -> (
-    value: Element, differential: (TangentVector) -> Element.TangentVector
-  ) {
-    func differential(_ v: TangentVector) -> Element.TangentVector {
-      return v[index]
-    }
-    return (self[index], differential)
-  }
+//  @usableFromInline
+//  @derivative(of: subscript)
+//  func _jvpSubscript(index: Int) -> (
+//    value: Element, differential: (TangentVector) -> Element.TangentVector
+//  ) {
+//    func differential(_ v: TangentVector) -> Element.TangentVector {
+//      return v[index]
+//    }
+//    return (self[index], differential)
+//  }
 
   @usableFromInline
   @derivative(of: +)
@@ -236,22 +236,22 @@ extension Array where Element: Differentiable {
     return (lhs + rhs, pullback)
   }
 
-  @usableFromInline
-  @derivative(of: +)
-  static func _jvpConcatenate(_ lhs: Self, _ rhs: Self) -> (
-    value: Self,
-    differential: (TangentVector, TangentVector) -> TangentVector
-  ) {
-    func differential(_ l: TangentVector, _ r: TangentVector) -> TangentVector {
-      precondition(
-        l.base.count == lhs.count && r.base.count == rhs.count, """
-          Tangent vectors with invalid count; expected to equal the \
-          operand counts \(lhs.count) and \(rhs.count)
-          """)
-      return .init(l.base + r.base)
-    }
-    return (lhs + rhs, differential)
-  }
+//  @usableFromInline
+//  @derivative(of: +)
+//  static func _jvpConcatenate(_ lhs: Self, _ rhs: Self) -> (
+//    value: Self,
+//    differential: (TangentVector, TangentVector) -> TangentVector
+//  ) {
+//    func differential(_ l: TangentVector, _ r: TangentVector) -> TangentVector {
+//      precondition(
+//        l.base.count == lhs.count && r.base.count == rhs.count, """
+//          Tangent vectors with invalid count; expected to equal the \
+//          operand counts \(lhs.count) and \(rhs.count)
+//          """)
+//      return .init(l.base + r.base)
+//    }
+//    return (lhs + rhs, differential)
+//  }
 }
 
 
@@ -269,15 +269,15 @@ extension Array where Element: Differentiable {
     })
   }
 
-  @usableFromInline
-  @derivative(of: append)
-  mutating func _jvpAppend(_ element: Element) -> (
-    value: Void,
-    differential: (inout TangentVector, Element.TangentVector) -> Void
-  ) {
-    append(element)
-    return ((), { $0.base.append($1) })
-  }
+//  @usableFromInline
+//  @derivative(of: append)
+//  mutating func _jvpAppend(_ element: Element) -> (
+//    value: Void,
+//    differential: (inout TangentVector, Element.TangentVector) -> Void
+//  ) {
+//    append(element)
+//    return ((), { $0.base.append($1) })
+//  }
 }
 
 extension Array where Element: Differentiable {
@@ -297,14 +297,14 @@ extension Array where Element: Differentiable {
     })
   }
 
-  @usableFromInline
-  @derivative(of: +=)
-  static func _jvpAppend(_ lhs: inout Self, _ rhs: Self) -> (
-    value: Void, differential: (inout TangentVector, TangentVector) -> Void
-  ) {
-    lhs += rhs
-    return ((), { $0.base += $1.base })
-  }
+//  @usableFromInline
+//  @derivative(of: +=)
+//  static func _jvpAppend(_ lhs: inout Self, _ rhs: Self) -> (
+//    value: Void, differential: (inout TangentVector, TangentVector) -> Void
+//  ) {
+//    lhs += rhs
+//    return ((), { $0.base += $1.base })
+//  }
 }
 
 extension Array where Element: Differentiable {
@@ -321,16 +321,16 @@ extension Array where Element: Differentiable {
     )
   }
 
-  @usableFromInline
-  @derivative(of: init(repeating:count:))
-  static func _jvpInit(repeating repeatedValue: Element, count: Int) -> (
-    value: Self, differential: (Element.TangentVector) -> TangentVector
-  ) {
-    (
-      value: Self(repeating: repeatedValue, count: count),
-      differential: { v in TangentVector(.init(repeating: v, count: count)) }
-    )
-  }
+//  @usableFromInline
+//  @derivative(of: init(repeating:count:))
+//  static func _jvpInit(repeating repeatedValue: Element, count: Int) -> (
+//    value: Self, differential: (Element.TangentVector) -> TangentVector
+//  ) {
+//    (
+//      value: Self(repeating: repeatedValue, count: count),
+//      differential: { v in TangentVector(.init(repeating: v, count: count)) }
+//    )
+//  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -367,26 +367,26 @@ extension Array where Element: Differentiable {
     return (value: values, pullback: pullback)
   }
 
-  @inlinable
-  @derivative(of: differentiableMap)
-  internal func _jvpDifferentiableMap<Result: Differentiable>(
-    _ body: @differentiable(reverse) (Element) -> Result
-  ) -> (
-    value: [Result],
-    differential: (Array.TangentVector) -> Array<Result>.TangentVector
-  ) {
-    var values: [Result] = []
-    var differentials: [(Element.TangentVector) -> Result.TangentVector] = []
-    for x in self {
-      let (y, df) = valueWithDifferential(at: x, of: body)
-      values.append(y)
-      differentials.append(df)
-    }
-    func differential(_ tans: Array.TangentVector) -> Array<Result>.TangentVector {
-      .init(zip(tans.base, differentials).map { tan, df in df(tan) })
-    }
-    return (value: values, differential: differential)
-  }
+//  @inlinable
+//  @derivative(of: differentiableMap)
+//  internal func _jvpDifferentiableMap<Result: Differentiable>(
+//    _ body: @differentiable(reverse) (Element) -> Result
+//  ) -> (
+//    value: [Result],
+//    differential: (Array.TangentVector) -> Array<Result>.TangentVector
+//  ) {
+//    var values: [Result] = []
+//    var differentials: [(Element.TangentVector) -> Result.TangentVector] = []
+//    for x in self {
+//      let (y, df) = valueWithDifferential(at: x, of: body)
+//      values.append(y)
+//      differentials.append(df)
+//    }
+//    func differential(_ tans: Array.TangentVector) -> Array<Result>.TangentVector {
+//      .init(zip(tans.base, differentials).map { tan, df in df(tan) })
+//    }
+//    return (value: values, differential: differential)
+//  }
 }
 
 extension Array where Element: Differentiable {
@@ -437,32 +437,32 @@ extension Array where Element: Differentiable {
     )
   }
 
-  @inlinable
-  @derivative(of: differentiableReduce, wrt: (self, initialResult))
-  func _jvpDifferentiableReduce<Result: Differentiable>(
-    _ initialResult: Result,
-    _ nextPartialResult: @differentiable(reverse) (Result, Element) -> Result
-  ) -> (value: Result,
-        differential: (Array.TangentVector, Result.TangentVector)
-          -> Result.TangentVector) {
-    var differentials:
-      [(Result.TangentVector, Element.TangentVector) -> Result.TangentVector]
-        = []
-    let count = self.count
-    differentials.reserveCapacity(count)
-    var result = initialResult
-    for element in self {
-      let (y, df) =
-        valueWithDifferential(at: result, element, of: nextPartialResult)
-      result = y
-      differentials.append(df)
-    }
-    return (value: result, differential: { dSelf, dInitial in
-      var dResult = dInitial
-      for (dElement, df) in zip(dSelf.base, differentials) {
-        dResult = df(dResult, dElement)
-      }
-      return dResult
-    })
-  }
+//  @inlinable
+//  @derivative(of: differentiableReduce, wrt: (self, initialResult))
+//  func _jvpDifferentiableReduce<Result: Differentiable>(
+//    _ initialResult: Result,
+//    _ nextPartialResult: @differentiable(reverse) (Result, Element) -> Result
+//  ) -> (value: Result,
+//        differential: (Array.TangentVector, Result.TangentVector)
+//          -> Result.TangentVector) {
+//    var differentials:
+//      [(Result.TangentVector, Element.TangentVector) -> Result.TangentVector]
+//        = []
+//    let count = self.count
+//    differentials.reserveCapacity(count)
+//    var result = initialResult
+//    for element in self {
+//      let (y, df) =
+//        valueWithDifferential(at: result, element, of: nextPartialResult)
+//      result = y
+//      differentials.append(df)
+//    }
+//    return (value: result, differential: { dSelf, dInitial in
+//      var dResult = dInitial
+//      for (dElement, df) in zip(dSelf.base, differentials) {
+//        dResult = df(dResult, dElement)
+//      }
+//      return dResult
+//    })
+//  }
 }

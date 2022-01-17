@@ -85,15 +85,15 @@ public struct AnyDifferentiable: Differentiable {
     return (AnyDifferentiable(base), { v in v.base as! T.TangentVector })
   }
 
-  @inlinable
-  @derivative(of: init)
-  internal static func _jvpInit<T: Differentiable>(
-    _ base: T
-  ) -> (
-    value: AnyDifferentiable, differential: (T.TangentVector) -> AnyDerivative
-  ) {
-    return (AnyDifferentiable(base), { dbase in AnyDerivative(dbase) })
-  }
+//  @inlinable
+//  @derivative(of: init)
+//  internal static func _jvpInit<T: Differentiable>(
+//    _ base: T
+//  ) -> (
+//    value: AnyDifferentiable, differential: (T.TangentVector) -> AnyDerivative
+//  ) {
+//    return (AnyDifferentiable(base), { dbase in AnyDerivative(dbase) })
+//  }
 
   public typealias TangentVector = AnyDerivative
 
@@ -268,14 +268,14 @@ public struct AnyDerivative: Differentiable & AdditiveArithmetic {
     return (AnyDerivative(base), { v in v.base as! T.TangentVector })
   }
 
-  @inlinable
-  @derivative(of: init)
-  internal static func _jvpInit<T>(
-    _ base: T
-  ) -> (value: AnyDerivative, differential: (T.TangentVector) -> AnyDerivative)
-  where T: Differentiable, T.TangentVector == T {
-    return (AnyDerivative(base), { dbase in AnyDerivative(dbase) })
-  }
+//  @inlinable
+//  @derivative(of: init)
+//  internal static func _jvpInit<T>(
+//    _ base: T
+//  ) -> (value: AnyDerivative, differential: (T.TangentVector) -> AnyDerivative)
+//  where T: Differentiable, T.TangentVector == T {
+//    return (AnyDerivative(base), { dbase in AnyDerivative(dbase) })
+//  }
 
   public typealias TangentVector = AnyDerivative
 
@@ -320,16 +320,16 @@ public struct AnyDerivative: Differentiable & AdditiveArithmetic {
     return (lhs + rhs, { v in (v, v) })
   }
 
-  @derivative(of: +)
-  @inlinable
-  internal static func _jvpAdd(
-    lhs: AnyDerivative, rhs: AnyDerivative
-  ) -> (
-    value: AnyDerivative,
-    differential: (AnyDerivative, AnyDerivative) -> (AnyDerivative)
-  ) {
-    return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
-  }
+//  @derivative(of: +)
+//  @inlinable
+//  internal static func _jvpAdd(
+//    lhs: AnyDerivative, rhs: AnyDerivative
+//  ) -> (
+//    value: AnyDerivative,
+//    differential: (AnyDerivative, AnyDerivative) -> (AnyDerivative)
+//  ) {
+//    return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
+//  }
 
   @inlinable
   public static func - (
@@ -349,16 +349,16 @@ public struct AnyDerivative: Differentiable & AdditiveArithmetic {
     return (lhs - rhs, { v in (v, .zero - v) })
   }
 
-  @derivative(of: -)
-  @inlinable
-  internal static func _jvpSubtract(
-    lhs: AnyDerivative, rhs: AnyDerivative
-  ) -> (
-    value: AnyDerivative,
-    differential: (AnyDerivative, AnyDerivative) -> AnyDerivative
-  ) {
-    return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
-  }
+//  @derivative(of: -)
+//  @inlinable
+//  internal static func _jvpSubtract(
+//    lhs: AnyDerivative, rhs: AnyDerivative
+//  ) -> (
+//    value: AnyDerivative,
+//    differential: (AnyDerivative, AnyDerivative) -> AnyDerivative
+//  ) {
+//    return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
+//  }
 
   // `Differentiable` requirements.
   @inlinable

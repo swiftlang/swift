@@ -62,13 +62,13 @@ extension ${Self} {
     return (-x, { v in -v })
   }
 
-  @usableFromInline
-  @_transparent
-  @derivative(of: -)
-  static func _jvpNegate(x: ${Self})
-  -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
-    return (-x, { dx in -dx })
-  }
+//  @usableFromInline
+//  @_transparent
+//  @derivative(of: -)
+//  static func _jvpNegate(x: ${Self})
+//  -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
+//    return (-x, { dx in -dx })
+//  }
 }
 
 /// Derivatives of standard binary operators.

@@ -62,19 +62,19 @@ where T == T.TangentVector {
   expectEqualWithTolerance(TestLiteralType(dfdy), grad.1, ulps: ulps)
 }
 
-func checkDerivative<T: BinaryFloatingPoint & Differentiable>(
-  _ f: @differentiable(reverse) (T, T) -> T,
-  _ x: T,
-  _ y: T,
-  ulps: T = 192)
-where T == T.TangentVector {
-  let eps = T(0.01)
-  let deriv = derivative(at: x, y, of: f)
-  let (dfdx, dfdy) = computeDividedDifference(f, x, y, eps: eps)
-  expectEqualWithTolerance(TestLiteralType(dfdx + dfdy), deriv, ulps: ulps)
-}
+//func checkDerivative<T: BinaryFloatingPoint & Differentiable>(
+//  _ f: @differentiable(reverse) (T, T) -> T,
+//  _ x: T,
+//  _ y: T,
+//  ulps: T = 192)
+//where T == T.TangentVector {
+//  let eps = T(0.01)
+//  let deriv = derivative(at: x, y, of: f)
+//  let (dfdx, dfdy) = computeDividedDifference(f, x, y, eps: eps)
+//  expectEqualWithTolerance(TestLiteralType(dfdx + dfdy), deriv, ulps: ulps)
+//}
 
-%for op in ['derivative', 'gradient']:
+%for op in ['gradient']:
 %for T in ['Float', 'Float80']:
 
 %if T == 'Float80':
@@ -206,6 +206,6 @@ DerivativeTests.test("${op}_${T}") {
 %end
 
 %end # for T in ['Float', 'Float80']:
-%end # for op in ['derivative', 'gradient']:
+%end # for op in ['gradient']:
 
 runAllTests()
