@@ -468,6 +468,10 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
   if (ObjCInterop)
     this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
+
+  // Automatically with libc++ when possible.
+  if (Context.LangOpts.EnableCXXInterop && Context.LangOpts.Target.isOSDarwin())
+    this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
   
   // FIXME: It'd be better to have the driver invocation or build system that
   // executes the linker introduce these compatibility libraries, since at
