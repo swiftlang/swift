@@ -317,6 +317,7 @@ public struct RemoteCallTarget {
   let mangledName: String
 
   // Only intended to be created by the _Distributed library.
+  // TODO(distributed): make this internal and only allow calling by the synthesized code?
   public init(_mangledName: String) {
     self.mangledName = _mangledName
   }

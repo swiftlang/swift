@@ -679,8 +679,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // -----------------------------------------------------------------------
       auto remoteCallFnDecl =
           selfTyDecl->getDistributedActorSystemRemoteCallFunction();
-      auto remoteCallFnRef = SILDeclRef(remoteCallFnDecl);
       assert(remoteCallFnDecl && "no remoteCall func found!");
+      auto remoteCallFnRef = SILDeclRef(remoteCallFnDecl);
 
       // === get the actorSystem property
       auto systemRef = emitActorPropertyReference(
@@ -689,8 +689,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
       AbstractFunctionDecl *makeInvocationFnDecl =
           selfTyDecl->getDistributedActorSystemMakeInvocationFunction();
-      auto makeInvocationFnRef = SILDeclRef(makeInvocationFnDecl);
       assert(makeInvocationFnDecl && "no remoteCall func found!");
+      auto makeInvocationFnRef = SILDeclRef(makeInvocationFnDecl);
 
       ProtocolDecl *invocationEncoderProto =
           ctx.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
@@ -820,7 +820,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
                 invocationEncoderNominal);
         assert(doneRecordingFnDecl);
         auto doneRecordingFnRef = SILDeclRef(doneRecordingFnDecl);
-        assert(doneRecordingFnDecl && "no remoteCall func found!");
+        assert(doneRecordingFnDecl && "no 'doneRecording' func found!");
 
         auto doneRecordingFnSIL =
             builder.getOrCreateFunction(loc, doneRecordingFnRef, ForDefinition);
@@ -871,8 +871,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
 //        // %29 = metatype $@thin RemoteCallTarget.Type // user: %37
-//        auto remoteCallTargetMetaTy = B.createMetatype(loc, remoteCallTargetTy);
-//
         auto remoteCallTargetMetatype = getLoweredType(MetatypeType::get(remoteCallTargetTy));
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
         auto remoteCallTargetMetatypeValue = B.createMetatype(loc, remoteCallTargetMetatype);
@@ -899,7 +897,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
         // %33 = metatype $@thin String.Type // user: %35
-        auto StringNominalTy = ctx.getStringDecl();
+//        auto StringNominalTy = ctx.getStringDecl();
 //        auto StringTy = getLoweredType(ctx.getStringType());
 //        auto StringMetaTy = B.createMetatype(loc, StringTy);
         auto StringMetaTy = CanMetatypeType::get(CanType(ctx.getStringType()), MetatypeRepresentation::Thin);
@@ -916,7 +914,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         // // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
         // %34 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %35
         fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
-        auto stringInitDeclRef = ctx.getStringBuiltinInitDecl(StringNominalTy); // FIXME ????
+        auto stringInitDeclRef = ctx.getStringBuiltinInitDecl(ctx.getStringDecl());
         stringInitDeclRef.dump();
         fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
         auto stringInitRef = SILDeclRef(stringInitDeclRef.getDecl(), SILDeclRef::Kind::Allocator);
@@ -929,7 +927,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
         // %35 = apply %34(%30, %31, %32, %33) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %37
-        auto mangledNameString =
+        auto mangledNameStringValue =
             B.createApply(loc, stringInitFnRef, {},
                           /*args*/{mangledNameLiteral, codeUnitCountLiteral,
                            isAsciiLiteral, stringSelf});
@@ -940,6 +938,21 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         F.dump();
         fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
 
+        // --- Create the RemoteCallTarget instance, passing the mangledNameString
+        // function_ref RemoteCallTarget.init(_mangledName:)
+        // %36 = function_ref @$s12_Distributed16RemoteCallTargetV12_mangledNameACSS_tcfC : $@convention(method) (@owned String, @thin RemoteCallTarget.Type) -> @out RemoteCallTarget // user: %37
+        auto remoteCallInitDecl = remoteCallTargetDecl->getDistributedRemoteCallTargetInitFunction();
+        assert(remoteCallInitDecl && "no 'RemoteCallTarget.init' found!");
+        auto remoteCallInitRef = SILDeclRef(remoteCallInitDecl);
+        auto remoteCallInitFnSIL =
+            builder.getOrCreateFunction(loc, remoteCallInitRef, ForDefinition);
+        SILValue remoteCallInitFn = B.createFunctionRefFor(loc, remoteCallInitFnSIL);
+
+        // %37 = apply %36(%28, %35, %29) : $@convention(method) (@owned String, @thin RemoteCallTarget.Type) -> @out RemoteCallTarget
+        auto remoteCallTargetValueRet = B.createApply(
+            loc, remoteCallInitFn, {},
+            {/*out*/ remoteCallTargetValue, mangledNameStringValue,
+             remoteCallTargetMetatypeValue});
         // ---------------------------------------------------------------------
         // ---------------------------------------------------------------------
         // ---------------------------------------------------------------------

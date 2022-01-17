@@ -7476,21 +7476,25 @@ NominalTypeDecl::getDistributedActorSystemMakeInvocationFunction() const {
   return nullptr;
 }
 
-AbstractFunctionDecl*
-NominalTypeDecl::getDistributedActorInvocationRecordArgumentFunction() const {
+ConstructorDecl*
+NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   auto &C = this->getASTContext();
 
-  // FIXME(distributed): implement more properly...
+  // FIXME(distributed): implement more properly... do with caching etc
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
-  for (auto value : mutableThis->lookupDirect(C.Id_recordArgument)) {
-    auto func = dyn_cast<AbstractFunctionDecl>(value);
-    if (!func)
+  for (auto value : mutableThis->getMembers()) {
+    auto ctor = dyn_cast<ConstructorDecl>(value);
+    if (!ctor)
       continue;
 
-    if (func->getParameters()->size() != 0)
+    auto params = ctor->getParameters();
+    if (params->size() != 1)
       return nullptr;
 
-    return func;
+    if (params->get(0)->getArgumentName() == C.getIdentifier("_mangledName"))
+      return ctor;
+
+    return nullptr;
   }
 
   // TODO(distributed): make a Request for it?
