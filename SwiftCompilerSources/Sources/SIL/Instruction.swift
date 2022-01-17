@@ -98,6 +98,10 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     }
   }
 
+  final public var mayReleaseOrReadRefCount: Bool {
+    return SILInstruction_mayReleaseOrReadRefCount(bridged)
+  }
+
   public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
     lhs === rhs
   }
@@ -237,7 +241,9 @@ final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
 
 final public class DeallocRefInst : Instruction, UnaryInstruction {}
 
-public class RefCountingInst : Instruction, UnaryInstruction {}
+public class RefCountingInst : Instruction, UnaryInstruction {
+  public var isAtomic: Bool { RefCountingInst_getIsAtomic(bridged) }
+}
 
 final public class StrongRetainInst : RefCountingInst {
 }
@@ -356,10 +362,14 @@ final public class GlobalValueInst : GlobalAccessInst {}
 final public class IntegerLiteralInst : SingleValueInstruction {}
 
 final public class TupleInst : SingleValueInstruction {
+  public var uniqueNonTrivialElt: Value? {
+    TupleInst_getUniqueNonTrivialElt(bridged).value
+  }
 }
 
 final public class TupleExtractInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { TupleExtractInst_fieldIndex(bridged) }
+  public var isEltOnlyNonTrivialElt: Bool { TupleExtractInst_isEltOnlyNonTrivialElt(bridged) }
 }
 
 final public
@@ -368,10 +378,16 @@ class TupleElementAddrInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public class StructInst : SingleValueInstruction {
+  public var uniqueNonTrivialFieldValue: Value? {
+    StructInst_getUniqueNonTrivialFieldValue(bridged).value
+  }
 }
 
 final public class StructExtractInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { StructExtractInst_fieldIndex(bridged) }
+  public var isFieldOnlyNonTrivialField: Bool { 
+    StructExtractInst_isFieldOnlyNonTrivialField(bridged)
+  }
 }
 
 final public
@@ -513,6 +529,9 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { BeginApplyInst_numArguments(bridged) }
 
   public var singleDirectResult: Value? { nil }
+}
+
+final public class RefToBridgeObjectInst: MultipleValueInstruction {
 }
 
 //===----------------------------------------------------------------------===//

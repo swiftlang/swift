@@ -159,6 +159,6 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
 
 } // end anonymous namespace
 
-SILTransform *swift::createReleaseDevirtualizer() {
+SILTransform *swift::createLegacyReleaseDevirtualizer() {
   return new ReleaseDevirtualizer();
 }

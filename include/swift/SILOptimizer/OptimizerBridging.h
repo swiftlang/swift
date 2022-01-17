@@ -141,17 +141,8 @@ void BasicBlockSet_erase(BridgedBasicBlockSet set, BridgedBasicBlock block);
 BridgedFunction BasicBlockSet_getFunction(BridgedBasicBlockSet set);
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
-BridgedRCIdentityAnalysis
-PassContext_getRCIdentityAnalysis(BridgedPassContext context);
 
-BridgedRCIdentityFunctionInfo
-RCIdentityAnalysis_getFunctionInfo(BridgedRCIdentityAnalysis bridgedAnalysis,
-                                   BridgedFunction function);
-
-BridgedValue RCIdentityFunctionInfo_getRCIdentityRoot(
-    BridgedRCIdentityFunctionInfo bridgedInfo, BridgedValue value);
-
-OptionalBridgedFunction PassContext_getDeallocRef(BridgedPassContext context,
+OptionalBridgedFunction PassContext_getDestructor(BridgedPassContext context,
                                                   BridgedType type);
 
 BridgedSubstitutionMap

@@ -394,6 +394,10 @@ BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst) {
   return (BridgedMemoryBehavior)castToInst(inst)->getMemoryBehavior();
 }
 
+bool SILInstruction_mayReleaseOrReadRefCount(BridgedInstruction inst) {
+  return castToInst(inst)->mayReleaseOrReadRefCount();
+}
+
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result) {
   return {static_cast<MultipleValueInstructionResult *>(result.obj)->getParent()};
 }
@@ -435,12 +439,28 @@ SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei) {
   return castToInst<TupleExtractInst>(tei)->getFieldIndex();
 }
 
+bool TupleExtractInst_isEltOnlyNonTrivialElt(BridgedInstruction tei) {
+  return castToInst<TupleExtractInst>(tei)->isEltOnlyNonTrivialElt();
+}
+
 SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai) {
   return castToInst<TupleElementAddrInst>(teai)->getFieldIndex();
 }
 
+OptionalBridgedValue TupleInst_getUniqueNonTrivialElt(BridgedInstruction ti) {
+  return {castToInst<TupleInst>(ti)->getUniqueNonTrivialElt()};
+}
+
 SwiftInt StructExtractInst_fieldIndex(BridgedInstruction sei) {
   return castToInst<StructExtractInst>(sei)->getFieldIndex();
+}
+
+bool StructExtractInst_isFieldOnlyNonTrivialField(BridgedInstruction sei) {
+  return castToInst<StructExtractInst>(sei)->isFieldOnlyNonTrivialField();
+}
+
+OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue(BridgedInstruction si) {
+  return {castToInst<StructInst>(si)->getUniqueNonTrivialFieldValue()};
 }
 
 SwiftInt StructElementAddrInst_fieldIndex(BridgedInstruction seai) {
@@ -503,6 +523,11 @@ void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic) {
   castToInst<RefCountingInst>(rc)->setAtomicity(
       isAtomic ? RefCountingInst::Atomicity::Atomic
                : RefCountingInst::Atomicity::NonAtomic);
+}
+
+bool RefCountingInst_getIsAtomic(BridgedInstruction rc) {
+  return castToInst<RefCountingInst>(rc)->getAtomicity() ==
+         RefCountingInst::Atomicity::Atomic;
 }
 
 //===----------------------------------------------------------------------===//

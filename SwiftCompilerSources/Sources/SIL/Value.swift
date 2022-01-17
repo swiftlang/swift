@@ -58,3 +58,7 @@ final class Undef : Value {
 final class PlaceholderValue : Value {
   public var definingInstruction: Instruction? { nil }
 }
+
+extension OptionalBridgedValue {
+  var value: Value? { obj.getAs(AnyObject.self) as? Value }
+}

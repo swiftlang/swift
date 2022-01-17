@@ -12,10 +12,8 @@
 
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SIL/DynamicCasts.h"
-#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/OptimizerBridging.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -606,23 +604,4 @@ void RCIdentityAnalysis::initialize(SILPassManager *PM) {
 
 SILAnalysis *swift::createRCIdentityAnalysis(SILModule *M) {
   return new RCIdentityAnalysis(M);
-}
-
-//===----------------------------------------------------------------------===//
-//                            Swift Bridging
-//===----------------------------------------------------------------------===//
-
-BridgedRCIdentityFunctionInfo
-RCIdentityAnalysis_getFunctionInfo(BridgedRCIdentityAnalysis bridgedAnalysis,
-                                   BridgedFunction function) {
-  RCIdentityAnalysis *rcia =
-    static_cast<RCIdentityAnalysis *>(bridgedAnalysis.rcia);
-  return {rcia->get(castToFunction(function))};
-}
-
-BridgedValue RCIdentityFunctionInfo_getRCIdentityRoot(
-    BridgedRCIdentityFunctionInfo bridgedInfo, BridgedValue value) {
-  RCIdentityFunctionInfo *info =
-    static_cast<RCIdentityFunctionInfo *>(bridgedInfo.functionInfo);
-  return {info->getRCIdentityRoot(castToSILValue(value))};
 }

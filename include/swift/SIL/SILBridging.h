@@ -119,6 +119,10 @@ typedef struct {
 } BridgedValue;
 
 typedef struct {
+  OptionalSwiftObject obj;
+} OptionalBridgedValue;
+
+typedef struct {
   SwiftObject obj;
 } BridgedInstruction;
 
@@ -211,6 +215,7 @@ void SILInstruction_setOperand(BridgedInstruction inst, SwiftInt index,
                                BridgedValue value);
 BridgedLocation SILInstruction_getLocation(BridgedInstruction inst);
 BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst);
+bool SILInstruction_mayReleaseOrReadRefCount(BridgedInstruction inst);
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result);
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst);
@@ -224,8 +229,12 @@ BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
 BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri);
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei);
+bool TupleExtractInst_isEltOnlyNonTrivialElt(BridgedInstruction tei);
 SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai);
+OptionalBridgedValue TupleInst_getUniqueNonTrivialElt(BridgedInstruction ti);
 SwiftInt StructExtractInst_fieldIndex(BridgedInstruction sei);
+bool StructExtractInst_isFieldOnlyNonTrivialField(BridgedInstruction sei);
+OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue(BridgedInstruction si);
 SwiftInt StructElementAddrInst_fieldIndex(BridgedInstruction seai);
 SwiftInt EnumInst_caseIndex(BridgedInstruction ei);
 SwiftInt UncheckedEnumDataInst_caseIndex(BridgedInstruction uedi);
@@ -241,6 +250,7 @@ SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
 SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
 void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);
+bool RefCountingInst_getIsAtomic(BridgedInstruction rc);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedInstruction insertionPoint,

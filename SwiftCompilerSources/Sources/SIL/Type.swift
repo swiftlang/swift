@@ -22,3 +22,9 @@ public struct Type {
     return SILType_isTrivial(bridged, function.bridged) != 0
   }
 }
+
+extension Type: Equatable {
+  public static func == (lhs: Type, rhs: Type) -> Bool {
+    lhs.bridged.typePtr == rhs.bridged.typePtr
+  }
+}

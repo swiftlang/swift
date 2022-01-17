@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import AST
 import SILBridging
 
 /// A utility to create new instructions at a given insertion point.
@@ -102,14 +101,16 @@ public struct Builder {
     function: Value,
     _ substitutionMap: SubstitutionMap,
     arguments: [Value]
-  ) -> FunctionRefInst {
+  ) -> ApplyInst {
     notifyInstructionsChanged()
-    let functionRef = arguments.withBridgedValues { valuesRef in
+    notifyCallsChanged()
+
+    let apply = arguments.withBridgedValues { valuesRef in
       SILBuilder_createApply(
         bridgedInsPoint, location.bridgedLocation, function.bridged,
         substitutionMap.bridged, valuesRef
       )
     }
-    return functionRef.getAs(FunctionRefInst.self)
+    return apply.getAs(ApplyInst.self)
   }
 }

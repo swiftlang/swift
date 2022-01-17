@@ -24,7 +24,6 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -1322,13 +1321,7 @@ void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
   castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
 }
 
-BridgedRCIdentityAnalysis
-PassContext_getRCIdentityAnalysis(BridgedPassContext context) {
-  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
-  return {pm->getAnalysis<RCIdentityAnalysis>()};
-}
-
-OptionalBridgedFunction PassContext_getDeallocRef(BridgedPassContext context,
+OptionalBridgedFunction PassContext_getDestructor(BridgedPassContext context,
                                                   BridgedType type) {
   auto *cd = castToSILType(type).getClassOrBoundGenericClass();
   assert(cd && "no class type allocated with alloc_ref");
