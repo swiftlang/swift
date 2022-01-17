@@ -43,7 +43,7 @@ let releaseDevirtualizerPass = FunctionPass(
           // these we know that they don't have associated objects, which are
           // _not_ released by the deinit method.
           if let deallocStackRef = instruction as? DeallocStackRefInst {
-            devirtualizeReleaseOfObject(context, release, deallocStackRef)
+            tryDevirtualizeReleaseOfObject(context, release, deallocStackRef)
             lastRelease = nil
             continue
           }
@@ -51,7 +51,7 @@ let releaseDevirtualizerPass = FunctionPass(
 
         if instruction is ReleaseValueInst || instruction is StrongReleaseInst {
           lastRelease = instruction as? RefCountingInst
-        } else if instruction.mayReleaseOrReadRefCount {
+        } else if instruction.mayRelease || instruction.mayReadRefCount {
           lastRelease = nil
         }
       }
@@ -59,8 +59,8 @@ let releaseDevirtualizerPass = FunctionPass(
   }
 )
 
-/// Devirtualize releases of array buffers.
-private func devirtualizeReleaseOfObject(
+/// Tries to de-virtualize the final release of a stack promoted object.
+private func tryDevirtualizeReleaseOfObject(
   _ context: PassContext,
   _ release: RefCountingInst,
   _ deallocStackRef: DeallocStackRefInst
@@ -71,30 +71,19 @@ private func devirtualizeReleaseOfObject(
     root = newRoot
   }
 
-  guard root === allocRefInstruction else {
+  if root != allocRefInstruction {
     return
   }
 
-  createDeallocCall(context, allocRefInstruction.type, release, allocRefInstruction)
-}
+  let type = allocRefInstruction.type
 
-/// Replaces the release-instruction `release` with an explicit call to
-/// the deallocating destructor of `type` for `object`.
-private func createDeallocCall(
-  _ context: PassContext,
-  _ type: Type,
-  _ release: RefCountingInst,
-  _ object: Value
-) {
   guard let dealloc = context.getDestructor(ofClass: type) else {
     return
   }
 
-  let substitutionMap = context.getContextSubstitutionMap(for: type)
-
   let builder = Builder(at: release, location: release.location, context)
 
-  var object = object
+  var object: Value = allocRefInstruction
   if object.type != type {
     object = builder.createUncheckedRefCast(object: object, type: type)
   }
@@ -107,6 +96,7 @@ private func createDeallocCall(
   // argument.
   let functionRef = builder.createFunctionRef(dealloc)
 
+  let substitutionMap = context.getContextSubstitutionMap(for: type)
   builder.createApply(function: functionRef, substitutionMap, arguments: [object])
   context.erase(instruction: release)
 }
@@ -135,7 +125,7 @@ private func stripRCIdentityPreservingInsts(_ value: Value) -> Value? {
   // only reference count that can be modified is the non-trivial field. Return
   // the non-trivial field.
   case let si as StructInst:
-    return si.uniqueNonTrivialFieldValue
+    return si.uniqueNonTrivialOperand
 
   // If we have an enum instruction with a payload, strip off the enum to
   // expose the enum's payload.
@@ -152,9 +142,73 @@ private func stripRCIdentityPreservingInsts(_ value: Value) -> Value? {
   // semantics, a retain_value on the tuple is equivalent to a retain value on
   // the tuple operand.
   case let ti as TupleInst:
-    return ti.uniqueNonTrivialElt
+    return ti.uniqueNonTrivialOperand
 
   default:
     return nil
+  }
+}
+
+private extension Instruction {
+  /// Search the operands of this tuple for a unique non-trivial elt. If we find
+  /// it, return it. Otherwise return `nil`.
+  var uniqueNonTrivialOperand: Value? {
+    var candidateElt: Value?
+    let function = self.function
+
+    // For each operand...
+    for op in operands.enumerated() {
+      // If the operand is not trivial...
+      if !op.type.isTrivial(in: function) {
+        // And we have not found a `candidateElt` yet, set index to `op` and continue.
+        if candidateElt == nil {
+          candidateElt = op
+          continue
+        }
+
+        // Otherwise, we have two values that are non-trivial. Bail.
+        return nil
+      }
+    }
+
+    return candidateElt
+  }
+}
+
+private extension TupleExtractInst {
+  var isEltOnlyNonTrivialElt: Bool {
+    let function = self.function
+    // If the elt we are extracting is trivial, we cannot be a non-trivial
+    // field... return false.
+    if type.isTrivial(in: function) {
+      return false
+    }
+
+    // Ok, we know that the elt we are extracting is non-trivial. Make sure that
+    // we have no other non-trivial elts.
+    let opTy = operand[0].type
+    let fieldNo = self.fieldIndex
+
+    // For each element index of the tuple...
+    for (i, eltType) in opType.tupleElements.enumerated() {
+      // If the element index is the one we are extracting, skip it...
+      if i == fieldNo {
+        continue
+      }
+
+      // Otherwise check if we have a non-trivial type. If we don't have one,
+      // continue.
+      if eltType.isTrivial(in: function) {
+        continue
+      }
+
+      // If we do have a non-trivial type, return false. We have multiple
+      // non-trivial types violating our condition.
+      return false
+    }
+
+    // We checked every other elt of the tuple and did not find any
+    // non-trivial elt except for ourselves. Return `true``.
+    return true
   }
 }

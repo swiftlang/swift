@@ -500,8 +500,8 @@ BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst) {
   return (BridgedMemoryBehavior)castToInst(inst)->getMemoryBehavior();
 }
 
-bool SILInstruction_mayReleaseOrReadRefCount(BridgedInstruction inst) {
-  return castToInst(inst)->mayReleaseOrReadRefCount();
+bool SILInstruction_mayRelease(BridgedInstruction inst) {
+  return castToInst(inst)->mayRelease();
 }
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result) {
@@ -545,16 +545,8 @@ SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei) {
   return castToInst<TupleExtractInst>(tei)->getFieldIndex();
 }
 
-bool TupleExtractInst_isEltOnlyNonTrivialElt(BridgedInstruction tei) {
-  return castToInst<TupleExtractInst>(tei)->isEltOnlyNonTrivialElt();
-}
-
 SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai) {
   return castToInst<TupleElementAddrInst>(teai)->getFieldIndex();
-}
-
-OptionalBridgedValue TupleInst_getUniqueNonTrivialElt(BridgedInstruction ti) {
-  return {castToInst<TupleInst>(ti)->getUniqueNonTrivialElt()};
 }
 
 SwiftInt StructExtractInst_fieldIndex(BridgedInstruction sei) {

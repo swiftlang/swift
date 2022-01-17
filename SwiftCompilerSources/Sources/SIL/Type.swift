@@ -29,10 +29,6 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public var isEnum: Bool { SILType_isEnum(bridged) != 0 }
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
-
-  public func isNonTrivialOrContainsRawPointer(in function: Function) -> Bool {
-    return SILType_isNonTrivialOrContainsRawPointer(bridged, function.bridged) != 0
-  }
   
   public func getFieldIndexOfNominal(fieldName: String) -> Int? {
     let idx = fieldName.withBridgedStringRef {

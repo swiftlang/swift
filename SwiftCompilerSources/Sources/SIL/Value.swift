@@ -41,8 +41,15 @@ extension Value {
 
 public typealias HashableValue = ObjectIdentifier
 
+// We can't make `Value` inherit from `Equatable`, since `Equatable` is a PAT,
+// and we do use `Value` existentials around the codebase. Thus functions from
+// `Equatable` are declared separately.
 public func ==(_ lhs: Value, _ rhs: Value) -> Bool {
   return lhs === rhs
+}
+
+public func !=(_ lhs: Value, _ rhs: Value) -> Bool {
+  return !(lhs === rhs)
 }
 
 extension BridgedValue {

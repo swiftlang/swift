@@ -207,7 +207,6 @@ BridgedType SILValue_getType(BridgedValue value);
 BridgedStringRef SILType_debugDescription(BridgedType);
 SwiftInt SILType_isAddress(BridgedType);
 SwiftInt SILType_isTrivial(BridgedType, BridgedFunction);
-SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType, BridgedFunction);
 SwiftInt SILType_isNominal(BridgedType type);
 SwiftInt SILType_isClass(BridgedType type);
 SwiftInt SILType_isStruct(BridgedType type);
@@ -231,7 +230,7 @@ void SILInstruction_setOperand(BridgedInstruction inst, SwiftInt index,
                                BridgedValue value);
 BridgedLocation SILInstruction_getLocation(BridgedInstruction inst);
 BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst);
-bool SILInstruction_mayReleaseOrReadRefCount(BridgedInstruction inst);
+bool SILInstruction_mayRelease(BridgedInstruction inst);
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result);
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst);
@@ -245,9 +244,7 @@ BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
 BridgedFunction FunctionRefInst_getReferencedFunction(BridgedInstruction fri);
 SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei);
-bool TupleExtractInst_isEltOnlyNonTrivialElt(BridgedInstruction tei);
 SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai);
-OptionalBridgedValue TupleInst_getUniqueNonTrivialElt(BridgedInstruction ti);
 SwiftInt StructExtractInst_fieldIndex(BridgedInstruction sei);
 bool StructExtractInst_isFieldOnlyNonTrivialField(BridgedInstruction sei);
 OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue(BridgedInstruction si);
