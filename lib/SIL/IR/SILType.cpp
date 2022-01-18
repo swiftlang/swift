@@ -507,7 +507,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
 
 SILModuleConventions::SILModuleConventions(SILModule &M)
     : M(&M),
-      loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues
+      loweredAddresses(!M.getOptions().EnableSILOpaqueValues
                        || M.getStage() == SILStage::Lowered)
 {}
 

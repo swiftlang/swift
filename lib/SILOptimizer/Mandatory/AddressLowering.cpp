@@ -1527,7 +1527,7 @@ void AddressLowering::runOnFunction(SILFunction *F) {
 
 /// The entry point to this function transformation.
 void AddressLowering::run() {
-  if (getModule()->getASTContext().LangOpts.EnableSILOpaqueValues) {
+  if (getModule()->getOptions().EnableSILOpaqueValues) {
     for (auto &F : *getModule())
       runOnFunction(&F);
   }

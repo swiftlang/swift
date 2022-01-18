@@ -571,8 +571,6 @@ int main(int argc, char **argv) {
     EnableObjCInterop ? true :
     DisableObjCInterop ? false : llvm::Triple(Target).isOSDarwin();
 
-  Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
-
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(PassRemarksPassed);
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
@@ -634,6 +632,7 @@ int main(int argc, char **argv) {
   SILOpts.EnableSpeculativeDevirtualization = EnableSpeculativeDevirtualization;
   SILOpts.IgnoreAlwaysInline = IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = EnableOSSAModules;
+  SILOpts.EnableSILOpaqueValues = EnableSILOpaqueValues;
 
   if (CopyPropagationState) {
     SILOpts.CopyPropagation = *CopyPropagationState;
