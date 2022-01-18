@@ -192,8 +192,23 @@ public:
       + CR->NumMetadataSources * sizeof(MetadataSourceRecord);
   }
 };
+
+class ConformanceRecordIterator
+  : public ReflectionSectionIteratorBase<ConformanceRecordIterator,
+                                         ExternalProtocolConformanceRecord> {
+public:
+   ConformanceRecordIterator(RemoteRef<void> Cur, uint64_t Size)
+   : ReflectionSectionIteratorBase(Cur, Size)
+ {}
+
+ static uint64_t getCurrentRecordSize(RemoteRef<ExternalProtocolConformanceRecord> CD){
+   return sizeof(ExternalProtocolConformanceRecord);
+ }
+};
+
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
+using ConformanceSection = ReflectionSection<ConformanceRecordIterator>;
 
 struct ReflectionInfo {
   FieldSection Field;
@@ -202,6 +217,7 @@ struct ReflectionInfo {
   CaptureSection Capture;
   GenericSection TypeReference;
   GenericSection ReflectionString;
+  ConformanceSection Conformance;
 };
 
 struct ClosureContextInfo {
@@ -739,6 +755,7 @@ public:
   void dumpAssociatedTypeSection(std::ostream &stream);
   void dumpBuiltinTypeSection(std::ostream &stream);
   void dumpCaptureSection(std::ostream &stream);
+  void dumpConformanceSection(std::ostream &stream);
   void dumpAllSections(std::ostream &stream);
 };
 

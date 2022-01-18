@@ -496,6 +496,41 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
   }
 }
 
+/// Given the address of a conformance descriptor, attempt to read it.
+static void readConformanceDescriptor(
+                                      const ExternalProtocolConformanceRecord &record) {
+
+  // Read the flags to figure out how much space we should read.
+  ContextDescriptorFlags flags;
+  if (!Reader->readBytes(RemoteAddress(address), (uint8_t*)&flags,
+                         sizeof(flags)))
+    return nullptr;
+}
+
+void TypeRefBuilder::dumpConformanceSection(std::ostream &stream) {
+  for (const auto &section : ReflectionInfos) {
+    for (const auto conformanceRecord : section.Conformance) {
+      stream << "dummy\n";
+      readConformanceDescriptor(conformanceRecord->get());
+
+//      switch (auto kind = conformance->getTypeKind()) {
+//        case TypeReferenceKind::DirectObjCClassName:
+//          stream << "DirectObjCClassName\n";
+//          break;
+//
+//      case TypeReferenceKind::IndirectObjCClass:
+//          stream << "IndirectObjCClass\n";
+//          break;
+//
+//      case TypeReferenceKind::DirectTypeDescriptor:
+//      case TypeReferenceKind::IndirectTypeDescriptor:
+//          stream << "TypeDescriptor\n";
+//          break;
+//      }
+    }
+  }
+}
+
 void TypeRefBuilder::dumpAllSections(std::ostream &stream) {
   stream << "FIELDS:\n";
   stream << "=======\n";
@@ -512,6 +547,10 @@ void TypeRefBuilder::dumpAllSections(std::ostream &stream) {
   stream << "CAPTURE DESCRIPTORS:\n";
   stream << "====================\n";
   dumpCaptureSection(stream);
+  stream << "\n";
+  stream << "CONFORMANCES:\n";
+  stream << "=============\n";
+  dumpConformanceSection(stream);
   stream << "\n";
 }
 

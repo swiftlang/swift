@@ -12,14 +12,15 @@
 
 namespace swift {
 
-/// Represents the six reflection sections used by Swift
+/// Represents the seven reflection sections used by Swift
 enum ReflectionSectionKind : uint8_t {
   fieldmd,
   assocty,
   builtin,
   capture,
   typeref,
-  reflstr
+  reflstr,
+  conform
 };
 
 /// Abstract base class responsible for providing the correct reflection section
@@ -47,6 +48,8 @@ public:
       return "__swift5_typeref";
     case reflstr:
       return "__swift5_reflstr";
+    case conform:
+      return "__swift5_proto";
     }
     llvm_unreachable("Section type not found.");
   }
@@ -69,6 +72,8 @@ public:
       return "swift5_typeref";
     case reflstr:
       return "swift5_reflstr";
+    case conform:
+      return "swift5_proto";
     }
     llvm_unreachable("Section type not found.");
   }
@@ -91,6 +96,8 @@ public:
       return ".sw5tyrf";
     case reflstr:
       return ".sw5rfst";
+    case conform:
+      return ".sw5cnfrm"; // TODO: Figure out the real name
     }
     llvm_unreachable("Section  not found.");
   }

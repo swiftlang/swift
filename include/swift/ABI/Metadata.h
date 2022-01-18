@@ -2840,6 +2840,10 @@ using TargetProtocolConformanceRecord =
 
 using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
 
+using ExternalProtocolConformanceDescriptor
+  = TargetProtocolConformanceDescriptor<External<RuntimeTarget<8>>>;
+using ExternalProtocolConformanceRecord = TargetProtocolConformanceRecord<External<RuntimeTarget<8>>>;
+
 template<typename Runtime>
 struct TargetGenericContext;
 
