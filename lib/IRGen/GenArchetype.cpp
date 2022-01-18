@@ -66,7 +66,8 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   // If this is an opaque archetype, we'll need to instantiate using its
   // descriptor.
   if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
-    return emitOpaqueTypeMetadataRef(IGF, opaque, request);
+    if (opaque->isRoot())
+      return emitOpaqueTypeMetadataRef(IGF, opaque, request);
   }
 
   // If there's no local or opaque metadata, it must be a nested type.
@@ -508,9 +509,11 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           DynamicMetadataRequest request) {
   auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFn();
   auto opaqueDecl = archetype->getDecl();
-
+  auto genericParam = archetype->getInterfaceType()
+      ->castTo<GenericTypeParamType>();
   auto *descriptor = getAddressOfOpaqueTypeDescriptor(IGF, opaqueDecl);
-  auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+  auto indexValue = llvm::ConstantInt::get(
+      IGF.IGM.SizeTy, genericParam->getIndex());
 
   llvm::CallInst *result = nullptr;
   withOpaqueTypeGenericArgs(IGF, archetype,
