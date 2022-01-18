@@ -1055,7 +1055,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     // instruction
     if (isForwardingBorrow(value)) {
       if (auto *i = value->getDefiningInstruction()) {
-        llvm::copy(i->getOperandValues(true /*skip type dependent ops*/),
+        llvm::copy(i->getNonTypeDependentOperandValues(),
                    std::back_inserter(worklist));
         continue;
       }
@@ -1100,7 +1100,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
     // instruction
     if (isForwardingBorrow(currentValue)) {
       if (auto *i = currentValue->getDefiningInstruction()) {
-        auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
+        auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
         auto begin = instOps.begin();
@@ -1160,7 +1160,7 @@ bool swift::getAllOwnedValueIntroducers(
     // instruction
     if (isForwardingConsume(value)) {
       if (auto *i = value->getDefiningInstruction()) {
-        llvm::copy(i->getOperandValues(true /*skip type dependent ops*/),
+        llvm::copy(i->getNonTypeDependentOperandValues(),
                    std::back_inserter(worklist));
         continue;
       }
@@ -1201,7 +1201,7 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
     // instruction
     if (isForwardingConsume(currentValue)) {
       if (auto *i = currentValue->getDefiningInstruction()) {
-        auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
+        auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
         auto begin = instOps.begin();

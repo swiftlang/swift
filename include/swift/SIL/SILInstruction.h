@@ -567,19 +567,30 @@ public:
   bool maySuspend() const;
 
 private:
-  /// Predicate used to filter OperandValueRange.
+  /// Functor for Operand::get()
   struct OperandToValue;
-  /// Predicate used to filter TransformedOperandValueRange.
+  /// Functor for Operand::get()
+  struct OperandRefToValue;
+  /// Predicate to filter NonTypeDependentOperandValueRange
+  struct NonTypeDependentOperandToValue;
+  /// Predicate to filter TransformedOperandValueRange.
   struct OperandToTransformedValue;
 
 public:
-  using OperandValueRange =
-      OptionalTransformRange<ArrayRef<Operand>, OperandToValue>;
+  using OperandValueRange = TransformRange<ArrayRef<Operand*>, OperandToValue>;
+  using OperandRefValueRange =
+    TransformRange<ArrayRef<Operand>, OperandRefToValue>;
+  using NonTypeDependentOperandValueRange =
+    OptionalTransformRange<ArrayRef<Operand>, NonTypeDependentOperandToValue>;
   using TransformedOperandValueRange =
-      OptionalTransformRange<ArrayRef<Operand>, OperandToTransformedValue>;
+    OptionalTransformRange<ArrayRef<Operand>, OperandToTransformedValue>;
 
-  OperandValueRange
-  getOperandValues(bool skipTypeDependentOperands = false) const;
+  static OperandValueRange getOperandValues(ArrayRef<Operand*> operands);
+
+  OperandRefValueRange getOperandValues() const;
+
+  NonTypeDependentOperandValueRange getNonTypeDependentOperandValues() const;
+
   TransformedOperandValueRange
   getOperandValues(std::function<SILValue(SILValue)> transformFn,
                    bool skipTypeDependentOperands) const;
@@ -879,14 +890,24 @@ inline const SILNode *SILNode::instAsNode(const SILInstruction *inst) {
 
 
 struct SILInstruction::OperandToValue {
-  const SILInstruction &i;
-  bool skipTypeDependentOps;
+  SILValue operator()(const Operand *use) const {
+    return use->get();
+  }
+};
 
-  OperandToValue(const SILInstruction &i, bool skipTypeDependentOps)
-      : i(i), skipTypeDependentOps(skipTypeDependentOps) {}
+struct SILInstruction::OperandRefToValue {
+  SILValue operator()(const Operand &use) const {
+    return use.get();
+  }
+};
+
+struct SILInstruction::NonTypeDependentOperandToValue {
+  const SILInstruction &i;
+
+  NonTypeDependentOperandToValue(const SILInstruction &i): i(i) {}
 
   Optional<SILValue> operator()(const Operand &use) const {
-    if (skipTypeDependentOps && i.isTypeDependentOperand(use))
+    if (i.isTypeDependentOperand(use))
       return None;
     return use.get();
   }
@@ -910,11 +931,21 @@ struct SILInstruction::OperandToTransformedValue {
   }
 };
 
+inline SILInstruction::OperandValueRange
+SILInstruction::getOperandValues(ArrayRef<Operand*> operands) {
+  return OperandValueRange(operands, OperandToValue());
+}
+
 inline auto
-SILInstruction::getOperandValues(bool skipTypeDependentOperands) const
-    -> OperandValueRange {
-  return OperandValueRange(getAllOperands(),
-                           OperandToValue(*this, skipTypeDependentOperands));
+SILInstruction::getOperandValues() const -> OperandRefValueRange {
+  return OperandRefValueRange(getAllOperands(), OperandRefToValue());
+}
+
+inline auto
+SILInstruction::getNonTypeDependentOperandValues() const
+  -> NonTypeDependentOperandValueRange {
+  return NonTypeDependentOperandValueRange(getAllOperands(),
+                                           NonTypeDependentOperandToValue(*this));
 }
 
 inline auto
