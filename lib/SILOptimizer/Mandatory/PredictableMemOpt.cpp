@@ -2888,6 +2888,9 @@ bool swift::optimizeMemoryAccesses(SILFunction &fn) {
 }
 
 bool swift::eliminateDeadAllocations(SILFunction &fn) {
+  if (!fn.hasOwnership())
+    return false;
+
   bool changed = false;
   DeadEndBlocks deadEndBlocks(&fn);
 

@@ -19,7 +19,7 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
   swift_create_post_build_symlink(swift-frontend-bootstrapping0
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping0/bin")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping0/${CMAKE_CFG_INTDIR}/bin")
 
   # Bootstrapping - level 1
 
@@ -37,7 +37,7 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
   swift_create_post_build_symlink(swift-frontend-bootstrapping1
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping1/bin")
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping1/${CMAKE_CFG_INTDIR}/bin")
 endif()
 
 add_swift_host_tool(swift-frontend
