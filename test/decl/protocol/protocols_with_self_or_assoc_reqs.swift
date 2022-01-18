@@ -510,44 +510,36 @@ protocol UnfulfillableGenericRequirements {
 }
 extension UnfulfillableGenericRequirements {
   func method1() where A : Class<Self> {}
-  // expected-note@-1 {{where 'Self.A' = '(UnfulfillableGenericRequirements).A', 'Class<Self>' = 'Class<UnfulfillableGenericRequirements>'}}
   func method2() where A: Sequence, A.Element == Self {}
-  // expected-note@-1 {{where 'Self' = 'UnfulfillableGenericRequirements', 'Self.A.Element' = '((UnfulfillableGenericRequirements).A).Element'}}
-  // expected-note@-2 {{where 'Self.A' = '(UnfulfillableGenericRequirements).A'}}
   func method3<U>(_: U) -> U {}
   func method4<U>(_: U) where U : Class<Self.A> {}
-  // expected-note@-1 {{where 'U' = 'Bool', 'Class<Self.A>' = 'Class<(UnfulfillableGenericRequirements).A>'}}
-  // expected-note@-2 {{where 'U' = 'Bool', 'Class<Self.A>' = 'Class<(UnfulfillableGenericRequirementsDerived1).A>'}}
-  // expected-note@-3 {{where 'U' = 'Bool', 'Class<Self.A>' = 'Class<(UnfulfillableGenericRequirementsDerived2).A>'}}
+  // expected-note@-1 3 {{where 'U' = 'Bool'}}
   func method5<U>(_: U) where U: Sequence, Self == U.Element {}
   // expected-note@-1 {{where 'U' = 'Bool'}}
 
-  // expected-note@+3 {{where 'Self.A' = '(UnfulfillableGenericRequirements).A'}}
-  // expected-note@+2 {{where 'Self.A.Element' = '((UnfulfillableGenericRequirements).A).Element'}}
   // expected-note@+1 2 {{where 'U' = 'Bool'}}
   func method6<U>(_: U) where U: UnfulfillableGenericRequirements,
                               A: Sequence, A.Element: Sequence,
                               U.A == A.Element.Element {}
   func method7<U>(_: U) where U: UnfulfillableGenericRequirements & Class<Self> {}
-  // expected-note@-1 {{where 'U' = 'Class<UnfulfillableGenericRequirements>'}}
 }
 do {
   let exist: any UnfulfillableGenericRequirements
 
-  exist.method1() // expected-error {{instance method 'method1()' requires that '(UnfulfillableGenericRequirements).A' inherit from 'Class<UnfulfillableGenericRequirements>'}}
+  exist.method1() // expected-error {{instance method 'method1()' requires that 'Self.A' inherit from 'Class<Self>'}}
   exist.method2()
-  // expected-error@-1 {{instance method 'method2()' requires the types 'UnfulfillableGenericRequirements' and '((UnfulfillableGenericRequirements).A).Element' be equivalent}}
-  // expected-error@-2 {{instance method 'method2()' requires that '(UnfulfillableGenericRequirements).A' conform to 'Sequence'}}
+  // expected-error@-1 {{instance method 'method2()' requires the types 'Self' and 'Self.A.Element' be equivalent}}
+  // expected-error@-2 {{instance method 'method2()' requires that 'Self.A' conform to 'Sequence'}}
   _ = exist.method3(false) // ok
   exist.method4(false)
-  // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<(UnfulfillableGenericRequirements).A>'}}
+  // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}
   // expected-error@-2 {{member 'method4' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; use a generic constraint instead}}
   exist.method5(false)
   // expected-error@-1 {{instance method 'method5' requires that 'Bool' conform to 'Sequence'}}
   // expected-error@-2 {{member 'method5' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; use a generic constraint instead}}
 
   exist.method7(false)
-  // expected-error@-1 {{instance method 'method7' requires that 'Class<UnfulfillableGenericRequirements>' conform to 'UnfulfillableGenericRequirements'}}
+  // expected-error@-1 {{instance method 'method7' requires that 'U' conform to 'UnfulfillableGenericRequirements'}}
   // expected-error@-2 {{member 'method7' cannot be used on value of protocol type 'UnfulfillableGenericRequirements'; use a generic constraint instead}}
 }
 protocol UnfulfillableGenericRequirementsDerived1: UnfulfillableGenericRequirements where A == Bool {}
@@ -558,10 +550,10 @@ do {
   let exist2: any UnfulfillableGenericRequirementsDerived2
 
   exist1.method4(false)
-  // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<(UnfulfillableGenericRequirementsDerived1).A>'}}
+  // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>}}
   exist2.method4(false)
   // expected-error@-1 {{member 'method4' cannot be used on value of protocol type 'UnfulfillableGenericRequirementsDerived2'; use a generic constraint instead}}
-  // expected-error@-2 {{instance method 'method4' requires that 'Bool' inherit from 'Class<(UnfulfillableGenericRequirementsDerived2).A>'}}
+  // expected-error@-2 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}
 }
 protocol UnfulfillableGenericRequirementsDerived3: UnfulfillableGenericRequirements where A: Sequence, A.Element: Sequence {}
 do {
@@ -571,8 +563,8 @@ do {
   let exist2: any UnfulfillableGenericRequirementsDerived3
 
   exist1.method6(false)
-  // expected-error@-1 {{instance method 'method6' requires that '((UnfulfillableGenericRequirements).A).Element' conform to 'Sequence'}}
-  // expected-error@-2 {{instance method 'method6' requires that '(UnfulfillableGenericRequirements).A' conform to 'Sequence'}}
+  // expected-error@-1 {{instance method 'method6' requires that 'Self.A.Element' conform to 'Sequence'}}
+  // expected-error@-2 {{instance method 'method6' requires that 'Self.A' conform to 'Sequence'}}
   // expected-error@-3 {{instance method 'method6' requires that 'Bool' conform to 'UnfulfillableGenericRequirements'}}
   exist2.method6(false)
   // expected-error@-1 {{member 'method6' cannot be used on value of protocol type 'UnfulfillableGenericRequirementsDerived3'; use a generic constraint instead}}
@@ -586,38 +578,38 @@ protocol InvalidTypeParameters {
   associatedtype A
 }
 extension InvalidTypeParameters {
-  func method1() -> A.A where A: InvalidTypeParameters {} // expected-note {{where 'Self.A' = '(InvalidTypeParameters).A'}}
-  func method2(_: A.A) where A: InvalidTypeParameters {} // expected-note {{where 'Self.A' = '(InvalidTypeParameters).A'}}
-  func method3(_: A.A, _: A) where A: InvalidTypeParameters {} // expected-note {{where 'Self.A' = '(InvalidTypeParameters).A'}}
+  func method1() -> A.A where A: InvalidTypeParameters {}
+  func method2(_: A.A) where A: InvalidTypeParameters {}
+  func method3(_: A.A, _: A) where A: InvalidTypeParameters {}
 }
 do {
   let exist: any InvalidTypeParameters
 
-  exist.method1() // expected-error {{instance method 'method1()' requires that '(InvalidTypeParameters).A' conform to 'InvalidTypeParameters'}}
-  exist.method2(false) // expected-error {{instance method 'method2' requires that '(InvalidTypeParameters).A' conform to 'InvalidTypeParameters'}}
-  exist.method3(false, false) // expected-error {{instance method 'method3' requires that '(InvalidTypeParameters).A' conform to 'InvalidTypeParameters'}}
+  exist.method1() // expected-error {{instance method 'method1()' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
+  exist.method2(false) // expected-error {{instance method 'method2' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
+  exist.method3(false, false) // expected-error {{instance method 'method3' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
   // expected-error@-1 {{member 'method3' cannot be used on value of protocol type 'InvalidTypeParameters'; use a generic constraint instead}}
 }
 
 protocol GenericRequirementFailures {
   associatedtype A
 }
-extension GenericRequirementFailures where A == Never { // expected-note 3 {{'Self.A' = '(GenericRequirementFailures).A'}}
+extension GenericRequirementFailures where A == Never {
   func method1() {}
   func method2() -> Self {}
   func method3(_: A) {}
 }
-extension GenericRequirementFailures where A: GenericRequirementFailures { // expected-note {{where 'Self.A' = '(GenericRequirementFailures).A'}}
+extension GenericRequirementFailures where A: GenericRequirementFailures {
   func method4() {}
 }
 do {
   let exist: any GenericRequirementFailures
 
-  exist.method1() // expected-error {{referencing instance method 'method1()' on 'GenericRequirementFailures' requires the types '(GenericRequirementFailures).A' and 'Never' be equivalent}}
-  exist.method2() // expected-error {{referencing instance method 'method2()' on 'GenericRequirementFailures' requires the types '(GenericRequirementFailures).A' and 'Never' be equivalent}}
-  exist.method3(false) // expected-error {{referencing instance method 'method3' on 'GenericRequirementFailures' requires the types '(GenericRequirementFailures).A' and 'Never' be equivalent}}
+  exist.method1() // expected-error {{referencing instance method 'method1()' on 'GenericRequirementFailures' requires the types 'Self.A' and 'Never' be equivalent}}
+  exist.method2() // expected-error {{referencing instance method 'method2()' on 'GenericRequirementFailures' requires the types 'Self.A' and 'Never' be equivalent}}
+  exist.method3(false) // expected-error {{referencing instance method 'method3' on 'GenericRequirementFailures' requires the types 'Self.A' and 'Never' be equivalent}}
   // expected-error@-1 {{member 'method3' cannot be used on value of protocol type 'GenericRequirementFailures'; use a generic constraint instead}}
-  exist.method4() // expected-error {{referencing instance method 'method4()' on 'GenericRequirementFailures' requires that '(GenericRequirementFailures).A' conform to 'GenericRequirementFailures'}}
+  exist.method4() // expected-error {{referencing instance method 'method4()' on 'GenericRequirementFailures' requires that 'Self.A' conform to 'GenericRequirementFailures'}}
 }
 protocol GenericRequirementFailuresDerived: GenericRequirementFailures where A: GenericRequirementFailures {}
 do {

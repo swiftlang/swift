@@ -359,8 +359,25 @@ bool RequirementFailure::diagnoseAsError() {
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
 
-  auto lhs = getLHS();
-  auto rhs = getRHS();
+  // Instead of printing archetypes rooted on an opened existential, which
+  // are currently an implementation detail, have a weird textual
+  // representation, and may be misleading (a root opened archetype prints like
+  // an existential type), use the corresponding 'Self'-rooted interface types
+  // from the requirement, which are more familiar.
+  const auto lhs = [&] {
+    if (getLHS()->hasOpenedExistential()) {
+      return getRequirement().getFirstType();
+    }
+
+    return getLHS();
+  }();
+  const auto rhs = [&] {
+    if (getRHS()->hasOpenedExistential()) {
+      return getRequirement().getSecondType();
+    }
+
+    return getRHS();
+  }();
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
@@ -387,7 +404,8 @@ bool RequirementFailure::diagnoseAsError() {
                    AffectedDecl->getName(), lhs, rhs);
   }
 
-  emitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
+  maybeEmitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
+
   return true;
 }
 
@@ -406,8 +424,8 @@ bool RequirementFailure::diagnoseAsNote() {
   return true;
 }
 
-void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
-                                             Type rhs) const {
+void RequirementFailure::maybeEmitRequirementNote(const Decl *anchor, Type lhs,
+                                                  Type rhs) const {
   auto &req = getRequirement();
 
   if (req.getKind() != RequirementKind::SameType) {
@@ -431,6 +449,11 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 
   if (req.getKind() == RequirementKind::Layout ||
       rhs->isEqual(req.getSecondType())) {
+    // If the note is tautological, bail out.
+    if (lhs->isEqual(req.getFirstType())) {
+      return;
+    }
+
     emitDiagnosticAt(anchor, diag::where_requirement_failure_one_subst,
                      req.getFirstType(), lhs);
     return;
