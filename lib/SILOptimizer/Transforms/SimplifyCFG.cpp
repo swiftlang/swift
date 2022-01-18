@@ -1324,7 +1324,7 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
   for (SILValue branchArg : targetBranch->getArgs()) {
     if (branchArg->getParentBlock() == targetBB) {
       auto *phi = dyn_cast<SILPhiArgument>(branchArg);
-      if (!phi || !phi->isPhiArgument()) {
+      if (!phi || !phi->isPhi()) {
         return;
       }
       branchArg = phi->getIncomingPhiValue(sourceBB);

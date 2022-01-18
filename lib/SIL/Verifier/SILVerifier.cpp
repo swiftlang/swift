@@ -1003,7 +1003,7 @@ public:
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
     // - Non-phi arguments have a single predecessor.
-    assert(arg->isPhiArgument() && "precondition");
+    assert(arg->isPhi() && "precondition");
     for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
       auto *TI = predBB->getTerminator();
       if (F.hasOwnership()) {
@@ -1015,7 +1015,7 @@ public:
                 "All phi argument inputs must be from branches.");
       }
     }
-    if (arg->isPhiArgument() && prohibitAddressPhis()) {
+    if (arg->isPhi() && prohibitAddressPhis()) {
       // As a property of well-formed SIL, we disallow address-type
       // phis. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
@@ -1033,7 +1033,7 @@ public:
     checkLegalType(arg->getFunction(), arg, nullptr);
     checkValueBaseOwnership(arg);
     if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
-      if (phiArg->isPhiArgument())
+      if (phiArg->isPhi())
         visitSILPhiArgument(phiArg);
       else {
         // A non-phi BlockArgument must have a single predecessor unless it is

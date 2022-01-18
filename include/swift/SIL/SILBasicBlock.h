@@ -581,7 +581,7 @@ struct PhiValue {
 
   PhiValue(SILValue value) {
     auto *blockArg = dyn_cast<SILPhiArgument>(value);
-    if (!blockArg || !blockArg->isPhiArgument())
+    if (!blockArg || !blockArg->isPhi())
       return;
 
     phiBlock = blockArg->getParent();
@@ -598,6 +598,11 @@ struct PhiValue {
 
   SILPhiArgument *getValue() const {
     return cast<SILPhiArgument>(phiBlock->getArgument(argIndex));
+  }
+
+  Operand *getOperand(SILBasicBlock *predecessor) {
+    auto *branch = cast<BranchInst>(predecessor->getTerminator());
+    return &branch->getAllOperands()[argIndex];
   }
 
   operator SILValue() const { return getValue(); }
