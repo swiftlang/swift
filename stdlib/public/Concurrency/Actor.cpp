@@ -1727,7 +1727,9 @@ using TargetExecutorSignature =
     AsyncSignature<void(/*on=*/DefaultActor *,
                         /*targetName=*/const char *, /*targetNameSize=*/size_t,
                         /*argumentBuffer=*/void *,
+                        /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
+                        /*resultType=*/const Metadata *,
                         /*resumeFunc=*/TaskContinuationFunction *,
                         /*callContext=*/AsyncContext *),
                    /*throws=*/true>;
@@ -1742,7 +1744,11 @@ TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 ///   - a result buffer as a raw pointer
 ///   - a reference to an actor to execute method on.
 using DistributedAccessorSignature =
-    AsyncSignature<void(void *, void *, HeapObject *),
+    AsyncSignature<void(/*argumentBuffer=*/void *,
+                        /*argumentTypes=*/const Metadata *const *,
+                        /*resultBuffer=*/void *,
+                        /*resultType=*/const Metadata *,
+                        /*actor=*/HeapObject *),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -1769,7 +1775,9 @@ void ::swift_distributed_execute_target(
     DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,
     void *argumentBuffer,
+    const Metadata *const *argumentTypes,
     void *resultBuffer,
+    const Metadata *resultType,
     TaskContinuationFunction *resumeFunc,
     AsyncContext *callContext) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
@@ -1803,5 +1811,8 @@ void ::swift_distributed_execute_target(
   calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       swift_distributed_execute_target_resume);
 
-  accessorEntry(calleeContext, argumentBuffer, resultBuffer, actor);
+  accessorEntry(calleeContext,
+                argumentBuffer, argumentTypes,
+                resultBuffer, resultType,
+                actor);
 }

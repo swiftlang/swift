@@ -33,6 +33,7 @@
 #include "ScalarPairTypeInfo.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ExtInfo.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunction.h"
@@ -92,7 +93,9 @@ public:
   void emit();
 
 private:
-  void computeArguments(llvm::Value *argumentBuffer, Explosion &arguments);
+  void computeArguments(llvm::Value *argumentBuffer,
+                        llvm::Value *argumentTypes,
+                        Explosion &arguments);
 
   FunctionPointer getPointerToTarget() const;
 
@@ -132,7 +135,9 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
       /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Guaranteed,
       {/*argumentBuffer=*/getRawPointerParameter(),
+       /*argumentTypes=*/getRawPointerParameter(),
        /*resultBuffer=*/getRawPointerParameter(),
+       /*resultType=*/getRawPointerParameter(),
        /*actor=*/targetTy->getParameters().back()},
       /*Yields=*/{},
       /*Results=*/{},
@@ -181,6 +186,7 @@ DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
               FunctionPointer::BasicKind::AsyncFunctionPointer))) {}
 
 void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
+                                           llvm::Value *argumentTypes,
                                            Explosion &arguments) {
   auto fnType = Target->getLoweredFunctionType();
 
@@ -301,8 +307,12 @@ void DistributedAccessor::emit() {
 
   // UnsafeRawPointer that holds all of the argument values.
   auto *argBuffer = params.claimNext();
+  // `swift.type**` that holds the argument types that correspond to values.
+  auto *argTypes = params.claimNext();
   // UnsafeRawPointer that is used to store the result.
   auto *resultBuffer = params.claimNext();
+  // `swift.type*` that holds the type fo the result.
+  auto *resultType = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
 
@@ -333,7 +343,7 @@ void DistributedAccessor::emit() {
 
   // Step one is to load all of the data from argument buffer,
   // so it could be forwarded to the distributed method.
-  computeArguments(argBuffer, arguments);
+  computeArguments(argBuffer, argTypes, arguments);
 
   // Step two, let's form and emit a call to the distributed method
   // using computed argument explosion.

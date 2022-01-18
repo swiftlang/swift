@@ -207,11 +207,9 @@ extension DistributedActorSystem {
     }
 
     // Prepare buffer for the parameter types to be decoded into:
-    let paramTypesBuffer = UnsafeMutableRawBufferPointer
-      .allocate(byteCount: MemoryLayout<Any.Type>.size * Int(paramCount),
-        alignment: MemoryLayout<Any.Type>.alignment)
+    let argumentTypesBuffer = UnsafeMutableBufferPointer<Any.Type>.allocate(capacity: Int(paramCount))
     defer {
-      paramTypesBuffer.deallocate()
+      argumentTypesBuffer.deallocate()
     }
 
     // Demangle and write all parameter types into the prepared buffer
@@ -220,7 +218,7 @@ extension DistributedActorSystem {
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
         genericEnv,
         substitutionsBuffer,
-        paramTypesBuffer.baseAddress!._rawValue, Int(paramCount))
+        argumentTypesBuffer.baseAddress!._rawValue, Int(paramCount))
     }
 
     // Fail if the decoded parameter types count seems off and fishy
@@ -234,11 +232,11 @@ extension DistributedActorSystem {
     }
 
     // Copy the types from the buffer into a Swift Array
-    var paramTypes: [Any.Type] = []
+    var argumentTypes: [Any.Type] = []
     do {
-      paramTypes.reserveCapacity(Int(decodedNum))
-      for paramType in paramTypesBuffer.bindMemory(to: Any.Type.self) {
-        paramTypes.append(paramType)
+      argumentTypes.reserveCapacity(Int(decodedNum))
+      for argumentType in argumentTypesBuffer {
+        argumentTypes.append(argumentType)
       }
     }
 
@@ -268,7 +266,7 @@ extension DistributedActorSystem {
     }
 
     // Prepare the buffer to decode the argument values into
-    let hargs = HeterogeneousBuffer.allocate(forTypes: paramTypes)
+    let hargs = HeterogeneousBuffer.allocate(forTypes: argumentTypes)
     defer {
       hargs.deinitialize()
       hargs.deallocate()
@@ -279,14 +277,14 @@ extension DistributedActorSystem {
       // TODO(distributed): decode the generics info
       // TODO(distributed): move this into the IRGen synthesized funcs, so we don't need hargs at all and can specialize the decodeNextArgument calls
       do {
-        var paramIdx = 0
+        var argumentIdx = 0
         for unsafeRawArgPointer in hargs {
-          guard paramIdx < paramCount else {
+          guard argumentIdx < paramCount else {
             throw ExecuteDistributedTargetError(
-              message: "Unexpected attempt to decode more parameters than expected: \(paramIdx + 1)")
+              message: "Unexpected attempt to decode more parameters than expected: \(argumentIdx + 1)")
           }
-          let paramType = paramTypes[paramIdx]
-          paramIdx += 1
+          let argumentType = argumentTypes[argumentIdx]
+          argumentIdx += 1
 
           // FIXME(distributed): func doDecode<Arg: SerializationRequirement>(_: Arg.Type) throws {
           // FIXME:     but how would we call this...?
@@ -296,7 +294,7 @@ extension DistributedActorSystem {
               .bindMemory(to: Arg.self, capacity: 1)
             try invocationDecoder.decodeNextArgument(Arg.self, into: unsafeArgPointer)
           }
-          try _openExistential(paramType, do: doDecodeArgument)
+          try _openExistential(argumentType, do: doDecodeArgument)
         }
       }
 
@@ -308,7 +306,9 @@ extension DistributedActorSystem {
         on: actor,
         mangledTargetName, UInt(mangledTargetName.count),
         argumentBuffer: hargs.buffer._rawValue, // TODO(distributed): pass the invocationDecoder instead, so we can decode inside IRGen directly into the argument explosion
-        resultBuffer: resultBuffer._rawValue
+        argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
+        resultBuffer: resultBuffer._rawValue,
+        resultType: returnTypeFromTypeInfo
       )
 
       func onReturn<R>(_ resultTy: R.Type) async throws {
@@ -327,7 +327,9 @@ func _executeDistributedTarget(
   on actor: AnyObject, // DistributedActor
   _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
   argumentBuffer: Builtin.RawPointer, // HeterogeneousBuffer of arguments
-  resultBuffer: Builtin.RawPointer
+  argumentTypes: Builtin.RawPointer,
+  resultBuffer: Builtin.RawPointer,
+  resultType: Any.Type
 ) async throws
 
 // ==== ----------------------------------------------------------------------------------------------------------------
