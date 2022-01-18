@@ -34,7 +34,7 @@ This document explains how differentiation is implemented in the Swift compiler,
 
 ```swift
 // From the standard library:
-// func gradient<T, R>(at x: T, in f: @differentiable (T) -> R) -> T.TangentVector
+// func gradient<T, R>(at x: T, of f: @differentiable (T) -> R) -> T.TangentVector
 // where R: FloatingPoint, R.TangentVector == R
 
 // 1. What does the `@differentiable` attribute do?
@@ -51,7 +51,7 @@ func cubed(_ x: Float) -> Float {
 // transform generates derivative functions for the closure expression. The
 // `gradient` higher-order function extracts and applies a derivative function to
 // evaluate a gradient value.
-gradient(at: 4, in: { x in x * x * x }) // 48.0
+gradient(at: 4, of: { x in x * x * x }) // 48.0
 ```
 
 > NOTE:
@@ -397,13 +397,13 @@ func cubed(_ x: Float) -> Float {
 //   %cubed = differentiable_function [wrt 0] %closure_ref
 //       with {%closure_jvp_ref, %closure_vjp_ref}
 
-gradient(at: Float(4), in: { x in x * x * x })
+gradient(at: Float(4), of: { x in x * x * x })
 
 // Swift supports implicit function conversions, which happens above.
 // Below is what the conversion looks like explicitly:
 // let foo: (Float) -> Float = { x in x * x * x }
 // let cubed: @differentiable (Float) -> Float = foo
-// gradient(at: Float(4), in: cubed)
+// gradient(at: Float(4), of: cubed)
 ```
 
 > TODO: Update the \[differentiable\] attribute directly above the Swift declaration of `cubed(_:)` with a SIL differentiability witness.
