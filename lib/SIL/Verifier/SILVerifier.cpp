@@ -5515,6 +5515,11 @@ public:
           if (term->isFunctionExiting()) {
             require(state.Stack.empty(),
                     "return with stack allocs that haven't been deallocated");
+            if (!state.ActiveOps.empty()) {
+              for (const auto &op : state.ActiveOps) {
+                op->dump();
+              }
+            }
             require(state.ActiveOps.empty(),
                     "return with operations still active");
             require(!state.GotAsyncContinuation,

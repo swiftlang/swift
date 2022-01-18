@@ -7450,7 +7450,7 @@ NominalTypeDecl::getDistributedActorSystemRemoteCallFunction() const {
 }
 
 AbstractFunctionDecl*
-NominalTypeDecl::getDistributedActorSystemMakeInvocationFunction() const {
+NominalTypeDecl::getDistributedActorSystemMakeInvocationEncoderFunction() const {
   auto &C = this->getASTContext();
   NominalTypeDecl *system = const_cast<NominalTypeDecl *>(this);
   if (this->isDistributedActor()) {

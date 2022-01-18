@@ -128,13 +128,7 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF,
 /// distributed method.
 static SILValue *emitDistributedRemoteCallTargetValue(SILGenFunction &SGF,
                                                       SILLocation loc) {
-  ASTContext &ctx = SGF.getASTContext();
-  auto &B = SGF.B;
-
-  auto &F = SGF.F;
   assert(false); // FIXME(!!)!!!!(!!)!!!!(!!)!!!!(!!)!!!!(!!)!!!!(!!)!!!!
-//
-//  F.decl
 }
 
 // MARK: local instance initialization
@@ -480,9 +474,9 @@ SILGenFunction::emitConditionalResignIdentityCall(SILLocation loc,
   }
 }
 
-// MARK: system.makeInvocation()
+// MARK: system.makeInvocationEncoder()
 
-void SILGenFunction::emitDistributedActorSystemMakeInvocationCall(
+void SILGenFunction::emitDistributedActorSystemMakeInvocationEncoderCall(
     SILLocation loc, ClassDecl *actorDecl, ManagedValue actorSelf,
     SILBasicBlock *normalBB, SILBasicBlock *errorBB) {
   ASTContext &ctx = getASTContext();
@@ -646,7 +640,45 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     B.createCondBranch(loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
   }
 
-  // // if __isRemoteActor(self)
+  // === Local Call ------------------------------------------------------------
+  // {
+  //   return (try)? (await)? self.X(...)
+  // }
+  // Prepare some variables that we need to destroy etc. from returnBB/errorBB:
+  BeginAccessInst *invocationValueAccess = nullptr;
+  {
+    B.emitBlock(isLocalBB);
+
+    auto nativeMethodTy = SGM.Types.getConstantOverrideType(getTypeExpansionContext(),
+                                                            native);
+    auto nativeFnSILTy = SILType::getPrimitiveObjectType(nativeMethodTy);
+    auto nativeSilFnType = nativeFnSILTy.castTo<SILFunctionType>();
+
+    bool isClassMethod = false;
+    if (auto classDecl = dyn_cast<ClassDecl>(fd->getDeclContext())) {
+      if (!classDecl->isFinal() && !fd->isFinal() &&
+          !fd->hasForcedStaticDispatch())
+        isClassMethod = true;
+    }
+
+    SILValue nativeFn;
+    if (isClassMethod) {
+      nativeFn = emitClassMethodRef(
+          loc, params[params.size() - 1], native, nativeMethodTy);
+    } else {
+      nativeFn = emitGlobalFunctionRef(loc, native);
+    }
+    auto subs = F.getForwardingSubstitutionMap();
+
+    if (nativeSilFnType->hasErrorResult()) {
+      B.createTryApply(loc, nativeFn, subs, params, localReturnBB, localErrorBB);
+    } else {
+      auto result = B.createApply(loc, nativeFn, subs, params);
+      B.createBranch(loc, returnBB, {result});
+    }
+  }
+
+  // === Remote Call -----------------------------------------------------------
   // {
   //   var invocation = try self.actorSystem.makeInvocation()
   // }
@@ -683,21 +715,21 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           *this, loc, selfValue.getValue(),
           lookupProperty(selfTyDecl, ctx.Id_actorSystem));
 
-      AbstractFunctionDecl *makeInvocationFnDecl =
-          selfTyDecl->getDistributedActorSystemMakeInvocationFunction();
-      assert(makeInvocationFnDecl && "no remoteCall func found!");
-      auto makeInvocationFnRef = SILDeclRef(makeInvocationFnDecl);
+      AbstractFunctionDecl *makeInvocationEncoderFnDecl =
+          selfTyDecl->getDistributedActorSystemMakeInvocationEncoderFunction();
+      assert(makeInvocationEncoderFnDecl && "no remoteCall func found!");
+      auto makeInvocationEncoderFnRef = SILDeclRef(makeInvocationEncoderFnDecl);
 
       ProtocolDecl *invocationEncoderProto =
           ctx.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
 
-      auto makeInvocationMethodTy = SGM.Types.getConstantOverrideType(getTypeExpansionContext(),
-                                                        makeInvocationFnRef);
-      auto makeInvocationDerivativeFnSILTy = SILType::getPrimitiveObjectType(makeInvocationMethodTy);
-      auto makeInvocationSilFnType = makeInvocationDerivativeFnSILTy.castTo<SILFunctionType>();
+      auto makeInvocationEncoderMethodTy = SGM.Types.getConstantOverrideType(
+          getTypeExpansionContext(), makeInvocationEncoderFnRef);
+      auto makeInvocationEncoderDerivativeFnSILTy = SILType::getPrimitiveObjectType(makeInvocationEncoderMethodTy);
+      auto makeInvocationEncoderSilFnType = makeInvocationEncoderDerivativeFnSILTy.castTo<SILFunctionType>();
 
       auto invocationEncoderResultInfo =
-          makeInvocationSilFnType->getResults().begin();
+          makeInvocationEncoderSilFnType->getResults().begin();
       auto invocationEncoderCanTy = invocationEncoderResultInfo->getInterfaceType();
       auto invocationEncoderTy = getLoweredType(invocationEncoderCanTy);
 
@@ -705,12 +737,12 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
       // === -------------------------------------------------------------------
       // var encoder = actorSystem.makeInvocationEncoder()
-      auto makeInvocationFnSIL =
-          builder.getOrCreateFunction(loc, makeInvocationFnRef, ForDefinition);
-      SILValue makeInvocationFn = B.createFunctionRefFor(loc, makeInvocationFnSIL);
+      auto makeInvocationEncoderFnSIL =
+          builder.getOrCreateFunction(loc, makeInvocationEncoderFnRef, ForDefinition);
+      SILValue makeInvocationEncoderFn =
+          B.createFunctionRefFor(loc, makeInvocationEncoderFnSIL);
 
       ApplyInst *invocationValue;
-      BeginAccessInst *invocationValueAccess;
       SILValue encoderTemp = emitTemporaryAllocation(loc, invocationEncoderTy);
       {
 //        emitDistributedActorSystemWitnessCall(
@@ -720,7 +752,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 //              /*args=*/ { });
 
         invocationValue = B.createApply(
-            loc, makeInvocationFn,
+            loc, makeInvocationEncoderFn,
             /*subs=*/F.getForwardingSubstitutionMap(),
             /*args=*/{systemRef});
 
@@ -733,11 +765,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
                                 SILAccessEnforcement::Static,
                                 false,
                                 false);
-
-        fprintf(stderr, "[%s:%d] (%s) invocation Value: \n", __FILE__, __LINE__, __FUNCTION__);
-        invocationValue->dump();
-        fprintf(stderr, "[%s:%d] (%s) invocation Value access: \n", __FILE__, __LINE__, __FUNCTION__);
-        invocationValueAccess->dump();
       }
 
       // We need to maintain a "next normal basic block" pointer because
@@ -806,7 +833,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         nextNormalBB = doneRecordingNormalBB;
 
 //          auto doneRecordingFnDecl =
-//              selfTyDecl->getDistributedActorSystemMakeInvocationFunction();
+//              selfTyDecl->getDistributedActorSystemMakeInvocationEncoderFunction();
 
         NominalTypeDecl *invocationEncoderNominal =
             invocationEncoderTy.getNominalOrBoundGenericNominal();
@@ -841,6 +868,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // === create the RemoteCallTarget
       auto remoteCallTargetDecl = ctx.getRemoteCallTargetDecl();
       auto remoteCallTargetTy = F.mapTypeIntoContext(remoteCallTargetDecl->getDeclaredInterfaceType());
+      AllocStackInst *remoteCallTargetValue;
       {
         B.emitBlock(nextNormalBB);
         B.createEndAccess(loc, invocationValueAccess, /*aborted=*/false);
@@ -861,7 +889,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
         // %28 = alloc_stack $RemoteCallTarget, let, name "target" // users: %58, %57, %50, %77, %76, %37
-        auto remoteCallTargetValue = B.createAllocStack(loc, getLoweredType(remoteCallTargetTy));
+        remoteCallTargetValue = B.createAllocStack(loc, getLoweredType(remoteCallTargetTy));
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
 //        // %29 = metatype $@thin RemoteCallTarget.Type // user: %37
@@ -907,18 +935,11 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
         // // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
         // %34 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %35
-        fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
         auto stringInitDeclRef = ctx.getStringBuiltinInitDecl(ctx.getStringDecl());
-        stringInitDeclRef.dump();
-        fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
         auto stringInitRef = SILDeclRef(stringInitDeclRef.getDecl(), SILDeclRef::Kind::Allocator);
-        stringInitRef.dump();
-        fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
-         auto stringInitFn = M.findFunction(stringInitRef.mangle(), SILLinkage::PublicExternal);
-        fprintf(stderr, "[%s:%d] (%s) HERE 1\n", __FILE__, __LINE__, __FUNCTION__);
+        // NotForDefinition since it seems the body of the init function is not there yet:
+         auto stringInitFn = builder.getOrCreateFunction(loc, stringInitRef, NotForDefinition);
         auto stringInitFnRef = B.createFunctionRef(loc, stringInitFn);
-        stringInitFnRef->dump();
-        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
         // %35 = apply %34(%30, %31, %32, %33) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %37
         auto mangledNameStringValue =
@@ -947,9 +968,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
             loc, remoteCallTargetInitFn, {},
             {/*out*/ remoteCallTargetValue, mangledNameStringValue,
              remoteCallTargetMetatypeValue});
-        // ---------------------------------------------------------------------
-        // ---------------------------------------------------------------------
-        // ---------------------------------------------------------------------
+
         B.createBranch(loc, remoteCallBB, {remoteCallTargetValue});
       }
 
@@ -1059,20 +1078,23 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
             remoteCallNormalBB->createPhiArgument(resultType, OwnershipKind::Owned);
 
         // end_access %48 : $*FakeInvocation // id: %52
+        B.createEndAccess(loc, invocationValueAccess, /*aborted=*/false);
+
         // release_value %40 : $FakeActorSystem // id: %53
         // %54 = load %38 : $*String // user: %55
         // release_value %54 : $String // id: %55
         // dealloc_stack %38 : $*String // id: %56
         // destroy_addr %28 : $*RemoteCallTarget // id: %57
+        B.emitDestroyAddr(loc, remoteCallTargetValue);
+
         // dealloc_stack %28 : $*RemoteCallTarget // id: %58
+        B.createDeallocStack(loc, remoteCallTargetValue);
+
         // dealloc_stack %15 : $*FakeInvocation // id: %59
-        // br bb8 // id: %60
+        B.createDeallocStack(loc, encoderTemp);
 
-
-        // bb8: // Preds: bb7 bb5
-        // %66 = tuple () // user: %67
-        // return %66 : $() // id: %67
-        B.createReturn(loc, returnValue);
+        // branch to return
+        B.createBranch(loc, returnBB, { returnValue });
       }
 
       // Emit all basic error blocks which handle errors thrown by invocation
@@ -1095,43 +1117,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   fprintf(stderr, "[%s:%d] (%s) ----------------------------------------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-
-  // // else
-  // {
-  //   return (try)? (await)? self.X(...)
-  // }
-  {
-    B.setInsertionPoint(isLocalBB);
-    B.emitBlock(isLocalBB);
-
-    auto nativeMethodTy = SGM.Types.getConstantOverrideType(getTypeExpansionContext(),
-                                                            native);
-    auto nativeFnSILTy = SILType::getPrimitiveObjectType(nativeMethodTy);
-    auto nativeSilFnType = nativeFnSILTy.castTo<SILFunctionType>();
-
-    bool isClassMethod = false;
-    if (auto classDecl = dyn_cast<ClassDecl>(fd->getDeclContext())) {
-      if (!classDecl->isFinal() && !fd->isFinal() &&
-          !fd->hasForcedStaticDispatch())
-        isClassMethod = true;
-    }
-
-    SILValue nativeFn;
-    if (isClassMethod) {
-      nativeFn = emitClassMethodRef(
-        loc, params[params.size() - 1], native, nativeMethodTy);
-    } else {
-      nativeFn = emitGlobalFunctionRef(loc, native);
-    }
-    auto subs = F.getForwardingSubstitutionMap();
-
-    if (nativeSilFnType->hasErrorResult()) {
-      B.createTryApply(loc, nativeFn, subs, params, localReturnBB, localErrorBB);
-    } else {
-      auto result = B.createApply(loc, nativeFn, subs, params);
-      B.createBranch(loc, returnBB, {result});
-    }
-  }
 
   // TODO(distributed): to use a emitAndBranch local function, since these four blocks are so similar
 
@@ -1181,6 +1166,9 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     SILValue error = errorBB->createPhiArgument(
         fnConv.getSILErrorType(getTypeExpansionContext()),
         OwnershipKind::Owned);
+
+    if (invocationValueAccess)
+      B.createEndAccess(loc, invocationValueAccess, /*aborted=*/false);
 
     Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
     B.createThrow(loc, error);

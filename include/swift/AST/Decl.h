@@ -3363,7 +3363,7 @@ public:
   AbstractFunctionDecl* getDistributedActorSystemRemoteCallFunction() const;
 
   /// Find the 'makeInvocation' function.
-  AbstractFunctionDecl* getDistributedActorSystemMakeInvocationFunction() const;
+  AbstractFunctionDecl* getDistributedActorSystemMakeInvocationEncoderFunction() const;
 
   /// Find the 'DistributedTargetInvocation.recordArgument' function.
   AbstractFunctionDecl* getDistributedActorInvocationRecordArgumentFunction() const;
