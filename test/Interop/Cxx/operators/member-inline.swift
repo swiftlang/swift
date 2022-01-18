@@ -1,15 +1,13 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop)
-//
+
 // REQUIRES: executable_test
-//
-// We can't yet call member functions correctly on Windows (SR-13129).
-// XFAIL: OS=windows-msvc
 
 import MemberInline
 import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")
 
+#if !os(Windows)    // SR-13129
 OperatorsTestSuite.test("LoadableIntWrapper.plus (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
@@ -18,6 +16,7 @@ OperatorsTestSuite.test("LoadableIntWrapper.plus (inline)") {
 
   expectEqual(19, result.value)
 }
+#endif
 
 OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   var wrapper = LoadableIntWrapper(value: 42)
@@ -132,6 +131,7 @@ OperatorsTestSuite.test("DifferentTypesArrayByVal.subscript (inline)") {
   expectEqual(1.5.rounded(.up), resultDouble.rounded(.up))
 }
 
+#if !os(Windows)    // SR-13129
 OperatorsTestSuite.test("NonTrivialArrayByVal.subscript (inline)") {
   var arr = NonTrivialArrayByVal()
   let NonTrivialByVal = arr[0];
@@ -145,6 +145,7 @@ OperatorsTestSuite.test("NonTrivialArrayByVal.subscript (inline)") {
   expectEqual(5, NonTrivialByVal.e)
   expectEqual(6, NonTrivialByVal.f)
 }
+#endif
 
 OperatorsTestSuite.test("PtrByVal.subscript (inline)") {
   var arr = PtrByVal()
