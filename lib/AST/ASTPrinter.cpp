@@ -4841,17 +4841,19 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
         return isSimpleUnderPrintOptions(typealias->getSinglyDesugaredType());
     } else if (auto opaque =
                  dyn_cast<OpaqueTypeArchetypeType>(T.getPointer())) {
-      switch (Options.OpaqueReturnTypePrinting) {
-      case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
-      case PrintOptions::OpaqueReturnTypePrintingMode::Description:
-        return true;
-      case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
-        return opaque->getDecl()->hasExplicitGenericParams();
-      case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
-        return opaque->getDecl()->hasExplicitGenericParams() ||
-            isSimpleUnderPrintOptions(opaque->getExistentialType());
+      if (opaque->isRoot()) {
+        switch (Options.OpaqueReturnTypePrinting) {
+        case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
+        case PrintOptions::OpaqueReturnTypePrintingMode::Description:
+          return true;
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+          return opaque->getDecl()->hasExplicitGenericParams();
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
+          return opaque->getDecl()->hasExplicitGenericParams() ||
+              isSimpleUnderPrintOptions(opaque->getExistentialType());
+        }
+        llvm_unreachable("bad opaque-return-type printing mode");
       }
-      llvm_unreachable("bad opaque-return-type printing mode");
     } else if (auto existential = dyn_cast<ExistentialType>(T.getPointer())) {
       if (!Options.PrintExplicitAny)
         return isSimpleUnderPrintOptions(existential->getConstraintType());
@@ -5893,6 +5895,12 @@ public:
   }
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
+    if (auto parent = T->getParent()) {
+      visitParentType(parent);
+      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      return;
+    }
+
     if (Options.PrintForSIL)
       Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
     visit(T->getOpenedExistentialType());
@@ -5918,20 +5926,34 @@ public:
     }
   }
 
-  void visitNestedArchetypeType(NestedArchetypeType *T) {
-    visitParentType(T->getParent());
-    printArchetypeCommon(T, T->getAssocType());
+  static AbstractTypeParamDecl *getAbstractTypeParamDecl(ArchetypeType *T) {
+    if (auto gp = T->getInterfaceType()->getAs<GenericTypeParamType>()) {
+      return gp->getDecl();
+    }
+
+    auto depMemTy = T->getInterfaceType()->castTo<DependentMemberType>();
+    return depMemTy->getAssocType();
   }
 
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
-    printArchetypeCommon(T, T->getInterfaceType()->getDecl());
+    if (auto parent = T->getParent())
+      visitParentType(parent);
+
+    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
+    if (auto parent = T->getParent()) {
+      visitParentType(parent);
+      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      return;
+    }
+
     // Try to print a named opaque type.
     auto printNamedOpaque = [&] {
-      if (auto genericParam =
-              T->getDecl()->getExplicitGenericParam(T->getOrdinal())) {
+      unsigned ordinal =
+          T->getInterfaceType()->castTo<GenericTypeParamType>()->getIndex();
+      if (auto genericParam = T->getDecl()->getExplicitGenericParam(ordinal)) {
         visit(genericParam->getDeclaredInterfaceType());
         return true;
       }
@@ -5996,7 +6018,9 @@ public:
   }
 
   void visitSequenceArchetypeType(SequenceArchetypeType *T) {
-    printArchetypeCommon(T, T->getInterfaceType()->getDecl());
+    if (auto parent = T->getParent())
+      visitParentType(parent);
+    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {

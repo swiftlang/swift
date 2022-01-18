@@ -89,9 +89,9 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   auto root = A->getRoot();
   if (!isa<PrimaryArchetypeType>(root) && !isa<SequenceArchetypeType>(root))
     return true;
-  if (isa<OpenedArchetypeType>(A->getRoot()))
+  if (isa<OpenedArchetypeType>(root))
     return true;
-  if (isa<OpaqueTypeArchetypeType>(A->getRoot()))
+  if (isa<OpaqueTypeArchetypeType>(root))
     return true;
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
