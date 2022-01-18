@@ -23,6 +23,10 @@ include(AddSwiftStdlib)
 list(REMOVE_ITEM SWIFT_SDK_IOS_ARCHITECTURES "armv7" "armv7s")
 list(REMOVE_ITEM SWIFT_SDK_IOS_SIMULATOR_ARCHITECTURES "i386")
 
+# Don't build the libraries for arm64e; it's not a stable ABI.
+list(REMOVE_ITEM SWIFT_SDK_IOS_ARCHITECTURES "arm64e")
+list(REMOVE_ITEM SWIFT_SDK_OSX_ARCHITECTURES "arm64e")
+
 # The back-deployed library can only be shared.
 list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
 
