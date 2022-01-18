@@ -2064,7 +2064,7 @@ public:
   /// \endverbatim
   ///
   /// using the current builder's state as the injection point.
-  void emitDistributedActorSystemMakeInvocationCall(
+  void emitDistributedActorSystemMakeInvocationEncoderCall(
       SILLocation loc,
       ClassDecl *actorDecl, ManagedValue actorSelf,
       SILBasicBlock *normalBB, SILBasicBlock *errorBB);
