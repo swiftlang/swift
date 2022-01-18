@@ -2583,7 +2583,7 @@ static void concretizeNestedTypeFromConcreteParent(
     // Otherwise we have an abstract conformance to an opaque result type.
     assert(conformance.isAbstract());
     auto archetype = concreteParent->castTo<ArchetypeType>();
-    witnessType = archetype->getNestedType(assocType->getName());
+    witnessType = archetype->getNestedType(assocType);
   }
 
   builder.addSameTypeRequirement(

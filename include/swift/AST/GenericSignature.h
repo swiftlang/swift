@@ -390,6 +390,8 @@ public:
 
   bool isCanonicalTypeInContext(Type type) const;
 
+  bool isValidTypeInContext(Type type) const;
+
   /// Retrieve the conformance access path used to extract the conformance of
   /// interface \c type to the given \c protocol.
   ///

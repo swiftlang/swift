@@ -295,7 +295,8 @@ static Type getIdentityOpaqueTypeArchetypeType(
   if (outerGenericSignature)
     subs = outerGenericSignature->getIdentitySubstitutionMap();
 
-  return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+  Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
+  return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
 
 Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
@@ -2127,7 +2128,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
             subs = outerGenericSignature->getIdentitySubstitutionMap();
 
           return OpaqueTypeArchetypeType::get(
-                            opaqueDecl, gpDecl->getIndex(), subs);
+              opaqueDecl, gpDecl->getDeclaredInterfaceType(), subs);
         }
       }
 

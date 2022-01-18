@@ -274,7 +274,8 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
         opaqueDecl->getGenericSignature(), allArgs,
         LookUpConformanceInModule(parentModule));
-    return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+    Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
+    return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
   }
   
   // TODO: named opaque types
@@ -638,9 +639,8 @@ Type ASTBuilder::createDependentMemberType(StringRef member,
   auto identifier = Ctx.getIdentifier(member);
 
   if (auto *archetype = base->getAs<ArchetypeType>()) {
-    if (archetype->hasNestedType(identifier))
-      return archetype->getNestedType(identifier);
-
+      if (Type memberType = archetype->getNestedTypeByName(identifier))
+        return memberType;
   }
 
   if (base->isTypeParameter()) {
@@ -656,8 +656,8 @@ Type ASTBuilder::createDependentMemberType(StringRef member,
   auto identifier = Ctx.getIdentifier(member);
 
   if (auto *archetype = base->getAs<ArchetypeType>()) {
-    if (archetype->hasNestedType(identifier))
-      return archetype->getNestedType(identifier);
+    if (auto assocType = protocol->getAssociatedType(identifier))
+      return archetype->getNestedType(assocType);
   }
 
   if (base->isTypeParameter()) {
