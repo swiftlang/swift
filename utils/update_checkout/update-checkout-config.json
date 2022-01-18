@@ -190,7 +190,7 @@
                 "indexstore-db": "release/5.6",
                 "sourcekit-lsp": "release/5.6",
                 "swift-format": "release/5.6",
-                "swift-installer-scripts": "main",
+                "swift-installer-scripts": "release/5.6",
                 "swift-docc": "release/5.6",
                 "swift-lmdb": "release/5.6",
                 "swift-docc-render-artifact": "release/5.6",
