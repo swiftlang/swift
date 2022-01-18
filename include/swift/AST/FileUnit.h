@@ -16,6 +16,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/Debug.h"
 
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -307,6 +308,9 @@ public:
   virtual StringRef getExportedModuleName() const {
     return getParentModule()->getRealName().str();
   }
+
+  SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
+  SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
 
   /// Traverse the decls within this file.
   ///

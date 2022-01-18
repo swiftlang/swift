@@ -26,6 +26,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
@@ -855,6 +856,9 @@ public:
   /// \c SerializeOptionsForDebugging hack. Once this information can be
   /// transferred from module files to the dSYMs, remove this.
   bool isExternallyConsumed() const;
+
+  SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
+  SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
 
   SourceRange getSourceRange() const { return SourceRange(); }
 
