@@ -1912,10 +1912,11 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
   for (auto *D: KnownDecls) {
     if (auto *Ext = dyn_cast<ExtensionDecl>(D)) {
       if (HandledExtensions.find(Ext) == HandledExtensions.end()) {
-        auto *NTD = Ext->getExtendedNominal();
-        // Check if the extension is from other modules.
-        if (!llvm::is_contained(Modules, NTD->getModuleContext())) {
-          ExtensionMap[NTD].push_back(Ext);
+        if (auto *NTD = Ext->getExtendedNominal()) {
+          // Check if the extension is from other modules.
+          if (!llvm::is_contained(Modules, NTD->getModuleContext())) {
+            ExtensionMap[NTD].push_back(Ext);
+          }
         }
       }
     }
