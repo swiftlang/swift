@@ -208,14 +208,16 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
     std::cerr << "reserved field in swift_reflection_info_t is not zero\n";
     abort();
   }
-  
+
   ReflectionInfo ContextInfo{
     sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
     sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
     sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
     sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
     sectionFromInfo<const void *>(Info, Info.type_references),
-    sectionFromInfo<const void *>(Info, Info.reflection_strings)};
+    sectionFromInfo<const void *>(Info, Info.reflection_strings),
+    // TODO: Conformance section
+    ConformanceSection(RemoteRef<void>(), 0)};
   
   Context->addReflectionInfo(ContextInfo);
 }
@@ -234,8 +236,9 @@ void swift_reflection_addReflectionMappingInfo(
       reflectionSectionFromLocalAndRemote<CaptureDescriptorIterator>(
           Info.capture),
       reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
-      reflectionSectionFromLocalAndRemote<const void *>(
-          Info.reflection_strings)};
+      reflectionSectionFromLocalAndRemote<const void *>(Info.reflection_strings),
+      // TODO: Conformance section
+      ConformanceSection(RemoteRef<void>(), 0)};
 
   Context->addReflectionInfo(ContextInfo);
 }

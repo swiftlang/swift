@@ -497,14 +497,13 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
 }
 
 /// Given the address of a conformance descriptor, attempt to read it.
-static void readConformanceDescriptor(
-                                      const ExternalProtocolConformanceRecord &record) {
+static void readConformanceDescriptor(const ExternalProtocolConformanceRecord &record) {
 
   // Read the flags to figure out how much space we should read.
-  ContextDescriptorFlags flags;
-  if (!Reader->readBytes(RemoteAddress(address), (uint8_t*)&flags,
-                         sizeof(flags)))
-    return nullptr;
+//  ContextDescriptorFlags flags;
+//  if (!Reader->readBytes(RemoteAddress(address), (uint8_t*)&flags,
+//                         sizeof(flags)))
+//    return nullptr;
 }
 
 void TypeRefBuilder::dumpConformanceSection(std::ostream &stream) {
