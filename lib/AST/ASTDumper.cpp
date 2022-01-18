@@ -3722,6 +3722,7 @@ namespace {
                               StringRef label) {
       printCommon(label, className);
       printField("address", static_cast<void *>(T));
+      printRec("interface_type", T->getInterfaceType());
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
         OS << " layout=";
@@ -3731,54 +3732,25 @@ namespace {
         printField("conforms_to", proto->printRef());
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);
+
     }
     
-    void printArchetypeNestedTypes(ArchetypeType *T) {
-      Indent += 2;
-      for (auto nestedType : T->getKnownNestedTypes()) {
-        OS << "\n";
-        OS.indent(Indent) << "(";
-        PrintWithColorRAII(OS, TypeFieldColor) << "nested_type";
-        OS << "=";
-        OS << nestedType.first.str() << " ";
-        if (!nestedType.second) {
-          PrintWithColorRAII(OS, TypeColor) << "<<unresolved>>";
-        } else {
-          PrintWithColorRAII(OS, TypeColor);
-          OS << "=" << nestedType.second.getString();
-        }
-        OS << ")";
-      }
-      Indent -= 2;
-    }
-
     void visitPrimaryArchetypeType(PrimaryArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "primary_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
-      printArchetypeNestedTypes(T);
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
-    }
-    void visitNestedArchetypeType(NestedArchetypeType *T, StringRef label) {
-      printArchetypeCommon(T, "nested_archetype_type", label);
-      printField("name", T->getFullName());
-      printField("parent", T->getParent());
-      printField("assoc_type", T->getAssocType()->printRef());
-      printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "opened_archetype_type", label);
       printRec("opened_existential", T->getOpenedExistentialType());
       printField("opened_existential_id", T->getOpenedExistentialID());
-      printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T,
                                       StringRef label) {
       printArchetypeCommon(T, "opaque_type", label);
       printField("decl", T->getDecl()->getNamingDecl()->printRef());
-      printField("ordinal", T->getOrdinal());
       if (!T->getSubstitutions().empty()) {
         OS << '\n';
         SmallPtrSet<const ProtocolConformance *, 4> Dumped;
@@ -3786,14 +3758,12 @@ namespace {
                                SubstitutionMap::DumpStyle::Full,
                                Indent + 2, Dumped);
       }
-      printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitSequenceArchetypeType(SequenceArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "sequence_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
-      printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
