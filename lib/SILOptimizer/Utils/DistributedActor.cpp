@@ -122,10 +122,6 @@ void emitDistributedActorSystemWitnessCall(
       subConformances.push_back(distributedActorConfRef);
     }
 
-    for (auto &type : subTypes) {
-      type->dump();
-    }
-
     subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
   }
 

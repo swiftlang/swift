@@ -593,6 +593,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   auto isRemoteBB = createBasicBlock();
   auto isLocalBB = createBasicBlock();
   auto localErrorBB = createBasicBlock();
+  auto remoteCallBB = createBasicBlock();
 //  auto makeInvocationNormalBB = OLDSYNTHESIS ? nullptr : createBasicBlock();
 //  auto makeInvocationErrorBB = OLDSYNTHESIS ? nullptr : createBasicBlock();
   auto remoteErrorBB = createBasicBlock();
@@ -838,6 +839,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       }
 
       // === create the RemoteCallTarget
+      auto remoteCallTargetDecl = ctx.getRemoteCallTargetDecl();
+      auto remoteCallTargetTy = F.mapTypeIntoContext(remoteCallTargetDecl->getDeclaredInterfaceType());
       {
         B.emitBlock(nextNormalBB);
         B.createEndAccess(loc, invocationValueAccess, /*aborted=*/false);
@@ -855,10 +858,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
 //        auto remoteCallTargetTy = getLoweredType(ctx.getRemoteCallTargetType()); // WAS OK
 
-        fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
-
-        auto remoteCallTargetDecl = ctx.getRemoteCallTargetDecl();
-        auto remoteCallTargetTy = F.mapTypeIntoContext(remoteCallTargetDecl->getDeclaredInterfaceType());
         fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
         // %28 = alloc_stack $RemoteCallTarget, let, name "target" // users: %58, %57, %50, %77, %76, %37
@@ -951,14 +950,59 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         // ---------------------------------------------------------------------
         // ---------------------------------------------------------------------
         // ---------------------------------------------------------------------
-        // TODO: actual SIL ended the BB here and just `br` to the remoteCall calling one, do we need to?
+        B.createBranch(loc, remoteCallBB, {remoteCallTargetValue});
       }
 
       // === Call the remoteCall on the actor system
+      auto remoteCallNormalBB = createBasicBlock();
+      auto remoteCallErrorBB = createBasicBlock();
+      dynamicBasicErrorBlocks.push_back(remoteCallErrorBB);
       {
+        B.emitBlock(remoteCallBB);
+        SILValue remoteCallTargetValue = remoteCallBB->createPhiArgument(
+            getLoweredType(remoteCallTargetTy), OwnershipKind::Owned);
+
         // --- Prepare storage for the return value
         // %38 = alloc_stack $String // users: %54, %56, %50, %75
         auto remoteCallReturnValue = B.createAllocStack(loc, resultType);
+
+        // --- Prepare 'throwing' type, Error or Never depending on throws of the target
+        SILValue thrownErrorMetatypeValue;
+        if (fd->hasThrows()) {
+          auto errorTy = F.mapTypeIntoContext(
+              ctx.getErrorDecl()->getInterfaceType());
+          auto errorMetatype = getLoweredType(MetatypeType::get(errorTy));
+          thrownErrorMetatypeValue = B.createMetatype(loc, errorMetatype);
+        } else {
+          auto neverTy = F.mapTypeIntoContext(
+              ctx.getNeverType());
+          auto neverMetatype = getLoweredType(MetatypeType::get(neverTy));
+          thrownErrorMetatypeValue = B.createMetatype(loc, neverMetatype);
+        }
+        assert(thrownErrorMetatypeValue);
+
+        // --- Prepare 'returning' type, can be 'Void' or specific type
+        SILValue returnMetatypeValue;
+        switch (methodTy->getNumResults()) {
+        case 0: {
+          auto voidTy = ctx.getVoidType();
+          auto voidMetatype =
+              getLoweredType(MetatypeType::get(voidTy, MetatypeRepresentation::Thick));
+          // %42 = metatype $@thin Never.Type
+          // %43 = metatype $@thick Never.Type /// we just have this one
+          returnMetatypeValue = B.createMetatype(loc, voidMetatype);
+          break;
+        }
+        case 1: {
+          CanType returnType = methodTy->getSingleResult().getInterfaceType();
+          auto returnMetatype = getLoweredType(MetatypeType::get(returnType, MetatypeRepresentation::Thick));
+          returnMetatypeValue = B.createMetatype(loc, returnMetatype);
+          break;
+        }
+        default:
+          llvm_unreachable("Can't support more results than one.");
+        }
+        assert(returnMetatypeValue);
 
         // function_ref FakeActorSystem.remoteCall<A, B, C>(on:target:invocationDecoder:throwing:returning:)
         // %49 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mSgtYaKAJ0bC0RzSeR0_SER0_AA0C7AddressV2IDRtzr1_lF : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %50
@@ -970,19 +1014,66 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
             builder.getOrCreateFunction(loc, remoteCallFnRef, ForDefinition);
         SILValue remoteCallFn = B.createFunctionRefFor(loc, remoteCallFnSIL);
 
-        // try_apply %49<MyDistActor, Never, String>(%38, %2, %28, %48, %43, %46, %40) : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error), normal bb5, error bb10 // id: %50
+        // --- prepare subs for the 'remoteCall'
+        // <MyDistActor, ErrorType, ReturnType>
         SubstitutionMap remoteCallSubs = SubstitutionMap();
-//        B.createTryApply(loc, remoteCallFn, remoteCallSubs,
-//                         /*args=*/{
-//                             /*out*/remoteCallReturnValue,
-//
-//
-//                         })
+        if (false) { // FIXME(distributed): implement the signatures !!!!!!
+          auto remoteCallGenericSig = remoteCallFnDecl->getGenericSignature();
+          SmallVector<Type, 3> subTypes;
+          SmallVector<ProtocolConformanceRef, 3> subConformances;
+          subTypes.push_back(getLoweredType(selfTy).getASTType());
+
+          // FIXME(distributed): get the conformances right here...
+
+          remoteCallSubs =
+              SubstitutionMap::get(remoteCallGenericSig,
+                                   subTypes, subConformances);
+        }
+
+        // try_apply %49<MyDistActor, Never, String>(%38, %2, %28, %48, %43, %46, %40) : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error), normal bb5, error bb10 // id: %50
+        B.createTryApply(loc, remoteCallFn,
+                         remoteCallSubs,
+                         /*args=*/{
+                             remoteCallReturnValue, // out, return value
+                             selfValue.getValue(), // self
+                             remoteCallTargetValue, // target
+                             invocationValueAccess, // invocation decoder
+                             thrownErrorMetatypeValue, // throwing type
+                             returnMetatypeValue // returning type
+                         },
+                         /*normalBB=*/remoteCallNormalBB,
+                         /*errorBB=*/remoteCallErrorBB);
       }
 
       fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
       F.dump();
       fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+
+      // === Continue returning the value from the remote call
+      {
+        // bb5(%51 : $()): // Preds: bb4
+        B.emitBlock(remoteCallNormalBB);
+        fprintf(stderr, "[%s:%d] (%s) result type in remoteCallNormalBB:\n", __FILE__, __LINE__, __FUNCTION__);
+        resultType.dump();
+        SILValue returnValue =
+            remoteCallNormalBB->createPhiArgument(resultType, OwnershipKind::Owned);
+
+        // end_access %48 : $*FakeInvocation // id: %52
+        // release_value %40 : $FakeActorSystem // id: %53
+        // %54 = load %38 : $*String // user: %55
+        // release_value %54 : $String // id: %55
+        // dealloc_stack %38 : $*String // id: %56
+        // destroy_addr %28 : $*RemoteCallTarget // id: %57
+        // dealloc_stack %28 : $*RemoteCallTarget // id: %58
+        // dealloc_stack %15 : $*FakeInvocation // id: %59
+        // br bb8 // id: %60
+
+
+        // bb8: // Preds: bb7 bb5
+        // %66 = tuple () // user: %67
+        // return %66 : $() // id: %67
+        B.createReturn(loc, returnValue);
+      }
 
       // Emit all basic error blocks which handle errors thrown by invocation
       // preparing calls; All those blocks just branch to errorBB.
