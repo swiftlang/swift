@@ -677,11 +677,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
                        remoteErrorBB);
     } else {
       // -----------------------------------------------------------------------
-      auto remoteCallFnDecl =
-          selfTyDecl->getDistributedActorSystemRemoteCallFunction();
-      assert(remoteCallFnDecl && "no remoteCall func found!");
-      auto remoteCallFnRef = SILDeclRef(remoteCallFnDecl);
-
       // === get the actorSystem property
       auto systemRef = emitActorPropertyReference(
           *this, loc, selfValue.getValue(),
@@ -941,26 +936,48 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         // --- Create the RemoteCallTarget instance, passing the mangledNameString
         // function_ref RemoteCallTarget.init(_mangledName:)
         // %36 = function_ref @$s12_Distributed16RemoteCallTargetV12_mangledNameACSS_tcfC : $@convention(method) (@owned String, @thin RemoteCallTarget.Type) -> @out RemoteCallTarget // user: %37
-        auto remoteCallInitDecl = remoteCallTargetDecl->getDistributedRemoteCallTargetInitFunction();
-        assert(remoteCallInitDecl && "no 'RemoteCallTarget.init' found!");
-        auto remoteCallInitRef = SILDeclRef(remoteCallInitDecl);
-        auto remoteCallInitFnSIL =
-            builder.getOrCreateFunction(loc, remoteCallInitRef, ForDefinition);
-        SILValue remoteCallInitFn = B.createFunctionRefFor(loc, remoteCallInitFnSIL);
+        auto remoteCallTargetInitDecl = remoteCallTargetDecl->getDistributedRemoteCallTargetInitFunction();
+        assert(remoteCallTargetInitDecl && "no 'RemoteCallTarget.init' found!");
+        auto remoteCallTargetInitRef = SILDeclRef(remoteCallTargetInitDecl);
+        auto remoteCallTargetInitFnSIL =
+            builder.getOrCreateFunction(loc, remoteCallTargetInitRef, ForDefinition);
+        SILValue remoteCallTargetInitFn = B.createFunctionRefFor(loc, remoteCallTargetInitFnSIL);
 
         // %37 = apply %36(%28, %35, %29) : $@convention(method) (@owned String, @thin RemoteCallTarget.Type) -> @out RemoteCallTarget
-        auto remoteCallTargetValueRet = B.createApply(
-            loc, remoteCallInitFn, {},
+        B.createApply(
+            loc, remoteCallTargetInitFn, {},
             {/*out*/ remoteCallTargetValue, mangledNameStringValue,
              remoteCallTargetMetatypeValue});
         // ---------------------------------------------------------------------
         // ---------------------------------------------------------------------
         // ---------------------------------------------------------------------
+        // TODO: actual SIL ended the BB here and just `br` to the remoteCall calling one, do we need to?
       }
 
       // === Call the remoteCall on the actor system
       {
+        // --- Prepare storage for the return value
+        // %38 = alloc_stack $String // users: %54, %56, %50, %75
+        auto remoteCallReturnValue = B.createAllocStack(loc, resultType);
 
+        // function_ref FakeActorSystem.remoteCall<A, B, C>(on:target:invocationDecoder:throwing:returning:)
+        // %49 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mSgtYaKAJ0bC0RzSeR0_SER0_AA0C7AddressV2IDRtzr1_lF : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %50
+        auto remoteCallFnDecl =
+            selfTyDecl->getDistributedActorSystemRemoteCallFunction();
+        assert(remoteCallFnDecl && "no remoteCall func found!");
+        auto remoteCallFnRef = SILDeclRef(remoteCallFnDecl);
+        auto remoteCallFnSIL =
+            builder.getOrCreateFunction(loc, remoteCallFnRef, ForDefinition);
+        SILValue remoteCallFn = B.createFunctionRefFor(loc, remoteCallFnSIL);
+
+        // try_apply %49<MyDistActor, Never, String>(%38, %2, %28, %48, %43, %46, %40) : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error), normal bb5, error bb10 // id: %50
+        SubstitutionMap remoteCallSubs = SubstitutionMap();
+//        B.createTryApply(loc, remoteCallFn, remoteCallSubs,
+//                         /*args=*/{
+//                             /*out*/remoteCallReturnValue,
+//
+//
+//                         })
       }
 
       fprintf(stderr, "[%s:%d] (%s) ---------------------------\n", __FILE__, __LINE__, __FUNCTION__);
