@@ -119,7 +119,10 @@ function(add_swift_compiler_modules_library name)
     if (dependencies)
       foreach(dep_module ${dependencies})
         if (DEFINED "${dep_module}_dep_target")
-          list(APPEND deps "${${dep_module}_dep_target}")
+          # We have to add the module target for the ordering dependency
+          # and the output file for the file dependency (otherwise the dependent
+          # module wouldn't be rebuilt if the current module changes)
+          list(APPEND deps "${${dep_module}_dep_target}" "${build_dir}/${dep_module}.o")
         else()
           message(FATAL_ERROR "module dependency ${module} -> ${dep_module} not found. Make sure to add modules in dependency order")
         endif()
