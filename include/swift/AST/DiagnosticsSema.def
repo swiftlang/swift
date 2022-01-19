@@ -4475,6 +4475,10 @@ ERROR(global_actor_from_nonactor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
       " from %select{this|a non-isolated}3%select{| synchronous}5 context",
       (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
+ERROR(global_actor_from_initializing_expr,none,
+      "expression requiring global actor %0 cannot appear in "
+        "default-value expression of %1 %2",
+      (Type, DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_call,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
