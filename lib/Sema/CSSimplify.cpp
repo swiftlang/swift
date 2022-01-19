@@ -2849,8 +2849,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Handle opaque archetypes.
   if (auto arch1 = type1->getAs<ArchetypeType>()) {
     auto arch2 = type2->castTo<ArchetypeType>();
-    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1->getRoot());
-    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2->getRoot());
+    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1);
+    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2);
     assert(opaque1->getDecl() == opaque2->getDecl());
     assert(opaque1->getCanonicalInterfaceType(arch1->getInterfaceType())->isEqual(
                opaque2->getCanonicalInterfaceType(arch2->getInterfaceType())));

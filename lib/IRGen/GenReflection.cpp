@@ -200,7 +200,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   if (type->hasOpaqueArchetype()) {
     auto hasOpaqueAssocType = type.findIf([](CanType t) -> bool {
       if (auto a = dyn_cast<ArchetypeType>(t)) {
-        return isa<OpaqueTypeArchetypeType>(a->getRoot()) &&
+        return isa<OpaqueTypeArchetypeType>(a) &&
           a->getInterfaceType()->is<DependentMemberType>();
       }
       return false;

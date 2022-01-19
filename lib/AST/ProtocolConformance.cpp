@@ -115,7 +115,7 @@ ProtocolConformanceRef::subst(Type origType,
   // unless we're specifically substituting opaque types.
   if (auto origArchetype = origType->getAs<ArchetypeType>()) {
     if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
-        && isa<OpaqueTypeArchetypeType>(origArchetype->getRoot())) {
+        && isa<OpaqueTypeArchetypeType>(origArchetype)) {
       return *this;
     }
   }
