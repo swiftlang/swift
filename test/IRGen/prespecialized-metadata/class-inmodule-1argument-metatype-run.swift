@@ -11,6 +11,8 @@
 // UNSUPPORTED: CPU=x86_64 && OS=watchos
 // UNSUPPORTED: CPU=i386 && OS=watchos
 // UNSUPPORTED: use_os_stdlib
+// rdar://87772056
+// UNSUPPORTED: CPU=arm64e && OS=ios
 
 class MyGenericClazz<T> {
 }

@@ -11,6 +11,8 @@
 // UNSUPPORTED: CPU=x86_64 && OS=watchos
 // UNSUPPORTED: CPU=i386 && OS=watchos
 // UNSUPPORTED: use_os_stdlib
+// rdar://87772056
+// UNSUPPORTED: CPU=arm64e && OS=ios
 
 class MyGenericClazz<T> {
 
@@ -42,29 +44,29 @@ func consume<T>(clazzType: MyGenericClazz<T>.Type) {
 
 
 public func doit() {
-  // CHECK: [[FLOAT_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Float> @ 46
+  // CHECK: [[FLOAT_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Float> @ 48
   consume(MyGenericClazz<Float>())
-  // CHECK: [[FLOAT_METADATA_ADDRESS]] MyGenericClazz<Float> @ 48
+  // CHECK: [[FLOAT_METADATA_ADDRESS]] MyGenericClazz<Float> @ 50
   consume(clazz: MyGenericClazz<Float>())
 
-  // CHECK: [[DOUBLE_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Double> @ 51
+  // CHECK: [[DOUBLE_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Double> @ 53
   consume(MyGenericClazz<Double>())
-  // CHECK: [[DOUBLE_METADATA_ADDRESS]] MyGenericClazz<Double> @ 53
+  // CHECK: [[DOUBLE_METADATA_ADDRESS]] MyGenericClazz<Double> @ 55
   consume(clazz: MyGenericClazz<Double>())
 
-  // CHECK: [[INT_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Int> @ 56
+  // CHECK: [[INT_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Int> @ 58
   consume(MyGenericClazz<Int>())
-  // CHECK: [[INT_METADATA_ADDRESS]] MyGenericClazz<Int> @ 58
+  // CHECK: [[INT_METADATA_ADDRESS]] MyGenericClazz<Int> @ 60
   consume(clazz: MyGenericClazz<Int>())
 
-  // CHECK: [[STRING_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<String> @ 61
+  // CHECK: [[STRING_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<String> @ 63
   consume(MyGenericClazz<String>())
-  // CHECK: [[STRING_METADATA_ADDRESS]] MyGenericClazz<String> @ 63
+  // CHECK: [[STRING_METADATA_ADDRESS]] MyGenericClazz<String> @ 65
   consume(clazz: MyGenericClazz<String>())
 
-  // CHECK: [[NESTED_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<MyGenericClazz<String>> @ 66
-  consume(MyGenericClazz<MyGenericClazz<String>>())
   // CHECK: [[NESTED_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<MyGenericClazz<String>> @ 68
+  consume(MyGenericClazz<MyGenericClazz<String>>())
+  // CHECK: [[NESTED_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<MyGenericClazz<String>> @ 70
   consume(clazz: MyGenericClazz<MyGenericClazz<String>>())
 
   // CHECK: [[FLOAT_METADATA_METATYPE_ADDRESS:[0-9a-f]+]] MyGenericClazz<Float>
