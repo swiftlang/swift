@@ -472,6 +472,25 @@ void DistributedAccessor::emit() {
   // so it could be forwarded to the distributed method.
   computeArguments(argBuffer, argTypes, arguments);
 
+  // Add all of the substitutions to the explosion
+  if (auto *environment = Target->getGenericEnvironment()) {
+    // swift.type **
+    llvm::Value *substitutionBuffer =
+        IGF.Builder.CreateBitCast(substitutions, IGM.TypeMetadataPtrPtrTy);
+
+    for (unsigned index : indices(environment->getGenericParams())) {
+      auto offset =
+          Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
+      auto alignment =
+          IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
+
+      auto substitution =
+          IGF.emitAddressAtOffset(substitutionBuffer, Offset(offset),
+                                  IGM.TypeMetadataPtrTy, Alignment(alignment));
+      arguments.add(IGF.Builder.CreateLoad(substitution, "substitution"));
+    }
+  }
+
   // Step two, let's form and emit a call to the distributed method
   // using computed argument explosion.
   {
