@@ -611,25 +611,14 @@ static ReflectionContextHolder makeReflectionContextForObjectFiles(
   uint8_t pointerSize;
   Reader->queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize,
                           nullptr, &pointerSize);
+  
   switch (pointerSize) {
   case 4:
-    return makeReflectionContextForMetadataReader<
-    // FIXME: This could be configurable.
-#if SWIFT_OBJC_INTEROP
-        External<WithObjCInterop<RuntimeTarget<4>>>
-#else
-        External<NoObjCInterop<RuntimeTarget<4>>>
-#endif
-        >(std::move(Reader));
+    return makeReflectionContextForMetadataReader<External<RuntimeTarget<4>>>
+                                                            (std::move(Reader));
   case 8:
-    return makeReflectionContextForMetadataReader<
-    // FIXME: This could be configurable.
-#if SWIFT_OBJC_INTEROP
-        External<WithObjCInterop<RuntimeTarget<8>>>
-#else
-        External<NoObjCInterop<RuntimeTarget<8>>>
-#endif
-        >(std::move(Reader));
+    return makeReflectionContextForMetadataReader<External<RuntimeTarget<8>>>
+                                                            (std::move(Reader));
   default:
     fputs("unsupported word size in object file\n", stderr);
     abort();

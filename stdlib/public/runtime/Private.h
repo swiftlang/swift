@@ -487,9 +487,9 @@ public:
     return c;
 #endif
   }
-
-  template <>
-  inline const ClassMetadata *Metadata::getClassObject() const {
+  
+  template<> inline const ClassMetadata *
+  Metadata::getClassObject() const {
     switch (getKind()) {
     case MetadataKind::Class: {
       // Native Swift class metadata is also the class object.

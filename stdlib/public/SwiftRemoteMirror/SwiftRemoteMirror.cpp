@@ -36,11 +36,7 @@ using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
 
-#if SWIFT_OBJC_INTEROP
-using Runtime = External<WithObjCInterop<RuntimeTarget<sizeof(uintptr_t)>>>;
-#else
-using Runtime = External<NoObjCInterOp<RuntimeTarget<sizeof(uintptr_t)>>>;
-#endif
+using Runtime = External<RuntimeTarget<sizeof(uintptr_t)>>;
 using NativeReflectionContext = swift::reflection::ReflectionContext<Runtime>;
 
 struct SwiftReflectionContext {
