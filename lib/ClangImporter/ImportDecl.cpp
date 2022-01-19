@@ -250,29 +250,6 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     }
 #include "MappedTypes.def"
 
-    if (Name.str() == "CGFloat") {
-      SwiftModuleName = "CoreGraphics";
- 
-      ModuleDecl *M = Impl.getNamedModule("CoreFoundation");
-      if (M) {
-        Type SwiftType = Impl.getNamedSwiftType(M, "CGFloat");
-        if (SwiftType) {
-          SwiftModuleName = "CoreFoundation";
-        }
-      }
- 
-      CTypeKind = MappedCTypeKind::CGFloat;
-      Bitwidth = 0;
-      IsSwiftModule = false;
-      SwiftTypeName = "CGFloat";
-      CanBeMissing = false;
-      NameMapping = MappedTypeNameKind::DoNothing;
-      assert(verifyNameMapping(MappedTypeNameKind::DoNothing,
-                              "CGFloat", "CGFloat") &&
-            "MappedTypes.def: Identical names must use DoNothing");
-      break;
-    }
-
     // We handle `BOOL` as a special case because the selection here is more
     // complicated as the type alias exists on multiple platforms as different
     // types.  It appears in an Objective-C context where it is a `signed char`
@@ -460,16 +437,20 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     M = Impl.getStdlibModule();
   else
     M = Impl.getNamedModule(SwiftModuleName);
-  if (!M) {
-    // User did not import the library module that contains the type we want to
-    // substitute.
-    *IsError = true;
-    return std::make_pair(Type(), "");
-  }
 
   Type SwiftType = Impl.getNamedSwiftType(M, SwiftTypeName);
+
+  if (!SwiftType && CTypeKind == MappedCTypeKind::CGFloat) {
+    // Fall back to looking for CGFloat in Core Graphics.
+    M = Impl.getNamedModule("CoreGraphics");
+    SwiftType = Impl.getNamedSwiftType(M, SwiftTypeName);
+  }
+
   if (!SwiftType && !CanBeMissing) {
     // The required type is not defined in the standard library.
+    // The required type is not defined in the library, or the user has not
+    // imported the library that defines it (so `M` was null and
+    // `getNamedSwiftType()` returned early).
     *IsError = true;
     return std::make_pair(Type(), "");
   }
