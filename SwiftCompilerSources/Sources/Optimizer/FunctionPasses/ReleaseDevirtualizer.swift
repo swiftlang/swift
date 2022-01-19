@@ -51,7 +51,7 @@ let releaseDevirtualizerPass = FunctionPass(
 
         if instruction is ReleaseValueInst || instruction is StrongReleaseInst {
           lastRelease = instruction as? RefCountingInst
-        } else if instruction.mayRelease || instruction.mayReadRefCount {
+        } else if instruction.mayRelease {
           lastRelease = nil
         }
       }
@@ -106,14 +106,14 @@ private func stripRCIdentityPreservingInsts(_ value: Value) -> Value? {
 
   switch inst {
   // First strip off RC identity preserving casts.
-  case is UpcastInst, 
-    is UncheckedRefCastInst,
-    is InitExistentialRefInst,
-    is OpenExistentialRefInst,
-    is RefToBridgeObjectInst,
-    is BridgeObjectToRefInst,
-    is ConvertFunctionInst,
-    is UncheckedEnumDataInst:
+  case is UpcastInst,
+       is UncheckedRefCastInst,
+       is InitExistentialRefInst,
+       is OpenExistentialRefInst,
+       is RefToBridgeObjectInst,
+       is BridgeObjectToRefInst,
+       is ConvertFunctionInst,
+       is UncheckedEnumDataInst:
     return inst.operands[0].value
 
   // Then if we have a struct_extract that is extracting a non-trivial member
@@ -178,9 +178,18 @@ private extension TupleExtractInst {
 
     let opType = operand.type
 
-    return opType.tupleElements.filter { 
-      !$0.isTrivial(in: function) 
-    }.count == 1
+    var nonTrivialEltsCount = 0
+    for elt in opType.tupleElements {
+      if elt.isTrivial(in: function) {
+        nonTrivialEltsCount += 1
+      }
+
+      if nonTrivialEltsCount > 1 {
+        return false
+      }
+    }
+
+    return true
   }
 }
 
@@ -194,8 +203,17 @@ private extension StructExtractInst {
 
     let structType = operand.type
 
-    return structType.getStructFields(in: function).filter { 
-      !$0.isTrivial(in: function)
-    }.count == 1
+    var nonTrivialFieldsCount = 0
+    for field in structType.getStructFields(in: function) {
+      if field.isTrivial(in: function) {
+        nonTrivialFieldsCount += 1
+      }
+
+      if nonTrivialFieldsCount > 1 {
+        return false
+      }
+    }
+
+    return true
   }
 }

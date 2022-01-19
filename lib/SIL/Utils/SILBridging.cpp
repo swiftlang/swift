@@ -420,8 +420,10 @@ BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx) {
 }
 
 SwiftInt SILType_getNumStructFields(BridgedType type) {
-  StructType *ty = castToSILType(type).castTo<StructType>();
-  return ty->getDecl()->getStoredProperties().size();
+  SILType silType = castToSILType(type);
+  StructDecl *decl =
+      cast<StructDecl>(silType.getNominalOrBoundGenericNominal());
+  return decl->getStoredProperties().size();
 }
 
 BridgedType SILType_getStructFieldType(BridgedType type, SwiftInt index,
@@ -429,8 +431,8 @@ BridgedType SILType_getStructFieldType(BridgedType type, SwiftInt index,
   SILType silType = castToSILType(type);
   SILFunction *silFunction = castToFunction(function);
 
-  StructType *ty = silType.castTo<StructType>();
-  VarDecl *property = ty->getDecl()->getStoredProperties()[index];
+  StructDecl *decl = cast<StructDecl>(silType.getNominalOrBoundGenericNominal());
+  VarDecl *property = decl->getStoredProperties()[index];
 
   SILType propertyType = silType.getFieldType(
       property, silFunction->getModule(), TypeExpansionContext(*silFunction));
