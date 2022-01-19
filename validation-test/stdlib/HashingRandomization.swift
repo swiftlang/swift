@@ -1,3 +1,4 @@
+// REQUIRES: rdar80475018
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name main %s -o %t/hash
 // RUN: %target-codesign %t/hash
