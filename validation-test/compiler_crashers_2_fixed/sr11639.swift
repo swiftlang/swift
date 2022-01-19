@@ -15,4 +15,4 @@ public protocol BazProtocol: FooProtocol {
 }
 
 // CHECK-LABEL: sr11639.(file).BazProtocol@
-// CHECK-NEXT: Requirement signature: <Self where Self : FooProtocol, Self.Foo1 : FooProtocol, Self.Foo2Bar == Self.Foo1.Bar>
+// CHECK-NEXT: Requirement signature: <Self where Self : FooProtocol, Self.[BazProtocol]Foo1 : FooProtocol, Self.[BazProtocol]Foo2Bar == Self.[BazProtocol]Foo1.[FooProtocol]Bar>
