@@ -563,10 +563,10 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 
 // defer bodies inherit global actor-ness
 @MainActor
-var statefulThingy: Bool = false
+var statefulThingy: Bool = false // expected-note {{var declared here}}
 
 @MainActor
-func useFooInADefer() -> String {
+func useFooInADefer() -> String { // expected-note {{calls to global function 'useFooInADefer()' from outside of its actor context are implicitly asynchronous}}
   defer {
     statefulThingy = true
   }
@@ -580,4 +580,31 @@ func useFooInADefer() -> String {
 @_dynamicReplacement(for: dynamicOnMainActor)
 func replacesDynamicOnMainActor() {
   onlyOnMainActor()
+}
+
+// ----------------------------------------------------------------------
+// Global-actor isolation of stored property initializer expressions
+// ----------------------------------------------------------------------
+
+class Cutter {
+  @MainActor var x = useFooInADefer() // expected-warning {{expression requiring global actor 'MainActor' cannot appear in default-value expression of property 'x'; this is an error in Swift 6}}
+  @MainActor var y = { () -> Bool in
+      var z = statefulThingy // expected-warning {{expression requiring global actor 'MainActor' cannot appear in default-value expression of property 'y'; this is an error in Swift 6}}
+      return z
+    }()
+}
+
+@SomeGlobalActor
+class Butter {
+  var a = useFooInADefer() // expected-error {{call to main actor-isolated global function 'useFooInADefer()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+
+  nonisolated let b = statefulThingy // expected-error {{var 'statefulThingy' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
+
+  var c: Int = {
+    return getGlobal7() // expected-warning {{expression requiring global actor 'SomeGlobalActor' cannot appear in default-value expression of property 'c'; this is an error in Swift 6}}
+  }()
+
+  lazy var d: Int = getGlobal7()
+
+  static var e: Int = getGlobal7()
 }
