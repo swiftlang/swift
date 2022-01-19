@@ -1722,14 +1722,15 @@ void *swift_distributed_get_generic_environment(const char *targetNameStart,
 ///    _ targetName: UnsafePointer<UInt8>,
 ///    _ targetNameLength: UInt,
 ///    argumentBuffer: Builtin.RawPointer,
-///    resultBuffer: Builtin.RawPointer) async throws
+///    argumentTypes: UnsafeBufferPointer<Any.Type>,
+///    resultBuffer: Builtin.RawPointer
+/// ) async throws
 using TargetExecutorSignature =
     AsyncSignature<void(/*on=*/DefaultActor *,
                         /*targetName=*/const char *, /*targetNameSize=*/size_t,
                         /*argumentBuffer=*/void *,
                         /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
-                        /*resultType=*/const Metadata *,
                         /*resumeFunc=*/TaskContinuationFunction *,
                         /*callContext=*/AsyncContext *),
                    /*throws=*/true>;
@@ -1747,7 +1748,6 @@ using DistributedAccessorSignature =
     AsyncSignature<void(/*argumentBuffer=*/void *,
                         /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
-                        /*resultType=*/const Metadata *,
                         /*actor=*/HeapObject *),
                    /*throws=*/true>;
 
@@ -1777,7 +1777,6 @@ void ::swift_distributed_execute_target(
     void *argumentBuffer,
     const Metadata *const *argumentTypes,
     void *resultBuffer,
-    const Metadata *resultType,
     TaskContinuationFunction *resumeFunc,
     AsyncContext *callContext) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
@@ -1813,6 +1812,6 @@ void ::swift_distributed_execute_target(
 
   accessorEntry(calleeContext,
                 argumentBuffer, argumentTypes,
-                resultBuffer, resultType,
+                resultBuffer,
                 actor);
 }

@@ -152,7 +152,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   assert(targetTy->isAsync());
   assert(targetTy->hasErrorResult());
 
-  // Accessor gets argument value buffer and a reference to `self` of
+  // Accessor gets argument/result value buffer and a reference to `self` of
   // the actor and produces a call to the distributed thunk forwarding
   // its result(s) out.
   return SILFunctionType::get(
@@ -161,7 +161,6 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
       {/*argumentBuffer=*/getRawPointerParameter(),
        /*argumentTypes=*/getRawPointerParameter(),
        /*resultBuffer=*/getRawPointerParameter(),
-       /*resultType=*/getRawPointerParameter(),
        /*actor=*/targetTy->getParameters().back()},
       /*Yields=*/{},
       /*Results=*/{},
@@ -438,8 +437,6 @@ void DistributedAccessor::emit() {
   auto *argTypes = params.claimNext();
   // UnsafeRawPointer that is used to store the result.
   auto *resultBuffer = params.claimNext();
-  // `swift.type*` that holds the type fo the result.
-  auto *resultType = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
 
