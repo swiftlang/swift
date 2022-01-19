@@ -523,6 +523,17 @@ do {
   // expected-error@-3 {{cannot convert value of type 'Bool' to expected argument type 'C<UnfulfillableGenericRequirements>'}}
 }
 
+protocol RequirementFailures {
+  associatedtype A
+}
+extension RequirementFailures {
+  func method() where A: RequirementFailures {} // expected-note {{where 'Self.A' = '(RequirementFailures).A'}}
+}
+do {
+  let exist: any RequirementFailures
+  exist.method() // expected-error {{instance method 'method()' requires that '(RequirementFailures).A' conform to 'RequirementFailures'}}
+}
+
 // Settable storage members with a 'Self' result type may not be used with an
 // existential base.
 protocol P2 {
