@@ -58,6 +58,13 @@ SILBasicBlock *SILGenFunction::createBasicBlock() {
   }
 }
 
+// FIXME(distributed): remove this
+SILBasicBlock *SILGenFunction::createBasicBlock(llvm::StringRef debugComment) {
+  auto bb = createBasicBlock();
+  bb->setDebugComment(debugComment);
+  return bb;
+}
+
 SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
   switch (section) {
   case FunctionSection::Ordinary: {

@@ -818,6 +818,7 @@ public:
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
   SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlock(llvm::StringRef debugComment);
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
@@ -2053,21 +2054,6 @@ public:
                                          ClassDecl *actorDecl,
                                          ManagedValue actorSelf,
                                          SILBasicBlock *continueBB);
-
-  /// For a distributed actor, emits code to invoke the system's
-  /// resignID function.
-  ///
-  /// Specifically, this code emits SIL that performs the call
-  ///
-  /// \verbatim
-  ///   try self.actorSystem.makeInvocation()
-  /// \endverbatim
-  ///
-  /// using the current builder's state as the injection point.
-  void emitDistributedActorSystemMakeInvocationEncoderCall(
-      SILLocation loc,
-      ClassDecl *actorDecl, ManagedValue actorSelf,
-      SILBasicBlock *normalBB, SILBasicBlock *errorBB);
 
   void emitDistributedActorClassMemberDestruction(
       SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,

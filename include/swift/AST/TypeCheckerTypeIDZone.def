@@ -108,7 +108,7 @@ SWIFT_REQUEST(TypeChecker, IsDistributedActorRequest, bool(NominalTypeDecl *),
 SWIFT_REQUEST(TypeChecker, GetDistributedRemoteFuncRequest, AbstractFunctionDecl *(AbstractFunctionDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorSystemRemoteCallFunctionRequest,
-              AbstractFunctionDecl *(NominalTypeDecl *),
+              AbstractFunctionDecl *(NominalTypeDecl *, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorIDPropertyRequest, VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)

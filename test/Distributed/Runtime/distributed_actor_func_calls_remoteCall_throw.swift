@@ -17,49 +17,9 @@
 
 import _Distributed
 
-final class Obj: @unchecked Sendable, Codable  {}
-
-struct LargeStruct: Sendable, Codable {
-  var q: String
-  var a: Int
-  var b: Int64
-  var c: Double
-  var d: String
-}
-
-enum E : Sendable, Codable {
-  case foo, bar
-}
-
 distributed actor Greeter {
-  distributed func empty() {
+  distributed func maybeThrows() throws {
   }
-
-  distributed func hello() -> String {
-    return "Hello, World!"
-  }
-
-  distributed func answer() -> Int {
-    return 42
-  }
-
-  distributed func largeResult() -> LargeStruct {
-    .init(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
-  }
-
-  distributed func echo(name: String) -> String {
-    return "Echo: \(name)"
-  }
-
-  distributed func enumResult() -> E {
-    .bar
-  }
-
-
-  distributed func test(i: Int, s: String) -> String {
-    return s
-  }
-
 }
 
 
@@ -71,11 +31,18 @@ struct ActorAddress: Sendable, Hashable, Codable {
   }
 }
 
+//final class FakeActorSystem: DistributedActorSystem {
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = FakeInvocation
   typealias InvocationEncoder = FakeInvocation
   typealias SerializationRequirement = Codable
+
+//  let state0: String = ""
+//  let state1: String = ""
+//  let state2: String = ""
+
+  init() {}
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
   throws -> Act? where Act: DistributedActor {
@@ -108,10 +75,13 @@ struct FakeActorSystem: DistributedActorSystem {
     returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
-    Err: Error,
+          Err: Error
+//,
 //          Act.ID == ActorID,
-    Res: SerializationRequirement {
-    fatalError("not implemented: \(#function)")
+//          Res: SerializationRequirement
+  {
+    print("remoteCall: on:\(actor), target:\(target), invocation:\(invocationDecoder), throwing:\(throwing), returning:\(returning)")
+    return () as! Res
   }
 
   func remoteCallVoid<Act, Err>(
@@ -121,11 +91,13 @@ struct FakeActorSystem: DistributedActorSystem {
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-    Err: Error
+          Err: Error
 //          Act.ID == ActorID
   {
-    fatalError("not implemented: \(#function)")
+    print("remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocationDecoder), throwing:\(throwing)")
+    return ()
   }
+
 }
 
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
@@ -141,7 +113,7 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
     arguments.append(argument)
   }
-  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws { // FIXME: how to pass the conformance!!!!
     self.errorType = type
   }
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {
@@ -198,76 +170,14 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-// actual mangled name:
-let emptyName = "$s4main7GreeterC5emptyyyFTE"
-let helloName = "$s4main7GreeterC5helloSSyFTE"
-let answerName = "$s4main7GreeterC6answerSiyFTE"
-let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
-let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
-
-let echoName = "$s4main7GreeterC4echo4nameS2S_tFTE"
-
 func test() async throws {
   let system = FakeActorSystem()
 
   let local = Greeter(system: system)
+  let ref = try Greeter.resolve(id: local.id, using: system)
 
-  // act as if we decoded an Invocation:
-  var emptyInvocation = FakeInvocation()
-
-  try await system.executeDistributedTarget(
-      on: local,
-      mangledTargetName: emptyName,
-      invocationDecoder: &emptyInvocation,
-      handler: FakeResultHandler()
-  )
-  // CHECK: RETURN: ()
-
-  try await system.executeDistributedTarget(
-      on: local,
-      mangledTargetName: helloName,
-      invocationDecoder: &emptyInvocation,
-      handler: FakeResultHandler()
-  )
-  // CHECK: RETURN: Hello, World!
-
-  try await system.executeDistributedTarget(
-      on: local,
-      mangledTargetName: answerName,
-      invocationDecoder: &emptyInvocation,
-      handler: FakeResultHandler()
-  )
-  // CHECK: RETURN: 42
-
-  try await system.executeDistributedTarget(
-      on: local,
-      mangledTargetName: largeResultName,
-      invocationDecoder: &emptyInvocation,
-      handler: FakeResultHandler()
-  )
-  // CHECK: RETURN: LargeStruct(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
-
-  try await system.executeDistributedTarget(
-      on: local,
-      mangledTargetName: enumResultName,
-      invocationDecoder: &emptyInvocation,
-      handler: FakeResultHandler()
-  )
-  // CHECK: RETURN: bar
-
-  var echoInvocation = system.makeInvocationEncoder()
-  try echoInvocation.recordArgument("Caplin")
-  try echoInvocation.doneRecording()
-  try await system.executeDistributedTarget(
-      on: local,
-      mangledTargetName: echoName,
-      invocationDecoder: &echoInvocation,
-      handler: FakeResultHandler()
-  )
-  // CHECK: RETURN: Echo: Caplin
-
-  print("done")
-  // CHECK-NEXT: done
+  try await ref.maybeThrows()
+  // CHECK: remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC11maybeThrowsyyKFTE"), invocation:FakeInvocation(arguments: [], returnType: nil, errorType: Optional(Swift.Error.Protocol), argumentIndex: 0), throwing:Error.Protocol
 }
 
 @main struct Main {

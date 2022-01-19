@@ -45,12 +45,15 @@ SubstitutionMap::Storage::Storage(
     numConformanceRequirements(genericSig->getNumConformanceRequirements())
 {
   if (replacementTypes.size() != getNumReplacementTypes()) {
-    fprintf(stderr, "[%s:%d] (%s) replacementTypes = %d\n", __FILE__, __LINE__,
-            __FUNCTION__, replacementTypes.size());
-    fprintf(stderr, "[%s:%d] (%s) getNumReplacementTypes = %d\n", __FILE__,
-            __LINE__, __FUNCTION__, getNumReplacementTypes());
+    fprintf(stderr, "[%s:%d] (%s) replacementTypes n = %d\n", __FILE__, __LINE__, __FUNCTION__, replacementTypes.size());
+    fprintf(stderr, "[%s:%d] (%s) getNumReplacementTypes() = %d\n", __FILE__, __LINE__, __FUNCTION__, getNumReplacementTypes());
   }
   assert(replacementTypes.size() == getNumReplacementTypes());
+  if (conformances.size() != numConformanceRequirements) {
+    fprintf(stderr, "[%s:%d] (%s) conformances.size() n = %d\n", __FILE__, __LINE__, __FUNCTION__, conformances.size());
+    for (auto c : conformances) c.dump();
+    fprintf(stderr, "[%s:%d] (%s) numConformanceRequirements = %d\n", __FILE__, __LINE__, __FUNCTION__, numConformanceRequirements);
+  }
   assert(conformances.size() == numConformanceRequirements);
 
   std::copy(replacementTypes.begin(), replacementTypes.end(),

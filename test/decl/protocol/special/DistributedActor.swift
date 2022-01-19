@@ -122,7 +122,7 @@ struct FakeActorSystem: DistributedActorSystem {
   }
 
 
-  public func makeInvocationEncoder() -> InvocationDecoder {
+  public func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 }

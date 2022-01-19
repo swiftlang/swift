@@ -1657,6 +1657,7 @@ public:
 
 } // end anonymous namespace
 
+// TODO: move onto SGF directly and reuse in SILGenDistributed and other places
 static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
                                            StringRef Str, SGFContext C,
                                         StringLiteralExpr::Encoding encoding) {
@@ -5086,6 +5087,7 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   }
 
   // Perform the call.
+  // TODO: in general this produces RValues...
   RValue result = emission.apply(requiresDowncast ? SGFContext() : C);
 
   // If we need a downcast, do it down.

@@ -816,6 +816,9 @@ public:
       for (auto Id : PredIDs)
         *this << ' ' << Id;
     }
+    if (BB->getDebugComment().size() > 0) {
+      *this << " /// " << BB->getDebugComment();
+    }
     *this << '\n';
 
     const auto &SM = BB->getModule().getASTContext().SourceMgr;
