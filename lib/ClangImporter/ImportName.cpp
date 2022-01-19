@@ -416,6 +416,9 @@ namespace {
     else
       nameStr = cast<clang::ObjCPropertyDecl>(decl)->getName().str();
     for (unsigned i = 1, n = overriddenNames.size(); i != n; ++i) {
+      if (ctx.Diags.isPrettyPrintingDecl())
+        continue;
+
       ctx.Diags.diagnose(SourceLoc(), diag::inconsistent_swift_name,
                          method == nullptr,
                          nameStr,
