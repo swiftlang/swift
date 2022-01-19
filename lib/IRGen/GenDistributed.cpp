@@ -24,6 +24,7 @@
 #include "GenCall.h"
 #include "GenDecl.h"
 #include "GenMeta.h"
+#include "GenOpaque.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -66,8 +67,7 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
 namespace {
 
 struct AllocationInfo {
-  SILType Type;
-  const TypeInfo &TI;
+  unsigned ArgumentIdx;
   StackAddress Addr;
 };
 
@@ -96,6 +96,30 @@ private:
   void computeArguments(llvm::Value *argumentBuffer,
                         llvm::Value *argumentTypes,
                         Explosion &arguments);
+
+  /// Load an argument value from the given buffer \c argumentSlot
+  /// to the given explosion \c arguments. Type of the argument is
+  /// the same as parameter type.
+  ///
+  /// Returns a pair of aligned offset and value size.
+  std::pair<llvm::Value *, llvm::Value *>
+  loadArgument(unsigned argumentIdx,
+               llvm::Value *argumentSlot,
+               SILType paramType,
+               ParameterConvention convention,
+               Explosion &arguments);
+
+  /// Load an argument value from the given buffer \c argumentSlot
+  /// to the given explosion \c arguments. Information describing
+  /// the type of argument comes from runtime metadata.
+  ///
+  /// Returns a pair of aligned offset and value size.
+  std::pair<llvm::Value *, llvm::Value *>
+  loadArgument(unsigned argumentIdx,
+               llvm::Value *argumentSlot,
+               llvm::Value *argumentType,
+               ParameterConvention convention,
+               Explosion &arguments);
 
   FunctionPointer getPointerToTarget() const;
 
@@ -204,88 +228,191 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
   // Initialize "offset" with the address of the base of the argument buffer.
   IGF.Builder.CreateStore(argumentBuffer, offset);
 
-  for (const auto &param : parameters) {
-    auto paramTy = param.getSILStorageInterfaceType();
-    const TypeInfo &typeInfo = IGF.getTypeInfo(paramTy);
+  // Cast type buffer to `swift.type**`
+  argumentTypes =
+      IGF.Builder.CreateBitCast(argumentTypes, IGM.TypeMetadataPtrPtrTy);
 
-    // 1. Load current offset.
+  for (unsigned i = 0, n = parameters.size(); i != n; ++i) {
+    const auto &param = parameters[i];
+    auto paramTy = param.getSILStorageInterfaceType();
+
+    // The size of the loaded argument value
+    llvm::Value *valueSize;
+
+    // Load current offset
     llvm::Value *currentOffset = IGF.Builder.CreateLoad(offset, "elt_offset");
 
-    // 2. Cast the pointer to the type of the element.
-    Address eltPtr = IGF.Builder.CreateBitCast(
-        Address(currentOffset, IGM.getPointerAlignment()),
-        IGM.getStoragePointerType(paramTy));
+    // Load argument value into the provided explosion
+    if (paramTy.hasTypeParameter()) {
+      auto offset =
+          Size(i * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
+      auto alignment =
+          IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
 
-    // 3. Adjust typed pointer to the alignment of the type.
-    auto alignedOffset = typeInfo.roundUpToTypeAlignment(IGF, eltPtr, paramTy);
+      // Load metadata describing argument value from argument types buffer.
+      auto typeLoc = IGF.emitAddressAtOffset(
+          argumentTypes, Offset(offset), IGM.TypeMetadataPtrTy,
+          Alignment(alignment), "arg_type_loc");
 
-    if (paramTy.isObject()) {
-      auto &nativeSchema = typeInfo.nativeParameterValueSchema(IGM);
-      // If schema is empty, skip to the next argument.
-      if (nativeSchema.empty())
-        continue;
+      auto *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
+
+      // Load argument value based using loaded type metadata.
+      std::tie(currentOffset, valueSize) = loadArgument(
+          i, currentOffset, argumentTy, param.getConvention(), arguments);
+    } else {
+      std::tie(currentOffset, valueSize) = loadArgument(
+          i, currentOffset, paramTy, param.getConvention(), arguments);
     }
 
-    // 4. Create an exploded version of the type to pass as an
-    //    argument to distributed method.
-
-    switch (param.getConvention()) {
-    case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant: {
-      // The +1 argument is passed indirectly, so we need to copy it into
-      // a temporary.
-
-      auto stackAddr = typeInfo.allocateStack(IGF, paramTy, "arg.temp");
-      auto argPtr = stackAddr.getAddress().getAddress();
-
-      typeInfo.initializeWithCopy(IGF, stackAddr.getAddress(), alignedOffset,
-                                  paramTy, /*isOutlined=*/false);
-      arguments.add(argPtr);
-
-      // Remember to deallocate later.
-      AllocatedArguments.push_back({paramTy, typeInfo, stackAddr});
-      break;
-    }
-
-    case ParameterConvention::Indirect_In_Guaranteed: {
-      // The argument is +0, so we can use the address of the param in
-      // the context directly.
-      arguments.add(alignedOffset.getAddress());
-      break;
-    }
-
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_InoutAliasable:
-      llvm_unreachable("indirect parameters are not supported");
-
-    case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Unowned: {
-      cast<LoadableTypeInfo>(typeInfo).loadAsTake(IGF, alignedOffset,
-                                                  arguments);
-      break;
-    }
-
-    case ParameterConvention::Direct_Owned:
-      // Copy the value out at +1.
-      cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, alignedOffset,
-                                                  arguments);
-    }
-
-    // 6. Move the offset to the beginning of the next element, unless
-    //    this is the last element.
+    // Move the offset to the beginning of the next element, unless
+    // this is the last element
     if (param != parameters.back()) {
-      llvm::Value *typeSize = typeInfo.getSize(IGF, paramTy);
-
-      llvm::Value *addr = alignedOffset.getAddress();
-      addr = IGF.Builder.CreatePtrToInt(addr, IGM.IntPtrTy);
+      llvm::Value *addr = IGF.Builder.CreatePtrToInt(currentOffset, IGM.IntPtrTy);
       llvm::Value *nextOffset = IGF.Builder.CreateIntToPtr(
-          IGF.Builder.CreateAdd(addr, typeSize), IGM.Int8PtrTy);
-
+          IGF.Builder.CreateAdd(addr, valueSize), IGM.Int8PtrTy);
       IGF.Builder.CreateStore(nextOffset, offset);
     }
   }
 
   IGF.Builder.CreateLifetimeEnd(offset, IGM.getPointerSize());
+}
+
+std::pair<llvm::Value *, llvm::Value *>
+DistributedAccessor::loadArgument(unsigned argumentIdx,
+                                  llvm::Value *argumentSlot,
+                                  llvm::Value *argumentType,
+                                  ParameterConvention convention,
+                                  Explosion &arguments) {
+  // TODO: `emitLoad*` would actually load value witness table every
+  // time it's called, which is sub-optimal but all of the APIs that
+  // deal with value witness tables are currently hidden in GenOpaque.cpp
+  llvm::Value *valueSize = emitLoadOfSize(IGF, argumentType);
+
+  llvm::Value *isInline, *flags;
+  std::tie(isInline, flags) = emitLoadOfIsInline(IGF, argumentType);
+
+  llvm::Value *alignmentMask = emitAlignMaskFromFlags(IGF, flags);
+
+  // Align argument value offset as required by its type metadata.
+  llvm::Value *alignedSlot =
+      IGF.Builder.CreatePtrToInt(argumentSlot, IGM.IntPtrTy);
+  {
+    alignedSlot = IGF.Builder.CreateNUWAdd(alignedSlot, alignmentMask);
+
+    llvm::Value *invertedMask = IGF.Builder.CreateNot(alignmentMask);
+    alignedSlot = IGF.Builder.CreateAnd(alignedSlot, invertedMask);
+    alignedSlot =
+        IGF.Builder.CreateIntToPtr(alignedSlot, IGM.OpaquePtrTy);
+  }
+
+  switch (convention) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant: {
+    // The +1 argument is passed indirectly, so we need to copy it into
+    // a temporary.
+
+    auto stackAddr =
+        IGF.emitDynamicAlloca(IGM.Int8Ty, valueSize, Alignment(16));
+    auto argPtr = stackAddr.getAddress().getAddress();
+
+    emitInitializeWithCopyCall(IGF, argumentType, stackAddr.getAddress(),
+                               Address(alignedSlot, IGM.getPointerAlignment()));
+    arguments.add(argPtr);
+
+    // Remember to deallocate later.
+    AllocatedArguments.push_back({argumentIdx, stackAddr});
+    break;
+  }
+
+  case ParameterConvention::Indirect_In_Guaranteed: {
+    // The argument is +0, so we can use the address of the param in
+    // the context directly.
+    arguments.add(alignedSlot);
+    break;
+  }
+
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    llvm_unreachable("indirect 'inout' parameters are not supported");
+
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Owned:
+    llvm_unreachable("cannot pass opaque type directly");
+  }
+
+  return {alignedSlot, valueSize};
+}
+
+std::pair<llvm::Value *, llvm::Value *>
+DistributedAccessor::loadArgument(unsigned argumentIdx,
+                                  llvm::Value *argumentSlot,
+                                  SILType paramTy,
+                                  ParameterConvention convention,
+                                  Explosion &arguments) {
+  const TypeInfo &typeInfo = IGF.getTypeInfo(paramTy);
+
+  // 1. Check whether the native representation is empty e.g.
+  //    this happens for empty enums.
+  if (paramTy.isObject()) {
+    auto &nativeSchema = typeInfo.nativeParameterValueSchema(IGM);
+    // If schema is empty, skip to the next argument.
+    if (nativeSchema.empty())
+      return {argumentSlot, typeInfo.getSize(IGF, paramTy)};
+  }
+
+  // 2. Cast the pointer to the type of the element.
+  Address eltPtr = IGF.Builder.CreateBitCast(
+      Address(argumentSlot, IGM.getPointerAlignment()),
+      IGM.getStoragePointerType(paramTy));
+
+  // 3. Adjust typed pointer to the alignment of the type.
+  auto alignedOffset = typeInfo.roundUpToTypeAlignment(IGF, eltPtr, paramTy);
+
+  // 4. Create an exploded version of the type to pass as an
+  //    argument to distributed method.
+
+  switch (convention) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Constant: {
+    // The +1 argument is passed indirectly, so we need to copy it into
+    // a temporary.
+
+    auto stackAddr = typeInfo.allocateStack(IGF, paramTy, "arg.temp");
+    auto argPtr = stackAddr.getAddress().getAddress();
+
+    typeInfo.initializeWithCopy(IGF, stackAddr.getAddress(), alignedOffset,
+                                paramTy, /*isOutlined=*/false);
+    arguments.add(argPtr);
+
+    // Remember to deallocate later.
+    AllocatedArguments.push_back({argumentIdx, stackAddr});
+    break;
+  }
+
+  case ParameterConvention::Indirect_In_Guaranteed: {
+    // The argument is +0, so we can use the address of the param in
+    // the context directly.
+    arguments.add(alignedOffset.getAddress());
+    break;
+  }
+
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    llvm_unreachable("indirect 'inout' parameters are not supported");
+
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Direct_Unowned: {
+    cast<LoadableTypeInfo>(typeInfo).loadAsTake(IGF, alignedOffset, arguments);
+    break;
+  }
+
+  case ParameterConvention::Direct_Owned:
+    // Copy the value out at +1.
+    cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, alignedOffset, arguments);
+  }
+
+  return {alignedOffset.getAddress(), typeInfo.getSize(IGF, paramTy)};
 }
 
 void DistributedAccessor::emit() {
@@ -385,8 +512,18 @@ void DistributedAccessor::emit() {
 
     // Deallocate all of the copied arguments.
     {
-      for (auto &entry : AllocatedArguments)
-        entry.TI.deallocateStack(IGF, entry.Addr, entry.Type);
+      auto targetType = Target->getLoweredFunctionType();
+      for (auto &alloca : AllocatedArguments) {
+        const auto &param = targetType->getParameters()[alloca.ArgumentIdx];
+        auto paramTy = param.getSILStorageInterfaceType();
+
+        if (paramTy.hasTypeParameter()) {
+          IGF.emitDeallocateDynamicAlloca(alloca.Addr);
+        } else {
+          auto &typeInfo = IGF.getTypeInfo(paramTy);
+          typeInfo.deallocateStack(IGF, alloca.Addr, paramTy);
+        }
+      }
     }
 
     Explosion voidResult;
