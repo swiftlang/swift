@@ -874,10 +874,21 @@ public:
   void emitConstructorPrologActorHop(SILLocation loc,
                                      Optional<ActorIsolation> actorIso);
 
+  /// Set the given global actor as the isolation for this function
+  /// (generally a thunk) and hop to it.
+  void emitPrologGlobalActorHop(SILLocation loc, Type globalActor);
+
   /// Emit the executor for the given actor isolation.
   Optional<SILValue> emitExecutor(SILLocation loc,
                                   ActorIsolation isolation,
                                   Optional<ManagedValue> maybeSelf);
+
+  /// Emit the executor value that corresponds to the generic (concurrent)
+  /// executor.
+  SILValue emitGenericExecutor(SILLocation loc);
+
+  /// Emit the executor value that corresponds to the main actor.
+  SILValue emitMainExecutor(SILLocation loc);
 
   /// Emit a precondition check to ensure that the function is executing in
   /// the expected isolation context.

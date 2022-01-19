@@ -2944,11 +2944,10 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   // If the input is synchronous and global-actor-qualified, and the
   // output is asynchronous, hop to the executor expected by the input.
-  ExecutorBreadcrumb prevExecutor;
+  // Treat this thunk as if it were isolated to that global actor.
   if (outputSubstType->isAsync() && !inputSubstType->isAsync()) {
     if (Type globalActor = inputSubstType->getGlobalActor()) {
-      prevExecutor = SGF.emitHopToTargetActor(
-          loc, ActorIsolation::forGlobalActor(globalActor, false), None);
+      SGF.emitPrologGlobalActorHop(loc, globalActor);
     }
   }
 
@@ -2994,9 +2993,6 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   // Reabstract the result.
   SILValue outerResult = resultPlanner.execute(innerResult);
-
-  // If we hopped to the target's executor, then we need to hop back.
-  prevExecutor.emit(SGF, loc);
 
   scope.pop();
   SGF.B.createReturn(loc, outerResult);
