@@ -13,7 +13,7 @@
 import SILBridging
 
 public struct Type : CustomStringConvertible, CustomReflectable {
-  var bridged: BridgedType
+  public let bridged: BridgedType
   
   public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
   public var isObject: Bool { !isAddress }
@@ -37,8 +37,8 @@ public struct Type : CustomStringConvertible, CustomReflectable {
     return idx >= 0 ? idx : nil
   }
 
-  public func getFieldTypeOfNominal(fieldIndex: Int, in function: Function) -> Type {
-    SILType_getTypeOfField(bridged, fieldIndex, function.bridged).type
+  public func getStructFields(in function: Function) -> StructElementArray {
+    StructElementArray(type: self, function: function)
   }
   
   public var description: String { SILType_debugDescription(bridged).takeString() }
@@ -46,8 +46,14 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
+extension Type: Equatable {
+  public static func ==(lhs: Type, rhs: Type) -> Bool { 
+    lhs.bridged.typePtr == rhs.bridged.typePtr
+  }
+}
+
 public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
-  fileprivate let type: Type
+  public let type: Type
 
   public var startIndex: Int { return 0 }
   public var endIndex: Int { SILType_getNumTupleElements(type.bridged) }
@@ -59,4 +65,16 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
 extension BridgedType {
   var type: Type { Type(bridged: self) }
+}
+
+public struct StructElementArray : RandomAccessCollection, FormattedLikeArray {
+  public let type: Type
+  let function: Function
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { SILType_getNumStructFields(type.bridged) }
+
+  public subscript(_ index: Int) -> Type {
+    SILType_getStructFieldType(type.bridged, index, function.bridged).type
+  }
 }

@@ -388,9 +388,6 @@ public final class StructInst: SingleValueInstruction {
 
 public final class StructExtractInst: SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { StructExtractInst_fieldIndex(bridged) }
-  public var isFieldOnlyNonTrivialField: Bool {
-    StructExtractInst_isFieldOnlyNonTrivialField(bridged)
-  }
 }
 
 public

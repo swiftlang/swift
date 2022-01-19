@@ -59,7 +59,7 @@ let releaseDevirtualizerPass = FunctionPass(
   }
 )
 
-/// Tries to de-virtualize the final release of a stack promoted object.
+/// Tries to de-virtualize the final release of a stack-promoted object.
 private func tryDevirtualizeReleaseOfObject(
   _ context: PassContext,
   _ release: RefCountingInst,
@@ -157,12 +157,12 @@ private extension Instruction {
     let function = self.function
 
     // For each operand...
-    for op in operands.enumerated() {
+    for op in operands {
       // If the operand is not trivial...
-      if !op.type.isTrivial(in: function) {
+      if !op.value.type.isTrivial(in: function) {
         // And we have not found a `candidateElt` yet, set index to `op` and continue.
         if candidateElt == nil {
-          candidateElt = op
+          candidateElt = op.value
           continue
         }
 
@@ -186,7 +186,7 @@ private extension TupleExtractInst {
 
     // Ok, we know that the elt we are extracting is non-trivial. Make sure that
     // we have no other non-trivial elts.
-    let opTy = operand[0].type
+    let opType = operand.type
     let fieldNo = self.fieldIndex
 
     // For each element index of the tuple...
@@ -209,6 +209,28 @@ private extension TupleExtractInst {
 
     // We checked every other elt of the tuple and did not find any
     // non-trivial elt except for ourselves. Return `true``.
+    return true
+  }
+}
+
+private extension StructExtractInst {
+  var isFieldOnlyNonTrivialField: Bool {
+    let function = self.function
+
+    if type.isTrivial(in: function) {
+      return false
+    }
+
+    let structType = operand.type
+
+    for (i, fieldType) in structType.getStructFields(in: function).enumerated() {
+      if i == fieldIndex || fieldType.isTrivial(in: function) {
+        continue
+      }
+
+      return false
+    }
+
     return true
   }
 }

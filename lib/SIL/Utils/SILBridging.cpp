@@ -380,12 +380,6 @@ SwiftInt SILType_isEnum(BridgedType type) {
   return castToSILType(type).getEnumOrBoundGenericEnum() ? 1 : 0;
 }
 
-SwiftInt SILType_isNonTrivialOrContainsRawPointer(BridgedType type,
-                                                  BridgedFunction function) {
-  SILFunction *f = castToFunction(function);
-  return castToSILType(type).isNonTrivialOrContainsRawPointer(*f);
-}
-
 SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
                                           BridgedStringRef fieldName) {
   SILType ty = castToSILType(type);
@@ -414,20 +408,6 @@ SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
   return -1;
 }
 
-BridgedType SILType_getTypeOfField(BridgedType type, SwiftInt fieldIndex,
-                                   BridgedFunction inFunction) {
-  SILType ty = castToSILType(type);
-  auto *nominal = ty.getNominalOrBoundGenericNominal();
-  assert(nominal);
-
-  VarDecl *field = getIndexedField(nominal, (unsigned)fieldIndex);
-  assert(field);
-
-  SILFunction *f = castToFunction(inFunction);
-  SILType fieldTy = ty.getFieldType(field, f->getModule(),f->getTypeExpansionContext());
-  return {fieldTy.getOpaqueValue()};
-}
-
 SwiftInt SILType_getNumTupleElements(BridgedType type) {
   TupleType *tupleTy = castToSILType(type).castTo<TupleType>();
   return tupleTy->getNumElements();
@@ -437,6 +417,25 @@ BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx) {
   SILType ty = castToSILType(type);
   SILType elmtTy = ty.getTupleElementType((unsigned)elementIdx);
   return {elmtTy.getOpaqueValue()};
+}
+
+SwiftInt SILType_getNumStructFields(BridgedType type) {
+  StructType *ty = castToSILType(type).castTo<StructType>();
+  return ty->getDecl()->getStoredProperties().size();
+}
+
+BridgedType SILType_getStructFieldType(BridgedType type, SwiftInt index,
+                                       BridgedFunction function) {
+  SILType silType = castToSILType(type);
+  SILFunction *silFunction = castToFunction(function);
+
+  StructType *ty = silType.castTo<StructType>();
+  VarDecl *property = ty->getDecl()->getStoredProperties()[index];
+
+  SILType propertyType = silType.getFieldType(
+      property, silFunction->getModule(), TypeExpansionContext(*silFunction));
+
+  return {propertyType.getOpaqueValue()};
 }
 
 //===----------------------------------------------------------------------===//
@@ -551,10 +550,6 @@ SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai) {
 
 SwiftInt StructExtractInst_fieldIndex(BridgedInstruction sei) {
   return castToInst<StructExtractInst>(sei)->getFieldIndex();
-}
-
-bool StructExtractInst_isFieldOnlyNonTrivialField(BridgedInstruction sei) {
-  return castToInst<StructExtractInst>(sei)->isFieldOnlyNonTrivialField();
 }
 
 OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue(BridgedInstruction si) {
