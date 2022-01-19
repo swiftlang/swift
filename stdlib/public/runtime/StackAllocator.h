@@ -109,8 +109,8 @@ private:
     }
 
     /// The size of the slab header.
-    static size_t headerSize() {
-      return llvm::alignTo(sizeof(Slab), llvm::Align(alignment));
+    static constexpr size_t headerSize() {
+      return (sizeof(Slab) + alignment - 1) & ~(alignment - 1);
     }
 
     /// Return \p size with the added overhead of the slab header.
@@ -274,6 +274,10 @@ public:
       SWIFT_FATAL_ERROR(0, "not all allocations are deallocated");
     (void)freeAllSlabs(firstSlabIsPreallocated ? firstSlab->next : firstSlab);
     assert(getNumAllocatedSlabs() == 0);
+  }
+
+  static constexpr size_t slabHeaderSize() {
+    return Slab::headerSize();
   }
 
   /// Allocate a memory buffer of \p size.
