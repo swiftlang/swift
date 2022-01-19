@@ -2473,6 +2473,12 @@ namespace {
       for (auto redecl : decl->redecls())
         Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
 
+      // Because a namespaces's decl context is the bridging header, make sure
+      // we add them to the bridging header lookup table.
+      addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
+                            const_cast<clang::NamespaceDecl *>(decl),
+                            Impl.getNameImporter());
+
       return enumDecl;
     }
 

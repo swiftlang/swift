@@ -363,8 +363,7 @@ public:
     "<bridging-header-import>";
 
 private:
-  /// The Swift lookup table for the bridging header.
-  std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
+  DiagnosticWalker Walker;
 
   /// The Swift lookup tables, per module.
   ///
@@ -429,6 +428,9 @@ private:
   llvm::SmallDenseMap<ModuleDecl *, SourceFile *> ClangSwiftAttrSourceFiles;
 
 public:
+  /// The Swift lookup table for the bridging header.
+  std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
+
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
 
