@@ -102,16 +102,18 @@ private func tryDevirtualizeReleaseOfObject(
 }
 
 private func stripRCIdentityPreservingInsts(_ value: Value) -> Value? {
-  switch value {
+  guard let inst = value as? Instruction else { return nil }
+
+  switch inst {
   // First strip off RC identity preserving casts.
-  case let inst as Instruction where inst is UpcastInst ||
-    inst is UncheckedRefCastInst ||
-    inst is InitExistentialRefInst ||
-    inst is OpenExistentialRefInst ||
-    inst is RefToBridgeObjectInst ||
-    inst is BridgeObjectToRefInst ||
-    inst is ConvertFunctionInst ||
-    inst is UncheckedEnumDataInst:
+  case is UpcastInst, 
+    is UncheckedRefCastInst,
+    is InitExistentialRefInst,
+    is OpenExistentialRefInst,
+    is RefToBridgeObjectInst,
+    is BridgeObjectToRefInst,
+    is ConvertFunctionInst,
+    is UncheckedEnumDataInst:
     return inst.operands[0].value
 
   // Then if we have a struct_extract that is extracting a non-trivial member
@@ -119,30 +121,24 @@ private func stripRCIdentityPreservingInsts(_ value: Value) -> Value? {
   // the struct is equivalent to a ref count operation on the extracted
   // member. Strip off the extract.
   case let sei as StructExtractInst where sei.isFieldOnlyNonTrivialField:
-    return sei.operands[0].value
+    return sei.operand
 
-  // If we have a struct instruction with only one non-trivial stored field, the
-  // only reference count that can be modified is the non-trivial field. Return
-  // the non-trivial field.
-  case let si as StructInst:
-    return si.uniqueNonTrivialOperand
+  // If we have a struct or tuple instruction with only one non-trivial operand, the
+  // only reference count that can be modified is the non-trivial operand. Return
+  // the non-trivial operand.
+  case is StructInst, is TupleInst:
+    return inst.uniqueNonTrivialOperand
 
   // If we have an enum instruction with a payload, strip off the enum to
   // expose the enum's payload.
   case let ei as EnumInst where !ei.operands.isEmpty:
-    return ei.operands[0].value
+    return ei.operand
 
   // If we have a tuple_extract that is extracting the only non trivial member
   // of a tuple, a retain_value on the tuple is equivalent to a retain_value on
   // the extracted value.
   case let tei as TupleExtractInst where tei.isEltOnlyNonTrivialElt:
-    return tei.operands[0].value
-
-  // If we are forming a tuple and the tuple only has one element with reference
-  // semantics, a retain_value on the tuple is equivalent to a retain value on
-  // the tuple operand.
-  case let ti as TupleInst:
-    return ti.uniqueNonTrivialOperand
+    return tei.operand
 
   default:
     return nil
@@ -156,11 +152,8 @@ private extension Instruction {
     var candidateElt: Value?
     let function = self.function
 
-    // For each operand...
     for op in operands {
-      // If the operand is not trivial...
       if !op.value.type.isTrivial(in: function) {
-        // And we have not found a `candidateElt` yet, set index to `op` and continue.
         if candidateElt == nil {
           candidateElt = op.value
           continue
@@ -178,38 +171,16 @@ private extension Instruction {
 private extension TupleExtractInst {
   var isEltOnlyNonTrivialElt: Bool {
     let function = self.function
-    // If the elt we are extracting is trivial, we cannot be a non-trivial
-    // field... return false.
+
     if type.isTrivial(in: function) {
       return false
     }
 
-    // Ok, we know that the elt we are extracting is non-trivial. Make sure that
-    // we have no other non-trivial elts.
     let opType = operand.type
-    let fieldNo = self.fieldIndex
 
-    // For each element index of the tuple...
-    for (i, eltType) in opType.tupleElements.enumerated() {
-      // If the element index is the one we are extracting, skip it...
-      if i == fieldNo {
-        continue
-      }
-
-      // Otherwise check if we have a non-trivial type. If we don't have one,
-      // continue.
-      if eltType.isTrivial(in: function) {
-        continue
-      }
-
-      // If we do have a non-trivial type, return false. We have multiple
-      // non-trivial types violating our condition.
-      return false
-    }
-
-    // We checked every other elt of the tuple and did not find any
-    // non-trivial elt except for ourselves. Return `true``.
-    return true
+    return opType.tupleElements.filter { 
+      !$0.isTrivial(in: function) 
+    }.count == 1
   }
 }
 
@@ -223,14 +194,8 @@ private extension StructExtractInst {
 
     let structType = operand.type
 
-    for (i, fieldType) in structType.getStructFields(in: function).enumerated() {
-      if i == fieldIndex || fieldType.isTrivial(in: function) {
-        continue
-      }
-
-      return false
-    }
-
-    return true
+    return structType.getStructFields(in: function).filter { 
+      !$0.isTrivial(in: function)
+    }.count == 1
   }
 }
