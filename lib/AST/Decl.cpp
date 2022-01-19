@@ -3847,14 +3847,14 @@ findExistentialSelfReferences(CanGenericSignature existentialSig, Type type,
     return SelfReferenceInfo::forSelfRef(TypePosition::Invariant);
 
   // Protocol compositions preserve variance.
-  auto constraint = type;
-  if (auto existential = constraint->getAs<ExistentialType>())
-    constraint = existential->getConstraintType();
-  if (auto *comp = constraint->getAs<ProtocolCompositionType>()) {
-    // 'Self' may be referenced only in a superclass component.
-    if (const auto superclass = comp->getSuperclass()) {
-      return findExistentialSelfReferences(existentialSig, superclass,
-                                           position);
+  if (auto *existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
+  if (auto *comp = type->getAs<ProtocolCompositionType>()) {
+    // 'Self' may be referenced only in an explicit superclass component.
+    for (const auto member : comp->getMembers()) {
+      if (member->getClassOrBoundGenericClass()) {
+        return findExistentialSelfReferences(existentialSig, member, position);
+      }
     }
 
     return SelfReferenceInfo();
