@@ -1723,7 +1723,8 @@ void *swift_distributed_get_generic_environment(const char *targetNameStart,
 ///    _ targetNameLength: UInt,
 ///    argumentBuffer: Builtin.RawPointer,
 ///    argumentTypes: UnsafeBufferPointer<Any.Type>,
-///    resultBuffer: Builtin.RawPointer
+///    resultBuffer: Builtin.RawPointer,
+///    substitutions: UnsafeRawPointer?
 /// ) async throws
 using TargetExecutorSignature =
     AsyncSignature<void(/*on=*/DefaultActor *,
@@ -1731,6 +1732,7 @@ using TargetExecutorSignature =
                         /*argumentBuffer=*/void *,
                         /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
+                        /*substitutions=*/void *,
                         /*resumeFunc=*/TaskContinuationFunction *,
                         /*callContext=*/AsyncContext *),
                    /*throws=*/true>;
@@ -1742,12 +1744,15 @@ TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 /// Accessor takes:
 ///   - an async context
 ///   - an argument buffer as a raw pointer
+///   - a list of all argument types (with substitutions applied)
 ///   - a result buffer as a raw pointer
+///   - a list of substitutions
 ///   - a reference to an actor to execute method on.
 using DistributedAccessorSignature =
     AsyncSignature<void(/*argumentBuffer=*/void *,
                         /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
+                        /*substitutions=*/void *,
                         /*actor=*/HeapObject *),
                    /*throws=*/true>;
 
@@ -1777,6 +1782,7 @@ void ::swift_distributed_execute_target(
     void *argumentBuffer,
     const Metadata *const *argumentTypes,
     void *resultBuffer,
+    void *substitutions,
     TaskContinuationFunction *resumeFunc,
     AsyncContext *callContext) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
@@ -1813,5 +1819,6 @@ void ::swift_distributed_execute_target(
   accessorEntry(calleeContext,
                 argumentBuffer, argumentTypes,
                 resultBuffer,
+                substitutions,
                 actor);
 }

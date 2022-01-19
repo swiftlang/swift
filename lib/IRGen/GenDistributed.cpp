@@ -161,6 +161,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
       {/*argumentBuffer=*/getRawPointerParameter(),
        /*argumentTypes=*/getRawPointerParameter(),
        /*resultBuffer=*/getRawPointerParameter(),
+       /*substitutions=*/getRawPointerParameter(),
        /*actor=*/targetTy->getParameters().back()},
       /*Yields=*/{},
       /*Results=*/{},
@@ -437,6 +438,8 @@ void DistributedAccessor::emit() {
   auto *argTypes = params.claimNext();
   // UnsafeRawPointer that is used to store the result.
   auto *resultBuffer = params.claimNext();
+  // UnsafeRawPointer that represents a list of substitutions
+  auto *substitutions = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
 
