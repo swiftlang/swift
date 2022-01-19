@@ -1277,11 +1277,6 @@ FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
     return getImpl().DoneRecordingDistributedInvocationEncoderDecl;
   }
 
-//  auto mutableThis = const_cast<ASTContext *>(this);
-//  auto module = mutableThis->getModuleByIdentifier(Id_Distributed);
-//  if (!module)
-//    return nullptr;
-
   NominalTypeDecl *encoderProto = nominal ?
       nominal :
       getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
@@ -1293,6 +1288,35 @@ FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
 
     if (fd->getParameters()->size() != 0)
       continue;
+
+    if (fd->getResultInterfaceType()->isVoid() &&
+        fd->hasThrows() &&
+        !fd->hasAsync())
+      return fd;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) const {
+  if (getImpl().DoneRecordingDistributedInvocationEncoderDecl) {
+    return getImpl().DoneRecordingDistributedInvocationEncoderDecl;
+  }
+
+  NominalTypeDecl *encoderProto = nominal ?
+      nominal :
+      getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  assert(encoderProto && "Missing DistributedTargetInvocationEncoder protocol");
+  for (auto result : encoderProto->lookupDirect(Id_recordErrorType)) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+
+    if (fd->getParameters()->size() != 1)
+      continue;
+
+    // TODO(distributed): more checks that the arg type matches (!!!)
 
     if (fd->getResultInterfaceType()->isVoid() &&
         fd->hasThrows() &&

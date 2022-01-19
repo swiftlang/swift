@@ -372,6 +372,7 @@ public protocol DistributedTargetInvocationEncoder {
 //  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
   // TODO: offer recordArgument(label:type:)
 
+  // TODO: as ad-hoc requirement as well
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
 //  /// Ad-hoc requirement

@@ -654,6 +654,14 @@ public:
   FuncDecl *getDoneRecordingOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal = nullptr) const;
 
+  // Retrieve the declaration of DistributedInvocationEncoder.recordErrorType().
+  //
+  // \param nominal optionally provide a 'NominalTypeDecl' from which the
+  // function decl shall be extracted. This is useful to avoid witness calls
+  // through the protocol which is looked up when nominal is null.
+  FuncDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal = nullptr) const;
+
   /// Look for the declaration with the given name within the
   /// passed in module.
   void lookupInModule(ModuleDecl *M, StringRef name,

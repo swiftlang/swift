@@ -1657,6 +1657,7 @@ public:
 
 } // end anonymous namespace
 
+// TODO: move onto SGF directly and reuse in SILGenDistributed and other places
 static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
                                            StringRef Str, SGFContext C,
                                         StringLiteralExpr::Encoding encoding) {
