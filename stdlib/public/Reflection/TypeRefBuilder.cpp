@@ -107,7 +107,7 @@ TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
       if (!mangling.isSuccess()) {
         return {};
       }
-      return mangling.result();
+      return std::move(mangling.result());
     }
   }
 
@@ -194,16 +194,16 @@ const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
 
 RemoteRef<FieldDescriptor>
 TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
-  std::string MangledName;
+  const std::string *MangledName;
   if (auto N = dyn_cast<NominalTypeRef>(TR))
-    MangledName = N->getMangledName();
+    MangledName = &N->getMangledName();
   else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR))
-    MangledName = BG->getMangledName();
+    MangledName = &BG->getMangledName();
   else
     return nullptr;
 
   // Try the cache.
-  auto Found = FieldTypeInfoCache.find(MangledName);
+  auto Found = FieldTypeInfoCache.find(*MangledName);
   if (Found != FieldTypeInfoCache.end())
     return Found->second;
 
@@ -216,13 +216,13 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
         continue;
       auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
       if (auto NormalizedName = normalizeReflectionName(CandidateMangledName))
-        FieldTypeInfoCache[*NormalizedName] = FD;
+        FieldTypeInfoCache[std::move(*NormalizedName)] = FD;
     }
 
     // Since we're done with the current ReflectionInfo, increment early in
     // case we get a cache hit.
     ++FirstUnprocessedReflectionInfoIndex;
-    Found = FieldTypeInfoCache.find(MangledName);
+    Found = FieldTypeInfoCache.find(*MangledName);
     if (Found != FieldTypeInfoCache.end())
       return Found->second;
   }

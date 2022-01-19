@@ -249,6 +249,10 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    // Only consider root archetypes.
+    if (!archetype->isRoot())
+      return Type();
+
     if (!isa<PrimaryArchetypeType>(archetype) &&
         !isa<SequenceArchetypeType>(archetype))
       return Type();

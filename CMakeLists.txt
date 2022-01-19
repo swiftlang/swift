@@ -534,7 +534,12 @@ include(CMakePushCheckState)
 
 # Print out path and version of any installed commands
 message(STATUS "CMake (${CMAKE_COMMAND}) Version: ${CMAKE_VERSION}")
-execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} --version
+if(XCODE)
+  set(version_flag -version)
+else()
+  set(version_flag --version)
+endif()
+execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} ${version_flag}
   OUTPUT_VARIABLE _CMAKE_MAKE_PROGRAM_VERSION
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")

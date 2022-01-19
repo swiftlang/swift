@@ -431,6 +431,19 @@ Type RequirementMachine::getCanonicalTypeInContext(
   });
 }
 
+/// Determine if the given type parameter is valid with respect to this
+/// requirement machine's generic signature.
+bool RequirementMachine::isValidTypeInContext(Type type) const {
+  assert(type->isTypeParameter());
+
+  auto term = Context.getMutableTermForType(type->getCanonicalType(),
+                                            /*proto=*/nullptr);
+  System.simplify(term);
+
+  auto prefix = getLongestValidPrefix(term);
+  return (prefix == term);
+}
+
 /// Retrieve the conformance access path used to extract the conformance of
 /// interface \c type to the given \c protocol.
 ///
