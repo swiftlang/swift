@@ -17,6 +17,7 @@ add_swift_compiler_module(SIL
   Location.swift
   Operand.swift
   Registration.swift
+  SubstitutionMap.swift
   Type.swift
   Utils.swift
   Value.swift)

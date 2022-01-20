@@ -24,12 +24,10 @@ extension Value {
   }
 
   public var uses: UseList {
-    return UseList(SILValue_firstUse(bridged))
+    UseList(SILValue_firstUse(bridged))
   }
 
-  public var type: Type {
-    return Type(bridged: SILValue_getType(bridged))
-  }
+  public var type: Type { SILValue_getType(bridged).type }
 
   public var hashable: HashableValue { ObjectIdentifier(self) }
 
@@ -43,12 +41,19 @@ extension Value {
 
 public typealias HashableValue = ObjectIdentifier
 
+// We can't make `Value` inherit from `Equatable`, since `Equatable` is a PAT,
+// and we do use `Value` existentials around the codebase. Thus functions from
+// `Equatable` are declared separately.
 public func ==(_ lhs: Value, _ rhs: Value) -> Bool {
   return lhs === rhs
 }
 
+public func !=(_ lhs: Value, _ rhs: Value) -> Bool {
+  return !(lhs === rhs)
+}
+
 extension BridgedValue {
-  func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
+  public func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
 }
 
 final class Undef : Value {
@@ -57,4 +62,8 @@ final class Undef : Value {
 
 final class PlaceholderValue : Value {
   public var definingInstruction: Instruction? { nil }
+}
+
+extension OptionalBridgedValue {
+  var value: Value? { obj.getAs(AnyObject.self) as? Value }
 }
