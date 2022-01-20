@@ -850,7 +850,8 @@ internal func constant_vprintf_backend(
 @inlinable
 @_transparent
 @_optimize(none)
-public func constant_vprintf(_ message: ConstantVPrintFMessage) {
+public func print(_ message: ConstantVPrintFMessage) {
+  guard !_isPrintingDisabled() else { return }
   let formatString = message.interpolation.formatString
   let argumentClosures = message.interpolation.arguments.argumentClosures
   let formatStringPointer = _getGlobalStringTablePointer(formatString)
