@@ -186,6 +186,22 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
   });
 }
 
+/// Prints the C++  "generated header" interface for \p M to \p
+/// outputPath.
+///
+/// ...unless \p outputPath is empty, in which case it does nothing.
+///
+/// \returns true if there were any errors
+///
+/// \see swift::printAsCxx
+static bool printAsCxxIfNeeded(StringRef outputPath, ModuleDecl *M) {
+  if (outputPath.empty())
+    return false;
+  return withOutputFile(
+      M->getDiags(), outputPath,
+      [&](raw_ostream &os) -> bool { return printAsCXX(os, M); });
+}
+
 /// Prints the stable module interface for \p M to \p outputPath.
 ///
 /// ...unless \p outputPath is empty, in which case it does nothing.
@@ -825,6 +841,12 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     hadAnyError |= printAsObjCIfNeeded(
         Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), BridgingHeaderPathForPrint);
+  }
+  if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
+      opts.InputsAndOutputs.hasCxxHeaderOutputPath()) {
+    hadAnyError |= printAsCxxIfNeeded(
+        Invocation.getCxxHeaderOutputPathForAtMostOnePrimary(),
+        Instance.getMainModule());
   }
 
   // Only want the header if there's been any errors, ie. there's not much

@@ -249,6 +249,7 @@ KNOWN_SETTINGS=(
     cross-compile-with-host-tools                 ""                "set to use the clang we build for the host to then build the cross-compile hosts"
     cross-compile-install-prefixes                ""                "semicolon-separated list of install prefixes to use for the cross-compiled hosts. The list expands, so if there are more cross-compile hosts than prefixes, unmatched hosts use the last prefix in the list"
     cross-compile-deps-path                       ""                "path for CMake to look for cross-compiled library dependencies, such as libXML2"
+    cross-compile-append-host-target-to-destdir   "1"               "turns on appending the host target name of each cross-compiled toolchain to its install-destdir, to keep them separate from the natively-built toolchain"
     skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
     skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
@@ -1133,8 +1134,10 @@ function get_host_install_destdir() {
         if [[ $(should_include_host_in_lipo ${host}) ]]; then
             # If this is one of the hosts we should lipo, install in to a temporary subdirectory.
             local host_install_destdir="${BUILD_DIR}/intermediate-install/${host}"
-        elif [[ "${host}" == "merged-hosts" ]]; then
-            # This assumes that all hosts are merged to the lipo.
+        elif [[ "${host}" == "merged-hosts" ]] ||
+             [[ "$(true_false ${CROSS_COMPILE_APPEND_HOST_TARGET_TO_DESTDIR})" == "FALSE" ]]; then
+            # This assumes that all hosts are merged to the lipo, or the build
+            # was told not to append anything.
             local host_install_destdir="${INSTALL_DESTDIR}"
         else
             local host_install_destdir="${INSTALL_DESTDIR}/${host}"

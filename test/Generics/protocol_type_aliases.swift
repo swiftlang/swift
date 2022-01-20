@@ -14,7 +14,7 @@ protocol Q {
 }
 
 // CHECK-LABEL: .requirementOnNestedTypeAlias@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q, τ_0_0.B.A == Int>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q, τ_0_0.[Q]B.[P]A == Int>
 func requirementOnNestedTypeAlias<T>(_: T) where T: Q, T.B.X == Int {}
 
 struct S<T> {}
@@ -29,11 +29,11 @@ protocol Q2 {
 }
 
 // CHECK-LABEL: .requirementOnConcreteNestedTypeAlias@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == S<τ_0_0.B.A>>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.[Q2]C == S<τ_0_0.[Q2]B.[P2]A>>
 func requirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, T.C == T.B.X {}
 
 // CHECK-LABEL: .concreteRequirementOnConcreteNestedTypeAlias@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == τ_0_0.B.A>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.[Q2]C == τ_0_0.[Q2]B.[P2]A>
 func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> == T.B.X {}
 // expected-warning@-1 {{neither type in same-type constraint ('S<T.C>' or 'T.B.X' (aka 'S<T.B.A>')) refers to a generic parameter or associated type}}
 

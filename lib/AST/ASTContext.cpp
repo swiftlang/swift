@@ -4286,15 +4286,25 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
 }
 
 CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::get(
-    Type existential, Optional<UUID> knownID) {
+    CanType existential, Optional<UUID> knownID) {
   Type interfaceType = GenericTypeParamType::get(
       /*isTypeSequence=*/false, 0, 0, existential->getASTContext());
   return get(existential, interfaceType, knownID);
 }
 
-CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
+CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
                                                 Type interfaceType,
                                                 Optional<UUID> knownID) {
+  // FIXME: Opened archetypes can't be transformed because the
+  // the identity of the archetype has to be preserved. This
+  // means that simplifying an opened archetype in the constraint
+  // system to replace type variables with fixed types is not
+  // yet supported. For now, assert that an opened archetype never
+  // contains type variables to catch cases where type variables
+  // would be applied to the type-checked AST.
+  assert(!existential->hasTypeVariable() &&
+         "opened existentials containing type variables cannot be simplified");
+
   auto &ctx = existential->getASTContext();
   auto &openedExistentialEnvironments =
       ctx.getImpl().OpenedExistentialEnvironments;
@@ -4327,9 +4337,10 @@ CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
 }
 
 
-CanType OpenedArchetypeType::getAny(Type existential, Type interfaceType) {
+CanType OpenedArchetypeType::getAny(CanType existential, Type interfaceType) {
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
-    auto instanceTy = metatypeTy->getExistentialInstanceType();
+    auto instanceTy =
+        metatypeTy->getExistentialInstanceType()->getCanonicalType();
     return CanMetatypeType::get(
         OpenedArchetypeType::getAny(instanceTy, interfaceType));
   }
@@ -4337,7 +4348,7 @@ CanType OpenedArchetypeType::getAny(Type existential, Type interfaceType) {
   return OpenedArchetypeType::get(existential, interfaceType);
 }
 
-CanType OpenedArchetypeType::getAny(Type existential) {
+CanType OpenedArchetypeType::getAny(CanType existential) {
   Type interfaceType = GenericTypeParamType::get(
       /*isTypeSequence=*/false, 0, 0, existential->getASTContext());
   return getAny(existential, interfaceType);

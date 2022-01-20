@@ -2362,7 +2362,7 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
     }
 
     auto NewTy = SILFunctionType::get(
-        loweredTy->getSubstGenericSignature(),
+        loweredTy->getInvocationGenericSignature(),
         loweredTy->getExtInfo(),
         loweredTy->getCoroutineKind(),
         loweredTy->getCalleeConvention(),

@@ -200,6 +200,9 @@ struct PrintOptions {
   /// Print fully qualified extended types if ambiguous.
   bool FullyQualifiedExtendedTypesIfAmbiguous = false;
 
+  /// Whether to protocol-qualify DependentMemberTypes.
+  bool ProtocolQualifiedDependentMemberTypes = false;
+
   /// If true, printed module names will use the "exported" name, which may be
   /// different from the regular name.
   ///

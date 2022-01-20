@@ -623,9 +623,14 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
                    diag::error_mode_cannot_emit_reference_dependencies);
     return true;
   }
-  if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&
+  if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitClangHeader(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasCxxHeaderOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_cxx_header);
     return true;
   }
   if (!FrontendOptions::canActionEmitLoadedModuleTrace(Opts.RequestedAction) &&

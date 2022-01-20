@@ -1907,7 +1907,8 @@ ConstraintSystem::getTypeOfMemberReference(
       }
     }
   } else if (baseObjTy->isExistentialType()) {
-    auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
+    auto openedArchetype = OpenedArchetypeType::get(
+        baseObjTy->getCanonicalType());
     OpenedExistentialTypes.insert(
         {getConstraintLocator(locator), openedArchetype});
     baseOpenedTy = openedArchetype;
