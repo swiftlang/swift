@@ -40,7 +40,8 @@ void BottomUpFunctionOrder::DFS(SILFunction *Start) {
   for (auto &B : *Start) {
     for (auto &I : B) {
       auto FAS = FullApplySite::isa(&I);
-      if (!FAS && !isa<StrongReleaseInst>(&I) && !isa<ReleaseValueInst>(&I))
+      if (!FAS && !isa<StrongReleaseInst>(&I) && !isa<ReleaseValueInst>(&I) &&
+                  !isa<DestroyValueInst>(&I))
         continue;
 
       auto Callees = FAS ? BCA->getCalleeList(FAS)
