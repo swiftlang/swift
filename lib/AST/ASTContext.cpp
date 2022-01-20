@@ -4349,8 +4349,18 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
   return newOpaque;
 }
 
-CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
+CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
                                                 Optional<UUID> knownID) {
+  // FIXME: Opened archetypes can't be transformed because the
+  // the identity of the archetype has to be preserved. This
+  // means that simplifying an opened archetype in the constraint
+  // system to replace type variables with fixed types is not
+  // yet supported. For now, assert that an opened archetype never
+  // contains type variables to catch cases where type variables
+  // would be applied to the type-checked AST.
+  assert(!existential->hasTypeVariable() &&
+         "opened existentials containing type variables cannot be simplified");
+
   auto &ctx = existential->getASTContext();
   auto &openedExistentialArchetypes = ctx.getImpl().OpenedExistentialArchetypes;
   // If we know the ID already...
@@ -4418,9 +4428,10 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
   return env;
 }
 
-CanType OpenedArchetypeType::getAny(Type existential) {
+CanType OpenedArchetypeType::getAny(CanType existential) {
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
-    auto instanceTy = metatypeTy->getExistentialInstanceType();
+    auto instanceTy =
+        metatypeTy->getExistentialInstanceType()->getCanonicalType();
     return CanMetatypeType::get(OpenedArchetypeType::getAny(instanceTy));
   }
   assert(existential->isExistentialType());

@@ -5517,7 +5517,7 @@ public:
     decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
                                                        existentialID);
 
-    return OpenedArchetypeType::get(MF.getType(existentialID));
+    return OpenedArchetypeType::get(MF.getType(existentialID)->getCanonicalType());
   }
       
   Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,

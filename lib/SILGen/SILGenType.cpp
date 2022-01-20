@@ -831,7 +831,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                           ProtocolConformanceRef(conformance));
 
   // Open the protocol type.
-  auto openedType = OpenedArchetypeType::get(protocol->getExistentialType());
+  auto openedType = OpenedArchetypeType::get(
+      protocol->getExistentialType()->getCanonicalType());
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,
