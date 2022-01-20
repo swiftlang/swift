@@ -205,6 +205,42 @@ AssociatedTypeDecl *RewriteContext::getAssociatedTypeForSymbol(Symbol symbol) {
   return assocType;
 }
 
+/// Find the most canonical associated type declaration with the given
+/// name among a set of conforming protocols stored in this property map
+/// entry.
+AssociatedTypeDecl *PropertyBag::getAssociatedType(Identifier name) {
+  auto found = AssocTypes.find(name);
+  if (found != AssocTypes.end())
+    return found->second;
+
+  AssociatedTypeDecl *assocType = nullptr;
+
+  for (auto *proto : ConformsTo) {
+    auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
+      otherAssocType = otherAssocType->getAssociatedTypeAnchor();
+
+      if (otherAssocType->getName() == name &&
+          (assocType == nullptr ||
+           TypeDecl::compare(otherAssocType->getProtocol(),
+                             assocType->getProtocol()) < 0)) {
+        assocType = otherAssocType;
+      }
+    };
+
+    for (auto *otherAssocType : proto->getAssociatedTypeMembers()) {
+      checkOtherAssocType(otherAssocType);
+    }
+  }
+
+  assert(assocType != nullptr && "Need to look harder");
+
+  auto inserted = AssocTypes.insert(std::make_pair(name, assocType)).second;
+  assert(inserted);
+  (void) inserted;
+
+  return assocType;
+}
+
 /// Compute the interface type for a range of symbols, with an optional
 /// root type.
 ///
@@ -233,8 +269,8 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
     result = genericParam;
   };
 
-  for (; begin != end; ++begin) {
-    auto symbol = *begin;
+  for (auto *iter = begin; iter != end; ++iter) {
+    auto symbol = *iter;
 
     if (!result) {
       // A valid term always begins with a generic parameter, protocol or
@@ -253,7 +289,7 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
         handleRoot(GenericTypeParamType::get(/*type sequence*/ false, 0, 0,
                                              ctx.getASTContext()));
 
-        // An associated type term at the root means we have a dependent
+        // An associated type symbol at the root means we have a dependent
         // member type rooted at Self; handle the associated type below.
         break;
 
@@ -281,8 +317,8 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
     if (symbol.getKind() == Symbol::Kind::Protocol) {
 #ifndef NDEBUG
       // Ensure that the domain of the suffix contains P.
-      if (begin + 1 < end) {
-        auto protos = (begin + 1)->getProtocols();
+      if (iter + 1 < end) {
+        auto protos = (iter + 1)->getProtocols();
         assert(std::find(protos.begin(), protos.end(), symbol.getProtocol()));
       }
 #endif
@@ -290,8 +326,39 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
     }
 
     // We should have a resolved type at this point.
-    auto *assocType =
-        ctx.getAssociatedTypeForSymbol(symbol);
+    AssociatedTypeDecl *assocType;
+
+    if (begin == iter) {
+      // FIXME: Eliminate this case once merged associated types are gone.
+      assocType = ctx.getAssociatedTypeForSymbol(symbol);
+    } else {
+      // The protocol stored in an associated type symbol appearing in a
+      // canonical term is not necessarily the right protocol to look for
+      // an associated type declaration to get a canonical _type_, because
+      // the reduction order on terms is different than the canonical order
+      // on types.
+      //
+      // Instead, find all protocols that the prefix conforms to, and look
+      // for an associated type in those protocols.
+      MutableTerm prefix(begin, iter);
+      assert(prefix.size() > 0);
+
+      auto *props = map.lookUpProperties(prefix.rbegin(), prefix.rend());
+      assert(props != nullptr);
+
+      // Assert that the associated type's protocol appears among the set
+      // of protocols that the prefix conforms to.
+  #ifndef NDEBUG
+      auto conformsTo = props->getConformsTo();
+      for (auto *otherProto : symbol.getProtocols()) {
+        assert(std::find(conformsTo.begin(), conformsTo.end(), otherProto)
+               != conformsTo.end());
+      }
+  #endif
+
+      assocType = props->getAssociatedType(symbol.getName());
+    }
+
     result = DependentMemberType::get(result, assocType);
   }
 

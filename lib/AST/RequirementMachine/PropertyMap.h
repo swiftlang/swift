@@ -99,6 +99,9 @@ class PropertyBag {
   /// ConformsTo list.
   llvm::TinyPtrVector<ProtocolConformance *> ConcreteConformances;
 
+  /// Cache of associated type declarations.
+  llvm::SmallDenseMap<Identifier, AssociatedTypeDecl *, 2> AssocTypes;
+
   explicit PropertyBag(Term key) : Key(key) {}
 
   void copyPropertiesFrom(const PropertyBag *next,
@@ -151,6 +154,8 @@ public:
   getConformsToExcludingSuperclassConformances() const;
 
   MutableTerm getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const;
+
+  AssociatedTypeDecl *getAssociatedType(Identifier name);
 
   void verify(const RewriteSystem &system) const;
 };
