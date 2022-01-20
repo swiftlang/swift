@@ -181,8 +181,11 @@ class Product(object):
         self.source_dir = source_dir
         self.build_dir = build_dir
         self.cmake_options = cmake.CMakeOptions()
-        self.common_c_flags = ['-Wno-unknown-warning-option',
-                               '-Werror=unguarded-availability-new']
+        if toolchain.cc.endswith('gcc'):
+            self.common_c_flags = []
+        else:
+            self.common_c_flags = ['-Wno-unknown-warning-option',
+                                   '-Werror=unguarded-availability-new']
 
     def is_release(self):
         """is_release() -> Bool
