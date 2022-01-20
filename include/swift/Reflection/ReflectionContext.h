@@ -221,6 +221,22 @@ public:
             SectionsBuf + (I * sizeof(typename T::Section)));
         if (strncmp(S->sectname, Name.data(), strlen(Name.data())) != 0)
           continue;
+
+        // The above check verifies that `Name` is a prefix to the examined
+        // section name, to allow for matching of sections with a suffix
+        // like `_TEXT`, etc.
+        // "__swift5_proto" section name is a substring of "__swift5_protos",
+        // Ensure we don't return the latter when looking for the former.
+        SwiftObjectFileFormatMachO ObjectFileFormat;
+        if (Name.data() ==
+            ObjectFileFormat.getSectionName(ReflectionSectionKind::conform)) {
+          auto protocolsSectionName =
+              ObjectFileFormat.getSectionName(ReflectionSectionKind::protocs);
+          if (strncmp(S->sectname, protocolsSectionName.data(),
+                      strlen(protocolsSectionName.data())) == 0)
+            continue;
+        }
+
         auto RemoteSecStart = S->addr + Slide;
         auto LocalSectBuf =
             this->getReader().readBytes(RemoteAddress(RemoteSecStart), S->size);

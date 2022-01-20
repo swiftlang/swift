@@ -79,6 +79,16 @@ struct RuntimeTarget<4> {
   using StoredSize = uint32_t;
   using StoredPointerDifference = int32_t;
   static constexpr size_t PointerSize = 4;
+
+#if SWIFT_OBJC_INTEROP
+  static constexpr bool ObjCInterop = true;
+  template <typename T>
+  using TargetAnyClassMetadata = TargetAnyClassMetadataObjCInterop<T>;
+#else
+  static constexpr bool ObjCInterop = false;
+  template <typename T>
+  using TargetAnyClassMetadata = TargetAnyClassMetadata<T>;
+#endif
 };
 
 template <>
@@ -91,6 +101,16 @@ struct RuntimeTarget<8> {
   using StoredSize = uint64_t;
   using StoredPointerDifference = int64_t;
   static constexpr size_t PointerSize = 8;
+
+#if SWIFT_OBJC_INTEROP
+  static constexpr bool ObjCInterop = true;
+  template <typename T>
+  using TargetAnyClassMetadata = TargetAnyClassMetadataObjCInterop<T>;
+#else
+  static constexpr bool ObjCInterop = false;
+  template <typename T>
+  using TargetAnyClassMetadata = TargetAnyClassMetadata<T>;
+#endif
 };
 
 namespace reflection {
@@ -539,6 +559,14 @@ namespace {
 }
 
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
+
+template<unsigned PointerSize>
+using ExternalTypeContextDescriptor
+#if SWIFT_OBJC_INTEROP
+= TargetTypeContextDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
+#else
+= TargetTypeContextDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
+#endif
 
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -2106,7 +2134,15 @@ using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
 
 template<typename Runtime> struct TargetProtocolDescriptor;
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
-  
+
+template<unsigned PointerSize>
+using ExternalProtocolDescriptor
+#if SWIFT_OBJC_INTEROP
+= TargetProtocolDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
+#else
+= TargetProtocolDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
+#endif
+
 /// A witness table for a protocol.
 ///
 /// With the exception of the initial protocol conformance descriptor,
@@ -2722,6 +2758,16 @@ public:
     return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
+  constexpr inline auto
+  getTypeDescriptorOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, TypeRef);
+  }
+
+  constexpr inline auto
+  getProtocolDescriptorOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Protocol);
+  }
+
   TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor *
   _getTypeDescriptorLocation() const {
     if (getTypeKind() != TypeReferenceKind::IndirectTypeDescriptor)
@@ -2840,9 +2886,21 @@ using TargetProtocolConformanceRecord =
 
 using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
 
+template<unsigned PointerSize>
 using ExternalProtocolConformanceDescriptor
-  = TargetProtocolConformanceDescriptor<External<RuntimeTarget<8>>>;
-using ExternalProtocolConformanceRecord = TargetProtocolConformanceRecord<External<RuntimeTarget<8>>>;
+#if SWIFT_OBJC_INTEROP
+= TargetProtocolConformanceDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
+#else
+= TargetProtocolConformanceDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
+#endif
+
+template<unsigned PointerSize>
+using ExternalProtocolConformanceRecord
+#if SWIFT_OBJC_INTEROP
+= TargetProtocolConformanceRecord<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
+#else
+= TargetProtocolConformanceRecord<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
+#endif
 
 template<typename Runtime>
 struct TargetGenericContext;
@@ -2893,6 +2951,13 @@ private:
 };
 
 using ContextDescriptor = TargetContextDescriptor<InProcess>;
+template<unsigned PointerSize>
+using ExternalContextDescriptor
+#if SWIFT_OBJC_INTEROP
+= TargetContextDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
+#else
+= TargetContextDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
+#endif
 
 inline bool isCImportedModuleName(llvm::StringRef name) {
   // This does not include MANGLING_MODULE_CLANG_IMPORTER because that's
@@ -3415,6 +3480,11 @@ public:
     return {this->template getTrailingObjects<
                              TargetProtocolRequirement<Runtime>>(),
             NumRequirements};
+  }
+
+  constexpr inline auto
+  getNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Name);
   }
 
   /// Retrieve the requirement base descriptor address.
@@ -4080,6 +4150,11 @@ public:
   /// Return the offset of the start of generic arguments in the nominal
   /// type's metadata. The returned value is measured in sizeof(StoredPointer).
   int32_t getGenericArgumentOffset() const;
+
+  constexpr inline auto
+  getNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Name);
+  }
 
   /// Return the start of the generic arguments array in the nominal
   /// type's metadata. The returned value is measured in sizeof(StoredPointer).

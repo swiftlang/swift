@@ -217,7 +217,7 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
     sectionFromInfo<const void *>(Info, Info.type_references),
     sectionFromInfo<const void *>(Info, Info.reflection_strings),
     // TODO: Conformance section
-    ConformanceSection(RemoteRef<void>(), 0)};
+    ReflectionSection<const void *>(nullptr, 0)};
   
   Context->addReflectionInfo(ContextInfo);
 }
@@ -238,7 +238,7 @@ void swift_reflection_addReflectionMappingInfo(
       reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
       reflectionSectionFromLocalAndRemote<const void *>(Info.reflection_strings),
       // TODO: Conformance section
-      ConformanceSection(RemoteRef<void>(), 0)};
+      ReflectionSection<const void *>(nullptr, 0)};
 
   Context->addReflectionInfo(ContextInfo);
 }

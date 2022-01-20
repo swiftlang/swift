@@ -126,6 +126,7 @@ struct ReflectionContextHolder {
   ReflectionContextOwner Owner;
   reflection::TypeRefBuilder &Builder;
   ObjectMemoryReader &Reader;
+  uint8_t PointerSize;
 };
 
 template <typename T>

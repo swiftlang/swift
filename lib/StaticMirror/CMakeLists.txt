@@ -1,5 +1,3 @@
-
-
 add_swift_host_library(swiftStaticMirror STATIC
    ObjectFileContext.cpp)
 

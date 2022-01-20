@@ -115,7 +115,17 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
   switch (Action) {
   case ActionType::DumpReflectionSections:
     // Dump everything
-    builder.dumpAllSections(stream);
+    switch (context.PointerSize) {
+    case 4:
+      builder.dumpAllSections<4>(stream);
+      break;
+     case 8:
+      builder.dumpAllSections<8>(stream);
+      break;
+    default:
+      fputs("unsupported word size in object file\n", stderr);
+      abort();
+    }
     break;
   case ActionType::DumpTypeLowering: {
     for (std::string Line; std::getline(std::cin, Line);) {

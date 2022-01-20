@@ -192,23 +192,8 @@ public:
       + CR->NumMetadataSources * sizeof(MetadataSourceRecord);
   }
 };
-
-class ConformanceRecordIterator
-  : public ReflectionSectionIteratorBase<ConformanceRecordIterator,
-                                         ExternalProtocolConformanceRecord> {
-public:
-   ConformanceRecordIterator(RemoteRef<void> Cur, uint64_t Size)
-   : ReflectionSectionIteratorBase(Cur, Size)
- {}
-
- static uint64_t getCurrentRecordSize(RemoteRef<ExternalProtocolConformanceRecord> CD){
-   return sizeof(ExternalProtocolConformanceRecord);
- }
-};
-
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
-using ConformanceSection = ReflectionSection<ConformanceRecordIterator>;
 
 struct ReflectionInfo {
   FieldSection Field;
@@ -217,7 +202,7 @@ struct ReflectionInfo {
   CaptureSection Capture;
   GenericSection TypeReference;
   GenericSection ReflectionString;
-  ConformanceSection Conformance;
+  GenericSection Conformance;
 };
 
 struct ClosureContextInfo {
@@ -250,6 +235,17 @@ struct FieldTypeInfo {
   static FieldTypeInfo forField(std::string Name, int Value, const TypeRef *TR) {
     return FieldTypeInfo(Name, Value, TR, false);
   }
+};
+
+/// Info about a protocol conformance read out from an Image
+struct ProtocolConformanceInfo {
+  std::string typeName;
+  std::string protocolName;
+
+  // TODO:
+  // const TypeRef *type;
+  // std::string mangledTypeName;
+  // std::string mangledProtocolName;
 };
 
 /// An implementation of MetadataReader's BuilderType concept for
@@ -686,14 +682,23 @@ public:
   }
   
 private:
+  using RefDemangler = std::function<Demangle::Node * (RemoteRef<char>, bool)>;
+  using UnderlyingTypeReader = std::function<const TypeRef* (uint64_t, unsigned)>;
+  using ByteReader = std::function<remote::MemoryReader::ReadBytesResult (remote::RemoteAddress, unsigned)>;
+  using StringReader = std::function<bool (remote::RemoteAddress, std::string &)>;
+  using PointerReader = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress, unsigned)>;
+
   // These fields are captured from the MetadataReader template passed into the
   // TypeRefBuilder struct, to isolate its template-ness from the rest of
   // TypeRefBuilder.
   unsigned PointerSize;
-  std::function<Demangle::Node * (RemoteRef<char>, bool)>
-    TypeRefDemangler;
-  std::function<const TypeRef* (uint64_t, unsigned)>
-    OpaqueUnderlyingTypeReader;
+  RefDemangler TypeRefDemangler;
+  UnderlyingTypeReader OpaqueUnderlyingTypeReader;
+
+  // Opaque fields captured from the MetadataReader's MemoryReader
+  ByteReader OpaqueByteReader;
+  StringReader OpaqueStringReader;
+  PointerReader OpaquePointerReader;
   
 public:
   template<typename Runtime>
@@ -710,6 +715,15 @@ public:
       [&reader](uint64_t descriptorAddr, unsigned ordinal) -> const TypeRef* {
         return reader.readUnderlyingTypeForOpaqueTypeDescriptor(
           descriptorAddr, ordinal).getType();
+      }),
+      OpaqueByteReader([&reader](remote::RemoteAddress address, unsigned size) -> remote::MemoryReader::ReadBytesResult {
+        return reader.Reader->readBytes(address, size);
+      }),
+      OpaqueStringReader([&reader](remote::RemoteAddress address, std::string &dest) -> bool {
+        return reader.Reader->readString(address, dest);
+      }),
+      OpaquePointerReader([&reader](remote::RemoteAddress address, unsigned size) -> llvm::Optional<remote::RemoteAbsolutePointer> {
+        return reader.Reader->readPointer(address, size);
       })
   {}
 
@@ -749,16 +763,290 @@ public:
   /// Dumping typerefs, field declarations, associated types
   ///
 
-  void dumpTypeRef(RemoteRef<char> MangledName,
-                   std::ostream &stream, bool printTypeName = false);
+  void dumpTypeRef(RemoteRef<char> MangledName, std::ostream &stream,
+                   bool printTypeName = false);
   void dumpFieldSection(std::ostream &stream);
   void dumpAssociatedTypeSection(std::ostream &stream);
   void dumpBuiltinTypeSection(std::ostream &stream);
   void dumpCaptureSection(std::ostream &stream);
-  void dumpConformanceSection(std::ostream &stream);
-  void dumpAllSections(std::ostream &stream);
-};
 
+  ///
+  /// Extraction of protocol conformances
+  ///
+
+private:
+  /// Reader of protocol descriptors from Images
+  template <unsigned PointerSize>
+  struct ProtocolConformanceDescriptorReader {
+    std::string Error;
+    ByteReader OpaqueByteReader;
+    StringReader OpaqueStringReader;
+    PointerReader OpaquePointerReader;
+
+    ProtocolConformanceDescriptorReader(ByteReader byteReader,
+                                        StringReader stringReader,
+                                        PointerReader pointerReader)
+        : Error(""), OpaqueByteReader(byteReader),
+          OpaqueStringReader(stringReader), OpaquePointerReader(pointerReader) {
+    }
+
+    std::string getConformingTypeName(
+        const char *conformanceDescriptorAddress,
+        const ExternalProtocolConformanceDescriptor<PointerSize>
+            &conformanceDescriptor) {
+      std::string typeName;
+      // Compute the address of the type descriptor as follows:
+      //    - Compute the address of the TypeRef field in the protocol
+      //    descriptor
+      //    - Read the TypeRef field to compute the offset to the type
+      //    descriptor
+      //    - Address of the type descriptor is found at the (2) offset from the
+      //      conformance descriptor address
+      auto contextDescriptorFieldAddress = detail::applyRelativeOffset(
+          conformanceDescriptorAddress,
+          (int32_t)conformanceDescriptor.getTypeDescriptorOffset());
+      auto contextDescriptorOffsetBytes =
+          OpaqueByteReader(remote::RemoteAddress(contextDescriptorFieldAddress),
+                           sizeof(uint32_t));
+      if (!contextDescriptorOffsetBytes.get()) {
+        Error = "Failed to read type descriptor field in conformance descriptor.";
+        return typeName;
+      }
+      auto contextDescriptorOffset =
+          (const uint32_t *)contextDescriptorOffsetBytes.get();
+
+      // Read the type descriptor itself using the address computed above
+      auto contextDescriptorAddress = detail::applyRelativeOffset(
+          (const char *)contextDescriptorFieldAddress,
+          (int32_t)*contextDescriptorOffset);
+      auto contextDescriptorBytes =
+          OpaqueByteReader(remote::RemoteAddress(contextDescriptorAddress),
+                           sizeof(ExternalContextDescriptor<PointerSize>));
+      if (!contextDescriptorBytes.get()) {
+        Error = "Failed to read context descriptor.";
+        return typeName;
+      }
+      const ExternalContextDescriptor<PointerSize> *contextDescriptor =
+          (const ExternalContextDescriptor<PointerSize> *)
+              contextDescriptorBytes.get();
+
+      auto typeDescriptor =
+          dyn_cast<ExternalTypeContextDescriptor<PointerSize>>(
+              contextDescriptor);
+      if (!typeDescriptor) {
+        Error = "Unexpected type of context descriptor.";
+        return typeName;
+      }
+
+      // Compute the address of the type descriptor's name field and read the
+      // offset
+      auto typeNameOffsetAddress =
+          detail::applyRelativeOffset((const char *)contextDescriptorAddress,
+                                      (int32_t)typeDescriptor->getNameOffset());
+      auto typeNameOfsetBytes = OpaqueByteReader(
+          remote::RemoteAddress(typeNameOffsetAddress), sizeof(uint32_t));
+      if (!typeNameOfsetBytes.get()) {
+        Error = "Failed to read type name offset in a type descriptor.";
+        return typeName;
+      }
+      auto typeNameOffset = (const uint32_t *)typeNameOfsetBytes.get();
+
+      // Using the offset above, compute the address of the name field itsel
+      // and read it.
+      auto typeNameAddress = detail::applyRelativeOffset(
+          (const char *)typeNameOffsetAddress, (int32_t)*typeNameOffset);
+      OpaqueStringReader(remote::RemoteAddress(typeNameAddress), typeName);
+      return typeName;
+    }
+
+    std::string getConformanceProtocol(
+        const char *conformanceDescriptorAddress,
+        const ExternalProtocolConformanceDescriptor<PointerSize>
+            &conformanceDescriptor) {
+      std::string protocolName = "";
+      auto protocolDescriptorFieldAddress = detail::applyRelativeOffset(
+          conformanceDescriptorAddress,
+          (int32_t)conformanceDescriptor.getProtocolDescriptorOffset());
+
+      auto protocolDescriptorOffsetBytes = OpaqueByteReader(
+          remote::RemoteAddress(protocolDescriptorFieldAddress),
+          sizeof(uint32_t));
+      if (!protocolDescriptorOffsetBytes.get()) {
+        Error = "Error reading protocol descriptor field in conformance descriptor.";
+        return protocolName;
+      }
+      auto protocolDescriptorOffset =
+          (const uint32_t *)protocolDescriptorOffsetBytes.get();
+
+      auto protocolDescriptorTarget = detail::applyRelativeOffset(
+          (const char *)protocolDescriptorFieldAddress,
+          (int32_t)*protocolDescriptorOffset);
+
+      // If indirect, attempt to get symbol name from external bindings
+      if ((uint64_t)protocolDescriptorTarget & 0x1) {
+        auto adjustedProtocolDescriptorTarget =
+            (const void *)((uint64_t)protocolDescriptorTarget & ~(0x1));
+        if (auto symbol = OpaquePointerReader(
+                remote::RemoteAddress(adjustedProtocolDescriptorTarget), 8)) {
+
+          Demangle::Context Ctx;
+          auto demangledRoot =
+              Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
+          assert(demangledRoot->getKind() == Node::Kind::Global);
+          assert(demangledRoot->getChild(0)->getKind() ==
+                 Node::Kind::ProtocolDescriptor);
+          protocolName = nodeToString(demangledRoot->getChild(0)->getChild(0));
+        } else {
+          Error = "Error reading external protocol address.";
+          return protocolName;
+        }
+        // If direct, read the protocol descriptor and get symbol name
+      } else {
+        auto protocolDescriptorBytes =
+            OpaqueByteReader(remote::RemoteAddress(protocolDescriptorTarget),
+                             sizeof(ExternalProtocolDescriptor<PointerSize>));
+        if (!protocolDescriptorBytes.get()) {
+          Error = "Error reading protocol descriptor.";
+          return protocolName;
+        }
+        const ExternalProtocolDescriptor<PointerSize> *protocolDescriptor =
+            (const ExternalProtocolDescriptor<PointerSize> *)
+                protocolDescriptorBytes.get();
+
+        // Compute the address of the protocol descriptor's name field and read
+        // the offset
+        auto protocolNameOffsetAddress = detail::applyRelativeOffset(
+            (const char *)protocolDescriptorTarget,
+            (int32_t)protocolDescriptor->getNameOffset());
+        auto protocolNameOfsetBytes = OpaqueByteReader(
+            remote::RemoteAddress(protocolNameOffsetAddress), sizeof(uint32_t));
+        if (!protocolNameOfsetBytes.get()) {
+          Error = "Failed to read type name offset in a protocol descriptor.";
+          return protocolName;
+        }
+        auto protocolNameOffset =
+            (const uint32_t *)protocolNameOfsetBytes.get();
+
+        // Using the offset above, compute the address of the name field itsel
+        // and read it.
+        auto protocolNameAddress =
+            detail::applyRelativeOffset((const char *)protocolNameOffsetAddress,
+                                        (int32_t)*protocolNameOffset);
+        OpaqueStringReader(remote::RemoteAddress(protocolNameAddress),
+                           protocolName);
+      }
+
+      return protocolName;
+    }
+
+    /// Given the address of a conformance descriptor, attempt to read it.
+    ProtocolConformanceInfo
+    readConformanceDescriptor(RemoteRef<void> conformanceRecordRef) {
+      const ExternalProtocolConformanceRecord<PointerSize> *CD =
+          (const ExternalProtocolConformanceRecord<PointerSize> *)
+              conformanceRecordRef.getLocalBuffer();
+      // Read the Protocol Conformance Descriptor by getting its address from
+      // the conformance record.
+      auto conformanceDescriptorAddress = (const char *)CD->getRelative(
+          (void *)conformanceRecordRef.getAddressData());
+
+      auto descriptorBytes = OpaqueByteReader(
+          remote::RemoteAddress(conformanceDescriptorAddress),
+          sizeof(ExternalProtocolConformanceDescriptor<PointerSize>));
+      if (!descriptorBytes.get()) {
+        Error = "Failed to read protocol conformance descriptor.";
+        return ProtocolConformanceInfo();
+      }
+      const ExternalProtocolConformanceDescriptor<PointerSize>
+          *conformanceDescriptorPtr =
+              (const ExternalProtocolConformanceDescriptor<PointerSize> *)
+                  descriptorBytes.get();
+
+      auto conformingTypeName = getConformingTypeName(
+          conformanceDescriptorAddress, *conformanceDescriptorPtr);
+      auto conformanceProtocol = getConformanceProtocol(
+          conformanceDescriptorAddress, *conformanceDescriptorPtr);
+
+      return ProtocolConformanceInfo{conformingTypeName,
+                                     conformanceProtocol};
+    }
+
+    bool hasError() {
+      return !Error.empty();
+    }
+  };
+
+public:
+  template <unsigned PointerSize>
+  void dumpConformanceSection(std::ostream &stream) {
+    // Collect all conformances and aggregate them per-conforming-type.
+    std::unordered_map<std::string, std::vector<std::string>> typeConformances;
+    ProtocolConformanceDescriptorReader<PointerSize> conformanceReader(
+        OpaqueByteReader, OpaqueStringReader, OpaquePointerReader);
+
+    for (const auto &section : ReflectionInfos) {
+      auto ConformanceBegin = section.Conformance.startAddress();
+      auto ConformanceEnd = section.Conformance.endAddress();
+      for (auto conformanceAddr = ConformanceBegin;
+           conformanceAddr != ConformanceEnd;
+           conformanceAddr = conformanceAddr.atByteOffset(4)) {
+        auto conformanceInfo =
+            conformanceReader.readConformanceDescriptor(conformanceAddr);
+        if (conformanceReader.hasError()) {
+          stream << "Error reading conformance descriptor: "
+                 << conformanceReader.Error << "\n";
+          continue;
+        }
+
+        if (typeConformances.count(conformanceInfo.typeName) != 0) {
+          typeConformances[conformanceInfo.typeName].push_back(
+              conformanceInfo.protocolName);
+        } else {
+          typeConformances.emplace(
+              conformanceInfo.typeName,
+              std::vector<std::string>{conformanceInfo.protocolName});
+        }
+      }
+    }
+
+    for (auto &pair : typeConformances) {
+      stream << pair.first << " : ";
+      bool first = true;
+      for (auto &protocol : pair.second) {
+        if (!first) {
+          stream << ", ";
+        }
+        first = false;
+        stream << protocol;
+      }
+      stream << "\n";
+    }
+  }
+
+  template <unsigned PointerSize>
+  void dumpAllSections(std::ostream &stream) {
+    stream << "FIELDS:\n";
+    stream << "=======\n";
+    dumpFieldSection(stream);
+    stream << "\n";
+    stream << "ASSOCIATED TYPES:\n";
+    stream << "=================\n";
+    dumpAssociatedTypeSection(stream);
+    stream << "\n";
+    stream << "BUILTIN TYPES:\n";
+    stream << "==============\n";
+    dumpBuiltinTypeSection(stream);
+    stream << "\n";
+    stream << "CAPTURE DESCRIPTORS:\n";
+    stream << "====================\n";
+    dumpCaptureSection(stream);
+    stream << "\n";
+    stream << "CONFORMANCES:\n";
+    stream << "=============\n";
+    dumpConformanceSection<PointerSize>(stream);
+    stream << "\n";
+  }
+};
 
 } // end namespace reflection
 } // end namespace swift

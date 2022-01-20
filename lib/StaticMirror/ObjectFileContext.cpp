@@ -496,7 +496,7 @@ ObjectMemoryReader::resolvePointer(reflection::RemoteAddress Addr,
 
 template <typename Runtime>
 ReflectionContextHolder makeReflectionContextForMetadataReader(
-    std::shared_ptr<ObjectMemoryReader> reader) {
+    std::shared_ptr<ObjectMemoryReader> reader, uint8_t pointerSize) {
   using ReflectionContext = reflection::ReflectionContext<Runtime>;
   auto context = new ReflectionContext(reader);
   auto &builder = context->getBuilder();
@@ -505,11 +505,7 @@ ReflectionContextHolder makeReflectionContextForMetadataReader(
   }
   return {ReflectionContextOwner(
               context, [](void *x) { delete (ReflectionContext *)x; }),
-          builder, *reader};
-}
-
-uint8_t queryPointerSize(const std::vector<const ObjectFile *> &objectFiles) {
-
+          builder, *reader, pointerSize};
 }
 
 ReflectionContextHolder makeReflectionContextForObjectFiles(
@@ -521,6 +517,7 @@ ReflectionContextHolder makeReflectionContextForObjectFiles(
                           &pointerSize);
 
   switch (pointerSize) {
+  case 4:
     return makeReflectionContextForMetadataReader<
      // FIXME: This could be configurable.
  #if SWIFT_OBJC_INTEROP
@@ -528,7 +525,7 @@ ReflectionContextHolder makeReflectionContextForObjectFiles(
  #else
          External<NoObjCInterop<RuntimeTarget<4>>>
  #endif
-         >(std::move(Reader));
+         >(std::move(Reader), pointerSize);
    case 8:
      return makeReflectionContextForMetadataReader<
      // FIXME: This could be configurable.
@@ -537,7 +534,7 @@ ReflectionContextHolder makeReflectionContextForObjectFiles(
  #else
          External<NoObjCInterop<RuntimeTarget<8>>>
  #endif
-         >(std::move(Reader));
+         >(std::move(Reader), pointerSize);
   default:
     fputs("unsupported word size in object file\n", stderr);
     abort();
