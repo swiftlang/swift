@@ -389,6 +389,10 @@ static void writeEpilogue(raw_ostream &os) {
       "#endif\n";
 }
 
+static std::string computeMacroGuard(const ModuleDecl *M) {
+  return (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
+}
+
 bool swift::printAsObjC(raw_ostream &os, ModuleDecl *M,
                         StringRef bridgingHeader) {
   llvm::PrettyStackTraceString trace("While generating Objective-C header");
@@ -397,11 +401,21 @@ bool swift::printAsObjC(raw_ostream &os, ModuleDecl *M,
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleContents{moduleContentsBuf};
   printModuleContentsAsObjC(moduleContents, imports, *M);
-  std::string macroGuard = (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
-  writePrologue(os, M->getASTContext(), macroGuard);
+  writePrologue(os, M->getASTContext(), computeMacroGuard(M));
   writeImports(os, imports, *M, bridgingHeader);
   writePostImportPrologue(os, *M);
   os << moduleContents.str();
+  writeEpilogue(os);
+
+  return false;
+}
+
+bool swift::printAsCXX(raw_ostream &os, ModuleDecl *M) {
+  llvm::PrettyStackTraceString trace("While generating C++ header");
+
+  writePrologue(os, M->getASTContext(), computeMacroGuard(M));
+  writePostImportPrologue(os, *M);
+  // TODO (Alex): emit module contents.
   writeEpilogue(os);
 
   return false;

@@ -467,6 +467,12 @@ bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
         return outs.ObjCHeaderOutputPath;
       });
 }
+bool FrontendInputsAndOutputs::hasCxxHeaderOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.CxxHeaderOutputPath;
+      });
+}
 bool FrontendInputsAndOutputs::hasLoadedModuleTracePath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
