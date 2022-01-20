@@ -184,12 +184,18 @@ extension UnaryInstruction {
 final public class UnimplementedInstruction : Instruction {
 }
 
-final public class StoreInst : Instruction {
+public protocol StoringInstruction : AnyObject {
+  var operands: OperandArray { get }
+}
+
+extension StoringInstruction {
   public var sourceOperand: Operand { return operands[0] }
   public var destinationOperand: Operand { return operands[1] }
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
+}
 
+final public class StoreInst : Instruction, StoringInstruction {
   // must match with enum class StoreOwnershipQualifier
   public enum StoreOwnership: Int {
     case unqualified = 0, initialize = 1, assign = 2, trivial = 3
@@ -199,11 +205,21 @@ final public class StoreInst : Instruction {
   }
 }
 
+final public class StoreWeakInst : Instruction, StoringInstruction { }
+final public class StoreUnownedInst : Instruction, StoringInstruction { }
+
 final public class CopyAddrInst : Instruction {
   public var sourceOperand: Operand { return operands[0] }
   public var destinationOperand: Operand { return operands[1] }
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
+  
+  public var isTakeOfSrc: Bool {
+    CopyAddrInst_isTakeOfSrc(bridged) != 0
+  }
+  public var isInitializationOfDest: Bool {
+    CopyAddrInst_isInitializationOfDest(bridged) != 0
+  }
 }
 
 final public class EndAccessInst : Instruction, UnaryInstruction {
@@ -262,6 +278,10 @@ final public class DestroyValueInst : Instruction, UnaryInstruction {}
 
 final public class DestroyAddrInst : Instruction, UnaryInstruction {}
 
+final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstruction {
+  public var caseIndex: Int { InjectEnumAddrInst_caseIndex(bridged) }
+}
+
 final public class UnimplementedRefCountingInst : RefCountingInst {}
 
 //===----------------------------------------------------------------------===//
@@ -275,6 +295,8 @@ final public class UnimplementedSingleValueInst : SingleValueInstruction {
 
 final public class LoadInst : SingleValueInstruction, UnaryInstruction {}
 
+final public class LoadWeakInst : SingleValueInstruction, UnaryInstruction {}
+final public class LoadUnownedInst : SingleValueInstruction, UnaryInstruction {}
 final public class LoadBorrowInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
@@ -362,6 +384,10 @@ final public class GlobalValueInst : GlobalAccessInst {}
 
 final public class IntegerLiteralInst : SingleValueInstruction {}
 
+final public class StringLiteralInst : SingleValueInstruction {
+  public var string: String { StringLiteralInst_getValue(bridged).string }
+}
+
 final public class TupleInst : SingleValueInstruction {
 }
 
@@ -386,15 +412,26 @@ class StructElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { StructElementAddrInst_fieldIndex(bridged) }
 }
 
-final public class EnumInst : SingleValueInstruction {
+public protocol EnumInstruction : AnyObject {
+  var caseIndex: Int { get }
+}
+
+final public class EnumInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
   public var caseIndex: Int { EnumInst_caseIndex(bridged) }
 
   public var operand: Value? { operands.first?.value }
 }
 
-final public
-class UncheckedEnumDataInst : SingleValueInstruction, UnaryInstruction {
+final public class UncheckedEnumDataInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
   public var caseIndex: Int { UncheckedEnumDataInst_caseIndex(bridged) }
+}
+
+final public class InitEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
+  public var caseIndex: Int { InitEnumDataAddrInst_caseIndex(bridged) }
+}
+
+final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
+  public var caseIndex: Int { UncheckedTakeEnumDataAddrInst_caseIndex(bridged) }
 }
 
 final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction {
@@ -430,12 +467,22 @@ class MarkDependenceInst : SingleValueInstruction {
   public var base: Value { return operands[1].value }
 }
 
+final public class RefToBridgeObjectInst : SingleValueInstruction,
+                                           UnaryInstruction {}
+
 final public class BridgeObjectToRefInst : SingleValueInstruction,
+                                           UnaryInstruction {}
+
+final public class BridgeObjectToWordInst : SingleValueInstruction,
                                            UnaryInstruction {}
 
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
+  public var fieldIndex: Int { ProjectBoxInst_fieldIndex(bridged) }
+}
 
 final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -446,6 +493,19 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { PartialApplyInst_numArguments(bridged) }
+  public var isOnStack: Bool { PartialApplyInst_isOnStack(bridged) != 0 }
+
+  public func calleeArgIndex(callerArgIndex: Int) -> Int {
+    PartialApply_getCalleeArgIndexOfFirstAppliedArg(bridged) + callerArgIndex
+  }
+
+  public func callerArgIndex(calleeArgIndex: Int) -> Int? {
+    let firstIdx = PartialApply_getCalleeArgIndexOfFirstAppliedArg(bridged)
+    if calleeArgIndex >= firstIdx {
+      return calleeArgIndex - firstIdx
+    }
+    return nil
+  }
 }
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {
@@ -520,8 +580,6 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var singleDirectResult: Value? { nil }
 }
 
-public final class RefToBridgeObjectInst: MultipleValueInstruction {}
-
 //===----------------------------------------------------------------------===//
 //                            terminator instructions
 //===----------------------------------------------------------------------===//
@@ -565,6 +623,26 @@ final public class BranchInst : TermInst {
 }
 
 final public class CondBranchInst : TermInst {
+  var trueBlock: BasicBlock { successors[0] }
+  var falseBlock: BasicBlock { successors[1] }
+
+  var condition: Value { operands[0].value }
+
+  var trueOperands: OperandArray { operands[1...CondBranchInst_getNumTrueArgs(bridged)] }
+  var falseOperands: OperandArray {
+    let ops = operands
+    return ops[(CondBranchInst_getNumTrueArgs(bridged) &+ 1)..<ops.count]
+  }
+
+  public func getArgument(for operand: Operand) -> Argument {
+    let argIdx = operand.index - 1
+    let numTrueArgs = CondBranchInst_getNumTrueArgs(bridged)
+    if (0..<numTrueArgs).contains(argIdx) {
+      return trueBlock.arguments[argIdx]
+    } else {
+      return falseBlock.arguments[argIdx - numTrueArgs]
+    }
+  }
 }
 
 final public class SwitchValueInst : TermInst {
