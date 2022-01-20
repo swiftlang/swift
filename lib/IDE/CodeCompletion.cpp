@@ -4100,7 +4100,7 @@ public:
 
     if (!ExprType->getMetatypeInstanceType()->isAnyObject())
       if (ExprType->isAnyExistentialType())
-        ExprType = OpenedArchetypeType::getAny(ExprType);
+        ExprType = OpenedArchetypeType::getAny(ExprType->getCanonicalType());
 
     if (!IsSelfRefExpr && !IsSuperRefExpr && ExprType->getAnyNominal() &&
         ExprType->getAnyNominal()->isActor()) {
