@@ -773,7 +773,7 @@ public:
 
   /// Verify that all operands of this instruction have compatible ownership
   /// with this instruction.
-  void verifyOperandOwnership() const;
+  void verifyOperandOwnership(SILModuleConventions *silConv = nullptr) const;
 
   /// Verify that this instruction and its associated debug information follow
   /// all SIL debug info invariants.

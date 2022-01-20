@@ -2690,7 +2690,7 @@ private:
     // sync. We don't care if an instruction is used in global_addr.
     if (F)
       TheInst->verifyDebugInfo();
-    TheInst->verifyOperandOwnership();
+    TheInst->verifyOperandOwnership(&C.silConv);
 #endif
   }
 
