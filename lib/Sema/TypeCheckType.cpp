@@ -2677,7 +2677,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       diagnoseInvalid(repr, attrs.getLoc(TAK_opened), diag::opened_non_protocol,
                       ty);
     } else {
-      ty = OpenedArchetypeType::get(ty, attrs.OpenedID);
+      ty = OpenedArchetypeType::get(ty->getCanonicalType(), attrs.OpenedID);
     }
     attrs.clearAttribute(TAK_opened);
   }
