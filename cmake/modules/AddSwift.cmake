@@ -118,13 +118,19 @@ function(_add_host_variant_c_compile_link_flags name)
     set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
   endif()
 
-  # MSVC, clang-cl, gcc don't understand -target.
-  if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+  # MSVC and gcc don't understand -target.
+  # clang-cl understands --target.
+  if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
-    target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+    if("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC") # clang-cl options
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
+    else()
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+    endif()
   endif()
 
   if (CMAKE_Swift_COMPILER)

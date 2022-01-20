@@ -1246,8 +1246,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
   // Don't inline the function, so it stays as a signal to the ARC passes.
   // The ARC passes will remove references to the function when they're
   // no longer needed.
-  fixLifetime->addAttribute(llvm::AttributeList::FunctionIndex,
-                            llvm::Attribute::NoInline);
+  fixLifetime->addFnAttr(llvm::Attribute::NoInline);
 
   // Give the function an empty body.
   auto entry = llvm::BasicBlock::Create(getLLVMContext(), "", fixLifetime);
@@ -1967,8 +1966,7 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
                                          object->getName() + ".Type");
   metadata->setCallingConv(llvm::CallingConv::C);
   metadata->setDoesNotThrow();
-  metadata->addAttribute(llvm::AttributeList::FunctionIndex,
-                         llvm::Attribute::ReadOnly);
+  metadata->addFnAttr(llvm::Attribute::ReadOnly);
   return metadata;
 }
 

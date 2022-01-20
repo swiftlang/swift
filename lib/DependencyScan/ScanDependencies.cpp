@@ -808,8 +808,8 @@ generateFullDependencyGraph(CompilerInstance &instance,
                                         module.first,
                                         {module.second, currentImportPathSet});
     if (!moduleDepsQuery) {
-      std::string err = "Module Dependency Cache missing module" + module.first;
-      llvm::report_fatal_error(err);
+      llvm::report_fatal_error(Twine("Module Dependency Cache missing module") +
+                               module.first);
     }
 
     auto moduleDeps = *moduleDepsQuery;

@@ -3649,10 +3649,8 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
                                      /*varargs*/ false);
   }
 
-  auto attrs = llvm::AttributeList::get(getLLVMContext(),
-                                       llvm::AttributeList::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
-
+  auto attrs = llvm::AttributeList().addFnAttribute(getLLVMContext(),
+                                                    llvm::Attribute::NoUnwind);
   return Signature(fnType, attrs, SwiftCC);
 }
 

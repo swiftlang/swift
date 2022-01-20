@@ -86,13 +86,13 @@
         "wasm": {
             "aliases": ["wasm", "swiftwasm"],
             "repos": {
-                "llvm-project": "stable/20210726",
+                "llvm-project": "stable/20211026",
                 "swift": "swiftwasm",
                 "cmark": "main",
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "0.4.3",
+                "swift-argument-parser": "1.0.1",
                 "swift-crypto": "1.1.5",
                 "swift-driver": "main",
                 "swift-syntax": "main",
@@ -113,9 +113,9 @@
             }
         },
        "main": {
-            "aliases": ["swift/main", "main", "stable/20210726"],
+            "aliases": ["swift/main", "main", "stable/20211026"],
             "repos": {
-                "llvm-project": "stable/20210726",
+                "llvm-project": "stable/20211026",
                 "swift": "main",
                 "cmark": "main",
                 "llbuild": "main",
@@ -155,7 +155,7 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/20211026"],
+            "aliases": ["rebranch"],
             "repos": {
                 "llvm-project": "stable/20211026",
                 "swift": "rebranch",

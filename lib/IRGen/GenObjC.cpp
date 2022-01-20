@@ -721,8 +721,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   // Merge initial attributes with attrs.
   llvm::AttrBuilder b;
   IGM.constructInitialFnAttributes(b);
-  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
-  
+  fwd->addFnAttrs(b);
+
   IRGenFunction subIGF(IGM, fwd);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
