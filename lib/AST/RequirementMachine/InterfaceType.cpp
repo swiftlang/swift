@@ -211,10 +211,10 @@ AssociatedTypeDecl *RewriteContext::getAssociatedTypeForSymbol(Symbol symbol) {
 /// If the root type is specified, we wrap it in a series of
 /// DependentMemberTypes. Otherwise, the root is computed from
 /// the first symbol of the range.
-template<typename Iter>
-Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
-                           TypeArrayView<GenericTypeParamType> genericParams,
-                           const PropertyMap &map) {
+static Type
+getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      const PropertyMap &map) {
   auto &ctx = map.getRewriteContext();
   Type result = root;
 

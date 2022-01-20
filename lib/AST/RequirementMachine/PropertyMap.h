@@ -212,6 +212,8 @@ public:
 
   ~PropertyMap();
 
+  PropertyBag *lookUpProperties(std::reverse_iterator<const Symbol *> begin,
+                                std::reverse_iterator<const Symbol *> end) const;
   PropertyBag *lookUpProperties(const MutableTerm &key) const;
 
   std::pair<CompletionResult, unsigned>

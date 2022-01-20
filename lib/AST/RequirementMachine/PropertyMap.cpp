@@ -235,15 +235,24 @@ PropertyMap::~PropertyMap() {
   clear();
 }
 
+/// Look for a property bag corresponding to a suffix of the given range.
+///
+/// Returns nullptr if no information is known about this key.
+PropertyBag *
+PropertyMap::lookUpProperties(std::reverse_iterator<const Symbol *> begin,
+                              std::reverse_iterator<const Symbol *> end) const {
+  if (auto result = Trie.find(begin, end))
+    return *result;
+
+  return nullptr;
+}
+
 /// Look for a property bag corresponding to a suffix of the given key.
 ///
 /// Returns nullptr if no information is known about this key.
 PropertyBag *
 PropertyMap::lookUpProperties(const MutableTerm &key) const {
-  if (auto result = Trie.find(key.rbegin(), key.rend()))
-    return *result;
-
-  return nullptr;
+  return lookUpProperties(key.rbegin(), key.rend());
 }
 
 /// Look for a property bag corresponding to the given key, creating a new
