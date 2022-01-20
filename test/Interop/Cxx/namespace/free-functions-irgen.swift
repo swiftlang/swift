@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-ir -I %S/Inputs -enable-cxx-interop %s | %FileCheck %s
+// REQUIRSE: SR15759
 
 import FreeFunctions
 
