@@ -7,8 +7,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// XFAIL: OS=windows-msvc
-
 struct Boom: Error {}
 struct IgnoredBoom: Error {}
 
