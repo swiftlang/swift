@@ -656,10 +656,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       llvm::errs() << "\n";
       PD->printContext(llvm::errs());
       llvm::errs() << "Generic signature: ";
-      sig->print(llvm::errs());
+      PrintOptions Opts;
+      Opts.ProtocolQualifiedDependentMemberTypes = true;
+      sig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
       llvm::errs() << "Canonical generic signature: ";
-      sig.getCanonicalSignature()->print(llvm::errs());
+      sig.getCanonicalSignature()->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
     return sig;
@@ -817,10 +819,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       GC->printContext(llvm::errs());
     }
     llvm::errs() << "Generic signature: ";
-    sig->print(llvm::errs());
+    PrintOptions Opts;
+    Opts.ProtocolQualifiedDependentMemberTypes = true;
+    sig->print(llvm::errs(), Opts);
     llvm::errs() << "\n";
     llvm::errs() << "Canonical generic signature: ";
-    sig.getCanonicalSignature()->print(llvm::errs());
+    sig.getCanonicalSignature()->print(llvm::errs(), Opts);
     llvm::errs() << "\n";
   }
 

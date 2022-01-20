@@ -110,7 +110,7 @@ protocol P7 {
 }
 
 // CHECK: superclassConformance4
-// CHECK: Generic signature: <T, U where T : P3, U : P3, T.T : C, T.T == U.T>
+// CHECK: Generic signature: <T, U where T : P3, U : P3, T.[P3]T : C, T.[P3]T == U.[P3]T>
 func superclassConformance4<T: P3, U: P3>(_: T, _: U)
   where T.T: C, // expected-note{{superclass constraint 'U.T' : 'C' implied here}}
         U.T: C, // expected-warning{{redundant superclass constraint 'U.T' : 'C'}}
@@ -159,8 +159,8 @@ protocol P10 {
 }
 
 // CHECK: superclass_constraint.(file).testP10
-// CHECK: Generic signature: <T where T : P10, T.A : C10>
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0.A : C10>
+// CHECK: Generic signature: <T where T : P10, T.[P10]A : C10>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0.[P10]A : C10>
 func testP10<T>(_: T) where T: P10, T.A: C10 { }
 
 // Nested types of generic class-constrained type parameters.
@@ -184,7 +184,7 @@ protocol X {
 }
 
 // CHECK-DAG: .noRedundancyWarning@
-// CHECK: Generic signature: <C where C : X, C.Y == B>
+// CHECK: Generic signature: <C where C : X, C.[X]Y == B>
 func noRedundancyWarning<C : X>(_ wrapper: C) where C.Y == B {}
 
 // Qualified lookup bug -- <https://bugs.swift.org/browse/SR-2190>
