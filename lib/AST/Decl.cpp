@@ -8792,16 +8792,16 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   // Without this distinction, a nominal can have non-async initializers
   // with various kinds of isolation, so an impossible constraint can be
   // created. See SE-0327 for details.
-  if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
-    if (auto *var =
-          init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
+  if (auto *var = dc->getNonLocalVarDecl()) {
 
-      if (var->isInstanceMember() &&
-          !var->getAttrs().hasAttribute<LazyAttr>())
-        return ActorIsolation::forUnspecified();
-
-      return getActorIsolation(var);
+    // Isolation officially changes, as described above, in Swift 6+
+    if (dc->getASTContext().isSwiftVersionAtLeast(6) &&
+        var->isInstanceMember() &&
+        !var->getAttrs().hasAttribute<LazyAttr>()) {
+      return ActorIsolation::forUnspecified();
     }
+
+     return getActorIsolation(var);
   }
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
