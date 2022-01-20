@@ -271,7 +271,7 @@ GlobalActorAttributeRequest::evaluate(
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     // Subscripts and properties are fine...
     if (auto var = dyn_cast<VarDecl>(storage)) {
-      if (var->getDeclContext()->isLocalContext()) {
+      if (var->getDeclContext()->isLocalContext() && !var->isTopLevelGlobal()) {
         var->diagnose(diag::global_actor_on_local_variable, var->getName())
             .highlight(globalActorAttr->getRangeWithAt());
         return None;

@@ -74,3 +74,38 @@ b += 1
 // CHECK: [[PE_INT_FUNC:%[0-9]+]] = function_ref @$sSi2peoiyySiz_SitFZ
 // CHECK: [[INCREMENTED:%[0-9]+]] = apply [[PE_INT_FUNC]]([[BACCESS]], {{%[0-9]+}}, {{%[0-9]+}})
 // CHECK: end_access [[BACCESS]]
+
+
+// CHECK: bb1:
+if #available(SwiftStdlib 5.1, *) {
+    await print(a)
+
+    // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
+    // CHECK: [[OLDACTOR:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
+    // CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
+    // CHECK: [[AGLOBAL:%[0-9]+]] = load [trivial] [[AACCESS]] : $*Int
+    // CHECK: end_access [[AACCESS]]
+    // CHECK: hop_to_executor [[OLDACTOR]]
+    // CHECK: end_borrow [[ACTORREF]]
+
+    await incrementA()
+
+    // CHECK: [[INCREMENTA:%[0-9]+]] = function_ref @$s24toplevel_globalactorvars10incrementAyyF
+    // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
+    // CHECK: [[OLDACTOR:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
+    // CHECK: {{%[0-9]+}} = apply [[INCREMENTA]]()
+    // CHECK: hop_to_executor [[OLDACTOR]]
+    // CHECK: end_borrow [[ACTORREF]]
+
+
+    b += 1
+
+    // CHECK-NOT: hop_to_executor
+    // CHECK: [[BACCESS:%[0-9]+]] = begin_access [modify] [dynamic] [[BGLOBAL_ADDR]]
+    // static Int.+= infix(_:_:)
+    // CHECK: [[PE_INT_FUNC:%[0-9]+]] = function_ref @$sSi2peoiyySiz_SitFZ
+    // CHECK: [[INCREMENTED:%[0-9]+]] = apply [[PE_INT_FUNC]]([[BACCESS]], {{%[0-9]+}}, {{%[0-9]+}})
+    // CHECK: end_access [[BACCESS]]
+}
