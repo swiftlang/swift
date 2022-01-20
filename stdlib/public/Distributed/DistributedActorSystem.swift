@@ -188,6 +188,9 @@ extension DistributedActorSystem {
       }
 
       substitutionsBuffer = .allocate(capacity: subs.count)
+      defer {
+        substitutionsBuffer?.deallocate()
+      }
 
       for (offset, substitution) in subs.enumerated() {
         let element = substitutionsBuffer?.advanced(by: offset)
