@@ -5087,6 +5087,7 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   }
 
   // Perform the call.
+  // TODO: in general this produces RValues...
   RValue result = emission.apply(requiresDowncast ? SGFContext() : C);
 
   // If we need a downcast, do it down.
