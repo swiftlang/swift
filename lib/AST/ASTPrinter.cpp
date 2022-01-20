@@ -6053,6 +6053,11 @@ public:
   void visitDependentMemberType(DependentMemberType *T) {
     visitParentType(T->getBase());
     if (auto *const Assoc = T->getAssocType()) {
+      if (Options.ProtocolQualifiedDependentMemberTypes) {
+        Printer << "[";
+        Printer.printName(Assoc->getProtocol()->getName());
+        Printer << "]";
+      }
       Printer.printTypeRef(T, Assoc, T->getName());
     } else {
       Printer.printName(T->getName());

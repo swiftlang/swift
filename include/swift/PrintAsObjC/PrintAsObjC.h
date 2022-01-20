@@ -26,6 +26,11 @@ namespace swift {
   ///
   /// Returns true on error.
   bool printAsObjC(raw_ostream &out, ModuleDecl *M, StringRef bridgingHeader);
+
+  /// Print the C++-compatible declarations in a module as a Clang header.
+  ///
+  /// Returns true on error.
+  bool printAsCXX(raw_ostream &os, ModuleDecl *M);
 }
 
 #endif

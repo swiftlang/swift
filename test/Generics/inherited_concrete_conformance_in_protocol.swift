@@ -7,7 +7,7 @@ protocol Collection : Sequence {}
 struct MyCollection : Collection {}
 
 // CHECK-LABEL: inherited_concrete_conformance_in_protocol.(file).P@
-// CHECK-LABEL: Requirement signature: <Self where Self.T == MyCollection>
+// CHECK-LABEL: Requirement signature: <Self where Self.[P]T == MyCollection>
 
 protocol P {
   associatedtype T : Collection where T == MyCollection
