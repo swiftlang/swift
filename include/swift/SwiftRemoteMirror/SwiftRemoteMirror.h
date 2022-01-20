@@ -47,6 +47,8 @@ extern unsigned long long swift_reflection_classIsSwiftMask;
 /// 2 - swift_reflection_iterateAsyncTaskAllocations has been replaced by
 ///     swift_reflection_asyncTaskSlabPointer and
 ///     swift_reflection_asyncTaskSlabAllocations.
+/// 3 - The async task slab size calculation is fixed to account for alignment,
+///     no longer short by 8 bytes.
 SWIFT_REMOTE_MIRROR_LINKAGE extern uint32_t swift_reflection_libraryVersion;
 
 /// Get the metadata version supported by the Remote Mirror library.
