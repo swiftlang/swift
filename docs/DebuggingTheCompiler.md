@@ -931,7 +931,7 @@ standalone driver must be built as a separate build product using the
 *just-built* Swift compiler and toolchain (the ones built in the same
 `build-script` invocation, preceding the SwiftDriver build product). The
 additional build product is added to the build by specifying the
-`--swift-driver` option of the `build-script`. The driver product is istalled
+`--swift-driver` option of the `build-script`. The driver product is installed
 into the resulting toolchain installation by specifying the
 `--install-swift-driver` option of the `build-script`.
 

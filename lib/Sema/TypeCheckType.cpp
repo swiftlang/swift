@@ -295,7 +295,8 @@ static Type getIdentityOpaqueTypeArchetypeType(
   if (outerGenericSignature)
     subs = outerGenericSignature->getIdentitySubstitutionMap();
 
-  return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+  Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
+  return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
 
 Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
@@ -2127,7 +2128,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
             subs = outerGenericSignature->getIdentitySubstitutionMap();
 
           return OpaqueTypeArchetypeType::get(
-                            opaqueDecl, gpDecl->getIndex(), subs);
+              opaqueDecl, gpDecl->getDeclaredInterfaceType(), subs);
         }
       }
 
@@ -2274,7 +2275,13 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
           Optional<MetatypeRepresentation> storedRepr;
           // The instance type is not a SIL type.
           auto instanceOptions = options;
-          instanceOptions.setContext(None);
+          TypeResolverContext context = TypeResolverContext::None;
+          if (isa<MetatypeTypeRepr>(repr)) {
+            context = TypeResolverContext::MetatypeBase;
+          } else if (isa<ProtocolTypeRepr>(repr)) {
+            context = TypeResolverContext::ProtocolMetatypeBase;
+          }
+          instanceOptions.setContext(context);
           instanceOptions -= TypeResolutionFlags::SILType;
 
           auto instanceTy = resolveType(base, instanceOptions);
@@ -2670,7 +2677,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       diagnoseInvalid(repr, attrs.getLoc(TAK_opened), diag::opened_non_protocol,
                       ty);
     } else {
-      ty = OpenedArchetypeType::get(ty, attrs.OpenedID);
+      ty = OpenedArchetypeType::get(ty->getCanonicalType(), attrs.OpenedID);
     }
     attrs.clearAttribute(TAK_opened);
   }
@@ -3166,7 +3173,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
 
   ProtocolConformanceRef witnessMethodConformance;
   if (witnessMethodProtocol) {
-    auto resolved = resolveType(witnessMethodProtocol, options);
+    auto resolved = resolveType(witnessMethodProtocol,
+        options.withContext(TypeResolverContext::GenericRequirement));
     if (resolved->hasError())
       return resolved;
 
@@ -3442,11 +3450,7 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     return ErrorType::get(getASTContext());
   }
 
-  // FIXME: Don't use ExistentialType for AnyObject for now.
-  bool isConstraintType = (result->is<ProtocolType>() &&
-                           !result->isAnyObject());
-  if (isConstraintType &&
-      getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+  if (result->isConstraintType() &&
       options.isConstraintImplicitExistential()) {
     return ExistentialType::get(result);
   }
@@ -3807,7 +3811,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       continue;
     }
 
-    if (ty->isExistentialType()) {
+    if (ty->isConstraintType()) {
       auto layout = ty->getExistentialLayout();
       if (auto superclass = layout.explicitSuperclass)
         if (checkSuperclass(tyR->getStartLoc(), superclass))
@@ -3835,10 +3839,8 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   auto composition =
       ProtocolCompositionType::get(getASTContext(), Members,
                                    /*HasExplicitAnyObject=*/false);
-  if (getASTContext().LangOpts.EnableExplicitExistentialTypes &&
-      options.isConstraintImplicitExistential() &&
-      !composition->isAny()) {
-    composition = ExistentialType::get(composition);
+  if (options.isConstraintImplicitExistential()) {
+    return ExistentialType::get(composition);
   }
   return composition;
 }
@@ -3856,14 +3858,6 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
   if (!constraintType->isExistentialType()) {
     diagnose(repr->getLoc(), diag::any_not_existential,
              constraintType->isTypeParameter(),
-             constraintType)
-      .fixItRemove({anyStart, anyEnd});
-    return constraintType;
-  }
-
-  // Warn about `any Any` and `any AnyObject`.
-  if (constraintType->isAny() || constraintType->isAnyObject()) {
-    diagnose(repr->getLoc(), diag::unnecessary_any,
              constraintType)
       .fixItRemove({anyStart, anyEnd});
     return constraintType;
@@ -4085,7 +4079,8 @@ public:
       if (proto->existentialRequiresAny()) {
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
-                           proto->getName());
+                           proto->getName())
+            .limitBehavior(DiagnosticBehavior::Warning);
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
@@ -4101,7 +4096,8 @@ public:
 
             Ctx.Diags.diagnose(comp->getNameLoc(),
                                diag::existential_requires_any,
-                               protoDecl->getName());
+                               protoDecl->getName())
+                .limitBehavior(DiagnosticBehavior::Warning);
           }
         }
         return false;

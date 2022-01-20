@@ -1379,6 +1379,8 @@ namespace {
         baseIsInstance = false;
         isExistentialMetatype = baseMeta->is<ExistentialMetatypeType>();
         baseTy = baseMeta->getInstanceType();
+        if (auto existential = baseTy->getAs<ExistentialType>())
+          baseTy = existential->getConstraintType();
 
         // A valid reference to a static member (computed property or a method)
         // declared on a protocol is only possible if result type conforms to
@@ -5346,10 +5348,8 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType) {
 
   while (fromInstanceType->is<AnyMetatypeType>() &&
          toInstanceType->is<MetatypeType>()) {
-    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()
-      ->getInstanceType();
-    toInstanceType = toInstanceType->castTo<MetatypeType>()
-      ->getInstanceType();
+    fromInstanceType = fromInstanceType->getMetatypeInstanceType();
+    toInstanceType = toInstanceType->getMetatypeInstanceType();
   }
 
   if (fromInstanceType->is<ArchetypeType>()) {
@@ -5370,7 +5370,8 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType) {
   if (fromInstanceType->isExistentialType()) {
     // Coercion from superclass-constrained existential to its
     // concrete superclass.
-    auto fromArchetype = OpenedArchetypeType::getAny(fromType);
+    auto fromArchetype = OpenedArchetypeType::getAny(
+        fromType->getCanonicalType());
 
     auto *archetypeVal = cs.cacheType(new (ctx) OpaqueValueExpr(
         expr->getSourceRange(), fromArchetype));
@@ -5422,7 +5423,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType) {
          toInstanceType->is<ExistentialMetatypeType>()) {
     if (!fromInstanceType->is<UnresolvedType>())
       fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
-    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getInstanceType();
+    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getExistentialInstanceType();
   }
 
   ASTContext &ctx = cs.getASTContext();
@@ -5433,7 +5434,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType) {
 
   // For existential-to-existential coercions, open the source existential.
   if (fromType->isAnyExistentialType()) {
-    fromType = OpenedArchetypeType::getAny(fromType);
+    fromType = OpenedArchetypeType::getAny(fromType->getCanonicalType());
 
     auto *archetypeVal = cs.cacheType(
         new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromType));
@@ -6749,7 +6750,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
     if (!cast<ArchetypeType>(desugaredFromType)->requiresClass())
@@ -7071,7 +7071,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::DynamicSelf:
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
   case TypeKind::GenericTypeParam:
@@ -7511,7 +7510,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           openedInstanceTy = metaTy->getInstanceType();
           existentialInstanceTy = existentialInstanceTy
             ->castTo<ExistentialMetatypeType>()
-            ->getInstanceType();
+            ->getExistentialInstanceType();
         }
         assert(openedInstanceTy->castTo<OpenedArchetypeType>()
                    ->getOpenedExistentialType()
@@ -8035,7 +8034,6 @@ namespace {
         // Note that in this mode `ClosuresToTypeCheck` acts
         // as a stack because multi-statement closures could
         // have other multi-statement closures in the body.
-        auto &ctx = closure->getASTContext();
         if (cs.participatesInInference(closure)) {
           hadError |= cs.applySolutionToBody(
               solution, closure, Rewriter.dc,
@@ -8419,6 +8417,30 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
     resultTarget.setExpr(wrapAsyncLetInitializer(
         cs, resultTarget.getAsExpr(), resultTarget.getDeclContext()));
   }
+
+  // If this property has an opaque result type, set the underlying type
+  // substitutions based on the initializer.
+  if (auto var = resultTarget.getInitializationPattern()->getSingleVar()) {
+    SubstitutionMap substitutions;
+    if (auto opaque = var->getOpaqueResultTypeDecl()) {
+      resultTarget.getAsExpr()->forEachChildExpr([&](Expr *expr) -> Expr * {
+        if (auto coercionExpr = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
+          auto newSubstitutions =
+              coercionExpr->substitutions.mapReplacementTypesOutOfContext();
+          if (substitutions.empty()) {
+            substitutions = newSubstitutions;
+          } else {
+            assert(substitutions.getCanonical() ==
+                       newSubstitutions.getCanonical());
+          }
+        }
+        return expr;
+      });
+
+      opaque->setUnderlyingTypeSubstitutions(substitutions);
+    }
+  }
+
 
   return resultTarget;
 }

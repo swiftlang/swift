@@ -699,6 +699,11 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
     out << "- " << rule << "\n";
   }
   out << "}\n";
+  out << "Relations: {\n";
+  for (const auto &relation : Relations) {
+    out << "- " << relation.first << " =>> " << relation.second << "\n";
+  }
+  out << "}\n";
   out << "Rewrite loops: {\n";
   for (const auto &loop : Loops) {
     if (loop.isDeleted())

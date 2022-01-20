@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -c -O -enable-copy-propagation=true -enable-lexical-lifetimes=true -sil-verify-all -Xllvm -sil-print-final-ossa-module %s | %FileCheck %s
 
+// REQUIRES: rdar87255563
+
 // =============================================================================
 // = DECLARATIONS                                                             {{
 // =============================================================================

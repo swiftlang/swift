@@ -14,11 +14,13 @@ func optionalMethodGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
-  // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
+  // CHECK:   [[TLIFETIME:%[^,]+]] = begin_borrow [lexical] [[TBOX]]
+  // CHECK:   [[PT:%[0-9]+]] = project_box [[TLIFETIME]]
   // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed (Int) -> ()> }
-  // CHECK:   project_box [[OPT_BOX]]
+  // CHECK:   [[OPT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OPT_BOX]]
+  // CHECK:   project_box [[OPT_LIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
   // CHECK:   alloc_stack $Optional<@callee_guaranteed (Int) -> ()>
@@ -32,11 +34,13 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
-  // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
+  // CHECK:   [[TLIFETIME:%[^,]+]] = begin_borrow [lexical] [[TBOX]]
+  // CHECK:   [[PT:%[0-9]+]] = project_box [[TLIFETIME]]
   // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
-  // CHECK:   project_box [[OPT_BOX]]
+  // CHECK:   [[OPT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OPT_BOX]]
+  // CHECK:   project_box [[OPT_LIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
   // CHECK:   alloc_stack $Optional<Int>
@@ -50,11 +54,13 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
-  // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
+  // CHECK:   [[TLIFETIME:%[^,]+]] = begin_borrow [lexical] [[TBOX]]
+  // CHECK:   [[PT:%[0-9]+]] = project_box [[TLIFETIME]]
   // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
-  // CHECK:   project_box [[OPT_BOX]]
+  // CHECK:   [[OPT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OPT_BOX]]
+  // CHECK:   project_box [[OPT_LIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
   // CHECK:   [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 5

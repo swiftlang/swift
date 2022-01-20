@@ -454,6 +454,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalMoveOnly |=
     Args.hasArg(OPT_enable_experimental_move_only);
 
+  Opts.EnableExperimentalPairwiseBuildBlock |=
+    Args.hasArg(OPT_enable_experimental_pairwise_build_block);
+
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
@@ -853,20 +856,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableSubstSILFunctionTypes =
       Args.hasArg(OPT_disable_subst_sil_function_types);
-
-  if (auto A = Args.getLastArg(OPT_requirement_machine_EQ)) {
-    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
-        .Case("off", RequirementMachineMode::Disabled)
-        .Case("on", RequirementMachineMode::Enabled)
-        .Case("verify", RequirementMachineMode::Verify)
-        .Default(None);
-
-    if (value)
-      Opts.EnableRequirementMachine = *value;
-    else
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-  }
 
   if (auto A = Args.getLastArg(OPT_requirement_machine_protocol_signatures_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())

@@ -1037,8 +1037,7 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
   if (auto *DRE = loc.getAsASTNode<DeclRefExpr>())
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
       if (!isa<ParamDecl>(VD) && VD->isImplicit() &&
-          (VD->getType()->is<ProtocolType>() ||
-           VD->getType()->is<ProtocolCompositionType>()) &&
+          VD->getType()->isExistentialType() &&
           VD->getType()->getExistentialLayout().isErrorExistential()) {
         DbgVar = SILDebugVariable(VD->isLet(), 0);
         loc = SILLocation(VD);
@@ -1851,7 +1850,8 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   auto &existentialTL = SGF.getTypeLowering(E->getType());
   auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
 
-  auto archetype = OpenedArchetypeType::getAny(E->getType());
+  auto archetype = OpenedArchetypeType::getAny(
+      E->getType()->getCanonicalType());
   AbstractionPattern abstractionPattern(archetype);
   auto &concreteTL = SGF.getTypeLowering(abstractionPattern,
                                          concreteFormalType);

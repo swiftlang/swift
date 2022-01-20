@@ -197,27 +197,13 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
   llvm_unreachable("invalid file kind");
 }
 
-static const Decl* getGroupDecl(const Decl *D) {
-  auto GroupD = D;
-
-  // Extensions always exist in the same group with the nominal.
-  if (auto ED = dyn_cast_or_null<ExtensionDecl>(D->getDeclContext()->
-                                                getInnermostTypeContext())) {
-    if (auto ExtNominal = ED->getExtendedNominal())
-      GroupD = ExtNominal;
-  }
-  return GroupD;
-}
-
 Optional<StringRef> Decl::getGroupName() const {
   if (hasClangNode())
     return None;
-  if (auto GroupD = getGroupDecl(this)) {
+  if (auto *Unit =
+          dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
-    if (auto *Unit =
-        dyn_cast<FileUnit>(GroupD->getDeclContext()->getModuleScopeContext())) {
-      return Unit->getGroupNameForDecl(GroupD);
-    }
+    return Unit->getGroupNameForDecl(this);
   }
   return None;
 }
@@ -225,12 +211,10 @@ Optional<StringRef> Decl::getGroupName() const {
 Optional<StringRef> Decl::getSourceFileName() const {
   if (hasClangNode())
     return None;
-  if (auto GroupD = getGroupDecl(this)) {
+  if (auto *Unit =
+          dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
-    if (auto *Unit =
-        dyn_cast<FileUnit>(GroupD->getDeclContext()->getModuleScopeContext())) {
-      return Unit->getSourceFileNameForDecl(GroupD);
-    }
+    return Unit->getSourceFileNameForDecl(this);
   }
   return None;
 }
@@ -238,9 +222,9 @@ Optional<StringRef> Decl::getSourceFileName() const {
 Optional<unsigned> Decl::getSourceOrder() const {
   if (hasClangNode())
     return None;
-  // We can only get source orders from deserialized module files.
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    // We can only get source orders from deserialized module files.
     return Unit->getSourceOrderForDecl(this);
   }
   return None;

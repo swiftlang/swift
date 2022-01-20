@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../SwiftShims/GlobalObjects.h"
-#include "../SwiftShims/Random.h"
+#include "SwiftShims/GlobalObjects.h"
+#include "SwiftShims/Random.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"

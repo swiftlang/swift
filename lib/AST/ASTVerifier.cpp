@@ -618,13 +618,7 @@ public:
           }
 
           // Get the archetype's generic signature.
-          GenericEnvironment *archetypeEnv;
-          if (auto seq = dyn_cast<SequenceArchetypeType>(root)) {
-            archetypeEnv = seq->getGenericEnvironment();
-          } else {
-            auto rootPrimary = cast<PrimaryArchetypeType>(root);
-            archetypeEnv = rootPrimary->getGenericEnvironment();
-          }
+          GenericEnvironment *archetypeEnv = root->getGenericEnvironment();
           auto archetypeSig = archetypeEnv->getGenericSignature();
 
           auto genericCtx = Generics.back();
@@ -657,24 +651,6 @@ public:
             Out << "Contextual type: " << contextType.getString() << "\n";
 
             return true;
-          }
-
-          // Make sure that none of the nested types are dependent.
-          for (const auto &nested : archetype->getKnownNestedTypes()) {
-            if (!nested.second)
-              continue;
-            
-            if (auto nestedType = nested.second) {
-              if (nestedType->hasTypeParameter()) {
-                Out << "Nested type " << nested.first.str()
-                    << " of archetype " << archetype->getString()
-                    << " is dependent type " << nestedType->getString()
-                    << "\n";
-                return true;
-              }
-            }
-
-            verifyChecked(nested.second, visitedArchetypes);
           }
         }
 
@@ -2067,7 +2043,10 @@ public:
         abort();
       }
 
-      checkSameType(E->getBase()->getType(), metatype->getInstanceType(),
+      auto instance = metatype->getInstanceType();
+      if (auto existential = metatype->getAs<ExistentialMetatypeType>())
+        instance = existential->getExistentialInstanceType();
+      checkSameType(E->getBase()->getType(), instance,
                     "base type of .Type expression");
       verifyCheckedBase(E);
     }
@@ -3422,11 +3401,12 @@ public:
     }
 
     Type checkExceptionTypeExists(const char *where) {
-      auto exn = Ctx.getErrorDecl();
-      if (exn) return exn->getDeclaredInterfaceType();
+      if (!Ctx.getErrorDecl()) {
+        Out << "exception type does not exist in " << where << "\n";
+        abort();
+      }
 
-      Out << "exception type does not exist in " << where << "\n";
-      abort();
+      return Ctx.getErrorExistentialType();
     }
 
     bool isGoodSourceRange(SourceRange SR) {

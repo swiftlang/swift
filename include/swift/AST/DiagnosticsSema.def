@@ -1108,7 +1108,7 @@ WARNING(conditional_downcast_same_type,none,
         "bridging conversion; did you mean to use 'as'?}2",
         (Type, Type, unsigned))
 WARNING(is_expr_same_type,none,
-        "checking a value with optional type %0 against dynamic type %1 "
+        "checking a value with optional type %0 against type %1 "
         "succeeds whenever the value is non-nil; did you mean to use "
         "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
@@ -2441,8 +2441,8 @@ ERROR(protocol_composition_one_class,none,
       "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
-      "type %0 constrained to non-protocol, non-class type %1",
-      (Type, Type))
+      "type %0 constrained to non-protocol, non-class type '%1'",
+      (Type, StringRef))
 NOTE(requires_conformance_nonprotocol_fixit,none,
      "use '%0 == %1' to require '%0' to be '%1'",
      (StringRef, StringRef))
@@ -4648,8 +4648,6 @@ ERROR(unchecked_not_inheritance_clause,none,
 ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
-WARNING(unnecessary_any,none,
-         "'any' is redundant on type %0", (Type))
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))

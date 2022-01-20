@@ -95,8 +95,8 @@ func r21544303() {
   inSubcall = false
 
   // This is a problem, but isn't clear what was intended.
-  var somethingElse = true {
-  }  // expected-error {{computed property must have accessors specified}}
+  var somethingElse = true { // expected-error {{unexpected '{' in declaration}}
+  }  
   inSubcall = false
 
   var v2 : Bool = false

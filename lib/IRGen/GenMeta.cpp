@@ -5023,10 +5023,8 @@ namespace {
         auto candidate = IGF.IGM.getAddrOfTypeMetadata(type);
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
                                            {request.get(IGF), candidate});
-        call->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::NoUnwind);
-        call->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::ReadNone);
+        call->addFnAttr(llvm::Attribute::NoUnwind);
+        call->addFnAttr(llvm::Attribute::ReadNone);
 
         return MetadataResponse::handle(IGF, request, call);
       });
@@ -5340,8 +5338,10 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Actor:
-  case KnownProtocolKind::DistributedActorSystem:
   case KnownProtocolKind::DistributedActor:
+  case KnownProtocolKind::DistributedActorSystem:
+  case KnownProtocolKind::DistributedTargetInvocationEncoder:
+  case KnownProtocolKind::DistributedTargetInvocationDecoder:
   case KnownProtocolKind::ActorIdentity:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:

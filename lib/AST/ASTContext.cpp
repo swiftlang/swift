@@ -17,7 +17,6 @@
 #include "swift/AST/ASTContext.h"
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
-#include "GenericSignatureBuilder.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -72,16 +71,8 @@
 using namespace swift;
 
 #define DEBUG_TYPE "ASTContext"
-STATISTIC(NumRegisteredGenericSignatureBuilders,
-          "# of generic signature builders successfully registered");
-STATISTIC(NumRegisteredGenericSignatureBuildersAlready,
-          "# of generic signature builders already registered");
 STATISTIC(NumCollapsedSpecializedProtocolConformances,
           "# of specialized protocol conformances collapsed");
-
-/// Define this to 1 to enable expensive assertions of the
-/// GenericSignatureBuilder.
-#define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
 
 void ModuleLoader::anchor() {}
 void ClangModuleLoader::anchor() {}
@@ -389,6 +380,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::FoldingSet<PackType> PackTypes;
+    llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    MetatypeType*> MetatypeTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
@@ -471,18 +463,13 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
-  llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
-  llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
+  llvm::DenseMap<UUID, GenericEnvironment *> OpenedExistentialEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
 
   llvm::FoldingSet<GenericSignatureImpl> GenericSignatures;
-
-  /// Stored generic signature builders for canonical generic signatures.
-  llvm::DenseMap<GenericSignature, std::unique_ptr<GenericSignatureBuilder>>
-    GenericSignatureBuilders;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -860,9 +847,9 @@ Type ASTContext::get##NAME##Type() const { \
 }
 #include "swift/AST/KnownStdlibTypes.def"
 
-CanType ASTContext::getExceptionType() const {
+CanType ASTContext::getErrorExistentialType() const {
   if (auto exn = getErrorDecl()) {
-    return exn->getDeclaredInterfaceType()->getCanonicalType();
+    return exn->getExistentialType()->getCanonicalType();
   } else {
     // Use Builtin.NativeObject just as a stand-in.
     return TheNativeObjectType;
@@ -1938,111 +1925,6 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   getImpl().LoadedModules[M->getRealName()] = M;
 }
 
-void ASTContext::registerGenericSignatureBuilder(
-                                       GenericSignature sig,
-                                       GenericSignatureBuilder &&builder) {
-  if (LangOpts.EnableRequirementMachine == RequirementMachineMode::Enabled)
-    return;
-
-  auto canSig = sig.getCanonicalSignature();
-  auto &genericSignatureBuilders = getImpl().GenericSignatureBuilders;
-  auto known = genericSignatureBuilders.find(canSig);
-  if (known != genericSignatureBuilders.end()) {
-    ++NumRegisteredGenericSignatureBuildersAlready;
-    return;
-  }
-
-  ++NumRegisteredGenericSignatureBuilders;
-  genericSignatureBuilders[canSig] =
-    std::make_unique<GenericSignatureBuilder>(std::move(builder));
-}
-
-GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
-                                                      CanGenericSignature sig) {
-  // We should only create GenericSignatureBuilders if the requirement machine
-  // mode is ::Disabled or ::Verify.
-  assert(LangOpts.EnableRequirementMachine != RequirementMachineMode::Enabled &&
-         "Shouldn't create GenericSignatureBuilder when RequirementMachine "
-         "is enabled");
-
-  // Check whether we already have a generic signature builder for this
-  // signature and module.
-  auto &genericSignatureBuilders = getImpl().GenericSignatureBuilders;
-  auto known = genericSignatureBuilders.find(sig);
-  if (known != genericSignatureBuilders.end())
-    return known->second.get();
-
-  // Create a new generic signature builder with the given signature.
-  auto builder = new GenericSignatureBuilder(*this);
-
-  // Store this generic signature builder (no generic environment yet).
-  genericSignatureBuilders[sig] =
-    std::unique_ptr<GenericSignatureBuilder>(builder);
-
-  builder->addGenericSignature(sig);
-
-#if SWIFT_GSB_EXPENSIVE_ASSERTIONS
-  auto builderSig =
-    builder->computeGenericSignature(/*allowConcreteGenericParams=*/true);
-  if (builderSig.getCanonicalSignature() != sig) {
-    llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
-    llvm::errs() << "Original generic signature   : ";
-    sig->print(llvm::errs());
-    llvm::errs() << "\nReprocessed generic signature: ";
-    auto reprocessedSig = builderSig.getCanonicalSignature();
-
-    reprocessedSig->print(llvm::errs());
-    llvm::errs() << "\n";
-
-    if (sig.getGenericParams().size() ==
-          reprocessedSig.getGenericParams().size() &&
-        sig.getRequirements().size() ==
-          reprocessedSig.getRequirements().size()) {
-      for (unsigned i : indices(sig.getRequirements())) {
-        auto sigReq = sig.getRequirements()[i];
-        auto reprocessedReq = reprocessedSig.getRequirements()[i];
-        if (sigReq.getKind() != reprocessedReq.getKind()) {
-          llvm::errs() << "Requirement mismatch:\n";
-          llvm::errs() << "  Original: ";
-          sigReq.print(llvm::errs(), PrintOptions());
-          llvm::errs() << "\n  Reprocessed: ";
-          reprocessedReq.print(llvm::errs(), PrintOptions());
-          llvm::errs() << "\n";
-          break;
-        }
-
-        if (!sigReq.getFirstType()->isEqual(reprocessedReq.getFirstType())) {
-          llvm::errs() << "First type mismatch, original is:\n";
-          sigReq.getFirstType().dump(llvm::errs());
-          llvm::errs() << "Reprocessed:\n";
-          reprocessedReq.getFirstType().dump(llvm::errs());
-          llvm::errs() << "\n";
-          break;
-        }
-
-        if (sigReq.getKind() == RequirementKind::SameType &&
-            !sigReq.getSecondType()->isEqual(reprocessedReq.getSecondType())) {
-          llvm::errs() << "Second type mismatch, original is:\n";
-          sigReq.getSecondType().dump(llvm::errs());
-          llvm::errs() << "Reprocessed:\n";
-          reprocessedReq.getSecondType().dump(llvm::errs());
-          llvm::errs() << "\n";
-          break;
-        }
-      }
-    }
-
-    llvm_unreachable("idempotency problem with a generic signature");
-  }
-#else
-  // FIXME: This should be handled lazily in the future, and therefore not
-  // required.
-  builder->processDelayedRequirements();
-#endif
-
-  return builder;
-}
-
 rewriting::RewriteContext &
 ASTContext::getRewriteContext() {
   auto &rewriteCtx = getImpl().TheRewriteContext;
@@ -2374,7 +2256,7 @@ ASTContext::getSelfConformance(ProtocolDecl *protocol) {
   auto &entry = selfConformances[protocol];
   if (!entry) {
     entry = new (*this, AllocationArena::Permanent)
-      SelfProtocolConformance(protocol->getDeclaredInterfaceType());
+      SelfProtocolConformance(protocol->getExistentialType());
   }
   return entry;
 }
@@ -2616,7 +2498,7 @@ size_t ASTContext::getTotalMemory() const {
     // getImpl().BuiltinVectorTypes ?
     // getImpl().GenericSignatures ?
     // getImpl().CompoundNames ?
-    getImpl().OpenedExistentialArchetypes.getMemorySize() +
+    getImpl().OpenedExistentialEnvironments.getMemorySize() +
     getImpl().Permanent.getTotalMemory();
 
     Size += getSolverMemory();
@@ -2960,20 +2842,25 @@ Type TupleTypeElt::getType() const {
 PackExpansionType *PackExpansionType::get(Type patternTy) {
   assert(patternTy && "Missing pattern type in expansion");
 
+  auto properties = patternTy->getRecursiveProperties();
+  auto arena = getArena(properties);
+
   auto &context = patternTy->getASTContext();
   llvm::FoldingSetNodeID id;
   PackExpansionType::Profile(id, patternTy);
 
   void *insertPos;
   if (PackExpansionType *expType =
-          context.getImpl().PackExpansionTypes.FindNodeOrInsertPos(id,
-                                                                   insertPos))
+          context.getImpl()
+              .getArena(arena)
+              .PackExpansionTypes.FindNodeOrInsertPos(id, insertPos))
     return expType;
 
   const ASTContext *canCtx = patternTy->isCanonical() ? &context : nullptr;
   PackExpansionType *expansionTy = new (context, AllocationArena::Permanent)
       PackExpansionType(patternTy, canCtx);
-  context.getImpl().PackExpansionTypes.InsertNode(expansionTy, insertPos);
+  context.getImpl().getArena(arena).PackExpansionTypes.InsertNode(expansionTy,
+                                                                  insertPos);
   return expansionTy;
 }
 
@@ -3432,6 +3319,11 @@ MetatypeType::MetatypeType(Type T, const ASTContext *C,
 ExistentialMetatypeType *
 ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
                              const ASTContext &ctx) {
+  // If we're creating an existential metatype from an
+  // existential type, wrap the constraint type direcly.
+  if (auto existential = T->getAs<ExistentialType>())
+    T = existential->getConstraintType();
+
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -3462,6 +3354,10 @@ ExistentialMetatypeType::ExistentialMetatypeType(Type T,
     assert(getASTContext().LangOpts.EnableObjCInterop ||
            *repr != MetatypeRepresentation::ObjC);
   }
+}
+
+Type ExistentialMetatypeType::getExistentialInstanceType() {
+  return ExistentialType::get(getInstanceType());
 }
 
 ModuleType *ModuleType::get(ModuleDecl *M) {
@@ -4216,11 +4112,22 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
                            RecursiveTypeProperties properties)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
 
-ExistentialType *ExistentialType::get(Type constraint) {
+Type ExistentialType::get(Type constraint) {
+  auto &C = constraint->getASTContext();
+  if (!C.LangOpts.EnableExplicitExistentialTypes)
+    return constraint;
+
+  // FIXME: Any and AnyObject don't yet use ExistentialType.
+  if (constraint->isAny() || constraint->isAnyObject())
+    return constraint;
+
+  // ExistentialMetatypeType is already an existential type.
+  if (constraint->is<ExistentialMetatypeType>())
+    return constraint;
+
   auto properties = constraint->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  auto &C = constraint->getASTContext();
   auto &entry = C.getImpl().getArena(arena).ExistentialTypes[constraint];
   if (entry)
     return entry;
@@ -4337,7 +4244,7 @@ OpaqueTypeArchetypeType *OpaqueTypeArchetypeType::getNew(
 }
 
 Type OpaqueTypeArchetypeType::get(
-    OpaqueTypeDecl *Decl, unsigned ordinal, SubstitutionMap Substitutions) {
+    OpaqueTypeDecl *Decl, Type interfaceType, SubstitutionMap Substitutions) {
   // TODO: We could attempt to preserve type sugar in the substitution map.
   // Currently archetypes are assumed to be always canonical in many places,
   // though, so doing so would require fixing those places.
@@ -4358,21 +4265,57 @@ Type OpaqueTypeArchetypeType::get(
     environments[{Decl, Substitutions}] = env;
   }
 
-  auto opaqueParamType = Decl->getOpaqueGenericParams()[ordinal];
-  return env->getOrCreateArchetypeFromInterfaceType(opaqueParamType);
+  return env->getOrCreateArchetypeFromInterfaceType(interfaceType);
 }
 
-CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
+CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
+    GenericEnvironment *environment, Type interfaceType,
+    ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+    LayoutConstraint layout) {
+  auto arena = AllocationArena::Permanent;
+  ASTContext &ctx = interfaceType->getASTContext();
+  void *mem = ctx.Allocate(
+    OpenedArchetypeType::totalSizeToAlloc<ProtocolDecl *,Type,LayoutConstraint>(
+      conformsTo.size(),
+      superclass ? 1 : 0,
+      layout ? 1 : 0),
+      alignof(OpenedArchetypeType), arena);
+
+  return CanOpenedArchetypeType(::new (mem) OpenedArchetypeType(
+      environment, interfaceType, conformsTo, superclass, layout));
+}
+
+CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::get(
+    CanType existential, Optional<UUID> knownID) {
+  Type interfaceType = GenericTypeParamType::get(
+      /*isTypeSequence=*/false, 0, 0, existential->getASTContext());
+  return get(existential, interfaceType, knownID);
+}
+
+CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
+                                                Type interfaceType,
                                                 Optional<UUID> knownID) {
+  // FIXME: Opened archetypes can't be transformed because the
+  // the identity of the archetype has to be preserved. This
+  // means that simplifying an opened archetype in the constraint
+  // system to replace type variables with fixed types is not
+  // yet supported. For now, assert that an opened archetype never
+  // contains type variables to catch cases where type variables
+  // would be applied to the type-checked AST.
+  assert(!existential->hasTypeVariable() &&
+         "opened existentials containing type variables cannot be simplified");
+
   auto &ctx = existential->getASTContext();
-  auto &openedExistentialArchetypes = ctx.getImpl().OpenedExistentialArchetypes;
+  auto &openedExistentialEnvironments =
+      ctx.getImpl().OpenedExistentialEnvironments;
   // If we know the ID already...
   if (knownID) {
     // ... and we already have an archetype for that ID, return it.
-    auto found = openedExistentialArchetypes.find(*knownID);
+    auto found = openedExistentialEnvironments.find(*knownID);
     
-    if (found != openedExistentialArchetypes.end()) {
-      auto result = found->second;
+    if (found != openedExistentialEnvironments.end()) {
+      auto result = found->second->mapTypeIntoContext(interfaceType)
+          ->castTo<OpenedArchetypeType>();
       assert(result->getOpenedExistentialType()->isEqual(existential) &&
              "Retrieved the wrong opened existential type?");
       return CanOpenedArchetypeType(result);
@@ -4382,58 +4325,33 @@ CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
     knownID = UUID::fromTime();
   }
 
-  auto layout = existential->getExistentialLayout();
+  /// Create a generic environment for this opened archetype.
+  auto genericEnv = GenericEnvironment::forOpenedExistential(
+      existential, *knownID);
+  openedExistentialEnvironments[*knownID] = genericEnv;
 
-  SmallVector<ProtocolDecl *, 2> protos;
-  for (auto proto : layout.getProtocols())
-    protos.push_back(proto->getDecl());
-
-  auto layoutConstraint = layout.getLayoutConstraint();
-  if (!layoutConstraint && layout.requiresClass()) {
-    layoutConstraint = LayoutConstraint::getLayoutConstraint(
-        LayoutConstraintKind::Class);
-  }
-
-  auto layoutSuperclass = layout.getSuperclass();
-
-  auto arena = AllocationArena::Permanent;
-  void *mem = ctx.Allocate(
-    OpenedArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
-      protos.size(),
-      layoutSuperclass ? 1 : 0,
-      layoutConstraint ? 1 : 0),
-      alignof(OpenedArchetypeType), arena);
-
-  auto result =
-      ::new (mem) OpenedArchetypeType(ctx, existential,
-                                protos, layoutSuperclass,
-                                layoutConstraint, *knownID);
-  result->InterfaceType =
-      GenericTypeParamType::get(/*type sequence*/ false,
-                                /*depth*/ 0, /*index*/ 0, ctx);
-
-  openedExistentialArchetypes[*knownID] = result;
+  // Map the interface type into that environment.
+  auto result = genericEnv->mapTypeIntoContext(interfaceType)
+      ->castTo<OpenedArchetypeType>();
   return CanOpenedArchetypeType(result);
 }
 
-GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
-  if (Environment)
-    return Environment;
-  
-  auto thisType = const_cast<OpenedArchetypeType*>(this);
-  auto &ctx = thisType->getASTContext();
-  // Create a generic environment to represent the opened type.
-  auto signature = ctx.getOpenedArchetypeSignature(Opened);
-  return GenericEnvironment::forOpenedExistential(signature, thisType);
-}
 
-CanType OpenedArchetypeType::getAny(Type existential) {
+CanType OpenedArchetypeType::getAny(CanType existential, Type interfaceType) {
   if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
-    auto instanceTy = metatypeTy->getInstanceType();
-    return CanMetatypeType::get(OpenedArchetypeType::getAny(instanceTy));
+    auto instanceTy =
+        metatypeTy->getExistentialInstanceType()->getCanonicalType();
+    return CanMetatypeType::get(
+        OpenedArchetypeType::getAny(instanceTy, interfaceType));
   }
   assert(existential->isExistentialType());
-  return OpenedArchetypeType::get(existential);
+  return OpenedArchetypeType::get(existential, interfaceType);
+}
+
+CanType OpenedArchetypeType::getAny(CanType existential) {
+  Type interfaceType = GenericTypeParamType::get(
+      /*isTypeSequence=*/false, 0, 0, existential->getASTContext());
+  return getAny(existential, interfaceType);
 }
 
 void SubstitutionMap::Storage::Profile(
@@ -4580,27 +4498,26 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap, Type>(
-      0, 0, numGenericParams);
+  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap,
+                                  OpenedGenericEnvironmentData, Type>(
+      0, 0, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  return new (mem) GenericEnvironment(signature, Kind::Normal);
+  return new (mem) GenericEnvironment(signature);
 }
 
 /// Create a new generic environment for an opened archetype.
 GenericEnvironment *GenericEnvironment::forOpenedExistential(
-    GenericSignature signature, const OpenedArchetypeType *type) {
-  auto &ctx = signature->getASTContext();
+    Type existential, UUID uuid) {
+  auto &ctx = existential->getASTContext();
+  auto signature = ctx.getOpenedArchetypeSignature(existential);
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap, Type>(
-      0, 0, numGenericParams);
+  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap,
+                                  OpenedGenericEnvironmentData, Type>(
+      0, 0, 1, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
-  auto env = new (mem) GenericEnvironment(signature, Kind::OpenedExistential);
-  env->addMapping(
-      signature.getGenericParams().front(),
-      Type(const_cast<OpenedArchetypeType *>(type)));
-  return env;
+  return new (mem) GenericEnvironment(signature, existential, uuid);
 }
 
 /// Create a new generic environment for an opaque type with the given set of
@@ -4612,8 +4529,9 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
   // Allocate and construct the new environment.
   auto signature = opaque->getOpaqueInterfaceGenericSignature();
   unsigned numGenericParams = signature.getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap, Type>(
-      1, 1, numGenericParams);
+  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap,
+                                  OpenedGenericEnvironmentData, Type>(
+      1, 1, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment), arena);
   auto env = new (mem) GenericEnvironment(signature, opaque, subs);
   return env;
@@ -4978,7 +4896,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (auto nsErrorTy = getNSErrorType()) {
       // The corresponding value type is Error.
       if (bridgedValueType)
-        *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
+        *bridgedValueType = getErrorExistentialType();
 
       return nsErrorTy;
     }
@@ -5015,7 +4933,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   if (findConformance(KnownProtocolKind::Error)) {
     // The corresponding value type is Error.
     if (bridgedValueType)
-      *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
+      *bridgedValueType = getErrorExistentialType();
 
     // Bridge to NSError.
     if (auto nsErrorTy = getNSErrorType())
@@ -5103,16 +5021,18 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
 // constraints while existential values do.
 CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
   assert(type->isExistentialType());
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
 
-  const CanType existential = type->getCanonicalType();
+  const CanType constraint = type->getCanonicalType();
 
   // The opened archetype signature for a protocol type is identical
   // to the protocol's own canonical generic signature.
-  if (const auto protoTy = dyn_cast<ProtocolType>(existential)) {
+  if (const auto protoTy = dyn_cast<ProtocolType>(constraint)) {
     return protoTy->getDecl()->getGenericSignature().getCanonicalSignature();
   }
 
-  auto found = getImpl().ExistentialSignatures.find(existential);
+  auto found = getImpl().ExistentialSignatures.find(constraint);
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
@@ -5120,7 +5040,7 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
       GenericTypeParamType::get(/*type sequence*/ false,
                                 /*depth*/ 0, /*index*/ 0, *this);
   Requirement requirement(RequirementKind::Conformance, genericParam,
-                          existential);
+                          constraint);
   auto genericSig = buildGenericSignature(*this,
                                           GenericSignature(),
                                           {genericParam},
@@ -5129,7 +5049,7 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
   CanGenericSignature canGenericSig(genericSig);
 
   auto result = getImpl().ExistentialSignatures.insert(
-    std::make_pair(existential, canGenericSig));
+    std::make_pair(constraint, canGenericSig));
   assert(result.second);
   (void) result;
 

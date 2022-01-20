@@ -7,6 +7,8 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  AssumeSingleThreaded.swift
   SILPrinter.swift
   MergeCondFails.swift
+  ReleaseDevirtualizer.swift
 )

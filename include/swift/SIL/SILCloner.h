@@ -250,7 +250,9 @@ public:
 
   void remapOpenedType(CanOpenedArchetypeType archetypeTy) {
     auto existentialTy = archetypeTy->getOpenedExistentialType()->getCanonicalType();
-    auto replacementTy = OpenedArchetypeType::get(getOpASTType(existentialTy));
+    auto replacementTy = OpenedArchetypeType::get(
+        getOpASTType(existentialTy),
+        archetypeTy->getInterfaceType());
     registerOpenedExistentialRemapping(archetypeTy, replacementTy);
   }
 
@@ -2220,7 +2222,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
   auto openedType = Inst->getType().getASTType();
   auto exType = Inst->getOperand()->getType().getASTType();
   while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
-    exType = exMetatype.getInstanceType();
+    exType = exMetatype->getExistentialInstanceType()->getCanonicalType();
     openedType = cast<MetatypeType>(openedType).getInstanceType();
   }
   remapOpenedType(cast<OpenedArchetypeType>(openedType));

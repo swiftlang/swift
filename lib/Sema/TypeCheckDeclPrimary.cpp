@@ -1477,7 +1477,7 @@ static StringRef prettyPrintAttrs(const ValueDecl *VD,
   llvm::raw_svector_ostream os(out);
   StreamPrinter printer(os);
 
-  PrintOptions opts = PrintOptions::printEverything();
+  PrintOptions opts = PrintOptions::printDeclarations();
   VD->getAttrs().print(printer, opts, attrs, VD);
   return StringRef(out.begin(), out.size()).drop_back();
 }
@@ -1769,10 +1769,15 @@ public:
                               "@_implementationOnly ");
         }
 
-        static bool treatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
 #ifndef NDEBUG
-        treatAsError = true;
+        static bool enableTreatAsError = true;
+#else
+        static bool enableTreatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
 #endif
+
+        bool isImportOfUnderlying = importer->getName() == target->getName();
+        bool treatAsError = enableTreatAsError &&
+                            !isImportOfUnderlying;
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
@@ -2624,14 +2629,16 @@ public:
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Requirement signature: ";
-      requirementsSig->print(llvm::errs());
+      PrintOptions Opts;
+      Opts.ProtocolQualifiedDependentMemberTypes = true;
+      requirementsSig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
 
       llvm::errs() << "Canonical requirement signature: ";
       auto canRequirementSig =
         CanGenericSignature::getCanonical(requirementsSig.getGenericParams(),
                                           requirementsSig.getRequirements());
-      canRequirementSig->print(llvm::errs());
+      canRequirementSig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
 

@@ -118,6 +118,7 @@ public:
     EmitSyntax,        ///< Parse and dump Syntax tree as JSON
     DumpAST,           ///< Parse, type-check, and dump AST
     PrintAST,          ///< Parse, type-check, and pretty-print AST
+    PrintASTDecl,      ///< Parse, type-check, and pretty-print AST declarations
 
     /// Parse and dump scope map.
     DumpScopeMaps,
@@ -449,7 +450,7 @@ public:
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
-  static bool canActionEmitObjCHeader(ActionType);
+  static bool canActionEmitClangHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);

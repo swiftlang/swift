@@ -5480,19 +5480,21 @@ public:
   Expected<Type> deserializePrimaryArchetypeType(ArrayRef<uint64_t> scratch,
                                                  StringRef blobData) {
     GenericSignatureID sigID;
-    unsigned depth, index;
+    TypeID interfaceTypeID;
 
     decls_block::PrimaryArchetypeTypeLayout::readRecord(scratch, sigID,
-                                                        depth, index);
+                                                        interfaceTypeID);
 
-    auto sig = MF.getGenericSignature(sigID);
-    if (!sig)
-      MF.fatal();
+    auto sigOrError = MF.getGenericSignatureChecked(sigID);
+    if (!sigOrError)
+      return sigOrError.takeError();
 
-    Type interfaceType =
-        GenericTypeParamType::get(/*type sequence*/ false, depth, index, ctx);
-    Type contextType = sig.getGenericEnvironment()
-        ->mapTypeIntoContext(interfaceType);
+    auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTypeOrError)
+      return interfaceTypeOrError.takeError();
+
+    Type contextType = sigOrError.get().getGenericEnvironment()
+        ->mapTypeIntoContext(interfaceTypeOrError.get());
 
     if (contextType->hasError())
       MF.fatal();
@@ -5503,58 +5505,54 @@ public:
   Expected<Type> deserializeOpenedArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     TypeID existentialID;
+    TypeID interfaceID;
 
     decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
-                                                       existentialID);
+                                                       existentialID,
+                                                       interfaceID);
 
-    return OpenedArchetypeType::get(MF.getType(existentialID));
+    return OpenedArchetypeType::get(MF.getType(existentialID)->getCanonicalType(),
+                                    MF.getType(interfaceID));
   }
       
   Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     DeclID opaqueDeclID;
-    unsigned ordinal;
+    TypeID interfaceTypeID;
     SubstitutionMapID subsID;
     decls_block::OpaqueArchetypeTypeLayout::readRecord(
-        scratch, opaqueDeclID, ordinal, subsID);
+        scratch, opaqueDeclID, interfaceTypeID, subsID);
 
     auto opaqueTypeOrError = MF.getDeclChecked(opaqueDeclID);
     if (!opaqueTypeOrError)
       return opaqueTypeOrError.takeError();
+
+    auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTypeOrError)
+      return interfaceTypeOrError.takeError();
 
     auto opaqueDecl = cast<OpaqueTypeDecl>(opaqueTypeOrError.get());
     auto subsOrError = MF.getSubstitutionMapChecked(subsID);
     if (!subsOrError)
       return subsOrError.takeError();
 
-    return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subsOrError.get());
+    return OpaqueTypeArchetypeType::get(
+        opaqueDecl, interfaceTypeOrError.get(), subsOrError.get());
   }
       
-  Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
-                                                StringRef blobData) {
-    TypeID rootID, interfaceTyID;
-    decls_block::NestedArchetypeTypeLayout::readRecord(scratch,
-                                                       rootID, interfaceTyID);
-    
-    auto rootTy = MF.getType(rootID)->castTo<ArchetypeType>();
-    auto interfaceTy = MF.getType(interfaceTyID)->castTo<DependentMemberType>();
-    return rootTy->getGenericEnvironment()->mapTypeIntoContext(interfaceTy);
-  }
-
   Expected<Type> deserializeSequenceArchetypeType(ArrayRef<uint64_t> scratch,
                                                   StringRef blobData) {
     GenericSignatureID sigID;
-    unsigned depth, index;
+    TypeID interfaceTypeID;
 
-    decls_block::SequenceArchetypeTypeLayout::readRecord(scratch, sigID, depth,
-                                                         index);
+    decls_block::SequenceArchetypeTypeLayout::readRecord(scratch, sigID,
+                                                         interfaceTypeID);
 
     auto sig = MF.getGenericSignature(sigID);
     if (!sig)
       MF.fatal();
 
-    Type interfaceType =
-        GenericTypeParamType::get(/*type sequence*/ true, depth, index, ctx);
+    Type interfaceType = MF.getType(interfaceTypeID);
     Type contextType =
         sig.getGenericEnvironment()->mapTypeIntoContext(interfaceType);
 
@@ -6113,10 +6111,10 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(PrimaryArchetype)
   CASE(OpaqueArchetype)
   CASE(OpenedArchetype)
-  CASE(NestedArchetype)
   CASE(SequenceArchetype)
   CASE(GenericTypeParam)
   CASE(ProtocolComposition)
+  CASE(Existential)
   CASE(DependentMember)
   CASE(BoundGeneric)
   CASE(SILBlockStorage)

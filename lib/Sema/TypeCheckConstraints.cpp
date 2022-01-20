@@ -538,29 +538,6 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
-  // Bind a property with an opaque return type to the underlying type
-  // given by the initializer.
-  if (auto var = pattern->getSingleVar()) {
-    SubstitutionMap substitutions;
-    if (auto opaque = var->getOpaqueResultTypeDecl()) {
-      init->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (auto coercionExpr = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
-          auto newSubstitutions =
-              coercionExpr->substitutions.mapReplacementTypesOutOfContext();
-          if (substitutions.empty()) {
-            substitutions = newSubstitutions;
-          } else {
-            assert(substitutions.getCanonical() ==
-                       newSubstitutions.getCanonical());
-          }
-        }
-        return expr;
-      });
-
-      opaque->setUnderlyingTypeSubstitutions(substitutions);
-    }
-  }
-
   if (hadError)
     PBD->setInvalid();
 
@@ -1735,13 +1712,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //   }
     // }
     //
+    auto constraint = fromType;
+    if (auto existential = constraint->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
     if (auto *protocolDecl =
-          dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())) {
+          dyn_cast_or_null<ProtocolDecl>(constraint->getAnyNominal())) {
       if (!couldDynamicallyConformToProtocol(toType, protocolDecl, module)) {
         return failed();
       }
     } else if (auto protocolComposition =
-                   fromType->getAs<ProtocolCompositionType>()) {
+                   constraint->getAs<ProtocolCompositionType>()) {
       if (llvm::any_of(protocolComposition->getMembers(),
                        [&](Type protocolType) {
                          if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
@@ -1994,6 +1974,12 @@ static bool checkForDynamicAttribute(CanType ty,
       if (hasAttribute(superclass))
         return true;
     }
+  }
+
+  // If this is an existential type, check if its constraint type
+  // has the attribute.
+  if (auto existential = ty->getAs<ExistentialType>()) {
+    return hasAttribute(existential->getConstraintType());
   }
 
   // If this is a protocol composition, check if any of its members have the

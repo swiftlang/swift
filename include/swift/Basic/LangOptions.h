@@ -315,7 +315,7 @@ namespace swift {
 
     /// Enable support for explicit existential types via the \c any
     /// keyword.
-    bool EnableExplicitExistentialTypes = false;
+    bool EnableExplicitExistentialTypes = true;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
@@ -334,6 +334,9 @@ namespace swift {
 
     /// Enable experimental 'move only' features.
     bool EnableExperimentalMoveOnly = false;
+
+    /// Enable experimental pairwise `buildBlock` for result builders.
+    bool EnableExperimentalPairwiseBuildBlock = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
@@ -476,10 +479,6 @@ namespace swift {
     };
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
-
-    /// Whether the new experimental generics implementation is enabled.
-    RequirementMachineMode EnableRequirementMachine =
-        RequirementMachineMode::Enabled;
 
     /// Enables merged associated type support, which might go away.
     bool RequirementMachineMergedAssociatedTypes = true;

@@ -4363,6 +4363,11 @@ public:
   /// not exist.
   AssociatedTypeDecl *getAssociatedType(Identifier name) const;
 
+  /// Returns the existential type for this protocol.
+  Type getExistentialType() const {
+    return ExistentialType::get(getDeclaredInterfaceType());
+  }
+
   /// Walk this protocol and all of the protocols inherited by this protocol,
   /// transitively, invoking the callback function for each protocol.
   ///
@@ -5458,7 +5463,16 @@ class ParamDecl : public VarDecl {
   friend class DefaultArgumentInitContextRequest;
   friend class DefaultArgumentExprRequest;
 
-  llvm::PointerIntPair<Identifier, 1, bool> ArgumentNameAndDestructured;
+  enum class ArgumentNameFlags : uint8_t {
+    /// Whether or not this parameter is destructed.
+    Destructured = 1 << 0,
+
+    /// Whether or not this parameter is '_const'.
+    IsCompileTimeConst = 1 << 1,
+  };
+
+  llvm::PointerIntPair<Identifier, 2, OptionSet<ArgumentNameFlags>>
+      ArgumentNameAndFlags;
   SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
@@ -5489,13 +5503,10 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
-
-    /// Whether or not this parameter is '_const'.
-    IsCompileTimeConst = 1 << 3,
   };
 
   /// The default value, if any, along with flags.
-  llvm::PointerIntPair<StoredDefaultArgument *, 4, OptionSet<Flags>>
+  llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
       DefaultValueAndFlags;
 
   friend class ParamSpecifierRequest;
@@ -5513,7 +5524,7 @@ public:
 
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
-    return ArgumentNameAndDestructured.getPointer();
+    return ArgumentNameAndFlags.getPointer();
   }
 
   /// Retrieve the parameter (local) name for this function parameter.
@@ -5533,8 +5544,17 @@ public:
   TypeRepr *getTypeRepr() const { return TyRepr; }
   void setTypeRepr(TypeRepr *repr) { TyRepr = repr; }
 
-  bool isDestructured() const { return ArgumentNameAndDestructured.getInt(); }
-  void setDestructured(bool repr) { ArgumentNameAndDestructured.setInt(repr); }
+  bool isDestructured() const {
+    auto flags = ArgumentNameAndFlags.getInt();
+    return flags.contains(ArgumentNameFlags::Destructured);
+  }
+
+  void setDestructured(bool repr) {
+    auto flags = ArgumentNameAndFlags.getInt();
+    flags = repr ? flags | ArgumentNameFlags::Destructured
+                 : flags - ArgumentNameFlags::Destructured;
+    ArgumentNameAndFlags.setInt(flags);
+  }
 
   DefaultArgumentKind getDefaultArgumentKind() const {
     return static_cast<DefaultArgumentKind>(Bits.ParamDecl.defaultArgumentKind);
@@ -5666,13 +5686,15 @@ public:
 
   /// Whether or not this parameter is marked with '_const'.
   bool isCompileTimeConst() const {
-    return DefaultValueAndFlags.getInt().contains(Flags::IsCompileTimeConst);
+    return ArgumentNameAndFlags.getInt().contains(
+        ArgumentNameFlags::IsCompileTimeConst);
   }
 
   void setCompileTimeConst(bool value = true) {
-    auto flags = DefaultValueAndFlags.getInt();
-    DefaultValueAndFlags.setInt(value ? flags | Flags::IsCompileTimeConst
-                                      : flags - Flags::IsCompileTimeConst);
+    auto flags = ArgumentNameAndFlags.getInt();
+    flags = value ? flags | ArgumentNameFlags::IsCompileTimeConst
+                  : flags - ArgumentNameFlags::IsCompileTimeConst;
+    ArgumentNameAndFlags.setInt(flags);
   }
 
   /// Does this parameter reject temporary pointer conversions?

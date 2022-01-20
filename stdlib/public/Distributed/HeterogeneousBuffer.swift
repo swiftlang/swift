@@ -13,7 +13,9 @@
 import Swift
 
 @available(SwiftStdlib 5.6, *)
-struct HeterogeneousBuffer {
+struct HeterogeneousBuffer: Sequence {
+  typealias Element = UnsafeMutableRawPointer
+
   let types: [Any.Type]
   let buffer: UnsafeMutableRawPointer
 
@@ -45,6 +47,49 @@ struct HeterogeneousBuffer {
     }
 
     return HeterogeneousBuffer(types: types, buffer: buffer)
+  }
+
+  /// Iterator exposing writable unsafe pointers into the appropriate offsets
+  /// of the underlying `buffer`.
+  ///
+  /// Use this to initialize the buffer after allocating it "for types".
+  func makeIterator() -> UnsafeHeterogeneousBufferIterator {
+    UnsafeHeterogeneousBufferIterator(self)
+  }
+  struct UnsafeHeterogeneousBufferIterator: IteratorProtocol {
+    typealias Element = UnsafeMutableRawPointer
+
+    let hbuf: HeterogeneousBuffer
+
+    var i: Int = 0
+    var offset: Int = 0
+
+    init(_ hbuf: HeterogeneousBuffer) {
+      self.hbuf = hbuf
+    }
+
+    mutating func next() -> UnsafeMutableRawPointer? {
+      guard i < hbuf.types.count else {
+        return nil
+      }
+
+      func alignedOffsetAndSize<T>(_: T.Type) -> (offset: Int, size: Int) {
+        return (MemoryLayout<T>.nextAlignedOffset(offset), MemoryLayout<T>.size)
+      }
+
+      // Retrieve aligned offset and element size info
+      let info = _openExistential(hbuf.types[i], do: alignedOffsetAndSize)
+      // Adjust current offset
+      offset = info.offset
+
+      defer {
+        // Advance offset by the size of the current element
+        offset += info.size
+        i += 1
+      }
+
+      return hbuf.buffer.advanced(by: offset)
+    }
   }
 
   func deinitialize() {
@@ -135,37 +180,3 @@ extension HeterogeneousBuffer {
     return offset
   }
 }
-
-//func myCompute(_ i: Int8, _ s: String, _ d: Double) {
-//  print("myCompute: i = \(i), s = \(s), d = \(d)")
-//}
-//
-//func myComputeThunk(buffer: UnsafeMutableRawPointer) {
-//  var offset = 0
-//
-//  offset = MemoryLayout<Int8>.nextAlignedOffset(offset)
-//  let i = buffer.load(fromByteOffset: offset, as: Int8.self)
-//  offset += MemoryLayout<Int>.size
-//
-//  offset = MemoryLayout<String>.nextAlignedOffset(offset)
-//  let s = buffer.load(fromByteOffset: offset, as: String.self)
-//  offset += MemoryLayout<String>.size
-//
-//  offset = MemoryLayout<Double>.nextAlignedOffset(offset)
-//  let d = buffer.load(fromByteOffset: offset, as: Double.self)
-//  offset += MemoryLayout<Double>.size
-//
-//  myCompute(i, s, d)
-//}
-//
-//let values: [Any] = [1 as Int8, "hello", 3.14159]
-//print("Original array of existential values: \(values)")
-//let buffer = HeterogeneousBuffer.allocate(values: values)
-//print("Mapped back into an array of existential values: \(buffer.existentialValues)")
-//myComputeThunk(buffer: buffer.buffer)
-//buffer.deinitialize()
-//buffer.deallocate()
-//
-//// [1, "hello", 3.14159]
-//// [1, "hello", 3.14159]
-//// i = 1, s = hello, d = 3.14159

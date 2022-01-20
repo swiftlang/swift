@@ -908,6 +908,10 @@ private:
   /// to match the original function declaration.
   void printFunctionParameters(AbstractFunctionDecl *AFD);
 
+  void printArgument(const Argument &arg);
+
+  void printStmtCondition(StmtCondition stmt);
+
 #define DECL(Name,Parent) void visit##Name##Decl(Name##Decl *decl);
 #define ABSTRACT_DECL(Name, Parent)
 #define DECL_RANGE(Name,Start,End)
@@ -915,6 +919,11 @@ private:
 
 #define STMT(Name, Parent) void visit##Name##Stmt(Name##Stmt *stmt);
 #include "swift/AST/StmtNodes.def"
+
+#define EXPR(Name,Parent) void visit##Name##Expr(Name##Expr *expr);
+#define ABSTRACT_EXPR(Name, Parent)
+#define DECL_RANGE(Name,Start,End)
+#include "swift/AST/ExprNodes.def"
 
   void printSynthesizedExtension(Type ExtendedType, ExtensionDecl *ExtDecl);
 
@@ -946,6 +955,14 @@ public:
   }
 
   using ASTVisitor::visit;
+
+  bool visit(Expr *E) {
+    if (!Options.PrintExprs) {
+      return false;
+    }
+    ASTVisitor::visit(E);
+    return true;
+  }
 
   bool visit(Decl *D) {
     #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
@@ -1291,7 +1308,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::EnumElement: {
     auto elt = cast<EnumElementPattern>(pattern);
-    // FIXME: Print element expr.
+    Printer << "." << elt->getElementDecl()->getBaseName();
     if (elt->hasSubPattern())
       printPattern(elt->getSubPattern());
     break;
@@ -1307,15 +1324,19 @@ void PrintAST::printPattern(const Pattern *pattern) {
                                                        : tok::kw_false);
     break;
 
-  case PatternKind::Expr:
-    // FIXME: Print expr.
+  case PatternKind::Expr: {
+    auto expr = cast<ExprPattern>(pattern)->getSubExpr();
+    visit(expr);
     break;
+  }
 
-  case PatternKind::Binding:
+  case PatternKind::Binding: {
+    auto bPattern = cast<BindingPattern>(pattern);
     Printer.printIntroducerKeyword(
-        cast<BindingPattern>(pattern)->isLet() ? "let" : "var",
+        bPattern->isLet() ? "let" : "var",
         Options, " ");
-    printPattern(cast<BindingPattern>(pattern)->getSubPattern());
+    printPattern(bPattern->getSubPattern());
+  }
   }
 }
 
@@ -3050,7 +3071,12 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       printPatternType(pattern);
     }
 
-    if (Options.VarInitializers) {
+    if (Options.PrintExprs) {
+      if (auto initExpr = decl->getInit(idx)) {
+        Printer << " = ";
+        visit(initExpr);
+      }
+    } else if (Options.VarInitializers) {
       auto *vd = decl->getAnchoringVarDecl(idx);
       if (decl->hasInitStringRepresentation(idx) &&
           vd->isInitExposedToClients()) {
@@ -3579,8 +3605,7 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
     } else if (auto stmt = element.dyn_cast<Stmt*>()) {
       visit(stmt);
     } else {
-      // FIXME: print expression
-      // visit(element.get<Expr*>());
+      visit(element.get<Expr*>());
     }
   }
   return PrintedSomething;
@@ -4047,6 +4072,473 @@ void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
   Printer << " */";
 }
 
+void PrintAST::visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
+  Printer << expr->getDigitsText();
+}
+
+void PrintAST::visitFloatLiteralExpr(FloatLiteralExpr *expr) {
+  Printer << expr->getDigitsText();
+}
+
+void PrintAST::visitNilLiteralExpr(NilLiteralExpr *expr) {
+  Printer << "nil";
+}
+
+void PrintAST::visitStringLiteralExpr(StringLiteralExpr *expr) {
+  Printer << "\"" << expr->getValue() << "\"";
+}
+
+void PrintAST::visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
+  if (expr->getValue()) {
+    Printer << "true";
+  } else {
+    Printer << "false";
+  }
+}
+
+void PrintAST::visitRegexLiteralExpr(RegexLiteralExpr *expr) {
+  Printer << expr->getRegexText();
+}
+
+void PrintAST::visitErrorExpr(ErrorExpr *expr) {
+  Printer << "<error>";
+}
+
+void PrintAST::visitIfExpr(IfExpr *expr) {
+}
+
+void PrintAST::visitIsExpr(IsExpr *expr) {
+}
+
+void PrintAST::visitTapExpr(TapExpr *expr) {
+}
+
+void PrintAST::visitTryExpr(TryExpr *expr) {
+  Printer << "try ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitCallExpr(CallExpr *expr) {
+  visit(expr->getFn());
+  Printer << "(";
+  auto args = expr->getArgs()->getOriginalArgs();
+  bool isFirst = true;
+  // FIXME: handle trailing closures.
+  for (auto arg : *args) {
+    if (!isFirst) {
+      Printer << ", ";
+    }
+    printArgument(arg);
+    isFirst = false;
+  }
+  Printer << ")";
+}
+
+void PrintAST::printArgument(const Argument &arg) {
+  auto label = arg.getLabel();
+  if (!label.empty()) {
+    Printer << label.str();
+    Printer << ": ";
+  }
+  if (arg.isInOut()) {
+    Printer << "&";
+  }
+  visit(arg.getExpr());
+}
+
+void PrintAST::visitLoadExpr(LoadExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitTypeExpr(TypeExpr *expr) {
+  printType(expr->getType());
+}
+
+void PrintAST::visitArrayExpr(ArrayExpr *expr) {
+  Printer << "[";
+  bool isFirst = true;
+  auto elements = expr->getElements();
+  for (auto element : elements) {
+    if (!isFirst) {
+      Printer << ", ";
+    }
+    visit(element);
+    isFirst = false;
+  }
+  Printer << "]";
+}
+
+void PrintAST::visitDictionaryExpr(DictionaryExpr *expr) {
+  Printer << "[";
+  bool isFirst = true;
+  auto elements = expr->getElements();
+  for (auto element : elements) {
+    auto *tupleExpr = cast<TupleExpr>(element);
+    if (!isFirst) {
+      Printer << ", ";
+    }
+    visit(tupleExpr->getElement(0));
+    Printer << ": ";
+    visit(tupleExpr->getElement(1));
+    isFirst = false;
+  }
+  Printer << "]";
+}
+
+void PrintAST::visitArrowExpr(ArrowExpr *expr) {
+}
+
+void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
+  Printer << "await ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitInOutExpr(InOutExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitParenExpr(ParenExpr *expr) {
+  Printer << "(";
+  visit(expr->getSubExpr());
+  Printer << ")";
+}
+
+void PrintAST::visitTupleExpr(TupleExpr *expr) {
+  Printer << "(";
+  bool isFirst = true;
+  auto elements = expr->getElements();
+  for (auto element : elements) {
+    if (!isFirst) {
+      Printer << ", ";
+    }
+    visit(element);
+    isFirst = false;
+  }
+  Printer << ")";
+}
+
+void PrintAST::visitPackExpr(PackExpr *expr) {
+}
+
+void PrintAST::visitReifyPackExpr(ReifyPackExpr *expr) {
+}
+
+void PrintAST::visitAssignExpr(AssignExpr *expr) {
+  visit(expr->getDest());
+  Printer << " = ";
+  visit(expr->getSrc());
+}
+
+void PrintAST::visitBinaryExpr(BinaryExpr *expr) {
+  visit(expr->getLHS());
+  Printer << " ";
+  if (auto operatorRef = expr->getFn()->getMemberOperatorRef()) {
+    Printer << operatorRef->getDecl()->getBaseName();
+  }
+  Printer << " ";
+  visit(expr->getRHS());
+}
+
+void PrintAST::visitCoerceExpr(CoerceExpr *expr) {
+}
+
+void PrintAST::visitOneWayExpr(OneWayExpr *expr) {
+}
+
+void PrintAST::visitClosureExpr(ClosureExpr *expr) {
+}
+
+void PrintAST::visitDeclRefExpr(DeclRefExpr *expr) {
+  Printer << expr->getDecl()->getBaseName();
+}
+
+void PrintAST::visitDotSelfExpr(DotSelfExpr *expr) {
+  visit(expr->getSubExpr());
+  Printer << ".self";
+}
+
+void PrintAST::visitErasureExpr(ErasureExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitKeyPathExpr(KeyPathExpr *expr) {
+}
+
+void PrintAST::visitForceTryExpr(ForceTryExpr *expr) {
+  Printer << "try! ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitSequenceExpr(SequenceExpr *expr) {
+}
+
+void PrintAST::visitSuperRefExpr(SuperRefExpr *expr) {
+}
+
+void PrintAST::visitMemberRefExpr(MemberRefExpr *expr) {
+  visit(expr->getBase());
+  Printer << ".";
+  Printer << expr->getMember().getDecl()->getName();
+}
+
+void PrintAST::visitSubscriptExpr(SubscriptExpr *expr) {
+}
+
+void PrintAST::visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
+}
+
+void PrintAST::visitForceValueExpr(ForceValueExpr *expr) {
+}
+
+void PrintAST::visitKeyPathDotExpr(KeyPathDotExpr *expr) {
+}
+
+void PrintAST::visitAutoClosureExpr(AutoClosureExpr *expr) {
+  visit(expr->getSingleExpressionBody());
+}
+
+void PrintAST::visitCaptureListExpr(CaptureListExpr *expr) {
+}
+
+void PrintAST::visitDynamicTypeExpr(DynamicTypeExpr *expr) {
+}
+
+void PrintAST::visitOpaqueValueExpr(OpaqueValueExpr *expr) {
+}
+
+void PrintAST::visitOptionalTryExpr(OptionalTryExpr *expr) {
+}
+
+void PrintAST::visitPrefixUnaryExpr(PrefixUnaryExpr *expr) {
+}
+
+void PrintAST::visitBindOptionalExpr(BindOptionalExpr *expr) {
+}
+
+void PrintAST::visitBridgeToObjCExpr(BridgeToObjCExpr *expr) {
+}
+
+void PrintAST::visitObjCSelectorExpr(ObjCSelectorExpr *expr) {
+}
+
+void PrintAST::visitPostfixUnaryExpr(PostfixUnaryExpr *expr) {
+}
+
+void PrintAST::visitTupleElementExpr(TupleElementExpr *expr) {
+}
+
+void PrintAST::visitDerivedToBaseExpr(DerivedToBaseExpr *expr) {
+}
+
+void PrintAST::visitDotSyntaxCallExpr(DotSyntaxCallExpr *expr) {
+  visit(expr->getBase());
+  Printer << ".";
+  visit(expr->getFn());
+}
+
+void PrintAST::visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
+}
+
+void PrintAST::visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
+  visit(expr->getBase());
+  Printer << ".";
+  Printer << expr->getName().getBaseName();
+}
+
+void PrintAST::visitArrayToPointerExpr(ArrayToPointerExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitBridgeFromObjCExpr(BridgeFromObjCExpr *expr) {
+}
+
+void PrintAST::visitCodeCompletionExpr(CodeCompletionExpr *expr) {
+}
+
+void PrintAST::visitInOutToPointerExpr(InOutToPointerExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitLinearFunctionExpr(LinearFunctionExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
+}
+
+void PrintAST::visitLazyInitializerExpr(LazyInitializerExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitOpenExistentialExpr(OpenExistentialExpr *expr) {
+  visit(expr->getExistentialValue());
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitStringToPointerExpr(StringToPointerExpr *expr) {
+}
+
+void PrintAST::visitVarargExpansionExpr(VarargExpansionExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *expr) {
+}
+
+void PrintAST::visitDestructureTupleExpr(DestructureTupleExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
+}
+
+void PrintAST::visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
+}
+
+void PrintAST::visitPointerToPointerExpr(PointerToPointerExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
+}
+
+void PrintAST::visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
+  Printer << "_";
+}
+
+void PrintAST::visitEditorPlaceholderExpr(EditorPlaceholderExpr *expr) {
+}
+
+void PrintAST::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
+  visit(expr->getSubExpr());
+  Printer << " as! ";
+  printType(expr->getCastType());
+}
+
+void PrintAST::visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
+  visit(expr->getSubExpr());
+  Printer << " as? ";
+  printType(expr->getCastType());
+}
+
+void PrintAST::visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
+}
+
+void PrintAST::visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
+}
+
+void PrintAST::visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
+}
+
+void PrintAST::visitAnyHashableErasureExpr(AnyHashableErasureExpr *expr) {
+}
+
+void PrintAST::visitConstructorRefCallExpr(ConstructorRefCallExpr *expr) {
+  if (auto type = expr->getType()) {
+    if (auto *funcType = type->getAs<FunctionType>()) {
+      printType(funcType->getResult());
+    }
+  }
+}
+
+void PrintAST::visitFunctionConversionExpr(FunctionConversionExpr *expr) {
+}
+
+void PrintAST::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitKeyPathApplicationExpr(KeyPathApplicationExpr *expr) {
+}
+
+void PrintAST::visitMetatypeConversionExpr(MetatypeConversionExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitOptionalEvaluationExpr(OptionalEvaluationExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
+}
+
+void PrintAST::visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *expr) {
+}
+
+void PrintAST::visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
+}
+
+void PrintAST::visitForeignObjectConversionExpr(ForeignObjectConversionExpr *expr) {
+}
+
+void PrintAST::visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {
+}
+
+void PrintAST::visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
+}
+
+void PrintAST::visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *expr) {
+}
+
+void PrintAST::visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *expr) {
+}
+
+void PrintAST::visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *expr) {
+}
+
+void PrintAST::visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *expr) {
+}
+
+void PrintAST::visitCovariantReturnConversionExpr(CovariantReturnConversionExpr *expr) {
+}
+
+void PrintAST::visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
+}
+
+void PrintAST::visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *expr) {
+}
+
+void PrintAST::visitCovariantFunctionConversionExpr(CovariantFunctionConversionExpr *expr) {
+}
+
+void PrintAST::visitExistentialMetatypeToObjectExpr(ExistentialMetatypeToObjectExpr *expr) {
+}
+
+void PrintAST::visitUnresolvedMemberChainResultExpr(swift::UnresolvedMemberChainResultExpr *expr) {
+}
+
+void PrintAST::visitLinearFunctionExtractOriginalExpr(swift::LinearFunctionExtractOriginalExpr *expr) {
+}
+
+void PrintAST::visitLinearToDifferentiableFunctionExpr(swift::LinearToDifferentiableFunctionExpr *expr) {
+}
+
+void PrintAST::visitPropertyWrapperValuePlaceholderExpr(swift::PropertyWrapperValuePlaceholderExpr *expr) {
+}
+
+void PrintAST::visitDifferentiableFunctionExtractOriginalExpr(swift::DifferentiableFunctionExtractOriginalExpr *expr) {
+}
+
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   printBraceStmt(stmt);
 }
@@ -4055,7 +4547,7 @@ void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
   Printer << tok::kw_return;
   if (stmt->hasResult()) {
     Printer << " ";
-    // FIXME: print expression.
+    visit(stmt->getResult());
   }
 }
 
@@ -4080,7 +4572,7 @@ void PrintAST::visitYieldStmt(YieldStmt *stmt) {
 
 void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
   Printer << tok::kw_throw << " ";
-  // FIXME: print expression.
+  visit(stmt->getSubExpr());
 }
 
 void PrintAST::visitPoundAssertStmt(PoundAssertStmt *stmt) {
@@ -4095,7 +4587,7 @@ void PrintAST::visitDeferStmt(DeferStmt *stmt) {
 
 void PrintAST::visitIfStmt(IfStmt *stmt) {
   Printer << tok::kw_if << " ";
-  // FIXME: print condition
+  printStmtCondition(stmt->getCond());
   Printer << " ";
   visit(stmt->getThenStmt());
   if (auto elseStmt = stmt->getElseStmt()) {
@@ -4105,23 +4597,39 @@ void PrintAST::visitIfStmt(IfStmt *stmt) {
 }
 void PrintAST::visitGuardStmt(GuardStmt *stmt) {
   Printer << tok::kw_guard << " ";
-  // FIXME: print condition
-  Printer << " ";
+  printStmtCondition(stmt->getCond());
+  Printer << " else ";
   visit(stmt->getBody());
 }
 
 void PrintAST::visitWhileStmt(WhileStmt *stmt) {
   Printer << tok::kw_while << " ";
-  // FIXME: print condition
+  printStmtCondition(stmt->getCond());
   Printer << " ";
   visit(stmt->getBody());
 }
 
 void PrintAST::visitRepeatWhileStmt(RepeatWhileStmt *stmt) {
-  Printer << tok::kw_do << " ";
+  Printer << tok::kw_repeat << " ";
   visit(stmt->getBody());
   Printer << " " << tok::kw_while << " ";
-  // FIXME: print condition
+  visit(stmt->getCond());
+}
+
+void PrintAST::printStmtCondition(StmtCondition stmt) {
+  for (auto elt : stmt) {
+    if (auto pattern = elt.getPatternOrNull()) {
+      printPattern(pattern);
+      auto initializer = elt.getInitializer();
+      if (initializer) {
+        Printer << " = ";
+        visit(initializer);
+      }
+    }
+    else if (auto boolean = elt.getBooleanOrNull()) {
+      visit(boolean);
+    }
+  }
 }
 
 void PrintAST::visitDoStmt(DoStmt *stmt) {
@@ -4160,16 +4668,16 @@ void PrintAST::visitFallthroughStmt(FallthroughStmt *stmt) {
 
 void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   Printer << tok::kw_switch << " ";
-  // FIXME: print subject
-  Printer << "{";
+  visit(stmt->getSubjectExpr());
+  Printer << " {";
   Printer.printNewline();
   for (auto N : stmt->getRawCases()) {
     if (N.is<Stmt*>())
       visit(cast<CaseStmt>(N.get<Stmt*>()));
     else
       visit(cast<IfConfigDecl>(N.get<Decl*>()));
+    Printer.printNewline();
   }
-  Printer.printNewline();
   indent();
   Printer << "}";
 }
@@ -4333,17 +4841,22 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
         return isSimpleUnderPrintOptions(typealias->getSinglyDesugaredType());
     } else if (auto opaque =
                  dyn_cast<OpaqueTypeArchetypeType>(T.getPointer())) {
-      switch (Options.OpaqueReturnTypePrinting) {
-      case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
-      case PrintOptions::OpaqueReturnTypePrintingMode::Description:
-        return true;
-      case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
-        return opaque->getDecl()->hasExplicitGenericParams();
-      case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
-        return opaque->getDecl()->hasExplicitGenericParams() ||
-            isSimpleUnderPrintOptions(opaque->getExistentialType());
+      if (opaque->isRoot()) {
+        switch (Options.OpaqueReturnTypePrinting) {
+        case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
+        case PrintOptions::OpaqueReturnTypePrintingMode::Description:
+          return true;
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+          return opaque->getDecl()->hasExplicitGenericParams();
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword:
+          return opaque->getDecl()->hasExplicitGenericParams() ||
+              isSimpleUnderPrintOptions(opaque->getExistentialType());
+        }
+        llvm_unreachable("bad opaque-return-type printing mode");
       }
-      llvm_unreachable("bad opaque-return-type printing mode");
+    } else if (auto existential = dyn_cast<ExistentialType>(T.getPointer())) {
+      if (!Options.PrintExplicitAny)
+        return isSimpleUnderPrintOptions(existential->getConstraintType());
     }
     return T->hasSimpleTypeRepr();
   }
@@ -4764,9 +5277,7 @@ public:
       }
     }
 
-    auto &ctx = T->getASTContext();
-    if (T->is<ExistentialMetatypeType>() &&
-        ctx.LangOpts.EnableExplicitExistentialTypes)
+    if (T->is<ExistentialMetatypeType>() && Options.PrintExplicitAny)
       Printer << "any ";
 
     printWithParensIfNotSimple(T->getInstanceType());
@@ -4774,7 +5285,7 @@ public:
     // We spell normal metatypes of existential types as .Protocol.
     if (isa<MetatypeType>(T) &&
         T->getInstanceType()->isAnyExistentialType() &&
-        !ctx.LangOpts.EnableExplicitExistentialTypes) {
+        !Options.PrintExplicitAny) {
       Printer << ".Protocol";
     } else {
       Printer << ".Type";
@@ -5367,7 +5878,9 @@ public:
   }
 
   void visitExistentialType(ExistentialType *T) {
-    Printer << "any ";
+    if (Options.PrintExplicitAny)
+      Printer << "any ";
+
     visit(T->getConstraintType());
   }
 
@@ -5382,6 +5895,12 @@ public:
   }
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
+    if (auto parent = T->getParent()) {
+      visitParentType(parent);
+      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      return;
+    }
+
     if (Options.PrintForSIL)
       Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
     visit(T->getOpenedExistentialType());
@@ -5407,20 +5926,34 @@ public:
     }
   }
 
-  void visitNestedArchetypeType(NestedArchetypeType *T) {
-    visitParentType(T->getParent());
-    printArchetypeCommon(T, T->getAssocType());
+  static AbstractTypeParamDecl *getAbstractTypeParamDecl(ArchetypeType *T) {
+    if (auto gp = T->getInterfaceType()->getAs<GenericTypeParamType>()) {
+      return gp->getDecl();
+    }
+
+    auto depMemTy = T->getInterfaceType()->castTo<DependentMemberType>();
+    return depMemTy->getAssocType();
   }
 
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
-    printArchetypeCommon(T, T->getInterfaceType()->getDecl());
+    if (auto parent = T->getParent())
+      visitParentType(parent);
+
+    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
   }
 
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
+    if (auto parent = T->getParent()) {
+      visitParentType(parent);
+      printArchetypeCommon(T, getAbstractTypeParamDecl(T));
+      return;
+    }
+
     // Try to print a named opaque type.
     auto printNamedOpaque = [&] {
-      if (auto genericParam =
-              T->getDecl()->getExplicitGenericParam(T->getOrdinal())) {
+      unsigned ordinal =
+          T->getInterfaceType()->castTo<GenericTypeParamType>()->getIndex();
+      if (auto genericParam = T->getDecl()->getExplicitGenericParam(ordinal)) {
         visit(genericParam->getDeclaredInterfaceType());
         return true;
       }
@@ -5485,7 +6018,9 @@ public:
   }
 
   void visitSequenceArchetypeType(SequenceArchetypeType *T) {
-    printArchetypeCommon(T, T->getInterfaceType()->getDecl());
+    if (auto parent = T->getParent())
+      visitParentType(parent);
+    printArchetypeCommon(T, getAbstractTypeParamDecl(T));
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
@@ -5518,6 +6053,11 @@ public:
   void visitDependentMemberType(DependentMemberType *T) {
     visitParentType(T->getBase());
     if (auto *const Assoc = T->getAssocType()) {
+      if (Options.ProtocolQualifiedDependentMemberTypes) {
+        Printer << "[";
+        Printer.printName(Assoc->getProtocol()->getName());
+        Printer << "]";
+      }
       Printer.printTypeRef(T, Assoc, T->getName());
     } else {
       Printer.printName(T->getName());
