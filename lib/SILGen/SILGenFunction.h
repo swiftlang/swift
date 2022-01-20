@@ -2054,21 +2054,6 @@ public:
                                          ManagedValue actorSelf,
                                          SILBasicBlock *continueBB);
 
-  /// For a distributed actor, emits code to invoke the system's
-  /// resignID function.
-  ///
-  /// Specifically, this code emits SIL that performs the call
-  ///
-  /// \verbatim
-  ///   try self.actorSystem.makeInvocation()
-  /// \endverbatim
-  ///
-  /// using the current builder's state as the injection point.
-  void emitDistributedActorSystemMakeInvocationEncoderCall(
-      SILLocation loc,
-      ClassDecl *actorDecl, ManagedValue actorSelf,
-      SILBasicBlock *normalBB, SILBasicBlock *errorBB);
-
   void emitDistributedActorClassMemberDestruction(
       SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
       SILBasicBlock *normalMemberDestroyBB, SILBasicBlock *finishBB);
