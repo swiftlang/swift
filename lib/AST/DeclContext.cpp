@@ -83,6 +83,16 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
   return nullptr;
 }
 
+VarDecl *DeclContext::getNonLocalVarDecl() const {
+  if (auto *init = dyn_cast<PatternBindingInitializer>(this)) {
+   if (auto *var =
+         init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
+      return var;
+     }
+  }
+  return nullptr;
+}
+
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   assert(getSelfProtocolDecl() && "not a protocol");
 

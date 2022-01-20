@@ -193,7 +193,7 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
 ///
 /// \returns true if there were any errors
 ///
-/// \see swift::printAsCxx
+/// \see swift::printAsCXX
 static bool printAsCxxIfNeeded(StringRef outputPath, ModuleDecl *M) {
   if (outputPath.empty())
     return false;
