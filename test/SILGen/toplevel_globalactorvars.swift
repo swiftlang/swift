@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking -Xllvm -sil-full-demangle -enable-experimental-async-top-level %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-experimental-async-top-level %s | %FileCheck %s
 
 // a
 // CHECK-LABEL: sil_global hidden @$s24toplevel_globalactorvars1aSivp : $Int
@@ -10,8 +10,10 @@
 // CHECK-NEXT: alloc_global @$s24toplevel_globalactorvars1aSivp
 // CHECK-NEXT: [[AREF:%[0-9]+]] = global_addr @$s24toplevel_globalactorvars1aSivp : $*Int
 
+@available(SwiftStdlib 5.1, *)
 actor MyActorImpl {}
 
+@available(SwiftStdlib 5.1, *)
 @globalActor
 struct MyActor {
     static let shared = MyActorImpl()
