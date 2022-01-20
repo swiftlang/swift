@@ -557,7 +557,8 @@ void SILGenFunction::emitDistributedActorClassMemberDestruction(
 static void emitThrowWithCleanupBasicBlock(SILGenFunction &SGF, SILLocation loc,
                                            SILDeclRef thunk,
                                            SILBasicBlock *errorBB,
-                                           SILBasicBlock *throwBB) {
+                                           SILBasicBlock *throwBB,
+                                           ArrayRef<SILValue> endAccesses = {}) {
   if (!errorBB)
     return;
 
@@ -575,6 +576,10 @@ static void emitThrowWithCleanupBasicBlock(SILGenFunction &SGF, SILLocation loc,
   SILValue error = errorBB->createPhiArgument(
       fnConv.getSILErrorType(SGF.getTypeExpansionContext()),
       OwnershipKind::Owned);
+
+  for (const auto &access : endAccesses) {
+    B.createEndAccess(loc, access, /*aborted=*/false);
+  }
 
   SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
 
@@ -836,19 +841,19 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     SILValue makeInvocationEncoderFn =
         B.createFunctionRefFor(loc, makeInvocationEncoderFnSIL);
 
-    SILValue encoderBuf = emitTemporaryAllocation(loc, invocationEncoderTy);
-    ManagedValue encoderTemp = emitManagedBufferWithCleanup(encoderBuf); // FIXME: rename
+    SILValue invocationEncoderBuf = emitTemporaryAllocation(loc, invocationEncoderTy);
+    ManagedValue invocationEncoder = emitManagedBufferWithCleanup(invocationEncoderBuf);
     {
       ApplyInst *invocationValue = B.createApply(
           loc, makeInvocationEncoderFn,
           /*subs=*/SubstitutionMap(),
           /*args=*/{systemRef});
 
-      B.createStore(loc, invocationValue, encoderTemp.getValue(),
+      B.createStore(loc, invocationValue, invocationEncoder.getValue(),
                     StoreOwnershipQualifier::Trivial);
 
 //        invocationValueAccess =
-//            B.createBeginAccess(loc, encoderTemp.getValue(),
+//            B.createBeginAccess(loc, invocationEncoder.getValue(),
 //                                SILAccessKind::Modify,
 //                                SILAccessEnforcement::Static,
 //                                false,
@@ -885,18 +890,19 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
     SILBasicBlock *recordingDoneBB = nullptr;
     SILBasicBlock *recordingDoneErrorBB = nullptr;
+//    SILBasicBlock *recordingDoneError2BB = nullptr;
     if (!firstOfThrowingApplyBBs)
       recordingDoneBB = createBasicBlock();
     firstOfThrowingApplyBBs = false;
     recordingDoneErrorBB = createBasicBlock();
+//    recordingDoneError2BB = createBasicBlock();
     if (!nextNormalBB) {
       nextNormalBB = recordReturnTypeBB;
     }
 
     // === recordGenericSubstitution
-    {
+    if (shouldRecordGenericSubstitutions) {
       // TODO(distributed): record substitutions
-
     }
 
     // === encoder.recordArgument(s)
@@ -965,22 +971,25 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       B.createTryApply(
           loc, recordErrorTyFn,
           /*subs*/errorSubs,
-          /*args*/{ errorMetatypeValue, encoderTemp.getValue() },
+          /*args*/{ errorMetatypeValue, invocationEncoder.getValue() },
           /*normalBB*/nextNormalBB,
-          /*errorBB*/errorBB);
+          /*errorBB*/recordErrorTypeErrorBB);
     }
-    {
+    if (shouldRecordErrorType) {
       emitThrowWithCleanupBasicBlock(*this, loc, thunk, recordErrorTypeErrorBB, errorBB);
     }
 
     if (recordReturnTypeBB) {
       // TODO(distributed): record return type
+      B.emitBlock(recordReturnTypeBB);
       assert(false);
+    }
+    if (recordReturnTypeBB) {
+      emitThrowWithCleanupBasicBlock(*this, loc, thunk, recordReturnTypeErrorBB, errorBB);
     }
 
     // === try doneRecording
-//      SILValue encoderTempAccess; // 222222
-//    dynamicBasicErrorBlocks.push_back(doneRecordingErrorBB);
+    SILValue invocationEncoderAccess;
     SILBasicBlock *makeRemoteCallTargetBB = createBasicBlock();
     {
       if (recordingDoneBB)
@@ -997,29 +1006,59 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           builder.getOrCreateFunction(loc, doneRecordingFnRef, ForDefinition);
       SILValue doneRecordingFn = B.createFunctionRefFor(loc, doneRecordingFnSIL);
 
-//        encoderTempAccess =
-//            B.createBeginAccess(loc, encoderTemp.getValue(),
-//                                SILAccessKind::Modify,
-//                                SILAccessEnforcement::Static,
-//                                false,
-//                                false); // 22222
+      invocationEncoderAccess = B.createBeginAccess(
+          loc, invocationEncoder.getValue(), SILAccessKind::Modify,
+          SILAccessEnforcement::Static, false, false);
 
       B.createTryApply(
           loc, doneRecordingFn,
-          /*subs=*/SubstitutionMap(), // FIXME(distributed): (!!!)
-          /*args=*/{encoderTemp.getValue()},
+          /*subs=*/SubstitutionMap(),
+          /*args=*/{invocationEncoderAccess},
           /*normalBB=*/makeRemoteCallTargetBB,
           /*errorBB*/recordingDoneErrorBB);
-
-      //          emitDistributedActorSystemWitnessCall(
+//          emitDistributedActorSystemWitnessCall(
 //              B, loc, ctx.Id_doneRecording,
-//              encoderTemp, /*actorTypeSubs*/SILType(),
-//              /*args=*/ { encoderTemp },
+//              invocationEncoder, /*actorTypeSubs*/SILType(),
+//              /*args=*/ { invocationEncoder },
 //              std::make_pair(doneRecordingNormalBB, doneRecordingErrorBB));
 //          nextNormalBB = doneRecordingNormalBB;
     }
+//    {
+//      B.emitBlock(recordingDoneError1BB);
+//      SILValue error = recordingDoneError1BB->createPhiArgument(
+//          fnConv.getSILErrorType(getTypeExpansionContext()),
+//          OwnershipKind::Owned);
+//
+//      B.createEndAccess(loc, invocationEncoder.getValue(), /*aborted=*/false);
+//
+//      B.createBranch(loc, recordingDoneError2BB);
+//      fprintf(stderr, "[%s:%d] (%s) 11111 >>>>>>>\n", __FILE__, __LINE__, __FUNCTION__);
+//      fprintf(stderr, "[%s:%d] (%s) 11111 >>>>>>>\n", __FILE__, __LINE__, __FUNCTION__);
+//      recordingDoneError1BB->dump();
+//      fprintf(stderr, "[%s:%d] (%s) 11111 ^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
+//      fprintf(stderr, "[%s:%d] (%s) 11111 ^^^^^^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
+//    }
+//    {
+//      emitThrowWithCleanupBasicBlock(*this, loc, thunk, recordingDoneError2BB, errorBB);
+//      fprintf(stderr, "[%s:%d] (%s) 22222 >>>>>>>\n", __FILE__, __LINE__, __FUNCTION__);
+//      fprintf(stderr, "[%s:%d] (%s) 22222 >>>>>>>\n", __FILE__, __LINE__, __FUNCTION__);
+//      recordingDoneError2BB->dump();
+//      fprintf(stderr, "[%s:%d] (%s) 22222 ^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
+//      fprintf(stderr, "[%s:%d] (%s) 22222 ^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
+//    }
     {
-      emitThrowWithCleanupBasicBlock(*this, loc, thunk, recordingDoneErrorBB, errorBB);
+      B.emitBlock(recordingDoneErrorBB);
+
+      SILValue error = recordingDoneErrorBB->createPhiArgument(
+          fnConv.getSILErrorType(getTypeExpansionContext()),
+          OwnershipKind::Owned);
+
+      B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
+      Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
+      B.createBranch(loc, errorBB);
+
+      fprintf(stderr, "[%s:%d] (%s) RECORDING DONE ERROR\n", __FILE__, __LINE__, __FUNCTION__);
+      recordingDoneErrorBB->dump();
     }
 
     // === create the RemoteCallTarget
@@ -1029,9 +1068,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     SILBasicBlock *remoteCallReturnBB = createBasicBlock();
     SILBasicBlock *remoteCallErrorBB = createBasicBlock();
     {
-      if (makeRemoteCallTargetBB)
-        B.emitBlock(makeRemoteCallTargetBB);
-//        B.createEndAccess(loc, encoderTemp.getValue(), /*aborted=*/false);
+      B.emitBlock(makeRemoteCallTargetBB);
 
       auto mangledName = thunk.mangle(SILDeclRef::ManglingKind::Default);
       auto mangledNameRef = llvm::StringRef(mangledName.c_str(), mangledName.size()); // FIXME(distributed): can just pass the mangledName?
@@ -1199,7 +1236,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
                            /*out*/ remoteCallReturnValue.getValue(), // out, return value
                            selfValue.getValue(), // self
                            remoteCallTargetValue.getValue(), // target
-                           encoderTemp.getValue(), // invocation encoder
+                           invocationEncoder.getValue(), // invocation encoder
                            thrownErrorMetatypeValue, // throwing type
                            returnMetatypeValue // returning type
                        },
@@ -1229,11 +1266,13 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       SILValue result = remoteCallReturnBB->createPhiArgument(
           resultType, OwnershipKind::Owned);
 
+      B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
       Cleanups.emitCleanupsForReturn(CleanupLocation(loc), NotForUnwind);
       B.createBranch(loc, returnBB, {result});
     }
     {
-      emitThrowWithCleanupBasicBlock(*this, loc, thunk, remoteCallErrorBB, errorBB);
+      emitThrowWithCleanupBasicBlock(*this, loc, thunk, remoteCallErrorBB, errorBB,
+                                     /*endAccesses*/{invocationEncoderAccess});
     }
   } // end of `if isRemote { ... }`
 

@@ -5513,6 +5513,9 @@ public:
           state.GotAsyncContinuation = gaci;
         } else if (auto term = dyn_cast<TermInst>(&i)) {
           if (term->isFunctionExiting()) {
+            for (const auto &item : state.Stack) {
+              item->dump();
+            }
             require(state.Stack.empty(),
                     "return with stack allocs that haven't been deallocated");
             if (!state.ActiveOps.empty()) {
@@ -5606,6 +5609,15 @@ public:
             const auto &foundState = insertResult.first->second;
             require(state.Stack == foundState.Stack || isUnreachable(),
                     "inconsistent stack heights entering basic block");
+
+            if (!(state.ActiveOps == foundState.ActiveOps || isUnreachable())) {
+              fprintf(stderr, "[%s:%d] (%s) STATE OPS:\n", __FILE__, __LINE__, __FUNCTION__);
+              for (auto op : state.ActiveOps)
+                op->dump();
+              fprintf(stderr, "[%s:%d] (%s) FOUND STATE OPS:\n", __FILE__, __LINE__, __FUNCTION__);
+              for (auto op : foundState.ActiveOps)
+                op->dump();
+            }
             require(state.ActiveOps == foundState.ActiveOps || isUnreachable(),
                     "inconsistent active-operations sets entering basic block");
             require(state.CFG == foundState.CFG,
