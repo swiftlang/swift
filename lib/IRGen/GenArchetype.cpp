@@ -522,8 +522,7 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                        {request.get(IGF), genericArgs, descriptor, indexValue});
       result->setDoesNotThrow();
       result->setCallingConv(IGF.IGM.SwiftCC);
-      result->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::ReadOnly);
+      result->addFnAttr(llvm::Attribute::ReadOnly);
     });
   assert(result);
   
@@ -556,8 +555,7 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                    {genericArgs, descriptor, indexValue});
       result->setDoesNotThrow();
       result->setCallingConv(IGF.IGM.SwiftCC);
-      result->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::ReadOnly);
+      result->addFnAttr(llvm::Attribute::ReadOnly);
     });
   assert(result);
   

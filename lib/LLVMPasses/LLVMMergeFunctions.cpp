@@ -1287,8 +1287,8 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     unsigned ParamIdx = 0;
     
     // Add the existing parameters.
-    for (Value *OldArg : CI->arg_operands()) {
-      NewArgAttrs.push_back(NewPAL.getParamAttributes(ParamIdx));
+    for (Value *OldArg : CI->args()) {
+      NewArgAttrs.push_back(NewPAL.getParamAttrs(ParamIdx));
       NewArgs.push_back(OldArg);
       OldParamTypes.push_back(OldArg->getType());
       ++ParamIdx;
@@ -1315,7 +1315,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     // Don't transfer attributes from the function to the callee. Function
     // attributes typically aren't relevant to the calling convention or ABI.
     NewCI->setAttributes(AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
-                                            NewPAL.getRetAttributes(),
+                                            NewPAL.getRetAttrs(),
                                             NewArgAttrs));
     CI->replaceAllUsesWith(NewCI);
     CI->eraseFromParent();
