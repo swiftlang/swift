@@ -1463,7 +1463,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
       Attr = BBI->isLexical();
     } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
-      Attr = MVI->getAllowDiagnostics();
+      Attr = unsigned(MVI->getAllowDiagnostics()) |
+             (unsigned(MVI->isLexical() << 1));
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;

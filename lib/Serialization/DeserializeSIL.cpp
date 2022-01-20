@@ -1984,10 +1984,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   case SILInstructionKind::MoveValueInst: {
     auto Ty = MF->getType(TyID);
-    auto AllowsDiagnostics = bool(Attr);
+    bool AllowsDiagnostics = Attr & 0x1;
+    bool IsLexical = (Attr >> 1) & 0x1;
     auto *MVI = Builder.createMoveValue(
         Loc,
-        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        IsLexical);
     MVI->setAllowsDiagnostics(AllowsDiagnostics);
     ResultInst = MVI;
     break;

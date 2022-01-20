@@ -3275,21 +3275,28 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   case SILInstructionKind::MoveValueInst: {
     bool allowsDiagnostics = false;
+    bool isLexical = false;
+
     StringRef AttrName;
-    if (parseSILOptional(AttrName, *this)) {
-      if (!AttrName.equals("allows_diagnostics")) {
-        auto diag = diag::sil_movevalue_invalid_optional_attribute;
-        P.diagnose(InstLoc.getSourceLoc(), diag, AttrName);
+    SourceLoc AttrLoc;
+    while (parseSILOptional(AttrName, AttrLoc, *this)) {
+      if (AttrName == "allows_diagnostics")
+        allowsDiagnostics = true;
+      else if (AttrName == "lexical")
+        isLexical = true;
+      else {
+        P.diagnose(InstLoc.getSourceLoc(),
+                   diag::sil_invalid_attribute_for_instruction, AttrName,
+                   "move_value");
         return true;
       }
-      allowsDiagnostics = true;
     }
 
     if (parseTypedValueRef(Val, B))
       return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    auto *MVI = B.createMoveValue(InstLoc, Val);
+    auto *MVI = B.createMoveValue(InstLoc, Val, isLexical);
     MVI->setAllowsDiagnostics(allowsDiagnostics);
     ResultVal = MVI;
     break;

@@ -1896,6 +1896,8 @@ public:
   void visitMoveValueInst(MoveValueInst *I) {
     if (I->getAllowDiagnostics())
       *this << "[allows_diagnostics] ";
+    if (I->isLexical())
+      *this << "[lexical] ";
     *this << getIDAndType(I->getOperand());
   }
 

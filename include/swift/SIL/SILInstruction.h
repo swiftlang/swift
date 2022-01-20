@@ -7457,13 +7457,17 @@ class MoveValueInst
   /// set to false, we shouldn't emit such a diagnostic. This is a short term
   /// addition until we get MoveOnly wrapper types into the SIL type system.
   bool allowDiagnostics = false;
+  bool lexical = false;
 
-  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand, bool isLexical)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
+        lexical(isLexical) {}
 
 public:
   bool getAllowDiagnostics() const { return allowDiagnostics; }
   void setAllowsDiagnostics(bool newValue) { allowDiagnostics = newValue; }
+
+  bool isLexical() const { return lexical; };
 };
 
 /// Equivalent to a copy_addr to [init] except that it is used for diagnostics
