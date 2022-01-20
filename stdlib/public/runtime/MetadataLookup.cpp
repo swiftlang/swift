@@ -2092,6 +2092,40 @@ swift_func_getParameterTypeInfo(
   return typesLength;
 }
 
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+BufferAndSize
+swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
+                                   const void *const *genericArguments) {
+  assert(genericEnv);
+  assert(genericArguments);
+
+  llvm::SmallVector<const void *, 4> witnessTables;
+  SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
+
+  auto error = _checkGenericRequirements(
+      genericEnv->getGenericRequirements(), witnessTables,
+      [&substFn](unsigned depth, unsigned index) {
+        return substFn.getMetadata(depth, index);
+      },
+      [&substFn](const Metadata *type, unsigned index) {
+        return substFn.getWitnessTable(type, index);
+      });
+
+  if (error) {
+    return {/*ptr=*/nullptr, -1};
+  }
+
+  if (witnessTables.empty())
+    return {/*ptr=*/nullptr, 0};
+
+  void **tables = (void **)malloc(witnessTables.size() * sizeof(void *));
+  for (unsigned i = 0, n = witnessTables.size(); i != n; ++i)
+    tables[i] = const_cast<void *>(witnessTables[i]);
+
+  return {tables, static_cast<intptr_t>(witnessTables.size())};
+}
+
 // ==== End of Function metadata functions ---------------------------------------
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT

@@ -176,8 +176,10 @@ extension DistributedActorSystem {
     }
 
     var substitutionsBuffer: UnsafeMutablePointer<Any.Type>? = nil
+    var witnessTablesBuffer: UnsafeRawPointer? = nil
+    var numWitnessTables: Int = 0
 
-    if genericEnv != nil {
+    if let genericEnv = genericEnv {
       let subs = try invocationDecoder.decodeGenericSubstitutions()
 
       if subs.isEmpty {
@@ -190,6 +192,17 @@ extension DistributedActorSystem {
       for (offset, substitution) in subs.enumerated() {
         let element = substitutionsBuffer?.advanced(by: offset)
         element?.initialize(to: substitution)
+      }
+
+      (witnessTablesBuffer, numWitnessTables) = _getWitnessTablesFor(environment: genericEnv,
+                                                                     genericArguments: substitutionsBuffer!)
+      defer {
+        witnessTablesBuffer?.deallocate()
+      }
+
+      if numWitnessTables < 0 {
+        throw ExecuteDistributedTargetError(
+          message: "Generic substitutions \(subs) do not satisfy generic requirements of \(mangledTargetName)")
       }
     }
 

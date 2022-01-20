@@ -100,3 +100,11 @@ func _getGenericEnvironmentOfDistributedTarget(
     _ targetNameStart: UnsafePointer<UInt8>,
     _ targetNameLength: UInt
 ) -> UnsafeRawPointer?
+
+@available(SwiftStdlib 5.6, *)
+@_silgen_name("swift_distributed_getWitnessTables")
+public // SPI _Distributed
+func _getWitnessTablesFor(
+  environment: UnsafeRawPointer,
+  genericArguments: UnsafeRawPointer
+) -> (UnsafeRawPointer, Int)
