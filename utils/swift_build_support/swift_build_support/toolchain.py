@@ -93,12 +93,15 @@ class Darwin(Toolchain):
 
 
 class GenericUnix(Toolchain):
-    def __init__(self, suffixes):
+    def __init__(self, llvm_suffixes):
         super(GenericUnix, self).__init__()
 
         # On these platforms, search 'clang', 'clang++' unconditionally.
         # To determine the llvm_suffix.
-        ret = self.find_clang(['clang', 'clang++'], suffixes)
+        ret = self.find_clang(['clang', 'clang++'], llvm_suffixes)
+        if ret is None:
+            ret = self.find_gcc(['gcc', 'g++'], [''])
+
         if ret is None:
             self.cc = None
             self.cxx = None
@@ -112,11 +115,18 @@ class GenericUnix(Toolchain):
                 # Some platform may have `clang`, `clang++`, `llvm-cov-3.6`
                 # but not `llvm-cov`. In that case, we assume `clang` is
                 # corresponding to the best version of llvm tools found.
-                self.llvm_suffixes = suffixes
+                self.llvm_suffixes = llvm_suffixes
             else:
                 # Otherwise, we must have llvm tools with the same suffix as
                 # `clang` or `clang++`
                 self.llvm_suffixes = [suffix]
+
+    def find_gcc(self, tools, suffixes):
+        for suffix in suffixes:
+            ret = [which(t + suffix) for t in tools]
+            if all(t is not None for t in ret):
+                return (ret, suffix)
+        return None
 
     def find_clang(self, tools, suffixes):
         for suffix in suffixes:
