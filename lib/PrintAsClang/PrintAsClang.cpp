@@ -1,4 +1,4 @@
-//===--- PrintAsObjC.cpp - Emit a header file for a Swift AST -------------===//
+//===--- PrintAsClang.cpp - Emit a header file for a Swift AST ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/PrintAsObjC/PrintAsObjC.h"
+#include "swift/PrintAsClang/PrintAsClang.h"
 
 #include "ModuleContentsWriter.h"
 

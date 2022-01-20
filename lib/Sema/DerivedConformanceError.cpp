@@ -119,7 +119,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
 
     auto scope = Nominal->getFormalAccessScope(Nominal->getModuleScopeContext());
     if (scope.isPublic() || scope.isInternal())
-      // PrintAsObjC may print this domain, so we should make sure we use the
+      // PrintAsClang may print this domain, so we should make sure we use the
       // same string it will.
       synthesizer = deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain;
 

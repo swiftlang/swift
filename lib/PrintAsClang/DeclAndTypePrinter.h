@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_PRINTASOBJC_DECLANDTYPEPRINTER_H
-#define SWIFT_PRINTASOBJC_DECLANDTYPEPRINTER_H
+#ifndef SWIFT_PRINTASCLANG_DECLANDTYPEPRINTER_H
+#define SWIFT_PRINTASCLANG_DECLANDTYPEPRINTER_H
 
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
