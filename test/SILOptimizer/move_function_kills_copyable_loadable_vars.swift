@@ -2,6 +2,9 @@
 
 // REQUIRES: optimized_stdlib
 
+// rdar://87618517
+// UNSUPPORTED: asan
+
 import Swift
 
 //////////////////
