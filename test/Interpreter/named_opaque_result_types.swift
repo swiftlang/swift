@@ -34,8 +34,7 @@ struct X<T, U: Hashable>: P {
   func f() -> <
       R1: Collection, R2: Collection where R1.Element == T, R2.Element == U
   > (R1, R2) {
-    // FIXME: Use unzipCollection here
-    return (Array(data.map { $0.0 }), Set(data.map { $0.1 }))
+    return unzipCollection(data)
   }
 }
 
@@ -71,6 +70,7 @@ if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   print("too old")
   print("too old")
   print("too old")
+
   print("too old")
   print("too old")
 }
