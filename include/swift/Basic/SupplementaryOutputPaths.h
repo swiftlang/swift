@@ -39,7 +39,7 @@ struct SupplementaryOutputPaths {
   /// the header is emitted in single-file mode, since it needs whole-module
   /// information.
   ///
-  /// \sa swift::printAsCxx
+  /// \sa swift::printAsCXX
   std::string CxxHeaderOutputPath;
 
   /// The path to which we should emit a serialized module.
