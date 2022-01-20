@@ -1642,7 +1642,10 @@ public:
 
     // Check that the arguments and result match.
     SILFunctionConventions substConv(substTy, F.getModule());
-    //require(site.getArguments().size() == substTy->getNumSILArguments(),
+    if (site.getArguments().size() != substConv.getNumSILArguments()) {
+      fprintf(stderr, "[%s:%d] (%s) site arguments size: %d\n", __FILE__, __LINE__, __FUNCTION__, site.getArguments().size());
+      fprintf(stderr, "[%s:%d] (%s) substConv.getNumSILArguments(): %d\n", __FILE__, __LINE__, __FUNCTION__, substConv.getNumSILArguments());
+    }
     require(site.getNumArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = site.getNumArguments(); i < size; ++i) {
@@ -5793,6 +5796,11 @@ public:
       if (F->hasForeignBody())
         return;
 
+      fprintf(stderr, "[%s:%d] (%s) F DUMP\n", __FILE__, __LINE__, __FUNCTION__);
+      if (!F->isAvailableExternally() && F->getLinkage() == SILLinkage::Public) {
+      fprintf(stderr, "[%s:%d] (%s) HACK IT...\n", __FILE__, __LINE__, __FUNCTION__);
+        F->setLinkage(SILLinkage::PublicExternal);
+      }
       require(F->isAvailableExternally(),
               "external declaration of internal SILFunction not allowed");
       // If F is an external declaration, there is nothing further to do,

@@ -84,7 +84,10 @@ public struct FakeActorSystem: DistributedActorSystem {
   ) async throws -> Res
       where Act: DistributedActor,
             Act.ID == ActorID,
-            Res: SerializationRequirement {
+            Err: Error
+//      ,
+//            Res: SerializationRequirement
+  {
     throw ExecuteDistributedTargetError(
       message: "Not implemented.")
   }

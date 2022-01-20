@@ -132,6 +132,7 @@ public protocol DistributedActorSystem: Sendable {
 //  ) async throws -> Res
 //      where Act: DistributedActor,
 //            Act.ID == ActorID,
+//            Err: Error,
 //            Res: SerializationRequirement
 
 }

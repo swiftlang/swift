@@ -551,7 +551,8 @@ static void emitThrowWithCleanupBasicBlock(SILGenFunction &SGF, SILLocation loc,
                                            SILDeclRef thunk,
                                            SILBasicBlock *errorBB,
                                            SILBasicBlock *throwBB,
-                                           ArrayRef<SILValue> endAccesses = {}) {
+                                           ArrayRef<SILValue> endAccesses = {},
+                                           ArrayRef<SILValue> endLifetimes = {}) {
   if (!errorBB)
     return;
 
@@ -570,8 +571,11 @@ static void emitThrowWithCleanupBasicBlock(SILGenFunction &SGF, SILLocation loc,
       fnConv.getSILErrorType(SGF.getTypeExpansionContext()),
       OwnershipKind::Owned);
 
-  for (const auto &access : endAccesses) {
-    B.createEndAccess(loc, access, /*aborted=*/false);
+  for (const auto &value : endAccesses) {
+    B.createEndAccess(loc, value, /*aborted=*/false);
+  }
+  for (const auto &value : endLifetimes) {
+    B.createEndLifetime(loc, value);
   }
 
   SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
@@ -647,8 +651,14 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   // === `Self` types
   auto selfValue = ManagedValue::forUnmanaged(params[params.size() - 1]); // TODO(distributed): getSelfArgument instead
   auto selfTy = selfVarDecl->getType();
+  auto selfSILTy = getLoweredType(selfTy);
   auto *selfTyDecl = FunctionDC->getParent()->getSelfNominalTypeDecl();
   assert(selfTyDecl && "distributed instance method declared outside of actor");
+
+  // === Thrown 'Err' type
+  auto errorTy = F.mapTypeIntoContext(ctx.getErrorDecl()->getInterfaceType());
+  auto neverTy = F.mapTypeIntoContext(ctx.getNeverType());
+  auto errTy = fd->hasThrows() ? errorTy : neverTy;
 
   // === `InvocationEncoder` types
   AbstractFunctionDecl *makeInvocationEncoderFnDecl =
@@ -658,6 +668,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
   ProtocolDecl *invocationEncoderProto =
       ctx.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  ProtocolDecl *distributedActorProto =
+      ctx.getProtocol(KnownProtocolKind::DistributedActor);
 
   auto makeInvocationEncoderMethodTy = SGM.Types.getConstantOverrideType(
       getTypeExpansionContext(), makeInvocationEncoderFnRef);
@@ -869,12 +881,10 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
     SILBasicBlock *recordingDoneBB = nullptr;
     SILBasicBlock *recordingDoneErrorBB = nullptr;
-//    SILBasicBlock *recordingDoneError2BB = nullptr;
     if (!firstOfThrowingApplyBBs)
       recordingDoneBB = createBasicBlock();
     firstOfThrowingApplyBBs = false;
     recordingDoneErrorBB = createBasicBlock();
-//    recordingDoneError2BB = createBasicBlock();
     if (!nextNormalBB) {
       nextNormalBB = recordReturnTypeBB;
     }
@@ -919,9 +929,12 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       if (recordErrorTypeBB)
         B.emitBlock(recordErrorTypeBB);
 
+      fprintf(stderr, "[%s:%d] (%s) next normal BB from doneRecording will be:\n", __FILE__, __LINE__, __FUNCTION__);
       if (recordReturnTypeBB) {
+      fprintf(stderr, "[%s:%d] (%s)      recordReturnTypeBB\n", __FILE__, __LINE__, __FUNCTION__);
         nextNormalBB = recordReturnTypeBB;
       } else if (recordingDoneBB) {
+      fprintf(stderr, "[%s:%d] (%s)      recordingDoneBB\n", __FILE__, __LINE__, __FUNCTION__);
         nextNormalBB = recordingDoneBB;
       }
 
@@ -1034,7 +1047,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
       Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
-      B.createBranch(loc, errorBB);
+      B.createBranch(loc, errorBB, {error});
 
       fprintf(stderr, "[%s:%d] (%s) RECORDING DONE ERROR\n", __FILE__, __LINE__, __FUNCTION__);
       recordingDoneErrorBB->dump();
@@ -1044,10 +1057,15 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     auto remoteCallTargetDecl = ctx.getRemoteCallTargetDecl();
     auto remoteCallTargetTy = F.mapTypeIntoContext(remoteCallTargetDecl->getDeclaredInterfaceType());
     ManagedValue remoteCallTargetValue;
+    LoadInst *remoteCallSystemSelf = nullptr;
     SILBasicBlock *remoteCallReturnBB = createBasicBlock();
     SILBasicBlock *remoteCallErrorBB = createBasicBlock();
     {
       B.emitBlock(makeRemoteCallTargetBB);
+
+      // we come here from doneRecording which returns Void:
+      makeRemoteCallTargetBB->createPhiArgument(
+          getLoweredType(ctx.getVoidType()), OwnershipKind::Owned);
 
       auto mangledName = thunk.mangle(SILDeclRef::ManglingKind::Default);
       auto mangledNameRef = llvm::StringRef(mangledName.c_str(), mangledName.size()); // FIXME(distributed): can just pass the mangledName?
@@ -1135,8 +1153,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 //    // === Call the remoteCall on the actor system
 //    {
 //      B.emitBlock(remoteCallBB);
-//        SILValue remoteCallTargetValue = remoteCallBB->createPhiArgument( // TODO: do we need this?????????????????????????
-//            getLoweredType(remoteCallTargetTy), OwnershipKind::Owned); // 111111111
+//        SILValue remoteCallTargetValue = remoteCallBB->createPhiArgument(
+//            getLoweredType(remoteCallTargetTy), OwnershipKind::Owned);
 
       // --- Prepare storage for the return value
       // %38 = alloc_stack $String // users: %54, %56, %50, %75
@@ -1144,17 +1162,18 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto remoteCallReturnBuf = emitTemporaryAllocation(loc, resultType);
       auto remoteCallReturnValue = emitManagedBufferWithCleanup(remoteCallReturnBuf);
 
+      auto systemRef = emitActorPropertyReference(
+          *this, loc, selfValue.getValue(),
+          lookupProperty(selfTyDecl, ctx.Id_actorSystem));
+      remoteCallSystemSelf = B.createTrivialLoadOr(loc, systemRef, LoadOwnershipQualifier::Copy, true);
+
       // --- Prepare 'throwing' type, Error or Never depending on throws of the target
       SILValue thrownErrorMetatypeValue;
       if (fd->hasThrows()) {
-        auto errorTy = F.mapTypeIntoContext(
-            ctx.getErrorDecl()->getInterfaceType());
-        auto errorMetatype = getLoweredType(MetatypeType::get(errorTy));
+        auto errorMetatype = getLoweredType(MetatypeType::get(errorTy, MetatypeRepresentation::Thick));
         thrownErrorMetatypeValue = B.createMetatype(loc, errorMetatype);
       } else {
-        auto neverTy = F.mapTypeIntoContext(
-            ctx.getNeverType());
-        auto neverMetatype = getLoweredType(MetatypeType::get(neverTy));
+        auto neverMetatype = getLoweredType(MetatypeType::get(neverTy, MetatypeRepresentation::Thick));
         thrownErrorMetatypeValue = B.createMetatype(loc, neverMetatype);
       }
       assert(thrownErrorMetatypeValue);
@@ -1194,30 +1213,82 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
       // --- prepare subs for the 'remoteCall'
       // <MyDistActor, ErrorType, ReturnType>
-      SubstitutionMap remoteCallSubs = SubstitutionMap();
-      if (false) { // FIXME(distributed): implement the signatures !!!!!!
-        auto remoteCallGenericSig = remoteCallFnDecl->getGenericSignature();
-        SmallVector<Type, 3> subTypes;
-        SmallVector<ProtocolConformanceRef, 3> subConformances;
-        subTypes.push_back(getLoweredType(selfTy).getASTType());
+      auto remoteCallGenericSig = remoteCallFnDecl->getGenericSignature();
+      SmallVector<Type, 3> subTypes;
+      SmallVector<ProtocolConformanceRef, 3> subConformances;
+      // <τ_0_0,
+      //  τ_0_1,
+      //  τ_0_2 where τ_0_0 : DistributedActor,
+      //  τ_0_2 : Decodable,
+      //  τ_0_2 : Encodable,
+      //  τ_0_0.ID == ActorAddress
+      // >
+      // (
+      //  @guaranteed τ_0_0,
+      //  @in_guaranteed RemoteCallTarget,
+      //  @inout FakeInvocation,
+      //  @thick τ_0_1.Type,
+      //  Optional<@thick τ_0_2.Type>,
+      //  @guaranteed FakeActorSystem)
+      {
+        auto module = B.getModule().getSwiftModule();
 
-        // FIXME(distributed): get the conformances right here...
+        // <Self: DistributedActor>
+        auto distributedActorConfRef =
+            module->lookupConformance(selfSILTy.getASTType(), distributedActorProto);
+        assert(!distributedActorConfRef.isInvalid() &&
+               "Missing conformance to `DistributedActor`");
+        subTypes.push_back(selfSILTy.getASTType());
+        subConformances.push_back(distributedActorConfRef);
 
-        remoteCallSubs =
-            SubstitutionMap::get(remoteCallGenericSig,
-                                 subTypes, subConformances);
+        // <Err: Error>
+        auto thrownErrorConfRef =
+            module->lookupConformance(errTy,
+                                      ctx.getErrorDecl());
+        assert(!distributedActorConfRef.isInvalid() &&
+               "Missing conformance to `Error`");
+        subTypes.push_back(errTy);
+        subConformances.push_back(thrownErrorConfRef);
+
+        // <Res: SerializationRequirement>
+        // FIXME(distributed): must use SerializationRequirement!
+        auto encodableRequirementTy =
+            ctx.getProtocol(KnownProtocolKind::Encodable); // FIXME: actually use SerializatioNRequirement
+//        auto resultEncodableTypeConfRef =
+//            module->lookupConformance(resultType.getASTType(),
+//                                      encodableRequirementTy);
+//        assert(!distributedActorConfRef.isInvalid() &&
+//               "Missing conformance to `SerializationRequirement`");
+        subTypes.push_back(resultType.getASTType());
+//        subConformances.push_back(resultEncodableTypeConfRef);
+
+//        auto decodableRequirementTy =
+//            ctx.getProtocol(KnownProtocolKind::Decodable);
+//        auto resultDecodableTypeConfRef =
+//            module->lookupConformance(resultType.getASTType(),
+//                                      encodableRequirementTy);
+//        subTypes.push_back(resultType.getASTType());
+//        subConformances.push_back(resultDecodableTypeConfRef);
       }
+
+      SubstitutionMap remoteCallSubs =
+          SubstitutionMap::get(remoteCallGenericSig,
+                               subTypes, subConformances);
+
+      //      %30 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mtYaKAJ0bC0Rzs5ErrorR_AA0C7AddressV2IDRtzr1_lF  : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_1 : Error, τ_0_0.ID == ActorAddress>                        (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, @thick τ_0_2.Type, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %31
+      // OLD: %30 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mtYaKAJ0bC0RzSeR0_SER0_AA0C7AddressV2IDRtzr1_lF : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, @thick τ_0_2.Type, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %31
 
       // try_apply %49<MyDistActor, Never, String>(%38, %2, %28, %48, %43, %46, %40) : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error), normal bb5, error bb10 // id: %50
       B.createTryApply(loc, remoteCallFn,
                        remoteCallSubs,
-                       /*args=*/{
+                       {
                            /*out*/ remoteCallReturnValue.getValue(), // out, return value
-                           selfValue.getValue(), // self
+                           selfValue.getValue(), // on actor
                            remoteCallTargetValue.getValue(), // target
                            invocationEncoder.getValue(), // invocation encoder
                            thrownErrorMetatypeValue, // throwing type
-                           returnMetatypeValue // returning type
+                           returnMetatypeValue, // returning type
+                           /*self*/remoteCallSystemSelf // ActorSystem
                        },
                        /*normalBB=*/remoteCallReturnBB,
                        /*errorBB=*/remoteCallErrorBB);
@@ -1245,13 +1316,15 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       SILValue result = remoteCallReturnBB->createPhiArgument(
           resultType, OwnershipKind::Owned);
 
+      B.createEndLifetime(loc, remoteCallSystemSelf);
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
       Cleanups.emitCleanupsForReturn(CleanupLocation(loc), NotForUnwind);
       B.createBranch(loc, returnBB, {result});
     }
     {
       emitThrowWithCleanupBasicBlock(*this, loc, thunk, remoteCallErrorBB, errorBB,
-                                     /*endAccesses*/{invocationEncoderAccess});
+                                     /*endAccesses*/{invocationEncoderAccess},
+                                     /*endLifetimes*/{remoteCallSystemSelf});
     }
   } // end of `if isRemote { ... }`
 
