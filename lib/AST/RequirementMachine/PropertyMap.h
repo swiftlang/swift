@@ -124,7 +124,7 @@ public:
   Type getSuperclassBound(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      RewriteContext &ctx) const;
+      const PropertyMap &map) const;
 
   bool isConcreteType() const {
     return ConcreteType.hasValue();
@@ -137,7 +137,7 @@ public:
   Type getConcreteType(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      RewriteContext &ctx) const;
+      const PropertyMap &map) const;
 
   LayoutConstraint getLayoutConstraint() const {
     return Layout;
@@ -219,6 +219,31 @@ public:
                    unsigned maxDepth);
 
   void dump(llvm::raw_ostream &out) const;
+
+  /// Return the rewrite context used for allocating memory.
+  RewriteContext &getRewriteContext() const { return Context; }
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Term to type conversion. The opposite direction is implemented in
+  /// RewriteContext because it does not depend on the current rewrite system.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  Type getTypeForTerm(Term term,
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  Type getTypeForTerm(const MutableTerm &term,
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  Type getRelativeTypeForTerm(
+                      const MutableTerm &term, const MutableTerm &prefix) const;
+
+  Type getTypeFromSubstitutionSchema(
+                      Type schema,
+                      ArrayRef<Term> substitutions,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      const MutableTerm &prefix) const;
 
 private:
   void clear();

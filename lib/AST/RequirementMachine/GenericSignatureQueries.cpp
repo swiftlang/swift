@@ -38,19 +38,19 @@ RequirementMachine::getLocalRequirements(
   verify(term);
 
   GenericSignature::LocalRequirements result;
-  result.anchor = Context.getTypeForTerm(term, genericParams);
+  result.anchor = Map.getTypeForTerm(term, genericParams);
 
   auto *props = Map.lookUpProperties(term);
   if (!props)
     return result;
 
   if (props->isConcreteType()) {
-    result.concreteType = props->getConcreteType({}, term, Context);
+    result.concreteType = props->getConcreteType({}, term, Map);
     return result;
   }
 
   if (props->hasSuperclassBound()) {
-    result.superclass = props->getSuperclassBound({}, term, Context);
+    result.superclass = props->getSuperclassBound({}, term, Map);
   }
 
   for (const auto *proto : props->getConformsToExcludingSuperclassConformances())
@@ -152,7 +152,7 @@ getSuperclassBound(Type depType,
   if (!props->hasSuperclassBound())
     return Type();
 
-  return props->getSuperclassBound(genericParams, term, Context);
+  return props->getSuperclassBound(genericParams, term, Map);
 }
 
 bool RequirementMachine::isConcreteType(Type depType) const {
@@ -183,7 +183,7 @@ getConcreteType(Type depType,
   if (!props->isConcreteType())
     return Type();
 
-  return props->getConcreteType(genericParams, term, Context);
+  return props->getConcreteType(genericParams, term, Map);
 }
 
 bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
@@ -277,7 +277,7 @@ bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
       Self.System.simplify(term);
       Self.verify(term);
 
-      auto anchor = Self.Context.getTypeForTerm(term, {});
+      auto anchor = Self.Map.getTypeForTerm(term, {});
       if (CanType(anchor) != CanType(component))
         return Action::Stop;
 
@@ -353,7 +353,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
       if (props) {
         if (props->isConcreteType()) {
           auto concreteType = props->getConcreteType(genericParams,
-                                                     prefix, Context);
+                                                     prefix, Map);
           if (!concreteType->hasTypeParameter())
             return concreteType;
 
@@ -368,7 +368,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
         if (props->hasSuperclassBound() &&
             prefix.size() != term.size()) {
           auto superclass = props->getSuperclassBound(genericParams,
-                                                      prefix, Context);
+                                                      prefix, Map);
           if (!superclass->hasTypeParameter())
             return superclass;
 
@@ -377,7 +377,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
         }
       }
 
-      return Context.getTypeForTerm(prefix, genericParams);
+      return Map.getTypeForTerm(prefix, genericParams);
     }();
 
     // If T is already valid, the longest valid prefix U of T is T itself, and
@@ -402,7 +402,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
 
     // Compute the type of the unresolved suffix term V, rooted in the
     // generic parameter τ_0_0.
-    auto origType = Context.getRelativeTypeForTerm(term, prefix);
+    auto origType = Map.getRelativeTypeForTerm(term, prefix);
 
     // Substitute τ_0_0 in the above relative type with the concrete type
     // for U.

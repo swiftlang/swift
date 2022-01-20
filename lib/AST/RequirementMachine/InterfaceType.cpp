@@ -23,7 +23,7 @@
 // Type to term conversion is implemented on the RewriteContext, and does not
 // depend on the specific RewriteSystem used.
 //
-// Term to type conversion is implemented on the RewriteSystem, and must only
+// Term to type conversion is implemented on the PropertyMap, and must only
 // be performed after completion. This is because it relies on the property map
 // to map associated type symbols back to Swift types.
 //
@@ -40,8 +40,12 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "PropertyMap.h"
 #include "RewriteSystem.h"
 #include "RewriteContext.h"
+
+using namespace swift;
+using namespace rewriting;
 
 Term RewriteContext::getTermForType(CanType paramType,
                                     const ProtocolDecl *proto) {
@@ -210,7 +214,8 @@ AssociatedTypeDecl *RewriteContext::getAssociatedTypeForSymbol(Symbol symbol) {
 template<typename Iter>
 Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
                            TypeArrayView<GenericTypeParamType> genericParams,
-                           const RewriteContext &ctx) {
+                           const PropertyMap &map) {
+  auto &ctx = map.getRewriteContext();
   Type result = root;
 
   auto handleRoot = [&](GenericTypeParamType *genericParam) {
@@ -286,32 +291,32 @@ Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
 
     // We should have a resolved type at this point.
     auto *assocType =
-        const_cast<RewriteContext &>(ctx)
-            .getAssociatedTypeForSymbol(symbol);
+        ctx.getAssociatedTypeForSymbol(symbol);
     result = DependentMemberType::get(result, assocType);
   }
 
   return result;
 }
 
-Type RewriteContext::getTypeForTerm(Term term,
+Type PropertyMap::getTypeForTerm(Term term,
                       TypeArrayView<GenericTypeParamType> genericParams) const {
   return getTypeForSymbolRange(term.begin(), term.end(), Type(),
                                genericParams, *this);
 }
 
-Type RewriteContext::getTypeForTerm(const MutableTerm &term,
+Type PropertyMap::getTypeForTerm(const MutableTerm &term,
                       TypeArrayView<GenericTypeParamType> genericParams) const {
   return getTypeForSymbolRange(term.begin(), term.end(), Type(),
                                genericParams, *this);
 }
 
-Type RewriteContext::getRelativeTypeForTerm(
+Type PropertyMap::getRelativeTypeForTerm(
     const MutableTerm &term, const MutableTerm &prefix) const {
   assert(std::equal(prefix.begin(), prefix.end(), term.begin()));
 
   auto genericParam =
-      CanGenericTypeParamType::get(/*type sequence*/ false, 0, 0, Context);
+      CanGenericTypeParamType::get(/*type sequence*/ false, 0, 0,
+                                   Context.getASTContext());
   return getTypeForSymbolRange(
       term.begin() + prefix.size(), term.end(), genericParam,
       { }, *this);
@@ -389,7 +394,7 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
 
 /// Reverses the transformation performed by
 /// RewriteSystemBuilder::getConcreteSubstitutionSchema().
-Type RewriteContext::getTypeFromSubstitutionSchema(
+Type PropertyMap::getTypeFromSubstitutionSchema(
     Type schema, ArrayRef<Term> substitutions,
     TypeArrayView<GenericTypeParamType> genericParams,
     const MutableTerm &prefix) const {
