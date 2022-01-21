@@ -984,13 +984,15 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
         foundWitness = witness;
         foundType = searchType;
       } else {
+        auto foundName = swift_getTypeName(foundType, true);
+        auto searchName = swift_getTypeName(searchType, true);
         swift::warning(RuntimeErrorFlagNone,
-                       "Warning: '%s' conforms to protocol '%s', but it also "
-                       "inherits conformance from '%s'.  Relying on a "
+                       "Warning: '%.*s' conforms to protocol '%s', but it also "
+                       "inherits conformance from '%.*s'.  Relying on a "
                        "particular conformance is undefined behaviour.\n",
-                       foundType->getDescription()->Name.get(),
+                       (int)foundName.length, foundName.data,
                        protocol->Name.get(),
-                       searchType->getDescription()->Name.get());
+                       (int)searchName.length, searchName.data);
       }
     }
   }
@@ -1111,6 +1113,7 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
     }
   }
   const ClassMetadata *swiftSubclass = cast<ClassMetadata>(subclass);
+#if SWIFT_OBJC_INTEROP
   if (auto *objcSuperclass = dyn_cast<ObjCClassWrapperMetadata>(superclass)) {
     // Walk up swiftSubclass's ancestors until we get to an ObjC class, then
     // kick over to swift_dynamicCastMetatype.
@@ -1123,6 +1126,7 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
         });
     return false;
   }
+#endif
   if (isa<ForeignClassMetadata>(superclass)) {
     // superclass is foreign, but subclass is not (if it were, the above
     // !isa<ClassMetadata> condition would have been entered).  Since it is not
