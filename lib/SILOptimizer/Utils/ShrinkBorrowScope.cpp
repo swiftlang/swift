@@ -117,7 +117,7 @@ public:
            mayAccessPointer(instruction) || mayLoadWeakOrUnowned(instruction);
   }
 
-  bool canReplaceValueWithBorrowedValue(SILValue value) {
+  bool canReplaceValueWithBorrowee(SILValue value) {
     while (true) {
       auto *instruction = value.getDefiningInstruction();
       if (!instruction)
@@ -145,7 +145,7 @@ public:
     if (users.contains(instruction)) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
         if (bbi->isLexical() &&
-            canReplaceValueWithBorrowedValue(bbi->getOperand())) {
+            canReplaceValueWithBorrowee(bbi->getOperand())) {
           if (rewrite) {
             auto borrowee = introducer->getOperand();
             bbi->setOperand(borrowee);
@@ -154,7 +154,7 @@ public:
           return true;
         }
       } else if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
-        if (canReplaceValueWithBorrowedValue(cvi->getOperand())) {
+        if (canReplaceValueWithBorrowee(cvi->getOperand())) {
           if (rewrite) {
             auto borrowee = introducer->getOperand();
             cvi->setOperand(borrowee);
