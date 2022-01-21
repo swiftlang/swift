@@ -294,7 +294,7 @@ void CompileInstance::performSema(
   if (CI && ArgsHash == CachedArgHash &&
       CachedReuseCount < Opts.MaxASTReuseCount) {
     CI->getASTContext().CancellationFlag = CancellationFlag;
-    if (performCachedSemaIfPossible(DiagC)) {
+    if (!performCachedSemaIfPossible(DiagC)) {
       // If we compileted cacehd Sema operation. We're done.
       ++CachedReuseCount;
       return;
@@ -311,6 +311,9 @@ void CompileInstance::performSema(
     CI.reset();
     return;
   }
+
+  CI->addDiagnosticConsumer(DiagC);
+  SWIFT_DEFER { CI->removeDiagnosticConsumer(DiagC); };
 
   // CI is potentially reusable.
   CachedArgHash = ArgsHash;
