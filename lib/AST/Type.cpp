@@ -3976,10 +3976,13 @@ operator()(CanType dependentType, Type conformingReplacementType,
           || conformingReplacementType->is<DependentMemberType>()
           || conformingReplacementType->is<TypeVariableType>())
          && "replacement requires looking up a concrete conformance");
-  // Lookup conformances for opened existential.
-  if (conformingReplacementType->isOpenedExistential()) {
-    return conformedProtocol->getModuleContext()->lookupConformance(
-        conformingReplacementType, conformedProtocol);
+  // A class-constrained archetype might conform to the protocol
+  // concretely.
+  if (auto *archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
+    if (auto superclassType = archetypeType->getSuperclass()) {
+      return conformedProtocol->getModuleContext()->lookupConformance(
+          archetypeType, conformedProtocol);
+    }
   }
   return ProtocolConformanceRef(conformedProtocol);
 }
