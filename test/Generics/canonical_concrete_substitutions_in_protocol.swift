@@ -3,7 +3,7 @@
 struct G<T> {}
 
 // CHECK-LABEL: canonical_concrete_substitutions_in_protocol.(file).P@
-// CHECK-NEXT: Requirement signature: <Self where Self.A == G<Self.B>, Self.B == Self.T.X, Self.T : Q>
+// CHECK-NEXT: Requirement signature: <Self where Self.[P]A == G<Self.[P]B>, Self.[P]B == Self.[P]T.[Q]X, Self.[P]T : Q>
 
 protocol P {
   associatedtype A where A == G<T.X>

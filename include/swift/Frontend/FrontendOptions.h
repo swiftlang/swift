@@ -450,7 +450,7 @@ public:
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
-  static bool canActionEmitObjCHeader(ActionType);
+  static bool canActionEmitClangHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);

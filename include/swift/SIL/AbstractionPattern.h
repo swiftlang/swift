@@ -981,7 +981,7 @@ public:
         return true;
       }
       if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-        return !isa<OpaqueTypeArchetypeType>(archetype->getRoot());
+        return !isa<OpaqueTypeArchetypeType>(archetype);
       }
       return false;
     }

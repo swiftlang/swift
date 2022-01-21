@@ -5511,7 +5511,7 @@ public:
                                                        existentialID,
                                                        interfaceID);
 
-    return OpenedArchetypeType::get(MF.getType(existentialID),
+    return OpenedArchetypeType::get(MF.getType(existentialID)->getCanonicalType(),
                                     MF.getType(interfaceID));
   }
       

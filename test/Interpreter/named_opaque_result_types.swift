@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 5 -Xfrontend -enable-experimental-named-opaque-types %s -o %t/a.out
+// RUN: %target-build-swift -g -swift-version 5 -Xfrontend -enable-experimental-named-opaque-types %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -34,8 +34,7 @@ struct X<T, U: Hashable>: P {
   func f() -> <
       R1: Collection, R2: Collection where R1.Element == T, R2.Element == U
   > (R1, R2) {
-    // FIXME: Use unzipCollection here
-    return (Array(data.map { $0.0 }), Set(data.map { $0.1 }))
+    return unzipCollection(data)
   }
 }
 
@@ -62,6 +61,22 @@ if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   // CHECK: {{["Hello", "World", "!"]|too old}}
   print(x3.1)
 
+  // CHECK: Integer loop
+  // CHECK-NEXT: 1
+  // CHECK-NEXT: 2
+  // CHECK-NEXT: 3
+  print("Integer loop")
+  for i in x3.0 {
+    print(i)
+  }
+
+  // CHECK: Hello
+  // CHECK-NEXT: World
+  // CHECK-NEXT: !
+  for index in x3.1.indices {
+    print(x3.1[index])
+  }
+
   // CHECK: {{(Array<Int>, Set<String>)|too old}}
   let paType = getP_A(X<Int, String>.self)
   print(paType)
@@ -71,6 +86,17 @@ if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   print("too old")
   print("too old")
   print("too old")
+  print("too old")
+
+  print("Integer loop")
+  print("1")
+  print("2")
+  print("3")
+
+  print("Hello")
+  print("World")
+  print("!")
+
   print("too old")
   print("too old")
 }

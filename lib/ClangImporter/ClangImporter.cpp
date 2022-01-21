@@ -3168,6 +3168,9 @@ public:
 };
 } // unnamed namespace
 
+// FIXME: should submodules still be crawled for the symbol graph? (SR-15753)
+bool ClangModuleUnit::shouldCollectDisplayDecls() const { return isTopLevel(); }
+
 void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   VectorDeclPtrConsumer consumer(results);
   FilteringDeclaredDeclConsumer filterConsumer(consumer, this);

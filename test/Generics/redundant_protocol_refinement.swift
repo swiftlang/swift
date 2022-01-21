@@ -28,7 +28,7 @@ protocol P2 {
 protocol Good: P2, P1 where Assoc == Self {}
 
 // CHECK-LABEL: redundant_protocol_refinement.(file).Good@
-// CHECK-LABEL: Requirement signature: <Self where Self : P1, Self : P2, Self == Self.Assoc>
+// CHECK-LABEL: Requirement signature: <Self where Self : P1, Self : P2, Self == Self.[P2]Assoc>
 
 // missing refinement of 'P1'
 protocol Bad: P2 where Assoc == Self {}
@@ -36,4 +36,4 @@ protocol Bad: P2 where Assoc == Self {}
 // expected-note@-2 {{conformance constraint 'Self' : 'P1' implied here}}
 
 // CHECK-LABEL: redundant_protocol_refinement.(file).Bad@
-// CHECK-LABEL: Requirement signature: <Self where Self : P2, Self == Self.Assoc>
+// CHECK-LABEL: Requirement signature: <Self where Self : P2, Self == Self.[P2]Assoc>

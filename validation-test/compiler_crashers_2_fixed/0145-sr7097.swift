@@ -9,7 +9,7 @@ protocol P2 {
 }
 
 // CHECK-LABEL: .P3@
-// CHECK-NEXT: Requirement signature: <Self where Self : P2, Self.Assoc == ConformsToP1>
+// CHECK-NEXT: Requirement signature: <Self where Self : P2, Self.[P2]Assoc == ConformsToP1>
 protocol P3 : P2 { }
 
 struct S0<M: P3> where M.Assoc: P1 { } // expected-warning{{redundant conformance constraint 'M.Assoc' : 'P1'}}
