@@ -2015,6 +2015,9 @@ public:
   SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
 
+  LLVM_READONLY
+  ASTContext &getASTContext() const { return DeclContext::getASTContext(); }
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TopLevelCode;
   }
