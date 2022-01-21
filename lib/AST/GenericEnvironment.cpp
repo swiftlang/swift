@@ -362,11 +362,23 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       break;
     }
 
-    case Kind::Opaque:
+    case Kind::Opaque: {
+      // If the anchor type isn't rooted in a generic parameter that
+      // represents an opaque declaration, then apply the outer substitutions.
+      // It would be incorrect to build an opaque type archetype here.
+      auto rootGP = requirements.anchor->getRootGenericParam();
+      unsigned opaqueDepth =
+          getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
+      if (rootGP->getDepth() < opaqueDepth) {
+        result = maybeApplyOpaqueTypeSubstitutions(requirements.anchor);
+        break;
+      }
+
       result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
                                                requirements.protos, superclass,
                                                requirements.layout);
       break;
+    }
     }
   }
 

@@ -93,7 +93,7 @@ public:
   bool isContextArchetype() const {
     if (auto archetype =
             Type->getWithoutSpecifierType()->getAs<ArchetypeType>()) {
-      return !isa<OpaqueTypeArchetypeType>(archetype->getRoot());
+      return !isa<OpaqueTypeArchetypeType>(archetype);
     }
     return false;
   }
