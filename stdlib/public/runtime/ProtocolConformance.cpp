@@ -981,13 +981,15 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
         foundWitness = witness;
         foundType = searchType;
       } else {
+        auto foundName = swift_getTypeName(foundType, true);
+        auto searchName = swift_getTypeName(searchType, true);
         swift::warning(RuntimeErrorFlagNone,
-                       "Warning: '%s' conforms to protocol '%s', but it also "
-                       "inherits conformance from '%s'.  Relying on a "
+                       "Warning: '%.*s' conforms to protocol '%s', but it also "
+                       "inherits conformance from '%.*s'.  Relying on a "
                        "particular conformance is undefined behaviour.\n",
-                       foundType->getDescription()->Name.get(),
+                       (int)foundName.length, foundName.data,
                        protocol->Name.get(),
-                       searchType->getDescription()->Name.get());
+                       (int)searchName.length, searchName.data);
       }
     }
   }
