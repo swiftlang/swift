@@ -1,10 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -parse-stdlib -emit-sil -o /dev/null
 
 // REQUIRES: optimized_stdlib
-// REQUIRES: rdar87618517
-
-// rdar://87618517
-// UNSUPPORTED: asan
 
 import Swift
 

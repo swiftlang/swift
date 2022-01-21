@@ -822,7 +822,8 @@ bool ClosureArgDataflowState::process(
     for (unsigned i : indices(livenessWorklist)) {
       if (auto *ptr = livenessWorklist[i]) {
         LLVM_DEBUG(llvm::dbgs()
-                   << "ClosureArgLivenessDataflow. Liveness User: " << *ptr);
+                   << "ClosureArgLivenessDataflow. Final: Liveness User: "
+                   << *ptr);
         state.pairedUseInsts.push_back(ptr);
       }
     }
@@ -1350,6 +1351,7 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
       auto *func = fas.getCalleeFunction();
       if (!func || !func->isDefer())
         return false;
+      LLVM_DEBUG(llvm::dbgs() << "Found closure use: " << *op->getUser());
       useState.insertClosureOperand(op);
       return true;
     }
@@ -1595,12 +1597,14 @@ bool DataflowState::process(
     bool emittedSingleDiagnostic = false;
 
     LLVM_DEBUG(llvm::dbgs() << "Checking Multi Block Dataflow for: " << *mvi);
+    LLVM_DEBUG(llvm::dbgs() << "    Parent Block: bb"
+                            << mvi->getParent()->getDebugID() << "\n");
 
     BasicBlockWorklist worklist(fn);
     BasicBlockSetVector visitedBlocks(fn);
     for (auto *succBlock : mvi->getParent()->getSuccessorBlocks()) {
       LLVM_DEBUG(llvm::dbgs()
-                 << "    SuccBlocks: " << succBlock->getDebugID() << "\n");
+                 << "    SuccBlocks: bb" << succBlock->getDebugID() << "\n");
       worklist.pushIfNotVisited(succBlock);
       visitedBlocks.insert(succBlock);
     }
@@ -1644,7 +1648,8 @@ bool DataflowState::process(
       {
         auto iter = closureUseBlocks.find(next);
         if (iter != closureUseBlocks.end()) {
-          LLVM_DEBUG(llvm::dbgs() << "    Is Use Block! Emitting Error!\n");
+          LLVM_DEBUG(llvm::dbgs()
+                     << "    Is Use Block From Closure! Emitting Error!\n");
           // We found one! Emit the diagnostic and continue and see if we can
           // get more diagnostics.
           auto &astContext = fn->getASTContext();
@@ -1825,7 +1830,7 @@ void DataflowState::init() {
     }
   }
 
-  for (auto closureUse : useState.closureUses) {
+  for (auto &closureUse : useState.closureUses) {
     auto *use = closureUse.first;
     auto &state = closureUse.second;
     auto *user = use->getUser();
