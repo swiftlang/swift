@@ -35,7 +35,7 @@ namespace swift {
 
 class PathRemapper {
   SmallVector<std::pair<std::string, std::string>, 2> PathMappings;
-
+  friend class PathObfuscator;
 public:
   /// Adds a mapping such that any paths starting with `FromPrefix` have that
   /// portion replaced with `ToPrefix`.
@@ -71,6 +71,11 @@ public:
   }
   std::string recover(StringRef Path) const {
     return recoverer.remapPath(Path);
+  }
+  void forEachPair(llvm::function_ref<void(StringRef, StringRef)> op) const {
+    for (auto pair: obfuscator.PathMappings) {
+      op(pair.first, pair.second);
+    }
   }
 };
 

@@ -174,6 +174,11 @@ public:
     SearchPathOpts.setImportSearchPaths(Paths);
   }
 
+  void setSerializedPathObfuscator(const PathObfuscator &obfuscator) {
+    FrontendOpts.serializedPathObfuscator = obfuscator;
+    SearchPathOpts.DeserializedPathRecoverer = obfuscator;
+  }
+
   ArrayRef<std::string> getImportSearchPaths() const {
     return SearchPathOpts.getImportSearchPaths();
   }

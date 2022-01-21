@@ -1341,6 +1341,15 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.getLangOptions().DisableAvailabilityChecking = true;
     GenericArgs.push_back("-disable-availability-checking");
   }
+
+  // Pass-down the obfuscators so we can get the serialized search paths properly.
+  genericSubInvocation.setSerializedPathObfuscator(
+    SearchPathOpts.DeserializedPathRecoverer);
+  SearchPathOpts.DeserializedPathRecoverer
+    .forEachPair([&](StringRef lhs, StringRef rhs) {
+      GenericArgs.push_back(ArgSaver.save(llvm::Twine("-serialized-path-obfuscate ")
+        + lhs + "=" + rhs).str());
+  });
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
