@@ -43,7 +43,7 @@ fi
 cd $SOURCE_PATH
 
 if [ -z $(which cmake) ]; then
-  wget -O install_cmake.sh "https://github.com/Kitware/CMake/releases/download/v3.17.2/cmake-3.17.2-Linux-x86_64.sh"
+  wget -O install_cmake.sh "https://github.com/Kitware/CMake/releases/download/v3.22.1/cmake-3.22.1-linux-$(uname -m).sh"
   chmod +x install_cmake.sh
   sudo mkdir -p /opt/cmake
   sudo ./install_cmake.sh --skip-license --prefix=/opt/cmake
