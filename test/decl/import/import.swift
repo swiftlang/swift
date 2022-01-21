@@ -49,6 +49,7 @@ import func Swift.min
 
 import var x // expected-error {{expected module name}}
 import struct Swift.nonexistent // expected-error {{struct 'nonexistent' does not exist in module 'Swift'}}
+import func SwiftUI.Text.++ // expected-error{{cannot include postfix operator in import declaration}}{{25-28=}}
 
 import Swift.import.abc // expected-error {{expected identifier in import declaration}}
 // expected-error @-1 {{keyword 'import' cannot be used as an identifier here}}

@@ -315,6 +315,8 @@ ERROR(decl_expected_module_name,none,
 ERROR(expected_module_alias,none,
       "cannot refer to module as %0 because it has been aliased; use %1 "
       "instead", (Identifier, Identifier))
+ERROR(unexpected_operator_in_import_path,none,
+      "cannot include postfix operator in import declaration",())
 
 // Extension
 ERROR(expected_lbrace_extension,PointsToFirstBadToken,
