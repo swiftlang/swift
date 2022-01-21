@@ -329,11 +329,18 @@ bool CompileInstance::performCompile(
     DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag) {
 
+  // Cancellation check. This gives a chance to cancel queued up requests before
+  // processing anything.
+  if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
+    return true;
+
   performSema(Args, fileSystem, DiagC, CancellationFlag);
   if (CI->getDiags().hadAnyError())
     return true;
 
-  // TODO: Cancellation check.
+  // Cancellation check after Sema.
+  if (CI->isCancellationRequested())
+    return true;
 
   int ReturnValue = 0;
   return performCompileStepsPostSema(*CI, ReturnValue, /*observer=*/nullptr);
