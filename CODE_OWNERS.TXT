@@ -75,7 +75,7 @@ D: Debug info
 N: Jordan Rose
 E: jordan_rose@apple.com
 G: jrose-apple
-D: ClangImporter, Serialization, PrintAsObjC, Driver, Frontend
+D: ClangImporter, Serialization, PrintAsClang, Driver, Frontend
 
 N: Daniel Steffen
 E: dsteffen@apple.com

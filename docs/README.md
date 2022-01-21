@@ -102,7 +102,7 @@ documentation, please create a thread on the Swift forums under the
 - [DependencyAnalysis.md](/docs/DependencyAnalysis.md):
   Describes different kinds of dependencies across files in the same module,
   important for understanding incremental builds.
-- C and ObjC interoperability: Clang Importer and PrintAsObjC
+- C and ObjC interoperability: Clang Importer and PrintAsClang
   - [CToSwiftNameTranslation.md](/docs/CToSwiftNameTranslation.md):
     Describes how C and ObjC entities are imported into Swift
     by the Clang Importer.

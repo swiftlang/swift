@@ -64,7 +64,7 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
   for (const NominalTypeDecl * D = ED;
        D != nullptr;
        D = D->getDeclContext()->getSelfNominalTypeDecl()) {
-    // We don't currently PrintAsObjC any types whose parents are private or
+    // We don't currently PrintAsClang any types whose parents are private or
     // fileprivate.
     assert(D->getFormalAccess() >= AccessLevel::Internal &&
             "We don't currently append private discriminators");
