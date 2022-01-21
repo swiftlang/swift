@@ -796,6 +796,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///
 ///   type-composition:
 ///     'some'? type-simple
+///     'any'? type-simple
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
@@ -818,8 +819,9 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     SomeTypeContext.setTransparent();
   }
   
-  auto applyOpaque = [&](TypeRepr *type) -> TypeRepr* {
-    if (opaqueLoc.isValid()) {
+  auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
+    if (opaqueLoc.isValid() &&
+        (anyLoc.isInvalid() || SourceMgr.isBeforeInBuffer(opaqueLoc, anyLoc))) {
       type = new (Context) OpaqueReturnTypeRepr(opaqueLoc, type);
     } else if (anyLoc.isValid()) {
       type = new (Context) ExistentialTypeRepr(anyLoc, type);
@@ -879,14 +881,18 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
       auto keyword = Tok.getText();
       auto badLoc = consumeToken();
 
+      const bool isAnyKeyword = keyword.equals("any");
+
       diagnose(badLoc, diag::opaque_mid_composition, keyword)
           .fixItRemove(badLoc)
           .fixItInsert(FirstTypeLoc, keyword.str() + " ");
 
-      if (opaqueLoc.isInvalid()) {
+      if (isAnyKeyword) {
+        if (anyLoc.isInvalid()) {
+          anyLoc = badLoc;
+        }
+      } else if (opaqueLoc.isInvalid()) {
         opaqueLoc = badLoc;
-      } else if (anyLoc.isInvalid()) {
-        anyLoc = badLoc;
       }
     }
 
