@@ -263,6 +263,11 @@ bool CompileInstance::setupCI(
     return false;
   }
 
+  // Since LLVM arguments are parsed into a global state, LLVM can't handle
+  // multiple argument sets in a process simultaneously. So let's ignore them.
+  // FIXME: Remove this if possible.
+  invocation.getFrontendOptions().LLVMArgs.clear();
+
   /// Declare the frontend to be used for multiple compilations.
   invocation.getFrontendOptions().ReuseFrontendForMutipleCompilations = true;
 
