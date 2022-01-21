@@ -124,7 +124,111 @@ already infer from static analysis.
 Changing the implementation in a way that violates the optimizer's assumptions
 about the effects results in undefined behavior.
 
-For more details, see [OptimizerEffects.rst](/docs/proposals/OptimizerEffects.rst).
+### `@_effects(readnone)`
+
+Defines that the function does not have any observable memory reads or writes
+or any other observable side effects.
+
+This does not mean that the function cannot read or write memory at all.
+For example, it’s allowed to allocate and write to local objects inside the
+function. For example, the following `readnone` function allocates an array and
+writes to the array buffer
+
+```swift
+@_effects(readnone)
+func lookup(_ i: Int) -> Int {
+  let a = [7, 3 ,6, 9]
+  return a[i]
+}
+```
+
+A function can be marked as readnone if two calls of the same function with the
+same parameters can be simplified to one call (e.g. by the CSE optimization)
+without changing the semantics of the program.
+For example,
+
+```swift
+  let a = lookup(i)
+  // some other code, including memory writes
+  let b = lookup(i)
+```
+is equivalent to
+
+```swift
+  let a = lookup(i)
+  // some other code, including memory writes
+  let b = a
+```
+
+Some conclusions:
+
+* A `readnone` function must not return a newly allocated class instance.
+
+* A `readnone` function can return a newly allocated copy-on-write object, like
+  an Array, because COW data types conceptually behave like value types.
+
+* A `readnone` function must not release any parameter or any object indirectly
+  referenced from a parameter.
+
+* Any kind of observable side-effects are not allowed, like `print`, file IO, etc.
+
+### `@_effects(readonly)`
+
+Defines that the function does not have any observable memory writes or any
+other observable side effects, beside reading of memory.
+
+Similar to `readnone`, a `readonly` function is allowed to write to local objects.
+
+A function can be marked as `readonly` if it’s save to eliminate a call to such
+a function in case its return value is not used.
+Example:
+
+```swift
+@_effects(readonly)
+func lookup2(_ instance: SomeClass) -> Int {
+  let a = [7, 3 ,6, 9]
+  return a[instance.i]
+}
+```
+
+It is legal to eliminate an unused call to this function:
+
+```
+_ = lookup2(i)  // can be completely eliminated
+```
+
+Note that it would not be legal to CSE two calls to this function, because
+between those calls the member `i` of the class instance could be modified:
+
+```swift
+  let a = lookup2(instance)
+  instance.i += 1
+  let b = lookup2(instance)   // cannot be CSE'd with the first call
+```
+
+The same conclusions as for `readnone` also apply to `readonly`.
+
+### `@_effects(releasenone)`
+
+Defines that the function does not release any class instance.
+
+This effect must be used with care.
+There are several code patterns which release objects in a non-obvious way.
+For example:
+
+* A parameter which is passed to an “owned” argument (and not stored), like
+  initializer arguments.
+
+* Assignments, because they release the old value
+
+* COW data types, e.g. Strings. Conceptually they are value types, but
+  internally the keep a reference counted buffer.
+
+* Class references deep inside a hierarchy of value types.
+
+### `@_effects(readwrite)`
+
+This effect is not used by the compiler.
 
 ## `@_exported`
 
