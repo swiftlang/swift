@@ -99,6 +99,9 @@ class PropertyBag {
   /// ConformsTo list.
   llvm::TinyPtrVector<ProtocolConformance *> ConcreteConformances;
 
+  /// Cache of associated type declarations.
+  llvm::SmallDenseMap<Identifier, AssociatedTypeDecl *, 2> AssocTypes;
+
   explicit PropertyBag(Term key) : Key(key) {}
 
   void copyPropertiesFrom(const PropertyBag *next,
@@ -124,7 +127,7 @@ public:
   Type getSuperclassBound(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      RewriteContext &ctx) const;
+      const PropertyMap &map) const;
 
   bool isConcreteType() const {
     return ConcreteType.hasValue();
@@ -137,7 +140,7 @@ public:
   Type getConcreteType(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      RewriteContext &ctx) const;
+      const PropertyMap &map) const;
 
   LayoutConstraint getLayoutConstraint() const {
     return Layout;
@@ -151,6 +154,8 @@ public:
   getConformsToExcludingSuperclassConformances() const;
 
   MutableTerm getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const;
+
+  AssociatedTypeDecl *getAssociatedType(Identifier name);
 
   void verify(const RewriteSystem &system) const;
 };
@@ -212,6 +217,8 @@ public:
 
   ~PropertyMap();
 
+  PropertyBag *lookUpProperties(std::reverse_iterator<const Symbol *> begin,
+                                std::reverse_iterator<const Symbol *> end) const;
   PropertyBag *lookUpProperties(const MutableTerm &key) const;
 
   std::pair<CompletionResult, unsigned>
@@ -219,6 +226,31 @@ public:
                    unsigned maxDepth);
 
   void dump(llvm::raw_ostream &out) const;
+
+  /// Return the rewrite context used for allocating memory.
+  RewriteContext &getRewriteContext() const { return Context; }
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Term to type conversion. The opposite direction is implemented in
+  /// RewriteContext because it does not depend on the current rewrite system.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  Type getTypeForTerm(Term term,
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  Type getTypeForTerm(const MutableTerm &term,
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  Type getRelativeTypeForTerm(
+                      const MutableTerm &term, const MutableTerm &prefix) const;
+
+  Type getTypeFromSubstitutionSchema(
+                      Type schema,
+                      ArrayRef<Term> substitutions,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      const MutableTerm &prefix) const;
 
 private:
   void clear();

@@ -107,7 +107,7 @@ RequirementMachine::buildRequirementsFromRules(
   // Convert a rewrite rule into a requirement.
   auto createRequirementFromRule = [&](const Rule &rule) {
     if (auto prop = rule.isPropertyRule()) {
-      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
+      auto subjectType = Map.getTypeForTerm(rule.getRHS(), genericParams);
 
       switch (prop->getKind()) {
       case Symbol::Kind::Protocol:
@@ -125,7 +125,7 @@ RequirementMachine::buildRequirementsFromRules(
       case Symbol::Kind::Superclass: {
         // For compatibility with the old GenericSignatureBuilder, drop requirements
         // containing ErrorTypes.
-        auto superclassType = Context.getTypeFromSubstitutionSchema(
+        auto superclassType = Map.getTypeFromSubstitutionSchema(
                                 prop->getSuperclass(),
                                 prop->getSubstitutions(),
                                 genericParams, MutableTerm());
@@ -138,7 +138,7 @@ RequirementMachine::buildRequirementsFromRules(
       }
 
       case Symbol::Kind::ConcreteType: {
-        auto concreteType = Context.getTypeFromSubstitutionSchema(
+        auto concreteType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 genericParams, MutableTerm());
@@ -164,8 +164,8 @@ RequirementMachine::buildRequirementsFromRules(
     }
 
     assert(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
-    auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams);
-    auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
+    auto constraintType = Map.getTypeForTerm(rule.getLHS(), genericParams);
+    auto subjectType = Map.getTypeForTerm(rule.getRHS(), genericParams);
 
     sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
   };

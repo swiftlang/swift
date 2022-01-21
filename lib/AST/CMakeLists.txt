@@ -76,6 +76,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementEnvironment.cpp
   RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/HomotopyReduction.cpp
+  RequirementMachine/InterfaceType.cpp
   RequirementMachine/KnuthBendix.cpp
   RequirementMachine/MinimalConformances.cpp
   RequirementMachine/PropertyMap.cpp
