@@ -2597,7 +2597,9 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       outerParams->setDepth(depth--);
 
     return genericParams;
-  } else if (auto *proto = dyn_cast<ProtocolDecl>(value)) {
+  }
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(value)) {
     // The generic parameter 'Self'.
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
@@ -2615,7 +2617,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
                                            SourceLoc());
     return result;
   }
-  return nullptr;
+
+  return value->getParsedGenericParams();
 }
 
 NominalTypeDecl *

@@ -212,22 +212,31 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
 //----------------------------------------------------------------------------//
 
 Optional<GenericParamList *> GenericParamListRequest::getCachedResult() const {
+  using GenericParamsState = GenericContext::GenericParamsState;
   auto *decl = std::get<0>(getStorage());
-  if (auto *params = decl->GenericParamsAndBit.getPointer())
-    return params;
+  switch (decl->GenericParamsAndState.getInt()) {
+  case GenericParamsState::TypeChecked:
+  case GenericParamsState::ParsedAndTypeChecked:
+    return decl->GenericParamsAndState.getPointer();
 
-  if (decl->GenericParamsAndBit.getInt())
-    return nullptr;
-
-  return None;
+  case GenericParamsState::Parsed:
+    return None;
+  }
 }
 
 void GenericParamListRequest::cacheResult(GenericParamList *params) const {
+  using GenericParamsState = GenericContext::GenericParamsState;
   auto *context = std::get<0>(getStorage());
   if (params)
     params->setDeclContext(context);
 
-  context->GenericParamsAndBit.setPointerAndInt(params, true);
+  assert(context->GenericParamsAndState.getInt() == GenericParamsState::Parsed);
+  bool hadParsedGenericParams =
+  context->GenericParamsAndState.getPointer() != nullptr;
+  auto newState = hadParsedGenericParams
+      ? GenericParamsState::ParsedAndTypeChecked
+      : GenericParamsState::TypeChecked;
+  context->GenericParamsAndState.setPointerAndInt(params, newState);
 }
 
 //----------------------------------------------------------------------------//
