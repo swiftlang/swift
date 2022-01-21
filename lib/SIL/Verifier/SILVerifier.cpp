@@ -86,18 +86,17 @@ static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  auto root = A->getRoot();
-  if (!isa<PrimaryArchetypeType>(root) && !isa<SequenceArchetypeType>(root))
+  if (!isa<PrimaryArchetypeType>(A) && !isa<SequenceArchetypeType>(A))
     return true;
-  if (isa<OpenedArchetypeType>(root))
+  if (isa<OpenedArchetypeType>(A))
     return true;
-  if (isa<OpaqueTypeArchetypeType>(root))
+  if (isa<OpaqueTypeArchetypeType>(A))
     return true;
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (root->getGenericEnvironment() == genericEnv)
+    if (A->getGenericEnvironment() == genericEnv)
       return true;
 
   return false;

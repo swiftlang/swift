@@ -2807,6 +2807,19 @@ public:
 
       unsigned currentDepth = DC->getGenericContextDepth();
       if (currentDepth < GTPD->getDepth()) {
+        // If this is actually an opaque type's generic parameter, we're okay.
+        if (auto value = dyn_cast_or_null<ValueDecl>(DC->getAsDecl())) {
+          auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(value);
+          if (!opaqueDecl)
+            opaqueDecl = value->getOpaqueResultTypeDecl();
+          if (opaqueDecl) {
+            if (GTPD->getDepth() ==
+                    opaqueDecl->getOpaqueGenericParams().front()->getDepth()) {
+              return;
+            }
+          }
+        }
+
         Out << "GenericTypeParamDecl has incorrect depth\n";
         abort();
       }

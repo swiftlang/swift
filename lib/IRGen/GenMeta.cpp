@@ -2007,29 +2007,7 @@ namespace {
     ///
     /// When it does, returns the protocol.
     ProtocolDecl *requiresWitnessTable(const Requirement &req) const {
-      // We only care about conformance requirements.
-      if (req.getKind() != RequirementKind::Conformance)
-        return nullptr;
-
-      // The protocol must require a witness table.
-      auto proto = req.getProtocolDecl();
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-        return nullptr;
-
-      // The type itself must be anchored on one of the generic parameters of
-      // the opaque type (not an outer context).
-      Type subject = req.getFirstType();
-      while (auto depMember = subject->getAs<DependentMemberType>()) {
-        subject = depMember->getBase();
-      }
-
-      if (auto genericParam = subject->getAs<GenericTypeParamType>()) {
-        unsigned opaqueDepth = O->getOpaqueGenericParams().front()->getDepth();
-        if (genericParam->getDepth() == opaqueDepth)
-          return proto;
-      }
-
-      return nullptr;
+      return opaqueTypeRequiresWitnessTable(O, req);
     }
 
   public:
@@ -2154,6 +2132,33 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+ProtocolDecl *irgen::opaqueTypeRequiresWitnessTable(
+    OpaqueTypeDecl *opaque, const Requirement &req) {
+  // We only care about conformance requirements.
+  if (req.getKind() != RequirementKind::Conformance)
+    return nullptr;
+
+  // The protocol must require a witness table.
+  auto proto = req.getProtocolDecl();
+  if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+    return nullptr;
+
+  // The type itself must be anchored on one of the generic parameters of
+  // the opaque type (not an outer context).
+  Type subject = req.getFirstType();
+  while (auto depMember = subject->getAs<DependentMemberType>()) {
+    subject = depMember->getBase();
+  }
+
+  if (auto genericParam = subject->getAs<GenericTypeParamType>()) {
+    unsigned opaqueDepth = opaque->getOpaqueGenericParams().front()->getDepth();
+    if (genericParam->getDepth() == opaqueDepth)
+      return proto;
+  }
+
+  return nullptr;
+}
 
 static void eraseExistingTypeContextDescriptor(IRGenModule &IGM,
                                                NominalTypeDecl *type) {

@@ -536,16 +536,32 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           ProtocolDecl *protocol) {
   auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFn();
   auto opaqueDecl = archetype->getDecl();
-
+  assert(archetype->isRoot() && "Can only follow from the root");
 
   llvm::Value *descriptor = getAddressOfOpaqueTypeDescriptor(IGF, opaqueDecl);
 
-  auto foundProtocol = std::find(archetype->getConformsTo().begin(),
-                                 archetype->getConformsTo().end(),
-                                 protocol);
-  assert(foundProtocol != archetype->getConformsTo().end());
-  
-  unsigned index = foundProtocol - archetype->getConformsTo().begin() + 1;
+  // Compute the index at which this witness table resides.
+  unsigned index = opaqueDecl->getOpaqueGenericParams().size();
+  auto opaqueReqs =
+      opaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements();
+  bool found = false;
+  for (const auto &req : opaqueReqs) {
+    auto reqProto = opaqueTypeRequiresWitnessTable(opaqueDecl, req);
+    if (!reqProto)
+      continue;
+
+    // Is this requirement the one we're looking for?
+    if (reqProto == protocol &&
+        req.getFirstType()->isEqual(archetype->getInterfaceType())) {
+      found = true;
+      break;
+    }
+
+    ++index;
+  }
+
+  (void)found;
+  assert(found && "Opaque type does not conform to protocol");
   auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, index);
   
   llvm::CallInst *result = nullptr;
