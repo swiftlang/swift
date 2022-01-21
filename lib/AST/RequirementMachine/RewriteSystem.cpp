@@ -152,7 +152,7 @@ void Rule::dump(llvm::raw_ostream &out) const {
   if (Redundant)
     out << " [redundant]";
   if (Conflicting)
-    out << "[conflicting]";
+    out << " [conflicting]";
 }
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
