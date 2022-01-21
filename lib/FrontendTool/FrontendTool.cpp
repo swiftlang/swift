@@ -62,7 +62,7 @@
 #include "swift/Option/Options.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
-#include "swift/PrintAsObjC/PrintAsObjC.h"
+#include "swift/PrintAsClang/PrintAsClang.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"

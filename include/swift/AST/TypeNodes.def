@@ -33,7 +33,7 @@
 ///   process does not necessarily converge to the canonical type, however.
 ///   The default behavior is TYPE(id, parent).
 //
-// If you add a new sugared type, be sure to test it in PrintAsObjC!
+// If you add a new sugared type, be sure to test it in PrintAsClang!
 
 /// UNCHECKED_TYPE(id, parent)
 ///   This type is not present in valid, type-checked programs.

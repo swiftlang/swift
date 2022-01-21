@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_PRINTASOBJC_MODULECONTENTSWRITER_H
-#define SWIFT_PRINTASOBJC_MODULECONTENTSWRITER_H
+#ifndef SWIFT_PRINTASCLANG_MODULECONTENTSWRITER_H
+#define SWIFT_PRINTASCLANG_MODULECONTENTSWRITER_H
 
 #include "swift/AST/AttrKind.h"
 #include "swift/Basic/LLVM.h"

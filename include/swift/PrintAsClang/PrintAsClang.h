@@ -1,4 +1,4 @@
-//===--- PrintAsObjC.h - Emit a header file for a Swift AST -----*- C++ -*-===//
+//===--- PrintAsClang.h - Emit a header file for a Swift AST ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_PRINTASOBJC_H
-#define SWIFT_PRINTASOBJC_H
+#ifndef SWIFT_PRINTASCLANG_H
+#define SWIFT_PRINTASCLANG_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/AttrKind.h"
