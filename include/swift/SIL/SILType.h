@@ -179,10 +179,18 @@ public:
   ///    `@thick AnyObject.Type`.
   ///    More generally, you cannot recover a formal type from
   ///    a lowered type. See docs/SIL.rst for more details.
-  CanType getASTType() const {
-    return CanType(value.getPointer());
-  }
-  
+  /// 3. If the underlying type is move only, the returned CanType will not be
+  ///    pointer equal to the RawASTType since we return the unwrapped inner
+  ///    type. This is done under the assumption that in all cases where we are
+  ///    performing these AST queries on SILType, we are not interested in the
+  ///    move only-ness of the value (which we can query separately anyways).
+  CanType getASTType() const { return withoutMoveOnly().getRawASTType(); }
+
+  /// Returns the canonical AST type references by this SIL type without looking
+  /// through move only. Should only be used by internal utilities of SILType.
+  CanType getRawASTType() const { return CanType(value.getPointer()); }
+
+public:
   // FIXME -- Temporary until LLDB adopts getASTType()
   LLVM_ATTRIBUTE_DEPRECATED(CanType getSwiftRValueType() const,
                             "Please use getASTType()") {
@@ -411,9 +419,7 @@ public:
   }
 
   /// True if the type involves any archetypes.
-  bool hasArchetype() const {
-    return getASTType()->hasArchetype();
-  }
+  bool hasArchetype() const { return getASTType()->hasArchetype(); }
 
   /// True if the type involves any opaque archetypes.
   bool hasOpaqueArchetype() const {
@@ -586,7 +592,42 @@ public:
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getASTType()->isAnyObject(); }
-  
+
+  /// Returns true if this SILType is a move only wrapper type.
+  ///
+  /// Canonical way to check if a SILType is move only. Using is/getAs/castTo
+  /// will look through moveonly-ness.
+  bool isMoveOnly() const { return getRawASTType()->is<SILMoveOnlyType>(); }
+
+  /// Return *this if already move only... otherwise, wrap the current type
+  /// within a move only type wrapper and return that. Idempotent!
+  SILType asMoveOnly() const {
+    if (isMoveOnly())
+      return *this;
+    auto newType = SILMoveOnlyType::get(getRawASTType());
+    return SILType::getPrimitiveType(newType, getCategory());
+  }
+
+  /// Return this SILType, removing moveonly-ness.
+  ///
+  /// Is idempotent.
+  SILType withoutMoveOnly() const {
+    if (!isMoveOnly())
+      return *this;
+    auto moveOnly = getRawASTType()->castTo<SILMoveOnlyType>();
+    return SILType::getPrimitiveType(moveOnly->getInnerType(), getCategory());
+  }
+
+  /// If \p otherType is move only, return this type that is move only as
+  /// well. Otherwise, returns self. Useful for propagating "move only"-ness
+  /// from a parent type to a subtype.
+  SILType copyMoveOnly(SILType otherType) const {
+    if (otherType.isMoveOnly()) {
+      return asMoveOnly();
+    }
+    return *this;
+  }
+
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
 
