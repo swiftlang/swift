@@ -182,7 +182,12 @@ public:
   CanType getASTType() const {
     return CanType(value.getPointer());
   }
-  
+
+  /// Returns the underlying type that provides semantic meaning to this type
+  /// looking through modifiers like SILMoveOnlyType. If not a SILMoveOnlyType,
+  /// this is just getASTType().
+  CanType getSemanticASTType() const { return withoutMoveOnly().getASTType(); }
+
   // FIXME -- Temporary until LLDB adopts getASTType()
   LLVM_ATTRIBUTE_DEPRECATED(CanType getSwiftRValueType() const,
                             "Please use getASTType()") {
@@ -212,6 +217,27 @@ public:
   template<typename TYPE>
   bool is() const { return isa<TYPE>(getASTType()); }
 
+  /// Cast the Swift type referenced by this SIL type, or return null if the
+  /// cast fails.
+  template <typename TYPE>
+  typename CanTypeWrapperTraits<TYPE>::type semanticGetAs() const {
+    return dyn_cast<TYPE>(getSemanticASTType());
+  }
+
+  /// Cast the Swift type referenced by this SIL type, which must be of the
+  /// specified subtype.
+  template <typename TYPE>
+  typename CanTypeWrapperTraits<TYPE>::type semanticCastTo() const {
+    return cast<TYPE>(getSemanticASTType());
+  }
+
+  /// Returns true if the Swift type referenced by this SIL type is of the
+  /// specified subtype.
+  template <typename TYPE>
+  bool semanticIs() const {
+    return isa<TYPE>(getSemanticASTType());
+  }
+
   bool isVoid() const {
     return value.getPointer()->isVoid();
   }
@@ -224,12 +250,12 @@ public:
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
   StructDecl *getStructOrBoundGenericStruct() const {
-    return getASTType().getStructOrBoundGenericStruct();
+    return getSemanticASTType().getStructOrBoundGenericStruct();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
   EnumDecl *getEnumOrBoundGenericEnum() const {
-    return getASTType().getEnumOrBoundGenericEnum();
+    return getSemanticASTType().getEnumOrBoundGenericEnum();
   }
   
   /// Returns true if this type is an enum or contains an enum.
@@ -242,7 +268,7 @@ public:
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
-    return getASTType().getNominalOrBoundGenericNominal();
+    return getSemanticASTType().getNominalOrBoundGenericNominal();
   }
 
   /// If this type maps to a Swift class, check if that class is a foreign
@@ -333,43 +359,43 @@ public:
   /// Returns true if the referenced AST type has reference semantics, even if
   /// the lowered SIL type is known to be trivial.
   bool hasReferenceSemantics() const {
-    return getASTType().hasReferenceSemantics();
+    return getSemanticASTType().hasReferenceSemantics();
   }
 
   /// Returns true if the referenced type is any sort of class-reference type,
   /// meaning anything with reference semantics that is not a function type.
   bool isAnyClassReferenceType() const {
-    return getASTType().isAnyClassReferenceType();
+    return getSemanticASTType().isAnyClassReferenceType();
   }
   
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
   bool hasRetainablePointerRepresentation() const {
-    return getASTType()->hasRetainablePointerRepresentation();
+    return getSemanticASTType()->hasRetainablePointerRepresentation();
   }
   /// Returns true if the referenced type is an existential type.
   bool isExistentialType() const {
-    return getASTType().isExistentialType();
+    return getSemanticASTType().isExistentialType();
   }
   /// Returns true if the referenced type is any kind of existential type.
   bool isAnyExistentialType() const {
-    return getASTType().isAnyExistentialType();
+    return getSemanticASTType().isAnyExistentialType();
   }
   /// Returns true if the referenced type is a class existential type.
   bool isClassExistentialType() const {
-    return getASTType()->isClassExistentialType();
+    return getSemanticASTType()->isClassExistentialType();
   }
 
   /// Returns true if the referenced type is an opened existential type
   /// (which is actually a kind of archetype).
   bool isOpenedExistential() const {
-    return getASTType()->isOpenedExistential();
+    return getSemanticASTType()->isOpenedExistential();
   }
 
   /// Returns true if the referenced type is expressed in terms of one
   /// or more opened existential types.
   bool hasOpenedExistential() const {
-    return getASTType()->hasOpenedExistential();
+    return getSemanticASTType()->hasOpenedExistential();
   }
   
   /// Returns the representation used by an existential type. If the concrete
@@ -389,12 +415,12 @@ public:
   
   /// True if the type contains a type parameter.
   bool hasTypeParameter() const {
-    return getASTType()->hasTypeParameter();
+    return getSemanticASTType()->hasTypeParameter();
   }
   
   /// True if the type is bridgeable to an ObjC object pointer type.
   bool isBridgeableObjectType() const {
-    return getASTType()->isBridgeableObjectType();
+    return getSemanticASTType()->isBridgeableObjectType();
   }
 
   static bool isClassOrClassMetatype(Type t) {
@@ -407,17 +433,15 @@ public:
 
   /// True if the type is a class type or class metatype type.
   bool isClassOrClassMetatype() {
-    return isObject() && isClassOrClassMetatype(getASTType());
+    return isObject() && isClassOrClassMetatype(getSemanticASTType());
   }
 
   /// True if the type involves any archetypes.
-  bool hasArchetype() const {
-    return getASTType()->hasArchetype();
-  }
+  bool hasArchetype() const { return getSemanticASTType()->hasArchetype(); }
 
   /// True if the type involves any opaque archetypes.
   bool hasOpaqueArchetype() const {
-    return getASTType()->hasOpaqueArchetype();
+    return getSemanticASTType()->hasOpaqueArchetype();
   }
   
   /// Returns the ASTContext for the referenced Swift type.
@@ -493,32 +517,34 @@ public:
   /// Return the immediate superclass type of this type, or null if
   /// it's the most-derived type.
   SILType getSuperclass() const {
-    auto superclass = getASTType()->getSuperclass();
+    auto superclass = getSemanticASTType()->getSuperclass();
     if (!superclass) return SILType();
     return SILType::getPrimitiveObjectType(superclass->getCanonicalType());
   }
 
   /// Return true if Ty is a subtype of this exact SILType, or false otherwise.
   bool isExactSuperclassOf(SILType Ty) const {
-    return getASTType()->isExactSuperclassOf(Ty.getASTType());
+    return getSemanticASTType()->isExactSuperclassOf(Ty.getSemanticASTType());
   }
 
   /// Return true if Ty is a subtype of this SILType, or if this SILType
   /// contains archetypes that can be found to form a supertype of Ty, or false
   /// otherwise.
   bool isBindableToSuperclassOf(SILType Ty) const {
-    return getASTType()->isBindableToSuperclassOf(Ty.getASTType());
+    return getSemanticASTType()->isBindableToSuperclassOf(
+        Ty.getSemanticASTType());
   }
 
   /// Look through reference-storage types on this type.
   SILType getReferenceStorageReferentType() const {
-    return SILType(getASTType().getReferenceStorageReferent(), getCategory());
+    return SILType(getSemanticASTType().getReferenceStorageReferent(),
+                   getCategory());
   }
 
   /// Return the reference ownership of this type if it is a reference storage
   /// type. Otherwise, return None.
   Optional<ReferenceOwnership> getReferenceStorageOwnership() const {
-    auto type = getASTType()->getAs<ReferenceStorageType>();
+    auto type = getSemanticASTType()->getAs<ReferenceStorageType>();
     if (!type)
       return None;
     return type->getOwnership();
@@ -529,7 +555,8 @@ public:
   /// storage types may not be loadable (e.x.: weak ownership).
   SILType getReferenceStorageType(const ASTContext &ctx,
                                   ReferenceOwnership ownership) const {
-    auto *type = ReferenceStorageType::get(getASTType(), ownership, ctx);
+    auto *type =
+        ReferenceStorageType::get(getSemanticASTType(), ownership, ctx);
     return SILType::getPrimitiveAddressType(type->getCanonicalType());
   }
 

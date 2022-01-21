@@ -287,11 +287,17 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
+        getSemanticASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
   }
 
   auto loweredTy =
       TC.getLoweredRValueType(context, origFieldTy, substFieldTy);
+
+  // If this type is not a class type, then we propagate "move only"-ness to the
+  // field. Example:
+  if (!getClassOrBoundGenericClass() && isMoveOnly())
+    loweredTy = SILMoveOnlyType::get(loweredTy);
+
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
     return SILType::getPrimitiveAddressType(loweredTy);
   } else {
@@ -309,9 +315,9 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
   assert(elt->hasAssociatedValues());
 
-  if (auto objectType = getASTType().getOptionalObjectType()) {
+  if (auto objectType = getSemanticASTType().getOptionalObjectType()) {
     assert(elt == TC.Context.getOptionalSomeDecl());
-    return SILType(objectType, getCategory());
+    return SILType(objectType, getCategory()).copyMoveOnly(*this);
   }
 
   // If the case is indirect, then the payload is boxed.
@@ -321,13 +327,12 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
                    getCategory());
   }
 
-  auto substEltTy =
-    getASTType()->getTypeOfMember(&TC.M, elt,
-                                  elt->getArgumentInterfaceType());
+  auto substEltTy = getSemanticASTType()->getTypeOfMember(
+      &TC.M, elt, elt->getArgumentInterfaceType());
   auto loweredTy = TC.getLoweredRValueType(
       context, TC.getAbstractionPattern(elt), substEltTy);
 
-  return SILType(loweredTy, getCategory());
+  return SILType(loweredTy, getCategory()).copyMoveOnly(*this);
 }
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M,
@@ -431,16 +436,16 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
 }
 
 SILType SILType::getOptionalObjectType() const {
-  if (auto objectTy = getASTType().getOptionalObjectType()) {
-    return SILType(objectTy, getCategory());
+  if (auto objectTy = getSemanticASTType().getOptionalObjectType()) {
+    return SILType(objectTy, getCategory()).copyMoveOnly(*this);
   }
 
   return SILType();
 }
 
 SILType SILType::unwrapOptionalType() const {
-  if (auto objectTy = getOptionalObjectType()) {
-    return objectTy;
+  if (auto objectTy = withoutMoveOnly().getOptionalObjectType()) {
+    return objectTy.copyMoveOnly(*this);
   }
 
   return *this;
@@ -471,7 +476,7 @@ static bool isBridgedErrorClass(ASTContext &ctx, Type t) {
 ExistentialRepresentation
 SILType::getPreferredExistentialRepresentation(Type containedType) const {
   // Existential metatypes always use metatype representation.
-  if (is<ExistentialMetatypeType>())
+  if (semanticIs<ExistentialMetatypeType>())
     return ExistentialRepresentation::Metatype;
   
   // If the type isn't existential, then there is no representation.
