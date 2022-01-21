@@ -8,7 +8,7 @@
 // REQUIRES: executable_test
 // XFAIL: windows
 
-// CHECK: Warning: 'Sub' conforms to protocol 'Hello', but it also inherits conformance from 'Super'.  Relying on a particular conformance is undefined behaviour.
+// CHECK: Warning: 'main.Sub' conforms to protocol 'Hello', but it also inherits conformance from 'Def.Super'.  Relying on a particular conformance is undefined behaviour.
 // CHECK: Hello
 
 import StdlibUnittest
