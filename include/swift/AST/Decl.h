@@ -5101,6 +5101,12 @@ public:
     : VarDecl(DeclKind::Var, isStatic, introducer, nameLoc,
               name, dc, StorageIsMutable_t(introducer == Introducer::Var)) {}
 
+  static VarDecl *createImported(ASTContext &Context, DeclName Name,
+                                   SourceLoc SubscriptLoc,
+                                   SourceLoc ArrowLoc, Type ElementTy,
+                                   DeclContext *Parent,
+                                   ClangNode ClangN);
+
   SourceRange getSourceRange() const;
 
   Identifier getName() const { return getBaseIdentifier(); }
