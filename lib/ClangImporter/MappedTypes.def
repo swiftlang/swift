@@ -155,7 +155,7 @@ MAP_STDLIB_TYPE(
   Impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSUInteger),
   UnsignedWord, 0, "Int", false, DoNothing)
 
-// CoreGraphics types.
+// CGFloat.
 MAP_TYPE("CGFloat", CGFloat, 0, "CoreGraphics", "CGFloat", false, DoNothing)
 
 // CoreFoundation types.
