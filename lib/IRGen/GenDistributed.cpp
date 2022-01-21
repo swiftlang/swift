@@ -121,6 +121,16 @@ private:
                const SILParameterInfo &param,
                Explosion &arguments);
 
+  /// Load witness table addresses (if any) from the given buffer
+  /// into the given argument explosion.
+  ///
+  /// Number of witnesses to load is provided by \c numTables but
+  /// it's checked against the number of \c expectedWitnessTables.
+  void emitLoadOfWitnessTables(llvm::Value *witnessTables,
+                               llvm::Value *numTables,
+                               unsigned expectedWitnessTables,
+                               Explosion &arguments);
+
   FunctionPointer getPointerToTarget() const;
 
   Callee getCalleeForDistributedTarget(llvm::Value *self) const;
@@ -137,6 +147,11 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   auto getRawPointerParameter = [&]() {
     auto ptrType = Context.getUnsafeRawPointerType();
     return SILParameterInfo(ptrType->getCanonicalType(),
+                            ParameterConvention::Direct_Guaranteed);
+  };
+
+  auto getUIntParameter = [&]() {
+    return SILParameterInfo(Context.getUIntType()->getCanonicalType(),
                             ParameterConvention::Direct_Guaranteed);
   };
 
@@ -162,6 +177,8 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
        /*argumentTypes=*/getRawPointerParameter(),
        /*resultBuffer=*/getRawPointerParameter(),
        /*substitutions=*/getRawPointerParameter(),
+       /*witnessTables=*/getRawPointerParameter(),
+       /*numWitnessTables=*/getUIntParameter(),
        /*actor=*/targetTy->getParameters().back()},
       /*Yields=*/{},
       /*Results=*/{},
@@ -432,6 +449,37 @@ DistributedAccessor::loadArgument(unsigned argumentIdx,
   return {alignedOffset.getAddress(), typeInfo.getSize(IGF, paramTy)};
 }
 
+void DistributedAccessor::emitLoadOfWitnessTables(llvm::Value *witnessTables,
+                                                  llvm::Value *numTables,
+                                                  unsigned expectedWitnessTables,
+                                                  Explosion &arguments) {
+  auto contBB = IGF.createBasicBlock("");
+  auto unreachableBB = IGF.createBasicBlock("incorrect-witness-tables");
+
+  auto incorrectNum = IGF.Builder.CreateICmpNE(
+      numTables, llvm::ConstantInt::get(IGM.SizeTy, expectedWitnessTables));
+
+  // Make sure that we have a correct number of witness tables provided to us.
+  IGF.Builder.CreateCondBr(incorrectNum, unreachableBB, contBB);
+  {
+    IGF.Builder.emitBlock(unreachableBB);
+    IGF.Builder.CreateUnreachable();
+  }
+
+  IGF.Builder.emitBlock(contBB);
+
+  witnessTables = IGF.Builder.CreateBitCast(witnessTables, IGM.Int8PtrPtrTy);
+
+  for (unsigned i = 0, n = expectedWitnessTables; i != n; ++i) {
+    auto offset = Size(i * IGM.getPointerSize());
+    auto alignment = IGM.getPointerAlignment();
+
+    auto witnessTableAddr = IGF.emitAddressAtOffset(
+        witnessTables, Offset(offset), IGM.Int8PtrTy, Alignment(alignment));
+    arguments.add(witnessTableAddr.getAddress());
+  }
+}
+
 void DistributedAccessor::emit() {
   auto targetTy = Target->getLoweredFunctionType();
   SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
@@ -457,6 +505,10 @@ void DistributedAccessor::emit() {
   auto *resultBuffer = params.claimNext();
   // UnsafeRawPointer that represents a list of substitutions
   auto *substitutions = params.claimNext();
+  // UnsafeRawPointer that represents a list of witness tables
+  auto *witnessTables = params.claimNext();
+  // Integer that represented the number of witness tables
+  auto *numWitnessTables = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
 
@@ -490,12 +542,22 @@ void DistributedAccessor::emit() {
   computeArguments(argBuffer, argTypes, arguments);
 
   // Add all of the substitutions to the explosion
-  if (auto *environment = Target->getGenericEnvironment()) {
+  if (auto *genericEnvironment = Target->getGenericEnvironment()) {
     // swift.type **
     llvm::Value *substitutionBuffer =
         IGF.Builder.CreateBitCast(substitutions, IGM.TypeMetadataPtrPtrTy);
 
-    for (unsigned index : indices(environment->getGenericParams())) {
+    // Collect the generic arguments expected by the distributed thunk.
+    // We need this to determine the expected number of witness tables
+    // to load from the buffer provided by the caller.
+    llvm::SmallVector<llvm::Type *, 4> targetGenericArguments;
+    expandPolymorphicSignature(IGM, targetTy, targetGenericArguments);
+
+    unsigned numGenericArgs = genericEnvironment->getGenericParams().size();
+    unsigned expectedWitnessTables =
+        targetGenericArguments.size() - numGenericArgs;
+
+    for (unsigned index = 0; index < numGenericArgs; ++index) {
       auto offset =
           Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
       auto alignment =
@@ -506,6 +568,9 @@ void DistributedAccessor::emit() {
                                   IGM.TypeMetadataPtrTy, Alignment(alignment));
       arguments.add(IGF.Builder.CreateLoad(substitution, "substitution"));
     }
+
+    emitLoadOfWitnessTables(witnessTables, numWitnessTables,
+                            expectedWitnessTables, arguments);
   }
 
   // Step two, let's form and emit a call to the distributed method

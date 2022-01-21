@@ -34,10 +34,19 @@ enum E : Sendable, Codable {
   case foo, bar
 }
 
+struct S<T: Codable> : Codable {
+  var data: T
+}
+
 @_silgen_name("swift_distributed_actor_is_remote")
 func __isRemoteActor(_ actor: AnyObject) -> Bool
 
 distributed actor Greeter {
+  distributed func generic1<T: Codable, U: Codable>(t: T, u: U) {
+    print("---> T = \(t), type(of:) = \(type(of: t))")
+    print("---> U = \(u), type(of:) = \(type(of: u))")
+  }
+
   distributed func empty() {
   }
 
@@ -60,7 +69,6 @@ distributed actor Greeter {
   distributed func enumResult() -> E {
     .bar
   }
-
 }
 
 
@@ -158,7 +166,6 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
       fatalError("Cannot cast argument\(anyArgument) to expected \(Argument.self)")
     }
 
-    print("  > decode argument: \(argument)")
     pointer.initialize(to: argument)
     argumentIndex += 1
   }
@@ -194,6 +201,8 @@ let answerName = "$s4main7GreeterC6answerSiyFTE"
 let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
 let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
 let echoName = "$s4main7GreeterC4echo4name3ageS2S_SitFTE"
+// <T: Codable, U: Codable>(t: T, u: U)
+let generic1Name = "$s4main7GreeterC8generic11t1uyx_q_tSeRzSERzSeR_SER_r0_lFTE"
 
 func test() async throws {
   let system = FakeActorSystem()
@@ -254,6 +263,25 @@ func test() async throws {
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: Echo: name: Caplin, age: 42
+
+  var generic1Invocation = system.makeInvocationEncoder()
+
+  try generic1Invocation.recordGenericSubstitution(Int.self)
+  try generic1Invocation.recordGenericSubstitution(String.self)
+  try generic1Invocation.recordArgument(42)
+  try generic1Invocation.recordArgument("Ultimate Question!")
+  try generic1Invocation.doneRecording()
+
+  try await system.executeDistributedTarget(
+    on: local,
+    mangledTargetName: generic1Name,
+    invocationDecoder: &generic1Invocation,
+    handler: FakeResultHandler()
+  )
+
+  // CHECK: ---> T = 42, type(of:) = Int
+  // CHECK-NEXT: ---> U = Ultimate Question!, type(of:) = String
+  // CHECK-NEXT: RETURN: ()
 
   print("done")
   // CHECK-NEXT: done

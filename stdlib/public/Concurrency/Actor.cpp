@@ -1724,7 +1724,9 @@ void *swift_distributed_get_generic_environment(const char *targetNameStart,
 ///    argumentBuffer: Builtin.RawPointer,
 ///    argumentTypes: UnsafeBufferPointer<Any.Type>,
 ///    resultBuffer: Builtin.RawPointer,
-///    substitutions: UnsafeRawPointer?
+///    substitutions: UnsafeRawPointer?,
+///    witnessTables: UnsafeRawPointer?,
+///    numWitnessTables: UInt
 /// ) async throws
 using TargetExecutorSignature =
     AsyncSignature<void(/*on=*/DefaultActor *,
@@ -1733,6 +1735,8 @@ using TargetExecutorSignature =
                         /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
                         /*substitutions=*/void *,
+                        /*witnessTables=*/void **,
+                        /*numWitnessTables=*/size_t,
                         /*resumeFunc=*/TaskContinuationFunction *,
                         /*callContext=*/AsyncContext *),
                    /*throws=*/true>;
@@ -1747,12 +1751,16 @@ TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 ///   - a list of all argument types (with substitutions applied)
 ///   - a result buffer as a raw pointer
 ///   - a list of substitutions
+///   - a list of witness tables
+///   - a number of witness tables in the buffer
 ///   - a reference to an actor to execute method on.
 using DistributedAccessorSignature =
     AsyncSignature<void(/*argumentBuffer=*/void *,
                         /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
                         /*substitutions=*/void *,
+                        /*witnessTables=*/void **,
+                        /*numWitnessTables=*/size_t,
                         /*actor=*/HeapObject *),
                    /*throws=*/true>;
 
@@ -1783,6 +1791,8 @@ void ::swift_distributed_execute_target(
     const Metadata *const *argumentTypes,
     void *resultBuffer,
     void *substitutions,
+    void **witnessTables,
+    size_t numWitnessTables,
     TaskContinuationFunction *resumeFunc,
     AsyncContext *callContext) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
@@ -1820,5 +1830,7 @@ void ::swift_distributed_execute_target(
                 argumentBuffer, argumentTypes,
                 resultBuffer,
                 substitutions,
+                witnessTables,
+                numWitnessTables,
                 actor);
 }

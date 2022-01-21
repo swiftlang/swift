@@ -324,7 +324,9 @@ extension DistributedActorSystem {
         argumentBuffer: hargs.buffer._rawValue, // TODO(distributed): pass the invocationDecoder instead, so we can decode inside IRGen directly into the argument explosion
         argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
         resultBuffer: resultBuffer._rawValue,
-        substitutions: UnsafeRawPointer(substitutionsBuffer)
+        substitutions: UnsafeRawPointer(substitutionsBuffer),
+        witnessTables: witnessTablesBuffer,
+        numWitnessTables: UInt(numWitnessTables)
       )
 
       func onReturn<R>(_ resultTy: R.Type) async throws {
@@ -345,7 +347,9 @@ func _executeDistributedTarget(
   argumentBuffer: Builtin.RawPointer, // HeterogeneousBuffer of arguments
   argumentTypes: Builtin.RawPointer,
   resultBuffer: Builtin.RawPointer,
-  substitutions: UnsafeRawPointer?
+  substitutions: UnsafeRawPointer?,
+  witnessTables: UnsafeRawPointer?,
+  numWitnessTables: UInt
 ) async throws
 
 // ==== ----------------------------------------------------------------------------------------------------------------
