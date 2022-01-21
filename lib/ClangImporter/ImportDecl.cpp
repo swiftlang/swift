@@ -103,7 +103,11 @@ enum class MakeStructRawValuedFlags {
 };
 using MakeStructRawValuedOptions = OptionSet<MakeStructRawValuedFlags>;
 } // end anonymous namespace
-
+Expr *createSelfExpr(AccessorDecl *accessorDecl);
+DeclRefExpr *createParamRefExpr(AccessorDecl *accessorDecl, unsigned index);
+CallExpr * createAccessorImplCallExpr(FuncDecl *accessorImpl,
+                           Expr *selfExpr,
+                           DeclRefExpr *keyRefExpr = nullptr);
 static MakeStructRawValuedOptions
 getDefaultMakeStructRawValuedOptions() {
   MakeStructRawValuedOptions opts;
@@ -3525,6 +3529,11 @@ namespace {
           methods.push_back(MD);
           continue;
         }
+        
+        if (isa<VarDecl>(member) && isa<clang::CXXMethodDecl>(nd)) {
+          result->addMember(member);
+          continue;
+        }
 
         members.push_back(cast<VarDecl>(member));
       }
@@ -3566,6 +3575,7 @@ namespace {
                                                   /*wantBody=*/true);
           ctors.push_back(valueCtor);
         }
+        
         // TODO: we have a problem lazily looking up members of an unnamed
         // record, so we add them here. To fix this `translateContext` needs to
         // somehow translate unnamed contexts so that `SwiftLookupTable::lookup`
@@ -3624,6 +3634,13 @@ namespace {
           structResult->setIsCxxNonTrivial(
               !cxxRecordDecl->isTriviallyCopyable());
 
+        for (auto &getterAndSetter : Impl.GetterSetterMap) {
+            auto getter = getterAndSetter.second.first;
+            auto setter = getterAndSetter.second.second;
+            if (!getter) continue;
+
+            result->addMember(makeProperty(getterAndSetter.first,getter, setter));
+        }
         for (auto &subscriptInfo : Impl.cxxSubscripts) {
           auto declAndParameterType = subscriptInfo.first;
           if (declAndParameterType.first != result)
@@ -4308,12 +4325,180 @@ namespace {
 
       recordObjCOverride(result);
     }
+      static std::pair<BraceStmt *, bool>
+      synthesizeGetterBody(AbstractFunctionDecl *afd, void *context) {
+          auto accessor = cast<AccessorDecl>(afd);
+          auto method = static_cast<FuncDecl *>(context);
+          auto *selfDecl = accessor->getImplicitSelfDecl();
+          auto selfRef = new (method->getASTContext()) DeclRefExpr(selfDecl, DeclNameLoc(),
+                  /*implicit*/true);
+          selfRef->setType(selfDecl->getType());
+          auto *getterImplCallExpr =
+                  createAccessorImplCallExpr(method, selfRef);
+          auto returnStmt = new (method->getASTContext()) ReturnStmt(SourceLoc(), getterImplCallExpr);
+          auto body = BraceStmt::create(method->getASTContext(), SourceLoc(),
+                                        {returnStmt}, SourceLoc());
 
-    Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
-      return VisitFunctionDecl(decl);
+          return { body,/*isTypeChecked=*/true };
     }
 
-    Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
+    AccessorDecl *tryCreateGetterAccessor(const clang::CXXMethodDecl *clangMeth,
+                                          VarDecl *swiftVar, FuncDecl *method) {
+     
+      // If we have a constexpr var with an evaluated value, try to create an
+      // accessor for it. If we can remove all references to the global (which
+      // we should be able to do for constexprs) then we can remove the global
+      // entirely.
+      auto bodyParams = method->getParameters();
+      auto accessor = AccessorDecl::create(
+          Impl.SwiftContext, SourceLoc(), SourceLoc(), AccessorKind::Get,
+          swiftVar, SourceLoc(), StaticSpellingKind::KeywordStatic,
+          /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+          /*throws=*/false, SourceLoc(), /*genericParams*/ nullptr,bodyParams, swiftVar->getType(),
+          swiftVar->getDeclContext());
+      accessor->setBodySynthesizer(synthesizeGetterBody, method);
+      return accessor;
+    }
+
+      static std::pair<BraceStmt *, bool>
+      synthesizeSetterBody(AbstractFunctionDecl *afd, void *context) {
+          auto setterDecl = cast<AccessorDecl>(afd);
+          auto setterImpl = static_cast<FuncDecl *>(context);
+
+          ASTContext &ctx = setterDecl->getASTContext();
+
+          Expr *selfExpr = createSelfExpr(setterDecl);
+          DeclRefExpr *valueParamRefExpr = createParamRefExpr(setterDecl, 0);
+          assert(valueParamRefExpr);
+
+          Type elementTy = valueParamRefExpr->getDecl()->getInterfaceType();
+
+          auto *getterImplCallExpr =
+               createAccessorImplCallExpr(setterImpl, selfExpr,valueParamRefExpr);
+
+          auto body = BraceStmt::create(setterImpl->getASTContext(), SourceLoc(),
+                                       {getterImplCallExpr}, SourceLoc());
+          return { body, /*isTypeChecked=*/true };
+      }
+
+
+      AccessorDecl *tryCreateSetterAccessor(const clang::CXXMethodDecl *clangMeth,
+                                            VarDecl *swiftVar, FuncDecl *method) {
+          ASTContext &ctx = method->getASTContext();
+          // If we have a constexpr var with an evaluated value, try to create an
+          // accessor for it. If we can remove all references to the global (which
+          // we should be able to do for constexprs) then we can remove the global
+          // entirely.
+          auto paramVarDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
+                                      Identifier(), SourceLoc(),
+                                      ctx.getIdentifier("newValue"),swiftVar->getDeclContext());
+          paramVarDecl->setSpecifier(ParamSpecifier::Default);
+          paramVarDecl->setInterfaceType(swiftVar->getInterfaceType());
+
+          auto bodyParams =
+                  ParameterList::create(ctx, { paramVarDecl });
+          auto accessor = AccessorDecl::create(
+                  Impl.SwiftContext, SourceLoc(), SourceLoc(), AccessorKind::Set,
+                  swiftVar, SourceLoc(), StaticSpellingKind::None,
+                  /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                  /*throws=*/false, SourceLoc(), /*genericParams*/ nullptr,bodyParams, swiftVar->getASTContext().getVoidType(),
+                  swiftVar->getDeclContext());
+          accessor->setSelfAccessKind(SelfAccessKind::Mutating);
+          accessor->setBodySynthesizer(synthesizeSetterBody, method);
+          return accessor;
+      }
+
+      Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
+        decl->dump();
+        // Find if we have a getter.
+        auto pred = [](auto attr) {
+          if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+            return swiftAttr->getAttribute() == "import_as_getter" ||
+                   swiftAttr->getAttribute() == "import_as_setter";
+          }
+          return false;
+          // for setter
+        };
+
+        auto setterPred = [](auto attr) {
+          if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+            return swiftAttr->getAttribute() == "import_as_setter";
+          }
+          return false;
+          // for setter
+        };
+
+        auto method = VisitFunctionDecl(decl);
+
+        if (llvm::any_of(decl->attrs(), pred)) {
+
+          Optional<ImportedName> correctSwiftName;
+          ImportedName importedName;
+
+          std::tie(importedName, correctSwiftName) = importFullName(decl);
+          if (!importedName) {
+            return nullptr;
+          }
+
+          auto ASTstr =
+              importedName.getDeclName().getBaseIdentifier().str().drop_front(
+                  3);
+          auto name = Impl.SwiftContext.getIdentifier(ASTstr.lower());
+          auto dc = Impl.importDeclContextOf(
+              decl, importedName.getEffectiveContext());
+          if (!dc)
+            return nullptr;
+
+          auto importedType =
+              Impl.importType(decl->getReturnType(), ImportTypeKind::Result,
+                              isInSystemModule(dc), Bridgeability::None);
+          if (!importedType)
+            return nullptr;
+
+          auto type = importedType.getType();
+          auto It = Impl.GetterSetterMap.find(name);
+
+          Impl.GetterSetterMap[name].first = static_cast<FuncDecl *>(method);
+          // store the cxx methods then generate the property accessors
+          // move the logic to vicitmethod decl
+        }
+        if (llvm::any_of(decl->attrs(), setterPred)) {
+
+          Optional<ImportedName> correctSwiftName;
+          ImportedName importedName;
+
+          std::tie(importedName, correctSwiftName) = importFullName(decl);
+          if (!importedName) {
+            return nullptr;
+          }
+
+          auto ASTstr =
+              importedName.getDeclName().getBaseIdentifier().str().drop_front(
+                  3);
+          auto name = Impl.SwiftContext.getIdentifier(ASTstr.lower());
+          auto dc = Impl.importDeclContextOf(
+              decl, importedName.getEffectiveContext());
+          if (!dc)
+            return nullptr;
+
+          auto importedType =
+              Impl.importType(decl->getReturnType(), ImportTypeKind::Result,
+                              isInSystemModule(dc), Bridgeability::None);
+          if (!importedType)
+            return nullptr;
+
+          auto type = importedType.getType();
+          auto It = Impl.GetterSetterMap.find(name);
+
+          Impl.GetterSetterMap[name].second = static_cast<FuncDecl *>(method);
+          // store the cxx methods then generate the property accessors
+          // move the logic to vicitmethod decl
+        }
+
+        return method;
+      }
+
+      Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
       Optional<ImportedName> correctSwiftName;
       ImportedName importedName;
@@ -5203,8 +5388,8 @@ namespace {
     /// \param getter function returning `UnsafePointer<T>`
     /// \param setter function returning `UnsafeMutablePointer<T>`
     /// \return subscript declaration
-    SubscriptDecl *makeSubscript(FuncDecl *getter,
-                                 FuncDecl *setter);
+    SubscriptDecl *makeSubscript(FuncDecl *getter, FuncDecl *setter);
+    VarDecl *makeProperty(Identifier i, FuncDecl *getter, FuncDecl *setter);
 
     /// Import the accessor and its attributes.
     AccessorDecl *importAccessor(const clang::ObjCMethodDecl *clangAccessor,
@@ -7615,7 +7800,7 @@ SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
   return accessor;
 }
 
-static Expr *createSelfExpr(AccessorDecl *accessorDecl) {
+Expr *createSelfExpr(AccessorDecl *accessorDecl) {
   ASTContext &ctx = accessorDecl->getASTContext();
 
   auto selfDecl = accessorDecl->getImplicitSelfDecl();
@@ -7636,7 +7821,7 @@ static Expr *createSelfExpr(AccessorDecl *accessorDecl) {
   return inoutSelfExpr;
 }
 
-static DeclRefExpr *
+ DeclRefExpr *
 createParamRefExpr(AccessorDecl *accessorDecl, unsigned index) {
   ASTContext &ctx = accessorDecl->getASTContext();
 
@@ -7648,7 +7833,7 @@ createParamRefExpr(AccessorDecl *accessorDecl, unsigned index) {
   return paramRefExpr;
 }
 
-static CallExpr *
+ CallExpr *
 createAccessorImplCallExpr(FuncDecl *accessorImpl,
                            Expr *selfExpr,
                            DeclRefExpr *keyRefExpr) {
@@ -7665,7 +7850,14 @@ createAccessorImplCallExpr(FuncDecl *accessorImpl,
   accessorImplDotCallExpr->setType(accessorImpl->getMethodInterfaceType());
   accessorImplDotCallExpr->setThrows(false);
 
-  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {keyRefExpr});
+  ArgumentList *argList;
+  if (keyRefExpr) {
+      llvm::dbgs() << "Adding: "; keyRefExpr->dump();
+      llvm::dbgs() << "done. \n";
+    argList = ArgumentList::forImplicitUnlabeled(ctx, {keyRefExpr});
+  } else {
+    argList = ArgumentList::forImplicitUnlabeled(ctx, {});
+  }
   auto *accessorImplCallExpr =
       CallExpr::createImplicit(ctx, accessorImplDotCallExpr, argList);
   accessorImplCallExpr->setType(accessorImpl->getResultInterfaceType());
@@ -7763,6 +7955,63 @@ synthesizeSubscriptSetterBody(AbstractFunctionDecl *afd, void *context) {
 
   auto body = BraceStmt::create(ctx, SourceLoc(), { assignExpr, }, SourceLoc());
   return { body, /*isTypeChecked=*/true };
+}
+
+VarDecl *SwiftDeclConverter::makeProperty(Identifier identifier, FuncDecl *getter, FuncDecl *setter) {
+  // 1. create VarDecl
+  // 2. create AccessorDecl for getter
+  // 3. create AccessorDecl for seetter
+
+  //  VarDecl::createImported(ctx, name, )
+  auto &ctx = Impl.SwiftContext;
+  DeclName name(ctx, DeclBaseName(identifier), {});
+  auto dc = getter->getDeclContext();
+
+  auto result = VarDecl::createImported(ctx, name, getter->getStartLoc(), getter->getStartLoc(), getter->getInterfaceType(), dc, getter->getClangNode());
+  result->setAccess(AccessLevel::Public);
+
+  AccessorDecl *getterDecl = AccessorDecl::create(ctx,
+                                                  getter->getLoc(),
+                                                  getter->getLoc(),
+                                                  AccessorKind::Get,
+                                                  result,
+                                                  SourceLoc(),
+                                                  StaticSpellingKind::None,
+                                                  /*async*/ false, SourceLoc(),
+                                                  /*throws*/ false, SourceLoc(),
+                                                  nullptr, {},
+                                                  getter->getResultInterfaceType(),
+                                                  dc);
+  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->setImplicit();
+  getterDecl->setIsDynamic(false);
+  getterDecl->setIsTransparent(true);
+  getterDecl->setBodySynthesizer(synthesizeGetterBody, getter);
+
+
+
+  return result;
+//  VarDecl *getterResult = nullptr;
+//  if (It == Impl.GetterSetterMap.end()) {
+//    getterResult = Impl.createDeclWithClangNode<VarDecl>(
+//        decl, AccessLevel::Public,
+//        /*IsStatic*/ false, VarDecl::Introducer::Var, SourceLoc(), name, dc);
+//  } else {
+//    getterResult = get<0>(It->getSecond());
+//  }
+//  auto *getter = get<1>(It->getSecond());
+//  getterResult->setImplInfo(StorageImplInfo::getMutableComputed());
+//  getterResult->setAccessors(
+//      SourceLoc(),
+//      {getter,
+//       tryCreateSetterAccessor(decl, getterResult, cast<FuncDecl>(method))},
+//      SourceLoc());
+//  getterResult->dump();
+//  return method;
+//
+//  getterResult->setInterfaceType(type);
+//  StorageImplInfo info(ReadImplKind::Get);
+//  getterResult->setLazyStorageProperty(false);
 }
 
 SubscriptDecl *
@@ -9026,6 +9275,18 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
                                                 TypedefIsSuperfluous)) {
     Result = importDecl(UnderlyingDecl, version);
     SkippedOverTypedef = true;
+  }
+  // TODO extend Swift classes to it's equivalents from it's ClanDecled attributes
+  if (isa<clang::FunctionDecl>(ClangDecl)) {
+    if (ClangDecl->getDeclName().isIdentifier() && ClangDecl->getName().startswith("get")) {
+      const_cast<clang::NamedDecl *>(ClangDecl)->addAttr(
+          clang::SwiftAttrAttr::CreateImplicit(ClangDecl->getASTContext(), "import_as_getter"));
+    }
+    if (ClangDecl->getDeclName().isIdentifier() && ClangDecl->getName().startswith("set")) {
+      const_cast<clang::NamedDecl *>(ClangDecl)->addAttr(
+          clang::SwiftAttrAttr::CreateImplicit(ClangDecl->getASTContext(), "import_as_setter"));
+    }
+    
   }
 
   if (!Result) {
