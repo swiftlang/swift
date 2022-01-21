@@ -52,6 +52,11 @@ void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   ModuleDecl *moduleForInference,
                                   SmallVectorImpl<StructuralRequirement> &result);
 
+std::pair<MutableTerm, MutableTerm>
+getRuleForRequirement(const Requirement &req,
+                      const ProtocolDecl *proto,
+                      RewriteContext &ctx);
+
 /// A utility class for bulding rewrite rules from the top-level requirements
 /// of a generic signature.
 ///
@@ -88,10 +93,6 @@ struct RuleBuilder {
   /// New rules derived from requirements written by the user, which can be
   /// eliminated by homotopy reduction.
   std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
-
-  CanType getConcreteSubstitutionSchema(CanType concreteType,
-                                        const ProtocolDecl *proto,
-                                        SmallVectorImpl<Term> &result);
 
   RuleBuilder(RewriteContext &ctx, bool dump) : Context(ctx), Dump(dump) {}
   void addRequirements(ArrayRef<Requirement> requirements);

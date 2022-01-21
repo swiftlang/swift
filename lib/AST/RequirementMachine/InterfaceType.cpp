@@ -493,3 +493,32 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
     return None;
   });
 }
+
+/// Given a concrete type that may contain type parameters in structural positions,
+/// collect all the structural type parameter components, and replace them all with
+/// fresh generic parameters. The fresh generic parameters all have a depth of 0,
+/// and the index is an index into the 'result' array.
+///
+/// For example, given the concrete type Foo<X.Y, Array<Z>>, this produces the
+/// result type Foo<τ_0_0, Array<τ_0_1>>, with result array {X.Y, Z}.
+CanType
+RewriteContext::getSubstitutionSchemaFromType(CanType concreteType,
+                                              const ProtocolDecl *proto,
+                                              SmallVectorImpl<Term> &result) {
+  assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
+
+  if (!concreteType->hasTypeParameter())
+    return concreteType;
+
+  return CanType(concreteType.transformRec([&](Type t) -> Optional<Type> {
+    if (!t->isTypeParameter())
+      return None;
+
+    unsigned index = result.size();
+    result.push_back(getTermForType(CanType(t), proto));
+
+    return CanGenericTypeParamType::get(/*type sequence=*/ false,
+                                        /*depth=*/0, index,
+                                        Context);
+  }));
+}

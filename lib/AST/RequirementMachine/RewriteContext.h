@@ -170,6 +170,10 @@ public:
   MutableTerm getRelativeTermForType(CanType typeWitness,
                                      ArrayRef<Term> substitutions);
 
+  CanType getSubstitutionSchemaFromType(CanType concreteType,
+                                        const ProtocolDecl *proto,
+                                        SmallVectorImpl<Term> &result);
+
   AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol);
 
   Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs);
