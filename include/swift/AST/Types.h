@@ -5666,14 +5666,14 @@ public:
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
   static CanTypeWrapper<OpenedArchetypeType>
-                        get(Type existential,
+                        get(CanType existential,
                             Optional<UUID> knownID = None);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
   ///
   /// \param existential The existential type or existential metatype to open.
-  static CanType getAny(Type existential);
+  static CanType getAny(CanType existential);
 
   /// Retrieve the ID number of this opened existential.
   UUID getOpenedExistentialID() const { return ID; }
