@@ -118,7 +118,7 @@ private:
   loadArgument(unsigned argumentIdx,
                llvm::Value *argumentSlot,
                llvm::Value *argumentType,
-               ParameterConvention convention,
+               const SILParameterInfo &param,
                Explosion &arguments);
 
   FunctionPointer getPointerToTarget() const;
@@ -242,7 +242,6 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
     // Load current offset
     llvm::Value *currentOffset = IGF.Builder.CreateLoad(offset, "elt_offset");
 
-    // Load argument value into the provided explosion
     if (paramTy.hasTypeParameter()) {
       auto offset =
           Size(i * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
@@ -257,8 +256,8 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
       auto *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
 
       // Load argument value based using loaded type metadata.
-      std::tie(currentOffset, valueSize) = loadArgument(
-          i, currentOffset, argumentTy, param.getConvention(), arguments);
+      std::tie(currentOffset, valueSize) =
+          loadArgument(i, currentOffset, argumentTy, param, arguments);
     } else {
       std::tie(currentOffset, valueSize) = loadArgument(
           i, currentOffset, paramTy, param.getConvention(), arguments);
@@ -281,7 +280,7 @@ std::pair<llvm::Value *, llvm::Value *>
 DistributedAccessor::loadArgument(unsigned argumentIdx,
                                   llvm::Value *argumentSlot,
                                   llvm::Value *argumentType,
-                                  ParameterConvention convention,
+                                  const SILParameterInfo &param,
                                   Explosion &arguments) {
   // TODO: `emitLoad*` would actually load value witness table every
   // time it's called, which is sub-optimal but all of the APIs that
@@ -305,18 +304,22 @@ DistributedAccessor::loadArgument(unsigned argumentIdx,
         IGF.Builder.CreateIntToPtr(alignedSlot, IGM.OpaquePtrTy);
   }
 
-  switch (convention) {
+  Address argumentAddr(alignedSlot, IGM.getPointerAlignment());
+
+  switch (param.getConvention()) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Constant: {
-    // The +1 argument is passed indirectly, so we need to copy it into
-    // a temporary.
+    // The only way to load opaque type is to allocate a temporary
+    // variable on the stack for it and initialize from the given address
+    // either at +0 or +1 depending on convention.
 
     auto stackAddr =
         IGF.emitDynamicAlloca(IGM.Int8Ty, valueSize, Alignment(16));
     auto argPtr = stackAddr.getAddress().getAddress();
 
     emitInitializeWithCopyCall(IGF, argumentType, stackAddr.getAddress(),
-                               Address(alignedSlot, IGM.getPointerAlignment()));
+                               argumentAddr);
+
     arguments.add(argPtr);
 
     // Remember to deallocate later.
@@ -336,9 +339,22 @@ DistributedAccessor::loadArgument(unsigned argumentIdx,
     llvm_unreachable("indirect 'inout' parameters are not supported");
 
   case ParameterConvention::Direct_Guaranteed:
-  case ParameterConvention::Direct_Unowned:
-  case ParameterConvention::Direct_Owned:
-    llvm_unreachable("cannot pass opaque type directly");
+  case ParameterConvention::Direct_Unowned: {
+    auto paramTy = param.getSILStorageInterfaceType();
+    auto &typeInfo = IGM.getTypeInfo(paramTy);
+    Address eltPtr = IGF.Builder.CreateBitCast(
+        argumentAddr, IGM.getStoragePointerType(paramTy));
+
+    cast<LoadableTypeInfo>(typeInfo).loadAsTake(IGF, eltPtr, arguments);
+    break;
+  }
+
+  case ParameterConvention::Direct_Owned: {
+    auto &typeInfo = IGM.getTypeInfo(param.getSILStorageInterfaceType());
+    // Copy the value out at +1.
+    cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, argumentAddr, arguments);
+    break;
+  }
   }
 
   return {alignedSlot, valueSize};
@@ -410,6 +426,7 @@ DistributedAccessor::loadArgument(unsigned argumentIdx,
   case ParameterConvention::Direct_Owned:
     // Copy the value out at +1.
     cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, alignedOffset, arguments);
+    break;
   }
 
   return {alignedOffset.getAddress(), typeInfo.getSize(IGF, paramTy)};
