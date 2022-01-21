@@ -1625,6 +1625,14 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
 
+    // 'any' followed by another identifier is an existential type.
+    if (Tok.isContextualKeyword("any") &&
+        peekToken().is(tok::identifier)) {
+      ParserResult<TypeRepr> ty = parseType();
+      auto *typeExpr = new (Context) TypeExpr(ty.get());
+      return makeParserResult(typeExpr);
+    }
+
     LLVM_FALLTHROUGH;
   case tok::kw_Self:     // Self
     return parseExprIdentifier();
