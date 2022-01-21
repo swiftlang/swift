@@ -1113,7 +1113,6 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
     }
   }
   const ClassMetadata *swiftSubclass = cast<ClassMetadata>(subclass);
-#if SWIFT_OBJC_INTEROP
   if (auto *objcSuperclass = dyn_cast<ObjCClassWrapperMetadata>(superclass)) {
     // Walk up swiftSubclass's ancestors until we get to an ObjC class, then
     // kick over to swift_dynamicCastMetatype.
@@ -1126,7 +1125,6 @@ static bool isSubclass(const Metadata *subclass, const Metadata *superclass) {
         });
     return false;
   }
-#endif
   if (isa<ForeignClassMetadata>(superclass)) {
     // superclass is foreign, but subclass is not (if it were, the above
     // !isa<ClassMetadata> condition would have been entered).  Since it is not
