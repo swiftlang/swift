@@ -438,11 +438,18 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   else
     M = Impl.getNamedModule(SwiftModuleName);
 
+  if (!M) {
+    // User did not import the library module that contains the type we want to
+    // substitute.
+    *IsError = true;
+    return std::make_pair(Type(), "");
+  }
+
   Type SwiftType = Impl.getNamedSwiftType(M, SwiftTypeName);
 
   if (!SwiftType && CTypeKind == MappedCTypeKind::CGFloat) {
-    // Fall back to looking for CGFloat in Core Graphics.
-    M = Impl.getNamedModule("CoreGraphics");
+    // Look for CGFloat in CoreFoundation.
+    M = Impl.getNamedModule("CoreFoundation");
     SwiftType = Impl.getNamedSwiftType(M, SwiftTypeName);
   }
 

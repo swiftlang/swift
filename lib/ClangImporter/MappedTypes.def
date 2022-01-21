@@ -156,7 +156,7 @@ MAP_STDLIB_TYPE(
   UnsignedWord, 0, "Int", false, DoNothing)
 
 // CGFloat.
-MAP_TYPE("CGFloat", CGFloat, 0, "CoreFoundation", "CGFloat", false, DoNothing)
+MAP_TYPE("CGFloat", CGFloat, 0, "CoreGraphics", "CGFloat", false, DoNothing)
 
 // CoreFoundation types.
 // Note that we're preserving the typealias for CFIndex.

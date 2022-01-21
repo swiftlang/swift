@@ -30,6 +30,3 @@ public class Test: NSObject {
   @objc public func isEnabled() -> Bool { true }
   // CHECK-NEXT: init
 } // CHECK-NEXT: @end
-// Rebuild modules without -DCGFLOAT_IN_COREFOUNDATION
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreFoundation.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
