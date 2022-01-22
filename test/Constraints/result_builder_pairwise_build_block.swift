@@ -137,7 +137,7 @@ let flatValues2 = Values(flat: {
   if false {
     "nah"
   }
-  if #available(SwiftStdlib 5.0, *) {
+  if #available(*) {
     5.0
   }
   #endif

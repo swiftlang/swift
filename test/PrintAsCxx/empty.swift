@@ -2,7 +2,11 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -emit-cxx-header-path %t/empty.h
 // RUN: %FileCheck %s < %t/empty.h
 
+// RUN: %check-in-clang++ -std=c++14 %t/empty.h
+// RUN: %check-in-clang++ -std=c++17 %t/empty.h
+
 // CHECK-NOT: @import Swift;
+// CHECK-NOT: IBSegueAction
 
 // CHECK-LABEL: #ifndef EMPTY_SWIFT_H
 // CHECK-NEXT:  #define EMPTY_SWIFT_H
@@ -23,10 +27,9 @@
 // CHECK-NEXT: # define __has_warning(x) 0
 // CHECK-NEXT: #endif
 
-// CHECK-LABEL: #include <Foundation/Foundation.h>
-// CHECK: #include <stdint.h>
-// CHECK: #include <stddef.h>
-// CHECK: #include <stdbool.h>
+// CHECK-LABEL: #include <cstdint>
+// CHECK: #include <cstddef>
+// CHECK: #include <cstdbool>
 
 // CHECK-LABEL: !defined(SWIFT_TYPEDEFS)
 // CHECK-NEXT:  # define SWIFT_TYPEDEFS 1
@@ -50,5 +53,8 @@
 // CHECK: # define SWIFT_PROTOCOL_NAMED
 // CHECK: # define SWIFT_EXTENSION(M)
 // CHECK: # define OBJC_DESIGNATED_INITIALIZER
+
+// CHECK-LABEL: namespace empty {
+// CHECK: } // namespace empty
 
 // CHECK-NOT: @

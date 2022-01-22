@@ -985,7 +985,7 @@ GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
     : _GenericContext(), DeclContext(Kind, Parent) {
   if (Params) {
     Params->setDeclContext(this);
-    GenericParamsAndBit.setPointerAndInt(Params, false);
+    GenericParamsAndState.setPointerAndInt(Params, GenericParamsState::Parsed);
   }
 }
 
@@ -1006,9 +1006,14 @@ GenericParamList *GenericContext::getGenericParams() const {
 }
 
 GenericParamList *GenericContext::getParsedGenericParams() const {
-  if (GenericParamsAndBit.getInt())
+  switch (GenericParamsAndState.getInt()) {
+  case GenericParamsState::Parsed:
+  case GenericParamsState::ParsedAndTypeChecked:
+    return GenericParamsAndState.getPointer();
+
+  case GenericParamsState::TypeChecked:
     return nullptr;
-  return GenericParamsAndBit.getPointer();
+  }
 }
 
 bool GenericContext::hasComputedGenericSignature() const {

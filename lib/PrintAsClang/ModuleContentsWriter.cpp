@@ -619,3 +619,15 @@ swift::printModuleContentsAsObjC(raw_ostream &os,
                                                  : AccessLevel::Internal;
   ModuleWriter(os, imports, M, requiredAccess).write();
 }
+
+void swift::printModuleContentsAsCxx(
+    raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+    ModuleDecl &M) {
+  os << "namespace ";
+  M.ValueDecl::getName().print(os);
+  os << " {\n\n";
+  // TODO (Alex): Emit module contents.
+  os << "\n} // namespace ";
+  M.ValueDecl::getName().print(os);
+  os << "\n\n";
+}
