@@ -903,21 +903,6 @@ void RuleBuilder::addRequirement(const Requirement &req,
     // A superclass requirement T : C<X, Y> becomes a rewrite rule
     //
     //   T.[superclass: C<X, Y>] => T
-    //
-    // Together with a rewrite rule
-    //
-    //   [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>]
-    //
-    // Where 'L' is either AnyObject or _NativeObject, depending on the
-    // ancestry of C.
-    //
-    // The second rule is marked permanent. Completion will derive a new
-    // rule as a consequence of these two rules:
-    //
-    //   T.[layout: L] => T
-    //
-    // The new rule will be marked redundant by homotopy reduction since
-    // it is a consequence of the other two rules.
     auto otherType = CanType(req.getSecondType());
 
     // Build the symbol [superclass: C<X, Y>].
