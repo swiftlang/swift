@@ -42,11 +42,6 @@ struct S<T: Codable> : Codable {
 func __isRemoteActor(_ actor: AnyObject) -> Bool
 
 distributed actor Greeter {
-  distributed func generic1<T: Codable, U: Codable>(t: T, u: U) {
-    print("---> T = \(t), type(of:) = \(type(of: t))")
-    print("---> U = \(u), type(of:) = \(type(of: u))")
-  }
-
   distributed func empty() {
   }
 
@@ -68,6 +63,34 @@ distributed actor Greeter {
 
   distributed func enumResult() -> E {
     .bar
+  }
+
+  distributed func generic1<A: Codable>(a: A) {
+    print("---> A = \(a), type(of:) = \(type(of: a))")
+  }
+
+  distributed func generic2<A: Codable, B: Codable>(a: A, b: B) {
+    print("---> A = \(a), type(of:) = \(type(of: a))")
+    print("---> B = \(b), type(of:) = \(type(of: b))")
+  }
+
+  distributed func generic3<A: Codable, B: Codable, C: Codable>(a: A, b: Array<B>, c: C) {
+    print("---> A = \(a), type(of:) = \(type(of: a))")
+    print("---> B = \(b), type(of:) = \(type(of: b))")
+    print("---> C = \(c), type(of:) = \(type(of: c))")
+  }
+
+  distributed func generic4<A: Codable, B: Codable, C: Codable>(a: A, b: S<B>, c: Array<C>) {
+    print("---> A = \(a), type(of:) = \(type(of: a))")
+    print("---> B = \(b), type(of:) = \(type(of: b))")
+    print("---> C = \(c), type(of:) = \(type(of: c))")
+  }
+
+  distributed func generic5<A: Codable, B: Codable, C: Codable, D: Codable>(a: A, b: S<B>, c: C, d: D) {
+    print("---> A = \(a), type(of:) = \(type(of: a))")
+    print("---> B = \(b), type(of:) = \(type(of: b))")
+    print("---> C = \(c), type(of:) = \(type(of: c))")
+    print("---> D = \(d), type(of:) = \(type(of: d))")
   }
 }
 
@@ -201,8 +224,11 @@ let answerName = "$s4main7GreeterC6answerSiyFTE"
 let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
 let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
 let echoName = "$s4main7GreeterC4echo4name3ageS2S_SitFTE"
-// <T: Codable, U: Codable>(t: T, u: U)
-let generic1Name = "$s4main7GreeterC8generic11t1uyx_q_tSeRzSERzSeR_SER_r0_lFTE"
+let generic1Name = "$s4main7GreeterC8generic11ayx_tSeRzSERzlFTE"
+let generic2Name = "$s4main7GreeterC8generic21a1byx_q_tSeRzSERzSeR_SER_r0_lFTE"
+let generic3Name = "$s4main7GreeterC8generic31a1b1cyx_Sayq_Gq0_tSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
+let generic4Name = "$s4main7GreeterC8generic41a1b1cyx_AA1SVyq_GSayq0_GtSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
+let generic5Name = "$s4main7GreeterC8generic51a1b1c1dyx_AA1SVyq_Gq0_q1_tSeRzSERzSeR_SER_SeR0_SER0_SeR1_SER1_r2_lFTE"
 
 func test() async throws {
   let system = FakeActorSystem()
@@ -267,9 +293,7 @@ func test() async throws {
   var generic1Invocation = system.makeInvocationEncoder()
 
   try generic1Invocation.recordGenericSubstitution(Int.self)
-  try generic1Invocation.recordGenericSubstitution(String.self)
   try generic1Invocation.recordArgument(42)
-  try generic1Invocation.recordArgument("Ultimate Question!")
   try generic1Invocation.doneRecording()
 
   try await system.executeDistributedTarget(
@@ -278,9 +302,91 @@ func test() async throws {
     invocationDecoder: &generic1Invocation,
     handler: FakeResultHandler()
   )
+  // CHECK: ---> A = 42, type(of:) = Int
+  // CHECK-NEXT: RETURN: ()
 
-  // CHECK: ---> T = 42, type(of:) = Int
-  // CHECK-NEXT: ---> U = Ultimate Question!, type(of:) = String
+  var generic2Invocation = system.makeInvocationEncoder()
+
+  try generic2Invocation.recordGenericSubstitution(Int.self)
+  try generic2Invocation.recordGenericSubstitution(String.self)
+  try generic2Invocation.recordArgument(42)
+  try generic2Invocation.recordArgument("Ultimate Question!")
+  try generic2Invocation.doneRecording()
+
+  try await system.executeDistributedTarget(
+    on: local,
+    mangledTargetName: generic2Name,
+    invocationDecoder: &generic2Invocation,
+    handler: FakeResultHandler()
+  )
+  // CHECK: ---> A = 42, type(of:) = Int
+  // CHECK-NEXT: ---> B = Ultimate Question!, type(of:) = String
+  // CHECK-NEXT: RETURN: ()
+
+  var generic3Invocation = system.makeInvocationEncoder()
+
+  try generic3Invocation.recordGenericSubstitution(Int.self)
+  try generic3Invocation.recordGenericSubstitution(String.self)
+  try generic3Invocation.recordGenericSubstitution(S<Int>.self)
+  try generic3Invocation.recordArgument(42)
+  try generic3Invocation.recordArgument(["a", "b", "c"])
+  try generic3Invocation.recordArgument(S(data: 42))
+  try generic3Invocation.doneRecording()
+
+  try await system.executeDistributedTarget(
+    on: local,
+    mangledTargetName: generic3Name,
+    invocationDecoder: &generic3Invocation,
+    handler: FakeResultHandler()
+  )
+  // CHECK: ---> A = 42, type(of:) = Int
+  // CHECK-NEXT: ---> B = ["a", "b", "c"], type(of:) = Array<String>
+  // CHECK-NEXT: ---> C = S<Int>(data: 42), type(of:) = S<Int>
+  // CHECK-NEXT: RETURN: ()
+
+  var generic4Invocation = system.makeInvocationEncoder()
+
+  try generic4Invocation.recordGenericSubstitution(Int.self)
+  try generic4Invocation.recordGenericSubstitution(Int.self)
+  try generic4Invocation.recordGenericSubstitution(String.self)
+  try generic4Invocation.recordArgument(42)
+  try generic4Invocation.recordArgument(S(data: 42))
+  try generic4Invocation.recordArgument(["a", "b", "c"])
+  try generic4Invocation.doneRecording()
+
+  try await system.executeDistributedTarget(
+    on: local,
+    mangledTargetName: generic4Name,
+    invocationDecoder: &generic4Invocation,
+    handler: FakeResultHandler()
+  )
+  // CHECK: ---> A = 42, type(of:) = Int
+  // CHECK-NEXT: ---> B = S<Int>(data: 42), type(of:) = S<Int>
+  // CHECK-NEXT: ---> C = ["a", "b", "c"], type(of:) = Array<String>
+  // CHECK-NEXT: RETURN: ()
+
+  var generic5Invocation = system.makeInvocationEncoder()
+
+  try generic5Invocation.recordGenericSubstitution(Int.self)
+  try generic5Invocation.recordGenericSubstitution(Int.self)
+  try generic5Invocation.recordGenericSubstitution(String.self)
+  try generic5Invocation.recordGenericSubstitution([Double].self)
+  try generic5Invocation.recordArgument(42)
+  try generic5Invocation.recordArgument(S(data: 42))
+  try generic5Invocation.recordArgument("Hello, World!")
+  try generic5Invocation.recordArgument([0.0, 0xdecafbad])
+  try generic5Invocation.doneRecording()
+
+  try await system.executeDistributedTarget(
+    on: local,
+    mangledTargetName: generic5Name,
+    invocationDecoder: &generic5Invocation,
+    handler: FakeResultHandler()
+  )
+  // CHECK: ---> A = 42, type(of:) = Int
+  // CHECK-NEXT: ---> B = S<Int>(data: 42), type(of:) = S<Int>
+  // CHECK-NEXT: ---> C = Hello, World!, type(of:) = String
+  // CHECK-NEXT: ---> D = [0.0, 3737844653.0], type(of:) = Array<Double>
   // CHECK-NEXT: RETURN: ()
 
   print("done")
