@@ -1108,7 +1108,7 @@ struct TargetAnyClassMetadataObjCInterop
   using StoredSize = typename Runtime::StoredSize;
 
   using TargetClassMetadataObjCInterop =
-      TargetClassMetadata<Runtime, TargetAnyClassMetadataObjCInterop<Runtime>>;
+      swift::TargetClassMetadata<Runtime, TargetAnyClassMetadataObjCInterop<Runtime>>;
 
   constexpr TargetAnyClassMetadataObjCInterop(
       TargetAnyClassMetadataObjCInterop<Runtime> *isa,
