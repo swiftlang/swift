@@ -247,7 +247,7 @@ static VarDecl *addImplicitDistributedActorIDProperty(
 
 AbstractFunctionDecl*
 GetDistributedActorSystemRemoteCallFunctionRequest::evaluate(
-    Evaluator &evaluator, NominalTypeDecl *decl) const {
+    Evaluator &evaluator, NominalTypeDecl *decl, bool isVoidReturn) const {
   auto &C = decl->getASTContext();
 
   // It would be nice to check if this is a DistributedActorSystem
@@ -260,10 +260,12 @@ GetDistributedActorSystemRemoteCallFunctionRequest::evaluate(
     return nullptr;
   }
 
+  auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
+
   AbstractFunctionDecl *remoteCallFunc = nullptr;
-  for (auto value : decl->lookupDirect(C.Id_remoteCall)) {
+  for (auto value : decl->lookupDirect(callId)) {
     auto func = dyn_cast<AbstractFunctionDecl>(value);
-    if (func && func->isDistributedActorSystemRemoteCall()) {
+    if (func && func->isDistributedActorSystemRemoteCall(isVoidReturn)) {
       remoteCallFunc = func;
       break;
     }

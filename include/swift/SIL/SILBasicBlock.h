@@ -85,6 +85,9 @@ private:
   /// See also: BasicBlockBitfield::bitfieldID, SILFunction::currentBitfieldID.
   uint64_t lastInitializedBitfieldID = 0;
 
+  // FIXME(distributed): remove this
+  llvm::StringRef debugComment = "";
+
   friend struct llvm::ilist_traits<SILBasicBlock>;
 
   SILBasicBlock();
@@ -437,6 +440,15 @@ public:
   void print(SILPrintContext &Ctx) const;
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
+
+  // FIXME(distributed): remove this
+  llvm::StringRef getDebugComment() const {
+    return this->debugComment;
+  }
+  // FIXME(distributed): remove this
+  void setDebugComment(llvm::StringRef debugComment) {
+    this->debugComment = debugComment;
+  }
 
   /// getSublistAccess() - returns pointer to member of instruction list
   static InstListType SILBasicBlock::*getSublistAccess() {

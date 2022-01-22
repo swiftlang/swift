@@ -17,49 +17,16 @@
 
 import _Distributed
 
-final class Obj: @unchecked Sendable, Codable  {}
-
-struct LargeStruct: Sendable, Codable {
-  var q: String
-  var a: Int
-  var b: Int64
-  var c: Double
-  var d: String
-}
-
-enum E : Sendable, Codable {
-  case foo, bar
-}
+final class SomeClass: Sendable, Codable {}
 
 distributed actor Greeter {
-  distributed func empty() {
+  distributed func take(name: String, int: Int) {
+    print("take: \(name), int: \(int)")
   }
 
-  distributed func hello() -> String {
-    return "Hello, World!"
+  distributed func take(name: String, int: Int, clazz: SomeClass) {
+    print("take: \(name), int: \(int)")
   }
-
-  distributed func answer() -> Int {
-    return 42
-  }
-
-  distributed func largeResult() -> LargeStruct {
-    .init(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
-  }
-
-  distributed func echo(name: String) -> String {
-    return "Echo: \(name)"
-  }
-
-  distributed func enumResult() -> E {
-    .bar
-  }
-
-
-  distributed func test(i: Int, s: String) -> String {
-    return s
-  }
-
 }
 
 
@@ -71,11 +38,18 @@ struct ActorAddress: Sendable, Hashable, Codable {
   }
 }
 
+//final class FakeActorSystem: DistributedActorSystem {
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = FakeInvocation
   typealias InvocationEncoder = FakeInvocation
   typealias SerializationRequirement = Codable
+
+//  let state0: String = ""
+//  let state1: String = ""
+//  let state2: String = ""
+
+  init() {}
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
   throws -> Act? where Act: DistributedActor {
@@ -103,14 +77,31 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: InvocationDecoder,
+    invocationDecoder: inout InvocationDecoder,
     throwing: Err.Type,
     returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
-          Act.ID == ActorID,
-          Res: SerializationRequirement {
-    fatalError("INVOKED REMOTE CALL")
+          Err: Error,
+//          Act.ID == ActorID,
+          Res: SerializationRequirement
+  {
+    print("remoteCall: on:\(actor), target:\(target), invocation:\(invocationDecoder), throwing:\(throwing), returning:\(returning)")
+    return () as! Res
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Err: Error
+//          Act.ID == ActorID
+  {
+    print("remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocationDecoder), throwing:\(throwing)")
+    return ()
   }
 
 }
@@ -185,23 +176,18 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-// actual mangled name:
-let emptyName = "$s4main7GreeterC5emptyyyFTE"
-let helloName = "$s4main7GreeterC5helloSSyFTE"
-let answerName = "$s4main7GreeterC6answerSiyFTE"
-let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
-let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
-
-let echoName = "$s4main7GreeterC4echo4nameS2S_tFTE"
-
 func test() async throws {
   let system = FakeActorSystem()
 
   let local = Greeter(system: system)
   let ref = try Greeter.resolve(id: local.id, using: system)
 
-  try await ref.empty()
-  // CHECK: REMOTE CALL
+  try await ref.take(name: "Caplin", int: 1337)
+  // CHECK: remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(mangledName: "$s4main7GreeterC4take4name3intySS_SitFTE"), invocation:FakeInvocation(arguments: ["Caplin", 1337], returnType: nil, errorType: nil, argumentIndex: 0), throwing:Never
+
+  try await ref.take(name: "Caplin", int: 1337, clazz: .init())
+  // CHECK: remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(mangledName: "$s4main7GreeterC4take4name3int5clazzySS_SiAA9SomeClassCtFTE"), invocation:FakeInvocation(arguments: ["Caplin", 1337, main.SomeClass], returnType: nil, errorType: nil, argumentIndex: 0), throwing:Never
+
 }
 
 @main struct Main {
@@ -209,3 +195,4 @@ func test() async throws {
     try! await test()
   }
 }
+

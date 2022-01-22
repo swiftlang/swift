@@ -873,7 +873,7 @@ public:
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
     _require(type1 == type2, complaint,
-             [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
+             [&] { llvm::dbgs() << "     Got: " << type1 << "\n  Wanted: " << type2 << '\n'; });
   }
 
   /// Require two function types to be ABI-compatible.
@@ -5796,11 +5796,11 @@ public:
       if (F->hasForeignBody())
         return;
 
-      fprintf(stderr, "[%s:%d] (%s) F DUMP\n", __FILE__, __LINE__, __FUNCTION__);
-      if (!F->isAvailableExternally() && F->getLinkage() == SILLinkage::Public) {
-      fprintf(stderr, "[%s:%d] (%s) HACK IT...\n", __FILE__, __LINE__, __FUNCTION__);
-        F->setLinkage(SILLinkage::PublicExternal);
-      }
+//      fprintf(stderr, "[%s:%d] (%s) F DUMP\n", __FILE__, __LINE__, __FUNCTION__);
+//      if (!F->isAvailableExternally() && F->getLinkage() == SILLinkage::Public) {
+//      fprintf(stderr, "[%s:%d] (%s) HACK IT...\n", __FILE__, __LINE__, __FUNCTION__);
+//        F->setLinkage(SILLinkage::PublicExternal);
+//      }
       require(F->isAvailableExternally(),
               "external declaration of internal SILFunction not allowed");
       // If F is an external declaration, there is nothing further to do,

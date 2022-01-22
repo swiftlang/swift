@@ -24,6 +24,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -87,8 +89,115 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
 }
 
 /******************************************************************************/
+/********************* COMMON CONFORMANCE SIL PATTERNS ************************/
+/******************************************************************************/
+
+static void getSerializationRequirements(
+    SILGenFunction &SGF, ASTContext &ctx, NominalTypeDecl actorDecl,
+    SmallVectorImpl<ProtocolDecl *> &requirementProtocolDecls) {
+  auto encodableDecl =
+      ctx.getProtocol(KnownProtocolKind::Encodable); // FIXME: actually use SerializationRequirement
+  requirementProtocolDecls.push_back(encodableDecl);
+
+  auto decodableDecl =
+      ctx.getProtocol(KnownProtocolKind::Decodable); // FIXME: actually use SerializationRequirement
+  requirementProtocolDecls.push_back(decodableDecl);
+}
+
+// FIXME: this isn't actually implemented
+static void pushSerializationRequirementConformance(
+    SILGenFunction &SGF, ASTContext &ctx,
+    SILType type,
+    SmallVectorImpl<Type> &subTypes,
+    SmallVectorImpl<ProtocolConformanceRef> &subConformances) {
+  auto &B = SGF.B;
+  auto module = B.getModule().getSwiftModule();
+
+  //        auto resultEncodableTypeConfRef =
+  //            module->lookupConformance(resultType.getASTType(),
+  //                                      encodableRequirementTy);
+  //        assert(!distributedActorConfRef.isInvalid() &&
+  //               "Missing conformance to `SerializationRequirement`");
+  subTypes.push_back(type.getASTType());
+  //        subConformances.push_back(resultEncodableTypeConfRef);
+
+  //        auto decodableRequirementTy =
+  //            ctx.getProtocol(KnownProtocolKind::Decodable);
+  //        auto resultDecodableTypeConfRef =
+  //            module->lookupConformance(resultType.getASTType(),
+  //                                      encodableRequirementTy);
+  //        subTypes.push_back(resultType.getASTType());
+  //        subConformances.push_back(resultDecodableTypeConfRef);
+}
+
+/// Push `Type` and `ProtocolConformanceRef` for the `Error` protocol to
+/// `subTypes` and `subConformances`.
+static void pushErrorConformance(
+    SILGenFunction &SGF, ASTContext &ctx,
+    SmallVectorImpl<Type> &subTypes,
+    SmallVectorImpl<ProtocolConformanceRef> &subConformances) {
+  auto &B = SGF.B;
+  auto module = B.getModule().getSwiftModule();
+
+  auto errorDecl = ctx.getErrorDecl();
+  auto errorTy = errorDecl->getInterfaceType();
+  auto thrownErrorConfRef =
+      module->lookupConformance(errorDecl->getDeclaredInterfaceType(), ctx.getErrorDecl());
+
+  assert(!thrownErrorConfRef.isInvalid() && "Missing conformance to `Error`");
+  subTypes.push_back(errorTy);
+  subConformances.push_back(thrownErrorConfRef);
+}
+
+static void pushNeverErrorConformance(
+    SILGenFunction &SGF, ASTContext &ctx,
+    SmallVectorImpl<Type> &subTypes,
+    SmallVectorImpl<ProtocolConformanceRef> &subConformances) {
+  auto &B = SGF.B;
+  auto module = B.getModule().getSwiftModule();
+
+  auto neverDecl = ctx.getNeverDecl();
+  auto neverTy = neverDecl->getDeclaredInterfaceType();
+  auto thrownErrorConfRef =
+      module->lookupConformance(neverTy, ctx.getErrorDecl());
+
+//  assert(!thrownErrorConfRef.isInvalid() && "Missing conformance to `Error`"); // FIXME(distributed): how to deal with the `: Error` !!!!
+  subTypes.push_back(neverTy);
+  subConformances.push_back(thrownErrorConfRef); // FIXME(distributed): how to deal with the `: Error` !!!!
+}
+
+/// Push `Type` and `ProtocolConformanceRef` for the `Self` of this distributed
+/// actor to `subTypes` and `subConformances`.
+static void pushDistributedActorConformance(
+    SILGenFunction &SGF, ASTContext &ctx,
+    SILType distributedActorSelfTy,
+    SmallVectorImpl<Type> &subTypes,
+    SmallVectorImpl<ProtocolConformanceRef> &subConformances) {
+  auto &B = SGF.B;
+  auto module = B.getModule().getSwiftModule();
+
+  ProtocolDecl *distributedActorProto =
+      ctx.getProtocol(KnownProtocolKind::DistributedActor);
+
+  auto confRef =
+      module->lookupConformance(distributedActorSelfTy.getASTType(), distributedActorProto);
+  assert(!confRef.isInvalid() && "Missing conformance to `DistributedActor`");
+
+  subTypes.push_back(distributedActorSelfTy.getASTType());
+  subConformances.push_back(confRef);
+}
+
+
+/******************************************************************************/
 /******************* COMMON (DISTRIBUTED) SIL PATTERNS ************************/
 /******************************************************************************/
+
+static void createVoidPhiArgument(SILGenFunction &SGF,
+                                  ASTContext &ctx,
+                                  SILBasicBlock *block) {
+  block->createPhiArgument(
+      SGF.getLoweredType(ctx.getVoidType()), OwnershipKind::Owned);
+}
 
 static SILValue emitSimpleLoad(SILGenFunction &SGF,
                                SILLocation loc,
@@ -328,11 +437,11 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
   auto returnTy = getLoweredType(selfTy);
 
   // ==== Prepare all the basic blocks
-  auto returnBB = createBasicBlock();
-  auto resolvedBB = createBasicBlock();
-  auto makeProxyBB = createBasicBlock();
-  auto switchBB = createBasicBlock();
-  auto errorBB = createBasicBlock();
+  auto returnBB = createBasicBlock("returnBB");
+  auto resolvedBB = createBasicBlock("resolvedBB");
+  auto makeProxyBB = createBasicBlock("makeProxyBB");
+  auto switchBB = createBasicBlock("switchBB");
+  auto errorBB = createBasicBlock("errorBB");
 
   SILFunctionConventions fnConv = F.getConventions();
 
@@ -461,8 +570,8 @@ SILGenFunction::emitConditionalResignIdentityCall(SILLocation loc,
   
   // we only system.resignID if we are a local actor,
   // and thus the address was created by system.assignID.
-  auto isRemoteBB = createBasicBlock();
-  auto isLocalBB = createBasicBlock();
+  auto isRemoteBB = createBasicBlock("isRemoteBB");
+  auto isLocalBB = createBasicBlock("isLocalBB");
 
   // if __isRemoteActor(self) {
   //   ...
@@ -501,8 +610,8 @@ void SILGenFunction::emitDistributedActorClassMemberDestruction(
 
   Scope scope(Cleanups, CleanupLocation(cleanupLoc));
 
-  auto isLocalBB = createBasicBlock();
-  auto remoteMemberDestroyBB = createBasicBlock();
+  auto isLocalBB = createBasicBlock("isLocalBB");
+  auto remoteMemberDestroyBB = createBasicBlock("remoteMemberDestroyBB");
 
   // if __isRemoteActor(self) {
   //   ...
@@ -559,13 +668,13 @@ static void emitThrowWithCleanupBasicBlock(SILGenFunction &SGF, SILLocation loc,
   auto &B = SGF.B;
   auto &SGM = SGF.SGM;
 
+  B.emitBlock(errorBB);
+
   auto methodTy =
       SGM.Types.getConstantOverrideType(SGF.getTypeExpansionContext(), thunk);
   auto derivativeFnSILTy = SILType::getPrimitiveObjectType(methodTy);
   auto silFnType = derivativeFnSILTy.castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGM.M);
-
-  B.emitBlock(errorBB);
 
   SILValue error = errorBB->createPhiArgument(
       fnConv.getSILErrorType(SGF.getTypeExpansionContext()),
@@ -574,17 +683,14 @@ static void emitThrowWithCleanupBasicBlock(SILGenFunction &SGF, SILLocation loc,
   for (const auto &value : endAccesses) {
     B.createEndAccess(loc, value, /*aborted=*/false);
   }
-  for (const auto &value : endLifetimes) {
-    B.createEndLifetime(loc, value);
+  for (const auto &value : endLifetimes) { // TODO(distributed): use enterCleanup for ending lifetimes
+    if (value->getType().isAddress())
+      B.createEndLifetime(loc, value);
   }
 
   SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
 
   B.createBranch(loc, throwBB, {error});
-
-  fprintf(stderr, "[%s:%d] (%s) EMIT THROW VVVVVVVV\n", __FILE__, __LINE__, __FUNCTION__);
-  errorBB->dump();
-  fprintf(stderr, "[%s:%d] (%s) EMIT THROW ^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void emitEncoderRecordErrorTypeCall(SILGenFunction &SGF, SILLocation loc,
@@ -633,23 +739,18 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   auto shouldRecordArguments = fd->getParameters()->size() > 0;
   auto shouldRecordErrorType = fd->hasThrows();
   auto shouldRecordReturnType = !resultType.isVoid();
-  auto shouldDoneRecordingInBB =
-      shouldRecordGenericSubstitutions ||
-      shouldRecordArguments ||
-      shouldRecordErrorType ||
-      shouldRecordReturnType;
 
-  auto errorBB = createBasicBlock();
-  auto returnBB = createBasicBlock();
+  auto errorBB = createBasicBlock("errorBB");
+  auto returnBB = createBasicBlock("returnBB");
 
   auto *selfVarDecl = fd->getImplicitSelfDecl();
 
-  SmallVector<SILValue, 8> params;
-  bindParametersForForwarding(fd->getParameters(), params);
-  bindParameterForForwarding(selfVarDecl, params);
+  SmallVector<SILValue, 8> paramsForForwarding;
+  bindParametersForForwarding(fd->getParameters(), paramsForForwarding);
+  bindParameterForForwarding(selfVarDecl, paramsForForwarding);
 
   // === `Self` types
-  auto selfValue = ManagedValue::forUnmanaged(params[params.size() - 1]); // TODO(distributed): getSelfArgument instead
+  auto selfValue = ManagedValue::forUnmanaged(F.getSelfArgument());
   auto selfTy = selfVarDecl->getType();
   auto selfSILTy = getLoweredType(selfTy);
   auto *selfTyDecl = FunctionDC->getParent()->getSelfNominalTypeDecl();
@@ -691,8 +792,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   // } else {
   //   ...
   // }
-  auto isLocalBB = createBasicBlock();
-  auto isRemoteBB = createBasicBlock();
+  auto isLocalBB = createBasicBlock("isLocalBB");
+  auto isRemoteBB = createBasicBlock("isRemoteBB");
   {
     FuncDecl* isRemoteFn = ctx.getIsRemoteDistributedActor();
     assert(isRemoteFn &&
@@ -717,20 +818,16 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   // }
   SILBasicBlock *localReturnBB;
   SILBasicBlock *localCallErrorBB;
-//  // Prepare some variables that we need to destroy etc. from returnBB/errorBB:
-//  BeginAccessInst *invocationValueAccess = nullptr;
   {
     B.emitBlock(isLocalBB);
-    fprintf(stderr, "[%s:%d] (%s) isLocalBB\n", __FILE__, __LINE__, __FUNCTION__);
-    isLocalBB->dump();
 
     auto nativeMethodTy = SGM.Types.getConstantOverrideType(getTypeExpansionContext(),
                                                             native);
     auto nativeFnSILTy = SILType::getPrimitiveObjectType(nativeMethodTy);
     auto nativeSilFnType = nativeFnSILTy.castTo<SILFunctionType>();
 
-    localReturnBB = createBasicBlock();
-    localCallErrorBB = nativeSilFnType->hasErrorResult() ? createBasicBlock() : nullptr;
+    localReturnBB = createBasicBlock("localReturnBB");
+    localCallErrorBB = nativeSilFnType->hasErrorResult() ? createBasicBlock("localCalLErrorBB") : nullptr;
 
     bool isClassMethod = false;
     if (auto classDecl = dyn_cast<ClassDecl>(fd->getDeclContext())) {
@@ -742,16 +839,16 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     SILValue nativeFn;
     if (isClassMethod) {
       nativeFn = emitClassMethodRef(
-          loc, params[params.size() - 1], native, nativeMethodTy);
+          loc, selfValue.getValue(), native, nativeMethodTy);
     } else {
       nativeFn = emitGlobalFunctionRef(loc, native);
     }
     auto subs = F.getForwardingSubstitutionMap();
 
     if (localCallErrorBB) {
-      B.createTryApply(loc, nativeFn, subs, params, localReturnBB, localCallErrorBB);
+      B.createTryApply(loc, nativeFn, subs, paramsForForwarding, localReturnBB, localCallErrorBB);
     } else {
-      auto result = B.createApply(loc, nativeFn, subs, params);
+      auto result = B.createApply(loc, nativeFn, subs, paramsForForwarding);
       B.createBranch(loc, localReturnBB, {result});
     }
   }
@@ -763,39 +860,18 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     B.createBranch(loc, returnBB, {result});
   }
   { // local error
-    fprintf( stderr, "[%s:%d] (%s) CALL emitThrowWithCleanupBasicBlock: localCallErrorBB\n", __FILE__, __LINE__, __FUNCTION__);
     emitThrowWithCleanupBasicBlock(*this, loc, thunk, localCallErrorBB, errorBB);
   }
 
 
   // === Remote Call -----------------------------------------------------------
+  SILGenFunctionBuilder builder(SGM);
   // {
   //   var invocation = try self.actorSystem.makeInvocationEncoder()
   //   // ...
   // }
   {
     B.emitBlock(isRemoteBB);
-//    if (OLDSYNTHESIS) {
-//      // return try await self._remote_X(...)
-//      auto remoteFnDecl = selfTyDecl->lookupDirectRemoteFunc(fd);
-//      assert(remoteFnDecl &&
-//             "Could not find _remote_<dist_func_name> function");
-//      auto remoteFnRef = SILDeclRef(remoteFnDecl);
-//
-//      SILGenFunctionBuilder builder(SGM);
-//      auto remoteFnSIL =
-//          builder.getOrCreateFunction(loc, remoteFnRef, ForDefinition);
-//      SILValue remoteFn = B.createFunctionRefFor(loc, remoteFnSIL);
-//
-//      auto subs = F.getForwardingSubstitutionMap();
-//
-//      SmallVector<SILValue, 8> remoteParams(params);
-//
-//      B.createTryApply(loc, remoteFn, subs, remoteParams, remoteReturnBB,
-//                       remoteErrorBB);
-//    }
-
-    SILGenFunctionBuilder builder(SGM);
 
     // We need to maintain a "next normal basic block" pointer because
     // we cannot just emit a bunch of tryApply right after one another
@@ -827,138 +903,321 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // function_ref FakeActorSystem.makeInvocationEncoder()
       // %19 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV21makeInvocationEncoderAA0aG0VyF : $@convention(method) (@guaranteed FakeActorSystem) -> FakeInvocation // user: %20
       auto makeInvocationEncoderFnSIL =
-          builder.getOrCreateFunction(loc, makeInvocationEncoderFnRef, ForDefinition);
+          builder.getOrCreateFunction(loc, makeInvocationEncoderFnRef, NotForDefinition);
       SILValue makeInvocationEncoderFn =
           B.createFunctionRefFor(loc, makeInvocationEncoderFnSIL);
 
       //  %20 = apply %19(%17) : $@convention(method) (@guaranteed FakeActorSystem) -> FakeInvocation // user: %22
-      ApplyInst *invocationValue = B.createApply(
+      ApplyInst *invocationEncoderValue = B.createApply(
           loc, makeInvocationEncoderFn,
           /*subs=*/SubstitutionMap(),
           /*args=*/{systemLoaded});
 
       // B.emitReleaseValue(loc, systemLoaded);
-      B.createEndLifetime(loc, systemLoaded);
+      if (systemLoaded->getType().isAddress())
+        B.createEndLifetime(loc, systemLoaded);
 
-      B.createStore(loc, invocationValue, invocationEncoder.getValue(),
-                    StoreOwnershipQualifier::Trivial);
-
-//        invocationValueAccess =
-//            B.createBeginAccess(loc, invocationEncoder.getValue(),
-//                                SILAccessKind::Modify,
-//                                SILAccessEnforcement::Static,
-//                                false,
-//                                false);
-//      B.createBranch(loc, nextNormalBB);
+      B.createStore(loc, invocationEncoderValue, invocationEncoder.getValue(),
+                    StoreOwnershipQualifier::Init);
     }
 
     // === -------------------------------------------------------------------
     // populate the invocation:
 
+    // The graph of basic blocks depends
+    // test()
+    // [...] -> [doneRecording]
+    //           \-...ErrorBB
+    //
+    // test() throws
+    // [...] -> [recordErrorType] -> [doneRecordingBB]
+    //           \-...ErrorBB         \-...ErrorBB
+    //
+    // test() -> T
+    // [...] -> [recordReturnTypeBB] -> [doneRecordingBB]
+    //           \-...ErrorBB            \-...ErrorBB
+    //
+    // test() throws -> T
+    // [...] -> [recordErrorType] -> [recordReturnTypeBB] -> [doneRecordingBB]
+    //           \-...ErrorBB         \-...ErrorBB          \-...ErrorBB
+    //
+    // test(p: P1)
+    // [...] -> [recordArgument] -> [doneRecordingBB]
+    //           \-...ErrorBB        \-...ErrorBB
+    //
+    // test(p: P1) throws
+    // [...] -> [recordArgument] -> [recordErrorTypeBB] -> [doneRecordingBB]
+    //           \-...ErrorBB        \-...ErrorBB           \-...ErrorBB
+    //
+    // test(p: P1) throws -> P1
+    // [...] -> [recordArgument] -> [recordErrorTypeBB] -> [recordReturnTypeBB] -> [doneRecordingBB]
+    //           \-...ErrorBB        \-...ErrorBB           \-...ErrorBB            \-...ErrorBB
+    //
+    // test(p: P1, p: P2, ...)
+    // [...] -> [recordArgument] (-> [recordArgumentNBB])* -> [doneRecordingBB]
+    //           \-...ErrorBB         \-...ErrorBB             \-...ErrorBB
+    //
+    // test(p: P1, p: P2, ...) throws
+    // [...] -> [recordArgument] (-> [recordArgumentNBB])* -> [recordErrorType] -> [doneRecording]
+    //           \-...ErrorBB         \-...ErrorBB             \-...ErrorBB         \-...ErrorBB
+    //
+    // test(p: P1, p: P2, ...) throws -> T
+    // [...] -> [recordArgument] (-> [recordArgumentNBB])* -> [recordErrorType] -> [recordReturnType] -> [doneRecording]
+    //           \-...ErrorBB         \-...ErrorBB             \-...ErrorBB         \-...ErrorBB          \-...ErrorBB
     auto firstOfThrowingApplyBBs = true;
+    auto anyRecordBlocks = false;
 
-    // TODO: generics
+    SILBasicBlock *recordGenericSubstitutionsBB = nullptr;
+    SILBasicBlock *recordErrorGenericSubstitutionsBB = nullptr;
+    if (shouldRecordGenericSubstitutions) {
+      anyRecordBlocks = true;
+      assert(false);
+      if (!firstOfThrowingApplyBBs) {
+        recordGenericSubstitutionsBB = createBasicBlock("recordGenericSubstitutionsBB");
+        firstOfThrowingApplyBBs = false;
+      }
+      recordErrorGenericSubstitutionsBB = createBasicBlock("recordErrorGenericSubstitutionsBB");
+    }
+
+    if (shouldRecordArguments) {
+      anyRecordBlocks = true;
+      firstOfThrowingApplyBBs = false;
+    }
 
     SILBasicBlock *recordErrorTypeBB = nullptr;
     SILBasicBlock *recordErrorTypeErrorBB = nullptr;
     if (shouldRecordErrorType) {
-      if (!firstOfThrowingApplyBBs)
-        recordErrorTypeBB = createBasicBlock();
-      recordErrorTypeErrorBB = createBasicBlock();
+      anyRecordBlocks = true;
+      if (!firstOfThrowingApplyBBs) {
+        recordErrorTypeBB = createBasicBlock("recordErrorTypeBB");
+      }
       firstOfThrowingApplyBBs = false;
-      nextNormalBB = recordErrorTypeBB;
+      recordErrorTypeErrorBB = createBasicBlock("recordErrorTypeErrorBB");
     }
 
     SILBasicBlock *recordReturnTypeBB = nullptr;
     SILBasicBlock *recordReturnTypeErrorBB = nullptr;
     if (shouldRecordReturnType) {
-      if (!firstOfThrowingApplyBBs)
-        recordReturnTypeBB = createBasicBlock();
-      recordReturnTypeErrorBB = createBasicBlock();
+      anyRecordBlocks = true;
+      if (!firstOfThrowingApplyBBs) {
+        recordReturnTypeBB = createBasicBlock("recordReturnTypeBB");
+      }
       firstOfThrowingApplyBBs = false;
-      nextNormalBB = recordReturnTypeBB;
+      recordReturnTypeErrorBB = createBasicBlock("recordReturnTypeErrorBB");
     }
 
-    SILBasicBlock *recordingDoneBB = nullptr;
-    SILBasicBlock *recordingDoneErrorBB = nullptr;
-    if (!firstOfThrowingApplyBBs)
-      recordingDoneBB = createBasicBlock();
     firstOfThrowingApplyBBs = false;
-    recordingDoneErrorBB = createBasicBlock();
-    if (!nextNormalBB) {
-      nextNormalBB = recordReturnTypeBB;
+    SILBasicBlock *recordingDoneBB = nullptr;
+    SILBasicBlock *recordingDoneErrorBB = createBasicBlock("recordingDoneErrorBB");
+    if (anyRecordBlocks) {
+      // If any previous record* calls have been made, we need a BB to jump to
+      // on the normal path to the recordingDone call:
+      recordingDoneBB = createBasicBlock("recordingDoneBB");
     }
 
-    // === recordGenericSubstitution
+    // === All calls on invocationEncoder need Access:
+    SILValue invocationEncoderAccess;
+    {
+      invocationEncoderAccess = B.createBeginAccess(
+          loc, invocationEncoder.getValue(), SILAccessKind::Modify,
+          SILAccessEnforcement::Static, false, false);
+    }
+
+    // === encoder.recordGenericSubstitution() ---------------------------------
+    SILBasicBlock *recordGenericSubstitutionsErrorBB = nullptr;
     if (shouldRecordGenericSubstitutions) {
       // TODO(distributed): record substitutions
+      assert(false);
     }
 
-    // === encoder.recordArgument(s)
+    // === encoder.recordArgument() --------------------------------------------
     if (shouldRecordArguments) {
-      assert(false && "record arguments");
-//          auto recordArgumentFnDecl =
-//              selfTyDecl->getDistributedActorInvocationRecordArgumentFunction();
-//          auto recordArgumentFnRef = SILDeclRef(recordArgumentFnDecl);
-//          assert(remoteCallFnDecl && "no recordArgument func found!");
-//
-//          auto recordArgumentFnSIL =
-//              builder.getOrCreateFunction(loc, recordArgumentFnRef, ForDefinition);
-//          SILValue recordArgumentFn = B.createFunctionRefFor(loc, recordArgumentFnSIL);
-//
-//          for (const auto &param : params) {
-//            if (nextNormalBB)
-//              B.emitBlock(nextNormalBB);
-//
-//            auto recordArgumentNormalBB = createBasicBlock();
-//            auto recordArgumentErrorBB = createBasicBlock();
-//            nextNormalBB = recordArgumentNormalBB;
-//
-//            emitDistributedWitnessCall(
-//                B, loc, ctx.Id_recordArgument,
-//                invocationValue,
-//                invocationEncoderProto, getLoweredType(selfTy),
-//                /*args=*/{},
-//                std::make_pair(nextNormalBB, recordArgumentErrorBB)
-//                );
-//          }
+      if (nextNormalBB) {
+        B.emitBlock(nextNormalBB);
+      }
+      nextNormalBB = nullptr;
+
+      assert(invocationEncoderNominal);
+      FuncDecl *recordArgumentFnDecl =
+          ctx.getRecordArgumentOnDistributedInvocationEncoder(
+              invocationEncoderNominal);
+      auto recordArgumentFnRef = SILDeclRef(recordArgumentFnDecl);
+      assert(recordArgumentFnRef && "no 'recordArgument' func found!");
+
+      auto recordArgumentFnSIL =
+          builder.getOrCreateFunction(loc, recordArgumentFnRef, NotForDefinition);
+      SILValue recordArgumentFn =
+          B.createFunctionRefFor(loc, recordArgumentFnSIL);
+
+      // --- invoke recordArgument for every parameter
+      assert(paramsForForwarding.size() == fd->getParameters()->size() + 1);
+      assert(paramsForForwarding.back()->getType().getNominalOrBoundGenericNominal()->isDistributedActor());
+      // the parameters for forwarding include `self`, but here we should not
+      // copy that self, so we just drop it.
+      paramsForForwarding.pop_back();
+
+      auto funcDeclParamsNum = fd->getParameters()->size();
+      assert(funcDeclParamsNum > 0);
+      unsigned long paramIdx = 0;
+      Optional<SILValue> previousArgumentToDestroy;
+      for (SILValue paramValue : paramsForForwarding) {
+        auto isLastParam = ++paramIdx == funcDeclParamsNum;
+
+        auto paramTy = paramValue->getType().getASTType();
+        if (nextNormalBB) {
+          // this will be `nextRecordArgumentNormalBB` from the previous
+          // iteration i.e. if we're the first parameter, we just emit directly;
+          // if we're the second (or later) parameter, we need to emit a basic
+          // block here.
+          B.emitBlock(nextNormalBB);
+          createVoidPhiArgument(*this, ctx, nextNormalBB);
+        }
+
+        if (previousArgumentToDestroy.hasValue()) {
+          B.createDestroyAddr(loc, previousArgumentToDestroy.getValue());
+        }
+
+        // Prepare the next normalBB we need to jump to on successful recordArgument call;
+        // If this is the last parameter we need to record though, then we always
+        // go to the following record* function type, which need to be the
+        // 'nextNormalBB'.
+        SILBasicBlock *nextRecordArgumentNormalBB;
+        if (!isLastParam) {
+          nextRecordArgumentNormalBB = createBasicBlock("nextRecordArgumentNormalBB");
+        } else if (shouldRecordErrorType) {
+          nextRecordArgumentNormalBB = recordErrorTypeBB;
+        } else if (shouldRecordReturnType) {
+          nextRecordArgumentNormalBB = recordReturnTypeBB;
+        } else {
+          nextRecordArgumentNormalBB = recordingDoneBB;
+        }
+        nextNormalBB = nextRecordArgumentNormalBB;
+        auto recordArgumentErrorBB = createBasicBlock("recordArgumentErrorBB");
+
+        // === Prepare the argument
+        SILType argType = paramValue->getType();
+        if (paramValue->getType().hasArchetype()) {
+          fprintf(stderr, "[%s:%d] (%s) HAS ARCHETYPE\n", __FILE__, __LINE__, __FUNCTION__);
+          auto out = paramValue->getType().mapTypeOutOfContext();
+          out.dump();
+          argType = out;
+        }
+
+        llvm::Optional<ManagedValue> argValue;
+        {
+          fprintf(stderr, "[%s:%d] (%s) paramValue->getType()\n", __FILE__, __LINE__, __FUNCTION__);
+          paramValue->getType().dump();
+          paramValue->getType().getASTType().dump();
+          getLoweredType(paramValue->getType().getASTType()).dump();
+
+          auto argTemp = emitTemporaryAllocation(loc, paramValue->getType());
+          argValue = emitManagedBufferWithCleanup(argTemp);
+
+          fprintf(stderr, "[%s:%d] (%s) ----------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+          F.dump();
+          fprintf(stderr, "[%s:%d] (%s) ----------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+
+          if (paramValue->getType().isAddressOnly(F)) {
+            fprintf(stderr, "[%s:%d] (%s) createCopyAddr\n", __FILE__, __LINE__, __FUNCTION__);
+            B.createCopyAddr(loc, paramValue, argTemp, IsNotTake, IsInitialization);
+          } else {
+            if (paramValue->getType().isAddress()) {
+              fprintf(stderr, "[%s:%d] (%s) createTrivialLoadOr\n", __FILE__, __LINE__, __FUNCTION__);
+              paramValue = B.createTrivialLoadOr(loc, paramValue,
+                                                 LoadOwnershipQualifier::Take);
+            } else {
+              fprintf(stderr, "[%s:%d] (%s) emitCopyValueOperation\n", __FILE__, __LINE__, __FUNCTION__);
+              paramValue = B.emitCopyValueOperation(loc, paramValue);
+            }
+
+            B.emitStoreValueOperation(loc, paramValue, argTemp,
+                                      StoreOwnershipQualifier::Init);
+          }
+
+        }
+
+        // === Prepare generic signature
+        auto recordArgumentGenericSig = recordArgumentFnDecl->getGenericSignature();
+        SmallVector<Type, 1> subTypes;
+        SmallVector<ProtocolConformanceRef, 2> subConformances;
+        {
+          auto module = B.getModule().getSwiftModule();
+          subTypes.push_back(paramTy);
+
+          // --- Codable: Decodable
+          auto decodableRequirementTy =
+              ctx.getProtocol(KnownProtocolKind::Decodable); // FIXME: actually use SerializatioNRequirement
+          auto paramDecodableTypeConfRef = module->lookupConformance(
+              paramTy, decodableRequirementTy);
+          subConformances.push_back(paramDecodableTypeConfRef);
+
+          // --- Codable: Encodable
+          auto encodableRequirementTy = ctx.getProtocol(
+              KnownProtocolKind::Encodable); // FIXME: actually use SerializatioNRequirement
+          auto paramEncodableTypeConfRef = module->lookupConformance(
+              paramTy, encodableRequirementTy);
+          subConformances.push_back(paramEncodableTypeConfRef);
+
+        }
+        auto subs = SubstitutionMap::get(
+            recordArgumentGenericSig,
+            subTypes, subConformances);
+
+        B.createTryApply(
+            loc, recordArgumentFn,
+            subs,
+            {
+                argValue.hasValue() ? argValue->getValue() : paramValue,
+                invocationEncoderAccess
+            },
+            /*normalBB=*/nextNormalBB,
+            /*errorBB=*/recordArgumentErrorBB);
+        {
+          emitThrowWithCleanupBasicBlock(
+              *this, loc, thunk, recordArgumentErrorBB, errorBB,
+              /*endAccesses=*/{invocationEncoderAccess});
+        }
+      }
     }
 
-    // === encoder.recordErrorType
+    // === encoder.recordErrorType() -------------------------------------------
     if (shouldRecordErrorType) {
       if (recordErrorTypeBB)
         B.emitBlock(recordErrorTypeBB);
 
-      fprintf(stderr, "[%s:%d] (%s) next normal BB from doneRecording will be:\n", __FILE__, __LINE__, __FUNCTION__);
       if (recordReturnTypeBB) {
-      fprintf(stderr, "[%s:%d] (%s)      recordReturnTypeBB\n", __FILE__, __LINE__, __FUNCTION__);
         nextNormalBB = recordReturnTypeBB;
-      } else if (recordingDoneBB) {
-      fprintf(stderr, "[%s:%d] (%s)      recordingDoneBB\n", __FILE__, __LINE__, __FUNCTION__);
+      } else {
         nextNormalBB = recordingDoneBB;
       }
 
       // Get the error type.
       // If we ever did typed-throws we'd get the error type from fd here...
-      auto errorTy = F.mapTypeIntoContext(
-          ctx.getErrorDecl()->getInterfaceType());
-      auto errorMetatype = getLoweredType(MetatypeType::get(errorTy));
-      auto errorMetatypeValue = B.createMetatype(loc, errorMetatype); // TODO(distributed): we create this in two places, optimize a bit
+      auto errorMetatype = getLoweredType(MetatypeType::get(errorTy, MetatypeRepresentation::Thick));
+      auto errorMetatypeValue = B.createMetatype(loc, errorMetatype);
 
       // Get the function
-      FuncDecl *recordErrorTyFnDecl =
+      FuncDecl *recordErrorTypeFnDecl =
           ctx.getRecordErrorTypeOnDistributedInvocationEncoder(
               invocationEncoderNominal);
-      assert(recordErrorTyFnDecl);
-      auto recordErrorTyFnRef = SILDeclRef(recordErrorTyFnDecl);
-      auto recordErrorFnSIL =
-          builder.getOrCreateFunction(loc, recordErrorTyFnRef, ForDefinition);
-      SILValue recordErrorTyFn = B.createFunctionRefFor(loc, recordErrorFnSIL);
-      recordErrorTyFn->dump();
+      assert(recordErrorTypeFnDecl);
+      auto recordErrorTyFnRef = SILDeclRef(recordErrorTypeFnDecl);
+      auto recordErrorTypeFnSIL =
+          builder.getOrCreateFunction(loc, recordErrorTyFnRef, NotForDefinition);
+      SILValue recordErrorTyFn = B.createFunctionRefFor(loc, recordErrorTypeFnSIL);
 
       // Prepare the <E: Error> substitution,
       // but just fill it with Error anyway.
-      auto errorSubs = SubstitutionMap();
+      auto recordErrorTypeGenericSig = recordErrorTypeFnDecl->getGenericSignature();
+      SmallVector<Type, 1> subTypes;
+      SmallVector<ProtocolConformanceRef, 1> subConformances;
+      {
+        // <Err: Error>
+        pushErrorConformance(*this, ctx, subTypes, subConformances);
+      }
+      auto errorSubs = SubstitutionMap::get(
+          recordErrorTypeGenericSig,
+          subTypes, subConformances);
 
       B.createTryApply(
           loc, recordErrorTyFn,
@@ -968,24 +1227,81 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           /*errorBB*/recordErrorTypeErrorBB);
     }
     if (shouldRecordErrorType) {
-      emitThrowWithCleanupBasicBlock(*this, loc, thunk, recordErrorTypeErrorBB, errorBB);
+      emitThrowWithCleanupBasicBlock(
+          *this, loc, thunk, recordErrorTypeErrorBB, errorBB,
+          /*endAccesses=*/{invocationEncoderAccess});
     }
 
-    if (recordReturnTypeBB) {
-      // TODO(distributed): record return type
-      B.emitBlock(recordReturnTypeBB);
-      assert(false);
+    // === encoder.recordReturnType() ------------------------------------------
+    if (shouldRecordReturnType) {
+      if (recordReturnTypeBB) {
+        B.emitBlock(recordReturnTypeBB);
+        createVoidPhiArgument(*this, ctx, recordReturnTypeBB);
+      }
+
+      // Get the return meta type.
+      // If we ever did typed-throws we'd get the error type from fd here...
+      auto returnMetatype = getLoweredType(MetatypeType::get(resultType.getASTType(), MetatypeRepresentation::Thick));
+      auto returnMetatypeValue = B.createMetatype(loc, returnMetatype);
+
+      // Get the function
+      FuncDecl *recordReturnTypeFnDecl =
+          ctx.getRecordReturnTypeOnDistributedInvocationEncoder(
+              invocationEncoderNominal);
+      assert(recordReturnTypeFnDecl);
+      auto recordErrorTyFnRef = SILDeclRef(recordReturnTypeFnDecl);
+      auto recordReturnTypeFnSIL =
+          builder.getOrCreateFunction(loc, recordErrorTyFnRef, NotForDefinition);
+      SILValue recordErrorTyFn = B.createFunctionRefFor(loc, recordReturnTypeFnSIL);
+
+      // Prepare the <Res: SerializationRequirement> substitution,
+      // but just fill it with Error anyway.
+      auto recordReturnTypeGenericSig = recordReturnTypeFnDecl->getGenericSignature();
+      SmallVector<Type, 1> subTypes;
+      SmallVector<ProtocolConformanceRef, 2> subConformances;
+      {
+        auto module = B.getModule().getSwiftModule();
+
+        // <Res: SerializationRequirement>
+        subTypes.push_back(resultType.getASTType());
+
+        // pushSerializationRequirementConformance(*this, ctx, resultType, subTypes, subConformances); // FIXME(distributed): use this
+
+        // FIXME: actually use SerializationRequirement
+        subConformances.push_back(module->lookupConformance(
+            resultType.getASTType(),
+            ctx.getProtocol(KnownProtocolKind::Decodable)));
+
+        // FIXME: actually use SerializationRequirement
+        subConformances.push_back(module->lookupConformance(
+            resultType.getASTType(),
+            ctx.getProtocol(KnownProtocolKind::Encodable)));
+      }
+      auto errorSubs = SubstitutionMap::get(
+          recordReturnTypeGenericSig,
+          subTypes, subConformances);
+
+      B.createTryApply(
+          loc, recordErrorTyFn,
+          /*subs*/errorSubs,
+          /*args*/{ returnMetatypeValue, invocationEncoder.getValue() },
+          /*normalBB*/recordingDoneBB,
+          /*errorBB*/recordReturnTypeErrorBB);
     }
-    if (recordReturnTypeBB) {
-      emitThrowWithCleanupBasicBlock(*this, loc, thunk, recordReturnTypeErrorBB, errorBB);
+    if (shouldRecordReturnType) {
+      emitThrowWithCleanupBasicBlock(
+          *this, loc, thunk, recordReturnTypeErrorBB, errorBB,
+          /*endAccesses=*/{invocationEncoderAccess});
     }
 
-    // === try doneRecording
-    SILValue invocationEncoderAccess;
-    SILBasicBlock *makeRemoteCallTargetBB = createBasicBlock();
+    // === encoder.doneRecording() ---------------------------------------------
+    SILBasicBlock *makeRemoteCallTargetBB = createBasicBlock("makeRemoteCallTargetBB");
     {
-      if (recordingDoneBB)
+      if (recordingDoneBB) {
         B.emitBlock(recordingDoneBB);
+
+        createVoidPhiArgument(*this, ctx, recordingDoneBB);
+      }
 
       assert(invocationEncoderNominal);
       FuncDecl *doneRecordingFnDecl =
@@ -995,12 +1311,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto doneRecordingFnRef = SILDeclRef(doneRecordingFnDecl);
 
       auto doneRecordingFnSIL =
-          builder.getOrCreateFunction(loc, doneRecordingFnRef, ForDefinition);
+          builder.getOrCreateFunction(loc, doneRecordingFnRef, NotForDefinition);
       SILValue doneRecordingFn = B.createFunctionRefFor(loc, doneRecordingFnSIL);
-
-      invocationEncoderAccess = B.createBeginAccess(
-          loc, invocationEncoder.getValue(), SILAccessKind::Modify,
-          SILAccessEnforcement::Static, false, false);
 
       B.createTryApply(
           loc, doneRecordingFn,
@@ -1008,91 +1320,41 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           /*args=*/{invocationEncoderAccess},
           /*normalBB=*/makeRemoteCallTargetBB,
           /*errorBB*/recordingDoneErrorBB);
-//          emitDistributedActorSystemWitnessCall(
-//              B, loc, ctx.Id_doneRecording,
-//              invocationEncoder, /*actorTypeSubs*/SILType(),
-//              /*args=*/ { invocationEncoder },
-//              std::make_pair(doneRecordingNormalBB, doneRecordingErrorBB));
-//          nextNormalBB = doneRecordingNormalBB;
     }
-//    {
-//      B.emitBlock(recordingDoneError1BB);
-//      SILValue error = recordingDoneError1BB->createPhiArgument(
-//          fnConv.getSILErrorType(getTypeExpansionContext()),
-//          OwnershipKind::Owned);
-//
-//      B.createEndAccess(loc, invocationEncoder.getValue(), /*aborted=*/false);
-//
-//      B.createBranch(loc, recordingDoneError2BB);
-//      fprintf(stderr, "[%s:%d] (%s) 11111 >>>>>>>\n", __FILE__, __LINE__, __FUNCTION__);
-//      fprintf(stderr, "[%s:%d] (%s) 11111 >>>>>>>\n", __FILE__, __LINE__, __FUNCTION__);
-//      recordingDoneError1BB->dump();
-//      fprintf(stderr, "[%s:%d] (%s) 11111 ^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
-//      fprintf(stderr, "[%s:%d] (%s) 11111 ^^^^^^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
-//    }
-//    {
-//      emitThrowWithCleanupBasicBlock(*this, loc, thunk, recordingDoneError2BB, errorBB);
-//      fprintf(stderr, "[%s:%d] (%s) 22222 >>>>>>>\n", __FILE__, __LINE__, __FUNCTION__);
-//      fprintf(stderr, "[%s:%d] (%s) 22222 >>>>>>>\n", __FILE__, __LINE__, __FUNCTION__);
-//      recordingDoneError2BB->dump();
-//      fprintf(stderr, "[%s:%d] (%s) 22222 ^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
-//      fprintf(stderr, "[%s:%d] (%s) 22222 ^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
-//    }
     {
-      B.emitBlock(recordingDoneErrorBB);
-
-      SILValue error = recordingDoneErrorBB->createPhiArgument(
-          fnConv.getSILErrorType(getTypeExpansionContext()),
-          OwnershipKind::Owned);
-
-      B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
-      Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
-      B.createBranch(loc, errorBB, {error});
-
-      fprintf(stderr, "[%s:%d] (%s) RECORDING DONE ERROR\n", __FILE__, __LINE__, __FUNCTION__);
-      recordingDoneErrorBB->dump();
+      emitThrowWithCleanupBasicBlock(*this, loc, thunk, recordingDoneErrorBB,
+                                     errorBB, /*endAccesses=*/{invocationEncoderAccess});
     }
 
-    // === create the RemoteCallTarget
+    // === create the RemoteCallTarget -----------------------------------------
     auto remoteCallTargetDecl = ctx.getRemoteCallTargetDecl();
     auto remoteCallTargetTy = F.mapTypeIntoContext(remoteCallTargetDecl->getDeclaredInterfaceType());
     ManagedValue remoteCallTargetValue;
     LoadInst *remoteCallSystemSelf = nullptr;
-    SILBasicBlock *remoteCallReturnBB = createBasicBlock();
-    SILBasicBlock *remoteCallErrorBB = createBasicBlock();
+    SILBasicBlock *remoteCallReturnBB = createBasicBlock("remoteCallReturnBB");
+    SILBasicBlock *remoteCallErrorBB = createBasicBlock("remoteCallErrorBB");
+    ManagedValue remoteCallReturnValue;
     {
       B.emitBlock(makeRemoteCallTargetBB);
-
-      // we come here from doneRecording which returns Void:
-      makeRemoteCallTargetBB->createPhiArgument(
-          getLoweredType(ctx.getVoidType()), OwnershipKind::Owned);
+      createVoidPhiArgument(*this, ctx, makeRemoteCallTargetBB);
 
       auto mangledName = thunk.mangle(SILDeclRef::ManglingKind::Default);
       auto mangledNameRef = llvm::StringRef(mangledName.c_str(), mangledName.size()); // FIXME(distributed): can just pass the mangledName?
 
       // --- Get the `RemoteCallTarget` type
-//        auto remoteCallTargetDecl = ctx.getRemoteCallTargetDecl();
-//        auto remoteCallTargetTy =
-//            getLoweredType(remoteCallTargetDecl->getInterfaceType());
-
-//        auto remoteCallTargetTy = getLoweredType(ctx.getRemoteCallTargetType()); // WAS OK
 
       // %28 = alloc_stack $RemoteCallTarget, let, name "target" // users: %58, %57, %50, %77, %76, %37
-//        remoteCallTargetValue = B.createAllocStack(loc, getLoweredType(remoteCallTargetTy));
       auto remoteCallTargetBuf = emitTemporaryAllocation(loc, getLoweredType(remoteCallTargetTy));
-      // native.forwardInto(SGF, loc, buf);
       remoteCallTargetValue = emitManagedBufferWithCleanup(remoteCallTargetBuf);
 
-//        // %29 = metatype $@thin RemoteCallTarget.Type // user: %37
+      // %29 = metatype $@thin RemoteCallTarget.Type // user: %37
       auto remoteCallTargetMetatype = getLoweredType(MetatypeType::get(remoteCallTargetTy));
       auto remoteCallTargetMetatypeValue = B.createMetatype(loc, remoteCallTargetMetatype);
 
       // %30 = string_literal utf8 "MANGLED_NAME" // user: %35
-      // TODO: ManagedValue ... = emitStringLiteral
       auto mangledNameLiteral =
           B.createStringLiteral(loc, mangledNameRef,
                                 StringLiteralInst::Encoding::UTF8);
-      fprintf(stderr, "[%s:%d] (%s) HERE\n", __FILE__, __LINE__, __FUNCTION__);
 
       // %31 = integer_literal $Builtin.Word, 12 // user: %35
       auto codeUnitCountLiteral =
@@ -1107,9 +1369,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
                                  -1);
 
       // %33 = metatype $@thin String.Type // user: %35
-//        auto StringNominalTy = ctx.getStringDecl();
-//        auto StringTy = getLoweredType(ctx.getStringType());
-//        auto StringMetaTy = B.createMetatype(loc, StringTy);
       auto StringMetaTy = CanMetatypeType::get(CanType(ctx.getStringType()), MetatypeRepresentation::Thin);
       auto stringSelf =
           B.createMetatype(loc,
@@ -1137,7 +1396,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       assert(remoteCallTargetInitDecl && "no 'RemoteCallTarget.init' found!");
       auto remoteCallTargetInitRef = SILDeclRef(remoteCallTargetInitDecl);
       auto remoteCallTargetInitFnSIL =
-          builder.getOrCreateFunction(loc, remoteCallTargetInitRef, ForDefinition);
+          builder.getOrCreateFunction(loc, remoteCallTargetInitRef, NotForDefinition);
       SILValue remoteCallTargetInitFn = B.createFunctionRefFor(loc, remoteCallTargetInitFnSIL);
 
       // %37 = apply %36(%28, %35, %29) : $@convention(method) (@owned String, @thin RemoteCallTarget.Type) -> @out RemoteCallTarget
@@ -1146,21 +1405,12 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           {/*out*/ remoteCallTargetValue.getValue(), mangledNameStringValue,
            remoteCallTargetMetatypeValue});
 
-      // B.createBranch(loc, remoteCallBB, {remoteCallTargetValue.getValue()}); /// 1111111
-//      B.createBranch(loc, remoteCallBB);
-//    }
-//
-//    // === Call the remoteCall on the actor system
-//    {
-//      B.emitBlock(remoteCallBB);
-//        SILValue remoteCallTargetValue = remoteCallBB->createPhiArgument(
-//            getLoweredType(remoteCallTargetTy), OwnershipKind::Owned);
-
+      // === Prepare `actorSystem.remoteCall()` --------------------------------
       // --- Prepare storage for the return value
       // %38 = alloc_stack $String // users: %54, %56, %50, %75
-      // auto remoteCallReturnValue = B.createAllocStack(loc, resultType);
       auto remoteCallReturnBuf = emitTemporaryAllocation(loc, resultType);
-      auto remoteCallReturnValue = emitManagedBufferWithCleanup(remoteCallReturnBuf);
+//      remoteCallReturnValue = emitManagedBufferWithCleanup(remoteCallReturnBuf); // FIXME: !!!!!!!!!!!!!!!!!!!!!!!!!!
+      remoteCallReturnValue = ManagedValue::forUnmanaged(remoteCallReturnBuf); // FIXME: !!!!!!!!!!!!!!!!!!!!!!!!!!
 
       auto systemRef = emitActorPropertyReference(
           *this, loc, selfValue.getValue(),
@@ -1204,11 +1454,12 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // function_ref FakeActorSystem.remoteCall<A, B, C>(on:target:invocationDecoder:throwing:returning:)
       // %49 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mSgtYaKAJ0bC0RzSeR0_SER0_AA0C7AddressV2IDRtzr1_lF : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %50
       auto remoteCallFnDecl =
-          selfTyDecl->getDistributedActorSystemRemoteCallFunction();
+          ctx.getRemoteCallOnDistributedActorSystem(selfTyDecl, /*isVoid=*/resultType.isVoid());
+//          selfTyDecl->getDistributedActorSystemRemoteCallFunction();
       assert(remoteCallFnDecl && "no remoteCall func found!");
       auto remoteCallFnRef = SILDeclRef(remoteCallFnDecl);
       auto remoteCallFnSIL =
-          builder.getOrCreateFunction(loc, remoteCallFnRef, ForDefinition);
+          builder.getOrCreateFunction(loc, remoteCallFnRef, NotForDefinition);
       SILValue remoteCallFn = B.createFunctionRefFor(loc, remoteCallFnSIL);
 
       // --- prepare subs for the 'remoteCall'
@@ -1218,9 +1469,11 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       SmallVector<ProtocolConformanceRef, 3> subConformances;
       // <τ_0_0,
       //  τ_0_1,
-      //  τ_0_2 where τ_0_0 : DistributedActor,
-      //  τ_0_2 : Decodable,
-      //  τ_0_2 : Encodable,
+      //  τ_0_2 // only if resultTy != Void
+      //  where
+      //  τ_0_0 : DistributedActor,
+      //  τ_0_2 : Decodable, // only if resultTy != Void
+      //  τ_0_2 : Encodable, // only if resultTy != Void
       //  τ_0_0.ID == ActorAddress
       // >
       // (
@@ -1228,130 +1481,137 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       //  @in_guaranteed RemoteCallTarget,
       //  @inout FakeInvocation,
       //  @thick τ_0_1.Type,
-      //  Optional<@thick τ_0_2.Type>,
+      // @thick τ_0_2.Type, // only if resultTy != Void
       //  @guaranteed FakeActorSystem)
       {
         auto module = B.getModule().getSwiftModule();
 
         // <Self: DistributedActor>
-        auto distributedActorConfRef =
-            module->lookupConformance(selfSILTy.getASTType(), distributedActorProto);
-        assert(!distributedActorConfRef.isInvalid() &&
-               "Missing conformance to `DistributedActor`");
-        subTypes.push_back(selfSILTy.getASTType());
-        subConformances.push_back(distributedActorConfRef);
+        pushDistributedActorConformance(*this, ctx, selfSILTy, subTypes, subConformances);
 
         // <Err: Error>
-        auto thrownErrorConfRef =
-            module->lookupConformance(errTy,
-                                      ctx.getErrorDecl());
-        assert(!distributedActorConfRef.isInvalid() &&
-               "Missing conformance to `Error`");
-        subTypes.push_back(errTy);
-        subConformances.push_back(thrownErrorConfRef);
+        if (fd->hasThrows()) {
+          pushErrorConformance(*this, ctx, subTypes, subConformances);
+        } else {
+          pushNeverErrorConformance(*this, ctx, subTypes, subConformances);
+        }
 
-        // <Res: SerializationRequirement>
-        // FIXME(distributed): must use SerializationRequirement!
-        auto encodableRequirementTy =
-            ctx.getProtocol(KnownProtocolKind::Encodable); // FIXME: actually use SerializatioNRequirement
-//        auto resultEncodableTypeConfRef =
-//            module->lookupConformance(resultType.getASTType(),
-//                                      encodableRequirementTy);
-//        assert(!distributedActorConfRef.isInvalid() &&
-//               "Missing conformance to `SerializationRequirement`");
-        subTypes.push_back(resultType.getASTType());
-//        subConformances.push_back(resultEncodableTypeConfRef);
+        if (!resultType.isVoid()) {
+          // <Res: SerializationRequirement>
+          //        pushSerializationRequirementConformance(*this, ctx,
+          //                                                resultType,
+          //                                                subTypes, subConformances);
+          subTypes.push_back(resultType.getASTType());
 
-//        auto decodableRequirementTy =
-//            ctx.getProtocol(KnownProtocolKind::Decodable);
-//        auto resultDecodableTypeConfRef =
-//            module->lookupConformance(resultType.getASTType(),
-//                                      encodableRequirementTy);
-//        subTypes.push_back(resultType.getASTType());
-//        subConformances.push_back(resultDecodableTypeConfRef);
+          // FIXME(distributed): get the types from SerializationRequirement
+          subConformances.push_back(module->lookupConformance(
+              resultType.getASTType(),
+              ctx.getProtocol(KnownProtocolKind::Decodable)));
+
+          subConformances.push_back(module->lookupConformance(
+              resultType.getASTType(),
+              ctx.getProtocol(KnownProtocolKind::Encodable)));
+        }
       }
 
       SubstitutionMap remoteCallSubs =
           SubstitutionMap::get(remoteCallGenericSig,
                                subTypes, subConformances);
 
-      //      %30 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mtYaKAJ0bC0Rzs5ErrorR_AA0C7AddressV2IDRtzr1_lF  : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_1 : Error, τ_0_0.ID == ActorAddress>                        (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, @thick τ_0_2.Type, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %31
-      // OLD: %30 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mtYaKAJ0bC0RzSeR0_SER0_AA0C7AddressV2IDRtzr1_lF : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, @thick τ_0_2.Type, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %31
+      SmallVector<SILValue, 7> remoteCallArgs;
+      // 'out' arguments:
+      if (!resultType.isVoid())
+        remoteCallArgs.push_back(remoteCallReturnValue.getValue()); // return value buffer
+      // function arguments:
+      remoteCallArgs.push_back(selfValue.getValue()); // on actor
+      remoteCallArgs.push_back(remoteCallTargetValue.getValue()); // target
+      remoteCallArgs.push_back(invocationEncoderAccess); // invocation encoder
+      remoteCallArgs.push_back(thrownErrorMetatypeValue); // throwing type
+      if (!resultType.isVoid())
+        remoteCallArgs.push_back(returnMetatypeValue); // returning type, only if non-void
+      // self:
+      remoteCallArgs.push_back(remoteCallSystemSelf); // ActorSystem
 
       // try_apply %49<MyDistActor, Never, String>(%38, %2, %28, %48, %43, %46, %40) : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error), normal bb5, error bb10 // id: %50
       B.createTryApply(loc, remoteCallFn,
                        remoteCallSubs,
-                       {
-                           /*out*/ remoteCallReturnValue.getValue(), // out, return value
-                           selfValue.getValue(), // on actor
-                           remoteCallTargetValue.getValue(), // target
-                           invocationEncoder.getValue(), // invocation encoder
-                           thrownErrorMetatypeValue, // throwing type
-                           returnMetatypeValue, // returning type
-                           /*self*/remoteCallSystemSelf // ActorSystem
-                       },
+                       remoteCallArgs,
                        /*normalBB=*/remoteCallReturnBB,
                        /*errorBB=*/remoteCallErrorBB);
     }
 
-  //    // Emit all basic error blocks which handle errors thrown by invocation
-  //    // preparing calls; All those blocks just branch to errorBB.
-  //    for (const auto &dynamicErrorBB : dynamicBasicErrorBlocks) {
-  //      B.emitBlock(dynamicErrorBB);
-  //      SILValue error = dynamicErrorBB->createPhiArgument(
-  //          fnConv.getSILErrorType(getTypeExpansionContext()),
-  //          OwnershipKind::Owned);
-  //
-  //      B.createBranch(loc, errorBB, {error});
-  //    }
-//    {
-//      B.emitBlock(remoteCallReturnBB);
-//      SILValue result = remoteCallReturnBB->createPhiArgument(
-//          resultType, OwnershipKind::Owned);
-//      B.createBranch(loc, returnBB, {result});
-//    }
+    // === return <result of remote call> --------------------------------------
     {
       B.emitBlock(remoteCallReturnBB);
+      createVoidPhiArgument(*this, ctx, remoteCallReturnBB);
 
-      SILValue result = remoteCallReturnBB->createPhiArgument(
-          resultType, OwnershipKind::Owned);
+      auto result = remoteCallReturnValue.getValue();
+      auto resultLoaded = B.createTrivialLoadOr(loc, result, LoadOwnershipQualifier::Copy, true);
 
-      B.createEndLifetime(loc, remoteCallSystemSelf);
+      // FIXME(distributed): manual since I could not figure out how to NOT destroy_addr in the error path, where the memory is not initialized, so the destroy would fail SIL verification
+      B.createDestroyAddr(loc, result);
+//      B.createDeallocStack(loc, result);
+
+      if (remoteCallSystemSelf->getType().isAddress())
+        B.createEndLifetime(loc, remoteCallSystemSelf);
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
       Cleanups.emitCleanupsForReturn(CleanupLocation(loc), NotForUnwind);
-      B.createBranch(loc, returnBB, {result});
+      B.createBranch(loc, returnBB, {resultLoaded});
     }
     {
-      emitThrowWithCleanupBasicBlock(*this, loc, thunk, remoteCallErrorBB, errorBB,
-                                     /*endAccesses*/{invocationEncoderAccess},
-                                     /*endLifetimes*/{remoteCallSystemSelf});
+      // FIXME(distributed): manual since I could not figure out how to NOT destroy_addr in the error path, where the memory is not initialized, so the destroy would fail SIL verification
+//      emitThrowWithCleanupBasicBlock(*this, loc, thunk, remoteCallErrorBB, errorBB,
+//                                     /*endAccesses*/{invocationEncoderAccess},
+//                                     /*endLifetimes*/{remoteCallSystemSelf});
+      B.emitBlock(remoteCallErrorBB);
+      SILValue error = remoteCallErrorBB->createPhiArgument(
+          fnConv.getSILErrorType(getTypeExpansionContext()),
+          OwnershipKind::Owned);
+
+      auto result = remoteCallReturnValue.getValue();
+
+      auto methodTy =
+          SGM.Types.getConstantOverrideType(getTypeExpansionContext(), thunk);
+      auto derivativeFnSILTy = SILType::getPrimitiveObjectType(methodTy);
+      auto silFnType = derivativeFnSILTy.castTo<SILFunctionType>();
+      SILFunctionConventions fnConv(silFnType, SGM.M);
+
+
+//      B.createDeallocStack(loc, result); // FIXME: the reason this is manual is because I could not figure out how to NOT destroy_addr the result on this error exit path
+
+      B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
+
+      if (remoteCallSystemSelf->getType().isAddress())
+        B.createEndLifetime(loc, remoteCallSystemSelf);
+
+      Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
+
+      B.createBranch(loc, errorBB, {error});
     }
   } // end of `if isRemote { ... }`
 
   // Emit return logic
   {
     B.emitBlock(returnBB);
-
     SILValue result =
         returnBB->createPhiArgument(resultType, OwnershipKind::Owned);
+
     B.createReturn(loc, result);
   }
 
   // Emit the rethrow logic.
   {
     B.emitBlock(errorBB);
-
     SILValue error = errorBB->createPhiArgument(
         fnConv.getSILErrorType(getTypeExpansionContext()),
         OwnershipKind::Owned);
+
     B.createThrow(loc, error);
   }
 
-  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ===========================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ===========================================================================\n", __FILE__, __LINE__, __FUNCTION__);
   F.dump();
-  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ===========================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ===========================================================================\n", __FILE__, __LINE__, __FUNCTION__);
 }

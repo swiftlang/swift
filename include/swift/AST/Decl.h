@@ -3358,21 +3358,11 @@ public:
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
   VarDecl *getDistributedActorIDProperty() const;
 
-  /// Find the 'remoteCall' ad-hoc protocol requirement on a
-  /// 'DistributedActorSystem' protocol of specific implementation type.
-  AbstractFunctionDecl* getDistributedActorSystemRemoteCallFunction() const;
-
   /// Find the 'makeInvocation' function.
   AbstractFunctionDecl* getDistributedActorSystemMakeInvocationEncoderFunction() const;
 
-  /// Find the 'DistributedTargetInvocation.recordArgument' function.
-  AbstractFunctionDecl* getDistributedActorInvocationRecordArgumentFunction() const;
-
   /// Find the 'RemoteCallTarget.init(_mangledName:)' initializer function
   ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
-
-  /// Find the 'DistributedTargetInvocation.doneRecording' function.
-  AbstractFunctionDecl* getDistributedActorInvocationDoneRecordingFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -6371,7 +6361,7 @@ public:
   /// Determines whether this function is a 'remoteCall' function,
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedActorSystem' protocol.
-  bool isDistributedActorSystemRemoteCall() const;
+  bool isDistributedActorSystemRemoteCall(bool isVoidReturn) const;
 
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.

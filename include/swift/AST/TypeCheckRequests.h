@@ -1035,10 +1035,10 @@ public:
     bool isCached() const { return true; }
 };
 
-/// Obtain the 'id' property of a 'distributed actor'.
+/// Obtain the 'remoteCall' function of a 'DistributedActorSystem'.
 class GetDistributedActorSystemRemoteCallFunctionRequest :
     public SimpleRequest<GetDistributedActorSystemRemoteCallFunctionRequest,
-                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         AbstractFunctionDecl *(NominalTypeDecl *, bool voidReturn),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1046,7 +1046,7 @@ public:
 private:
   friend SimpleRequest;
 
-  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actorSystem) const;
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actorSystem, bool voidReturn) const;
 
 public:
     // Caching

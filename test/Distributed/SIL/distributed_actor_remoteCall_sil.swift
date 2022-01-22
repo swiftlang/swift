@@ -9,17 +9,11 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-
-
-
-
-
-
 @_silgen_name("swift_distributed_actor_is_remote")
 func __isRemoteActor(_ actor: AnyObject) -> Bool
 
 distributed actor MyDistActor {
-  distributed func test() {}
+//  distributed func test() {}
 
   nonisolated func TESTTESTTESTTEST(i: Int, s: String) async throws {
     // bb0:
@@ -29,7 +23,7 @@ distributed actor MyDistActor {
       // bb1:
       var invocation = self.actorSystem.makeInvocationEncoder()
 //      try invocation.recordArgument/*<Int>*/(i)
-//      try invocation.recordArgument/*<String>*/(s)
+      try invocation.recordArgument/*<String>*/(s)
 //      try invocation.recordErrorType/*<Error>*/(Error.self)
 //      try invocation.recordReturnType/*<String>*/(String.self)
       try invocation.doneRecording()
@@ -46,7 +40,6 @@ distributed actor MyDistActor {
 
     } else {
       // bb2:
-      try await self.test()
     }
   }
 }

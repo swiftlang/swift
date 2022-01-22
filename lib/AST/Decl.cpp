@@ -7387,16 +7387,23 @@ bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
 }
 
-bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall() const {
+bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn) const {
   auto &C = this->getASTContext();
 
+  auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
+
   // Check the name
-  if (this->getBaseName() != C.Id_remoteCall)
+  if (this->getBaseName() != callId)
     return false;
 
   auto params = this->getParameters();
+
   // Check the expected argument count
-  if (!params || params->size() != 5)
+  // - for value returning remoteCall:
+  if (!params || (!isVoidReturn && params->size() != 5))
+    return false;
+  // - for void returning remoteCallVoid:
+  if (!params || (isVoidReturn && params->size() != 4))
     return false;
 
   // Check API names of the arguments
@@ -7404,13 +7411,17 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall() const {
   auto targetParam = params->get(1);
   auto invocationParam = params->get(2);
   auto thrownTypeParam = params->get(3);
-  auto returnedTypeParam = params->get(4);
   if (actorParam->getArgumentName() != C.Id_on ||
       targetParam->getArgumentName() != C.Id_target ||
       invocationParam->getArgumentName() != C.Id_invocationDecoder ||
-      thrownTypeParam->getArgumentName() != C.Id_throwing ||
-      returnedTypeParam->getArgumentName() != C.Id_returning)
+      thrownTypeParam->getArgumentName() != C.Id_throwing)
     return false;
+
+  if (!isVoidReturn) {
+    auto returnedTypeParam = params->get(4);
+    if (returnedTypeParam->getArgumentName() != C.Id_returning)
+      return false;
+  }
 
   // FIXME(distributed): check the right types of the args and generics...
   // FIXME(distributed): check access level actually is ok, i.e. not private etc
@@ -7431,21 +7442,6 @@ AbstractFunctionDecl::getDistributedActorRemoteFuncDecl() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
       GetDistributedRemoteFuncRequest{mutableThis},
-      nullptr);
-}
-
-AbstractFunctionDecl*
-NominalTypeDecl::getDistributedActorSystemRemoteCallFunction() const {
-  const NominalTypeDecl *system = this;
-  if (this->isDistributedActor()) {
-    auto var = this->getDistributedActorSystemProperty();
-    system = var->getInterfaceType()->getAnyNominal();
-  }
-
-  auto mutableSystem = const_cast<NominalTypeDecl *>(system);
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem},
       nullptr);
 }
 
@@ -7495,27 +7491,6 @@ NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
       return ctor;
 
     return nullptr;
-  }
-
-  // TODO(distributed): make a Request for it?
-  return nullptr;
-}
-
-AbstractFunctionDecl*
-NominalTypeDecl::getDistributedActorInvocationDoneRecordingFunction() const {
-  auto &C = this->getASTContext();
-
-  // FIXME(distributed): implement more properly...
-  auto mutableThis = const_cast<NominalTypeDecl *>(this);
-  for (auto value : mutableThis->lookupDirect(C.Id_doneRecording)) {
-    auto func = dyn_cast<AbstractFunctionDecl>(value);
-    if (!func)
-      continue;
-
-    if (func->getParameters()->size() != 0)
-      return nullptr;
-
-    return func;
   }
 
   // TODO(distributed): make a Request for it?

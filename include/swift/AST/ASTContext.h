@@ -646,12 +646,22 @@ public:
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
+  /// Retrieve the declaration of DistributedActorSystem.remoteCall(Void)(...).
+  ///
+  /// \param actorOrSystem distributed actor or actor system to get the
+  /// remoteCall function for. If null, the 'DistributedActorSystem' protocol is
+  /// used.
+  /// \param isVoidReturn true if the call will be returning `Void`.
+  AbstractFunctionDecl *getRemoteCallOnDistributedActorSystem(
+      NominalTypeDecl *actorOrSystem,
+      bool isVoidReturn) const;
+
+  // Retrieve the declaration of DistributedInvocationEncoder.recordArgument(_:).
   //
   // \param nominal optionally provide a 'NominalTypeDecl' from which the
   // function decl shall be extracted. This is useful to avoid witness calls
   // through the protocol which is looked up when nominal is null.
-  FuncDecl *getDoneRecordingOnDistributedInvocationEncoder(
+  FuncDecl *getRecordArgumentOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal = nullptr) const;
 
   // Retrieve the declaration of DistributedInvocationEncoder.recordErrorType().
@@ -661,6 +671,23 @@ public:
   // through the protocol which is looked up when nominal is null.
   FuncDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal = nullptr) const;
+
+  // Retrieve the declaration of DistributedInvocationEncoder.recordReturnType().
+  //
+  // \param nominal optionally provide a 'NominalTypeDecl' from which the
+  // function decl shall be extracted. This is useful to avoid witness calls
+  // through the protocol which is looked up when nominal is null.
+  FuncDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal = nullptr) const;
+
+  // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
+  //
+  // \param nominal optionally provide a 'NominalTypeDecl' from which the
+  // function decl shall be extracted. This is useful to avoid witness calls
+  // through the protocol which is looked up when nominal is null.
+  FuncDecl *getDoneRecordingOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal = nullptr) const;
+
 
   /// Look for the declaration with the given name within the
   /// passed in module.

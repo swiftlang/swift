@@ -51,6 +51,7 @@ SubstitutionMap::Storage::Storage(
   assert(replacementTypes.size() == getNumReplacementTypes());
   if (conformances.size() != numConformanceRequirements) {
     fprintf(stderr, "[%s:%d] (%s) conformances.size() n = %d\n", __FILE__, __LINE__, __FUNCTION__, conformances.size());
+    for (auto c : conformances) c.dump();
     fprintf(stderr, "[%s:%d] (%s) numConformanceRequirements = %d\n", __FILE__, __LINE__, __FUNCTION__, numConformanceRequirements);
   }
   assert(conformances.size() == numConformanceRequirements);
