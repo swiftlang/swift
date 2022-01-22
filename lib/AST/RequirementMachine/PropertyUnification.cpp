@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "PropertyMap.h"
+#include "RequirementLowering.h"
 
 using namespace swift;
 using namespace rewriting;
@@ -703,15 +704,16 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     recordConcreteConformanceRule(concreteRuleID, conformanceRuleID,
                                   requirementKind, concreteConformanceSymbol);
 
-    auto assocTypes = proto->getAssociatedTypeMembers();
-    if (assocTypes.empty())
-      continue;
-
-    for (auto *assocType : assocTypes) {
+    for (auto *assocType : proto->getAssociatedTypeMembers()) {
       concretizeTypeWitnessInConformance(key, requirementKind,
                                          concreteConformanceSymbol,
                                          concrete, assocType);
     }
+
+    // We only infer conditional requirements in top-level generic signatures,
+    // not in protocol requirement signatures.
+    if (key.getRootProtocols().empty())
+      inferConditionalRequirements(concrete, substitutions);
   }
 }
 
@@ -1001,4 +1003,81 @@ void PropertyMap::recordConcreteConformanceRule(
   path.invert();
 
   (void) System.addRule(std::move(lhs), std::move(rhs), &path);
+}
+
+/// If \p key is fixed to a concrete type and is also subject to a conformance
+/// requirement, the concrete type might conform conditionally. In this case,
+/// introduce rules for any conditional requirements in the given conformance.
+void PropertyMap::inferConditionalRequirements(
+    ProtocolConformance *concrete, ArrayRef<Term> substitutions) const {
+
+  auto conditionalRequirements = concrete->getConditionalRequirements();
+
+  if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+    if (conditionalRequirements.empty())
+      llvm::dbgs() << "@@ No conditional requirements from ";
+    else
+      llvm::dbgs() << "@@ Inferring conditional requirements from ";
+
+    llvm::dbgs() << concrete->getType() << " : ";
+    llvm::dbgs() << concrete->getProtocol()->getName() << "\n";
+  }
+
+  if (conditionalRequirements.empty())
+    return;
+
+  SmallVector<Requirement, 2> desugaredRequirements;
+
+  // First, desugar all conditional requirements.
+  for (auto req : conditionalRequirements) {
+    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+      llvm::dbgs() << "@@@ Original requirement: ";
+      req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+
+    desugarRequirement(req, desugaredRequirements);
+  }
+
+  // Now, convert desugared conditional requirements to rules.
+  for (auto req : desugaredRequirements) {
+    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+      llvm::dbgs() << "@@@ Desugared requirement: ";
+      req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+
+    if (req.getKind() == RequirementKind::Conformance) {
+      auto *proto = req.getProtocolDecl();
+
+      // If we haven't seen this protocol before, add rules for its
+      // requirements.
+      if (!System.isKnownProtocol(proto)) {
+        if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+          llvm::dbgs() << "@@@ Unknown protocol: "<< proto->getName() << "\n";
+        }
+
+        RuleBuilder builder(Context, System.getProtocolMap());
+        builder.addProtocol(proto, /*initialComponent=*/false);
+        builder.collectRulesFromReferencedProtocols();
+
+        for (const auto &rule : builder.PermanentRules)
+          System.addPermanentRule(rule.first, rule.second);
+
+        for (const auto &rule : builder.RequirementRules)
+          System.addExplicitRule(rule.first, rule.second);
+      }
+    }
+
+    auto pair = getRuleForRequirement(req.getCanonical(), /*proto=*/nullptr,
+                                      substitutions, Context);
+
+    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+      llvm::dbgs() << "@@@ Induced rule from conditional requirement: "
+                   << pair.first << " => " << pair.second << "\n";
+    }
+
+    // FIXME: Do we need a rewrite path here?
+    (void) System.addRule(pair.first, pair.second);
+  }
 }

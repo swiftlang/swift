@@ -264,6 +264,10 @@ private:
                    ProtocolConformance *concrete,
                    AssociatedTypeDecl *assocType) const;
 
+  void inferConditionalRequirements(
+                   ProtocolConformance *concrete,
+                   ArrayRef<Term> substitutions) const;
+
   MutableTerm computeConstraintTermForTypeWitness(
       Term key, RequirementKind requirementKind,
       CanType concreteType, CanType typeWitness,
