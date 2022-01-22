@@ -8,7 +8,6 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // UNSUPPORTED: linux
-// XFAIL: windows
 
 @available(SwiftStdlib 5.5, *)
 func test_taskGroup_is_asyncSequence() async {

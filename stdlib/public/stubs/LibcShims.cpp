@@ -31,6 +31,15 @@
 
 #include "../SwiftShims/LibcShims.h"
 
+#if defined(_WIN32)
+static void __attribute__((__constructor__))
+_swift_stdlib_configure_console_mode(void) {
+  static UINT uiPrevConsoleCP = GetConsoleOutputCP();
+  atexit([]() { SetConsoleOutputCP(uiPrevConsoleCP); });
+  SetConsoleOutputCP(CP_UTF8);
+}
+#endif
+
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int _swift_stdlib_putchar_unlocked(int c) {
 #if defined(_WIN32)
@@ -42,9 +51,9 @@ int _swift_stdlib_putchar_unlocked(int c) {
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr,
-                                                  __swift_size_t size,
-                                                  __swift_size_t nitems) {
-    return fwrite(ptr, size, nitems, stdout);
+                                           __swift_size_t size,
+                                           __swift_size_t nitems) {
+  return fwrite(ptr, size, nitems, stdout);
 }
 
 SWIFT_RUNTIME_STDLIB_SPI
