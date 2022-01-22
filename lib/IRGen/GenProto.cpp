@@ -3732,6 +3732,11 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
                           .getIntValue());
         });
 
+        // Need to pad the structure after generic parameters
+        // up to four bytes because generic requirements that
+        // follow expect that alignment.
+        fields.addAlignmentPadding(Alignment(4));
+
         // Generic requirements
         irgen::addGenericRequirements(*this, fields, signature,
                                       signature.getRequirements());
