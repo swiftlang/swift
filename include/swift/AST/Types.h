@@ -5598,15 +5598,21 @@ enum class OpaqueSubstitutionKind {
 /// archetypes with underlying types visible at a given resilience expansion
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
-public:
-  const DeclContext *inContext;
   ResilienceExpansion contextExpansion;
-  bool isContextWholeModule;
+  llvm::PointerIntPair<const DeclContext *, 1, bool> inContextAndIsWholeModule;
+  llvm::SmallPtrSetImpl<OpaqueTypeDecl *> *seenDecls;
+
+public:
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
                                         ResilienceExpansion contextExpansion,
                                         bool isWholeModuleContext)
-      : inContext(inContext), contextExpansion(contextExpansion),
-        isContextWholeModule(isWholeModuleContext) {}
+      : contextExpansion(contextExpansion),
+        inContextAndIsWholeModule(inContext, isWholeModuleContext),
+        seenDecls(nullptr) {}
+
+  ReplaceOpaqueTypesWithUnderlyingTypes(
+      const DeclContext *inContext, ResilienceExpansion contextExpansion,
+      bool isWholeModuleContext, llvm::SmallPtrSetImpl<OpaqueTypeDecl *> &seen);
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -5622,6 +5628,13 @@ public:
   static OpaqueSubstitutionKind
   shouldPerformSubstitution(OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
                             ResilienceExpansion contextExpansion);
+
+private:
+  const DeclContext *getContext() const {
+    return inContextAndIsWholeModule.getPointer();
+  }
+
+  bool isWholeModule() const { return inContextAndIsWholeModule.getInt(); }
 };
 
 /// An archetype that represents the dynamic type of an opened existential.
