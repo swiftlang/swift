@@ -216,8 +216,12 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
     }
   }
   // Process the remaining operands. Insert destroys for consuming
-  // operands. Track newly dead operand values.
+  // operands. Track newly dead operand values. Instructions with multiple dead
+  // operands may occur in toDeleteInsts multiple times.
   for (auto *inst : toDeleteInsts) {
+    if (inst->isDeleted())
+      continue;
+
     for (Operand &operand : inst->getAllOperands()) {
       SILValue operandValue = operand.get();
       // Check for dead operands, which are dropped above.
@@ -249,6 +253,9 @@ void InstructionDeleter::cleanupDeadInstructions() {
     // append to deadInstructions. So we need to iterate until this it is empty.
     deadInstructions.clear();
     for (SILInstruction *deadInst : currentDeadInsts) {
+      if (deadInst->isDeleted())
+        continue;
+
       // deadInst will not have been deleted in the previous iterations,
       // because, by definition, deleteInstruction will only delete an earlier
       // instruction and its incidental/destroy uses. The former cannot be
