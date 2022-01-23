@@ -515,7 +515,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
 /// the original substitutions {X.Y} to produce the new schema Foo<τ_0_0>
 /// with substitutions {X.Y.A.B}.
 CanType
-RewriteContext::remapConcreteSubstitutionSchema(
+RewriteContext::getRelativeSubstitutionSchemaFromType(
     CanType concreteType,
     ArrayRef<Term> substitutions,
     SmallVectorImpl<Term> &result) {

@@ -183,7 +183,7 @@ namespace {
                                                       lhsSubstitutions);
 
         SmallVector<Term, 3> result;
-        auto concreteType = ctx.remapConcreteSubstitutionSchema(
+        auto concreteType = ctx.getRelativeSubstitutionSchemaFromType(
             CanType(secondType), rhsSubstitutions, result);
 
         MutableTerm constraintTerm(subjectTerm);
@@ -204,7 +204,7 @@ namespace {
                                                       rhsSubstitutions);
 
         SmallVector<Term, 3> result;
-        auto concreteType = ctx.remapConcreteSubstitutionSchema(
+        auto concreteType = ctx.getRelativeSubstitutionSchemaFromType(
             CanType(firstType), lhsSubstitutions, result);
 
         MutableTerm constraintTerm(subjectTerm);
@@ -842,8 +842,8 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   // Compute the concrete type symbol [concrete: C.X].
   SmallVector<Term, 3> result;
   auto typeWitnessSchema =
-      Context.remapConcreteSubstitutionSchema(typeWitness, substitutions,
-                                              result);
+      Context.getRelativeSubstitutionSchemaFromType(typeWitness, substitutions,
+                                                    result);
   auto typeWitnessSymbol =
       Symbol::forConcreteType(typeWitnessSchema, result, Context);
 
