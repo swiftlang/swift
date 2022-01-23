@@ -494,6 +494,51 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
   });
 }
 
+/// This method takes a concrete type that was derived from a concrete type
+/// produced by RewriteContext::getSubstitutionSchemaFromType() either by
+/// extracting a structural sub-component or performing a (Swift AST)
+/// substitution using subst(). It returns a new concrete substitution schema
+/// and a new list of substitution terms.
+///
+/// For example, suppose we start with the concrete type
+///
+///   Dictionary<τ_0_0, Array<τ_0_1>> with substitutions {X.Y, Z}
+///
+/// We can extract out the structural sub-component Array<τ_0_1>. If we wish
+/// to build a new concrete substitution schema, we call this method with
+/// Array<τ_0_1> and the original substitutions {X.Y, Z}. This will produce
+/// the new schema Array<τ_0_0> with substitutions {Z}.
+///
+/// As another example, consider we start with the schema Bar<τ_0_0> with
+/// original substitutions {X.Y}, and perform a Swift AST subst() to get
+/// Foo<τ_0_0.A.B>. We can then call this method with Foo<τ_0_0.A.B> and
+/// the original substitutions {X.Y} to produce the new schema Foo<τ_0_0>
+/// with substitutions {X.Y.A.B}.
+CanType
+RewriteContext::remapConcreteSubstitutionSchema(
+    CanType concreteType,
+    ArrayRef<Term> substitutions,
+    SmallVectorImpl<Term> &result) {
+  assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
+
+  if (!concreteType->hasTypeParameter())
+    return concreteType;
+
+  return CanType(concreteType.transformRec([&](Type t) -> Optional<Type> {
+    if (!t->isTypeParameter())
+      return None;
+
+    auto term = getRelativeTermForType(CanType(t), substitutions);
+
+    unsigned newIndex = result.size();
+    result.push_back(Term::get(term, *this));
+
+    return CanGenericTypeParamType::get(/*type sequence=*/ false,
+                                        /*depth=*/ 0, newIndex,
+                                        Context);
+  }));
+}
+
 /// Given a concrete type that may contain type parameters in structural positions,
 /// collect all the structural type parameter components, and replace them all with
 /// fresh generic parameters. The fresh generic parameters all have a depth of 0,

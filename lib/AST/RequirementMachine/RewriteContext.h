@@ -174,6 +174,10 @@ public:
                                         const ProtocolDecl *proto,
                                         SmallVectorImpl<Term> &result);
 
+  CanType remapConcreteSubstitutionSchema(CanType concreteType,
+                                          ArrayRef<Term> substitutions,
+                                          SmallVectorImpl<Term> &result);
+
   AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol);
 
   Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs);

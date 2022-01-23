@@ -132,51 +132,6 @@ static void recordConflict(Term key,
   newRule.markConflicting();
 }
 
-/// This method takes a concrete type that was derived from a concrete type
-/// produced by RewriteSystemBuilder::getConcreteSubstitutionSchema(),
-/// either by extracting a structural sub-component or performing a (Swift AST)
-/// substitution using subst(). It returns a new concrete substitution schema
-/// and a new list of substitution terms.
-///
-/// For example, suppose we start with the concrete type
-///
-///   Dictionary<τ_0_0, Array<τ_0_1>> with substitutions {X.Y, Z}
-///
-/// We can extract out the structural sub-component Array<τ_0_1>. If we wish
-/// to build a new concrete substitution schema, we call this method with
-/// Array<τ_0_1> and the original substitutions {X.Y, Z}. This will produce
-/// the new schema Array<τ_0_0> with substitutions {Z}.
-///
-/// As another example, consider we start with the schema Bar<τ_0_0> with
-/// original substitutions {X.Y}, and perform a Swift AST subst() to get
-/// Foo<τ_0_0.A.B>. We can then call this method with Foo<τ_0_0.A.B> and
-/// the original substitutions {X.Y} to produce the new schema Foo<τ_0_0>
-/// with substitutions {X.Y.A.B}.
-static CanType
-remapConcreteSubstitutionSchema(CanType concreteType,
-                                ArrayRef<Term> substitutions,
-                                RewriteContext &ctx,
-                                SmallVectorImpl<Term> &result) {
-  assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
-
-  if (!concreteType->hasTypeParameter())
-    return concreteType;
-
-  return CanType(concreteType.transformRec([&](Type t) -> Optional<Type> {
-    if (!t->isTypeParameter())
-      return None;
-
-    auto term = ctx.getRelativeTermForType(CanType(t), substitutions);
-
-    unsigned newIndex = result.size();
-    result.push_back(Term::get(term, ctx));
-
-    return CanGenericTypeParamType::get(/*type sequence=*/ false,
-                                        /*depth=*/ 0, newIndex,
-                                        ctx.getASTContext());
-  }));
-}
-
 namespace {
   /// Utility class used by unifyConcreteTypes() and unifySuperclasses()
   /// to walk two concrete types in parallel. Any time there is a mismatch,
@@ -228,9 +183,8 @@ namespace {
                                                       lhsSubstitutions);
 
         SmallVector<Term, 3> result;
-        auto concreteType = remapConcreteSubstitutionSchema(CanType(secondType),
-                                                            rhsSubstitutions,
-                                                            ctx, result);
+        auto concreteType = ctx.remapConcreteSubstitutionSchema(
+            CanType(secondType), rhsSubstitutions, result);
 
         MutableTerm constraintTerm(subjectTerm);
         constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
@@ -250,9 +204,8 @@ namespace {
                                                       rhsSubstitutions);
 
         SmallVector<Term, 3> result;
-        auto concreteType = remapConcreteSubstitutionSchema(CanType(firstType),
-                                                            lhsSubstitutions,
-                                                            ctx, result);
+        auto concreteType = ctx.remapConcreteSubstitutionSchema(
+            CanType(firstType), lhsSubstitutions, result);
 
         MutableTerm constraintTerm(subjectTerm);
         constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
@@ -889,8 +842,8 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   // Compute the concrete type symbol [concrete: C.X].
   SmallVector<Term, 3> result;
   auto typeWitnessSchema =
-      remapConcreteSubstitutionSchema(typeWitness, substitutions,
-                                      Context, result);
+      Context.remapConcreteSubstitutionSchema(typeWitness, substitutions,
+                                              result);
   auto typeWitnessSymbol =
       Symbol::forConcreteType(typeWitnessSchema, result, Context);
 
