@@ -1817,6 +1817,11 @@ ManglingError Remangler::mangleIsolated(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
+ManglingError Remangler::mangleCompileTimeConst(Node *node, unsigned depth) {
+  Buffer << "Yt";
+  return mangleSingleChildNode(node, depth + 1); // type
+}
+
 ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   Buffer << 'k';
   return mangleSingleChildNode(node, depth + 1); // type
