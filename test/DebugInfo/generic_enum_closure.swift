@@ -8,9 +8,9 @@ struct CErrorOr<T>
     // CHECK: define hidden {{.*}}void @"$s20generic_enum_closure8CErrorOrV1xACyxGAA14__CurrentErrnoV_tcfC"
     // CHECK-NOT: define
     // This is a SIL-level debug_value_addr instruction.
-    // CHECK: call void @llvm.dbg.declare
+    // CHECK: call void @llvm.dbg.addr
     // Self is in a dynamic alloca, hence the shadow copy.
-    // CHECK: call void @llvm.dbg.declare(
+    // CHECK: call void @llvm.dbg.addr(
     // CHECK-SAME: metadata i8** %[[SHADOW:.*]], metadata ![[SELF:.*]], meta
     // CHECK-SAME: !DIExpression(DW_OP_deref))
     // CHECK-DAG: store i8* %[[DYN:.*]], i8** %[[SHADOW]]

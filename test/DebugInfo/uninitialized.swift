@@ -7,7 +7,7 @@ class MyClass {}
 public func f() {
   var object: MyClass
   // CHECK: %[[OBJ:.*]] = alloca %[[T1:.*]]*, align
-  // CHECK: call void @llvm.dbg.declare(metadata %[[T1]]** %[[OBJ]],
+  // CHECK: call void @llvm.dbg.addr(metadata %[[T1]]** %[[OBJ]],
   // CHECK: %[[BC1:.*]] = bitcast %[[T1]]** %[[OBJ]] to i8*{{$}}
   // CHECK: void @llvm.memset.{{.*}}(i8* align {{(4|8)}} %[[BC1]], i8 0,
   // CHECK-SAME:                    ){{$}}
@@ -20,7 +20,7 @@ public func f() {
 public func g() {
   var dict: Dictionary<Int64, Int64>
   // CHECK: %[[DICT:.*]] = alloca %[[T2:.*]], align
-  // CHECK: call void @llvm.dbg.declare(metadata %[[T2]]* %[[DICT]],
+  // CHECK: call void @llvm.dbg.addr(metadata %[[T2]]* %[[DICT]],
   // CHECK: %[[BC2:.*]] = bitcast %[[T2]]* %[[DICT]] to i8*
   // CHECK: void @llvm.memset.{{.*}}(i8* align {{(4|8)}} %[[BC2]], i8 0,
   // CHECK-SAME:                    ){{$}}

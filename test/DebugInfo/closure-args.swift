@@ -17,7 +17,7 @@ func main() -> Void
     // value to be by-address. When that is fixed, remove the optional
     // DW_OP_deref below.
     //
-    // CHECK-NEXT: call void @llvm.dbg.declare(metadata %TSS** %[[RANDOM_STR_ADDR]], metadata !{{.*}}, metadata !DIExpression({{(DW_OP_deref)?}})), !dbg
+    // CHECK-NEXT: call void @llvm.dbg.addr(metadata %TSS** %[[RANDOM_STR_ADDR]], metadata !{{.*}}, metadata !DIExpression({{(DW_OP_deref)?}})), !dbg
 
     // CHECK: store %TSS* %{{.*}}, %TSS** %[[RANDOM_STR_ADDR]], align {{(4|8)}}
     // CHECK-DAG: !DILocalVariable(name: "lhs",{{.*}} line: [[@LINE+5]],

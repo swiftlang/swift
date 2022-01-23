@@ -2644,8 +2644,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   auto *BB = Builder.GetInsertBlock();
 
   // An alloca may only be described by exactly one dbg.declare.
-  if (isa<llvm::AllocaInst>(Storage) &&
-      !llvm::FindDbgDeclareUses(Storage).empty())
+  if (isa<llvm::AllocaInst>(Storage) && !llvm::FindDbgAddrUses(Storage).empty())
     return;
 
   // Fragment DIExpression cannot cover the whole variable
@@ -2671,16 +2670,16 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     auto *ParentBB = Alloca->getParent();
     auto InsertBefore = std::next(Alloca->getIterator());
     if (InsertBefore != ParentBB->end())
-      DBuilder.insertDeclare(Alloca, Var, Expr, DL, &*InsertBefore);
+      DBuilder.insertDbgAddrIntrinsic(Alloca, Var, Expr, DL, &*InsertBefore);
     else
-      DBuilder.insertDeclare(Alloca, Var, Expr, DL, ParentBB);
+      DBuilder.insertDbgAddrIntrinsic(Alloca, Var, Expr, DL, ParentBB);
   } else if ((isa<llvm::IntrinsicInst>(Storage) &&
               cast<llvm::IntrinsicInst>(Storage)->getIntrinsicID() ==
                   llvm::Intrinsic::coro_alloca_get)) {
     // FIXME: The live range of a coroutine alloca within the function may be
     // limited, so using a dbg.addr instead of a dbg.declare would be more
     // appropriate.
-    DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
+    DBuilder.insertDbgAddrIntrinsic(Storage, Var, Expr, DL, BB);
   } else if (InCoroContext) {
     // Function arguments in async functions are emitted without a shadow copy
     // (that would interfer with coroutine splitting) but with a dbg.declare to
@@ -2688,9 +2687,9 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // the Swift Context argument that is valid throughout the function.
     auto &EntryBlock = BB->getParent()->getEntryBlock();
     if (auto *InsertBefore = &*EntryBlock.getFirstInsertionPt())
-      DBuilder.insertDeclare(Storage, Var, Expr, DL, InsertBefore);
+      DBuilder.insertDbgAddrIntrinsic(Storage, Var, Expr, DL, InsertBefore);
     else
-      DBuilder.insertDeclare(Storage, Var, Expr, DL, &EntryBlock);
+      DBuilder.insertDbgAddrIntrinsic(Storage, Var, Expr, DL, &EntryBlock);
   } else {
     // Insert a dbg.value at the current insertion point.
     if (isa<llvm::Argument>(Storage) && !Var->getArg() &&

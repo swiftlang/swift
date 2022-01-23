@@ -12,7 +12,7 @@ public struct Continuation<A> {
 public typealias ContinuationU = Continuation<()>
 
 // CHECK: %2 = alloca %T1A12ContinuationV, align 8
-// CHECK-NEXT: call void @llvm.dbg.declare(metadata %T1A12ContinuationV* %2,
+// CHECK-NEXT: call void @llvm.dbg.addr(metadata %T1A12ContinuationV* %2,
 // CHECK-SAME:    metadata ![[X:.*]], metadata !DIExpression())
 // CHECK: ![[X]] = !DILocalVariable(name: "x",
 

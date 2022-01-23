@@ -9,11 +9,11 @@
 // argument.
 
 // CHECK-LABEL: define {{.*}} void @"$s1a3fibyS2iYF.resume.0"
-// CHECK: call void @llvm.dbg.declare
-// CHECK: call void @llvm.dbg.declare
-// CHECK: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[X0:[0-9]+]], {{.*}}!DIExpression(DW_OP
+// CHECK: call void @llvm.dbg.addr
+// CHECK: call void @llvm.dbg.addr
+// CHECK: call void @llvm.dbg.addr(metadata {{.*}}%0, metadata ![[X0:[0-9]+]], {{.*}}!DIExpression(DW_OP
 // CHECK-LABEL: define {{.*}} void @"$s1a3fibyS2iYF.resume.1"
-// FIXME: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[X1:[0-9]+]], {{.*}}!DIExpression(DW_OP
+// FIXME: call void @llvm.dbg.addr(metadata {{.*}}%0, metadata ![[X1:[0-9]+]], {{.*}}!DIExpression(DW_OP
 
 // CHECK: ![[X0]] = !DILocalVariable(name: "x"
 // FIXME: ![[X1]] = !DILocalVariable(name: "x"
