@@ -8949,6 +8949,14 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
     }
   }
 
+  if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
+    ASTContext &ctx = dc->getASTContext();
+    if (ctx.LangOpts.EnableExperimentalAsyncTopLevel) {
+      if (Type mainActor = ctx.getMainActorType())
+        return ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/false);
+    }
+  }
+
   return ActorIsolation::forUnspecified();
 }
 
