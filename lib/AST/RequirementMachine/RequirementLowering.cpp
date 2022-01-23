@@ -844,10 +844,17 @@ void RuleBuilder::addAssociatedType(const AssociatedTypeDecl *type,
 std::pair<MutableTerm, MutableTerm>
 swift::rewriting::getRuleForRequirement(const Requirement &req,
                                         const ProtocolDecl *proto,
+                                        Optional<ArrayRef<Term>> substitutions,
                                         RewriteContext &ctx) {
+  assert(!substitutions.hasValue() || proto == nullptr && "Can't have both");
+
   // Compute the left hand side.
   auto subjectType = CanType(req.getFirstType());
-  auto subjectTerm = ctx.getMutableTermForType(subjectType, proto);
+  auto subjectTerm = (substitutions
+                      ? ctx.getRelativeTermForType(
+                          subjectType, *substitutions)
+                      : ctx.getMutableTermForType(
+                          subjectType, proto));
 
   // Compute the right hand side.
   MutableTerm constraintTerm;
@@ -873,11 +880,13 @@ swift::rewriting::getRuleForRequirement(const Requirement &req,
     auto otherType = CanType(req.getSecondType());
 
     // Build the symbol [superclass: C<X, Y>].
-    SmallVector<Term, 1> substitutions;
-    otherType = ctx.getSubstitutionSchemaFromType(otherType, proto,
-                                                  substitutions);
-    auto superclassSymbol = Symbol::forSuperclass(otherType, substitutions,
-                                                  ctx);
+    SmallVector<Term, 1> result;
+    otherType = (substitutions
+                 ? ctx.getRelativeSubstitutionSchemaFromType(
+                    otherType, *substitutions, result)
+                 : ctx.getSubstitutionSchemaFromType(
+                    otherType, proto, result));
+    auto superclassSymbol = Symbol::forSuperclass(otherType, result, ctx);
 
     // Build the term T.[superclass: C<X, Y>].
     constraintTerm = subjectTerm;
@@ -890,8 +899,7 @@ swift::rewriting::getRuleForRequirement(const Requirement &req,
     //
     //   T.[layout: L] == T
     constraintTerm = subjectTerm;
-    constraintTerm.add(Symbol::forLayout(req.getLayoutConstraint(),
-                                         ctx));
+    constraintTerm.add(Symbol::forLayout(req.getLayoutConstraint(), ctx));
     break;
   }
 
@@ -903,17 +911,23 @@ swift::rewriting::getRuleForRequirement(const Requirement &req,
       // rewrite rule
       //
       //   T.[concrete: C<X, Y>] => T
-      SmallVector<Term, 1> substitutions;
-      otherType = ctx.getSubstitutionSchemaFromType(otherType, proto,
-                                                    substitutions);
+      SmallVector<Term, 1> result;
+      otherType = (substitutions
+                   ? ctx.getRelativeSubstitutionSchemaFromType(
+                        otherType, *substitutions, result)
+                   : ctx.getSubstitutionSchemaFromType(
+                        otherType, proto, result));
 
       constraintTerm = subjectTerm;
-      constraintTerm.add(Symbol::forConcreteType(otherType, substitutions,
-                                                 ctx));
+      constraintTerm.add(Symbol::forConcreteType(otherType, result, ctx));
       break;
     }
 
-    constraintTerm = ctx.getMutableTermForType(otherType, proto);
+    constraintTerm = (substitutions
+                      ? ctx.getRelativeTermForType(
+                            otherType, *substitutions)
+                      : ctx.getMutableTermForType(
+                            otherType, proto));
     break;
   }
   }
@@ -929,7 +943,9 @@ void RuleBuilder::addRequirement(const Requirement &req,
     llvm::dbgs() << "\n";
   }
 
-  RequirementRules.push_back(getRuleForRequirement(req, proto, Context));
+  RequirementRules.push_back(
+      getRuleForRequirement(req, proto, /*substitutions=*/None,
+                            Context));
 }
 
 void RuleBuilder::addRequirement(const StructuralRequirement &req,
