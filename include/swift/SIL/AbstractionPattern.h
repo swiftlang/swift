@@ -204,6 +204,8 @@ class AbstractionPattern {
     /// member function. OrigType is valid and is a function type. CXXMethod is
     /// valid.
     PartialCurriedCXXOperatorMethodType,
+    /// A derivative function type.
+    DerivativeFunctionType,
     /// A Swift function whose parameters and results are opaque. This is
     /// like `AP::Type<T>((T) -> T)`, except that the number of parameters is
     /// unspecified.
@@ -225,15 +227,15 @@ class AbstractionPattern {
     ///
     ///   differentiable_function
     ///     [parameters 0]
-    ///     %0 : $@callee_guaranteed (Float) -> Float
+    ///     %0 : $@callee_owned (Float) -> Float
     ///     with_derivative {
-    ///       %1 : $@callee_guaranteed (Float) -> (
+    ///       %1 : $@callee_owned (Float) -> (
     ///         Float,
-    ///         @owned @callee_guaranteed (Float) -> Float
+    ///         @owned @callee_owned (Float) -> Float
     ///       ),
-    ///       %2 : $@callee_guaranteed (Float) -> (
+    ///       %2 : $@callee_owned (Float) -> (
     ///         Float,
-    ///         @owned @callee_guaranteed (Float) -> Float
+    ///         @owned @callee_owned (Float) -> Float
     ///       )
     ///     }
     ///
@@ -241,15 +243,15 @@ class AbstractionPattern {
     ///
     ///   differentiable_function
     ///     [parameters 0]
-    ///     %3 : $@callee_guaranteed (@in_guaranteed Float) -> @out Float
+    ///     %3 : $@callee_owned (@in_guaranteed Float) -> @out Float
     ///     with_derivative {
-    ///       %4 : $@callee_guaranteed (@in_guaranteed Float) -> (
+    ///       %4 : $@callee_owned (@in_guaranteed Float) -> (
     ///         @out Float,
-    ///         @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float
+    ///         @owned @callee_owned (@in_guaranteed Float) -> @out Float
     ///       ),
-    ///       %5 : $@callee_guaranteed (@in_guaranteed Float) -> (
+    ///       %5 : $@callee_owned (@in_guaranteed Float) -> (
     ///         @out Float,
-    ///         @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float
+    ///         @owned @callee_owned (@in_guaranteed Float) -> @out Float
     ///       )
     ///     }
     ///
@@ -618,6 +620,7 @@ public:
     case Kind::CurriedCXXOperatorMethodType:
     case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::ObjCCompletionHandlerArgumentsType:
+    case Kind::DerivativeFunctionType:
       return true;
     case Kind::Invalid:
     case Kind::Opaque:
@@ -1029,6 +1032,7 @@ public:
     case Kind::CXXOperatorMethodType:
     case Kind::CurriedCXXOperatorMethodType:
     case Kind::PartialCurriedCXXOperatorMethodType:
+    case Kind::DerivativeFunctionType:
     case Kind::Type:
     case Kind::Discard:
       return OrigType;
@@ -1068,6 +1072,7 @@ public:
     case Kind::CXXOperatorMethodType:
     case Kind::CurriedCXXOperatorMethodType:
     case Kind::PartialCurriedCXXOperatorMethodType:
+    case Kind::DerivativeFunctionType:
     case Kind::Type:
     case Kind::Discard:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1093,6 +1098,7 @@ public:
     case Kind::Tuple:
     case Kind::Type:
     case Kind::Discard:
+    case Kind::DerivativeFunctionType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       return false;
@@ -1118,6 +1124,11 @@ public:
   /// True if the value is discarded.
   bool isDiscarded() const {
     return getKind() == Kind::Discard;
+  }
+
+  /// True if the value is a derivative function type.
+  bool isDerivativeFunctionType() const {
+    return getKind() == Kind::DerivativeFunctionType;
   }
 
   /// Return whether this abstraction pattern represents a Clang type.
@@ -1190,6 +1201,7 @@ public:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
     case Kind::ObjCCompletionHandlerArgumentsType:
+    case Kind::DerivativeFunctionType:
       return false;
     case Kind::PartialCurriedObjCMethodType:
     case Kind::CurriedObjCMethodType:
@@ -1211,6 +1223,7 @@ public:
       return typename CanTypeWrapperTraits<TYPE>::type();
     case Kind::Tuple:
       return typename CanTypeWrapperTraits<TYPE>::type();
+    case Kind::DerivativeFunctionType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       return typename CanTypeWrapperTraits<TYPE>::type();
@@ -1266,6 +1279,7 @@ public:
       return false;
     case Kind::Type:
     case Kind::Discard:
+    case Kind::DerivativeFunctionType:
       return getType() == type;
     }
     llvm_unreachable("bad kind");
@@ -1294,6 +1308,7 @@ public:
     case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    case Kind::DerivativeFunctionType:
       return false;
     case Kind::ObjCCompletionHandlerArgumentsType:
     case Kind::Tuple:
@@ -1325,6 +1340,7 @@ public:
     case Kind::PartialCurriedCXXOperatorMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
+    case Kind::DerivativeFunctionType:
       llvm_unreachable("pattern is not a tuple");      
     case Kind::Tuple:
       return getNumTupleElements_Stored();

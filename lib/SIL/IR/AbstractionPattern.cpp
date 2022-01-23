@@ -198,6 +198,7 @@ AbstractionPattern::getOptional(AbstractionPattern object) {
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::DerivativeFunctionType:
     llvm_unreachable("cannot add optionality to non-type abstraction");
   case Kind::Opaque:
     return AbstractionPattern::getOpaque();
@@ -300,6 +301,7 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  case Kind::DerivativeFunctionType:
     return false;
   case Kind::Opaque:
     return true;
@@ -376,6 +378,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::PartialCurriedCXXOperatorMethodType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  case Kind::DerivativeFunctionType:
     llvm_unreachable("function types are not tuples");
   case Kind::Opaque:
     return *this;
@@ -484,6 +487,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   case Kind::Opaque:
     return *this;
   case Kind::Type:
+  case Kind::DerivativeFunctionType:
     if (isTypeParameterOrOpaqueArchetype())
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
@@ -633,6 +637,7 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
   case Kind::Opaque:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
+  case Kind::DerivativeFunctionType:
   case Kind::Type:
     return AbstractionPattern(getGenericSignature(),
                               swiftCompletionHandlerType);
@@ -685,7 +690,8 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
   switch (getKind()) {
   case Kind::Opaque:
     return *this;
-  case Kind::Type: {
+  case Kind::Type:
+  case Kind::DerivativeFunctionType: {
     if (isTypeParameterOrOpaqueArchetype())
       return AbstractionPattern::getOpaque();
     auto params = cast<AnyFunctionType>(getType()).getParams();
@@ -883,6 +889,7 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::DerivativeFunctionType:
     llvm_unreachable("pattern for function or tuple cannot be for optional");
 
   case Kind::Opaque:
@@ -928,6 +935,7 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::DerivativeFunctionType:
     return *this;
   case Kind::Type:
     return AbstractionPattern(getGenericSignature(),
@@ -965,10 +973,13 @@ void AbstractionPattern::print(raw_ostream &out) const {
     return;
   case Kind::Type:
   case Kind::Discard:
+  case Kind::DerivativeFunctionType:
     out << (getKind() == Kind::Type
               ? "AP::Type" :
             getKind() == Kind::Discard
-              ? "AP::Discard" : "<<UNHANDLED CASE>>");
+              ? "AP::Discard" :
+            getKind() == Kind::DerivativeFunctionType
+              ? "AP:DerivativeFunctionType" : "<<UNHANDLED CASE>>");
     if (auto sig = getGenericSignature()) {
       sig->print(out);
     }
@@ -1193,6 +1204,7 @@ const {
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard:
+  case Kind::DerivativeFunctionType:
     auto memberTy = getType()->getTypeOfMember(member->getModuleContext(),
                                       member, origMemberInterfaceType)
                              ->getCanonicalType(getGenericSignature());
@@ -1215,9 +1227,12 @@ AbstractionPattern AbstractionPattern::getAutoDiffDerivativeFunctionType(
         parameterIndices, kind, lookupConformance, derivativeGenericSignature,
         makeSelfParamFirst);
     assert(derivativeFnTy);
-    return AbstractionPattern(
+    AbstractionPattern pattern;
+    pattern.initSwiftType(
         getGenericSignature(),
-        derivativeFnTy->getCanonicalType(getGenericSignature()));
+        derivativeFnTy->getCanonicalType(getGenericSignature()),
+        Kind::DerivativeFunctionType);
+    return pattern;
   }
   case Kind::Opaque:
     return getOpaqueDerivativeFunction();
@@ -1251,6 +1266,7 @@ AbstractionPattern::getResultConvention(TypeConverter &TC) const {
   case Kind::CXXOperatorMethodType:
   case Kind::CurriedCXXOperatorMethodType:
   case Kind::PartialCurriedCXXOperatorMethodType:
+  case Kind::DerivativeFunctionType:
     // Function types are always passed directly
     return Direct;
       
@@ -1295,6 +1311,7 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   case Kind::CXXOperatorMethodType:
   case Kind::CurriedCXXOperatorMethodType:
   case Kind::PartialCurriedCXXOperatorMethodType:
+  case Kind::DerivativeFunctionType:
     // Function types are always passed directly
     return Direct;
       
@@ -1340,6 +1357,7 @@ AbstractionPattern::operator==(const AbstractionPattern &other) const {
   
   case Kind::Type:
   case Kind::Discard:
+  case Kind::DerivativeFunctionType:
     return OrigType == other.OrigType
       && GenericSig == other.GenericSig;
       

@@ -50,7 +50,7 @@ struct NestedApplyInfo {
   AutoDiffConfig config;
   /// The original pullback type before reabstraction. `None` if the pullback
   /// type is not reabstracted.
-  Optional<CanSILFunctionType> originalPullbackType;
+  CanSILFunctionType originalPullbackType;
 };
 
 /// Per-module contextual information for the Differentiation pass.
