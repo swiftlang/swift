@@ -371,6 +371,7 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   // Merging multiple superclass or concrete type rules can induce new rules
   // to unify concrete type constructor arguments.
+  unsigned ruleCount = System.getRules().size();
   SmallVector<InducedRule, 3> inducedRules;
 
   for (const auto &bucket : properties) {
@@ -390,17 +391,17 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   // Some of the induced rules might be trivial; only count the induced rules
   // where the left hand side is not already equivalent to the right hand side.
-  unsigned addedNewRules = 0;
   for (auto pair : inducedRules) {
     // FIXME: Eventually, all induced rules will have a rewrite path.
-    if (System.addRule(pair.LHS, pair.RHS,
-                       pair.Path.empty() ? nullptr : &pair.Path)) {
-      ++addedNewRules;
+    (void) System.addRule(pair.LHS, pair.RHS,
+                          pair.Path.empty() ? nullptr : &pair.Path);
+  }
 
-      const auto &newRule = System.getRules().back();
-      if (newRule.getDepth() > maxDepth)
-        return std::make_pair(CompletionResult::MaxDepth, addedNewRules);
-    }
+  unsigned addedNewRules = System.getRules().size() - ruleCount;
+  for (unsigned i = ruleCount, e = System.getRules().size(); i < e; ++i) {
+    const auto &newRule = System.getRule(i);
+    if (newRule.getDepth() > maxDepth)
+      return std::make_pair(CompletionResult::MaxDepth, addedNewRules);
   }
 
   // Check invariants of the constructed property map.
