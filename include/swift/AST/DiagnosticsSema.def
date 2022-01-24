@@ -1925,6 +1925,11 @@ NOTE(invalid_nominal_extension_rewrite,none,
 // Protocols
 ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
+
+// FIXME: SwiftUI source compatibility hack; see usage for details.
+WARNING(type_does_not_conform_swiftui_warning,none,
+        "type %0 does not conform to protocol %1", (Type, Type))
+
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))
 
@@ -2300,6 +2305,10 @@ NOTE(protocol_witness_type_conflict,none,
 NOTE(protocol_witness_missing_requirement,none,
      "candidate would match if %0 %select{conformed to|subclassed|"
      "was the same type as}2 %1", (Type, Type, unsigned))
+NOTE(protocol_type_witness_missing_requirement,none,
+     "candidate would match if the conformance required that %0 "
+     "%select{conformed to|subclassed|was the same type as}2 %1",
+     (Type, Type, unsigned))
 
 NOTE(protocol_witness_optionality_conflict,none,
      "candidate %select{type has|result type has|parameter type has|"
