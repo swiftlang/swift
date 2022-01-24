@@ -67,7 +67,9 @@ static void recordRelation(Term key,
          (lhsProperty.getKind() == Symbol::Kind::Superclass &&
           rhsProperty.getKind() == Symbol::Kind::Layout) ||
          (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
-          rhsProperty.getKind() == Symbol::Kind::Superclass));
+          rhsProperty.getKind() == Symbol::Kind::Superclass) ||
+         (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
+          rhsProperty.getKind() == Symbol::Kind::Layout));
 
   if (debug) {
     llvm::dbgs() << "%% Recording relation: ";
@@ -484,7 +486,7 @@ void PropertyMap::checkConcreteTypeRequirements() {
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   for (auto *props : Entries) {
-    if (props->ConcreteTypeRule && props->SuperclassRule) {
+    if (props->ConcreteTypeRule) {
       auto concreteType = props->ConcreteType->getConcreteType();
 
       // A rule (T.[concrete: C] => T) where C is a class type induces a rule
@@ -497,11 +499,41 @@ void PropertyMap::checkConcreteTypeRequirements() {
         recordRelation(props->getKey(), *props->ConcreteTypeRule,
                        superclassSymbol, System, debug);
 
-      // Otherwise, we have a concrete vs superclass conflict.
-      } else {
+      // If the concrete type is not a class and we have a superclass
+      // requirement, we have a conflict.
+      } else if (props->SuperclassRule) {
         recordConflict(props->getKey(),
                        *props->ConcreteTypeRule,
                        *props->SuperclassRule, System);
+      }
+
+      // A rule (T.[concrete: C] => T) where C is a class type induces a rule
+      // (T.[layout: L] => T), where L is either AnyObject or _NativeObject.
+      if (concreteType->satisfiesClassConstraint()) {
+        Type superclassType = concreteType;
+        if (!concreteType->getClassOrBoundGenericClass())
+          superclassType = concreteType->getSuperclass();
+
+        auto layoutConstraint = LayoutConstraintKind::Class;
+        if (superclassType)
+          if (auto *classDecl = superclassType->getClassOrBoundGenericClass())
+            layoutConstraint = classDecl->getLayoutConstraintKind();
+
+        auto layout =
+            LayoutConstraint::getLayoutConstraint(
+              layoutConstraint, Context.getASTContext());
+        auto layoutSymbol = Symbol::forLayout(layout, Context);
+
+        recordRelation(props->getKey(), *props->ConcreteTypeRule,
+                       layoutSymbol, System, debug);
+
+      // If the concrete type does not satisfy a class layout constraint and
+      // we have such a layout requirement, we have a conflict.
+      } else if (props->LayoutRule &&
+                 props->Layout->isClass()) {
+        recordConflict(props->getKey(),
+                       *props->ConcreteTypeRule,
+                       *props->LayoutRule, System);
       }
     }
   }
