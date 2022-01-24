@@ -20,7 +20,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -2624,14 +2623,8 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 }
 
 bool SourceFile::shouldCrossImport() const {
-  if (Kind == SourceFileKind::SIL || Kind == SourceFileKind::Interface)
-    return false;
-  // Cross import when experimental differentiable programming is enabled. This
-  // is to enable tgmath derivatives defined in the platform differentiation
-  // overlay.
-//  if (isDifferentiableProgrammingEnabled(*this))
-//    return true;
-  return getASTContext().LangOpts.EnableCrossImportOverlays;
+  return Kind != SourceFileKind::SIL && Kind != SourceFileKind::Interface &&
+         getASTContext().LangOpts.EnableCrossImportOverlays;
 }
 
 void ModuleDecl::clearLookupCache() {
