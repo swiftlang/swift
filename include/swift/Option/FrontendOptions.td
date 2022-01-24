@@ -502,6 +502,10 @@ def enable_experimental_named_opaque_types :
   Flag<["-"], "enable-experimental-named-opaque-types">,
   HelpText<"Enable experimental support for named opaque result types">;
 
+def enable_experimental_opaque_parameters :
+  Flag<["-"], "enable-experimental-opaque-parameters">,
+  HelpText<"Enable experimental support for opaque parameters">;
+
 def enable_explicit_existential_types :
   Flag<["-"], "enable-explicit-existential-types">,
   HelpText<"Enable experimental support for explicit existential types">;
