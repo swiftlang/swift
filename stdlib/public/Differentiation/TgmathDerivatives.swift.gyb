@@ -52,10 +52,7 @@ func _jvpRemainder<T: FloatingPoint & Differentiable> (
   _ x: T,
   _ y: T
 ) -> (value: T, differential: (T, T) -> T) where T == T.TangentVector {
-  fatalError("""
-    Unimplemented JVP for 'remainder(_:)'. \
-    https://bugs.swift.org/browse/TF-1108 tracks this issue
-    """)
+  return (remainder(x, y), { (dx, dy) in dx + -dy * ((x / y).rounded(.toNearestOrEven)) })
 }
 
 @usableFromInline
@@ -73,10 +70,7 @@ func _jvpFmod<T: FloatingPoint & Differentiable> (
   _ x: T,
   _ y: T
 ) -> (value: T, differential: (T, T) -> T) where T == T.TangentVector {
-  fatalError("""
-    Unimplemented JVP for 'fmod(_:)'. \
-    https://bugs.swift.org/browse/TF-1108 tracks this issue
-    """)
+  return (fmod(x, y), { (dx, dy) in dx + -dy * ((x / y).rounded(.towardZero)) })
 }
 
 @usableFromInline
