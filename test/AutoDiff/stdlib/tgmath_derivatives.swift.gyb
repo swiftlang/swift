@@ -133,7 +133,8 @@ DerivativeTests.test("${op}_${T}") {
       checkGradient({ remainder($0, $1) }, x, y)
       checkGradient({ fmod($0, $1) }, x, y)
 %else: # if op == 'derivative'
-      // TODO(TF-1108): Implement JVPs for `remainder` and `fmod`.
+      checkDerivative({ remainder($0, $1) }, x, y)
+      checkDerivative({ fmod($0, $1) }, x, y)
 %end
     }
   }
