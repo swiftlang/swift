@@ -63,3 +63,4 @@ import AutolinkModuleMapLink
 #endif
 
 // UNSUPPORTED: OS=macosx && CPU=arm64
+// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
