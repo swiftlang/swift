@@ -5315,6 +5315,17 @@ ERROR(nonobjc_not_allowed,none,
 #undef OBJC_ATTR_SELECT
 
 //------------------------------------------------------------------------------
+// MARK: @exclusivity
+//------------------------------------------------------------------------------
+ERROR(exclusivity_on_wrong_decl,none,
+      "@exclusivity can only be used on class properties, static properties and global variables",
+      ())
+
+ERROR(exclusivity_on_computed_property,none,
+      "@exclusivity can only be used on stored properties",
+      ())
+
+//------------------------------------------------------------------------------
 // MARK: @_borrowed
 //------------------------------------------------------------------------------
 ERROR(borrowed_with_objc_dynamic,none,

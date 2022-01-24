@@ -1199,6 +1199,32 @@ public:
   }
 };
 
+/// Represents the exclusivity attribute.
+class ExclusivityAttr : public DeclAttribute {
+public:
+  enum Mode {
+    Checked,
+    Unchecked
+  };
+
+private:
+  Mode mode;
+
+public:
+  ExclusivityAttr(SourceLoc atLoc, SourceRange range, Mode mode)
+     : DeclAttribute(DAK_Exclusivity, atLoc, range, /*Implicit=*/false),
+       mode(mode) {}
+
+  ExclusivityAttr(Mode mode)
+    : ExclusivityAttr(SourceLoc(), SourceRange(), mode) {}
+
+  Mode getMode() const { return mode; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Exclusivity;
+  }
+};
+
 /// Represents the side effects attribute.
 class EffectsAttr : public DeclAttribute {
 public:

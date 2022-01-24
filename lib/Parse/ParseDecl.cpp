@@ -1996,6 +1996,21 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_Exclusivity: {
+    auto mode = parseSingleAttrOption<ExclusivityAttr::Mode>
+                            (*this, Loc, AttrRange, AttrName, DK)
+                       .when("checked", ExclusivityAttr::Mode::Checked)
+                       .when("unchecked", ExclusivityAttr::Mode::Unchecked)
+                       .diagnoseWhenOmitted();
+    if (!mode)
+      return false;
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ExclusivityAttr(AtLoc, AttrRange, *mode));
+
+    break;
+  }
+
   case DAK_ReferenceOwnership: {
     // Handle weak/unowned/unowned(unsafe).
     auto Kind = AttrName == "weak" ? ReferenceOwnership::Weak

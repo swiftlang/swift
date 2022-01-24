@@ -4416,6 +4416,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Exclusivity_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::ExclusivityDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) ExclusivityAttr((ExclusivityAttr::Mode)kind);
+        break;
+      }
+
       case decls_block::Effects_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::EffectsDeclAttrLayout::readRecord(scratch,
