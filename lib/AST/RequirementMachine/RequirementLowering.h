@@ -65,7 +65,6 @@ getRuleForRequirement(const Requirement &req,
 /// appearing on the right hand side of conformance requirements.
 struct RuleBuilder {
   RewriteContext &Context;
-  bool Dump;
 
   /// The keys are the unique protocols we've added so far. The value indicates
   /// whether the protocol's SCC is an initial component for the rewrite system.
@@ -81,7 +80,9 @@ struct RuleBuilder {
   ///
   /// This is what breaks the cycle in requirement signature computation for a
   /// group of interdependent protocols.
-  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
+  llvm::DenseMap<const ProtocolDecl *, bool> &ProtocolMap;
+
+  /// The keys of the above map in insertion order.
   std::vector<const ProtocolDecl *> Protocols;
 
   /// New rules to add which will be marked 'permanent'. These are rules for
@@ -95,7 +96,15 @@ struct RuleBuilder {
   /// eliminated by homotopy reduction.
   std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
 
-  RuleBuilder(RewriteContext &ctx, bool dump) : Context(ctx), Dump(dump) {}
+  /// Enables debugging output. Controlled by the -dump-requirement-machine
+  /// frontend flag.
+  bool Dump;
+
+  RuleBuilder(RewriteContext &ctx,
+              llvm::DenseMap<const ProtocolDecl *, bool> &protocolMap)
+      : Context(ctx), ProtocolMap(protocolMap),
+        Dump(ctx.getASTContext().LangOpts.DumpRequirementMachine) {}
+
   void addRequirements(ArrayRef<Requirement> requirements);
   void addRequirements(ArrayRef<StructuralRequirement> requirements);
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);

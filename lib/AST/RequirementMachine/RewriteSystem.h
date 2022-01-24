@@ -203,6 +203,17 @@ class RewriteSystem final {
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
 
+  /// The set of protocols known to this rewrite system. The boolean associated
+  /// with each key is true if the protocol is part of the 'Protos' set above,
+  /// otherwies it is false.
+  ///
+  /// See RuleBuilder::ProtocolMap for a more complete explanation. For the most
+  /// part, this is only used while building the rewrite system, but conditional
+  /// requirement inference forces us to be able to add new protocols to the
+  /// rewrite system after the fact, so this little bit of RuleBuilder state
+  /// outlives the initialization phase.
+  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
+
   DebugOptions Debug;
 
   /// Whether we've initialized the rewrite system with a call to initialize().
@@ -233,6 +244,10 @@ public:
   /// Return the rewrite context used for allocating memory.
   RewriteContext &getRewriteContext() const { return Context; }
 
+  llvm::DenseMap<const ProtocolDecl *, bool> &getProtocolMap() {
+    return ProtocolMap;
+  }
+
   DebugOptions getDebugOptions() const { return Debug; }
 
   void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
@@ -241,6 +256,10 @@ public:
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
     return Protos;
+  }
+
+  bool isKnownProtocol(const ProtocolDecl *proto) const {
+    return ProtocolMap.find(proto) != ProtocolMap.end();
   }
 
   unsigned getRuleID(const Rule &rule) const {
