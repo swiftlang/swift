@@ -3516,7 +3516,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       if (Type mainActor = ctx.getMainActorType())
         return inferredIsolation(
             ActorIsolation::forGlobalActor(mainActor,
-                                           /*unsafe=*/false));
+                                           /*unsafe=*/var->preconcurrency()));
     }
     if (auto isolation = getActorIsolationFromWrappedProperty(var))
       return inferredIsolation(isolation);
