@@ -90,12 +90,12 @@ public distributed actor MyOtherActor {
 
 // CHECK: define hidden swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTE"
 
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETF"(%swift.context* swiftasync %0, i8* %1, i8* %2, %T27distributed_actor_accessors7MyActorC* %3)
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETF"(%swift.context* swiftasync %0, i8* %1, i8* %2, i8* %3, {{.*}}, %T27distributed_actor_accessors7MyActorC* [[ACTOR:%.*]])
 
 /// Read the current offset and cast an element to `Int`
 
 // CHECK: store i8* %1, i8** %offset
-// CHECK-NEXT: %elt_offset = load i8*, i8** %offset
+// CHECK: %elt_offset = load i8*, i8** %offset
 // CHECK-NEXT: [[ELT_PTR:%.*]] = bitcast i8* %elt_offset to %TSi*
 // CHECK-NEXT: [[NATIVE_VAL_LOC:%.*]] = getelementptr inbounds %TSi, %TSi* [[ELT_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[ARG_VAL:%.*]] = load i32, i32* [[NATIVE_VAL_LOC]]
@@ -112,7 +112,7 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: i8* bitcast (void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)* @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTE" to i8*)
 // CHECK-SAME: %swift.context* [[THUNK_CONTEXT_PTR]],
 // CHECK-SAME: i32 [[ARG_VAL]],
-// CHECK-SAME: %T27distributed_actor_accessors7MyActorC* %3)
+// CHECK-SAME: %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, %swift.error* } [[THUNK_RESULT]], 0
 // CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
@@ -141,7 +141,7 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: i8* bitcast (void (%swift.context*, i32, %T27distributed_actor_accessors7MyActorC*)* @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTE" to i8*)
 // CHECK-SAME: %swift.context* [[THUNK_CONTEXT_PTR]],
 // CHECK-SAME: i32 [[NATIVE_ARG_VAL]],
-// CHECK-SAME: %T27distributed_actor_accessors7MyActorC* %3)
+// CHECK-SAME: %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i32, i32, i32, %swift.error* } [[THUNK_RESULT]], 0
 // CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
@@ -160,7 +160,7 @@ public distributed actor MyOtherActor {
 // CHECK: define hidden swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTE"
 
 /// !!! in `simple3` interesting bits are: argument value extraction (because string is exploded into N arguments) and call to distributed thunk
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETF"(%swift.context* swiftasync {{.*}}, i8* [[ARG_BUFF:%.*]], i8* [[RESULT_BUFF:%.*]], %T27distributed_actor_accessors7MyActorC* {{.*}})
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETF"(%swift.context* swiftasync {{.*}}, i8* [[ARG_BUFF:%.*]], i8* [[ARG_TYPES:%.*]], i8* [[RESULT_BUFF:%.*]], i8* [[SUBS:%.*]], i8* [[WITNESS_TABLES:%.*]], i32 [[NUM_WITNESS_TABLES:%.*]], %T27distributed_actor_accessors7MyActorC* [[ACTOR:%.*]])
 
 // CHECK: [[TYPED_RESULT_BUFF:%.*]] = bitcast i8* [[RESULT_BUFF]] to %TSi*
 
@@ -180,9 +180,9 @@ public distributed actor MyOtherActor {
 // CHECK: [[TMP_STR_ARG:%.*]] = bitcast { i32, i32, i32 }* %temp-coercion.coerced to %TSS*
 // CHECK-NEXT: %._guts1 = getelementptr inbounds %TSS, %TSS* [[TMP_STR_ARG]], i32 0, i32 0
 
-// CHECK: store i32 %10, i32* %._guts1._object._count._value, align 4
+// CHECK: store i32 {{.*}}, i32* %._guts1._object._count._value
 // CHECK: [[VARIANT:%.*]] = bitcast %Ts13_StringObjectV7VariantO* %._guts1._object._variant to i32*
-// CHECK-NEXT: store i32 %12, i32* [[VARIANT]], align 4
+// CHECK-NEXT: store i32 %17, i32* [[VARIANT]]
 
 // CHECK: [[STR_ARG_SIZE_PTR:%.*]] = getelementptr inbounds { i32, i32, i32 }, { i32, i32, i32 }* %temp-coercion.coerced, i32 0, i32 0
 // CHECK: [[STR_ARG_SIZE:%.*]] = load i32, i32* [[STR_ARG_SIZE_PTR]]
@@ -203,7 +203,7 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: i32 [[STR_ARG_SIZE]],
 // CHECK-SAME: i32 [[STR_ARG_VAL]],
 // CHECK_SAME: i32 [[STR_ARG_FLAGS]],
-// CHECK-SAME: %T27distributed_actor_accessors7MyActorC* %3)
+// CHECK-SAME: %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i32, %swift.error* } [[THUNK_RESULT]], 0
 // CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
@@ -216,15 +216,14 @@ public distributed actor MyOtherActor {
 
 // CHECK: define hidden swifttailcc void @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTE"
 
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTETF"(%swift.context* swiftasync %0, i8* [[BUFFER:%.*]], i8* [[RESULT_BUFF:%.*]], %T27distributed_actor_accessors7MyActorC* {{.*}})
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTETF"(%swift.context* swiftasync %0, i8* [[BUFFER:%.*]], i8* [[ARG_TYPES:%.*]], i8* [[RESULT_BUFF:%.*]], i8* [[SUBS:%.*]], i8* [[WITNESS_TABLES:%.*]], i32 [[NUM_WITNESS_TABLES:%.*]], %T27distributed_actor_accessors7MyActorC* [[ACTOR:%.*]])
 
 /// First, let's check that there were no loads from the argument buffer and no stores to "current offset".
 
 // CHECK: [[OFFSET:%.*]] = bitcast i8** %offset to i8*
 // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 4, i8* [[OFFSET]])
 // CHECK-NEXT: store i8* [[BUFFER]], i8** %offset
-// CHECK-NEXT: %elt_offset = load i8*, i8** %offset
-// CHECK-NEXT: [[ELT_PTR:.*]] = bitcast i8* %elt_offset to %T27distributed_actor_accessors7SimpleEO*
+// CHECK: %elt_offset = load i8*, i8** %offset
 // CHECK-NEXT: [[OFFSET:%.*]] = bitcast i8** %offset to i8*
 // CHECK-NEXT call void @llvm.lifetime.end.p0i8(i32 8, i8* [[OFFSET]])
 
@@ -241,8 +240,9 @@ public distributed actor MyOtherActor {
 
 /// First, Load both arguments from the buffer.
 
-// CHECK: [[TYPED_RESULT_BUFF:%.*]] = bitcast i8* %2 to %T27distributed_actor_accessors9IndirectEO*
+// CHECK: [[TYPED_RESULT_BUFF:%.*]] = bitcast i8* [[RESULT_BUFF]] to %T27distributed_actor_accessors9IndirectEO*
 // CHECK: store i8* %1, i8** %offset
+// CHECK-NEXT: {{.*}} = bitcast i8* [[ARG_TYPES]] to %swift.type**
 // CHECK-NEXT: %elt_offset = load i8*, i8** %offset
 
 // CHECK-NEXT: [[ENUM_PTR:%.*]] = bitcast i8* %elt_offset to %T27distributed_actor_accessors9IndirectEO*
@@ -272,7 +272,7 @@ public distributed actor MyOtherActor {
 
 // CHECK: define hidden swifttailcc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTE"
 
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTETF"(%swift.context* swiftasync {{.*}}, i8* [[ARG_BUFF:%.*]], i8* [[RESULT_BUFF:%.*]], %T27distributed_actor_accessors7MyActorC* {{.*}})
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTETF"(%swift.context* swiftasync {{.*}}, i8* [[ARG_BUFF:%.*]], i8* [[ARG_TYPES:%.*]], i8* [[RESULT_BUFF:%.*]], i8* [[SUBS:%.*]], i8* [[WITNESS_TABLES:%.*]], i32 [[NUM_WITNESS_TABLES:%.*]], %T27distributed_actor_accessors7MyActorC* [[ACTOR:%.*]])
 
 /// First, let's check that all of the different argument types here are loaded correctly.
 
@@ -340,7 +340,7 @@ public distributed actor MyOtherActor {
 
 /// Let's check that there is no offset allocation here since parameter list is empty
 
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETF"(%swift.context* swiftasync {{.*}}, i8* [[ARG_BUFF:%.*]], i8* [[RESULT_BUFF:%.*]], %T27distributed_actor_accessors12MyOtherActorC* {{.*}})
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETF"(%swift.context* swiftasync {{.*}}, i8* [[ARG_BUFF:%.*]], i8* [[ARG_TYPES:%.*]], i8* [[RESULT_BUFF:%.*]], i8* [[SUBS:%.*]], i8* [[WITNESS_TABLES:%.*]], i32 [[NUM_WITNESS_TABLES:%.*]], %T27distributed_actor_accessors12MyOtherActorC* {{.*}})
 // CHECK-NEXT: entry:
 // CHECK-NEXT: {{.*}} = alloca %swift.context*
 // CHECK-NEXT: %swifterror = alloca %swift.error*

@@ -158,7 +158,7 @@ func _withParameterTypeInfo(
 ) {
   let nameUTF8 = Array(name.utf8)
 
-  return try  nameUTF8.withUnsafeBufferPointer { nameUTF8  in
+  return nameUTF8.withUnsafeBufferPointer { nameUTF8  in
     // 1) demangle to get the expected parameter count of the func
     let paramCount = __getParameterCount(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
 
@@ -168,7 +168,7 @@ func _withParameterTypeInfo(
     }
 
     // prepare buffer for the parameter types to be decoded into:
-    var infoBuffer = UnsafeMutableRawBufferPointer
+    let infoBuffer = UnsafeMutableRawBufferPointer
         .allocate(byteCount: MemoryLayout<Any.Type>.size * Int(paramCount),
                   alignment: MemoryLayout<Any.Type>.alignment) // TODO: is this right always?
     defer {
