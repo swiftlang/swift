@@ -545,19 +545,14 @@ public:
 
   Demangle::NodePointer
   visitBoundGenericTypeRef(const BoundGenericTypeRef *BG) {
-    Node::Kind nodeKind;
     Node::Kind genericNodeKind;
     if (BG->isStruct()) {
-      nodeKind = Node::Kind::Structure;
       genericNodeKind = Node::Kind::BoundGenericStructure;
     } else if (BG->isEnum()) {
-      nodeKind = Node::Kind::Enum;
       genericNodeKind = Node::Kind::BoundGenericEnum;
     } else if (BG->isClass()) {
-      nodeKind = Node::Kind::Class;
       genericNodeKind = Node::Kind::BoundGenericClass;
     } else {
-      nodeKind = Node::Kind::OtherNominalType;
       genericNodeKind = Node::Kind::BoundGenericOtherNominalType;
     }
     auto unspecializedType = Dem.demangleType(BG->getMangledName());
