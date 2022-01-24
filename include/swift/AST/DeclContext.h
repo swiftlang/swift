@@ -73,6 +73,7 @@ namespace swift {
   class PrefixOperatorDecl;
   class ProtocolConformance;
   class ValueDecl;
+  class VarDecl;
   class Initializer;
   class ClassDecl;
   class SerializedAbstractClosureExpr;
@@ -354,6 +355,11 @@ public:
   /// If this DeclContext is a protocol extension, return the extended protocol.
   LLVM_READONLY
   ProtocolDecl *getExtendedProtocolDecl() const;
+
+  /// If this DeclContext is the initializer expression of a global or instance
+  /// property, return the VarDecl, otherwise return null.
+  LLVM_READONLY
+  VarDecl *getNonLocalVarDecl() const;
 
   /// Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.

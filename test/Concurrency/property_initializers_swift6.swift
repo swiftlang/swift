@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-concurrency
+// RUN: %target-typecheck-verify-swift -swift-version 6 -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
 
