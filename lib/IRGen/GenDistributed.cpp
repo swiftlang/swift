@@ -147,12 +147,12 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   auto getRawPointerParameter = [&]() {
     auto ptrType = Context.getUnsafeRawPointerType();
     return SILParameterInfo(ptrType->getCanonicalType(),
-                            ParameterConvention::Direct_Guaranteed);
+                            ParameterConvention::Direct_Unowned);
   };
 
   auto getUIntParameter = [&]() {
     return SILParameterInfo(Context.getUIntType()->getCanonicalType(),
-                            ParameterConvention::Direct_Guaranteed);
+                            ParameterConvention::Direct_Unowned);
   };
 
   // `self` of the distributed actor is going to be passed as an argument
