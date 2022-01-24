@@ -16,7 +16,7 @@ import Swift
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin.C.tgmath
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
 #elseif os(WASI)
   import WASILibc
@@ -276,7 +276,7 @@ func _${derivative_kind}Erfc(_ x: ${T}) -> (value: ${T}, ${linear_map_kind}: (${
 %end # for derivative_kind in ['jvp', 'vjp']:
 
 // Binary functions
-%for T in ['Float', 'Float80']:
+%for T in ['Float', 'Double', 'Float80']:
 %  if T == 'Float80':
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %  end
@@ -300,4 +300,4 @@ func _jvpPow(_ x: ${T}, _ y: ${T}) -> (value: ${T}, differential: (${T}, ${T}) -
 %  if T == 'Float80':
 #endif
 %  end # if T == 'Float80':
-%end # for T in ['Float', 'Float80']:
+%end # for T in ['Float', 'Double', 'Float80']:
