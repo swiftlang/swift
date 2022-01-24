@@ -284,8 +284,11 @@ public:
   }
 };
 
-/// The size of an allocator slab.
-static constexpr size_t SlabCapacity = 1000;
+/// The size of an allocator slab. We want the full allocation to fit into a
+/// 1024-byte malloc quantum. We subtract off the slab header size, plus a
+/// little extra to stay within our limits even when there's overhead from
+/// malloc stack logging.
+static constexpr size_t SlabCapacity = 1024 - StackAllocator<0, nullptr>::slabHeaderSize() - 8;
 extern Metadata TaskAllocatorSlabMetadata;
 
 using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata>;

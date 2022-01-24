@@ -336,7 +336,7 @@ PASS(RedundantPhiElimination, "redundant-phi-elimination",
      "Redundant Phi Block Argument Elimination")
 PASS(PhiExpansion, "phi-expansion",
      "Replace Phi arguments by their only used field")
-PASS(ReleaseDevirtualizer, "release-devirtualizer",
+SWIFT_FUNCTION_PASS_WITH_LEGACY(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
      "SIL retain Sinking")

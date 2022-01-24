@@ -299,7 +299,7 @@ static void diagnoseFunctionParamNotRepresentable(
 static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
                                            const ParameterList *PL,
                                            ObjCReason Reason) {
-  // If you change this function, you must add or modify a test in PrintAsObjC.
+  // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
@@ -598,7 +598,7 @@ bool swift::isRepresentableInObjC(
   asyncConvention = None;
   errorConvention = None;
 
-  // If you change this function, you must add or modify a test in PrintAsObjC.
+  // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
 
@@ -1025,7 +1025,7 @@ bool swift::isRepresentableInObjC(
 }
 
 bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
-  // If you change this function, you must add or modify a test in PrintAsObjC.
+  // If you change this function, you must add or modify a test in PrintAsClang.
   
   if (VD->isInvalid())
     return false;
@@ -1085,7 +1085,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 }
 
 bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
-  // If you change this function, you must add or modify a test in PrintAsObjC.
+  // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = SD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);

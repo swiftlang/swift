@@ -119,6 +119,8 @@ ERROR(error_mode_cannot_emit_reference_dependencies,none,
       "this mode does not support emitting reference dependency files", ())
 ERROR(error_mode_cannot_emit_header,none,
       "this mode does not support emitting Objective-C headers", ())
+ERROR(error_mode_cannot_emit_cxx_header,none,
+      "this mode does not support emitting C++ headers", ())
 ERROR(error_mode_cannot_emit_loaded_module_trace,none,
       "this mode does not support emitting the loaded module trace", ())
 ERROR(error_mode_cannot_emit_module,none,

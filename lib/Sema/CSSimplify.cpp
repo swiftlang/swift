@@ -2849,8 +2849,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Handle opaque archetypes.
   if (auto arch1 = type1->getAs<ArchetypeType>()) {
     auto arch2 = type2->castTo<ArchetypeType>();
-    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1->getRoot());
-    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2->getRoot());
+    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1);
+    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2);
     assert(opaque1->getDecl() == opaque2->getDecl());
     assert(opaque1->getCanonicalInterfaceType(arch1->getInterfaceType())->isEqual(
                opaque2->getCanonicalInterfaceType(arch2->getInterfaceType())));
@@ -5884,33 +5884,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       break;
     }
     
-    // Same for nested archetypes rooted in opaque types.
-    case TypeKind::NestedArchetype: {
-      auto nested1 = cast<NestedArchetypeType>(desugar1);
-      auto nested2 = cast<NestedArchetypeType>(desugar2);
-      
-      auto rootOpaque1 = dyn_cast<OpaqueTypeArchetypeType>(nested1->getRoot());
-      auto rootOpaque2 = dyn_cast<OpaqueTypeArchetypeType>(nested2->getRoot());
-      if (rootOpaque1 && rootOpaque2) {
-        auto interfaceTy1 = rootOpaque1->getCanonicalInterfaceType(
-            nested1->getInterfaceType());
-        auto interfaceTy2 = rootOpaque2->getCanonicalInterfaceType(
-            nested2->getInterfaceType());
-        if (interfaceTy1->isEqual(interfaceTy2)
-            && rootOpaque1->getDecl() == rootOpaque2->getDecl()) {
-          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
-          break;
-        }
-      }
-
-      // Before failing, let's give repair a chance to run in diagnostic mode.
-      if (shouldAttemptFixes())
-        break;
-
-      // If the archetypes aren't rooted in an opaque type, or are rooted in
-      // completely different decls, then there's nothing else we can do.
-      return getTypeMatchFailure(locator);
-    }
     case TypeKind::Pack: {
       auto tmpPackLoc = locator.withPathElement(LocatorPathElt::PackType(type1));
       auto packLoc = tmpPackLoc.withPathElement(LocatorPathElt::PackType(type2));
@@ -6475,7 +6448,6 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::BoundGenericStruct:
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
   case TypeKind::DynamicSelf:
@@ -9813,7 +9785,7 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
       instanceTy = metaTy->getExistentialInstanceType();
     }
     assert(instanceTy->isExistentialType());
-    Type openedTy = OpenedArchetypeType::get(instanceTy);
+    Type openedTy = OpenedArchetypeType::get(instanceTy->getCanonicalType());
     if (isMetatype)
       openedTy = MetatypeType::get(openedTy, getASTContext());
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);

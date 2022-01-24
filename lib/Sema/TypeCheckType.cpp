@@ -295,7 +295,8 @@ static Type getIdentityOpaqueTypeArchetypeType(
   if (outerGenericSignature)
     subs = outerGenericSignature->getIdentitySubstitutionMap();
 
-  return OpaqueTypeArchetypeType::get(opaqueDecl, ordinal, subs);
+  Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
+  return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
 
 Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
@@ -2127,7 +2128,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
             subs = outerGenericSignature->getIdentitySubstitutionMap();
 
           return OpaqueTypeArchetypeType::get(
-                            opaqueDecl, gpDecl->getIndex(), subs);
+              opaqueDecl, gpDecl->getDeclaredInterfaceType(), subs);
         }
       }
 
@@ -2676,7 +2677,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       diagnoseInvalid(repr, attrs.getLoc(TAK_opened), diag::opened_non_protocol,
                       ty);
     } else {
-      ty = OpenedArchetypeType::get(ty, attrs.OpenedID);
+      ty = OpenedArchetypeType::get(ty->getCanonicalType(), attrs.OpenedID);
     }
     attrs.clearAttribute(TAK_opened);
   }

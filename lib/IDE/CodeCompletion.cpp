@@ -2442,7 +2442,8 @@ public:
       // and not both.
       if (auto *archetypeType = t->getAs<ArchetypeType>()) {
         // Don't erase opaque archetype.
-        if (isa<OpaqueTypeArchetypeType>(archetypeType))
+        if (isa<OpaqueTypeArchetypeType>(archetypeType) &&
+            archetypeType->isRoot())
           return t;
 
         auto protos = archetypeType->getConformsTo();
@@ -4099,7 +4100,7 @@ public:
 
     if (!ExprType->getMetatypeInstanceType()->isAnyObject())
       if (ExprType->isAnyExistentialType())
-        ExprType = OpenedArchetypeType::getAny(ExprType);
+        ExprType = OpenedArchetypeType::getAny(ExprType->getCanonicalType());
 
     if (!IsSelfRefExpr && !IsSuperRefExpr && ExprType->getAnyNominal() &&
         ExprType->getAnyNominal()->isActor()) {

@@ -785,6 +785,7 @@ struct DeclInfo {
   const ValueDecl *OriginalProperty = nullptr;
   bool Unavailable = true;
   Type BaseType;
+  /// Whether the \c VD is in a synthesized extension of \c BaseType
   bool InSynthesizedExtension = false;
 
   DeclInfo(const ValueDecl *VD, Type ContainerType, bool IsRef, bool IsDynamic,
@@ -810,9 +811,8 @@ struct DeclInfo {
     }
 
     BaseType = findBaseTypeForReplacingArchetype(VD, ContainerType);
-    InSynthesizedExtension = false;
     if (BaseType) {
-      if (auto Target = BaseType->getAnyNominal()) {
+      if (auto *Target = BaseType->getAnyNominal()) {
         SynthesizedExtensionAnalyzer Analyzer(
             Target, PrintOptions::printModuleInterface(
                         Invoc.getFrontendOptions().PrintFullConvention));

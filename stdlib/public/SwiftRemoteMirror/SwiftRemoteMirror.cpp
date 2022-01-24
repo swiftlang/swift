@@ -19,7 +19,7 @@ extern "C" {
 SWIFT_REMOTE_MIRROR_LINKAGE
 unsigned long long swift_reflection_classIsSwiftMask = 2;
 
-SWIFT_REMOTE_MIRROR_LINKAGE uint32_t swift_reflection_libraryVersion = 2;
+SWIFT_REMOTE_MIRROR_LINKAGE uint32_t swift_reflection_libraryVersion = 3;
 }
 
 #include "swift/Demangling/Demangler.h"
@@ -36,7 +36,11 @@ using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
 
-using Runtime = External<RuntimeTarget<sizeof(uintptr_t)>>;
+#if SWIFT_OBJC_INTEROP
+using Runtime = External<WithObjCInterop<RuntimeTarget<sizeof(uintptr_t)>>>;
+#else
+using Runtime = External<NoObjCInterop<RuntimeTarget<sizeof(uintptr_t)>>>;
+#endif
 using NativeReflectionContext = swift::reflection::ReflectionContext<Runtime>;
 
 struct SwiftReflectionContext {

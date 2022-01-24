@@ -335,6 +335,9 @@ namespace swift {
     /// Enable experimental 'move only' features.
     bool EnableExperimentalMoveOnly = false;
 
+    /// Enable experimental pairwise `buildBlock` for result builders.
+    bool EnableExperimentalPairwiseBuildBlock = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;
@@ -389,6 +392,9 @@ namespace swift {
     /// Diagnose switches over non-frozen enums that do not have catch-all
     /// cases.
     bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
+
+    /// Enable making top-level code support concurrency
+    bool EnableExperimentalAsyncTopLevel = false;
 
     /// Regex for the passes that should report passed and missed optimizations.
     ///

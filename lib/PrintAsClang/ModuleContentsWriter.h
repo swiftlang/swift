@@ -1,4 +1,4 @@
-//===--- ModuleContentsWriter.h - Walk a module to print ObjC ---*- C++ -*-===//
+//===--- ModuleContentsWriter.h - Walk module to print ObjC/C++ -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_PRINTASOBJC_MODULECONTENTSWRITER_H
-#define SWIFT_PRINTASOBJC_MODULECONTENTSWRITER_H
+#ifndef SWIFT_PRINTASCLANG_MODULECONTENTSWRITER_H
+#define SWIFT_PRINTASCLANG_MODULECONTENTSWRITER_H
 
 #include "swift/AST/AttrKind.h"
 #include "swift/Basic/LLVM.h"
@@ -32,6 +32,12 @@ using ImportModuleTy = PointerUnion<ModuleDecl*, const clang::Module*>;
 void printModuleContentsAsObjC(raw_ostream &os,
                                llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
                                ModuleDecl &M);
+
+/// Prints the declarations of \p M to \p os in C++ language mode and collects
+/// imports in \p imports along the way.
+void printModuleContentsAsCxx(raw_ostream &os,
+                              llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+                              ModuleDecl &M);
 
 } // end namespace swift
 

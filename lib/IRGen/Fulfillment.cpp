@@ -67,7 +67,6 @@ static bool isLeafTypeMetadata(CanType type) {
   // Type parameters are statically opaque.
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
   case TypeKind::GenericTypeParam:

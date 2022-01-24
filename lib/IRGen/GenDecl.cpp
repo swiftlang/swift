@@ -2257,10 +2257,8 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
   llvm::AttrBuilder initialAttrs;
   IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
   // Merge initialAttrs with attrs.
-  auto updatedAttrs =
-    signature.getAttributes().addAttributes(IGM.getLLVMContext(),
-                                      llvm::AttributeList::FunctionIndex,
-                                            initialAttrs);
+  auto updatedAttrs = signature.getAttributes().addFnAttributes(
+      IGM.getLLVMContext(), initialAttrs);
   if (!updatedAttrs.isEmpty())
     fn->setAttributes(updatedAttrs);
 
@@ -2628,9 +2626,8 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
   auto &attrs = signature.getMutableAttributes();
   switch (f->getInlineStrategy()) {
   case NoInline:
-    attrs = attrs.addAttribute(signature.getType()->getContext(),
-                               llvm::AttributeList::FunctionIndex,
-                               llvm::Attribute::NoInline);
+    attrs = attrs.addFnAttribute(signature.getType()->getContext(),
+                                 llvm::Attribute::NoInline);
     break;
   case AlwaysInline:
     // FIXME: We do not currently transfer AlwaysInline since doing so results
@@ -2640,9 +2637,8 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
   }
 
   if (isReadOnlyFunction(f)) {
-    attrs = attrs.addAttribute(signature.getType()->getContext(),
-                               llvm::AttributeList::FunctionIndex,
-                               llvm::Attribute::ReadOnly);
+    attrs = attrs.addFnAttribute(signature.getType()->getContext(),
+                                 llvm::Attribute::ReadOnly);
   }
 }
 
@@ -3106,8 +3102,8 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   llvm::AttrBuilder attrBuilder;
   IGM.constructInitialFnAttributes(attrBuilder);
   attrBuilder.addAttribute(llvm::Attribute::AlwaysInline);
-  llvm::AttributeList attr = signature.getAttributes().addAttributes(
-      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, attrBuilder);
+  llvm::AttributeList attr = signature.getAttributes().addFnAttributes(
+      IGM.getLLVMContext(), attrBuilder);
   thunk->setAttributes(attr);
 
   IRGenFunction subIGF(IGM, thunk);

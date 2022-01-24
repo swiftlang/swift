@@ -1,4 +1,4 @@
-//===--- PrintAsObjC.h - Emit a header file for a Swift AST -----*- C++ -*-===//
+//===--- PrintAsClang.h - Emit a header file for a Swift AST ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_PRINTASOBJC_H
-#define SWIFT_PRINTASOBJC_H
+#ifndef SWIFT_PRINTASCLANG_H
+#define SWIFT_PRINTASCLANG_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/AttrKind.h"
@@ -26,6 +26,11 @@ namespace swift {
   ///
   /// Returns true on error.
   bool printAsObjC(raw_ostream &out, ModuleDecl *M, StringRef bridgingHeader);
+
+  /// Print the C++-compatible declarations in a module as a Clang header.
+  ///
+  /// Returns true on error.
+  bool printAsCXX(raw_ostream &os, ModuleDecl *M);
 }
 
 #endif

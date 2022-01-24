@@ -1545,12 +1545,12 @@ private:
     case TypeKind::OpaqueTypeArchetype:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::NestedArchetype:
     case TypeKind::SequenceArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
       AssociatedTypeDecl *assocType = nullptr;
-      if (auto nested = dyn_cast<NestedArchetypeType>(Archetype))
-        assocType = nested->getAssocType();
+      if (auto depMemTy = Archetype->getInterfaceType()
+              ->getAs<DependentMemberType>())
+        assocType = depMemTy->getAssocType();
       auto L = getFilenameAndLocation(*this, assocType);
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;

@@ -1,3 +1,6 @@
+// Legacy passes are tested with the Windows PR tests. So no need to test them on macOS/Linux 
+// (they don't run on these platforms anyway). Thus we don't test both new Swift and legacy passes
+// on the same platform at the same time.
 // RUN: %target-sil-opt -enable-sil-verify-all %s -release-devirtualizer -module-name=test | %FileCheck %s
 
 sil_stage canonical

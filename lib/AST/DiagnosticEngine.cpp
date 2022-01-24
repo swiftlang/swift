@@ -709,7 +709,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
       type = type->getWithoutSyntaxSugar();
     }
 
-    if (needsQualification && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
+    if (needsQualification &&
+        isa<OpaqueTypeArchetypeType>(type.getPointer()) &&
+        cast<ArchetypeType>(type.getPointer())->isRoot()) {
       auto opaqueTypeDecl = type->castTo<OpaqueTypeArchetypeType>()->getDecl();
 
       llvm::SmallString<256> NamingDeclText;

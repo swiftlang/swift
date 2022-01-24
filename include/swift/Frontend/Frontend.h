@@ -174,6 +174,11 @@ public:
     SearchPathOpts.setImportSearchPaths(Paths);
   }
 
+  void setSerializedPathObfuscator(const PathObfuscator &obfuscator) {
+    FrontendOpts.serializedPathObfuscator = obfuscator;
+    SearchPathOpts.DeserializedPathRecoverer = obfuscator;
+  }
+
   ArrayRef<std::string> getImportSearchPaths() const {
     return SearchPathOpts.getImportSearchPaths();
   }
@@ -388,6 +393,7 @@ public:
   std::string getOutputFilenameForAtMostOnePrimary() const;
   std::string getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
   std::string getObjCHeaderOutputPathForAtMostOnePrimary() const;
+  std::string getCxxHeaderOutputPathForAtMostOnePrimary() const;
   std::string getModuleOutputPathForAtMostOnePrimary() const;
   std::string
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;

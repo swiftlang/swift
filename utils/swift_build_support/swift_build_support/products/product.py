@@ -230,8 +230,10 @@ class Product(object):
                 # install in to a temporary subdirectory.
                 return '%s/intermediate-install/%s' % \
                     (os.path.dirname(self.build_dir), host_target)
-            elif host_target == "merged-hosts":
-                # This assumes that all hosts are merged to the lipo.
+            elif host_target == "merged-hosts" or \
+                    not self.args.cross_compile_append_host_target_to_destdir:
+                # This assumes that all hosts are merged to the lipo, or the build
+                # was told not to append anything.
                 return self.args.install_destdir
             else:
                 return '%s/%s' % (self.args.install_destdir, host_target)

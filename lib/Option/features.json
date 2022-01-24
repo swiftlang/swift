@@ -14,6 +14,9 @@
     },
     {
       "name": "emit-abi-descriptor"
+    },
+    {
+      "name": "no-warn-superfluous-index-unit-path"
     }
   ]
 }

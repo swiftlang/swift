@@ -111,6 +111,8 @@ public func registerSILClasses() {
   register(ObjCMethodInst.self)
   register(ObjCSuperMethodInst.self)
   register(WitnessMethodInst.self)
+  register(IsUniqueInst.self)
+  register(IsEscapingClosureInst.self)
   register(AllocStackInst.self)
   register(AllocRefInst.self)
   register(AllocRefDynamicInst.self)

@@ -2158,7 +2158,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));

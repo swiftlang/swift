@@ -487,19 +487,21 @@ public:
     return c;
 #endif
   }
-  
-  template<> inline const ClassMetadata *
-  Metadata::getClassObject() const {
+
+  template <>
+  inline const ClassMetadata *Metadata::getClassObject() const {
     switch (getKind()) {
     case MetadataKind::Class: {
       // Native Swift class metadata is also the class object.
       return static_cast<const ClassMetadata *>(this);
     }
+#if SWIFT_OBJC_INTEROP
     case MetadataKind::ObjCClassWrapper: {
       // Objective-C class objects are referenced by their Swift metadata wrapper.
       auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(this);
       return wrapper->Class;
     }
+#endif
     // Other kinds of types don't have class objects.
     default:
       return nullptr;

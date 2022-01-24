@@ -51,19 +51,19 @@ struct Term::Storage final
 
 size_t Term::size() const { return Ptr->Size; }
 
-ArrayRef<Symbol>::iterator Term::begin() const {
+const Symbol *Term::begin() const {
   return Ptr->getElements().begin();
 }
 
-ArrayRef<Symbol>::iterator Term::end() const {
+const Symbol *Term::end() const {
   return Ptr->getElements().end();
 }
 
-ArrayRef<Symbol>::reverse_iterator Term::rbegin() const {
+std::reverse_iterator<const Symbol *> Term::rbegin() const {
   return Ptr->getElements().rbegin();
 }
 
-ArrayRef<Symbol>::reverse_iterator Term::rend() const {
+std::reverse_iterator<const Symbol *> Term::rend() const {
   return Ptr->getElements().rend();
 }
 
@@ -121,8 +121,6 @@ bool Term::containsUnresolvedSymbols() const {
   return false;
 }
 
-namespace {
-
 /// Shortlex order on symbol ranges.
 ///
 /// First we compare length, then perform a lexicographic comparison
@@ -130,10 +128,9 @@ namespace {
 ///
 /// This is used to implement Term::compare() and MutableTerm::compare()
 /// below.
-template<typename Iter>
-int shortlexCompare(Iter lhsBegin, Iter lhsEnd,
-                    Iter rhsBegin, Iter rhsEnd,
-                    RewriteContext &ctx) {
+static int shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
+                           const Symbol *rhsBegin, const Symbol *rhsEnd,
+                           RewriteContext &ctx) {
   unsigned lhsSize = (lhsEnd - lhsBegin);
   unsigned rhsSize = (rhsEnd - rhsBegin);
   if (lhsSize != rhsSize)
@@ -158,8 +155,6 @@ int shortlexCompare(Iter lhsBegin, Iter lhsEnd,
   return 0;
 }
 
-}
-
 /// Shortlex order on terms.
 int Term::compare(Term other, RewriteContext &ctx) const {
   return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
@@ -170,14 +165,11 @@ int MutableTerm::compare(const MutableTerm &other, RewriteContext &ctx) const {
   return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 
-/// Replace the subterm in the range [from,to) with \p rhs.
+/// Replace the subterm in the range [from,to) with \p rhs. The subrange must
+/// be part of this term itself.
 ///
-/// Note that \p rhs must precede [from,to) in the linear
-/// order on terms.
-void MutableTerm::rewriteSubTerm(
-    decltype(MutableTerm::Symbols)::iterator from,
-    decltype(MutableTerm::Symbols)::iterator to,
-    Term rhs) {
+/// Note that \p rhs must precede [from,to) in the linear order on terms.
+void MutableTerm::rewriteSubTerm(Symbol *from, Symbol *to, Term rhs) {
   auto oldSize = size();
   unsigned lhsLength = (unsigned)(to - from);
   assert(rhs.size() <= lhsLength);

@@ -231,12 +231,11 @@ void FrontendOptions::forAllOutputPaths(
   }
   const SupplementaryOutputPaths &outs =
       input.getPrimarySpecificPaths().SupplementaryOutputs;
-  const std::string *outputs[] = {&outs.ModuleOutputPath,
-                                  &outs.ModuleDocOutputPath,
-                                  &outs.ModuleInterfaceOutputPath,
-                                  &outs.PrivateModuleInterfaceOutputPath,
-                                  &outs.ObjCHeaderOutputPath,
-                                  &outs.ModuleSourceInfoOutputPath};
+  const std::string *outputs[] = {
+      &outs.ModuleOutputPath,          &outs.ModuleDocOutputPath,
+      &outs.ModuleInterfaceOutputPath, &outs.PrivateModuleInterfaceOutputPath,
+      &outs.ObjCHeaderOutputPath,      &outs.CxxHeaderOutputPath,
+      &outs.ModuleSourceInfoOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
@@ -449,7 +448,7 @@ bool FrontendOptions::canActionEmitModuleSummary(ActionType action) {
   llvm_unreachable("unhandled action");
 }
 
-bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
+bool FrontendOptions::canActionEmitClangHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:

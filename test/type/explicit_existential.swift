@@ -156,6 +156,17 @@ func anyAny() {
 
 protocol P1 {}
 protocol P2 {}
+do {
+  // Test that we don't accidentally misparse an 'any' type as a 'some' type
+  // and vice versa.
+  let _: P1 & any P2 // expected-error {{'any' should appear at the beginning of a composition}}
+  let _: any P1 & any P2 // expected-error {{'any' should appear at the beginning of a composition}}
+  let _: any P1 & some P2 // expected-error {{'some' should appear at the beginning of a composition}}
+  let _: some P1 & any P2
+  // expected-error@-1 {{'some' type can only be declared on a single property declaration}}
+  // expected-error@-2 {{'any' should appear at the beginning of a composition}}
+}
+
 struct ConcreteComposition: P1, P2 {}
 
 func testMetatypes() {
@@ -201,4 +212,16 @@ struct Wrapper {
 func typealiasMemberReferences(metatype: Wrapper.Type) {
   let _: Wrapper.E.Protocol = metatype.E.self
   let _: (any Wrapper.E).Type = metatype.E.self
+}
+
+func testAnyTypeExpr() {
+  let _: (any P).Type = (any P).self
+
+  func test(_: (any P).Type) {}
+  test((any P).self)
+
+  // expected-error@+2 {{expected member name or constructor call after type name}}
+  // expected-note@+1 {{use '.self' to reference the type object}}
+  let invalid = any P
+  test(invalid)
 }

@@ -137,6 +137,14 @@ public:
 
   DebugOptions getDebugOptions() const { return Debug; }
 
+  ASTContext &getASTContext() const { return Context; }
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Reduction order on protocols.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
   const llvm::TinyPtrVector<const ProtocolDecl *> &
   getInheritedProtocols(const ProtocolDecl *proto);
 
@@ -147,34 +155,31 @@ public:
   int compareProtocols(const ProtocolDecl *lhs,
                        const ProtocolDecl *rhs);
 
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Type to term conversion. The opposite direction is implemented in
+  /// PropertyMap because it depends on the current rewrite system.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
   Term getTermForType(CanType paramType, const ProtocolDecl *proto);
 
   MutableTerm getMutableTermForType(CanType paramType,
                                     const ProtocolDecl *proto);
 
-  ASTContext &getASTContext() const { return Context; }
-
-  Type getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
-
-  Type getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
-
-  Type getRelativeTypeForTerm(
-                      const MutableTerm &term, const MutableTerm &prefix) const;
-
   MutableTerm getRelativeTermForType(CanType typeWitness,
                                      ArrayRef<Term> substitutions);
-
-  Type getTypeFromSubstitutionSchema(
-                      Type schema,
-                      ArrayRef<Term> substitutions,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const MutableTerm &prefix) const;
 
   AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol);
 
   Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs);
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Construction of requirement machines for connected components in the
+  /// protocol dependency graph.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
 
   RequirementMachine *getRequirementMachine(CanGenericSignature sig);
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);

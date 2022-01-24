@@ -73,4 +73,44 @@ public struct Builder {
     let dr = SILBuilder_createDeallocStackRef(bridgedInsPoint, location.bridgedLocation, operand.bridged)
     return dr.getAs(DeallocStackRefInst.self)
   }
+
+  public func createUncheckedRefCast(object: Value, type: Type) -> UncheckedRefCastInst {
+    notifyInstructionsChanged()
+    let object = SILBuilder_createUncheckedRefCast(
+      bridgedInsPoint, location.bridgedLocation, object.bridged, type.bridged)
+    return object.getAs(UncheckedRefCastInst.self)
+  }
+
+  @discardableResult
+  public func createSetDeallocating(operand: Value, isAtomic: Bool) -> SetDeallocatingInst {
+    notifyInstructionsChanged()
+    let setDeallocating = SILBuilder_createSetDeallocating(
+      bridgedInsPoint, location.bridgedLocation, operand.bridged, isAtomic)
+    return setDeallocating.getAs(SetDeallocatingInst.self)
+  }
+
+  public func createFunctionRef(_ function: Function) -> FunctionRefInst {
+    notifyInstructionsChanged()
+    let functionRef = SILBuilder_createFunctionRef(
+      bridgedInsPoint, location.bridgedLocation, function.bridged)
+    return functionRef.getAs(FunctionRefInst.self)
+  }
+
+  @discardableResult
+  public func createApply(
+    function: Value,
+    _ substitutionMap: SubstitutionMap,
+    arguments: [Value]
+  ) -> ApplyInst {
+    notifyInstructionsChanged()
+    notifyCallsChanged()
+
+    let apply = arguments.withBridgedValues { valuesRef in
+      SILBuilder_createApply(
+        bridgedInsPoint, location.bridgedLocation, function.bridged,
+        substitutionMap.bridged, valuesRef
+      )
+    }
+    return apply.getAs(ApplyInst.self)
+  }
 }

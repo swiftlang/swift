@@ -2629,14 +2629,16 @@ public:
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Requirement signature: ";
-      requirementsSig->print(llvm::errs());
+      PrintOptions Opts;
+      Opts.ProtocolQualifiedDependentMemberTypes = true;
+      requirementsSig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
 
       llvm::errs() << "Canonical requirement signature: ";
       auto canRequirementSig =
         CanGenericSignature::getCanonical(requirementsSig.getGenericParams(),
                                           requirementsSig.getRequirements());
-      canRequirementSig->print(llvm::errs());
+      canRequirementSig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
 

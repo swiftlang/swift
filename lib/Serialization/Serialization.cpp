@@ -4462,40 +4462,31 @@ public:
     auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
 
     GenericSignatureID sigID = S.addGenericSignatureRef(sig);
-    auto interfaceType = archetypeTy->getInterfaceType()
-      ->castTo<GenericTypeParamType>();
+    TypeID interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[PrimaryArchetypeTypeLayout::Code];
     PrimaryArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                           sigID,
-                                           interfaceType->getDepth(),
-                                           interfaceType->getIndex());
+                                           sigID, interfaceTypeID);
   }
 
   void visitOpenedArchetypeType(const OpenedArchetypeType *archetypeTy) {
     using namespace decls_block;
-    serializeSimpleWrapper<OpenedArchetypeTypeLayout>(
-        archetypeTy->getOpenedExistentialType());
+    auto existentialTypeID = S.addTypeRef(archetypeTy->getExistentialType());
+    auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
+    unsigned abbrCode = S.DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
+    OpenedArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          existentialTypeID, interfaceTypeID);
   }
 
   void
   visitOpaqueTypeArchetypeType(const OpaqueTypeArchetypeType *archetypeTy) {
     using namespace decls_block;
     auto declID = S.addDeclRef(archetypeTy->getDecl());
+    auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
     auto substMapID = S.addSubstitutionMapRef(archetypeTy->getSubstitutions());
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
     OpaqueArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          declID, archetypeTy->getOrdinal(),
-                                          substMapID);
-  }
-
-  void visitNestedArchetypeType(const NestedArchetypeType *archetypeTy) {
-    using namespace decls_block;
-    auto rootTypeID = S.addTypeRef(archetypeTy->getRoot());
-    auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
-    unsigned abbrCode = S.DeclTypeAbbrCodes[NestedArchetypeTypeLayout::Code];
-    NestedArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          rootTypeID, interfaceTypeID);
+                                          declID, interfaceTypeID, substMapID);
   }
 
   void visitSequenceArchetypeType(const SequenceArchetypeType *archetypeTy) {
@@ -4503,13 +4494,11 @@ public:
     auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
 
     GenericSignatureID sigID = S.addGenericSignatureRef(sig);
-    auto interfaceType =
-        archetypeTy->getInterfaceType()->castTo<GenericTypeParamType>();
+    TypeID interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SequenceArchetypeTypeLayout::Code];
     SequenceArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                            sigID, interfaceType->getDepth(),
-                                            interfaceType->getIndex());
+                                            sigID, interfaceTypeID);
   }
 
   void visitGenericTypeParamType(const GenericTypeParamType *genericParam) {
@@ -4902,7 +4891,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpaqueArchetypeTypeLayout>();
-  registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
   registerDeclTypeAbbr<SequenceArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<ExistentialTypeLayout>();

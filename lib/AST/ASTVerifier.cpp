@@ -618,13 +618,7 @@ public:
           }
 
           // Get the archetype's generic signature.
-          GenericEnvironment *archetypeEnv;
-          if (auto seq = dyn_cast<SequenceArchetypeType>(root)) {
-            archetypeEnv = seq->getGenericEnvironment();
-          } else {
-            auto rootPrimary = cast<PrimaryArchetypeType>(root);
-            archetypeEnv = rootPrimary->getGenericEnvironment();
-          }
+          GenericEnvironment *archetypeEnv = root->getGenericEnvironment();
           auto archetypeSig = archetypeEnv->getGenericSignature();
 
           auto genericCtx = Generics.back();
@@ -657,24 +651,6 @@ public:
             Out << "Contextual type: " << contextType.getString() << "\n";
 
             return true;
-          }
-
-          // Make sure that none of the nested types are dependent.
-          for (const auto &nested : archetype->getKnownNestedTypes()) {
-            if (!nested.second)
-              continue;
-            
-            if (auto nestedType = nested.second) {
-              if (nestedType->hasTypeParameter()) {
-                Out << "Nested type " << nested.first.str()
-                    << " of archetype " << archetype->getString()
-                    << " is dependent type " << nestedType->getString()
-                    << "\n";
-                return true;
-              }
-            }
-
-            verifyChecked(nested.second, visitedArchetypes);
           }
         }
 
@@ -2831,6 +2807,19 @@ public:
 
       unsigned currentDepth = DC->getGenericContextDepth();
       if (currentDepth < GTPD->getDepth()) {
+        // If this is actually an opaque type's generic parameter, we're okay.
+        if (auto value = dyn_cast_or_null<ValueDecl>(DC->getAsDecl())) {
+          auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(value);
+          if (!opaqueDecl)
+            opaqueDecl = value->getOpaqueResultTypeDecl();
+          if (opaqueDecl) {
+            if (GTPD->getDepth() ==
+                    opaqueDecl->getOpaqueGenericParams().front()->getDepth()) {
+              return;
+            }
+          }
+        }
+
         Out << "GenericTypeParamDecl has incorrect depth\n";
         abort();
       }
