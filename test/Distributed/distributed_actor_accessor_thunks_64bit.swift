@@ -76,6 +76,10 @@ public distributed actor MyActor {
   distributed func complex(_: [Int], _: Obj, _: String?, _: LargeStruct) -> LargeStruct {
     fatalError()
   }
+
+  // Combination of direct and indirect arguments involving generic arguments.
+  distributed func genericArgs<T: Codable, U: Codable>(_: T, _: [U]) {
+  }
 }
 
 @available(SwiftStdlib 5.6, *)
@@ -313,6 +317,77 @@ public distributed actor MyOtherActor {
 /// RESULT is returned indirectly so there is nothing to pass to `end`
 
 // CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
+
+/// ---> Accessor for `genericArgs`
+
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC11genericArgsyyx_Sayq_GtSeRzSERzSeR_SER_r0_lFTETF"(%swift.context* swiftasync %0, i8* [[ARG_BUF:%.*]], i8* [[ARG_TYPES:%.*]], i8* [[RESULT_BUF:%.*]], i8* [[GENERIC_SUBS:%.*]], i8* [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], %T27distributed_actor_accessors7MyActorC* [[ACTOR:%.*]])
+
+/// ---> Load `T`
+
+// CHECK: store i8* [[ARG_BUFF]], i8** %offset
+// CHECK-NEXT: [[ARG_TYPES_BUF:%.*]] = bitcast i8* [[ARG_TYPES]] to %swift.type**
+// CHECK-NEXT: %elt_offset = load i8*, i8** %offset
+// CHECK-NEXT: [[FIRST_ARG_TYPE_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ARG_TYPES_BUF]], i64 0
+// CHECK-NEXT: %arg_type = load %swift.type*, %swift.type** [[FIRST_ARG_TYPE_ADDR]]
+// CHECK: %size = load i64, i64* {{.*}}
+// CHECK: %flags = load i32, i32* {{.*}}
+// CHECK: [[ELT_PTR:%.*]] = ptrtoint i8* %elt_offset to i64
+// CHECK-NEXT: [[START_ELT_ALIGN:%.*]] = add nuw i64 [[ELT_PTR]], %flags.alignmentMask
+// CHECK-NEXT: [[ALIGNMENT:%.*]] = xor i64 %flags.alignmentMask, -1
+// CHECK-NEXT: [[ALIGNED_ELT_PTR:%.*]] = and i64 [[START_ELT_ALIGN]], [[ALIGNMENT]]
+// CHECK-NEXT: [[TYPED_ARG_0:%.*]] = inttoptr i64 [[ALIGNED_ELT_PTR:%.*]] to %swift.opaque*
+
+/// Move offset to the next element
+
+// CHECK: [[CUR_OFFSET:%.*]] = ptrtoint %swift.opaque* [[TYPED_ARG_0]] to i64
+// CHECK-NEXT: [[NEXT_OFFSET:%.*]] = add i64 [[CUR_OFFSET]], %size
+// CHECK-NEXT: [[NEXT_OFFSET_PTR:%.*]] = inttoptr i64 [[NEXT_OFFSET]] to i8*
+// CHECK-NEXT: store i8* [[NEXT_OFFSET_PTR]], i8** %offset
+
+/// ---> Load `[U]`
+
+// CHECK: %elt_offset2 = load i8*, i8** %offset
+// CHECK-NEXT: [[SECOND_ARG_TYPE_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ARG_TYPES_BUF]], i64 1
+// CHECK-NEXT: %arg_type3 = load %swift.type*, %swift.type** [[SECOND_ARG_TYPE_ADDR]]
+// CHECK: %size4 = load i64, i64* {{.*}}
+// CHECK: %flags6 = load i32, i32* {{.*}}
+// CHECK: [[ELT_PTR:%.*]] = ptrtoint i8* %elt_offset2 to i64
+// CHECK-NEXT: [[START_ELT_ALIGN:%.*]] = add nuw i64 [[ELT_PTR]], %flags6.alignmentMask
+// CHECK-NEXT: [[ALIGNMENT:%.*]] = xor i64 %flags6.alignmentMask, -1
+// CHECK-NEXT: [[ALIGNED_ELT_PTR:%.*]] = and i64 [[START_ELT_ALIGN]], [[ALIGNMENT]]
+// CHECK-NEXT: [[TYPED_ARG_1:%.*]] = inttoptr i64 [[ALIGNED_ELT_PTR]] to %swift.opaque*
+// CHECK-NEXT: [[ARR_ARG_1:%.*]] = bitcast %swift.opaque* [[TYPED_ARG_1]] to %TSa*
+// CHECK-NEXT: %._buffer = getelementptr inbounds %TSa, %TSa* [[ARR_ARG_1]], i32 0, i32 0
+// CHECK-NEXT: %._buffer._storage = getelementptr inbounds %Ts12_ArrayBufferV, %Ts12_ArrayBufferV* %._buffer, i32 0, i32 0
+// CHECK-NEXT: %._buffer._storage.rawValue = getelementptr inbounds %Ts14_BridgeStorageV, %Ts14_BridgeStorageV* %._buffer._storage, i32 0, i32 0
+// CHECK-NEXT: [[TYPED_ARG_1:%.*]] = load %swift.bridge*, %swift.bridge** %._buffer._storage.rawValue
+
+/// ---> Load generic argument substitutions from the caller-provided buffer
+
+// CHECK: [[GENERIC_SUBS_BUF:%.*]] = bitcast i8* [[GENERIC_SUBS]] to %swift.type**
+// CHECK-NEXT: [[SUB_T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENERIC_SUBS_BUF]], i64 0
+// CHECK-NEXT: [[SUB_T:%.*]] = load %swift.type*, %swift.type** [[SUB_T_ADDR]]
+// CHECK-NEXT: [[SUB_U_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENERIC_SUBS_BUF]], i64 1
+// CHECK-NEXT: [[SUB_U:%.*]] = load %swift.type*, %swift.type** [[SUB_U_ADDR]]
+
+/// --> Load witness tables from caller-provided buffer
+
+/// First, check whether the number of witness tables matches expected
+
+// CHECK: [[IS_INCORRECT_WITNESSES:%.*]] = icmp ne i64 [[NUM_WITNESS_TABLES]], 4
+// CHECK-NEXT: br i1 [[IS_INCORRECT_WITNESSES]], label %incorrect-witness-tables, label [[LOAD_WITNESS_TABLES:%.*]]
+// CHECK: incorrect-witness-tables:
+// CHECK-NEXT: unreachable
+
+// CHECK: [[WITNESS_BUF:%.*]] = bitcast i8* [[WITNESS_TABLES]] to i8**
+// CHECK-NEXT: [[T_ENCODABLE:%.*]] = getelementptr inbounds i8*, i8** [[WITNESS_BUF]], i64 0
+// CHECK-NEXT: [[T_DECODABLE:%.*]] = getelementptr inbounds i8*, i8** [[WITNESS_BUF]], i64 1
+// CHECK-NEXT: [[U_ENCODABLE:%.*]] = getelementptr inbounds i8*, i8** [[WITNESS_BUF]], i64 2
+// CHECK-NEXT: [[U_DECODABLE:%.*]] = getelementptr inbounds i8*, i8** [[WITNESS_BUF]], i64 3
+
+/// ---> Check that distributed thunk code is formed correctly
+
+// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, %swift.context* {{.*}}, %swift.opaque* [[TYPED_ARG_0]], %swift.bridge* [[TYPED_ARG_1]], %swift.type* [[SUB_T]], %swift.type* [[SUB_U]], i8** [[T_ENCODABLE]], i8** [[T_DECODABLE]], i8** [[U_ENCODABLE]], i8** [[U_DECODABLE]], %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
 
 /// ---> Thunk and distributed method for `MyOtherActor.empty`
 
