@@ -56,7 +56,6 @@ static void recordRelation(Term key,
                            unsigned lhsRuleID,
                            Symbol rhsProperty,
                            RewriteSystem &system,
-                           SmallVectorImpl<InducedRule> &inducedRules,
                            bool debug) {
   const auto &lhsRule = system.getRule(lhsRuleID);
   auto lhsProperty = lhsRule.getLHS().back();
@@ -141,19 +140,17 @@ namespace {
     ArrayRef<Term> rhsSubstitutions;
     RewriteContext &ctx;
     RewriteSystem &system;
-    SmallVectorImpl<InducedRule> &inducedRules;
     bool debug;
 
   public:
     ConcreteTypeMatcher(ArrayRef<Term> lhsSubstitutions,
                         ArrayRef<Term> rhsSubstitutions,
                         RewriteSystem &system,
-                        SmallVectorImpl<InducedRule> &inducedRules,
                         bool debug)
         : lhsSubstitutions(lhsSubstitutions),
           rhsSubstitutions(rhsSubstitutions),
           ctx(system.getRewriteContext()), system(system),
-          inducedRules(inducedRules), debug(debug) {}
+          debug(debug) {}
 
     bool alwaysMismatchTypeParameters() const { return true; }
 
@@ -260,7 +257,6 @@ namespace {
 /// Returns true if a conflict was detected.
 static bool unifyConcreteTypes(
     Symbol lhs, Symbol rhs, RewriteSystem &system,
-    SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
   auto lhsType = lhs.getConcreteType();
   auto rhsType = rhs.getConcreteType();
@@ -271,7 +267,7 @@ static bool unifyConcreteTypes(
 
   ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
                               rhs.getSubstitutions(),
-                              system, inducedRules, debug);
+                              system, debug);
   if (!matcher.match(lhsType, rhsType)) {
     // FIXME: Diagnose the conflict
     if (debug) {
@@ -308,7 +304,6 @@ static bool unifyConcreteTypes(
 /// that gets recorded in the property map.
 static std::pair<Symbol, bool> unifySuperclasses(
     Symbol lhs, Symbol rhs, RewriteSystem &system,
-    SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
   if (debug) {
     llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
@@ -351,7 +346,7 @@ static std::pair<Symbol, bool> unifySuperclasses(
   // Unify type contructor arguments.
   ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
                               rhs.getSubstitutions(),
-                              system, inducedRules, debug);
+                              system, debug);
   if (!matcher.match(lhsType, rhsType)) {
     if (debug) {
       llvm::dbgs() << "%% Superclass conflict\n";
@@ -366,8 +361,7 @@ static std::pair<Symbol, bool> unifySuperclasses(
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
 void PropertyMap::addProperty(
-    Term key, Symbol property, unsigned ruleID,
-    SmallVectorImpl<InducedRule> &inducedRules) {
+    Term key, Symbol property, unsigned ruleID) {
   assert(property.isProperty());
   assert(*System.getRule(ruleID).isPropertyRule() == property);
   auto *props = getOrCreateProperties(key);
@@ -401,8 +395,7 @@ void PropertyMap::addProperty(
       // the new layout requirement is redundant.
       if (mergedLayout == props->Layout) {
         if (checkRulePairOnce(*props->LayoutRule, ruleID)) {
-          recordRelation(key, *props->LayoutRule, property, System,
-                         inducedRules, debug);
+          recordRelation(key, *props->LayoutRule, property, System, debug);
         }
 
       // If the intersection is equal to the new layout requirement, the
@@ -410,8 +403,7 @@ void PropertyMap::addProperty(
       } else if (mergedLayout == newLayout) {
         if (checkRulePairOnce(ruleID, *props->LayoutRule)) {
           auto oldProperty = System.getRule(*props->LayoutRule).getLHS().back();
-          recordRelation(key, ruleID, oldProperty, System,
-                         inducedRules, debug);
+          recordRelation(key, ruleID, oldProperty, System, debug);
         }
 
         props->LayoutRule = ruleID;
@@ -437,8 +429,7 @@ void PropertyMap::addProperty(
             Context.getASTContext());
       auto layoutSymbol = Symbol::forLayout(layout, Context);
 
-      recordRelation(key, ruleID, layoutSymbol, System,
-                     inducedRules, debug);
+      recordRelation(key, ruleID, layoutSymbol, System, debug);
     }
 
     if (!props->Superclass) {
@@ -447,7 +438,7 @@ void PropertyMap::addProperty(
     } else {
       assert(props->SuperclassRule.hasValue());
       auto pair = unifySuperclasses(*props->Superclass, property,
-                                    System, inducedRules, debug);
+                                    System, debug);
       props->Superclass = pair.first;
       bool conflict = pair.second;
       if (conflict) {
@@ -466,7 +457,7 @@ void PropertyMap::addProperty(
     } else {
       assert(props->ConcreteTypeRule.hasValue());
       bool conflict = unifyConcreteTypes(*props->ConcreteType, property,
-                                         System, inducedRules, debug);
+                                         System, debug);
       if (conflict) {
         recordConflict(key, *props->ConcreteTypeRule, ruleID, System);
         return;
@@ -489,8 +480,7 @@ void PropertyMap::addProperty(
   llvm_unreachable("Bad symbol kind");
 }
 
-void PropertyMap::checkConcreteTypeRequirements(
-    SmallVectorImpl<InducedRule> &inducedRules) {
+void PropertyMap::checkConcreteTypeRequirements() {
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   for (auto *props : Entries) {
@@ -505,8 +495,7 @@ void PropertyMap::checkConcreteTypeRequirements(
             Context);
 
         recordRelation(props->getKey(), *props->ConcreteTypeRule,
-                       superclassSymbol, System,
-                       inducedRules, debug);
+                       superclassSymbol, System, debug);
 
       // Otherwise, we have a concrete vs superclass conflict.
       } else {
@@ -518,8 +507,7 @@ void PropertyMap::checkConcreteTypeRequirements(
   }
 }
 
-void PropertyMap::concretizeNestedTypesFromConcreteParents(
-    SmallVectorImpl<InducedRule> &inducedRules) {
+void PropertyMap::concretizeNestedTypesFromConcreteParents() {
   for (auto *props : Entries) {
     if (props->getConformsTo().empty())
       continue;
@@ -546,8 +534,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
           props->ConcreteType->getSubstitutions(),
           props->ConformsToRules,
           props->ConformsTo,
-          props->ConcreteConformances,
-          inducedRules);
+          props->ConcreteConformances);
     }
 
     if (props->hasSuperclassBound()) {
@@ -563,8 +550,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
           props->Superclass->getSubstitutions(),
           props->ConformsToRules,
           props->ConformsTo,
-          props->SuperclassConformances,
-          inducedRules);
+          props->SuperclassConformances);
     }
   }
 }
@@ -608,8 +594,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     ArrayRef<Term> substitutions,
     ArrayRef<unsigned> conformsToRules,
     ArrayRef<const ProtocolDecl *> conformsTo,
-    llvm::TinyPtrVector<ProtocolConformance *> &conformances,
-    SmallVectorImpl<InducedRule> &inducedRules) {
+    llvm::TinyPtrVector<ProtocolConformance *> &conformances) {
   assert(requirementKind == RequirementKind::SameType ||
          requirementKind == RequirementKind::Superclass);
   assert(conformsTo.size() == conformsToRules.size());
@@ -684,8 +669,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
         concreteType, substitutions, proto, Context);
 
     recordConcreteConformanceRule(concreteRuleID, conformanceRuleID,
-                                  requirementKind, concreteConformanceSymbol,
-                                  inducedRules);
+                                  requirementKind, concreteConformanceSymbol);
 
     auto assocTypes = proto->getAssociatedTypeMembers();
     if (assocTypes.empty())
@@ -694,8 +678,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     for (auto *assocType : assocTypes) {
       concretizeTypeWitnessInConformance(key, requirementKind,
                                          concreteConformanceSymbol,
-                                         concrete, assocType,
-                                         inducedRules);
+                                         concrete, assocType);
     }
   }
 }
@@ -704,8 +687,7 @@ void PropertyMap::concretizeTypeWitnessInConformance(
     Term key, RequirementKind requirementKind,
     Symbol concreteConformanceSymbol,
     ProtocolConformance *concrete,
-    AssociatedTypeDecl *assocType,
-    SmallVectorImpl<InducedRule> &inducedRules) const {
+    AssociatedTypeDecl *assocType) const {
   auto concreteType = concreteConformanceSymbol.getConcreteType();
   auto substitutions = concreteConformanceSymbol.getSubstitutions();
   auto *proto = concreteConformanceSymbol.getProtocol();
@@ -926,8 +908,7 @@ void PropertyMap::recordConcreteConformanceRule(
     unsigned concreteRuleID,
     unsigned conformanceRuleID,
     RequirementKind requirementKind,
-    Symbol concreteConformanceSymbol,
-    SmallVectorImpl<InducedRule> &inducedRules) const {
+    Symbol concreteConformanceSymbol) const {
   const auto &concreteRule = System.getRule(concreteRuleID);
   const auto &conformanceRule = System.getRule(conformanceRuleID);
 
