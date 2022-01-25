@@ -2825,7 +2825,8 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       if (!address) {
         address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
       } else {
-        assert(!ActorIso && "local var should not be actor isolated!");
+        assert((!ActorIso || Storage->isTopLevelGlobal()) &&
+               "local var should not be actor isolated!");
       }
       assert(address.isLValue() &&
              "physical lvalue decl ref must evaluate to an address");
