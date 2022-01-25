@@ -3063,7 +3063,7 @@ bool ValueDecl::isNativeMethodReplacement() const {
   if (isNativeDynamic())
     return true;
 
-  if (isObjCDynamicInGenericClass())
+  if (replacedDecl->isObjCDynamicInGenericClass())
     return replacedDecl->getModuleContext()->isImplicitDynamicEnabled();
 
   return false;
