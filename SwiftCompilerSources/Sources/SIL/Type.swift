@@ -21,7 +21,7 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public func isTrivial(in function: Function) -> Bool {
     return SILType_isTrivial(bridged, function.bridged) != 0
   }
-  
+
   public var isNominal: Bool { SILType_isNominal(bridged) != 0 }
   public var isClass: Bool { SILType_isClass(bridged) != 0 }
   public var isStruct: Bool { SILType_isStruct(bridged) != 0 }
@@ -29,16 +29,9 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public var isEnum: Bool { SILType_isEnum(bridged) != 0 }
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
-  
-  public func getFieldIndexOfNominal(fieldName: String) -> Int? {
-    let idx = fieldName.withBridgedStringRef {
-      SILType_getFieldIdxOfNominalType(bridged, $0)
-    }
-    return idx >= 0 ? idx : nil
-  }
 
-  public func getStructFields(in function: Function) -> StructElementArray {
-    StructElementArray(type: self, function: function)
+  public func getNominalFields(in function: Function) -> NominalFieldsArray {
+    NominalFieldsArray(type: self, function: function)
   }
   
   public var description: String { SILType_debugDescription(bridged).takeString() }
@@ -52,8 +45,27 @@ extension Type: Equatable {
   }
 }
 
+public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let type: Type
+  fileprivate let function: Function
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { SILType_getNumNominalFields(type.bridged) }
+
+  public subscript(_ index: Int) -> Type {
+    SILType_getNominalFieldType(type.bridged, index, function.bridged).type
+  }
+
+  public func getIndexOfField(withName name: String) -> Int? {
+    let idx = name.withBridgedStringRef {
+      SILType_getFieldIdxOfNominalType(type.bridged, $0)
+    }
+    return idx >= 0 ? idx : nil
+  }
+}
+
 public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
-  public let type: Type
+  fileprivate let type: Type
 
   public var startIndex: Int { return 0 }
   public var endIndex: Int { SILType_getNumTupleElements(type.bridged) }
@@ -65,16 +77,4 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
 extension BridgedType {
   var type: Type { Type(bridged: self) }
-}
-
-public struct StructElementArray : RandomAccessCollection, FormattedLikeArray {
-  public let type: Type
-  let function: Function
-
-  public var startIndex: Int { return 0 }
-  public var endIndex: Int { SILType_getNumStructFields(type.bridged) }
-
-  public subscript(_ index: Int) -> Type {
-    SILType_getStructFieldType(type.bridged, index, function.bridged).type
-  }
 }

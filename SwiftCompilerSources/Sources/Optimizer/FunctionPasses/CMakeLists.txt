@@ -11,4 +11,5 @@ swift_compiler_sources(Optimizer
   SILPrinter.swift
   MergeCondFails.swift
   ReleaseDevirtualizer.swift
+  RunUnitTests.swift
 )

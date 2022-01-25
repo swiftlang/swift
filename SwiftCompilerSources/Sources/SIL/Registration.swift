@@ -20,7 +20,7 @@ private func register<T: AnyObject>(_ cl: T.Type) {
 }
 
 public func registerSILClasses() {
-  register(Function.self)
+  Function.register()
   register(BasicBlock.self)
   register(GlobalVariable.self)
 

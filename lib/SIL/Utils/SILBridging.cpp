@@ -77,8 +77,6 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
 
   // Handle the important non Node classes.
   StringRef clName = getStringRef(className);
-  if (clName == "Function")
-    return SILFunction::registerBridgedMetatype(metatype);
   if (clName == "BasicBlock")
     return SILBasicBlock::registerBridgedMetatype(metatype);
   if (clName == "GlobalVariable")
@@ -380,6 +378,38 @@ SwiftInt SILType_isEnum(BridgedType type) {
   return castToSILType(type).getEnumOrBoundGenericEnum() ? 1 : 0;
 }
 
+SwiftInt SILType_getNumTupleElements(BridgedType type) {
+  TupleType *tupleTy = castToSILType(type).castTo<TupleType>();
+  return tupleTy->getNumElements();
+}
+
+BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx) {
+  SILType ty = castToSILType(type);
+  SILType elmtTy = ty.getTupleElementType((unsigned)elementIdx);
+  return {elmtTy.getOpaqueValue()};
+}
+
+SwiftInt SILType_getNumNominalFields(BridgedType type) {
+  SILType silType = castToSILType(type);
+  auto *nominal = silType.getNominalOrBoundGenericNominal();
+  assert(nominal && "expected nominal type");
+  return getNumFieldsInNominal(nominal);
+}
+
+BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
+                                        BridgedFunction function) {
+  SILType silType = castToSILType(type);
+  SILFunction *silFunction = castToFunction(function);
+
+  NominalTypeDecl *decl = silType.getNominalOrBoundGenericNominal();
+  VarDecl *field = getIndexedField(decl, (unsigned)index);
+
+  SILType fieldType = silType.getFieldType(
+      field, silFunction->getModule(), silFunction->getTypeExpansionContext());
+
+  return {fieldType.getOpaqueValue()};
+}
+
 SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
                                           BridgedStringRef fieldName) {
   SILType ty = castToSILType(type);
@@ -406,38 +436,6 @@ SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
     }
   }
   return -1;
-}
-
-SwiftInt SILType_getNumTupleElements(BridgedType type) {
-  TupleType *tupleTy = castToSILType(type).castTo<TupleType>();
-  return tupleTy->getNumElements();
-}
-
-BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx) {
-  SILType ty = castToSILType(type);
-  SILType elmtTy = ty.getTupleElementType((unsigned)elementIdx);
-  return {elmtTy.getOpaqueValue()};
-}
-
-SwiftInt SILType_getNumStructFields(BridgedType type) {
-  SILType silType = castToSILType(type);
-  StructDecl *decl =
-      cast<StructDecl>(silType.getNominalOrBoundGenericNominal());
-  return decl->getStoredProperties().size();
-}
-
-BridgedType SILType_getStructFieldType(BridgedType type, SwiftInt index,
-                                       BridgedFunction function) {
-  SILType silType = castToSILType(type);
-  SILFunction *silFunction = castToFunction(function);
-
-  StructDecl *decl = cast<StructDecl>(silType.getNominalOrBoundGenericNominal());
-  VarDecl *property = decl->getStoredProperties()[index];
-
-  SILType propertyType = silType.getFieldType(
-      property, silFunction->getModule(), TypeExpansionContext(*silFunction));
-
-  return {propertyType.getOpaqueValue()};
 }
 
 //===----------------------------------------------------------------------===//
