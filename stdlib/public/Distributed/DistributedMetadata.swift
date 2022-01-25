@@ -94,7 +94,7 @@ func __getReturnTypeInfo(
 /// Retrieve a generic environment descriptor associated with
 /// the given distributed target
 @available(SwiftStdlib 5.6, *)
-@_silgen_name("swift_distributed_get_generic_environment")
+@_silgen_name("swift_distributed_getGenericEnvironment")
 public // SPI _Distributed
 func _getGenericEnvironmentOfDistributedTarget(
     _ targetNameStart: UnsafePointer<UInt8>,
