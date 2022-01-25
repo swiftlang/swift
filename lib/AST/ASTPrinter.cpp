@@ -6031,7 +6031,8 @@ public:
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
-    if (T->getDecl() == nullptr) {
+    auto decl = T->getDecl();
+    if (!decl) {
       // If we have an alternate name for this type, use it.
       if (Options.AlternativeTypeNames) {
         auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
@@ -6045,6 +6046,25 @@ public:
       // canonical types to sugared types.
       if (Options.GenericSig)
         T = Options.GenericSig->getSugaredType(T);
+    }
+
+    // Print opaque types as "some ..."
+    if (decl && decl->isOpaqueType()) {
+      // If we have and should print based on the type representation, do so.
+      if (auto opaqueRepr = decl->getOpaqueTypeRepr()) {
+        if (willUseTypeReprPrinting(opaqueRepr, Type(), Options)) {
+          opaqueRepr->print(Printer, Options);
+          return;
+        }
+      }
+
+      // Print based on the type.
+      Printer << "some ";
+      if (auto inheritedType = decl->getInherited().front().getType())
+        inheritedType->print(Printer, Options);
+      else
+        Printer << "Any";
+      return;
     }
 
     const auto Name = T->getName();

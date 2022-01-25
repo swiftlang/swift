@@ -4113,7 +4113,7 @@ GenericTypeParamDecl::GenericTypeParamDecl(
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
   Bits.GenericTypeParamDecl.TypeSequence = isTypeSequence;
   Bits.GenericTypeParamDecl.IsOpaqueType = isOpaqueType;
-  assert(!isOpaqueType || !opaqueTypeRepr);
+  assert(isOpaqueType || !opaqueTypeRepr);
   if (isOpaqueType)
     *getTrailingObjects<OpaqueReturnTypeRepr *>() = opaqueTypeRepr;
 
@@ -7877,7 +7877,7 @@ GenericTypeParamDecl *OpaqueTypeDecl::getExplicitGenericParam(
   return genericParamType->getDecl();
 }
 
-unsigned OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
+Optional<unsigned> OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
     OpaqueReturnTypeRepr *repr) const {
   assert(NamingDeclAndHasOpaqueReturnTypeRepr.getInt() &&
          "can't do opaque param lookup without underlying interface repr");
@@ -7885,7 +7885,7 @@ unsigned OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
   auto found = std::find(opaqueReprs.begin(), opaqueReprs.end(), repr);
   if (found != opaqueReprs.end())
     return found - opaqueReprs.begin();
-  return -1;
+  return None;
 }
 
 Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {

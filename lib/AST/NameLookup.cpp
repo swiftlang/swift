@@ -2567,6 +2567,63 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
+/// If there are opaque parameters in the given declaration, create the
+/// generic parameters associated with them.
+static SmallVector<GenericTypeParamDecl *, 2>
+createOpaqueParameterGenericParams(
+    GenericContext *genericContext, GenericParamList *parsedGenericParams) {
+  ASTContext &ctx = genericContext->getASTContext();
+  if (!ctx.LangOpts.EnableExperimentalOpaqueParameters)
+    return { };
+
+  auto value = dyn_cast_or_null<ValueDecl>(genericContext->getAsDecl());
+  if (!value)
+    return { };
+
+  // Functions, initializers, and subscripts can contain opaque parameters.
+  ParameterList *params = nullptr;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
+    params = func->getParameters();
+  else if (auto subscript = dyn_cast<SubscriptDecl>(value))
+    params = subscript->getIndices();
+  else
+    return { };
+
+  // Look for parameters that have "some" types in them.
+  unsigned index = parsedGenericParams ? parsedGenericParams->size() : 0;
+  SmallVector<GenericTypeParamDecl *, 2> implicitGenericParams;
+  auto dc = value->getInnermostDeclContext();
+  for (auto param : *params) {
+    // Don't permit variadic or inout parameters.
+    if (param->isVariadic() || param->isInOut())
+      continue;
+
+    auto typeRepr = param->getTypeRepr();
+    if (!typeRepr)
+      continue;
+
+    // FIXME: Do we want to allow any structure here? Optionals?
+    auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(typeRepr);
+    if (!opaqueRepr)
+      continue;
+
+    // Allocate a new generic parameter to represent this opaque type.
+    auto gp = GenericTypeParamDecl::create(
+        dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
+        GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
+        opaqueRepr);
+    gp->setImplicit();
+
+    // Use the underlying constraint as the constraint on the generic parameter.
+    InheritedEntry inherited[1] = { { TypeLoc(opaqueRepr->getConstraint()) } };
+    gp->setInherited(ctx.AllocateCopy(inherited));
+
+    implicitGenericParams.push_back(gp);
+  }
+
+  return implicitGenericParams;
+}
+
 GenericParamList *
 GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
   if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
@@ -2619,7 +2676,35 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     return result;
   }
 
-  return value->getParsedGenericParams();
+  auto parsedGenericParams = value->getParsedGenericParams();
+
+  // Create implicit generic parameters due to opaque parameters, if we need
+  // them.
+  auto implicitGenericParams =
+      createOpaqueParameterGenericParams(value, parsedGenericParams);
+  if (implicitGenericParams.empty())
+    return parsedGenericParams;
+
+  // If there were no parsed generic parameters, create a fully-implicit
+  // generic parameter list.
+  ASTContext &ctx = value->getASTContext();
+  if (!parsedGenericParams) {
+    return GenericParamList::create(
+        ctx, SourceLoc(), implicitGenericParams, SourceLoc());
+  }
+
+  // Combine the existing generic parameters with the implicit ones.
+  SmallVector<GenericTypeParamDecl *, 4> allGenericParams;
+  allGenericParams.reserve(
+      parsedGenericParams->size() + implicitGenericParams.size());
+  allGenericParams.append(parsedGenericParams->begin(),
+                          parsedGenericParams->end());
+  allGenericParams.append(implicitGenericParams);
+  return GenericParamList::create(
+      ctx, parsedGenericParams->getLAngleLoc(), allGenericParams,
+      parsedGenericParams->getWhereLoc(),
+      parsedGenericParams->getRequirements(),
+      parsedGenericParams->getRAngleLoc());
 }
 
 NominalTypeDecl *
