@@ -169,7 +169,7 @@ public:
 /// The current state of a task's status records.
 class alignas(sizeof(void*) * 2) ActiveTaskStatus {
   enum : uintptr_t {
-    /// The current running priority of the task.
+    /// The max priority of the task. This is always >= basePriority in the task
     PriorityMask = 0xFF,
 
     /// Has the task been cancelled?
@@ -206,8 +206,8 @@ public:
   ActiveTaskStatus() = default;
 #endif
 
-  constexpr ActiveTaskStatus(JobFlags flags)
-    : Record(nullptr), Flags(uintptr_t(flags.getPriority())) {}
+  constexpr ActiveTaskStatus(JobPriority priority)
+      : Record(nullptr), Flags(uintptr_t(priority)) {}
 
   /// Is the task currently cancelled?
   bool isCancelled() const { return Flags & IsCancelled; }
@@ -317,12 +317,23 @@ struct AsyncTask::PrivateStorage {
   /// The top 32 bits of the task ID. The bottom 32 bits are in Job::Id.
   uint32_t Id;
 
-  PrivateStorage(JobFlags flags)
-      : Status(ActiveTaskStatus(flags)), Local(TaskLocal::Storage()) {}
+  /// Base priority of Task - set only at creation time of task.
+  /// Current max priority of task is ActiveTaskStatus.
+  ///
+  /// TODO (rokhinip): Only 8 bits of the full size_t are used. Change this into
+  /// flagset thing so that remaining bits are available for other non-changing
+  /// task status stuff
+  JobPriority BasePriority;
 
-  PrivateStorage(JobFlags flags, void *slab, size_t slabCapacity)
-      : Status(ActiveTaskStatus(flags)), Allocator(slab, slabCapacity),
-        Local(TaskLocal::Storage()) {}
+  // Always create an async task with max priority in ActiveTaskStatus = base
+  // priority. It will be updated later if needed.
+  PrivateStorage(JobPriority basePri)
+      : Status(ActiveTaskStatus(basePri)), Local(TaskLocal::Storage()),
+        BasePriority(basePri) {}
+
+  PrivateStorage(JobPriority basePri, void *slab, size_t slabCapacity)
+      : Status(ActiveTaskStatus(basePri)), Allocator(slab, slabCapacity),
+        Local(TaskLocal::Storage()), BasePriority(basePri) {}
 
   void complete(AsyncTask *task) {
     // Destroy and deallocate any remaining task local items.
@@ -347,14 +358,12 @@ inline const AsyncTask::PrivateStorage &
 AsyncTask::OpaquePrivateStorage::get() const {
   return reinterpret_cast<const PrivateStorage &>(*this);
 }
-inline void AsyncTask::OpaquePrivateStorage::initialize(AsyncTask *task) {
-  new (this) PrivateStorage(task->Flags);
+inline void AsyncTask::OpaquePrivateStorage::initialize(JobPriority basePri) {
+  new (this) PrivateStorage(basePri);
 }
-inline void
-AsyncTask::OpaquePrivateStorage::initializeWithSlab(AsyncTask *task,
-                                                    void *slab,
-                                                    size_t slabCapacity) {
-  new (this) PrivateStorage(task->Flags, slab, slabCapacity);
+inline void AsyncTask::OpaquePrivateStorage::initializeWithSlab(
+    JobPriority basePri, void *slab, size_t slabCapacity) {
+  new (this) PrivateStorage(basePri, slab, slabCapacity);
 }
 inline void AsyncTask::OpaquePrivateStorage::complete(AsyncTask *task) {
   get().complete(task);
