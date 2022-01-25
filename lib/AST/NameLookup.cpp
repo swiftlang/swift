@@ -2603,9 +2603,10 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // The generic parameter 'Self'.
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
-    auto selfDecl = new (ctx)
-        GenericTypeParamDecl(proto, selfId, SourceLoc(),
-                             /*type sequence=*/false, /*depth=*/0, /*index=*/0);
+    auto selfDecl = GenericTypeParamDecl::create(
+        proto, selfId, SourceLoc(), /*type sequence=*/false,
+        /*depth=*/0, /*index=*/0, /*opaque type=*/false,
+        /*opaque type repr=*/nullptr);
     auto protoType = proto->getDeclaredInterfaceType();
     InheritedEntry selfInherited[1] = {
       InheritedEntry(TypeLoc::withoutLoc(protoType)) };
