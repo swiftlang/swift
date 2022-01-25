@@ -35,9 +35,11 @@ cd $SWIFT_PATH
 ./utils/update-checkout --clone --scheme wasm --skip-repository swift
 
 # Install wasmer
-
-if [ ! -e ~/.wasmer/bin/wasmer ]; then
-  curl https://get.wasmer.io -sSfL | sh
+# FIXME: Wasmer doesn't support linux-aarch64, consider using a different WASI-compatible runtime.
+if [ "$(uname -m)" != "aarch64" ]; then
+  if [ ! -e ~/.wasmer/bin/wasmer ]; then
+    curl https://get.wasmer.io -sSfL | sh
+  fi
 fi
 
 cd $SOURCE_PATH
@@ -56,7 +58,7 @@ cmake --version
 
 if [ -z $(which sccache) ]; then
   sudo mkdir /opt/sccache && cd /opt/sccache
-  wget -O - "https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz" | \
+  wget -O - "https://github.com/mozilla/sccache/releases/download/0.2.14/sccache-0.2.14-$(uname -m)-unknown-linux-musl.tar.gz" | \
     sudo tar xz --strip-components 1
   sudo ln -sf /opt/sccache/sccache /usr/local/bin
 fi
