@@ -323,6 +323,18 @@ void CodeCompletionString::dump() const {
   }
 }
 
+ContextFreeCodeCompletionResult *
+ContextFreeCodeCompletionResult::withResultType(
+    const CodeCompletionResultType &NewResultType,
+    CodeCompletionResultSink &Sink) const {
+  return new (*Sink.Allocator) ContextFreeCodeCompletionResult(
+      getKind(), getOpaqueAssociatedKind(),
+      isOperator() ? getKnownOperatorKind() : CodeCompletionOperatorKind::None,
+      isSystem(), getCompletionString(), getModuleName(), getBriefDocComment(),
+      getAssociatedUSRs(), NewResultType, getNotRecommendedReason(),
+      getDiagnosticSeverity(), getDiagnosticMessage());
+}
+
 CodeCompletionDeclKind
 ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   switch (D->getKind()) {
@@ -1148,12 +1160,10 @@ CodeCompletionResult::CodeCompletionResult(
     const DeclContext *DC, ContextualNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
     StringRef DiagnosticMessage)
-    : ContextFree(ContextFree), SemanticContext(SemanticContext),
-      Flair(Flair.toRaw()), NotRecommended(NotRecommended),
-      DiagnosticSeverity(DiagnosticSeverity),
-      DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
-      TypeDistance(
-          ContextFree.getResultType().calculateTypeRelation(TypeContext, DC)) {}
+    : CodeCompletionResult(
+          ContextFree, SemanticContext, Flair, NumBytesToErase,
+          ContextFree.getResultType().calculateTypeRelation(TypeContext, DC),
+          NotRecommended, DiagnosticSeverity, DiagnosticMessage) {}
 
 CodeCompletionOperatorKind
 ContextFreeCodeCompletionResult::getCodeCompletionOperatorKind(
@@ -2060,6 +2070,10 @@ public:
 
   void setIdealExpectedType(Type Ty) {
     expectedTypeContext.idealType = Ty;
+  }
+
+  const ExpectedTypeContext &getExpectedTypeContext() const {
+    return expectedTypeContext;
   }
 
   CodeCompletionContext::TypeContextKind typeContextKind() const {
@@ -6627,7 +6641,8 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                      CompletionContext.CodeCompletionKind, DC,
                      /*Sink=*/nullptr);
 
-  Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
+  Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
+                                   Lookup.getExpectedTypeContext(), DC);
 }
 
 void deliverUnresolvedMemberResults(
@@ -7377,10 +7392,10 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
   Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
 
-static MutableArrayRef<CodeCompletionResult *>
-copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
-                          CodeCompletionCache::Value &source, bool onlyTypes,
-                          bool onlyPrecedenceGroups) {
+static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
+    CodeCompletionResultSink &targetSink, CodeCompletionCache::Value &source,
+    bool onlyTypes, bool onlyPrecedenceGroups,
+    const ExpectedTypeContext &TypeContext, DeclContext *DC) {
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
@@ -7434,14 +7449,21 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       return true;
     };
   }
+  // Precompute the USR type context so we don't have to recompute it for every
+  // result.
+  USRBasedTypeContext USRTypeContext(TypeContext, DC, source.USRTypeArena);
+
   for (auto contextFreeResult : source.Results) {
     if (!shouldIncludeResult(contextFreeResult)) {
       continue;
     }
+    auto typeRelation =
+        contextFreeResult->getResultType().calculateTypeRelation(
+            TypeContext, DC, &USRTypeContext);
     auto contextualResult = new (*targetSink.Allocator) CodeCompletionResult(
         *contextFreeResult, SemanticContextKind::OtherModule,
         CodeCompletionFlair(),
-        /*numBytesToErase=*/0, CodeCompletionResultTypeRelation::Unknown,
+        /*numBytesToErase=*/0, typeRelation,
         ContextualNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     targetSink.Results.push_back(contextualResult);
@@ -7454,7 +7476,7 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
 void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     CodeCompletionContext &context,
     ArrayRef<RequestedCachedModule> requestedModules,
-    DeclContext *DC) {
+    const ExpectedTypeContext &TypeContext, DeclContext *DC) {
 
   // Use the current SourceFile as the DeclContext so that we can use it to
   // perform qualified lookup, and to get the correct visibility for
@@ -7488,13 +7510,24 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       // properities) and simply store pointers to the context free results that
       // back the contextual results.
       for (auto Result : Sink.Results) {
-        CachedResults.push_back(Result->getContextFreeResultPtr());
+        // Make sure the CodeCompletionResultType of the result is USR-based so
+        // it can outlive the ASTContext it was created in.
+        CodeCompletionResultType USRBasedResultType(
+            Result->getContextFreeResult()
+                .getResultType()
+                .getUSRBasedResultTypes((*V)->USRTypeArena),
+            (*V)->USRTypeArena);
+        ContextFreeCodeCompletionResult *USRBasedResult =
+            Result->getContextFreeResult().withResultType(USRBasedResultType,
+                                                          Sink);
+        CachedResults.push_back(USRBasedResult);
       }
       context.Cache.set(R.Key, *V);
     }
     assert(V.hasValue());
-    auto newItems = copyCodeCompletionResults(
-        context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups);
+    auto newItems =
+        copyCodeCompletionResults(context.getResultSink(), **V, R.OnlyTypes,
+                                  R.OnlyPrecedenceGroups, TypeContext, DC);
     postProcessResults(newItems, context.CodeCompletionKind, DC,
                        &context.getResultSink());
   }

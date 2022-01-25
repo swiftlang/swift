@@ -850,6 +850,14 @@ public:
     assert(AssociatedDecl && "should have a decl");
   }
 
+  /// Copy this result to \p Sink with \p NewResultType . Note that this does
+  /// NOT copy the context free result. Thus the caller needs to ensure that the
+  /// context free result outlives the result returned by this
+  /// method.
+  ContextFreeCodeCompletionResult *
+  withResultType(const CodeCompletionResultType &NewResultType,
+                 CodeCompletionResultSink &Sink) const;
+
   CodeCompletionResultKind getKind() const { return Kind; }
 
   /// Returns the raw associated kind which will be interpreted differently
@@ -1281,6 +1289,7 @@ public:
   virtual void
   handleResultsAndModules(CodeCompletionContext &context,
                           ArrayRef<RequestedCachedModule> requestedModules,
+                          const ExpectedTypeContext &TypeContext,
                           DeclContext *DC) = 0;
 };
 
@@ -1292,6 +1301,7 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
   // Implement the CodeCompletionConsumer interface.
   void handleResultsAndModules(CodeCompletionContext &context,
                                ArrayRef<RequestedCachedModule> requestedModules,
+                               const ExpectedTypeContext &TypeContext,
                                DeclContext *DCForModules) override;
 
   /// Clients should override this method to receive \p Results.
