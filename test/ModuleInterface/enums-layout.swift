@@ -42,6 +42,16 @@ func testFrozenObjCEnum() -> FrozenObjCEnum {
   return .b
 } // CHECK-NEXT: {{^}$}}
 
+// CHECK-LABEL: define{{.+}}testFutureproofUnicodeScalarEnum
+func testFutureproofUnicodeScalarEnum() -> FutureproofUnicodeScalarEnum {
+  // CHECK: [[CASE:%.+]] = load i32, i32* @"$s3Lib28FutureproofUnicodeScalarEnumO1ayA2CmFWC"
+  // CHECK: [[METADATA_RESPONSE:%.+]] = tail call swiftcc %swift.metadata_response @"$s3Lib28FutureproofUnicodeScalarEnumOMa"
+  // CHECK: [[METADATA:%.+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
+  // CHECK: call void {{%.+}}(%swift.opaque* noalias %0, i32 [[CASE]], %swift.type* [[METADATA]])
+  // CHECK-NEXT: ret void
+  return .a
+}
+
 // CHECK-LABEL: define{{.+}}testFutureproofIndirectEnum
 func testFutureproofIndirectEnum() -> FutureproofIndirectEnum {
   // CHECK: [[CASE:%.+]] = load i32, i32* @"$s3Lib23FutureproofIndirectEnumO1cyA2CmFWC"
