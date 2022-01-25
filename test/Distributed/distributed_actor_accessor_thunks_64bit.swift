@@ -358,9 +358,8 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[TYPED_ARG_1:%.*]] = inttoptr i64 [[ALIGNED_ELT_PTR]] to %swift.opaque*
 // CHECK-NEXT: [[ARR_ARG_1:%.*]] = bitcast %swift.opaque* [[TYPED_ARG_1]] to %TSa*
 // CHECK-NEXT: %._buffer = getelementptr inbounds %TSa, %TSa* [[ARR_ARG_1]], i32 0, i32 0
-// CHECK-NEXT: %._buffer._storage = getelementptr inbounds %Ts12_ArrayBufferV, %Ts12_ArrayBufferV* %._buffer, i32 0, i32 0
-// CHECK-NEXT: %._buffer._storage.rawValue = getelementptr inbounds %Ts14_BridgeStorageV, %Ts14_BridgeStorageV* %._buffer._storage, i32 0, i32 0
-// CHECK-NEXT: [[TYPED_ARG_1:%.*]] = load %swift.bridge*, %swift.bridge** %._buffer._storage.rawValue
+// CHECK-NEXT: %._buffer._storage = getelementptr inbounds [[ARRAY_TYPE:%.*]], [[ARRAY_TYPE]]* %._buffer, i32 0, i32 0
+// CHECK: [[TYPED_ARG_1:%.*]] = load [[ARG_STORAGE_TYPE:%.*]], [[ARG_STORAGE_TYPE]]* %._buffer._storage
 
 /// ---> Load generic argument substitutions from the caller-provided buffer
 
@@ -387,7 +386,7 @@ public distributed actor MyOtherActor {
 
 /// ---> Check that distributed thunk code is formed correctly
 
-// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, %swift.context* {{.*}}, %swift.opaque* [[TYPED_ARG_0]], %swift.bridge* [[TYPED_ARG_1]], %swift.type* [[SUB_T]], %swift.type* [[SUB_U]], i8** [[T_ENCODABLE]], i8** [[T_DECODABLE]], i8** [[U_ENCODABLE]], i8** [[U_DECODABLE]], %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
+// CHECK-MACHO: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, %swift.context* {{.*}}, %swift.opaque* [[TYPED_ARG_0]], %swift.bridge* [[TYPED_ARG_1]], %swift.type* [[SUB_T]], %swift.type* [[SUB_U]], i8** [[T_ENCODABLE]], i8** [[T_DECODABLE]], i8** [[U_ENCODABLE]], i8** [[U_DECODABLE]], %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
 
 /// ---> Thunk and distributed method for `MyOtherActor.empty`
 
