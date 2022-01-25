@@ -204,7 +204,7 @@ private extension StructExtractInst {
     let structType = operand.type
 
     var nonTrivialFieldsCount = 0
-    for field in structType.getStructFields(in: function) {
+    for field in structType.getNominalFields(in: function) {
       if field.isTrivial(in: function) {
         nonTrivialFieldsCount += 1
       }
