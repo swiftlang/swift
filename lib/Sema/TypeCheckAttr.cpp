@@ -239,6 +239,7 @@ public:
   void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
   void visitInlinableAttr(InlinableAttr *attr);
   void visitOptimizeAttr(OptimizeAttr *attr);
+  void visitExclusivityAttr(ExclusivityAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
@@ -2469,6 +2470,27 @@ void AttributeChecker::visitOptimizeAttr(OptimizeAttr *attr) {
       return;
     }
   }
+}
+
+void AttributeChecker::visitExclusivityAttr(ExclusivityAttr *attr) {
+  if (auto *varDecl = dyn_cast<VarDecl>(D)) {
+    if (!varDecl->hasStorage()) {
+      diagnose(attr->getLocation(), diag::exclusivity_on_computed_property);
+      attr->setInvalid();
+      return;
+    }
+  
+    if (isa<ClassDecl>(varDecl->getDeclContext()))
+      return;
+    
+    if (varDecl->getDeclContext()->isTypeContext() && !varDecl->isInstanceMember())
+      return;
+    
+    if (varDecl->getDeclContext()->isModuleScopeContext())
+      return;
+  }
+  diagnose(attr->getLocation(), diag::exclusivity_on_wrong_decl);
+  attr->setInvalid();
 }
 
 void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {

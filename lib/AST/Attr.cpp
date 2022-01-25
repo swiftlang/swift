@@ -883,6 +883,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
+  case DAK_Exclusivity:
   case DAK_NonSendable:
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
@@ -1285,6 +1286,16 @@ StringRef DeclAttribute::getAttrName() const {
       return "_optimize(speed)";
     case OptimizationMode::ForSize:
       return "_optimize(size)";
+    default:
+      llvm_unreachable("Invalid optimization kind");
+    }
+  }
+  case DAK_Exclusivity: {
+    switch (cast<ExclusivityAttr>(this)->getMode()) {
+    case ExclusivityAttr::Checked:
+      return "exclusivity(checked)";
+    case ExclusivityAttr::Unchecked:
+      return "exclusivity(unchecked)";
     default:
       llvm_unreachable("Invalid optimization kind");
     }
