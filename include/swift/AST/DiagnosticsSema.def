@@ -2781,6 +2781,8 @@ ERROR(inheritance_from_class_with_missing_vtable_entries,none,
       "cannot inherit from class %0 because it has overridable members that "
       "could not be loaded",
       (Identifier))
+NOTE(inheritance_from_class_with_missing_vtable_entry, none,
+     "could not deserialize %0", (DeclName))
 ERROR(inheritance_from_class_with_missing_vtable_entries_versioned,none,
       "cannot inherit from class %0 (compiled with Swift %1) because it has "
       "overridable members that could not be loaded in Swift %2",
