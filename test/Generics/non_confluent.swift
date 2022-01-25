@@ -34,3 +34,14 @@ func foo<T : P1 & P2>(_: T) {}
 
 extension P1 where Self : P2 {}
 // expected-error@-1 {{cannot build rewrite system for generic signature; depth limit exceeded}}
+
+struct S<U : P1> : P1 {
+  typealias T = S<S<U>>
+}
+
+protocol P3 {
+// expected-error@-1 {{cannot build rewrite system for protocol; depth limit exceeded}}
+  associatedtype T : P1 where T == S<U>
+// expected-error@-1 {{type 'Self.U' does not conform to protocol 'P1'}}
+  associatedtype U : P1
+}

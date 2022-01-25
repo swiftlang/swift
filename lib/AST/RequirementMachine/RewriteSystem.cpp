@@ -152,7 +152,7 @@ void Rule::dump(llvm::raw_ostream &out) const {
   if (Redundant)
     out << " [redundant]";
   if (Conflicting)
-    out << "[conflicting]";
+    out << " [conflicting]";
 }
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
@@ -607,6 +607,7 @@ void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
 bool RewriteSystem::isInMinimizationDomain(
     ArrayRef<const ProtocolDecl *> protos) const {
   assert(protos.size() <= 1);
+  assert(Protos.empty() || !protos.empty());
 
   if (protos.empty() && Protos.empty())
     return true;
