@@ -94,7 +94,7 @@ A parsed representation of code used by a compiler.
 
 Serialized LLVM [IR](#IR).
 
-## build czar
+## build wrangler
 
 Apple term for "the person assigned to watch CI this week".
 
