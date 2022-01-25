@@ -627,7 +627,7 @@ public:
     return findReferenceRoot(getReference());
   }
 
-  /// Return the global variable being accessed.
+  /// Return the global variable being accessed. Always valid.
   ///
   /// Precondition: getKind() == Global
   SILGlobalVariable *getGlobal() const;

@@ -955,17 +955,10 @@ AccessStorage::AccessStorage(SILValue base, Kind kind)
   }
   if (getKind() == AccessBase::Global) {
     global = getReferencedGlobal(cast<SingleValueInstruction>(base));
-    // Require a decl for all formally accessed globals defined in this
-    // module. AccessEnforcementWMO requires this. Swift globals defined in
-    // another module either use an addressor, which has Unidentified
-    // storage. Imported non-Swift globals are accessed via global_addr but have
-    // no declaration.
-    assert(global->getDecl() || isa<GlobalAddrInst>(base));
-
     // It's unclear whether a global will ever be missing it's varDecl, but
     // technically we only preserve it for debug info. So if we don't have a
-    // decl, check the flag on SILGlobalVariable, which is guaranteed valid,
-    setLetAccess(getGlobal()->isLet());
+    // decl, check the flag on SILGlobalVariable, which is guaranteed valid.
+    setLetAccess(global->isLet());
     return;
   }
   value = base;
@@ -1001,7 +994,7 @@ const ValueDecl *AccessStorage::getDecl() const {
     return nullptr;
   case Class: {
     // The property index is relative to the VarDecl in ref_element_addr, and
-    // can only be reliably determined when the base is avaiable. Without the
+    // can only be reliably determined when the base is available. Without the
     // base, we can only make a best effort to extract it from the object type,
     // which might not even be a class in the case of bridge objects.
     if (ClassDecl *classDecl =
