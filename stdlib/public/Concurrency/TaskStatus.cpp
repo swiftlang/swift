@@ -411,7 +411,8 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
   // Propagate max priority of parent to child task's active status and the Job
   // header
   JobPriority pri = parentStatus.getStoredPriority();
-  newChildTaskStatus = newChildTaskStatus.withNewPriority(pri);
+  newChildTaskStatus =
+      newChildTaskStatus.withNewPriority(withUserInteractivePriorityDowngrade(pri));
   child->Flags.setPriority(pri);
 
   child->_private().Status.store(newChildTaskStatus, std::memory_order_relaxed);

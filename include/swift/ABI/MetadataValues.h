@@ -2014,12 +2014,12 @@ enum class JobKind : size_t {
 enum class JobPriority : size_t {
   // This is modelled off of Dispatch.QoS, and the values are directly
   // stolen from there.
-  UserInteractive = 0x21,
-  UserInitiated   = 0x19,
-  Default         = 0x15,
-  Utility         = 0x11,
-  Background      = 0x09,
-  Unspecified     = 0x00,
+  UserInteractive = 0x21, /* UI */
+  UserInitiated   = 0x19, /* IN */
+  Default         = 0x15, /* DEF */
+  Utility         = 0x11, /* UT */
+  Background      = 0x09, /* BG */
+  Unspecified     = 0x00, /* UN */
 };
 
 /// A tri-valued comparator which orders higher priorities first.
@@ -2028,12 +2028,18 @@ inline int descendingPriorityOrder(JobPriority lhs,
   return (lhs == rhs ? 0 : lhs > rhs ? -1 : 1);
 }
 
+inline JobPriority withUserInteractivePriorityDowngrade(JobPriority priority) {
+  return (priority == JobPriority::UserInteractive) ? JobPriority::UserInitiated
+                                                    : priority;
+}
+
 /// Flags for task creation.
 class TaskCreateFlags : public FlagSet<size_t> {
 public:
   enum {
-    Priority       = 0,
-    Priority_width = 8,
+    // Priority that user specified while creating the task
+    RequestedPriority = 0,
+    RequestedPriority_width = 8,
 
     Task_IsChildTask                              = 8,
     // bit 9 is unused
@@ -2046,8 +2052,9 @@ public:
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
   constexpr TaskCreateFlags() {}
 
-  FLAGSET_DEFINE_FIELD_ACCESSORS(Priority, Priority_width, JobPriority,
-                                 getPriority, setPriority)
+  FLAGSET_DEFINE_FIELD_ACCESSORS(RequestedPriority, RequestedPriority_width,
+                                 JobPriority, getRequestedPriority,
+                                 setRequestedPriority)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChildTask,
                                 isChildTask,
                                 setIsChildTask)
