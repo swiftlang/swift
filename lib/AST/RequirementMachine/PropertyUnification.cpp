@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "PropertyMap.h"
+#include "RequirementLowering.h"
 
 using namespace swift;
 using namespace rewriting;
@@ -56,7 +57,6 @@ static void recordRelation(Term key,
                            unsigned lhsRuleID,
                            Symbol rhsProperty,
                            RewriteSystem &system,
-                           SmallVectorImpl<InducedRule> &inducedRules,
                            bool debug) {
   const auto &lhsRule = system.getRule(lhsRuleID);
   auto lhsProperty = lhsRule.getLHS().back();
@@ -68,7 +68,9 @@ static void recordRelation(Term key,
          (lhsProperty.getKind() == Symbol::Kind::Superclass &&
           rhsProperty.getKind() == Symbol::Kind::Layout) ||
          (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
-          rhsProperty.getKind() == Symbol::Kind::Superclass));
+          rhsProperty.getKind() == Symbol::Kind::Superclass) ||
+         (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
+          rhsProperty.getKind() == Symbol::Kind::Layout));
 
   if (debug) {
     llvm::dbgs() << "%% Recording relation: ";
@@ -107,7 +109,7 @@ static void recordRelation(Term key,
 
   MutableTerm rhs(key);
 
-  inducedRules.emplace_back(lhs, rhs, path);
+  (void) system.addRule(lhs, rhs, &path);
 }
 
 static void recordConflict(Term key,
@@ -132,51 +134,6 @@ static void recordConflict(Term key,
   newRule.markConflicting();
 }
 
-/// This method takes a concrete type that was derived from a concrete type
-/// produced by RewriteSystemBuilder::getConcreteSubstitutionSchema(),
-/// either by extracting a structural sub-component or performing a (Swift AST)
-/// substitution using subst(). It returns a new concrete substitution schema
-/// and a new list of substitution terms.
-///
-/// For example, suppose we start with the concrete type
-///
-///   Dictionary<τ_0_0, Array<τ_0_1>> with substitutions {X.Y, Z}
-///
-/// We can extract out the structural sub-component Array<τ_0_1>. If we wish
-/// to build a new concrete substitution schema, we call this method with
-/// Array<τ_0_1> and the original substitutions {X.Y, Z}. This will produce
-/// the new schema Array<τ_0_0> with substitutions {Z}.
-///
-/// As another example, consider we start with the schema Bar<τ_0_0> with
-/// original substitutions {X.Y}, and perform a Swift AST subst() to get
-/// Foo<τ_0_0.A.B>. We can then call this method with Foo<τ_0_0.A.B> and
-/// the original substitutions {X.Y} to produce the new schema Foo<τ_0_0>
-/// with substitutions {X.Y.A.B}.
-static CanType
-remapConcreteSubstitutionSchema(CanType concreteType,
-                                ArrayRef<Term> substitutions,
-                                RewriteContext &ctx,
-                                SmallVectorImpl<Term> &result) {
-  assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
-
-  if (!concreteType->hasTypeParameter())
-    return concreteType;
-
-  return CanType(concreteType.transformRec([&](Type t) -> Optional<Type> {
-    if (!t->isTypeParameter())
-      return None;
-
-    auto term = ctx.getRelativeTermForType(CanType(t), substitutions);
-
-    unsigned newIndex = result.size();
-    result.push_back(Term::get(term, ctx));
-
-    return CanGenericTypeParamType::get(/*type sequence=*/ false,
-                                        /*depth=*/ 0, newIndex,
-                                        ctx.getASTContext());
-  }));
-}
-
 namespace {
   /// Utility class used by unifyConcreteTypes() and unifySuperclasses()
   /// to walk two concrete types in parallel. Any time there is a mismatch,
@@ -185,18 +142,18 @@ namespace {
     ArrayRef<Term> lhsSubstitutions;
     ArrayRef<Term> rhsSubstitutions;
     RewriteContext &ctx;
-    SmallVectorImpl<InducedRule> &inducedRules;
+    RewriteSystem &system;
     bool debug;
 
   public:
     ConcreteTypeMatcher(ArrayRef<Term> lhsSubstitutions,
                         ArrayRef<Term> rhsSubstitutions,
-                        RewriteContext &ctx,
-                        SmallVectorImpl<InducedRule> &inducedRules,
+                        RewriteSystem &system,
                         bool debug)
         : lhsSubstitutions(lhsSubstitutions),
           rhsSubstitutions(rhsSubstitutions),
-          ctx(ctx), inducedRules(inducedRules), debug(debug) {}
+          ctx(system.getRewriteContext()), system(system),
+          debug(debug) {}
 
     bool alwaysMismatchTypeParameters() const { return true; }
 
@@ -216,7 +173,9 @@ namespace {
             llvm::dbgs() << "%% Induced rule " << lhsTerm
                          << " == " << rhsTerm << "\n";
           }
-          inducedRules.emplace_back(lhsTerm, rhsTerm);
+
+          // FIXME: Need a rewrite path here.
+          (void) system.addRule(lhsTerm, rhsTerm);
         }
         return true;
       }
@@ -228,9 +187,8 @@ namespace {
                                                       lhsSubstitutions);
 
         SmallVector<Term, 3> result;
-        auto concreteType = remapConcreteSubstitutionSchema(CanType(secondType),
-                                                            rhsSubstitutions,
-                                                            ctx, result);
+        auto concreteType = ctx.getRelativeSubstitutionSchemaFromType(
+            CanType(secondType), rhsSubstitutions, result);
 
         MutableTerm constraintTerm(subjectTerm);
         constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
@@ -239,7 +197,9 @@ namespace {
           llvm::dbgs() << "%% Induced rule " << subjectTerm
                        << " == " << constraintTerm << "\n";
         }
-        inducedRules.emplace_back(subjectTerm, constraintTerm);
+
+        // FIXME: Need a rewrite path here.
+        (void) system.addRule(subjectTerm, constraintTerm);
         return true;
       }
 
@@ -250,9 +210,8 @@ namespace {
                                                       rhsSubstitutions);
 
         SmallVector<Term, 3> result;
-        auto concreteType = remapConcreteSubstitutionSchema(CanType(firstType),
-                                                            lhsSubstitutions,
-                                                            ctx, result);
+        auto concreteType = ctx.getRelativeSubstitutionSchemaFromType(
+            CanType(firstType), lhsSubstitutions, result);
 
         MutableTerm constraintTerm(subjectTerm);
         constraintTerm.add(Symbol::forConcreteType(concreteType, result, ctx));
@@ -261,7 +220,9 @@ namespace {
           llvm::dbgs() << "%% Induced rule " << subjectTerm
                        << " == " << constraintTerm << "\n";
         }
-        inducedRules.emplace_back(subjectTerm, constraintTerm);
+
+        // FIXME: Need a rewrite path here.
+        (void) system.addRule(subjectTerm, constraintTerm);
         return true;
       }
 
@@ -298,8 +259,7 @@ namespace {
 ///
 /// Returns true if a conflict was detected.
 static bool unifyConcreteTypes(
-    Symbol lhs, Symbol rhs, RewriteContext &ctx,
-    SmallVectorImpl<InducedRule> &inducedRules,
+    Symbol lhs, Symbol rhs, RewriteSystem &system,
     bool debug) {
   auto lhsType = lhs.getConcreteType();
   auto rhsType = rhs.getConcreteType();
@@ -310,7 +270,7 @@ static bool unifyConcreteTypes(
 
   ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
                               rhs.getSubstitutions(),
-                              ctx, inducedRules, debug);
+                              system, debug);
   if (!matcher.match(lhsType, rhsType)) {
     // FIXME: Diagnose the conflict
     if (debug) {
@@ -346,8 +306,7 @@ static bool unifyConcreteTypes(
 /// Returns the most derived superclass, which becomes the new superclass
 /// that gets recorded in the property map.
 static std::pair<Symbol, bool> unifySuperclasses(
-    Symbol lhs, Symbol rhs, RewriteContext &ctx,
-    SmallVectorImpl<InducedRule> &inducedRules,
+    Symbol lhs, Symbol rhs, RewriteSystem &system,
     bool debug) {
   if (debug) {
     llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
@@ -390,7 +349,7 @@ static std::pair<Symbol, bool> unifySuperclasses(
   // Unify type contructor arguments.
   ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
                               rhs.getSubstitutions(),
-                              ctx, inducedRules, debug);
+                              system, debug);
   if (!matcher.match(lhsType, rhsType)) {
     if (debug) {
       llvm::dbgs() << "%% Superclass conflict\n";
@@ -405,8 +364,7 @@ static std::pair<Symbol, bool> unifySuperclasses(
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
 void PropertyMap::addProperty(
-    Term key, Symbol property, unsigned ruleID,
-    SmallVectorImpl<InducedRule> &inducedRules) {
+    Term key, Symbol property, unsigned ruleID) {
   assert(property.isProperty());
   assert(*System.getRule(ruleID).isPropertyRule() == property);
   auto *props = getOrCreateProperties(key);
@@ -440,8 +398,7 @@ void PropertyMap::addProperty(
       // the new layout requirement is redundant.
       if (mergedLayout == props->Layout) {
         if (checkRulePairOnce(*props->LayoutRule, ruleID)) {
-          recordRelation(key, *props->LayoutRule, property, System,
-                         inducedRules, debug);
+          recordRelation(key, *props->LayoutRule, property, System, debug);
         }
 
       // If the intersection is equal to the new layout requirement, the
@@ -449,8 +406,7 @@ void PropertyMap::addProperty(
       } else if (mergedLayout == newLayout) {
         if (checkRulePairOnce(ruleID, *props->LayoutRule)) {
           auto oldProperty = System.getRule(*props->LayoutRule).getLHS().back();
-          recordRelation(key, ruleID, oldProperty, System,
-                         inducedRules, debug);
+          recordRelation(key, ruleID, oldProperty, System, debug);
         }
 
         props->LayoutRule = ruleID;
@@ -476,8 +432,7 @@ void PropertyMap::addProperty(
             Context.getASTContext());
       auto layoutSymbol = Symbol::forLayout(layout, Context);
 
-      recordRelation(key, ruleID, layoutSymbol, System,
-                     inducedRules, debug);
+      recordRelation(key, ruleID, layoutSymbol, System, debug);
     }
 
     if (!props->Superclass) {
@@ -486,8 +441,7 @@ void PropertyMap::addProperty(
     } else {
       assert(props->SuperclassRule.hasValue());
       auto pair = unifySuperclasses(*props->Superclass, property,
-                                    System.getRewriteContext(),
-                                    inducedRules, debug);
+                                    System, debug);
       props->Superclass = pair.first;
       bool conflict = pair.second;
       if (conflict) {
@@ -506,8 +460,7 @@ void PropertyMap::addProperty(
     } else {
       assert(props->ConcreteTypeRule.hasValue());
       bool conflict = unifyConcreteTypes(*props->ConcreteType, property,
-                                         System.getRewriteContext(),
-                                         inducedRules, debug);
+                                         System, debug);
       if (conflict) {
         recordConflict(key, *props->ConcreteTypeRule, ruleID, System);
         return;
@@ -530,12 +483,11 @@ void PropertyMap::addProperty(
   llvm_unreachable("Bad symbol kind");
 }
 
-void PropertyMap::checkConcreteTypeRequirements(
-    SmallVectorImpl<InducedRule> &inducedRules) {
+void PropertyMap::checkConcreteTypeRequirements() {
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   for (auto *props : Entries) {
-    if (props->ConcreteTypeRule && props->SuperclassRule) {
+    if (props->ConcreteTypeRule) {
       auto concreteType = props->ConcreteType->getConcreteType();
 
       // A rule (T.[concrete: C] => T) where C is a class type induces a rule
@@ -546,21 +498,49 @@ void PropertyMap::checkConcreteTypeRequirements(
             Context);
 
         recordRelation(props->getKey(), *props->ConcreteTypeRule,
-                       superclassSymbol, System,
-                       inducedRules, debug);
+                       superclassSymbol, System, debug);
 
-      // Otherwise, we have a concrete vs superclass conflict.
-      } else {
+      // If the concrete type is not a class and we have a superclass
+      // requirement, we have a conflict.
+      } else if (props->SuperclassRule) {
         recordConflict(props->getKey(),
                        *props->ConcreteTypeRule,
                        *props->SuperclassRule, System);
+      }
+
+      // A rule (T.[concrete: C] => T) where C is a class type induces a rule
+      // (T.[layout: L] => T), where L is either AnyObject or _NativeObject.
+      if (concreteType->satisfiesClassConstraint()) {
+        Type superclassType = concreteType;
+        if (!concreteType->getClassOrBoundGenericClass())
+          superclassType = concreteType->getSuperclass();
+
+        auto layoutConstraint = LayoutConstraintKind::Class;
+        if (superclassType)
+          if (auto *classDecl = superclassType->getClassOrBoundGenericClass())
+            layoutConstraint = classDecl->getLayoutConstraintKind();
+
+        auto layout =
+            LayoutConstraint::getLayoutConstraint(
+              layoutConstraint, Context.getASTContext());
+        auto layoutSymbol = Symbol::forLayout(layout, Context);
+
+        recordRelation(props->getKey(), *props->ConcreteTypeRule,
+                       layoutSymbol, System, debug);
+
+      // If the concrete type does not satisfy a class layout constraint and
+      // we have such a layout requirement, we have a conflict.
+      } else if (props->LayoutRule &&
+                 props->Layout->isClass()) {
+        recordConflict(props->getKey(),
+                       *props->ConcreteTypeRule,
+                       *props->LayoutRule, System);
       }
     }
   }
 }
 
-void PropertyMap::concretizeNestedTypesFromConcreteParents(
-    SmallVectorImpl<InducedRule> &inducedRules) {
+void PropertyMap::concretizeNestedTypesFromConcreteParents() {
   for (auto *props : Entries) {
     if (props->getConformsTo().empty())
       continue;
@@ -587,8 +567,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
           props->ConcreteType->getSubstitutions(),
           props->ConformsToRules,
           props->ConformsTo,
-          props->ConcreteConformances,
-          inducedRules);
+          props->ConcreteConformances);
     }
 
     if (props->hasSuperclassBound()) {
@@ -604,8 +583,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
           props->Superclass->getSubstitutions(),
           props->ConformsToRules,
           props->ConformsTo,
-          props->SuperclassConformances,
-          inducedRules);
+          props->SuperclassConformances);
     }
   }
 }
@@ -649,8 +627,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     ArrayRef<Term> substitutions,
     ArrayRef<unsigned> conformsToRules,
     ArrayRef<const ProtocolDecl *> conformsTo,
-    llvm::TinyPtrVector<ProtocolConformance *> &conformances,
-    SmallVectorImpl<InducedRule> &inducedRules) {
+    llvm::TinyPtrVector<ProtocolConformance *> &conformances) {
   assert(requirementKind == RequirementKind::SameType ||
          requirementKind == RequirementKind::Superclass);
   assert(conformsTo.size() == conformsToRules.size());
@@ -725,19 +702,18 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
         concreteType, substitutions, proto, Context);
 
     recordConcreteConformanceRule(concreteRuleID, conformanceRuleID,
-                                  requirementKind, concreteConformanceSymbol,
-                                  inducedRules);
+                                  requirementKind, concreteConformanceSymbol);
 
-    auto assocTypes = proto->getAssociatedTypeMembers();
-    if (assocTypes.empty())
-      continue;
-
-    for (auto *assocType : assocTypes) {
+    for (auto *assocType : proto->getAssociatedTypeMembers()) {
       concretizeTypeWitnessInConformance(key, requirementKind,
                                          concreteConformanceSymbol,
-                                         concrete, assocType,
-                                         inducedRules);
+                                         concrete, assocType);
     }
+
+    // We only infer conditional requirements in top-level generic signatures,
+    // not in protocol requirement signatures.
+    if (key.getRootProtocols().empty())
+      inferConditionalRequirements(concrete, substitutions);
   }
 }
 
@@ -745,8 +721,7 @@ void PropertyMap::concretizeTypeWitnessInConformance(
     Term key, RequirementKind requirementKind,
     Symbol concreteConformanceSymbol,
     ProtocolConformance *concrete,
-    AssociatedTypeDecl *assocType,
-    SmallVectorImpl<InducedRule> &inducedRules) const {
+    AssociatedTypeDecl *assocType) const {
   auto concreteType = concreteConformanceSymbol.getConcreteType();
   auto substitutions = concreteConformanceSymbol.getSubstitutions();
   auto *proto = concreteConformanceSymbol.getProtocol();
@@ -788,7 +763,8 @@ void PropertyMap::concretizeTypeWitnessInConformance(
       key, requirementKind, concreteType, typeWitness, subjectType,
       substitutions, path);
 
-  inducedRules.emplace_back(constraintType, subjectType, path);
+  assert(!path.empty());
+  (void) System.addRule(constraintType, subjectType, &path);
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
     llvm::dbgs() << "^^ Induced rule " << constraintType
                  << " => " << subjectType << "\n";
@@ -889,8 +865,8 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
   // Compute the concrete type symbol [concrete: C.X].
   SmallVector<Term, 3> result;
   auto typeWitnessSchema =
-      remapConcreteSubstitutionSchema(typeWitness, substitutions,
-                                      Context, result);
+      Context.getRelativeSubstitutionSchemaFromType(typeWitness, substitutions,
+                                                    result);
   auto typeWitnessSymbol =
       Symbol::forConcreteType(typeWitnessSchema, result, Context);
 
@@ -966,8 +942,7 @@ void PropertyMap::recordConcreteConformanceRule(
     unsigned concreteRuleID,
     unsigned conformanceRuleID,
     RequirementKind requirementKind,
-    Symbol concreteConformanceSymbol,
-    SmallVectorImpl<InducedRule> &inducedRules) const {
+    Symbol concreteConformanceSymbol) const {
   const auto &concreteRule = System.getRule(concreteRuleID);
   const auto &conformanceRule = System.getRule(conformanceRuleID);
 
@@ -1027,5 +1002,82 @@ void PropertyMap::recordConcreteConformanceRule(
   // it to go in the other direction.
   path.invert();
 
-  inducedRules.emplace_back(std::move(lhs), std::move(rhs), std::move(path));
+  (void) System.addRule(std::move(lhs), std::move(rhs), &path);
+}
+
+/// If \p key is fixed to a concrete type and is also subject to a conformance
+/// requirement, the concrete type might conform conditionally. In this case,
+/// introduce rules for any conditional requirements in the given conformance.
+void PropertyMap::inferConditionalRequirements(
+    ProtocolConformance *concrete, ArrayRef<Term> substitutions) const {
+
+  auto conditionalRequirements = concrete->getConditionalRequirements();
+
+  if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+    if (conditionalRequirements.empty())
+      llvm::dbgs() << "@@ No conditional requirements from ";
+    else
+      llvm::dbgs() << "@@ Inferring conditional requirements from ";
+
+    llvm::dbgs() << concrete->getType() << " : ";
+    llvm::dbgs() << concrete->getProtocol()->getName() << "\n";
+  }
+
+  if (conditionalRequirements.empty())
+    return;
+
+  SmallVector<Requirement, 2> desugaredRequirements;
+
+  // First, desugar all conditional requirements.
+  for (auto req : conditionalRequirements) {
+    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+      llvm::dbgs() << "@@@ Original requirement: ";
+      req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+
+    desugarRequirement(req, desugaredRequirements);
+  }
+
+  // Now, convert desugared conditional requirements to rules.
+  for (auto req : desugaredRequirements) {
+    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+      llvm::dbgs() << "@@@ Desugared requirement: ";
+      req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+
+    if (req.getKind() == RequirementKind::Conformance) {
+      auto *proto = req.getProtocolDecl();
+
+      // If we haven't seen this protocol before, add rules for its
+      // requirements.
+      if (!System.isKnownProtocol(proto)) {
+        if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+          llvm::dbgs() << "@@@ Unknown protocol: "<< proto->getName() << "\n";
+        }
+
+        RuleBuilder builder(Context, System.getProtocolMap());
+        builder.addProtocol(proto, /*initialComponent=*/false);
+        builder.collectRulesFromReferencedProtocols();
+
+        for (const auto &rule : builder.PermanentRules)
+          System.addPermanentRule(rule.first, rule.second);
+
+        for (const auto &rule : builder.RequirementRules)
+          System.addExplicitRule(rule.first, rule.second);
+      }
+    }
+
+    auto pair = getRuleForRequirement(req.getCanonical(), /*proto=*/nullptr,
+                                      substitutions, Context);
+
+    if (Debug.contains(DebugFlags::ConditionalRequirements)) {
+      llvm::dbgs() << "@@@ Induced rule from conditional requirement: "
+                   << pair.first << " => " << pair.second << "\n";
+    }
+
+    // FIXME: Do we need a rewrite path here?
+    (void) System.addRule(pair.first, pair.second);
+  }
 }

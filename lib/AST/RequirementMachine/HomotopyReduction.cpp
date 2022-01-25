@@ -386,9 +386,13 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
 
     const auto &otherRule = getRule(found->second);
 
-    // Prefer to delete "less canonical" rules.
-    if (rule.compare(otherRule, Context) > 0)
+    // If the new rule is conflicting, don't compare the rules at all
+    // and prefer to delete the new rule. Otherwise, prefer to delete
+    // the less canonical of the two rules.
+    if (rule.isConflicting() ||
+        rule.compare(otherRule, Context) > 0) {
       found = pair;
+    }
   }
 
   if (!found)
