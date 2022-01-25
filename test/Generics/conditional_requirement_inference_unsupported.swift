@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -enable-requirement-machine-merged-associated-types
+// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s -enable-requirement-machine-merged-associated-types 2>&1 | %FileCheck %s
 
 // A very elaborate invalid example (see comment in mergeP1AndP2())
 struct G<T> {}
