@@ -107,7 +107,7 @@ static void recordRelation(Term key,
 
   MutableTerm rhs(key);
 
-  inducedRules.emplace_back(lhs, rhs, path);
+  (void) system.addRule(lhs, rhs, &path);
 }
 
 static void recordConflict(Term key,
@@ -140,18 +140,20 @@ namespace {
     ArrayRef<Term> lhsSubstitutions;
     ArrayRef<Term> rhsSubstitutions;
     RewriteContext &ctx;
+    RewriteSystem &system;
     SmallVectorImpl<InducedRule> &inducedRules;
     bool debug;
 
   public:
     ConcreteTypeMatcher(ArrayRef<Term> lhsSubstitutions,
                         ArrayRef<Term> rhsSubstitutions,
-                        RewriteContext &ctx,
+                        RewriteSystem &system,
                         SmallVectorImpl<InducedRule> &inducedRules,
                         bool debug)
         : lhsSubstitutions(lhsSubstitutions),
           rhsSubstitutions(rhsSubstitutions),
-          ctx(ctx), inducedRules(inducedRules), debug(debug) {}
+          ctx(system.getRewriteContext()), system(system),
+          inducedRules(inducedRules), debug(debug) {}
 
     bool alwaysMismatchTypeParameters() const { return true; }
 
@@ -171,7 +173,9 @@ namespace {
             llvm::dbgs() << "%% Induced rule " << lhsTerm
                          << " == " << rhsTerm << "\n";
           }
-          inducedRules.emplace_back(lhsTerm, rhsTerm);
+
+          // FIXME: Need a rewrite path here.
+          (void) system.addRule(lhsTerm, rhsTerm);
         }
         return true;
       }
@@ -193,7 +197,9 @@ namespace {
           llvm::dbgs() << "%% Induced rule " << subjectTerm
                        << " == " << constraintTerm << "\n";
         }
-        inducedRules.emplace_back(subjectTerm, constraintTerm);
+
+        // FIXME: Need a rewrite path here.
+        (void) system.addRule(subjectTerm, constraintTerm);
         return true;
       }
 
@@ -214,7 +220,9 @@ namespace {
           llvm::dbgs() << "%% Induced rule " << subjectTerm
                        << " == " << constraintTerm << "\n";
         }
-        inducedRules.emplace_back(subjectTerm, constraintTerm);
+
+        // FIXME: Need a rewrite path here.
+        (void) system.addRule(subjectTerm, constraintTerm);
         return true;
       }
 
@@ -251,7 +259,7 @@ namespace {
 ///
 /// Returns true if a conflict was detected.
 static bool unifyConcreteTypes(
-    Symbol lhs, Symbol rhs, RewriteContext &ctx,
+    Symbol lhs, Symbol rhs, RewriteSystem &system,
     SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
   auto lhsType = lhs.getConcreteType();
@@ -263,7 +271,7 @@ static bool unifyConcreteTypes(
 
   ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
                               rhs.getSubstitutions(),
-                              ctx, inducedRules, debug);
+                              system, inducedRules, debug);
   if (!matcher.match(lhsType, rhsType)) {
     // FIXME: Diagnose the conflict
     if (debug) {
@@ -299,7 +307,7 @@ static bool unifyConcreteTypes(
 /// Returns the most derived superclass, which becomes the new superclass
 /// that gets recorded in the property map.
 static std::pair<Symbol, bool> unifySuperclasses(
-    Symbol lhs, Symbol rhs, RewriteContext &ctx,
+    Symbol lhs, Symbol rhs, RewriteSystem &system,
     SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
   if (debug) {
@@ -343,7 +351,7 @@ static std::pair<Symbol, bool> unifySuperclasses(
   // Unify type contructor arguments.
   ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
                               rhs.getSubstitutions(),
-                              ctx, inducedRules, debug);
+                              system, inducedRules, debug);
   if (!matcher.match(lhsType, rhsType)) {
     if (debug) {
       llvm::dbgs() << "%% Superclass conflict\n";
@@ -439,8 +447,7 @@ void PropertyMap::addProperty(
     } else {
       assert(props->SuperclassRule.hasValue());
       auto pair = unifySuperclasses(*props->Superclass, property,
-                                    System.getRewriteContext(),
-                                    inducedRules, debug);
+                                    System, inducedRules, debug);
       props->Superclass = pair.first;
       bool conflict = pair.second;
       if (conflict) {
@@ -459,8 +466,7 @@ void PropertyMap::addProperty(
     } else {
       assert(props->ConcreteTypeRule.hasValue());
       bool conflict = unifyConcreteTypes(*props->ConcreteType, property,
-                                         System.getRewriteContext(),
-                                         inducedRules, debug);
+                                         System, inducedRules, debug);
       if (conflict) {
         recordConflict(key, *props->ConcreteTypeRule, ruleID, System);
         return;
@@ -741,7 +747,8 @@ void PropertyMap::concretizeTypeWitnessInConformance(
       key, requirementKind, concreteType, typeWitness, subjectType,
       substitutions, path);
 
-  inducedRules.emplace_back(constraintType, subjectType, path);
+  assert(!path.empty());
+  (void) System.addRule(constraintType, subjectType, &path);
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
     llvm::dbgs() << "^^ Induced rule " << constraintType
                  << " => " << subjectType << "\n";
@@ -980,5 +987,5 @@ void PropertyMap::recordConcreteConformanceRule(
   // it to go in the other direction.
   path.invert();
 
-  inducedRules.emplace_back(std::move(lhs), std::move(rhs), std::move(path));
+  (void) System.addRule(std::move(lhs), std::move(rhs), &path);
 }
