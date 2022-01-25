@@ -2,8 +2,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -emit-cxx-header-path %t/empty.h
 // RUN: %FileCheck %s < %t/empty.h
 
-// RUN: %check-in-clang++ -std=c++14 %t/empty.h
-// RUN: %check-in-clang++ -std=c++17 %t/empty.h
+// RUN: %check-cxx-header-in-clang -std=c++14 %t/empty.h
+// RUN: %check-cxx-header-in-clang -std=c++17 %t/empty.h
 
 // CHECK-NOT: @import Swift;
 // CHECK-NOT: IBSegueAction
