@@ -2654,6 +2654,9 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
   if (flags.isIsolated())
     appendOperator("Yi");
 
+  if (flags.isCompileTimeConst())
+    appendOperator("Yt");
+
   if (!name.empty())
     appendIdentifier(name.str());
   if (flags.isVariadic())
