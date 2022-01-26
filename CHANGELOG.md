@@ -3,7 +3,7 @@ CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
-## Swift Next
+## Swift 5.7
 
 * [SE-0328][]:
 
