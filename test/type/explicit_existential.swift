@@ -213,4 +213,12 @@ func testAnyTypeExpr() {
   // expected-note@+1 {{use '.self' to reference the type object}}
   let invalid = any P
   test(invalid)
+
+  // Make sure 'any' followed by an identifier
+  // on the next line isn't parsed as a type.
+  func doSomething() {}
+
+  let any = 10
+  let _ = any
+  doSomething()
 }
