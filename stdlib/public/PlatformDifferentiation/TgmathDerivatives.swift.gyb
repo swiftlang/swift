@@ -1,27 +1,13 @@
-//===--- TgmathDerivatives.swift.gyb --------------------------*- swift -*-===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
-// This file defines derivatives for tgmath functions.
-//===----------------------------------------------------------------------===//
-
-import Swift
+import _Differentiation
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-  import Darwin.C.tgmath
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
-  import Glibc
-#elseif os(WASI)
-  import WASILibc
+  @_exported import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(Android) || os(Cygwin) || os(Haiku)
+  @_exported import Glibc
+#elseif os (WASI)
+  @_exported import WASILibc
 #elseif os(Windows)
-  import CRT
+  @_exported import CRT
 #else
 #error("Unsupported platform")
 #endif
