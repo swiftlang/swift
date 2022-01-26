@@ -2784,7 +2784,8 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   }
 
   // Cannot extend function types, tuple types, etc.
-  if (!extendedType->getAnyNominal()) {
+  if (!extendedType->getAnyNominal() &&
+      !extendedType->is<ParametrizedProtocolType>()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
     return error();

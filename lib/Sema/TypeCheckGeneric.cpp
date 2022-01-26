@@ -551,6 +551,21 @@ static Type formExtensionInterfaceType(
   if (type->is<ProtocolCompositionType>())
     type = type->getCanonicalType();
 
+  // A parametrized protocol type is not a nominal. Unwrap it to get
+  // the underlying nominal, and record a same-type requirement for
+  // the primary associated type.
+  if (auto *paramProtoTy = type->getAs<ParametrizedProtocolType>()) {
+    auto *protoTy = paramProtoTy->getBaseType();
+    type = protoTy;
+
+    auto *depMemTy = DependentMemberType::get(
+        protoTy->getDecl()->getSelfInterfaceType(),
+        paramProtoTy->getAssocType());
+    sameTypeReqs.emplace_back(
+      RequirementKind::SameType, depMemTy,
+      paramProtoTy->getArgumentType());
+  }
+
   Type parentType = type->getNominalParent();
   GenericTypeDecl *genericDecl = type->getAnyGeneric();
 
