@@ -2595,11 +2595,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
         (void) var->getPropertyWrapperInitializerInfo();
       }
     }
-
-    // For a distributed function, add the remote function.
-    if (auto *func = dyn_cast<FuncDecl>(member)) {
-      (void) func->getDistributedActorRemoteFuncDecl();
-    }
   }
 
   SortedDeclList synthesizedMembers;
