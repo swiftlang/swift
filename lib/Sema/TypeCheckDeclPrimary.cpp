@@ -249,6 +249,14 @@ static void checkInheritanceClause(
       inheritedTy = layout.explicitSuperclass;
     }
 
+    if (inheritedTy->is<ParametrizedProtocolType>()) {
+      if (!isa<ProtocolDecl>(decl)) {
+        decl->diagnose(diag::inheritance_from_parametrized_protocol,
+                       inheritedTy);
+      }
+      continue;
+    }
+
     // If this is an enum inheritance clause, check for a raw type.
     if (isa<EnumDecl>(decl)) {
       // Check if we already had a raw type.

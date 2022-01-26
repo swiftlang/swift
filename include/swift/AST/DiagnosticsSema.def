@@ -2773,6 +2773,8 @@ ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
   "inheritance from non-protocol type %0", (Type))
+ERROR(inheritance_from_parametrized_protocol,none,
+  "cannot inherit from parametrized protocol type %0", (Type))
 ERROR(superclass_not_first,none,
   "superclass %0 must appear first in the inheritance clause", (Type))
 ERROR(superclass_not_open,none,
