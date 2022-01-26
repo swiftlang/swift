@@ -315,12 +315,20 @@ public:
   void verifyRewriteRules(ValidityPolicy policy) const;
 
 private:
+  struct CriticalPair {
+    MutableTerm LHS;
+    MutableTerm RHS;
+    RewritePath Path;
+
+    CriticalPair(MutableTerm lhs, MutableTerm rhs, RewritePath path)
+      : LHS(lhs), RHS(rhs), Path(path) {}
+  };
+
   bool
   computeCriticalPair(
       ArrayRef<Symbol>::const_iterator from,
       const Rule &lhs, const Rule &rhs,
-      std::vector<std::pair<MutableTerm, MutableTerm>> &pairs,
-      std::vector<RewritePath> &paths,
+      std::vector<CriticalPair> &pairs,
       std::vector<RewriteLoop> &loops) const;
 
   /// Constructed from a rule of the form X.[P2:T] => X.[P1:T] by

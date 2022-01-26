@@ -337,8 +337,11 @@ void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
 /// where \p rhs begins at \p from, which must be an iterator pointing
 /// into \p lhs.
 ///
-/// The resulting pair is pushed onto \p result only if it is non-trivial,
-/// that is, the left hand side and right hand side are not equal.
+/// The resulting pair, together with a rewrite path relating them is
+/// pushed onto \p pairs only if it is non-trivial, that is, the left
+/// hand side and right hand side are not equal.
+///
+/// Otherwise, we record a rewrite loop in \p loops.
 ///
 /// Returns true if the pair was non-trivial, false if it was trivial.
 ///
@@ -372,9 +375,7 @@ void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
 bool
 RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                                    const Rule &lhs, const Rule &rhs,
-                                   std::vector<std::pair<MutableTerm,
-                                                         MutableTerm>> &pairs,
-                                   std::vector<RewritePath> &paths,
+                                   std::vector<CriticalPair> &pairs,
                                    std::vector<RewriteLoop> &loops) const {
   auto end = lhs.getLHS().end();
   if (from + rhs.getLHS().size() < end) {
@@ -420,8 +421,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     }
 
     // Add the pair (X, TYV).
-    pairs.emplace_back(x, tyv);
-    paths.push_back(path);
+    pairs.emplace_back(x, tyv, path);
   } else {
     // lhs == TU -> X, rhs == UV -> Y.
 
@@ -476,8 +476,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     }
 
     // Add the pair (XV, TY).
-    pairs.emplace_back(xv, ty);
-    paths.push_back(path);
+    pairs.emplace_back(xv, ty, path);
   }
 
   return true;
@@ -508,8 +507,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
   bool again = false;
 
-  std::vector<std::pair<MutableTerm, MutableTerm>> resolvedCriticalPairs;
-  std::vector<RewritePath> resolvedPaths;
+  std::vector<CriticalPair> resolvedCriticalPairs;
   std::vector<RewriteLoop> resolvedLoops;
 
   do {
@@ -557,23 +555,21 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           // Try to repair the confluence violation by adding a new rule.
           if (computeCriticalPair(from, lhs, rhs,
                                   resolvedCriticalPairs,
-                                  resolvedPaths,
                                   resolvedLoops)) {
             if (Debug.contains(DebugFlags::Completion)) {
               const auto &pair = resolvedCriticalPairs.back();
-              const auto &path = resolvedPaths.back();
 
               llvm::dbgs() << "$ Overlapping rules: (#" << i << ") ";
               llvm::dbgs() << lhs << "\n";
               llvm::dbgs() << "                -vs- (#" << j << ") ";
               llvm::dbgs() << rhs << ":\n";
               llvm::dbgs() << "$$ First term of critical pair is "
-                           << pair.first << "\n";
+                           << pair.LHS << "\n";
               llvm::dbgs() << "$$ Second term of critical pair is "
-                           << pair.second << "\n\n";
+                           << pair.RHS << "\n\n";
 
               llvm::dbgs() << "$$ Resolved via path: ";
-              path.dump(llvm::dbgs(), pair.first, *this);
+              pair.Path.dump(llvm::dbgs(), pair.LHS, *this);
               llvm::dbgs() << "\n\n";
             }
           } else {
@@ -598,18 +594,13 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
     simplifyLeftHandSides();
 
-    assert(resolvedCriticalPairs.size() == resolvedPaths.size());
-
     again = false;
-    for (unsigned index : indices(resolvedCriticalPairs)) {
-      const auto &pair = resolvedCriticalPairs[index];
-      const auto &path = resolvedPaths[index];
-
+    for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
       if (Rules.size() > maxIterations)
         return std::make_pair(CompletionResult::MaxIterations, steps);
 
-      if (!addRule(pair.first, pair.second, &path))
+      if (!addRule(pair.LHS, pair.RHS, &pair.Path))
         continue;
 
       // Check if the new rule is too long.
@@ -626,7 +617,6 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     }
 
     resolvedCriticalPairs.clear();
-    resolvedPaths.clear();
     resolvedLoops.clear();
 
     simplifyRightHandSidesAndSubstitutions();
