@@ -292,12 +292,6 @@ struct InferRequirementsWalker : public TypeWalker {
     auto decl = ty->getAnyNominal();
     if (!decl) return Action::Continue;
 
-    // FIXME: The GSB and the request evaluator both detect a cycle here if we
-    // force a recursive generic signature.  We should look into moving cycle
-    // detection into the generic signature request(s) - see rdar://55263708
-    if (!decl->hasComputedGenericSignature())
-      return Action::Continue;
-
     auto genericSig = decl->getGenericSignature();
     if (!genericSig)
       return Action::Continue;
