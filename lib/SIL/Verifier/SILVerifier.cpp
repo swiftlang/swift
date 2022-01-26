@@ -5796,11 +5796,6 @@ public:
       if (F->hasForeignBody())
         return;
 
-//      fprintf(stderr, "[%s:%d] (%s) F DUMP\n", __FILE__, __LINE__, __FUNCTION__);
-//      if (!F->isAvailableExternally() && F->getLinkage() == SILLinkage::Public) {
-//      fprintf(stderr, "[%s:%d] (%s) HACK IT...\n", __FILE__, __LINE__, __FUNCTION__);
-//        F->setLinkage(SILLinkage::PublicExternal);
-//      }
       require(F->isAvailableExternally(),
               "external declaration of internal SILFunction not allowed");
       // If F is an external declaration, there is nothing further to do,
