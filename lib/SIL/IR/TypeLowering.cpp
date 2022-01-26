@@ -3370,6 +3370,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
       return ABIDifference::NeedsThunk;
   }
 
+  // Asynchronous functions require a thunk if they differ in whether they
+  // have an error result.
+  if (fnTy1->hasErrorResult() != fnTy2->hasErrorResult() &&
+      (fnTy1->isAsync() || fnTy2->isAsync()))
+    return ABIDifference::NeedsThunk;
+
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {
     auto param1 = fnTy1->getParameters()[i], param2 = fnTy2->getParameters()[i];
     
