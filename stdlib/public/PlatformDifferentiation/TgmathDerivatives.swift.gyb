@@ -1,0 +1,17 @@
+import _Differentiation
+
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  @_exported import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(Android) || os(Cygwin) || os(Haiku)
+  @_exported import Glibc
+#elseif os (WASI)
+  @_exported import WASILibc
+#elseif os(Windows)
+  @_exported import CRT
+#else
+#error("Unsupported platform")
+#endif
+
+public func foo_test_func() -> Int {
+  2
+}

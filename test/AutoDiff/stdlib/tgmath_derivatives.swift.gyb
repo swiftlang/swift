@@ -1,12 +1,22 @@
 // RUN: %target-run-simple-swiftgyb(-Xfrontend -enable-experimental-forward-mode-differentiation)
 // REQUIRES: executable_test
 
+// TODO(philipturner) Once SwiftCompiler/Sources/ExperimentalRegex isn't broken, 
+//   try removing the explicit overlay imports and pass `-Xfrontend 
+//   -enable-cross-import-overlays` to this test's "RUN"
+
 #if canImport(Darwin)
-  import Darwin.C.tgmath
+  import Darwin
+  import _Darwin_Differentiation
 #elseif canImport(Glibc)
   import Glibc
+  import _Glibc_Differentiation
+#elseif os(WASI)
+  import WASILibc
+  import _WASILibc_Differentiation
 #elseif os(Windows)
   import CRT
+  import _CRT_Differentiation
 #else
 #error("Unsupported platform")
 #endif
@@ -21,6 +31,7 @@ import StdlibUnittest
 import _Differentiation
 
 let DerivativeTests = TestSuite("TGMath")
+precondition(foo_test_func() == 2)
 
 func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
                                  ulps allowed: T = 3,
