@@ -291,6 +291,7 @@ IDENTIFIER(throwing)
 IDENTIFIER(using)
 IDENTIFIER(InvocationDecoder)
 IDENTIFIER(whenLocal)
+IDENTIFIER(decodeNextArgument)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

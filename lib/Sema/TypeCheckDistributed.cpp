@@ -378,6 +378,40 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
   (void)decl->getDistributedActorIDProperty();
 }
 
+static Type getAssociatedTypeOfDistributedSystem(NominalTypeDecl *actor,
+                                                 Identifier member) {
+  assert(actor->isDistributedActor());
+  auto &ctx = actor->getASTContext();
+
+  auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+  if (!actorProtocol)
+    return ErrorType::get(ctx);
+
+  AssociatedTypeDecl *actorSystemDecl =
+      actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
+  if (!actorSystemDecl)
+    return ErrorType::get(ctx);
+
+  auto actorSystemProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  if (!actorSystemProtocol)
+    return ErrorType::get(ctx);
+
+  AssociatedTypeDecl *assocTypeDecl =
+      actorSystemProtocol->getAssociatedType(member);
+  if (!assocTypeDecl)
+    return ErrorType::get(ctx);
+
+  auto module = actor->getParentModule();
+  Type selfType = actor->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, actorProtocol);
+  Type dependentType = actorProtocol->getSelfInterfaceType();
+  dependentType = DependentMemberType::get(dependentType, actorSystemDecl);
+  dependentType = DependentMemberType::get(dependentType, assocTypeDecl);
+
+  return dependentType.subst(SubstitutionMap::getProtocolSubstitutions(
+      actorProtocol, selfType, conformance));
+}
+
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   assert(actor->isDistributedActor());
   auto &ctx = actor->getASTContext();
@@ -394,38 +428,8 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
 }
 
 Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
-  assert(actor->isDistributedActor());
   auto &ctx = actor->getASTContext();
-
-  auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-  if (!actorProtocol)
-    return ErrorType::get(ctx);
-
-  AssociatedTypeDecl *actorSystemDecl =
-      actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
-  if (!actorSystemDecl)
-    return ErrorType::get(ctx);
-
-  auto actorSystemProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
-  if (!actorSystemProtocol)
-    return ErrorType::get(ctx);
-
-  AssociatedTypeDecl *idAssocTypeDecl =
-      actorSystemProtocol->getAssociatedType(ctx.Id_ActorID);
-  if (!idAssocTypeDecl)
-    return ErrorType::get(ctx);
-
-  auto module = actor->getParentModule();
-  Type selfType = actor->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, actorProtocol);
-  Type dependentType = actorProtocol->getSelfInterfaceType();
-  dependentType = DependentMemberType::get(dependentType, actorSystemDecl);
-  dependentType = DependentMemberType::get(dependentType, idAssocTypeDecl);
-  auto t = dependentType.subst(
-      SubstitutionMap::getProtocolSubstitutions(
-        actorProtocol, selfType, conformance));
-
-  return t;
+  return getAssociatedTypeOfDistributedSystem(actor, ctx.Id_ActorID);
 }
 
 NominalTypeDecl *
@@ -440,36 +444,35 @@ ASTContext::getDistributedActorInvocationDecoder(NominalTypeDecl *actor) {
 NominalTypeDecl *
 GetDistributedActorInvocationDecoderRequest::evaluate(Evaluator &evaluator,
                                                       NominalTypeDecl *actor) const {
-    assert(actor->isDistributedActor());
+  auto &ctx = actor->getASTContext();
+  auto decoderTy =
+      getAssociatedTypeOfDistributedSystem(actor, ctx.Id_InvocationDecoder);
+  return decoderTy->hasError() ? nullptr : decoderTy->getAnyNominal();
+}
+
+FuncDecl *ASTContext::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
+  if (!actor->isDistributedActor())
+    return nullptr;
+
+  return evaluateOrDefault(
+    evaluator, GetDistributedActorArgumentDecodingMethodRequest{actor}, nullptr);
+}
+
+
+FuncDecl *
+GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
+                                                           NominalTypeDecl *actor) const {
   auto &ctx = actor->getASTContext();
 
-  auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-  if (!actorProtocol)
-    return nullptr;
+  auto *decoder = ctx.getDistributedActorInvocationDecoder(actor);
+  assert(decoder);
 
-  AssociatedTypeDecl *actorSystemDecl =
-      actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
-  if (!actorSystemDecl)
-    return nullptr;
+  auto decoderTy = decoder->getInterfaceType()->getMetatypeInstanceType();
 
-  auto actorSystemProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
-  if (!actorSystemProtocol)
-    return nullptr;
+  DeclName methodName(ctx, {ctx.Id_decodeNextArgument}, {ctx.Id_type});
+  auto members = TypeChecker::lookupMember(actor->getDeclContext(), decoderTy,
+                                           DeclNameRef(methodName));
 
-  AssociatedTypeDecl *decoderAssocTypeDecl =
-      actorSystemProtocol->getAssociatedType(ctx.Id_InvocationDecoder);
-  if (!decoderAssocTypeDecl)
-    return nullptr;
-
-  auto module = actor->getParentModule();
-  Type selfType = actor->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, actorProtocol);
-  Type dependentType = actorProtocol->getSelfInterfaceType();
-  dependentType = DependentMemberType::get(dependentType, actorSystemDecl);
-  dependentType = DependentMemberType::get(dependentType, decoderAssocTypeDecl);
-  auto t = dependentType.subst(
-      SubstitutionMap::getProtocolSubstitutions(
-        actorProtocol, selfType, conformance));
-
-  return t->getAnyNominal();
+  assert(members.size() == 1);
+  return cast<FuncDecl>(members[0].getValueDecl());
 }

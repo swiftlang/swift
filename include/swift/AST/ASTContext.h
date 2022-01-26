@@ -1349,6 +1349,10 @@ public:
   NominalTypeDecl *
   getDistributedActorInvocationDecoder(NominalTypeDecl *);
 
+  /// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
+  /// invocation decoder of the given distributed actor.
+  FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
+
 private:
   friend Decl;
 
