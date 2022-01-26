@@ -819,7 +819,7 @@ func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueGlobalWithDeadline")
 @usableFromInline
-func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64, 
+func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
                                    _ toleranceSec: Int64, _ toleranceNSec: Int64,
                                    _ clock: Int32, _ task: Builtin.Job)
 

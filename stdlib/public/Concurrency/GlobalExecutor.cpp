@@ -72,10 +72,10 @@ void (*swift::swift_task_enqueueGlobalWithDelay_hook)(
 
 SWIFT_CC(swift)
 void (*swift::swift_task_enqueueGlobalWithDeadline_hook)(
-    long long sec, 
+    long long sec,
     long long nsec,
-    long long tsec, 
-    long long tnsec, 
+    long long tsec,
+    long long tnsec,
     int clock, Job *job,
     swift_task_enqueueGlobalWithDeadline_original original) = nullptr;
 
@@ -113,10 +113,10 @@ void swift::swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job) {
 }
 
 void swift::swift_task_enqueueGlobalWithDeadline(
-    long long sec, 
+    long long sec,
     long long nsec,
-    long long tsec, 
-    long long tnsec, 
+    long long tsec,
+    long long tnsec,
     int clock, Job *job) {
   if (swift_task_enqueueGlobalWithDeadline_hook)
     swift_task_enqueueGlobalWithDeadline_hook(

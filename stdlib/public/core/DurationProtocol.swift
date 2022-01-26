@@ -15,7 +15,7 @@ public protocol DurationProtocol: Comparable, AdditiveArithmetic, Sendable {
   static func /= (_ lhs: inout Self, _ rhs: Int)
   static func * (_ lhs: Self, _ rhs: Int) -> Self
   static func *= (_ lhs: inout Self, _ rhs: Int)
-  
+
   static func / (_ lhs: Self, _ rhs: Self) -> Double
 }
 
@@ -23,7 +23,7 @@ extension DurationProtocol {
   public static func /= (_ lhs: inout Self, _ rhs: Int) {
     lhs = lhs / rhs
   }
-  
+
   public static func *= (_ lhs: inout Self, _ rhs: Int) {
     lhs = lhs * rhs
   }

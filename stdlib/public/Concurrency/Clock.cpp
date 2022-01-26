@@ -15,11 +15,11 @@
 #if __has_include(<time.h>)
 #define HAS_TIME 1
 #include <time.h>
-#endif 
+#endif
 
 using namespace swift;
 
-SWIFT_EXPORT_FROM(swift_Concurrency) 
+SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift)
 void swift_get_time(
   long long *seconds,

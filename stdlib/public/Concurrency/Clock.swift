@@ -14,7 +14,7 @@ import Swift
 @available(SwiftStdlib 9999, *)
 public protocol Clock: Sendable {
   associatedtype Instant: InstantProtocol
-  
+
   var now: Instant { get }
   var minimumResolution: Instant.Interval { get }
 
@@ -30,7 +30,7 @@ extension Clock {
     let end = now
     return start.duration(to: end)
   }
-  
+
   public func measure(
     _ work: () async throws -> Void
   ) async rethrows -> Instant.Interval {
@@ -53,7 +53,7 @@ enum swift_clock_id: Int32 {
 @_silgen_name("swift_get_time")
 @usableFromInline
 internal func _getTime(
-  seconds: UnsafeMutablePointer<Int64>, 
+  seconds: UnsafeMutablePointer<Int64>,
   nanoseconds: UnsafeMutablePointer<Int64>,
   clock: swift_clock_id)
 
@@ -61,6 +61,6 @@ internal func _getTime(
 @_silgen_name("swift_get_clock_res")
 @usableFromInline
 internal func _getClockRes(
-  seconds: UnsafeMutablePointer<Int64>, 
+  seconds: UnsafeMutablePointer<Int64>,
   nanoseconds: UnsafeMutablePointer<Int64>,
   clock: swift_clock_id)

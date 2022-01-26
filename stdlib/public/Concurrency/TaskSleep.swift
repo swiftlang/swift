@@ -20,7 +20,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This function doesn't block the underlying thread.
   public static func sleep(_ duration: UInt64) async {
-    return await Builtin.withUnsafeContinuation { 
+    return await Builtin.withUnsafeContinuation {
       (continuation: Builtin.RawUnsafeContinuation) -> Void in
       let job = _taskCreateNullaryContinuationJob(
           priority: Int(Task.currentPriority.rawValue),
@@ -297,8 +297,8 @@ extension Task where Success == Never, Failure == Never {
 
   @available(SwiftStdlib 9999, *)
   internal static func _sleep(
-    until seconds: Int64, _ nanoseconds: Int64, 
-    tolerance: Duration?, 
+    until seconds: Int64, _ nanoseconds: Int64,
+    tolerance: Duration?,
     clock: swift_clock_id
   ) async throws {
     // Allocate storage for the storage word.
@@ -345,7 +345,7 @@ extension Task where Success == Never, Failure == Never {
               let toleranceSeconds = tolerance?.seconds ?? 0
               let toleranceNanoseconds = tolerance?.nanoseconds ?? -1
               _enqueueJobGlobalWithDeadline(
-                  seconds, nanoseconds, 
+                  seconds, nanoseconds,
                   toleranceSeconds, toleranceNanoseconds,
                   clock.rawValue, Builtin.convertTaskToJob(sleepTask))
               return
@@ -400,8 +400,8 @@ extension Task where Success == Never, Failure == Never {
 
   @available(SwiftStdlib 9999, *)
   public static func sleep<C: Clock>(
-    until deadine: C.Instant, 
-    tolerance: C.Instant.Interval? = nil, 
+    until deadine: C.Instant,
+    tolerance: C.Instant.Interval? = nil,
     clock: C
   ) async throws {
     try await clock.sleep(until: deadine, tolerance: tolerance)

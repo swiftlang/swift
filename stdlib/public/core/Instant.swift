@@ -17,32 +17,32 @@ public protocol InstantProtocol: Comparable, Hashable, Sendable {
 }
 
 /*
-disabled for now - this perturbs operator resolution 
+disabled for now - this perturbs operator resolution
 extension InstantProtocol {
   @_alwaysEmitIntoClient
-  @inlinable  
+  @inlinable
   public static func + (_ lhs: Self, _ rhs: Interval) -> Self {
     lhs.advanced(by: rhs)
   }
-  
+
   @_alwaysEmitIntoClient
   @inlinable
   public static func += (_ lhs: inout Self, _ rhs: Interval) {
     lhs = lhs.advanced(by: rhs)
   }
-  
+
   @_alwaysEmitIntoClient
   @inlinable
   public static func - (_ lhs: Self, _ rhs: Interval) -> Self {
     lhs.advanced(by: .zero - rhs)
   }
-  
+
   @_alwaysEmitIntoClient
   @inlinable
   public static func -= (_ lhs: inout Self, _ rhs: Interval) {
     lhs = lhs.advanced(by: .zero - rhs)
   }
-  
+
   @_alwaysEmitIntoClient
   @inlinable
   public static func - (_ lhs: Self, _ rhs: Self) -> Interval {

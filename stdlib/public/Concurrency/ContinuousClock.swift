@@ -15,12 +15,12 @@ import Swift
 public struct ContinuousClock {
   public struct Instant: Codable, Sendable {
     internal var _value: Duration
-    
+
     internal init(_value: Duration) {
       self._value = _value
     }
   }
-  
+
   public init() { }
 }
 
@@ -36,33 +36,33 @@ extension ContinuousClock: Clock {
     ContinuousClock.now
   }
 
-  public var minimumResolution: Duration { 
+  public var minimumResolution: Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
     _getClockRes(
-      seconds: &seconds, 
-      nanoseconds: &nanoseconds, 
+      seconds: &seconds,
+      nanoseconds: &nanoseconds,
       clock: .continuous)
     return .seconds(seconds) + .nanoseconds(nanoseconds)
   }
-  
+
   public static var now: ContinuousClock.Instant {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
     _getClockRes(
-      seconds: &seconds, 
-      nanoseconds: &nanoseconds, 
+      seconds: &seconds,
+      nanoseconds: &nanoseconds,
       clock: .continuous)
     return ContinuousClock.Instant(_value:
       .seconds(seconds) + .nanoseconds(nanoseconds))
   }
-  
+
   public func sleep(
     until deadline: Instant, tolerance: Duration? = nil
   ) async throws {
-    try await Task._sleep(until: 
-      deadline._value.seconds, deadline._value.nanoseconds, 
-      tolerance: tolerance, 
+    try await Task._sleep(until:
+      deadline._value.seconds, deadline._value.nanoseconds,
+      tolerance: tolerance,
       clock: .continuous)
   }
 }
@@ -70,25 +70,25 @@ extension ContinuousClock: Clock {
 @available(SwiftStdlib 9999, *)
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }
-  
+
   public func advanced(by duration: Duration) -> ContinuousClock.Instant {
     return ContinuousClock.Instant(_value: _value + duration)
   }
-  
+
   public func duration(to other: ContinuousClock.Instant) -> Duration {
     other._value - _value
   }
-  
+
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_value)
   }
-  
+
   public static func == (
     _ lhs: ContinuousClock.Instant, _ rhs: ContinuousClock.Instant
   ) -> Bool {
     return lhs._value == rhs._value
   }
-  
+
   public static func < (
     _ lhs: ContinuousClock.Instant, _ rhs: ContinuousClock.Instant
   ) -> Bool {
@@ -96,13 +96,13 @@ extension ContinuousClock.Instant: InstantProtocol {
   }
 
   @_alwaysEmitIntoClient
-  @inlinable  
+  @inlinable
   public static func + (
     _ lhs: ContinuousClock.Instant, _ rhs: Duration
   ) -> ContinuousClock.Instant {
     lhs.advanced(by: rhs)
   }
-  
+
   @_alwaysEmitIntoClient
   @inlinable
   public static func += (
@@ -110,7 +110,7 @@ extension ContinuousClock.Instant: InstantProtocol {
   ) {
     lhs = lhs.advanced(by: rhs)
   }
-  
+
   @_alwaysEmitIntoClient
   @inlinable
   public static func - (
@@ -118,7 +118,7 @@ extension ContinuousClock.Instant: InstantProtocol {
   ) -> ContinuousClock.Instant {
     lhs.advanced(by: .zero - rhs)
   }
-  
+
   @_alwaysEmitIntoClient
   @inlinable
   public static func -= (
@@ -126,7 +126,7 @@ extension ContinuousClock.Instant: InstantProtocol {
   ) {
     lhs = lhs.advanced(by: .zero - rhs)
   }
-  
+
   @_alwaysEmitIntoClient
   @inlinable
   public static func - (
