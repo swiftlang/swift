@@ -360,11 +360,15 @@ GlobalActorAttributeRequest::evaluate(
       if (!var->isStatic() && var->isOrdinaryStoredProperty()) {
         if (auto *nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
           if (nominal->isValueType()) {
+
             var->diagnose(diag::global_actor_on_storage_of_value_type,
                           var->getName(), nominal->getDescriptiveKind())
               .highlight(globalActorAttr->getRangeWithAt())
               .warnUntilSwiftVersion(6);
-            return None;
+
+            // In Swift 6, once the diag above is an error, it is disallowed.
+            if (var->getASTContext().isSwiftVersionAtLeast(6))
+              return None;
           }
         }
       }

@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/dynamically_replaceable.swiftmodule -module-name dynamically_replaceable -warn-concurrency %S/Inputs/dynamically_replaceable.swift
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -warn-concurrency %S/Inputs/other_global_actor_inference.swift
 // RUN: %target-typecheck-verify-swift -I %t -disable-availability-checking
 // REQUIRES: concurrency
-import dynamically_replaceable
+import other_global_actor_inference
 
 actor SomeActor { }
 
@@ -30,6 +30,14 @@ struct GenericGlobalActor<T> {
 }
 @MainActor class Copper {}
 @MainActor func iron() {}
+
+struct Carbon {
+  @IntWrapper var atomicWeight: Int
+
+  func getWeight() -> Int {
+    return atomicWeight
+  }
+}
 
 // ----------------------------------------------------------------------
 // Check that @MainActor(blah) doesn't work
