@@ -597,7 +597,7 @@ private:
 
   /// Attempt to lex a regex literal, returning true if a regex literal was
   /// lexed, false if this is not a regex literal.
-  bool tryLexRegexLiteral(const char *TokStart);
+  bool tryLexRegexLiteral(const char *TokStart, const char *LeadingTriviaStart);
 
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char *,
