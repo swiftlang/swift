@@ -31,7 +31,6 @@ import StdlibUnittest
 import _Differentiation
 
 let DerivativeTests = TestSuite("TGMath")
-precondition(foo_test_func() == 2)
 
 func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
                                  ulps allowed: T = 3,
