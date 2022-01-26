@@ -554,6 +554,7 @@ void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
       llvm::dbgs() << "$ Right hand side simplification recorded a loop at ";
       llvm::dbgs() << lhs << ": ";
       loop.dump(llvm::dbgs(), MutableTerm(lhs), *this);
+      llvm::dbgs() << "\n";
     }
 
     recordRewriteLoop(MutableTerm(lhs), loop);
