@@ -12,24 +12,31 @@
 
 @frozen
 public struct Duration: Sendable {
+  /// The low 64 bits of a 128-bit signed integer value counting attoseconds.
   @usableFromInline
-  internal var _attoseconds: _DoubleWidth<Int64>
+  internal var _low: UInt64
 
-  @inlinable
+  /// The high 64 bits of a 128-bit signed integer value counting attoseconds.
+  @usableFromInline
+  internal var _high: Int64
+
   internal init(_attoseconds: _DoubleWidth<Int64>) {
-    self._attoseconds = _attoseconds
+    self._low = _attoseconds.low
+    self._high = _attoseconds.high
   }
 
   internal init(_seconds: Int64, nanoseconds: Int64) {
     self = Duration.seconds(_seconds) + Duration.nanoseconds(nanoseconds)
   }
 
-  @inlinable
+  internal var _attoseconds: _DoubleWidth<Int64> {
+    _DoubleWidth((high: _high, low: _low))
+  }
+
   public var seconds: Int64 {
     Int64(_attoseconds / 1_000_000_000_000_000_000)
   }
 
-  @inlinable
   public var nanoseconds: Int64 {
     let seconds = _attoseconds / 1_000_000_000_000_000_000
     let nanoseconds =
@@ -39,19 +46,16 @@ public struct Duration: Sendable {
 }
 
 extension Duration {
-  @inlinable
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
     return Duration(_attoseconds: _DoubleWidth<Int64>(seconds) *
                                  1_000_000_000_000_000_000)
   }
 
-  @inlinable
   public static func seconds(_ seconds: Double) -> Duration {
     return Duration(_attoseconds: _DoubleWidth<Int64>(seconds *
                                  1_000_000_000_000_000_000))
   }
 
-  @inlinable
   public static func milliseconds<T: BinaryInteger>(
     _ milliseconds: T
   ) -> Duration {
@@ -59,13 +63,11 @@ extension Duration {
                                  1_000_000_000_000_000)
   }
 
-  @inlinable
   public static func milliseconds(_ milliseconds: Double) -> Duration {
     return Duration(_attoseconds: _DoubleWidth<Int64>(milliseconds *
                                  1_000_000_000_000_000))
   }
 
-  @inlinable
   public static func microseconds<T: BinaryInteger>(
     _ microseconds: T
   ) -> Duration {
@@ -73,13 +75,11 @@ extension Duration {
                                  1_000_000_000_000)
   }
 
-  @inlinable
   public static func microseconds(_ microseconds: Double) -> Duration {
     return Duration(_attoseconds: _DoubleWidth<Int64>(microseconds *
                                  1_000_000_000_000))
   }
 
-  @inlinable
   public static func nanoseconds<T: BinaryInteger>(
     _ nanoseconds: T
   ) -> Duration {
@@ -111,93 +111,77 @@ extension Duration: Codable {
 extension Duration: Hashable { }
 
 extension Duration: Equatable {
-  @inlinable
   public static func == (_ lhs: Duration, _ rhs: Duration) -> Bool {
     return lhs._attoseconds == rhs._attoseconds
   }
 }
 
 extension Duration: Comparable {
-  @inlinable
   public static func < (_ lhs: Duration, _ rhs: Duration) -> Bool {
     return lhs._attoseconds < rhs._attoseconds
   }
 }
 
 extension Duration: AdditiveArithmetic {
-  @inlinable
   public static var zero: Duration { Duration(_attoseconds: 0) }
 
-  @inlinable
   public static func + (_ lhs: Duration, _ rhs: Duration) -> Duration {
     return Duration(_attoseconds: lhs._attoseconds + rhs._attoseconds)
   }
 
-  @inlinable
   public static func - (_ lhs: Duration, _ rhs: Duration) -> Duration {
     return Duration(_attoseconds: lhs._attoseconds - rhs._attoseconds)
   }
 
-  @inlinable
   public static func += (_ lhs: inout Duration, _ rhs: Duration) {
     lhs = lhs + rhs
   }
 
-  @inlinable
   public static func -= (_ lhs: inout Duration, _ rhs: Duration) {
     lhs = lhs - rhs
   }
 }
 
 extension Duration {
-  @inlinable
   public static func / (_ lhs: Duration, _ rhs: Double) -> Duration {
     return Duration(_attoseconds:
       _DoubleWidth<Int64>(Double(lhs._attoseconds) / rhs))
   }
 
-  @inlinable
   public static func /= (_ lhs: inout Duration, _ rhs: Double) {
     lhs = lhs / rhs
   }
 
-  @inlinable
   public static func / <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
     Duration(_attoseconds: lhs._attoseconds / _DoubleWidth<Int64>(rhs))
   }
 
-  @inlinable
   public static func /= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {
     lhs = lhs / rhs
   }
 
-  @inlinable
   public static func / (_ lhs: Duration, _ rhs: Duration) -> Double {
     Double(lhs._attoseconds) / Double(rhs._attoseconds)
   }
 
-  @inlinable
   public static func * (_ lhs: Duration, _ rhs: Double) -> Duration {
     Duration(_attoseconds: _DoubleWidth<Int64>(Double(lhs._attoseconds) * rhs))
   }
 
-  @inlinable
   public static func * <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
     Duration(_attoseconds: lhs._attoseconds * _DoubleWidth<Int64>(rhs))
   }
 
-  @inlinable
   public static func *= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {
     lhs = lhs * rhs
   }
 }
 
 extension Duration: CustomStringConvertible {
-  @inlinable
   public var description: String {
     return (Double(_attoseconds) / 1e18).description + " seconds"
   }

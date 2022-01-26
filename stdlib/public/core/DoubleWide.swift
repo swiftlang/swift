@@ -44,28 +44,21 @@
 /// The `DoubleWidth` type is not intended as a replacement for a variable-width
 /// integer type. Nesting `DoubleWidth` instances, in particular, may result in
 /// undesirable performance.
-@frozen
-@usableFromInline
-struct _DoubleWidth<Base: FixedWidthInteger> {
-  @usableFromInline
-  typealias High = Base
-  @usableFromInline
-  typealias Low = Base.Magnitude
+internal struct _DoubleWidth<Base: FixedWidthInteger> {
+  internal typealias High = Base
+  internal typealias Low = Base.Magnitude
 
   /// The high part of the value.
-  @usableFromInline
-  var high: High
+  internal var high: High
 
   /// The low part of the value.
-  @usableFromInline
-  var low: Low
+  internal var low: Low
 
   /// Creates a new instance from the given tuple of high and low parts.
   ///
   /// - Parameter value: The tuple to use as the source of the new instance's
   ///   high and low parts.
-  @inlinable
-  init(_ value: (high: High, low: Low)) {
+  internal init(_ value: (high: High, low: Low)) {
     self.high = value.high
     self.low = value.low
   }
@@ -82,41 +75,35 @@ struct _DoubleWidth<Base: FixedWidthInteger> {
   //
   // For that reason, we'll include an internal initializer that takes two
   // separate arguments.
-  @inlinable
   internal init(_ high: High, _ low: Low) {
     self.init((high, low))
   }
 
-  @inlinable
-  init() {
+  internal init() {
     self.init(0, 0)
   }
 }
 
 extension _DoubleWidth: CustomStringConvertible {
-  @inlinable
-  var description: String {
+  internal var description: String {
     return String(self, radix: 10)
   }
 }
 
 extension _DoubleWidth: CustomDebugStringConvertible {
-  @inlinable
-  var debugDescription: String {
+  internal var debugDescription: String {
     return "(\(high), \(low))"
   }
 }
 
 extension _DoubleWidth: Equatable {
-  @inlinable
-  static func == (_ lhs: _DoubleWidth, _ rhs: _DoubleWidth) -> Bool {
+  internal static func == (_ lhs: _DoubleWidth, _ rhs: _DoubleWidth) -> Bool {
     return lhs.low == rhs.low && lhs.high == rhs.high
   }
 }
 
 extension _DoubleWidth: Comparable {
-  @inlinable
-  static func < (_ lhs: _DoubleWidth, _ rhs: _DoubleWidth) -> Bool {
+  internal static func < (_ lhs: _DoubleWidth, _ rhs: _DoubleWidth) -> Bool {
     if lhs.high < rhs.high {
       return true
     } else if lhs.high > rhs.high {
@@ -128,16 +115,14 @@ extension _DoubleWidth: Comparable {
 }
 
 extension _DoubleWidth: Hashable {
-  @inlinable
-  func hash(into hasher: inout Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     hasher.combine(low)
     hasher.combine(high)
   }
 }
 
 extension _DoubleWidth: AdditiveArithmetic {
-  @inlinable
-  static func - (
+  internal static func - (
     _ lhs: _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>
   ) -> _DoubleWidth<Base> {
     var lhs = lhs
@@ -145,15 +130,13 @@ extension _DoubleWidth: AdditiveArithmetic {
     return lhs
   }
 
-  @inlinable
-  static func -= (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
+  internal static func -= (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
     let (result, overflow) = lhs.subtractingReportingOverflow(rhs)
     precondition(!overflow, "Overflow in -=")
     lhs = result
   }
 
-  @inlinable
-  static func + (
+  internal static func + (
     _ lhs: _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>
   ) -> _DoubleWidth<Base> {
     var lhs = lhs
@@ -161,8 +144,7 @@ extension _DoubleWidth: AdditiveArithmetic {
     return lhs
   }
 
-  @inlinable
-  static func += (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
+  internal static func += (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
     let (result, overflow) = lhs.addingReportingOverflow(rhs)
     precondition(!overflow, "Overflow in +=")
     lhs = result
@@ -170,11 +152,9 @@ extension _DoubleWidth: AdditiveArithmetic {
 }
 
 extension _DoubleWidth : Numeric {
-  @usableFromInline
-  typealias Magnitude = _DoubleWidth<Low>
+  internal typealias Magnitude = _DoubleWidth<Low>
 
-  @inlinable
-  var magnitude: Magnitude {
+  internal var magnitude: Magnitude {
     let result = Magnitude(Low(truncatingIfNeeded: high), low)
     if Base.isSigned && high < (0 as High) {
       return ~result &+ 1
@@ -183,21 +163,18 @@ extension _DoubleWidth : Numeric {
     }
   }
 
-  @inlinable
   internal init(_ magnitude: Magnitude) {
     self.init(High(magnitude.high), magnitude.low)
   }
 
-  @inlinable
-  init<T : BinaryInteger>(_ source: T) {
+  internal init<T : BinaryInteger>(_ source: T) {
     guard let result = _DoubleWidth<Base>(exactly: source) else {
       preconditionFailure("Value is outside the representable range")
     }
     self = result
   }
 
-  @inlinable
-  init?<T : BinaryInteger>(exactly source: T) {
+  internal init?<T : BinaryInteger>(exactly source: T) {
     // Can't represent a negative 'source' if Base is unsigned.
     guard _DoubleWidth.isSigned || source >= 0 else {
       return nil
@@ -220,8 +197,7 @@ extension _DoubleWidth : Numeric {
     }
   }
 
-  @inlinable
-  static func * (
+  internal static func * (
     _ lhs: _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>
   ) -> _DoubleWidth<Base> {
     var lhs = lhs
@@ -229,8 +205,7 @@ extension _DoubleWidth : Numeric {
     return lhs
   }
 
-  @inlinable
-  static func *= (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
+  internal static func *= (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
     let (result, overflow) = lhs.multipliedReportingOverflow(by: rhs)
     precondition(!overflow, "Overflow in *=")
     lhs = result
@@ -239,16 +214,11 @@ extension _DoubleWidth : Numeric {
 
 
 extension _DoubleWidth {
-  @frozen
-  @usableFromInline
-  struct Words {
-    @usableFromInline
-    var high: High.Words
-    @usableFromInline
-    var low: Low.Words
+  internal struct Words {
+    internal var high: High.Words
+    internal var low: Low.Words
 
-    @inlinable
-    init(_ value: _DoubleWidth<Base>) {
+    internal init(_ value: _DoubleWidth<Base>) {
       // Multiples of word size only.
       guard Base.bitWidth == Base.Magnitude.bitWidth &&
             (UInt.bitWidth % Base.bitWidth == 0 ||
@@ -259,8 +229,7 @@ extension _DoubleWidth {
       assert(!low.isEmpty)
     }
 
-    @inlinable
-    init(high: High.Words, low: Low.Words) {
+    internal init(high: High.Words, low: Low.Words) {
       self.high = high
       self.low = low
     }
@@ -268,29 +237,24 @@ extension _DoubleWidth {
 }
 
 extension _DoubleWidth.Words: RandomAccessCollection {
-  @usableFromInline
-  typealias Index = Int
+  internal typealias Index = Int
 
-  @inlinable
-  var startIndex: Index {
+  internal var startIndex: Index {
     return 0
   }
 
-  @inlinable
-  var endIndex: Index {
+  internal var endIndex: Index {
     return count
   }
 
-  @inlinable
-  var count: Int {
+  internal var count: Int {
     if Base.bitWidth < UInt.bitWidth {
       return 1
     }
     return low.count + high.count
   }
 
-  @inlinable
-  subscript(_ i: Index) -> UInt {
+  internal subscript(_ i: Index) -> UInt {
     if Base.bitWidth < UInt.bitWidth {
       precondition(i == 0, "Invalid index")
       assert(2 * Base.bitWidth <= UInt.bitWidth)
@@ -305,33 +269,27 @@ extension _DoubleWidth.Words: RandomAccessCollection {
 }
 
 extension _DoubleWidth: FixedWidthInteger {
-  @inlinable
-  var words: Words {
+  internal var words: Words {
     return Words(self)
   }
 
-  @inlinable
-  static var isSigned: Bool {
+  internal static var isSigned: Bool {
     return Base.isSigned
   }
 
-  @inlinable
-  static var max: _DoubleWidth {
+  internal static var max: _DoubleWidth {
     return self.init(High.max, Low.max)
   }
 
-  @inlinable
-  static var min: _DoubleWidth {
+  internal static var min: _DoubleWidth {
     return self.init(High.min, Low.min)
   }
 
-  @inlinable
-  static var bitWidth: Int {
+  internal static var bitWidth: Int {
     return High.bitWidth + Low.bitWidth
   }
 
-  @inlinable
-  func addingReportingOverflow(
+  internal func addingReportingOverflow(
     _ rhs: _DoubleWidth<Base>
   ) -> (partialValue: _DoubleWidth<Base>, overflow: Bool) {
     let (low, lowOverflow) =
@@ -343,8 +301,7 @@ extension _DoubleWidth: FixedWidthInteger {
     return (partialValue: _DoubleWidth(result), overflow: overflow)
   }
 
-  @inlinable
-  func subtractingReportingOverflow(
+  internal func subtractingReportingOverflow(
     _ rhs: _DoubleWidth<Base>
   ) -> (partialValue: _DoubleWidth<Base>, overflow: Bool) {
     let (low, lowOverflow) =
@@ -356,8 +313,7 @@ extension _DoubleWidth: FixedWidthInteger {
     return (partialValue: _DoubleWidth(result), overflow: overflow)
   }
 
-  @inlinable
-  func multipliedReportingOverflow(
+  internal func multipliedReportingOverflow(
     by rhs: _DoubleWidth
   ) -> (partialValue: _DoubleWidth, overflow: Bool) {
     let (carry, product) = multipliedFullWidth(by: rhs)
@@ -374,8 +330,7 @@ extension _DoubleWidth: FixedWidthInteger {
     return (result, didCarry || hadPositiveOverflow)
   }
 
-  @inlinable
-  func quotientAndRemainder(
+  internal func quotientAndRemainder(
     dividingBy other: _DoubleWidth
   ) -> (quotient: _DoubleWidth, remainder: _DoubleWidth) {
     let (quotient, remainder) =
@@ -393,8 +348,7 @@ extension _DoubleWidth: FixedWidthInteger {
     return (quotient_, remainder_)
   }
 
-  @inlinable
-  func dividedReportingOverflow(
+  internal func dividedReportingOverflow(
     by other: _DoubleWidth
   ) -> (partialValue: _DoubleWidth, overflow: Bool) {
     if other == (0 as _DoubleWidth) {
@@ -406,8 +360,7 @@ extension _DoubleWidth: FixedWidthInteger {
     return (quotientAndRemainder(dividingBy: other).quotient, false)
   }
 
-  @inlinable
-  func remainderReportingOverflow(
+  internal func remainderReportingOverflow(
     dividingBy other: _DoubleWidth
   ) -> (partialValue: _DoubleWidth, overflow: Bool) {
     if other == (0 as _DoubleWidth) {
@@ -419,8 +372,7 @@ extension _DoubleWidth: FixedWidthInteger {
     return (quotientAndRemainder(dividingBy: other).remainder, false)
   }
 
-  @inlinable
-  func multipliedFullWidth(
+  internal func multipliedFullWidth(
     by other: _DoubleWidth
   ) -> (high: _DoubleWidth, low: _DoubleWidth.Magnitude) {
     let isNegative = _DoubleWidth.isSigned &&
@@ -461,8 +413,7 @@ extension _DoubleWidth: FixedWidthInteger {
     }
   }
 
-  @inlinable
-  func dividingFullWidth(
+  internal func dividingFullWidth(
     _ dividend: (high: _DoubleWidth, low: _DoubleWidth.Magnitude)
   ) -> (quotient: _DoubleWidth, remainder: _DoubleWidth) {
     let other = _DoubleWidth<_DoubleWidth>(dividend)
@@ -484,31 +435,26 @@ extension _DoubleWidth: FixedWidthInteger {
     return (quotient_, remainder_)
   }
 
-  @inlinable
-  static prefix func ~(x: _DoubleWidth) -> _DoubleWidth {
+  internal static prefix func ~(x: _DoubleWidth) -> _DoubleWidth {
     _DoubleWidth(~x.high, ~x.low)
   }
 
-  @inlinable
-  static func &= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
+  internal static func &= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
     lhs.low &= rhs.low
     lhs.high &= rhs.high
   }
 
-  @inlinable
-  static func |= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
+  internal static func |= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
     lhs.low |= rhs.low
     lhs.high |= rhs.high
   }
 
-  @inlinable
-  static func ^= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
+  internal static func ^= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
     lhs.low ^= rhs.low
     lhs.high ^= rhs.high
   }
 
-  @inlinable
-  static func <<= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
+  internal static func <<= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
     if _DoubleWidth.isSigned && rhs < (0 as _DoubleWidth) {
       lhs >>= 0 - rhs
       return
@@ -525,8 +471,7 @@ extension _DoubleWidth: FixedWidthInteger {
     lhs &<<= rhs
   }
 
-  @inlinable
-  static func >>= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
+  internal static func >>= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
     if _DoubleWidth.isSigned && rhs < (0 as _DoubleWidth) {
       lhs <<= 0 - rhs
       return
@@ -546,7 +491,6 @@ extension _DoubleWidth: FixedWidthInteger {
   /// "Masking" notionally involves repeatedly incrementing or decrementing this
   /// value by `self.bitWidth` until the result is contained in the range
   /// `0..<self.bitWidth`.
-  @usableFromInline
   internal func _masked() -> _DoubleWidth {
     // FIXME(integers): test types with bit widths that aren't powers of 2
     if _DoubleWidth.bitWidth.nonzeroBitCount == 1 {
@@ -558,8 +502,7 @@ extension _DoubleWidth: FixedWidthInteger {
     return self % _DoubleWidth(_DoubleWidth.bitWidth)
   }
 
-  @inlinable
-  static func &<<= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
+  internal static func &<<= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
     let rhs = rhs._masked()
 
     guard rhs.low < Base.bitWidth else {
@@ -577,8 +520,7 @@ extension _DoubleWidth: FixedWidthInteger {
     lhs.low &<<= rhs.low
   }
 
-  @inlinable
-  static func &>>= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
+  internal static func &>>= (_ lhs: inout _DoubleWidth, _ rhs: _DoubleWidth) {
     let rhs = rhs._masked()
 
     guard rhs.low < Base.bitWidth else {
@@ -597,8 +539,7 @@ extension _DoubleWidth: FixedWidthInteger {
     lhs.high &>>= High(rhs.low)
   }
 
-  @inlinable
-  static func / (
+  internal static func / (
     _ lhs: _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>
   ) -> _DoubleWidth<Base> {
     var lhs = lhs
@@ -606,15 +547,13 @@ extension _DoubleWidth: FixedWidthInteger {
     return lhs
   }
 
-  @inlinable
-  static func /= (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
+  internal static func /= (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
     let (result, overflow) = lhs.dividedReportingOverflow(by: rhs)
     precondition(!overflow, "Overflow in /=")
     lhs = result
   }
 
-  @inlinable
-  static func % (
+  internal static func % (
     _ lhs: _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>
   ) -> _DoubleWidth<Base> {
     var lhs = lhs
@@ -622,45 +561,38 @@ extension _DoubleWidth: FixedWidthInteger {
     return lhs
   }
 
-  @inlinable
-  static func %= (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
+  internal static func %= (_ lhs: inout _DoubleWidth<Base>, _ rhs: _DoubleWidth<Base>) {
     let (result, overflow) = lhs.remainderReportingOverflow(dividingBy: rhs)
     precondition(!overflow, "Overflow in %=")
     lhs = result
   }
 
-  @inlinable
-  init(_truncatingBits bits: UInt) {
+  internal init(_truncatingBits bits: UInt) {
     low = Low(_truncatingBits: bits)
     high = High(_truncatingBits: bits >> UInt(Low.bitWidth))
   }
 
-  @inlinable
-  init(integerLiteral x: Int64) {
+  internal init(integerLiteral x: Int64) {
     self.init(x)
   }
 
-  @inlinable
-  var leadingZeroBitCount: Int {
+  internal var leadingZeroBitCount: Int {
     return high == (0 as High) ?
             High.bitWidth + low.leadingZeroBitCount :
             high.leadingZeroBitCount
   }
 
-  @inlinable
-  var trailingZeroBitCount: Int {
+  internal var trailingZeroBitCount: Int {
     return low == (0 as Low) ?
                     Low.bitWidth + high.trailingZeroBitCount :
                     low.trailingZeroBitCount
   }
 
-  @inlinable
-  var nonzeroBitCount: Int {
+  internal var nonzeroBitCount: Int {
     return high.nonzeroBitCount + low.nonzeroBitCount
   }
 
-  @inlinable
-  var byteSwapped: _DoubleWidth {
+  internal var byteSwapped: _DoubleWidth {
     return _DoubleWidth(High(truncatingIfNeeded: low.byteSwapped),
                         Low(truncatingIfNeeded: high.byteSwapped))
   }
@@ -752,7 +684,6 @@ extension _DoubleWidth : UnsignedInteger where Base : UnsignedInteger {
 
   /// Returns the quotient and remainder after dividing a double-width
   /// magnitude `lhs` by a double-width magnitude `rhs`.
-  @usableFromInline
   internal static func _divide(
     _ lhs: Magnitude, by rhs: Magnitude
   ) -> (quotient: Magnitude, remainder: Magnitude) {
