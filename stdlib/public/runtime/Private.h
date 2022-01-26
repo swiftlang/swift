@@ -58,6 +58,13 @@ public:
   bool isStrong() const { return Data == 0; }
 };
 
+/// A struct to return pointer and its size back to Swift
+/// as `(UnsafePointer<UInt8>, Int)`.
+struct BufferAndSize {
+  const void *buffer;
+  intptr_t length; // negative length means error.
+};
+
 /// Type information consists of metadata and its ownership info,
 /// such information is used by `_typeByMangledName` accessor
 /// since we don't represent ownership attributes in the metadata
