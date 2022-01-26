@@ -4502,6 +4502,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   // Check whether we have a reasonable constraint type at all.
   if (!constraintType->is<ProtocolType>() &&
       !constraintType->is<ProtocolCompositionType>() &&
+      !constraintType->is<ParametrizedProtocolType>() &&
       !constraintType->getClassOrBoundGenericClass()) {
     if (source.getLoc().isValid() && !constraintType->hasError()) {
       Impl->HadAnyError = true;
@@ -4514,8 +4515,30 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     return ConstraintResult::Conflicting;
   }
 
+  // Parametrized protocol requirements.
+  if (auto *paramProtoType = constraintType->getAs<ParametrizedProtocolType>()) {
+    bool anyErrors = false;
+
+    auto *protoDecl = paramProtoType->getBaseType()->getDecl();
+
+    if (isErrorResult(addConformanceRequirement(resolvedSubject, protoDecl,
+                                                source)))
+        anyErrors = true;
+
+    auto *assocType = paramProtoType->getAssocType();
+    auto depType = DependentMemberType::get(
+        resolvedSubject.getDependentType(*this), assocType);
+    if (isErrorResult(addSameTypeRequirement(Type(depType),
+                                             paramProtoType->getArgumentType(),
+                                             source,
+                                             UnresolvedHandlingKind::GenerateConstraints)))
+      anyErrors = true;
+
+    return anyErrors ? ConstraintResult::Conflicting
+                     : ConstraintResult::Resolved;
+
   // Protocol requirements.
-  if (constraintType->isExistentialType()) {
+  } else if (constraintType->isExistentialType()) {
     bool anyErrors = false;
     auto layout = constraintType->getExistentialLayout();
 
