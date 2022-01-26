@@ -60,7 +60,7 @@ final class FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 

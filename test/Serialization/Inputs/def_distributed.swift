@@ -61,7 +61,7 @@ public struct FakeActorSystem: DistributedActorSystem {
   public func resignID(_ id: ActorID) {
   }
 
-  public func makeInvocationEncoder() -> InvocationDecoder {
+  public func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 }

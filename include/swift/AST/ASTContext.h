@@ -649,8 +649,9 @@ public:
   /// Retrieve the declaration of DistributedActorSystem.remoteCall(Void)(...).
   ///
   /// \param actorOrSystem distributed actor or actor system to get the
-  /// remoteCall function for. If null, the 'DistributedActorSystem' protocol is
-  /// used.
+  /// remoteCall function for. Since the method we're looking for is an ad-hoc
+  /// requirement, a specific type MUST be passed here as it is not possible
+  /// to obtain the decl from just the `DistributedActorSystem` protocol type.
   /// \param isVoidReturn true if the call will be returning `Void`.
   AbstractFunctionDecl *getRemoteCallOnDistributedActorSystem(
       NominalTypeDecl *actorOrSystem,

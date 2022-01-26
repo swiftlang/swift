@@ -315,16 +315,20 @@ func _executeDistributedTarget(
 /// A distributed 'target' can be a `distributed func` or `distributed` computed property.
 @available(SwiftStdlib 5.6, *)
 public struct RemoteCallTarget {
-  let mangledName: String // TODO: StaticString would be better here; no arc, codesize of cleanups
+  let _mangledName: String // TODO: StaticString would be better here; no arc, codesize of cleanups
 
   // Only intended to be created by the _Distributed library.
   // TODO(distributed): make this internal and only allow calling by the synthesized code?
   public init(_mangledName: String) {
-    self.mangledName = _mangledName
+    self._mangledName = _mangledName
+  }
+
+  public var mangledName: String {
+    _mangledName
   }
 
   // <module>.Base.hello(hi:)
-  var fullName: String {
+  public var fullName: String {
     fatalError("NOT IMPLEMENTED YET: \(#function)")
   }
 }

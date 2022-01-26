@@ -15,16 +15,12 @@
 // FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
 // UNSUPPORTED: linux
 
-// XFAIL: *
-// FIXME(distributed): generics will come very shortly
-
 import _Distributed
 
 distributed actor Greeter {
-  distributed func generic<V: Codable>(_ value: V) -> String {
-    return "\(value)"
+  distributed func takeThrowReturn(name: String) async throws -> String {
+    name
   }
-
 }
 
 
@@ -42,6 +38,10 @@ struct FakeActorSystem: DistributedActorSystem {
   typealias InvocationDecoder = FakeInvocation
   typealias InvocationEncoder = FakeInvocation
   typealias SerializationRequirement = Codable
+
+//  let state0: String = ""
+//  let state1: String = ""
+//  let state2: String = ""
 
   init() {}
 
@@ -72,15 +72,16 @@ struct FakeActorSystem: DistributedActorSystem {
     on actor: Act,
     target: RemoteCallTarget,
     invocationDecoder: inout InvocationDecoder,
-    throwing errorType: Err.Type,
-    returning returnType: Res.Type
+    throwing: Err.Type,
+    returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
           Err: Error,
-//          Act.ID == ActorID,
-          Res: SerializationRequirement {
-    print("remoteCall: on:\(actor), target:\(target), invocation:\(invocationDecoder), throwing:\(errorType), returning:\(returnType)")
-    return "<MOCK ECHO>" as! Res
+          Res: SerializationRequirement
+//          Act.ID == ActorID
+  {
+    print("remoteCall: on:\(actor), target:\(target), invocation:\(invocationDecoder), throwing:\(throwing), returning:\(returning)")
+    return "<mock remote call>" as! Res
   }
 
   func remoteCallVoid<Act, Err>(
@@ -90,7 +91,7 @@ struct FakeActorSystem: DistributedActorSystem {
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-    Err: Error
+          Err: Error
 //          Act.ID == ActorID
   {
     print("remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocationDecoder), throwing:\(throwing)")
@@ -102,18 +103,17 @@ struct FakeActorSystem: DistributedActorSystem {
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
-  var types: [Any.Type] = []
   var arguments: [Any] = []
   var returnType: Any.Type? = nil
   var errorType: Any.Type? = nil
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
-    types.append(type)
+    fatalError("NOT IMPLEMENTED: \(#function)")
   }
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
     arguments.append(argument)
   }
-  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws { // FIXME: how to pass the conformance!!!!
     self.errorType = type
   }
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {
@@ -170,26 +170,17 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-// actual mangled name:
-let emptyName = "$s4main7GreeterC5emptyyyFTE"
-let helloName = "$s4main7GreeterC5helloSSyFTE"
-let answerName = "$s4main7GreeterC6answerSiyFTE"
-let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
-let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
-
-let echoName = "$s4main7GreeterC4echo4nameS2S_tFTE"
-
 func test() async throws {
   let system = FakeActorSystem()
 
   let local = Greeter(system: system)
   let ref = try Greeter.resolve(id: local.id, using: system)
 
-  let reply = try await ref.generic("Caplin")
-  // CHECK: remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC4echo4nameS2S_tFTE"), invocation:FakeInvocation(arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil, argumentIndex: 0), throwing:Never, returning:String
+  let value = try await ref.takeThrowReturn(name: "Example")
+  // CHECK: remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC15takeThrowReturn4nameS2S_tYaKFTE"), invocation:FakeInvocation(arguments: ["Example"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error.Protocol), argumentIndex: 0), throwing:Error.Protocol, returning:String
 
-  print("reply: \(reply)")
-  // CHECK: reply: <MOCK ECHO>
+  print("value: \(value)")
+  // CHECK: value: <mock remote call>
 }
 
 @main struct Main {

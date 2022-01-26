@@ -159,7 +159,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           "    target: RemoteCallTarget,\n"
           "    invocationDecoder: inout InvocationDecoder,\n"
           "    throwing: Err.Type\n"
-          ") async throws -> Res\n"
+          ") async throws\n"
           "  where Act: DistributedActor,\n"
           "        Act.ID == ActorID,\n"
           "        Err: Error\n");

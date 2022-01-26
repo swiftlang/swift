@@ -71,7 +71,7 @@ public struct FakeActorSystem: DistributedActorSystem {
   public func resignID(_ id: ActorID) {
   }
 
-  public func makeInvocationEncoder() -> InvocationDecoder {
+  public func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 
@@ -82,14 +82,24 @@ public struct FakeActorSystem: DistributedActorSystem {
       throwing: Err.Type,
       returning: Res.Type
   ) async throws -> Res
-      where Act: DistributedActor,
-            Act.ID == ActorID,
-            Err: Error
-//      ,
-//            Res: SerializationRequirement
-  {
-    throw ExecuteDistributedTargetError(
-      message: "Not implemented.")
+    where Act: DistributedActor,
+          Err: Error,
+//        Act.ID == ActorID,
+          Res: SerializationRequirement {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+
   }
 }
 

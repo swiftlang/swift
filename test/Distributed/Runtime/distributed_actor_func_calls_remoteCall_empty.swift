@@ -59,7 +59,7 @@ struct FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 
@@ -180,7 +180,7 @@ func test() async throws {
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   try await ref.empty()
-  // CHECK: remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(mangledName: "$s4main7GreeterC5emptyyyFTE"), invocation:FakeInvocation(arguments: [], returnType: nil, errorType: nil, argumentIndex: 0), throwing:Never
+  // CHECK: remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC5emptyyyFTE"), invocation:FakeInvocation(arguments: [], returnType: nil, errorType: nil, argumentIndex: 0), throwing:Never
 }
 
 @main struct Main {

@@ -60,7 +60,7 @@ struct FakeActorSystem: DistributedActorSystem {
     print("ready id:\(id)")
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 }

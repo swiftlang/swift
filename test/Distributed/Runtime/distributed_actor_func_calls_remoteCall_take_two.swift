@@ -70,7 +70,7 @@ struct FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 
@@ -183,10 +183,10 @@ func test() async throws {
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   try await ref.take(name: "Caplin", int: 1337)
-  // CHECK: remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(mangledName: "$s4main7GreeterC4take4name3intySS_SitFTE"), invocation:FakeInvocation(arguments: ["Caplin", 1337], returnType: nil, errorType: nil, argumentIndex: 0), throwing:Never
+  // CHECK: remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC4take4name3intySS_SitFTE"), invocation:FakeInvocation(arguments: ["Caplin", 1337], returnType: nil, errorType: nil, argumentIndex: 0), throwing:Never
 
   try await ref.take(name: "Caplin", int: 1337, clazz: .init())
-  // CHECK: remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(mangledName: "$s4main7GreeterC4take4name3int5clazzySS_SiAA9SomeClassCtFTE"), invocation:FakeInvocation(arguments: ["Caplin", 1337, main.SomeClass], returnType: nil, errorType: nil, argumentIndex: 0), throwing:Never
+  // CHECK: remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC4take4name3int5clazzySS_SiAA9SomeClassCtFTE"), invocation:FakeInvocation(arguments: ["Caplin", 1337, main.SomeClass], returnType: nil, errorType: nil, argumentIndex: 0), throwing:Never
 
 }
 

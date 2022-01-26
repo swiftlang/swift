@@ -1282,6 +1282,7 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
 
 AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
     NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
+  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
   const NominalTypeDecl *system = actorOrSystem;
   if (actorOrSystem && actorOrSystem->isDistributedActor()) {
     auto var = actorOrSystem->getDistributedActorSystemProperty();

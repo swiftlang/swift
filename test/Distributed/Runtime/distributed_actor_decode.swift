@@ -70,9 +70,36 @@ final class FakeActorSystem: DistributedActorSystem {
     print("resign address:\(id)")
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+      fatalError("not implemented: \(#function)")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+      fatalError("not implemented: \(#function)")
+  }
+
 }
 
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {

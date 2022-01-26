@@ -1050,14 +1050,17 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           B.createFunctionRefFor(loc, recordArgumentFnSIL);
 
       // --- invoke recordArgument for every parameter
-      assert(paramsForForwarding.size() == fd->getParameters()->size() + 1);
+      auto funcDeclParamsNum = fd->getParameters()->size();
+      assert(funcDeclParamsNum > 0 &&
+             "attempted recording arguments but no actual parameters declared "
+             "on distributed method");
+
+      assert(paramsForForwarding.size() == funcDeclParamsNum + 1);
       assert(paramsForForwarding.back()->getType().getNominalOrBoundGenericNominal()->isDistributedActor());
       // the parameters for forwarding include `self`, but here we should not
       // copy that self, so we just drop it.
       paramsForForwarding.pop_back();
 
-      auto funcDeclParamsNum = fd->getParameters()->size();
-      assert(funcDeclParamsNum > 0);
       unsigned long paramIdx = 0;
       Optional<SILValue> previousArgumentToDestroy;
       for (SILValue paramValue : paramsForForwarding) {
@@ -1182,8 +1185,10 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
     // === encoder.recordErrorType() -------------------------------------------
     if (shouldRecordErrorType) {
-      if (recordErrorTypeBB)
+      if (recordErrorTypeBB) {
         B.emitBlock(recordErrorTypeBB);
+        createVoidPhiArgument(*this, ctx, recordErrorTypeBB);
+      }
 
       if (recordReturnTypeBB) {
         nextNormalBB = recordReturnTypeBB;
@@ -1455,7 +1460,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // %49 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mSgtYaKAJ0bC0RzSeR0_SER0_AA0C7AddressV2IDRtzr1_lF : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %50
       auto remoteCallFnDecl =
           ctx.getRemoteCallOnDistributedActorSystem(selfTyDecl, /*isVoid=*/resultType.isVoid());
-//          selfTyDecl->getDistributedActorSystemRemoteCallFunction();
       assert(remoteCallFnDecl && "no remoteCall func found!");
       auto remoteCallFnRef = SILDeclRef(remoteCallFnDecl);
       auto remoteCallFnSIL =
