@@ -279,22 +279,6 @@ GetDistributedActorSystemRemoteCallFunctionRequest::evaluate(
 /************************ SYNTHESIS ENTRY POINT *******************************/
 /******************************************************************************/
 
-AbstractFunctionDecl *GetDistributedRemoteFuncRequest::evaluate(
-    Evaluator &evaluator, AbstractFunctionDecl *func) const {
-  if (!func->isDistributed())
-    return nullptr;
-
-  auto &C = func->getASTContext();
-  DeclContext *DC = func->getDeclContext();
-
-  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
-  // we won't be emitting the offending decl after all.
-  if (!C.getLoadedModule(C.Id_Distributed))
-    return nullptr;
-
-  return addImplicitDistributedActorRemoteFunction(DC, func);
-}
-
 VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *actor) const {
   if (!actor->isDistributedActor())

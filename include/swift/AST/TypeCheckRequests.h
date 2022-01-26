@@ -1017,24 +1017,6 @@ public:
     bool isCached() const { return true; }
 };
 
-/// Obtain the 'remote' counterpart of a 'distributed func'.
-class GetDistributedRemoteFuncRequest :
-    public SimpleRequest<GetDistributedRemoteFuncRequest,
-                         AbstractFunctionDecl *(AbstractFunctionDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  AbstractFunctionDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
-
-public:
-    // Caching
-    bool isCached() const { return true; }
-};
-
 /// Obtain the 'remoteCall' function of a 'DistributedActorSystem'.
 class GetDistributedActorSystemRemoteCallFunctionRequest :
     public SimpleRequest<GetDistributedActorSystemRemoteCallFunctionRequest,

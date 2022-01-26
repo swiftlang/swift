@@ -7434,18 +7434,6 @@ bool AbstractFunctionDecl::isDistributed() const {
 }
 
 AbstractFunctionDecl*
-AbstractFunctionDecl::getDistributedActorRemoteFuncDecl() const {
-  if (!this->isDistributed())
-    return nullptr;
-
-  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      GetDistributedRemoteFuncRequest{mutableThis},
-      nullptr);
-}
-
-AbstractFunctionDecl*
 NominalTypeDecl::getDistributedActorSystemMakeInvocationEncoderFunction() const {
   auto &C = this->getASTContext();
   NominalTypeDecl *system = const_cast<NominalTypeDecl *>(this);
