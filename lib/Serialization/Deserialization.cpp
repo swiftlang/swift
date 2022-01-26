@@ -5618,6 +5618,26 @@ public:
     return ProtocolCompositionType::get(ctx, protocols, hasExplicitAnyObject);
   }
 
+  Expected<Type> deserializeParametrizedProtocolType(ArrayRef<uint64_t> scratch,
+                                                     StringRef blobData) {
+
+    uint64_t baseTyID, argTyID;
+
+    decls_block::ParametrizedProtocolTypeLayout::readRecord(scratch,
+                                                            baseTyID, argTyID);
+
+    auto baseTy = MF.getTypeChecked(baseTyID);
+    if (!baseTy)
+      return baseTy.takeError();
+
+    auto argTy = MF.getTypeChecked(argTyID);
+    if (!argTy)
+      return argTy.takeError();
+
+    return ParametrizedProtocolType::get(
+        ctx, (*baseTy)->castTo<ProtocolType>(), *argTy);
+  }
+
   Expected<Type> deserializeExistentialType(ArrayRef<uint64_t> scratch,
                                             StringRef blobData) {
     TypeID constraintID;

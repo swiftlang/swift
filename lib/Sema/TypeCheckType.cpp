@@ -624,6 +624,44 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
 
+  if (ctx.LangOpts.EnableParametrizedProtocolTypes) {
+    if (auto *protoType = type->getAs<ProtocolType>()) {
+      // Build ParametrizedProtocolType if the protocol has a primary associated
+      // type and we're in a supported context (for now just generic requirements,
+      // inheritance clause, extension binding).
+      if (!resolution.getOptions().isParametrizedProtocolSupported()) {
+        diags.diagnose(loc, diag::parametrized_protocol_not_supported);
+        return ErrorType::get(ctx);
+      }
+
+      auto *protoDecl = protoType->getDecl();
+      if (protoDecl->getPrimaryAssociatedType() == nullptr) {
+        diags.diagnose(loc, diag::protocol_does_not_have_primary_assoc_type,
+                       protoType);
+
+        return ErrorType::get(ctx);
+      }
+
+      auto genericArgs = generic->getGenericArgs();
+
+      if (genericArgs.size() != 1) {
+        diags.diagnose(loc, diag::protocol_cannot_have_multiple_generic_arguments,
+                       protoType);
+
+        return ErrorType::get(ctx);
+      }
+
+      auto genericResolution =
+        resolution.withOptions(adjustOptionsForGenericArgs(options));
+
+      Type argTy = genericResolution.resolveType(genericArgs[0], silParams);
+      if (!argTy || argTy->hasError())
+        return ErrorType::get(ctx);
+
+      return ParametrizedProtocolType::get(ctx, protoType, argTy);
+    }
+  }
+
   // We must either have an unbound generic type, or a generic type alias.
   if (!type->is<UnboundGenericType>()) {
      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
@@ -3634,6 +3672,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
   case TypeResolverContext::GenericRequirement:
+  case TypeResolverContext::ExistentialConstraint:
   case TypeResolverContext::SameTypeRequirement:
   case TypeResolverContext::ProtocolMetatypeBase:
   case TypeResolverContext::MetatypeBase:
@@ -3849,9 +3888,13 @@ NeverNullType
 TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
                                      TypeResolutionOptions options) {
   auto constraintType = resolveType(repr->getConstraint(),
-      options.withContext(TypeResolverContext::GenericRequirement));
+      options.withContext(TypeResolverContext::ExistentialConstraint));
   if (constraintType->is<ExistentialMetatypeType>())
     return constraintType;
+
+  // If we already failed, don't diagnose again.
+  if (constraintType->hasError())
+    return ErrorType::get(getASTContext());
 
   auto anyStart = repr->getAnyLoc();
   auto anyEnd = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, anyStart);

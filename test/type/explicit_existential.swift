@@ -225,3 +225,6 @@ func testAnyTypeExpr() {
   let invalid = any P
   test(invalid)
 }
+
+func hasInvalidExistential(_: any DoesNotExistIHope) {}
+// expected-error@-1 {{cannot find type 'DoesNotExistIHope' in scope}}

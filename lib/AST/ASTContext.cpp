@@ -405,6 +405,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
+    llvm::FoldingSet<ParametrizedProtocolType> ParametrizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
     llvm::DenseMap<std::pair<OpaqueTypeDecl *, SubstitutionMap>,
                    GenericEnvironment *> OpaqueArchetypeEnvironments;
@@ -3240,8 +3241,35 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
                                                   Members,
                                                   HasExplicitAnyObject,
                                                   properties);
-  C.getImpl().getArena(arena).ProtocolCompositionTypes.InsertNode(compTy, InsertPos);
+  C.getImpl().getArena(arena).ProtocolCompositionTypes.InsertNode(
+      compTy, InsertPos);
   return compTy;
+}
+
+Type ParametrizedProtocolType::get(const ASTContext &C,
+                                   ProtocolType *baseTy,
+                                   Type argTy) {
+  bool isCanonical = baseTy->isCanonical();
+  RecursiveTypeProperties properties = baseTy->getRecursiveProperties();
+  properties |= argTy->getRecursiveProperties();
+  isCanonical &= argTy->isCanonical();
+
+  auto arena = getArena(properties);
+
+  void *InsertPos = nullptr;
+  llvm::FoldingSetNodeID ID;
+  ParametrizedProtocolType::Profile(ID, baseTy, argTy);
+
+  if (auto paramTy
+      = C.getImpl().getArena(arena).ParametrizedProtocolTypes
+          .FindNodeOrInsertPos(ID, InsertPos))
+    return paramTy;
+
+  auto paramTy = new (C, arena) ParametrizedProtocolType(
+        isCanonical ? &C : nullptr, baseTy, argTy, properties);
+  C.getImpl().getArena(arena).ParametrizedProtocolTypes.InsertNode(
+      paramTy, InsertPos);
+  return paramTy;
 }
 
 ReferenceStorageType *ReferenceStorageType::get(Type T,

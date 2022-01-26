@@ -579,6 +579,11 @@ namespace {
                                        IsTypeExpansionSensitive_t isSensitive) {
       return visitExistentialType(type, origType, isSensitive);
     }
+    RetTy visitParametrizedProtocolType(CanParametrizedProtocolType type,
+                                        AbstractionPattern origType,
+                                        IsTypeExpansionSensitive_t isSensitive) {
+      return visitExistentialType(type, origType, isSensitive);
+    }
 
     // Enums depend on their enumerators.
     RetTy visitEnumType(CanEnumType type, AbstractionPattern origType,

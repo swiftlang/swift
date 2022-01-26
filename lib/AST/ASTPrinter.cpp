@@ -5877,6 +5877,13 @@ public:
     }
   }
 
+  void visitParametrizedProtocolType(ParametrizedProtocolType *T) {
+    visit(T->getBaseType());
+    Printer << "<";
+    visit(T->getArgumentType());
+    Printer << ">";
+  }
+
   void visitExistentialType(ExistentialType *T) {
     if (Options.PrintExplicitAny)
       Printer << "any ";
