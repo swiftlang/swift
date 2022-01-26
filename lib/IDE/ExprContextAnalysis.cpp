@@ -339,6 +339,7 @@ namespace {
 class ExprParentFinder : public ASTWalker {
   friend class ExprContextAnalyzer;
   Expr *ChildExpr;
+  bool AcceptRangeMatch;
   std::function<bool(ParentTy, ParentTy)> Predicate;
 
   bool arePositionsSame(Expr *E1, Expr *E2) {
@@ -348,14 +349,20 @@ class ExprParentFinder : public ASTWalker {
 
 public:
   llvm::SmallVector<ParentTy, 5> Ancestors;
-  ExprParentFinder(Expr *ChildExpr,
+
+  /// Search for the \p ChildExpr in the decl context that is walked by this
+  /// \c ExprParentFinder. Add every parent node that matches \p Predicate to
+  /// \c Ancestors. If \p AcceptRangeMatch is \c true, consider an expression
+  /// with the same source range as \p ChildExpr equivalent to \p ChildExpr.
+  ExprParentFinder(Expr *ChildExpr, bool AcceptRangeMatch,
                    std::function<bool(ParentTy, ParentTy)> Predicate)
-      : ChildExpr(ChildExpr), Predicate(Predicate) {}
+      : ChildExpr(ChildExpr), AcceptRangeMatch(AcceptRangeMatch),
+        Predicate(Predicate) {}
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     // Finish if we found the target. 'ChildExpr' might have been replaced
     // with typechecked expression. In that case, match the position.
-    if (E == ChildExpr || arePositionsSame(E, ChildExpr))
+    if (E == ChildExpr || (AcceptRangeMatch && arePositionsSame(E, ChildExpr)))
       return {false, nullptr};
 
     if (E != ChildExpr && Predicate(E, Parent)) {
@@ -405,6 +412,28 @@ public:
     if (Predicate(P, Parent))
       Ancestors.pop_back();
     return P;
+  }
+};
+
+/// Finds all the \c DeclRefExprs that reference a given \c ValueExpr.
+class DeclRefFinder : public ASTWalker {
+  /// Search for \c DeclRefExprs that reference this value.
+  ValueDecl *SearchValue;
+
+public:
+  /// After the \c DeclRefFinder walked a \c DeclContext, the \c DeclRefExprs
+  /// that reference \c SearchValue.
+  std::vector<DeclRefExpr *> Refs;
+
+  DeclRefFinder(ValueDecl *SearchValue) : SearchValue(SearchValue) {}
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (auto *DR = dyn_cast<DeclRefExpr>(E)) {
+      if (DR->getDecl() == SearchValue) {
+        Refs.push_back(DR);
+      }
+    }
+    return {true, E};
   }
 };
 
@@ -827,6 +856,10 @@ getPositionInParams(DeclContext &DC, const ArgumentList *Args, Expr *CCExpr,
 class ExprContextAnalyzer {
   DeclContext *DC;
   Expr *ParsedExpr;
+  /// If \p AcceptRangeMatch is \c true, analyze consider expressions with the
+  /// same source range as \p ParsedExpr equivalent to \p ParsedExpr and analyze
+  /// those instead.
+  bool AcceptRangeMatch;
   SourceManager &SM;
   ASTContext &Context;
 
@@ -1176,6 +1209,71 @@ class ExprContextAnalyzer {
     return SM.rangeContains(E->getSourceRange(), ParsedExpr->getSourceRange());
   }
 
+  void recordPossibleTypeForPattern(Pattern *InitPattern, Expr *InitExpr) {
+    if (!InitPattern->hasType()) {
+      return;
+    }
+    Type InitType = InitPattern->getType();
+
+    // Consider completion in the following code fragement
+    //   let x = #^COMPLETE^#
+    //   foo(x) // with func foo(_ x: Int) {}
+    // x has unresolved type so by default we can't show any type relations
+    // for the global completions resulting from #^COMPLETE^#. But we know that
+    // x is later used in a situation that requires an Int, so we can prioritize
+    // code completion results that return an Int.
+    //
+    // This is particularly useful for result builders. Here, a result builder
+    //   @ViewBuilder var body: some View {
+    //     Text("Foo")
+    //     #^COMPLETE^#
+    //   }
+    // gets rewritten to
+    //   @ViewBuilder var body: some View {
+    //     let $__builder2: Text
+    //     let $__builder0 = Text("Foo")
+    //     let $__builder1 = #^COMPLETE^#
+    //     $__builder2 = ViewBuilder.buildBlock($__builder0, $__builder1)
+    //     return $__builder2
+    //   }
+    // which puts us in exactly the situation described above.
+    if (InitType->is<UnresolvedType>() && InitExpr == ParsedExpr) {
+      if (auto *Var = InitPattern->getSingleVar()) {
+        // We are in the let x = #^COMPLETE^# situation described above.
+        // Find any references to the newly defined variable with unresolved
+        // type, compute the contextual type where they are being used and
+        // report those contextual types for the newly defined variable.
+        // Note: We currently form the union of the contextual types of all var
+        // usages. Technically the intersection would be more correct, but
+        // that's non-trivial to compute.
+        DeclRefFinder DeclRefs(Var);
+        DC->walkContext(DeclRefs);
+        for (auto *DR : DeclRefs.Refs) {
+          // We only care about the contextual types of the variable usage.
+          // Discard everything else computed by the SubAnalyzer.
+          Expr *DiscardAnalyzedExpr = nullptr;
+          SmallVector<PossibleParamInfo, 0> DiscardPossibleParams;
+          SmallVector<FunctionTypeAndDecl, 0> DiscardPossibleCallees;
+          bool DiscardImplictSingleExpressionReturn;
+          // In result builders references to the implicitly declared variable
+          // have the same source range as its initializing expression, so we
+          // can't consider expressions with the same range as the variable
+          // reference equivalent or we'd end up in an infinite loop because we
+          // keep finding the initializing expression.
+          ExprContextAnalyzer SubAnalyzer(
+              DC, DR, /*AcceptRangeMatch=*/false, PossibleTypes,
+              DiscardPossibleParams, DiscardPossibleCallees,
+              DiscardAnalyzedExpr, DiscardImplictSingleExpressionReturn);
+          SubAnalyzer.Analyze();
+        }
+        return;
+      }
+    }
+
+    // We're not in the situation described above. Just record the type.
+    recordPossibleType(InitType);
+  }
+
   void analyzeDecl(Decl *D) {
     switch (D->getKind()) {
     case DeclKind::PatternBinding: {
@@ -1183,10 +1281,8 @@ class ExprContextAnalyzer {
       for (unsigned I : range(PBD->getNumPatternEntries())) {
         if (auto Init = PBD->getInit(I)) {
           if (containsTarget(Init)) {
-            if (PBD->getPattern(I)->hasType()) {
-              recordPossibleType(PBD->getPattern(I)->getType());
-              break;
-            }
+            recordPossibleTypeForPattern(PBD->getPattern(I), Init);
+            break;
           }
         }
       }
@@ -1289,15 +1385,15 @@ class ExprContextAnalyzer {
   }
 
 public:
-  ExprContextAnalyzer(
-      DeclContext *DC, Expr *ParsedExpr, SmallVectorImpl<Type> &PossibleTypes,
-      SmallVectorImpl<PossibleParamInfo> &PossibleArgs,
-      SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
-      Expr *&AnalyzedExpr, bool &implicitSingleExpressionReturn)
-      : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
-        Context(DC->getASTContext()), PossibleTypes(PossibleTypes),
-        PossibleParams(PossibleArgs), PossibleCallees(PossibleCallees),
-        AnalyzedExpr(AnalyzedExpr),
+  ExprContextAnalyzer(DeclContext *DC, Expr *ParsedExpr, bool AcceptRangeMatch,
+                      SmallVectorImpl<Type> &PossibleTypes,
+                      SmallVectorImpl<PossibleParamInfo> &PossibleArgs,
+                      SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
+                      Expr *&AnalyzedExpr, bool &implicitSingleExpressionReturn)
+      : DC(DC), ParsedExpr(ParsedExpr), AcceptRangeMatch(AcceptRangeMatch),
+        SM(DC->getASTContext().SourceMgr), Context(DC->getASTContext()),
+        PossibleTypes(PossibleTypes), PossibleParams(PossibleArgs),
+        PossibleCallees(PossibleCallees), AnalyzedExpr(AnalyzedExpr),
         implicitSingleExpressionReturn(implicitSingleExpressionReturn) {}
 
   void Analyze() {
@@ -1305,7 +1401,7 @@ public:
     if (!ParsedExpr)
       return;
 
-    ExprParentFinder Finder(ParsedExpr, [&](ASTWalker::ParentTy Node,
+    ExprParentFinder Finder(ParsedExpr, AcceptRangeMatch, [&](ASTWalker::ParentTy Node,
                                             ASTWalker::ParentTy Parent) {
       if (auto E = Node.getAsExpr()) {
         switch (E->getKind()) {
@@ -1405,8 +1501,8 @@ public:
 } // end anonymous namespace
 
 ExprContextInfo::ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
-  ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleParams,
-                               PossibleCallees, AnalyzedExpr,
-                               implicitSingleExpressionReturn);
+  ExprContextAnalyzer Analyzer(DC, TargetExpr, /*AcceptRangeMatch=*/true,
+                               PossibleTypes, PossibleParams, PossibleCallees,
+                               AnalyzedExpr, implicitSingleExpressionReturn);
   Analyzer.Analyze();
 }
