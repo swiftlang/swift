@@ -2,31 +2,67 @@
 
 set -ex
 
-sudo apt update
+if [[ "$(cat /etc/system-release)" == *"Amazon Linux release 2"* ]]; then
+  sudo yum -y install   \
+    clang               \
+    curl-devel          \
+    gcc-c++             \
+    git                 \
+    glibc-static        \
+    libbsd-devel        \
+    libedit-devel       \
+    libicu-devel        \
+    libuuid-devel       \
+    libxml2-devel       \
+    ncurses-compat-libs \
+    ncurses-devel       \
+    ninja-build         \
+    pexpect             \
+    pkgconfig           \
+    procps-ng           \
+    python              \
+    python-devel        \
+    python-pkgconfig    \
+    python-six          \
+    python3-devel       \
+    rsync               \
+    sqlite-devel        \
+    swig                \
+    tzdata              \
+    uuid-devel          \
+    wget                \
+    which
 
-if [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=18.04" ]; then
-  sudo apt install -y \
-    git ninja-build clang-10 python python-six \
-    uuid-dev libicu-dev icu-devtools libbsd-dev \
-    libedit-dev libxml2-dev libsqlite3-dev swig \
-    libpython-dev libncurses5 libncurses5-dev pkg-config \
-    libblocksruntime-dev libcurl4-openssl-dev \
-    make systemtap-sdt-dev tzdata rsync wget llvm-10 zip unzip
-  sudo ln -s -f /usr/bin/clang-10 /usr/bin/clang
-  sudo ln -s -f /usr/bin/clang++-10 /usr/bin/clang++
-elif [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=20.04" ]; then
-  sudo apt install -y \
-    git ninja-build clang python python-six \
-    uuid-dev libicu-dev icu-devtools libbsd-dev \
-    libedit-dev libxml2-dev libsqlite3-dev swig \
-    libpython2-dev libncurses5 libncurses5-dev pkg-config \
-    libblocksruntime-dev libcurl4-openssl-dev \
-    make systemtap-sdt-dev tzdata rsync wget llvm zip unzip
+  if [ ! -e /usr/local/bin/ninja ]; then
+    sudo ln -s /usr/bin/ninja-build /usr/local/bin/ninja
+  fi
 else
-  echo "Unknown Ubuntu version"
-  exit 1
+  sudo apt update
+
+  if [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=18.04" ]; then
+    sudo apt install -y \
+      git ninja-build clang-10 python python-six \
+      uuid-dev libicu-dev icu-devtools libbsd-dev \
+      libedit-dev libxml2-dev libsqlite3-dev swig \
+      libpython-dev libncurses5 libncurses5-dev pkg-config \
+      libblocksruntime-dev libcurl4-openssl-dev \
+      make systemtap-sdt-dev tzdata rsync wget llvm-10 zip unzip
+    sudo ln -s -f /usr/bin/clang-10 /usr/bin/clang
+    sudo ln -s -f /usr/bin/clang++-10 /usr/bin/clang++
+  elif [ $(grep RELEASE /etc/lsb-release) == "DISTRIB_RELEASE=20.04" ]; then
+    sudo apt install -y \
+      git ninja-build clang python python-six \
+      uuid-dev libicu-dev icu-devtools libbsd-dev \
+      libedit-dev libxml2-dev libsqlite3-dev swig \
+      libpython2-dev libncurses5 libncurses5-dev pkg-config \
+      libblocksruntime-dev libcurl4-openssl-dev \
+      make systemtap-sdt-dev tzdata rsync wget llvm zip unzip
+  else
+    echo "Unknown Ubuntu version"
+    exit 1
+  fi
+  sudo apt clean
 fi
-sudo apt clean
 
 SOURCE_PATH="$( cd "$(dirname $0)/../../../.." && pwd )" 
 SWIFT_PATH=$SOURCE_PATH/swift
