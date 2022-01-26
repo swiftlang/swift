@@ -33,83 +33,83 @@ using namespace swift;
 /*************************** _REMOTE_ FUNCTIONS *******************************/
 /******************************************************************************/
 
-/// Synthesizes the for `_remote_xxx` functions.
-///
-/// Create a stub body that emits a fatal error message.
-static std::pair<BraceStmt *, bool>
-synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
-  auto distributedFunc = static_cast<AbstractFunctionDecl *>(context);
-  auto classDecl = func->getDeclContext()->getSelfClassDecl();
-  auto &ctx = func->getASTContext();
-  auto &SM = ctx.SourceMgr;
-
-  auto *staticStringDecl = ctx.getStaticStringDecl();
-  auto staticStringType = staticStringDecl->getDeclaredInterfaceType();
-  auto staticStringInit = ctx.getStringBuiltinInitDecl(staticStringDecl);
-
-  auto *uintDecl = ctx.getUIntDecl();
-  auto uintType = uintDecl->getDeclaredInterfaceType();
-  auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
-
-  auto missingTransportDecl = ctx.getMissingDistributedActorSystem();
-  assert(missingTransportDecl && "Could not locate '_missingDistributedActorSystem' function");
-
-  // Create a call to _Distributed._missingDistributedActorSystem
-  auto loc = func->getLoc();
-  Expr *ref = new (ctx) DeclRefExpr(missingTransportDecl,
-                                    DeclNameLoc(loc), /*Implicit=*/true);
-  ref->setType(missingTransportDecl->getInterfaceType()
-  ->removeArgumentLabels(1));
-
-  llvm::SmallString<64> buffer;
-  StringRef fullClassName = ctx.AllocateCopy(
-      (classDecl->getModuleContext()->getName().str() +
-      "." +
-      classDecl->getName().str()).toStringRef(buffer));
-
-  auto *className = new (ctx) StringLiteralExpr(fullClassName, loc,
-                                                /*Implicit=*/true);
-  className->setBuiltinInitializer(staticStringInit);
-  assert(isa<ConstructorDecl>(className->getBuiltinInitializer().getDecl()));
-  className->setType(staticStringType);
-
-  auto *funcName = new (ctx) StringLiteralExpr(
-      ctx.AllocateCopy(func->getName().getBaseName().getIdentifier().str()), loc,
-      /*Implicit=*/true);
-  funcName->setType(staticStringType);
-  funcName->setBuiltinInitializer(staticStringInit);
-
-  // Note: Sadly we cannot just rely on #function, #file, #line for the location
-  // (MagicIdentifierLiteralExpr), of the call because the call is made from a thunk.
-  // That thunk does not carry those info today although it could.
-  //
-  // Instead, we offer the location where the distributed func was declared.
-  auto fileString = SM.getDisplayNameForLoc(distributedFunc->getStartLoc());
-  auto *file = new (ctx) StringLiteralExpr(fileString, loc, /*Implicit=*/true);
-  file->setType(staticStringType);
-  file->setBuiltinInitializer(staticStringInit);
-
-  auto startLineAndCol = SM.getPresumedLineAndColumnForLoc(distributedFunc->getStartLoc());
-  auto *line = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.first);
-  line->setType(uintType);
-  line->setBuiltinInitializer(uintInit);
-
-  auto *column = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.second);
-  column->setType(uintType);
-  column->setBuiltinInitializer(uintInit);
-
-  auto *argList = ArgumentList::forImplicitUnlabeled(
-      ctx, {className, funcName, file, line, column});
-  auto *call = CallExpr::createImplicit(ctx, ref, argList);
-  call->setType(ctx.getNeverType());
-  call->setThrows(false);
-
-  SmallVector<ASTNode, 2> stmts;
-  stmts.push_back(call);
-  auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
-                                /*implicit=*/true);
-  return { body, /*isTypeChecked=*/true };
-}
+///// Synthesizes the for `_remote_xxx` functions.
+/////
+///// Create a stub body that emits a fatal error message.
+//static std::pair<BraceStmt *, bool>
+//synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
+//  auto distributedFunc = static_cast<AbstractFunctionDecl *>(context);
+//  auto classDecl = func->getDeclContext()->getSelfClassDecl();
+//  auto &ctx = func->getASTContext();
+//  auto &SM = ctx.SourceMgr;
+//
+//  auto *staticStringDecl = ctx.getStaticStringDecl();
+//  auto staticStringType = staticStringDecl->getDeclaredInterfaceType();
+//  auto staticStringInit = ctx.getStringBuiltinInitDecl(staticStringDecl);
+//
+//  auto *uintDecl = ctx.getUIntDecl();
+//  auto uintType = uintDecl->getDeclaredInterfaceType();
+//  auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
+//
+//  auto missingTransportDecl = ctx.getMissingDistributedActorSystem();
+//  assert(missingTransportDecl && "Could not locate '_missingDistributedActorSystem' function");
+//
+//  // Create a call to _Distributed._missingDistributedActorSystem
+//  auto loc = func->getLoc();
+//  Expr *ref = new (ctx) DeclRefExpr(missingTransportDecl,
+//                                    DeclNameLoc(loc), /*Implicit=*/true);
+//  ref->setType(missingTransportDecl->getInterfaceType()
+//  ->removeArgumentLabels(1));
+//
+//  llvm::SmallString<64> buffer;
+//  StringRef fullClassName = ctx.AllocateCopy(
+//      (classDecl->getModuleContext()->getName().str() +
+//      "." +
+//      classDecl->getName().str()).toStringRef(buffer));
+//
+//  auto *className = new (ctx) StringLiteralExpr(fullClassName, loc,
+//                                                /*Implicit=*/true);
+//  className->setBuiltinInitializer(staticStringInit);
+//  assert(isa<ConstructorDecl>(className->getBuiltinInitializer().getDecl()));
+//  className->setType(staticStringType);
+//
+//  auto *funcName = new (ctx) StringLiteralExpr(
+//      ctx.AllocateCopy(func->getName().getBaseName().getIdentifier().str()), loc,
+//      /*Implicit=*/true);
+//  funcName->setType(staticStringType);
+//  funcName->setBuiltinInitializer(staticStringInit);
+//
+//  // Note: Sadly we cannot just rely on #function, #file, #line for the location
+//  // (MagicIdentifierLiteralExpr), of the call because the call is made from a thunk.
+//  // That thunk does not carry those info today although it could.
+//  //
+//  // Instead, we offer the location where the distributed func was declared.
+//  auto fileString = SM.getDisplayNameForLoc(distributedFunc->getStartLoc());
+//  auto *file = new (ctx) StringLiteralExpr(fileString, loc, /*Implicit=*/true);
+//  file->setType(staticStringType);
+//  file->setBuiltinInitializer(staticStringInit);
+//
+//  auto startLineAndCol = SM.getPresumedLineAndColumnForLoc(distributedFunc->getStartLoc());
+//  auto *line = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.first);
+//  line->setType(uintType);
+//  line->setBuiltinInitializer(uintInit);
+//
+//  auto *column = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.second);
+//  column->setType(uintType);
+//  column->setBuiltinInitializer(uintInit);
+//
+//  auto *argList = ArgumentList::forImplicitUnlabeled(
+//      ctx, {className, funcName, file, line, column});
+//  auto *call = CallExpr::createImplicit(ctx, ref, argList);
+//  call->setType(ctx.getNeverType());
+//  call->setThrows(false);
+//
+//  SmallVector<ASTNode, 2> stmts;
+//  stmts.push_back(call);
+//  auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
+//                                /*implicit=*/true);
+//  return { body, /*isTypeChecked=*/true };
+//}
 
 // FIXME(distributed): remove this, won't be needed with the new remoteCall
 static Identifier makeRemoteFuncIdentifier(FuncDecl* distributedFunc) {
