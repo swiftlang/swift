@@ -136,6 +136,11 @@ typedef struct {
   SwiftObject obj;
 } BridgedMultiValueResult;
 
+typedef struct {
+  const unsigned char * _Nullable message;
+  SwiftInt position;
+} BridgedParsingError;
+
 // Must be in sync with SILInstruction::MemoryBehavior
 // TODO: do this less hacky.
 typedef enum {
@@ -158,7 +163,29 @@ typedef enum {
 #include "swift/AST/Builtins.def"
 } BridgedBuiltinID;
 
+enum {
+  EffectsFlagEscape = 0x1,
+  EffectsFlagDerived = 0x2
+};
+
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
+
+typedef void (* _Nonnull FunctionRegisterFn)(BridgedFunction f,
+                                        void * _Nonnull data,
+                                        SwiftInt size);
+typedef void (* _Nonnull FunctionWriteFn)(BridgedFunction,
+                                          BridgedOStream, SwiftInt);
+typedef BridgedParsingError (* _Nonnull FunctionParseFn)(BridgedFunction,
+                         BridgedStringRef, SwiftInt, SwiftInt, BridgedArrayRef);
+typedef SwiftInt (* _Nonnull FunctionCopyEffectsFn)(BridgedFunction,
+                                                    BridgedFunction);
+typedef SwiftInt (* _Nonnull FunctionGetEffectFlagsFn)(BridgedFunction, SwiftInt);
+
+void Function_register(SwiftMetatype metatype,
+            FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
+            FunctionWriteFn writeFn, FunctionParseFn parseFn,
+            FunctionCopyEffectsFn copyEffectsFn,
+            FunctionGetEffectFlagsFn hasEffectsFn);
 
 void OStream_write(BridgedOStream os, BridgedStringRef str);
 
@@ -212,14 +239,14 @@ SwiftInt SILType_isClass(BridgedType type);
 SwiftInt SILType_isStruct(BridgedType type);
 SwiftInt SILType_isTuple(BridgedType type);
 SwiftInt SILType_isEnum(BridgedType type);
-SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
-                                          BridgedStringRef fieldName);
 SwiftInt SILType_getNumTupleElements(BridgedType type);
 BridgedType SILType_getTupleElementType(BridgedType type, SwiftInt elementIdx);
+SwiftInt SILType_getNumNominalFields(BridgedType type);
+BridgedType SILType_getNominalFieldType(BridgedType type, SwiftInt index,
+                                        BridgedFunction function);
+SwiftInt SILType_getFieldIdxOfNominalType(BridgedType type,
+                                          BridgedStringRef fieldName);
 BridgedSubstitutionMap SILType_getContextSubstitutionMap(BridgedType);
-SwiftInt SILType_getNumStructFields(BridgedType type);
-BridgedType SILType_getStructFieldType(BridgedType type, SwiftInt index,
-                                       BridgedFunction function);
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
 

@@ -371,36 +371,28 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   // Merging multiple superclass or concrete type rules can induce new rules
   // to unify concrete type constructor arguments.
-  SmallVector<InducedRule, 3> inducedRules;
+  unsigned ruleCount = System.getRules().size();
 
   for (const auto &bucket : properties) {
     for (auto property : bucket) {
       addProperty(property.key, property.symbol,
-                  property.ruleID, inducedRules);
+                  property.ruleID);
     }
   }
 
   // Now, check for conflicts between superclass and concrete type rules.
-  checkConcreteTypeRequirements(inducedRules);
+  checkConcreteTypeRequirements();
 
   // Now, we merge concrete type rules with conformance rules, by adding
   // relations between associated type members of type parameters with
   // the concrete type witnesses in the concrete type's conformance.
-  concretizeNestedTypesFromConcreteParents(inducedRules);
+  concretizeNestedTypesFromConcreteParents();
 
-  // Some of the induced rules might be trivial; only count the induced rules
-  // where the left hand side is not already equivalent to the right hand side.
-  unsigned addedNewRules = 0;
-  for (auto pair : inducedRules) {
-    // FIXME: Eventually, all induced rules will have a rewrite path.
-    if (System.addRule(pair.LHS, pair.RHS,
-                       pair.Path.empty() ? nullptr : &pair.Path)) {
-      ++addedNewRules;
-
-      const auto &newRule = System.getRules().back();
-      if (newRule.getDepth() > maxDepth)
-        return std::make_pair(CompletionResult::MaxDepth, addedNewRules);
-    }
+  unsigned addedNewRules = System.getRules().size() - ruleCount;
+  for (unsigned i = ruleCount, e = System.getRules().size(); i < e; ++i) {
+    const auto &newRule = System.getRule(i);
+    if (newRule.getDepth() > maxDepth)
+      return std::make_pair(CompletionResult::MaxDepth, addedNewRules);
   }
 
   // Check invariants of the constructed property map.

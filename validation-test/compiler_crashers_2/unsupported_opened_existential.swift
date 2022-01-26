@@ -1,5 +1,7 @@
 // RUN: not --crash %target-swift-frontend -emit-ir %s
 
+// REQUIRES: asserts
+
 func fetch() {
   sryMap { return "" }
   .napError{ $0.abc() }
