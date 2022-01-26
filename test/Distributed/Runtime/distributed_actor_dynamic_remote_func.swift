@@ -14,9 +14,9 @@ distributed actor LocalWorker {
 
   init(system: FakeActorSystem) {}
 
-//  distributed func function() async throws -> String {
-//    "local:"
-//  }
+  distributed func function() async throws -> String {
+    "local:"
+  }
 
   distributed func echo(name: String) async throws -> String {
     "local:\(name)"
@@ -74,9 +74,9 @@ struct FakeActorSystem: DistributedActorSystem {
     returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
-    Act.ID == ActorID,
-    Err: Error,
-    Res: SerializationRequirement {
+//          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
     return "remoteCall: \(target.mangledName)" as! Res
   }
 
@@ -87,8 +87,8 @@ struct FakeActorSystem: DistributedActorSystem {
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-    Act.ID == ActorID,
-    Err: Error {
+//          Act.ID == ActorID,
+          Err: Error {
     fatalError("not implemented \(#function)")
   }
 }
@@ -132,9 +132,9 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 func test_local() async throws {
   let system = FakeActorSystem()
 
-//  let worker = LocalWorker(system: system)
-//  let x = try await worker.function()
-//  print("call: \(x)")
+  let worker = LocalWorker(system: system)
+  let x = try await worker.function()
+  print("call: \(x)")
   // CHECK: assign type:LocalWorker, id:[[ADDRESS:.*]]
   // CHECK: ready actor:main.LocalWorker, id:[[ADDRESS]]
   // CHECK: call: local:
@@ -145,13 +145,13 @@ func test_remote() async throws {
   let system = FakeActorSystem()
 
   let worker = try LocalWorker.resolve(id: address, using: system)
-//  let x = try await worker.function()
-//  print("call: \(x)")
-//  // CHECK: call: _cluster_remote_function():
+  let x = try await worker.function()
+  print("call: \(x)")
+  // CHECK: remoteCall: $s4main11LocalWorkerC8functionSSyYaKFTE
 
   let e = try await worker.echo(name: "Charlie")
   print("call: \(e)")
-  // CHECK: call: _cluster_remote_echo(name:):Charlie
+  // CHECK: remoteCall: $s4main11LocalWorkerC4echo4nameS2S_tYaKFTE
 }
 
 @main struct Main {
