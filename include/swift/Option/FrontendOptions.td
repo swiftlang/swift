@@ -295,6 +295,10 @@ def enable_experimental_eager_clang_module_diagnostics :
   Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
   HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
 
+def enable_experimental_opaque_parameters :
+  Flag<["-"], "enable-experimental-opaque-parameters">,
+  HelpText<"Enable experimental support for opaque parameters">;
+
 def enable_experimental_pairwise_build_block :
   Flag<["-"], "enable-experimental-pairwise-build-block">,
   HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
@@ -501,10 +505,6 @@ def disable_subst_sil_function_types :
 def enable_experimental_named_opaque_types :
   Flag<["-"], "enable-experimental-named-opaque-types">,
   HelpText<"Enable experimental support for named opaque result types">;
-
-def enable_experimental_opaque_parameters :
-  Flag<["-"], "enable-experimental-opaque-parameters">,
-  HelpText<"Enable experimental support for opaque parameters">;
 
 def enable_explicit_existential_types :
   Flag<["-"], "enable-explicit-existential-types">,
