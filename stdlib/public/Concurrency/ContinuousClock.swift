@@ -94,4 +94,44 @@ extension ContinuousClock.Instant: InstantProtocol {
   ) -> Bool {
     return lhs._value < rhs._value
   }
+
+  @_alwaysEmitIntoClient
+  @inlinable  
+  public static func + (
+    _ lhs: ContinuousClock.Instant, _ rhs: Duration
+  ) -> ContinuousClock.Instant {
+    lhs.advanced(by: rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  @inlinable
+  public static func += (
+    _ lhs: inout ContinuousClock.Instant, _ rhs: Duration
+  ) {
+    lhs = lhs.advanced(by: rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  @inlinable
+  public static func - (
+    _ lhs: ContinuousClock.Instant, _ rhs: Duration
+  ) -> ContinuousClock.Instant {
+    lhs.advanced(by: .zero - rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  @inlinable
+  public static func -= (
+    _ lhs: inout ContinuousClock.Instant, _ rhs: Duration
+  ) {
+    lhs = lhs.advanced(by: .zero - rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  @inlinable
+  public static func - (
+    _ lhs: ContinuousClock.Instant, _ rhs: ContinuousClock.Instant
+  ) -> Duration {
+    rhs.duration(to: lhs)
+  }
 }

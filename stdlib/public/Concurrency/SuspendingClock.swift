@@ -41,7 +41,7 @@ extension SuspendingClock: Clock {
     _getClockRes(
       seconds: &seconds, 
       nanoseconds: &nanoseconds, 
-      clock: .continuous)
+      clock: .suspending)
     return SuspendingClock.Instant(_value:
       .seconds(seconds) + .nanoseconds(nanoseconds))
   }
@@ -52,7 +52,7 @@ extension SuspendingClock: Clock {
     _getClockRes(
       seconds: &seconds, 
       nanoseconds: &nanoseconds, 
-      clock: .continuous)
+      clock: .suspending)
     return .seconds(seconds) + .nanoseconds(nanoseconds)
   }
 
@@ -92,6 +92,46 @@ extension SuspendingClock.Instant: InstantProtocol {
     _ lhs: SuspendingClock.Instant, _ rhs: SuspendingClock.Instant
   ) -> Bool {
     return lhs._value < rhs._value
+  }
+  
+  @_alwaysEmitIntoClient
+  @inlinable  
+  public static func + (
+    _ lhs: SuspendingClock.Instant, _ rhs: Duration
+  ) -> SuspendingClock.Instant {
+    lhs.advanced(by: rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  @inlinable
+  public static func += (
+    _ lhs: inout SuspendingClock.Instant, _ rhs: Duration
+  ) {
+    lhs = lhs.advanced(by: rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  @inlinable
+  public static func - (
+    _ lhs: SuspendingClock.Instant, _ rhs: Duration
+  ) -> SuspendingClock.Instant {
+    lhs.advanced(by: .zero - rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  @inlinable
+  public static func -= (
+    _ lhs: inout SuspendingClock.Instant, _ rhs: Duration
+  ) {
+    lhs = lhs.advanced(by: .zero - rhs)
+  }
+  
+  @_alwaysEmitIntoClient
+  @inlinable
+  public static func - (
+    _ lhs: SuspendingClock.Instant, _ rhs: SuspendingClock.Instant
+  ) -> Duration {
+    rhs.duration(to: lhs)
   }
 }
 
