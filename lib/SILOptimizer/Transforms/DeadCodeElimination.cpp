@@ -292,7 +292,7 @@ void DCE::markLive() {
           SmallVector<SILValue, 4> roots;
           findGuaranteedReferenceRoots(borrowInst->getOperand(), roots);
           for (auto root : roots) {
-            visitTransitiveEndBorrows(BorrowedValue(root),
+            visitTransitiveEndBorrows(root,
                                       [&](EndBorrowInst *endBorrow) {
                                         markInstructionLive(endBorrow);
                                       });

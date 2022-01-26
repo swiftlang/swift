@@ -1203,7 +1203,7 @@ void findTransitiveReborrowBaseValuePairs(
 /// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
 /// its reborrows.
 void visitTransitiveEndBorrows(
-    BorrowedValue beginBorrow,
+    SILValue value,
     function_ref<void(EndBorrowInst *)> visitEndBorrow);
 
 /// Whether the specified lexical begin_borrow instruction is nested.
