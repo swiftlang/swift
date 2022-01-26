@@ -2553,6 +2553,10 @@ public:
         if (!isInvalidSuperclass) {
           CD->diagnose(diag::inheritance_from_class_with_missing_vtable_entries,
                        Super->getName());
+          for (const auto &member : Super->getMembers())
+            if (const auto *MMD = dyn_cast<MissingMemberDecl>(member))
+              CD->diagnose(diag::inheritance_from_class_with_missing_vtable_entry,
+                           MMD->getName());
           isInvalidSuperclass = true;
         }
       }
