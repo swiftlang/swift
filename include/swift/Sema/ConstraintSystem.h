@@ -74,7 +74,8 @@ class SolutionApplicationTarget;
 namespace TypeChecker {
 
 Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
-                                                        Type builderType);
+                                                      Type builderType,
+                                                      bool AllowHoles);
 
 Optional<constraints::SolutionApplicationTarget>
 typeCheckExpression(constraints::SolutionApplicationTarget &target,
@@ -1413,7 +1414,7 @@ enum class ConstraintSystemFlags {
   /// Note that this flag is automatically applied to all constraint systems,
   /// when \c DebugConstraintSolver is set in \c TypeCheckerOptions. It can be
   /// automatically enabled for select constraint solving attempts by setting
-  /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically 
+  /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically
   /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
   DebugConstraints = 0x10,
@@ -1437,6 +1438,8 @@ enum class ConstraintSystemFlags {
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
   UseClangFunctionTypes = 0x80,
+
+  AllowResultBuilderTransformWithHoles = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -3007,7 +3010,8 @@ private:
   // FIXME: Perhaps these belong on ConstraintSystem itself.
   friend Optional<BraceStmt *>
   swift::TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func,
-                                                        Type builderType);
+                                                      Type builderType,
+                                                      bool AllowHoles);
 
   friend Optional<SolutionApplicationTarget>
   swift::TypeChecker::typeCheckExpression(

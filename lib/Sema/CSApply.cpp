@@ -8876,7 +8876,10 @@ Optional<SolutionApplicationTarget> ConstraintSystem::applySolution(
   // produce a fallback diagnostic to highlight the problem.
   {
     const auto &score = solution.getFixedScore();
-    if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0) {
+    if (score.Data[SK_Fix] > 0 ||
+        (score.Data[SK_Hole] > 0 &&
+         !this->Options.contains(
+             ConstraintSystemFlags::AllowResultBuilderTransformWithHoles))) {
       maybeProduceFallbackDiagnostic(target);
       return None;
     }
