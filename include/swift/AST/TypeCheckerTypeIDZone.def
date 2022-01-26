@@ -233,6 +233,9 @@ SWIFT_REQUEST(TypeChecker, PropertyWrapperTypeInfoRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ProtocolRequiresClassRequest, bool(ProtocolDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PrimaryAssociatedTypeRequest,
+              AssociatedTypeDecl *(ProtocolDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RequirementRequest,
               Requirement(WhereClauseOwner, unsigned, TypeResolutionStage),
               Cached, HasNearestLocation)

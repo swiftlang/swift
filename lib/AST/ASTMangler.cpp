@@ -1266,6 +1266,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendExistentialLayout(layout, sig, forDecl);
     }
 
+    case TypeKind::ParametrizedProtocol: {
+      llvm::errs() << "Not implemented\n";
+      abort();
+    }
+
     case TypeKind::Existential: {
       auto constraint = cast<ExistentialType>(tybase)->getConstraintType();
       return appendType(constraint, sig, forDecl);

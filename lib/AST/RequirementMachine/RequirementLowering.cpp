@@ -133,6 +133,29 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
     return;
   }
 
+  if (auto *paramType = constraintType->getAs<ParametrizedProtocolType>()) {
+    auto *protoDecl = paramType->getBaseType()->getDecl();
+
+    desugarConformanceRequirement(subjectType, paramType->getBaseType(),
+                                  result);
+
+    auto *assocType = protoDecl->getPrimaryAssociatedType();
+
+    Type memberType;
+    if (!subjectType->isTypeParameter()) {
+      auto *M = protoDecl->getParentModule();
+      auto conformance = M->lookupConformance(
+          subjectType, protoDecl);
+      memberType = conformance.getConcrete()->getTypeWitness(assocType);
+    } else {
+      memberType = DependentMemberType::get(subjectType, assocType);
+    }
+
+    desugarSameTypeRequirement(memberType, paramType->getArgumentType(),
+                               result);
+    return;
+  }
+
   auto *compositionType = constraintType->castTo<ProtocolCompositionType>();
   if (compositionType->hasExplicitAnyObject()) {
     desugarLayoutRequirement(subjectType,
@@ -187,21 +210,19 @@ swift::rewriting::desugarRequirement(Requirement req,
 static void realizeTypeRequirement(Type subjectType, Type constraintType,
                                    SourceLoc loc,
                                    SmallVectorImpl<StructuralRequirement> &result) {
-  // Check whether we have a reasonable constraint type at all.
-  if (!constraintType->isExistentialType() &&
-      !constraintType->getClassOrBoundGenericClass()) {
-    // FIXME: Diagnose
-    return;
-  }
-
   SmallVector<Requirement, 2> reqs;
 
-  if (constraintType->isExistentialType()) {
+  if (constraintType->is<ProtocolType>() ||
+      constraintType->is<ProtocolCompositionType>() ||
+      constraintType->is<ParametrizedProtocolType>()) {
     // Handle conformance requirements.
     desugarConformanceRequirement(subjectType, constraintType, reqs);
-  } else {
+  } else if (constraintType->getClassOrBoundGenericClass()) {
     // Handle superclass requirements.
     desugarSuperclassRequirement(subjectType, constraintType, reqs);
+  } else {
+    // FIXME: Diagnose
+    return;
   }
 
   // Add source location information.
