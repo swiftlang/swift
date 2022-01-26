@@ -250,6 +250,7 @@ public:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
+    case Context::ExistentialConstraint:
     case Context::MetatypeBase:
       return false;
     case Context::None:
@@ -272,6 +273,40 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
       return true;
+    }
+  }
+
+  /// Whether parametrized protocol types are supported in this context.
+  bool isParametrizedProtocolSupported() const {
+    switch (context) {
+    case Context::Inherited:
+    case Context::ExtensionBinding:
+    case Context::GenericRequirement:
+      return true;
+    case Context::None:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::MetatypeBase:
+    case Context::ExistentialConstraint:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::FunctionInput:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::EnumPatternPayload:
+    case Context::SameTypeRequirement:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+      return false;
     }
   }
 

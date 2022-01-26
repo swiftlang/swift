@@ -625,9 +625,15 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto &diags = ctx.Diags;
 
   if (ctx.LangOpts.EnableParametrizedProtocolTypes) {
-    // Build ParametrizedProtocolType if the protocol has a primary associated
-    // type.
     if (auto *protoType = type->getAs<ProtocolType>()) {
+      // Build ParametrizedProtocolType if the protocol has a primary associated
+      // type and we're in a supported context (for now just generic requirements,
+      // inheritance clause, extension binding).
+      if (!resolution.getOptions().isParametrizedProtocolSupported()) {
+        diags.diagnose(loc, diag::parametrized_protocol_not_supported);
+        return ErrorType::get(ctx);
+      }
+
       auto *protoDecl = protoType->getDecl();
       if (protoDecl->getPrimaryAssociatedType() == nullptr) {
         diags.diagnose(loc, diag::protocol_does_not_have_primary_assoc_type,
