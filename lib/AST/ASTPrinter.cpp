@@ -1658,7 +1658,42 @@ void PrintAST::printSingleDepthOfGenericSignature(
       });
   };
 
-  if (printParams) {
+  /// Separate the explicit generic parameters from the implicit, opaque
+  /// generic parameters. We only print the former.
+  TypeArrayView<GenericTypeParamType> opaqueGenericParams;
+  for (unsigned index : indices(genericParams)) {
+    auto gpDecl = genericParams[index]->getDecl();
+    if (!gpDecl)
+      continue;
+
+    if (gpDecl->isOpaqueType() && gpDecl->isImplicit()) {
+      // We found the first implicit opaque type parameter. Split the
+      // generic parameters array at this position.
+      opaqueGenericParams = genericParams.slice(index);
+      genericParams = genericParams.slice(0, index);
+      break;
+    }
+  }
+
+  // Determines whether a given type is based on one of the opaque generic
+  // parameters.
+  auto dependsOnOpaque = [&](Type type) {
+    if (opaqueGenericParams.empty())
+      return false;
+
+    if (!type->isTypeParameter())
+      return false;
+
+    auto rootGP = type->getRootGenericParam();
+    for (auto opaqueGP : opaqueGenericParams) {
+      if (rootGP->isEqual(opaqueGP))
+        return true;
+    }
+
+    return false;
+  };
+
+  if (printParams && !genericParams.empty()) {
     // Print the generic parameters.
     Printer << "<";
     llvm::interleave(
@@ -1686,10 +1721,17 @@ void PrintAST::printSingleDepthOfGenericSignature(
         continue;
 
       auto first = req.getFirstType();
+
+      if (dependsOnOpaque(first))
+        continue;
+
       Type second;
 
-      if (req.getKind() != RequirementKind::Layout)
+      if (req.getKind() != RequirementKind::Layout) {
         second = req.getSecondType();
+        if (dependsOnOpaque(second))
+          continue;
+      }
 
       if (!subMap.empty()) {
         Type subFirst = substParam(first);
@@ -1748,7 +1790,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
     }
   }
 
-  if (printParams)
+  if (printParams && !genericParams.empty())
     Printer << ">";
 }
 
