@@ -3666,6 +3666,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
   case TypeResolverContext::GenericRequirement:
+  case TypeResolverContext::ExistentialConstraint:
   case TypeResolverContext::SameTypeRequirement:
   case TypeResolverContext::ProtocolMetatypeBase:
   case TypeResolverContext::MetatypeBase:
@@ -3881,7 +3882,7 @@ NeverNullType
 TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
                                      TypeResolutionOptions options) {
   auto constraintType = resolveType(repr->getConstraint(),
-      options.withContext(TypeResolverContext::GenericRequirement));
+      options.withContext(TypeResolverContext::ExistentialConstraint));
   if (constraintType->is<ExistentialMetatypeType>())
     return constraintType;
 

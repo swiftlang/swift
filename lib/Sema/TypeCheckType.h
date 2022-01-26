@@ -122,7 +122,10 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are checking the underlying type of a generic typealias.
   GenericTypeAliasDecl,
 
-  /// Whether we are in a requirement of a generic declaration
+  /// Whether we are in the constraint type of an existential type.
+  ExistentialConstraint,
+
+  /// Whether we are in a requirement of a generic declaration.
   GenericRequirement,
 
   /// Whether we are in a same-type requirement of a generic
@@ -225,6 +228,7 @@ public:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
+    case Context::ExistentialConstraint:
     case Context::SameTypeRequirement:
     case Context::ProtocolMetatypeBase:
     case Context::MetatypeBase:
