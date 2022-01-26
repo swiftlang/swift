@@ -851,8 +851,8 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
 
     // Look up the inherited conformance.
     ModuleDecl *module = entry->getDeclContext()->getParentModule();
-    auto inheritedConformance = module->lookupConformance(superclassTy,
-                                                          protocol);
+    auto inheritedConformance = module->lookupConformance(
+        superclassTy, protocol, /*allowMissing=*/true);
 
     // Form the inherited conformance.
     entry->Conformance =

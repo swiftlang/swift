@@ -48,37 +48,6 @@ extension Unicode {
   }
 }
 
-// Takes an unflattened array of scalar ranges and grapheme break properties and
-// attempts to merge ranges who share the same break property. E.g:
-//
-//     0x0 ... 0xA  = .control
-//     0xB ... 0xB  = .control
-//     0xC ... 0x1F = .control
-//
-//    into:
-//
-//    0x0 ... 0x1F = .control
-func flatten(
-  _ unflattened: [(ClosedRange<UInt32>, Unicode.GraphemeBreakProperty)]
-) -> [(ClosedRange<UInt32>, Unicode.GraphemeBreakProperty)] {
-  var result: [(ClosedRange<UInt32>, Unicode.GraphemeBreakProperty)] = []
-
-  for elt in unflattened.sorted(by: { $0.0.lowerBound < $1.0.lowerBound }) {
-    guard !result.isEmpty, result.last!.1 == elt.1 else {
-      result.append(elt)
-      continue
-    }
-    
-    if elt.0.lowerBound == result.last!.0.upperBound + 1 {
-      result[result.count - 1].0 = result.last!.0.lowerBound ... elt.0.upperBound
-    } else {
-      result.append(elt)
-    }
-  }
-
-  return result
-}
-
 // Given a path to one of the Unicode data files, reads it and returns the
 // unflattened list of scalar & grapheme break property.
 //
@@ -150,7 +119,9 @@ func emit(
   into result: inout String
 ) {
   result += """
-  static __swift_uint32_t _swift_stdlib_graphemeBreakProperties[\(data.count)] = {
+  #define GRAPHEME_BREAK_DATA_COUNT \(data.count)
+  
+  static const __swift_uint32_t _swift_stdlib_graphemeBreakProperties[\(data.count)] = {
 
   """
 
@@ -181,69 +152,20 @@ func emit(
       value |= 1 << 31
     }
 
-    return "0x\(String(value, radix: 16))"
+    return "0x\(String(value, radix: 16, uppercase: true))"
   }
 
-  result += "\n};\n\n"
-}
-
-// Writes the stdlib internal routine for binary searching the grapheme array.
-func emitAccessor(
-  _ dataCount: Int,
-  into result: inout String
-) {
   result += """
-  SWIFT_RUNTIME_STDLIB_INTERNAL
-  __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar) {
-    auto low = 0;
-    auto high = \(dataCount) - 1;
-
-    while (high >= low) {
-      auto idx = low + (high - low) / 2;
-
-      auto entry = _swift_stdlib_graphemeBreakProperties[idx];
-
-      // Shift the enum and range count out of the value.
-      auto lower = (entry << 11) >> 11;
-
-      // Shift the enum out first, then shift out the scalar value.
-      auto upper = lower + ((entry << 3) >> 24);
-
-      // Shift everything out.
-      auto enumValue = (__swift_uint8_t)(entry >> 29);
-
-      // Special case: extendedPictographic who used an extra bit for the range.
-      if (enumValue == 5) {
-        upper = lower + ((entry << 2) >> 23);
-      }
-
-      if (scalar >= lower && scalar <= upper) {
-        return enumValue;
-      }
-
-      if (scalar > upper) {
-        low = idx + 1;
-        continue;
-      }
-
-      if (scalar < lower) {
-        high = idx - 1;
-        continue;
-      }
-    }
-
-    // If we made it out here, then our scalar was not found in the grapheme
-    // array (this occurs when a scalar doesn't map to any grapheme break
-    // property). Return the max value here to indicate .any.
-    return 0xFF;
-  }
-
+  
+  };
+  
+  
   """
 }
 
 // Main entry point into the grapheme break property generator.
 func generateGraphemeBreakProperty() {
-  var result = readFile("Input/UnicodeGrapheme.cpp")
+  var result = readFile("Input/GraphemeData.h")
 
   let baseData = getGraphemeBreakPropertyData(
     for: "Data/GraphemeBreakProperty.txt"
@@ -267,10 +189,21 @@ func generateGraphemeBreakProperty() {
   }
 
   emit(data, into: &result)
-
-  emitAccessor(data.count, into: &result)
-
-  write(result, to: "Output/UnicodeGrapheme.cpp")
+  
+  // Handle the CLDR grapheme breaking rules:
+  
+  let indicSyllabicCategory = readFile("Data/IndicSyllabicCategory.txt")
+  
+  let consonants = getLinkingConsonant(from: indicSyllabicCategory)
+  
+  emitLinkingConsonant(consonants, into: &result)
+  
+  result += """
+  #endif // #ifndef GRAPHEME_DATA_H
+  
+  """
+  
+  write(result, to: "Output/Common/GraphemeData.h")
 }
 
 generateGraphemeBreakProperty()

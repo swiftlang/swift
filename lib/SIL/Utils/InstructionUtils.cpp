@@ -461,6 +461,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::SwitchValueInst:
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
@@ -776,6 +777,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       rt |= RuntimeEffect::MetaData;
       break;
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::Closure:

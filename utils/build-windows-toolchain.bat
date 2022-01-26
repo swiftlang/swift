@@ -202,10 +202,6 @@ cmake ^
   -D PYTHON_EXECUTABLE=%PYTHON_HOME%\python.exe ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE="%SourceRoot%\swift-corelibs-libdispatch" ^
   -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%SourceRoot%\swift-experimental-string-processing ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="%BuildRoot%\Library\icu-67.1\include\unicode" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC="%BuildRoot%\Library\icu-67.1\lib64\icuuc.lib" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="%BuildRoot%\Library\icu-67.1\include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N="%BuildRoot%\Library\icu-67.1\lib64\icuin.lib" ^
 
   -G Ninja ^
   -S llvm-project\llvm || (exit /b)
@@ -233,10 +229,6 @@ cmake ^
   -D SWIFT_NATIVE_SWIFT_TOOLS_PATH=%BuildRoot%\1\bin ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=%SourceRoot%\swift-corelibs-libdispatch ^
   -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%SourceRoot%\swift-experimental-string-processing ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="%BuildRoot%\Library\icu-67.1\include\unicode" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC="%BuildRoot%\Library\icu-67.1\lib64\icuuc.lib" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="%BuildRoot%\Library\icu-67.1\include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N="%BuildRoot%\Library\icu-67.1\lib64\icuin.lib" ^
 
   -D SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES ^

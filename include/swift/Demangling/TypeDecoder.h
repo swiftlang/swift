@@ -372,10 +372,14 @@ void decodeRequirement(NodePointer node,
 
     BuiltType constraintType;
     if (child->getKind() ==
-            Demangle::Node::Kind::DependentGenericConformanceRequirement ||
-        child->getKind() ==
-            Demangle::Node::Kind::DependentGenericSameTypeRequirement) {
+        Demangle::Node::Kind::DependentGenericConformanceRequirement) {
       constraintType = Builder.decodeMangledType(child->getChild(1));
+      if (!constraintType)
+        return;
+    } else if (child->getKind() ==
+               Demangle::Node::Kind::DependentGenericSameTypeRequirement) {
+      constraintType = Builder.decodeMangledType(
+          child->getChild(1), /*forRequirement=*/false);
       if (!constraintType)
         return;
     }
@@ -468,15 +472,17 @@ public:
   explicit TypeDecoder(BuilderType &Builder) : Builder(Builder) {}
 
   /// Given a demangle tree, attempt to turn it into a type.
-  TypeLookupErrorOr<BuiltType> decodeMangledType(NodePointer Node) {
-    return decodeMangledType(Node, 0);
+  TypeLookupErrorOr<BuiltType> decodeMangledType(NodePointer Node,
+                                                 bool forRequirement = true) {
+    return decodeMangledType(Node, 0, forRequirement);
   }
 
 protected:
   static const unsigned MaxDepth = 1024;
 
   TypeLookupErrorOr<BuiltType> decodeMangledType(NodePointer Node,
-                                                 unsigned depth) {
+                                                 unsigned depth,
+                                                 bool forRequirement = true) {
     if (depth > TypeDecoder::MaxDepth)
       return TypeLookupError("Mangled type is too complex");
 
@@ -499,7 +505,8 @@ protected:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children.");
 
-      return decodeMangledType(Node->getChild(0), depth + 1);
+      return decodeMangledType(Node->getChild(0), depth + 1,
+                               forRequirement);
     case NodeKind::Class:
     {
 #if SWIFT_OBJC_INTEROP
@@ -543,7 +550,8 @@ protected:
         return MAKE_NODE_TYPE_ERROR0(genericArgs, "is not TypeList");
 
       for (auto genericArg : *genericArgs) {
-        auto paramType = decodeMangledType(genericArg, depth + 1);
+        auto paramType = decodeMangledType(genericArg, depth + 1,
+                                           /*forRequirement=*/false);
         if (paramType.isError())
           return paramType;
         args.push_back(paramType.getType());
@@ -698,14 +706,16 @@ protected:
       }
 
       return Builder.createProtocolCompositionType(Protocols, Superclass,
-                                                   IsClassBound);
+                                                   IsClassBound,
+                                                   forRequirement);
     }
 
     case NodeKind::Protocol:
     case NodeKind::ProtocolSymbolicReference: {
       if (auto Proto = decodeMangledProtocolType(Node, depth + 1)) {
         return Builder.createProtocolCompositionType(Proto, BuiltType(),
-                                                     /*IsClassBound=*/false);
+                                                     /*IsClassBound=*/false,
+                                                     forRequirement);
       }
 
       return MAKE_NODE_TYPE_ERROR0(Node, "failed to decode protocol type");
@@ -845,7 +855,8 @@ protected:
                           Node->getKind() == NodeKind::EscapingObjCBlock);
 
       auto result =
-          decodeMangledType(Node->getChild(firstChildIdx + 1), depth + 1);
+          decodeMangledType(Node->getChild(firstChildIdx + 1), depth + 1,
+                            /*forRequirement=*/false);
       if (result.isError())
         return result;
       return Builder.createFunctionType(
@@ -962,7 +973,8 @@ protected:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
-      return decodeMangledType(Node->getChild(0), depth + 1);
+      return decodeMangledType(Node->getChild(0), depth + 1,
+                               /*forRequirement=*/false);
 
     case NodeKind::Tuple: {
       llvm::SmallVector<BuiltType, 8> elements;
@@ -994,7 +1006,8 @@ protected:
 
         // Decode the element type.
         auto elementType =
-            decodeMangledType(element->getChild(typeChildIndex), depth + 1);
+            decodeMangledType(element->getChild(typeChildIndex), depth + 1,
+                              /*forRequirement=*/false);
         if (elementType.isError())
           return elementType;
 
@@ -1012,9 +1025,11 @@ protected:
                                       "fewer children (%zu) than required (2)",
                                       Node->getNumChildren());
 
-        return decodeMangledType(Node->getChild(1), depth + 1);
+        return decodeMangledType(Node->getChild(1), depth + 1,
+                                 /*forRequirement=*/false);
       }
-      return decodeMangledType(Node->getChild(0), depth + 1);
+      return decodeMangledType(Node->getChild(0), depth + 1,
+                               /*forRequirement=*/false);
 
     case NodeKind::DependentGenericType: {
       if (Node->getNumChildren() < 2)
@@ -1161,7 +1176,8 @@ return {}; // Not Implemented!
                 "more substitutions than generic params");
           while (index >= genericParamsAtDepth[paramDepth])
             ++paramDepth, index = 0;
-          auto substTy = decodeMangledType(subst, depth + 1);
+          auto substTy = decodeMangledType(subst, depth + 1,
+                                           /*forRequirement=*/false);
           if (substTy.isError())
             return substTy;
           substitutions.emplace_back(
@@ -1243,7 +1259,8 @@ return {}; // Not Implemented!
         if (genericsNode->getKind() != NodeKind::TypeList)
           break;
         for (auto argNode : *genericsNode) {
-          auto arg = decodeMangledType(argNode, depth + 1);
+          auto arg = decodeMangledType(argNode, depth + 1,
+                                       /*forRequirement=*/false);
           if (arg.isError())
             return arg;
           genericArgsBuf.push_back(arg.getType());
@@ -1480,7 +1497,8 @@ private:
         }
       }
 
-      auto paramType = decodeMangledType(node, depth + 1);
+      auto paramType = decodeMangledType(node, depth + 1,
+                                         /*forRequirement=*/false);
       if (paramType.isError())
         return false;
 
@@ -1544,8 +1562,10 @@ private:
 
 template <typename BuilderType>
 inline TypeLookupErrorOr<typename BuilderType::BuiltType>
-decodeMangledType(BuilderType &Builder, NodePointer Node) {
-  return TypeDecoder<BuilderType>(Builder).decodeMangledType(Node);
+decodeMangledType(BuilderType &Builder, NodePointer Node,
+                  bool forRequirement = false) {
+  return TypeDecoder<BuilderType>(Builder)
+      .decodeMangledType(Node, forRequirement);
 }
 
 SWIFT_END_INLINE_NAMESPACE

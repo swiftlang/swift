@@ -152,7 +152,7 @@ void Rule::dump(llvm::raw_ostream &out) const {
   if (Redundant)
     out << " [redundant]";
   if (Conflicting)
-    out << "[conflicting]";
+    out << " [conflicting]";
 }
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
@@ -169,13 +169,14 @@ RewriteSystem::~RewriteSystem() {
 }
 
 void RewriteSystem::initialize(
-    bool recordLoops,
+    bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
   RecordLoops = recordLoops;
+  Protos = protos;
 
   for (const auto &rule : permanentRules)
     addPermanentRule(rule.first, rule.second);
@@ -594,6 +595,41 @@ void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
   }
 }
 
+/// When minimizing a generic signature, we only care about loops where the
+/// basepoint is a generic parameter symbol.
+///
+/// When minimizing protocol requirement signatures, we only care about loops
+/// where the basepoint is a protocol symbol or associated type symbol whose
+/// protocol is part of the connected component.
+///
+/// All other loops can be discarded since they do not encode redundancies
+/// that are relevant to us.
+bool RewriteSystem::isInMinimizationDomain(
+    ArrayRef<const ProtocolDecl *> protos) const {
+  assert(protos.size() <= 1);
+  assert(Protos.empty() || !protos.empty());
+
+  if (protos.empty() && Protos.empty())
+    return true;
+
+  if (std::find(Protos.begin(), Protos.end(), protos[0]) != Protos.end())
+    return true;
+
+  return false;
+}
+
+void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
+                                      RewritePath path) {
+  if (!RecordLoops)
+    return;
+
+  // Ignore the rewrite rule if it is not part of our minimization domain.
+  if (!isInMinimizationDomain(basepoint.getRootProtocols()))
+    return;
+
+  Loops.emplace_back(basepoint, path);
+}
+
 void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 #ifndef NDEBUG
 
@@ -662,6 +698,11 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {
     out << "- " << rule << "\n";
+  }
+  out << "}\n";
+  out << "Relations: {\n";
+  for (const auto &relation : Relations) {
+    out << "- " << relation.first << " =>> " << relation.second << "\n";
   }
   out << "}\n";
   out << "Rewrite loops: {\n";

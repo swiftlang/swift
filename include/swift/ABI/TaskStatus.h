@@ -35,7 +35,7 @@ namespace swift {
 /// access by a cancelling thread.  In particular, the chain of
 /// status records must not be disturbed.  When the task leaves
 /// the scope that requires the status record, the record can
-/// be unregistered from the task with `swift_task_removeStatusRecord`,
+/// be unregistered from the task with `removeStatusRecord`,
 /// at which point the memory can be returned to the system.
 class TaskStatusRecord {
 public:
@@ -256,7 +256,7 @@ public:
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeStatusRecord` and freely
+/// code may call `removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class CancellationNotificationStatusRecord : public TaskStatusRecord {
@@ -284,7 +284,7 @@ public:
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeStatusRecord` and freely
+/// code may call `removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class EscalationNotificationStatusRecord : public TaskStatusRecord {

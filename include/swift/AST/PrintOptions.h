@@ -128,6 +128,9 @@ struct PrintOptions {
   /// Whether to print function definitions.
   bool FunctionDefinitions = false;
 
+  /// Whether to print expressions.
+  bool PrintExprs = false;
+  
   /// Whether to print '{ get set }' on readwrite computed properties.
   bool PrintGetSetOnRWProperties = true;
 
@@ -196,6 +199,9 @@ struct PrintOptions {
 
   /// Print fully qualified extended types if ambiguous.
   bool FullyQualifiedExtendedTypesIfAmbiguous = false;
+
+  /// Whether to protocol-qualify DependentMemberTypes.
+  bool ProtocolQualifiedDependentMemberTypes = false;
 
   /// If true, printed module names will use the "exported" name, which may be
   /// different from the regular name.
@@ -274,6 +280,10 @@ struct PrintOptions {
   bool PrintLongAttrsOnSeparateLines = false;
 
   bool PrintImplicitAttrs = true;
+
+  /// Whether to print the \c any keyword for existential
+  /// types.
+  bool PrintExplicitAny = false;
 
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
@@ -644,6 +654,13 @@ struct PrintOptions {
   ///
   /// This is only intended for debug output.
   static PrintOptions printEverything() {
+    PrintOptions result = printDeclarations();
+    result.FunctionDefinitions = true;
+    result.PrintExprs = true;
+    return result;
+  }
+
+  static PrintOptions printDeclarations() {
     PrintOptions result = printVerbose();
     result.ExcludeAttrList.clear();
     result.ExcludeAttrList.push_back(DAK_FixedLayout);

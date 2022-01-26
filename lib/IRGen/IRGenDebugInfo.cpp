@@ -97,6 +97,22 @@ public:
   };
 };
 
+static bool equalWithoutExistentialTypes(Type t1, Type t2) {
+  if (!t1->getASTContext().LangOpts.EnableExplicitExistentialTypes)
+    return false;
+
+  auto withoutExistentialTypes = [](Type type) -> Type {
+    return type.transform([](Type type) -> Type {
+      if (auto existential = type->getAs<ExistentialType>())
+        return existential->getConstraintType();
+      return type;
+    });
+  };
+
+  return withoutExistentialTypes(t1)
+      ->isEqual(withoutExistentialTypes(t2));
+}
+
 class IRGenDebugInfoImpl : public IRGenDebugInfo {
   friend class IRGenDebugInfoImpl;
   const IRGenOptions &Opts;
@@ -900,6 +916,9 @@ private:
         Ty->dump(llvm::errs());
         abort();
       } else if (!Reconstructed->isEqual(Ty) &&
+                 // FIXME: Some existential types are reconstructed without
+                 // an explicit ExistentialType wrapping the constraint.
+                 !equalWithoutExistentialTypes(Reconstructed, Ty) &&
                  !EqualUpToClangTypes().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
         llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
@@ -1526,12 +1545,12 @@ private:
     case TypeKind::OpaqueTypeArchetype:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::NestedArchetype:
     case TypeKind::SequenceArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
       AssociatedTypeDecl *assocType = nullptr;
-      if (auto nested = dyn_cast<NestedArchetypeType>(Archetype))
-        assocType = nested->getAssocType();
+      if (auto depMemTy = Archetype->getInterfaceType()
+              ->getAs<DependentMemberType>())
+        assocType = depMemTy->getAssocType();
       auto L = getFilenameAndLocation(*this, assocType);
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;

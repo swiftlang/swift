@@ -1949,19 +1949,58 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
 
   case DAK_Effects: {
-    auto kind = parseSingleAttrOption<EffectsKind>
-                         (*this, Loc, AttrRange, AttrName, DK)
-                    .when("readonly", EffectsKind::ReadOnly)
-                    .when("readnone", EffectsKind::ReadNone)
-                    .when("readwrite", EffectsKind::ReadWrite)
-                    .when("releasenone", EffectsKind::ReleaseNone)
-                    .diagnoseWhenOmitted();
-    if (!kind)
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));      return false;
+    }
+    EffectsKind kind = EffectsKind::Unspecified;
+    SourceLoc customStart, customEnd;
+    {
+      SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
+
+      if (Tok.isNot(tok::identifier)) {
+        diagnose(Loc, diag::error_in_effects_attribute, "expected identifier");
+        return false;
+      }
+
+      if (Tok.getText() == "readonly")
+        kind = EffectsKind::ReadOnly;
+      else if (Tok.getText() == "readnone")
+        kind = EffectsKind::ReadNone;
+      else if (Tok.getText() == "readwrite")
+        kind = EffectsKind::ReadWrite;
+      else if (Tok.getText() == "releasenone")
+        kind = EffectsKind::ReleaseNone;
+      else {
+        customStart = customEnd = Tok.getLoc();
+        while (Tok.isNot(tok::r_paren) && Tok.isNot(tok::eof)) {
+          consumeToken();
+        }
+        customEnd = Tok.getLoc();
+        kind = EffectsKind::Custom;
+        AttrRange = SourceRange(Loc, customEnd);
+      }
+      if (kind != EffectsKind::Custom) {
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+        consumeToken(tok::identifier);
+      }
+    }
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
+    }
 
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) EffectsAttr(AtLoc, AttrRange, *kind));
-
+    if (!DiscardAttribute) {
+      if (kind == EffectsKind::Custom) {
+        StringRef customStr = SourceMgr.extractText(
+                          CharSourceRange(SourceMgr, customStart, customEnd));
+        Attributes.add(new (Context) EffectsAttr(AtLoc, AttrRange,
+                                                 customStr, customStart));
+      } else {
+        Attributes.add(new (Context) EffectsAttr(AtLoc, AttrRange, kind));
+      }
+    }
     break;
   }
 
@@ -1992,6 +2031,21 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     if (!DiscardAttribute)
       Attributes.add(new (Context) OptimizeAttr(AtLoc, AttrRange, *optMode));
+
+    break;
+  }
+
+  case DAK_Exclusivity: {
+    auto mode = parseSingleAttrOption<ExclusivityAttr::Mode>
+                            (*this, Loc, AttrRange, AttrName, DK)
+                       .when("checked", ExclusivityAttr::Mode::Checked)
+                       .when("unchecked", ExclusivityAttr::Mode::Unchecked)
+                       .diagnoseWhenOmitted();
+    if (!mode)
+      return false;
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ExclusivityAttr(AtLoc, AttrRange, *mode));
 
     break;
   }
@@ -4873,6 +4927,11 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                            /*diagnoseDollarPrefix=*/false,
                            diag::expected_identifier_in_decl, "import"))
       return nullptr;
+    if (Tok.is(tok::oper_postfix)) {
+        diagnose(Tok, diag::unexpected_operator_in_import_path)
+          .fixItRemove(Tok.getLoc());
+        return nullptr;
+    }
     HasNext = consumeIf(tok::period);
   } while (HasNext);
 
@@ -6226,7 +6285,7 @@ ParserStatus Parser::parseGetEffectSpecifier(ParsedAccessors &accessors,
 
 ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
                                  GenericParamList *GenericParams,
-                                 ParameterList *Indices,
+                                 ParameterList *Indices, TypeRepr *ResultType,
                                  ParsedAccessors &accessors,
                                  AbstractStorageDecl *storage,
                                  SourceLoc StaticLoc) {
@@ -6258,8 +6317,22 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     if (parsingLimitedSyntax)
       return makeParserSuccess();
 
-    diagnose(accessors.RBLoc, diag::computed_property_no_accessors,
-             /*subscript*/ Indices != nullptr);
+    if (ResultType != nullptr) {
+      // An error type at this point means we couldn't parse
+      // the result type for subscript correctly which will be
+      // already diagnosed as missing result type in declaration.
+      if (ResultType->getKind() == TypeReprKind::Error)
+        return makeParserError();
+
+      diagnose(accessors.RBLoc, diag::missing_accessor_return_decl,
+               /*subscript*/ Indices != nullptr, ResultType);
+    } else {
+      // This is supposed to be a computed property, but we don't
+      // have a result type representation which indicates this is probably not
+      // a well-formed computed property. So we can assume that empty braces
+      // are unexpected at this position for this declaration.
+      diagnose(accessors.LBLoc, diag::unexpected_curly_braces_in_decl);
+    }
     return makeParserError();
   }
 
@@ -6488,9 +6561,11 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
 
   // Parse getter and setter.
   ParsedAccessors accessors;
+  auto typedPattern = dyn_cast<TypedPattern>(pattern);
+  auto *resultTypeRepr = typedPattern ? typedPattern->getTypeRepr() : nullptr;
   auto AccessorStatus = parseGetSet(Flags, /*GenericParams=*/nullptr,
-                                    /*Indices=*/nullptr, accessors,
-                                    storage, StaticLoc);
+                                    /*Indices=*/nullptr, resultTypeRepr,
+                                    accessors, storage, StaticLoc);
   if (AccessorStatus.hasCodeCompletion())
     return makeParserCodeCompletionStatus();
   if (AccessorStatus.isErrorOrHasCompletion())
@@ -6500,7 +6575,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
   if (!PrimaryVar)
     return nullptr;
 
-  if (!isa<TypedPattern>(pattern)) {
+  if (!typedPattern) {
     if (accessors.Get || accessors.Set || accessors.Address ||
         accessors.MutableAddress) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
@@ -8029,7 +8104,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       Status.setIsParseError();
     }
   } else if (!Status.hasCodeCompletion()) {
-    Status |= parseGetSet(Flags, GenericParams, Indices.get(),
+    Status |= parseGetSet(Flags, GenericParams, Indices.get(), ElementTy.get(),
                           accessors, Subscript, StaticLoc);
   }
 

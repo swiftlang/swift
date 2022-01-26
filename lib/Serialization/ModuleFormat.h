@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 654; // opaque result type orinal
+const uint16_t SWIFTMODULE_VERSION_MINOR = 663; // escape argument effects
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -269,12 +269,13 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
-  
+
   FirstSIL = 8,
   Method = FirstSIL,
   ObjCMethod,
   WitnessMethod,
   Closure,
+  CXXMethod,
 };
 using SILFunctionTypeRepresentationField = BCFixed<4>;
 
@@ -1071,34 +1072,26 @@ namespace decls_block {
   using PrimaryArchetypeTypeLayout = BCRecordLayout<
     PRIMARY_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
-    BCVBR<4>, // generic type parameter depth
-    BCVBR<4>  // index + 1, or zero if we have a generic type parameter decl
+    TypeIDField              // interface type
   >;
 
   using OpenedArchetypeTypeLayout = BCRecordLayout<
     OPENED_ARCHETYPE_TYPE,
-    TypeIDField         // the existential type
+    TypeIDField,         // the existential type
+    TypeIDField          // the interface type
   >;
   
   using OpaqueArchetypeTypeLayout = BCRecordLayout<
     OPAQUE_ARCHETYPE_TYPE,
     DeclIDField,           // the opaque type decl
-    BCVBR<4>,              // the ordinal
+    TypeIDField,           // the interface type
     SubstitutionMapIDField // the arguments
   >;
   
-  using NestedArchetypeTypeLayout = BCRecordLayout<
-    NESTED_ARCHETYPE_TYPE,
-    TypeIDField, // root archetype
-    TypeIDField // interface type relative to root
-  >;
-
   using SequenceArchetypeTypeLayout = BCRecordLayout<
     SEQUENCE_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
-    BCVBR<4>,                // generic type parameter depth
-    BCVBR<4> // index + 1, or zero if we have a generic type
-             // parameter decl
+    TypeIDField              // interface type
   >;
 
   using DynamicSelfTypeLayout = BCRecordLayout<
@@ -1844,7 +1837,8 @@ namespace decls_block {
 
   using EffectsDeclAttrLayout = BCRecordLayout<
     Effects_DECL_ATTR,
-    BCFixed<2>  // modref value
+    BCFixed<3>,   // EffectKind
+    DeclIDField   // Custom effect string or 0.
   >;
 
   using ForeignErrorConventionLayout = BCRecordLayout<
@@ -1928,6 +1922,11 @@ namespace decls_block {
   using OptimizeDeclAttrLayout = BCRecordLayout<
     Optimize_DECL_ATTR,
     BCFixed<2>  // optimize value
+  >;
+
+  using ExclusivityDeclAttrLayout = BCRecordLayout<
+    Optimize_DECL_ATTR,
+    BCFixed<2>  // exclusivity mode
   >;
 
   using AvailableDeclAttrLayout = BCRecordLayout<

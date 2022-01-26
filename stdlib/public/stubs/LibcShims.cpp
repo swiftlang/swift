@@ -29,7 +29,7 @@
 
 #include <type_traits>
 
-#include "../SwiftShims/LibcShims.h"
+#include "SwiftShims/LibcShims.h"
 
 #if defined(_WIN32)
 static void __attribute__((__constructor__))

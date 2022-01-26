@@ -362,7 +362,8 @@ class FailableBaseClass {
   // CHECK: bb0([[SELF_META:%.*]] : $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[SELF_META]])
   // CHECK:   destroy_value [[MARKED_SELF_BOX]]
   // CHECK:   [[RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
@@ -381,7 +382,8 @@ class FailableBaseClass {
   // CHECK: bb0([[SELF_META:%.*]] : $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[SELF_META]])
   // CHECK:   cond_br {{.*}}, [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
   //
@@ -414,7 +416,8 @@ class FailableBaseClass {
   // CHECK: bb0([[SELF_META:%.*]] : $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[SELF_META]])
   // CHECK:   switch_enum [[NEW_SELF]] : $Optional<FailableBaseClass>, case #Optional.some!enumelt: [[SUCC_BB:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL_BB:bb[0-9]+]]
   //
@@ -460,11 +463,13 @@ class FailableDerivedClass : FailableBaseClass {
   // CHECK: bb0([[OLD_SELF:%.*]] : @owned $FailableDerivedClass):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
-  // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   store [[OLD_SELF]] to [init] [[PB_BOX]]
   // CHECK-NEXT: br bb1
   //
   // CHECK: bb1:
+  // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.none!enumelt
   // CHECK-NEXT: br bb2([[RESULT]]
@@ -481,7 +486,8 @@ class FailableDerivedClass : FailableBaseClass {
     // First initialize the lvalue for self.
     // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableDerivedClass }, let, name "self"
     // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
-    // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
+    // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
     // CHECK:   store [[OLD_SELF]] to [init] [[PB_BOX]]
     //
     // Then assign canary to other member using a borrow.
@@ -576,7 +582,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT]]
+  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Then initialize the canary with nil. We are able to borrow the initialized self to avoid retain/release overhead.
@@ -618,7 +625,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT]]
+  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Then initialize the canary with nil. We are able to borrow the initialized self to avoid retain/release overhead.
@@ -667,7 +675,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT]]
+  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Call the initializer.
@@ -686,6 +695,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   //
   // ... and destroy the box in the error block.
   // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK-NEXT:   end_borrow [[LIFETIME]]
   // CHECK-NEXT:   destroy_value [[MARK_UNINIT]]
   // CHECK-NEXT:   throw [[ERROR]]
   // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC34delegatingFailDuringDelegationCallACSi_tKcfc'
@@ -698,7 +708,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT]]
+  // CHECK:   [[LIFETIME:%.*]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[PROJ:%.*]] = project_box [[LIFETIME]]
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Call the initializer and then store the new self back into its memory slot.
@@ -721,6 +732,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   //
   // ... and destroy the box in the error block.
   // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK-NEXT:   end_borrow [[LIFETIME]]
   // CHECK-NEXT:   destroy_value [[MARK_UNINIT]]
   // CHECK-NEXT:   throw [[ERROR]]
   // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC29delegatingFailAfterDelegationACSi_tKcfc'
@@ -733,7 +745,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   // Create our box.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
-  // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT]]
+  // CHECK:   [[MARK_UNINIT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARK_UNINIT]]
+  // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT_LIFETIME]]
   //
   // Perform the unwrap.
   // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
@@ -753,6 +766,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   [[NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF_CAST]] : $ThrowBaseClass to $ThrowDerivedClass
   // CHECK:   store [[NEW_SELF]] to [init] [[PROJ]]
   // CHECK:   [[RESULT:%.*]] = load [copy] [[PROJ]]
+  // CHECK:   end_borrow [[MARK_UNINIT_LIFETIME]]
   // CHECK:   destroy_value [[MARK_UNINIT]]
   // CHECK:   return [[RESULT]]
   //
@@ -766,6 +780,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   br [[ERROR_JOIN]]([[ERROR]]
   //
   // CHECK: [[ERROR_JOIN]]([[ERROR_PHI:%.*]] : @owned $Error):
+  // CHECK:   end_borrow [[MARK_UNINIT_LIFETIME]]
   // CHECK:   destroy_value [[MARK_UNINIT]]
   // CHECK:   throw [[ERROR_PHI]]
   // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegation0fg6DuringI11ArgEmissionACSi_SitKcfc'
@@ -867,7 +882,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[SUCC_BB1:bb[0-9]+]], error [[ERROR_BB1:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB1]](
@@ -876,6 +892,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: [[SUCC_BB2]]([[NEW_SELF:%.*]] : @owned $ThrowDerivedClass):
   // CHECK-NEXT: assign [[NEW_SELF]] to [[PB_BOX]]
   // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[PB_BOX]]
+  // CHECK-NEXT:   end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: return [[RESULT]]
   //
@@ -886,6 +903,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK-NEXT: br [[THROWING_BB]]([[ERROR]]
   //
   // CHECK: [[THROWING_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: throw [[ERROR]]
   convenience init(chainingFailDuringDelegationArgEmission : Int, chainingFailDuringDelegationCall : Int) throws {
@@ -901,7 +919,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
+  // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:   try_apply {{.*}}([[SELF_META]]) : {{.*}}, normal [[SUCC_BB1:bb[0-9]+]], error [[ERROR_BB1:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB1]]([[NEW_SELF:%.*]] : @owned $ThrowDerivedClass):
@@ -912,6 +931,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   //
   // CHECK: [[SUCC_BB2]](
   // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[PB_BOX]]
+  // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: return [[RESULT]]
   //
@@ -922,6 +942,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK-NEXT: br [[THROWING_BB]]([[ERROR]]
   //
   // CHECK: [[THROWING_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: throw [[ERROR]]
   // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC28chainingFailBeforeDelegation0fg6DuringI11ArgEmission0fgjI4CallACSi_S2itKcfC'

@@ -44,21 +44,6 @@ namespace rewriting {
 class MutableTerm;
 class Term;
 
-/// A new rule introduced during property map construction, as a result of
-/// unifying two property symbols that apply to the same common suffix term.
-struct InducedRule {
-  MutableTerm LHS;
-  MutableTerm RHS;
-  RewritePath Path;
-
-  InducedRule(MutableTerm LHS, MutableTerm RHS, RewritePath Path)
-    : LHS(LHS), RHS(RHS), Path(Path) {}
-
-  // FIXME: Eventually all induced rules will have a rewrite path.
-  InducedRule(MutableTerm LHS, MutableTerm RHS)
-    : LHS(LHS), RHS(RHS) {}
-};
-
 /// Stores a convenient representation of all "property-like" rewrite rules of
 /// the form T.[p] => T, where [p] is a property symbol, for some term 'T'.
 class PropertyBag {
@@ -99,13 +84,11 @@ class PropertyBag {
   /// ConformsTo list.
   llvm::TinyPtrVector<ProtocolConformance *> ConcreteConformances;
 
+  /// Cache of associated type declarations.
+  llvm::SmallDenseMap<Identifier, AssociatedTypeDecl *, 2> AssocTypes;
+
   explicit PropertyBag(Term key) : Key(key) {}
 
-  Optional<unsigned> addProperty(Symbol property,
-                                 unsigned ruleID,
-                                 RewriteSystem &system,
-                                 SmallVectorImpl<InducedRule> &inducedRules,
-                                 bool debug);
   void copyPropertiesFrom(const PropertyBag *next,
                           RewriteContext &ctx);
 
@@ -122,27 +105,27 @@ public:
     return Superclass.hasValue();
   }
 
-  Type getSuperclassBound() const {
+  CanType getSuperclassBound() const {
     return Superclass->getSuperclass();
   }
 
   Type getSuperclassBound(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      RewriteContext &ctx) const;
+      const PropertyMap &map) const;
 
   bool isConcreteType() const {
     return ConcreteType.hasValue();
   }
 
-  Type getConcreteType() const {
+  CanType getConcreteType() const {
     return ConcreteType->getConcreteType();
   }
 
   Type getConcreteType(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      RewriteContext &ctx) const;
+      const PropertyMap &map) const;
 
   LayoutConstraint getLayoutConstraint() const {
     return Layout;
@@ -157,6 +140,8 @@ public:
 
   MutableTerm getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const;
 
+  AssociatedTypeDecl *getAssociatedType(Identifier name);
+
   void verify(const RewriteSystem &system) const;
 };
 
@@ -170,11 +155,34 @@ class PropertyMap {
   std::vector<PropertyBag *> Entries;
   Trie<PropertyBag *, MatchKind::Longest> Trie;
 
-  using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
-  llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
+  // Building the property map introduces new induced rules, which
+  // runs another round of Knuth-Bendix completion, which rebuilds the
+  // property map again.
+  //
+  // To avoid wasted work from re-introducing the same induced rules,
+  // we track the rules we've seen already on previous builds.
 
+  /// Maps a pair of rules where the first is a conformance rule and the
+  /// second is a superclass or concrete type rule, to a concrete
+  /// conformance.
   llvm::DenseMap<std::pair<unsigned, unsigned>, ProtocolConformance *>
       ConcreteConformances;
+
+  /// Superclass requirements always imply a layout requirement, and
+  /// concrete type requirements where the type is a class imply a
+  /// superclass requirement.
+  ///
+  /// Keep track of such rules to avoid wasted work from recording the
+  /// same rewrite loop more than once.
+  llvm::DenseSet<unsigned> CheckedRules;
+
+  /// When a type parameter is subject to two requirements of the same
+  /// kind, we have a pair of rewrite rules T.[p1] => T and T.[p2] => T.
+  ///
+  /// One of these rules might imply the other. Keep track of these pairs
+  /// to avoid wasted work from recording the same rewrite loop more than
+  /// once.
+  llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedRulePairs;
 
   DebugOptions Debug;
 
@@ -194,6 +202,8 @@ public:
 
   ~PropertyMap();
 
+  PropertyBag *lookUpProperties(std::reverse_iterator<const Symbol *> begin,
+                                std::reverse_iterator<const Symbol *> end) const;
   PropertyBag *lookUpProperties(const MutableTerm &key) const;
 
   std::pair<CompletionResult, unsigned>
@@ -202,15 +212,42 @@ public:
 
   void dump(llvm::raw_ostream &out) const;
 
+  /// Return the rewrite context used for allocating memory.
+  RewriteContext &getRewriteContext() const { return Context; }
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Term to type conversion. The opposite direction is implemented in
+  /// RewriteContext because it does not depend on the current rewrite system.
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  Type getTypeForTerm(Term term,
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  Type getTypeForTerm(const MutableTerm &term,
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  Type getRelativeTypeForTerm(
+                      const MutableTerm &term, const MutableTerm &prefix) const;
+
+  Type getTypeFromSubstitutionSchema(
+                      Type schema,
+                      ArrayRef<Term> substitutions,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      const MutableTerm &prefix) const;
+
 private:
   void clear();
-  Optional<unsigned>
-  addProperty(Term key, Symbol property, unsigned ruleID,
-              SmallVectorImpl<InducedRule> &inducedRules);
 
-  void computeConcreteTypeInDomainMap();
-  void concretizeNestedTypesFromConcreteParents(
-                   SmallVectorImpl<InducedRule> &inducedRules);
+  bool checkRuleOnce(unsigned ruleID);
+  bool checkRulePairOnce(unsigned firstRuleID, unsigned secondRuleID);
+
+  void addProperty(Term key, Symbol property, unsigned ruleID);
+
+  void checkConcreteTypeRequirements();
+
+  void concretizeNestedTypesFromConcreteParents();
 
   void concretizeNestedTypesFromConcreteParent(
                    Term key, RequirementKind requirementKind,
@@ -219,15 +256,17 @@ private:
                    ArrayRef<Term> substitutions,
                    ArrayRef<unsigned> conformsToRules,
                    ArrayRef<const ProtocolDecl *> conformsTo,
-                   llvm::TinyPtrVector<ProtocolConformance *> &conformances,
-                   SmallVectorImpl<InducedRule> &inducedRules);
+                   llvm::TinyPtrVector<ProtocolConformance *> &conformances);
 
   void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
                    Symbol concreteConformanceSymbol,
                    ProtocolConformance *concrete,
-                   AssociatedTypeDecl *assocType,
-                   SmallVectorImpl<InducedRule> &inducedRules) const;
+                   AssociatedTypeDecl *assocType) const;
+
+  void inferConditionalRequirements(
+                   ProtocolConformance *concrete,
+                   ArrayRef<Term> substitutions) const;
 
   MutableTerm computeConstraintTermForTypeWitness(
       Term key, RequirementKind requirementKind,
@@ -240,8 +279,7 @@ private:
     unsigned concreteRuleID,
     unsigned conformanceRuleID,
     RequirementKind requirementKind,
-    Symbol concreteConformanceSymbol,
-    SmallVectorImpl<InducedRule> &inducedRules) const;
+    Symbol concreteConformanceSymbol) const;
 
   void verify() const;
 };

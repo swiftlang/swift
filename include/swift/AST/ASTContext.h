@@ -95,7 +95,6 @@ namespace swift {
   class TypeVariableType;
   class TupleType;
   class FunctionType;
-  class GenericSignatureBuilder;
   class ArchetypeType;
   class Identifier;
   class InheritedNameSet;
@@ -368,6 +367,12 @@ private:
   /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
   mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
 
+  /// The maximum arity of `_StringProcessing.Tuple{n}`.
+  static constexpr unsigned StringProcessingTupleDeclMaxArity = 8;
+  /// Cached `_StringProcessing.Tuple{n}` declarations.
+  mutable SmallVector<StructDecl *, StringProcessingTupleDeclMaxArity - 2>
+      StringProcessingTupleDecls;
+
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
@@ -526,7 +531,7 @@ public:
 
   /// Retrieve the declaration of Swift.Error.
   ProtocolDecl *getErrorDecl() const;
-  CanType getExceptionType() const;
+  CanType getErrorExistentialType() const;
   
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** Retrieve the declaration of Swift.NAME. */ \
@@ -623,7 +628,15 @@ public:
 
   /// Retrieve _StringProcessing.Regex.init(_regexString: String, version: Int).
   ConcreteDeclRef getRegexInitDecl(Type regexType) const;
-  
+
+  /// Retrieve the max arity that `_StringProcessing.Tuple{arity}` was
+  /// instantiated for.
+  unsigned getStringProcessingTupleDeclMaxArity() const;
+
+  /// Retrieve the `_StringProcessing.Tuple{arity}` declaration for the given
+  /// arity.
+  StructDecl *getStringProcessingTupleDecl(unsigned arity) const;
+
   /// Retrieve the declaration of Swift.<(Int, Int) -> Bool.
   FuncDecl *getLessThanIntDecl() const;
 
@@ -1255,14 +1268,6 @@ public:
   /// Increments \c NumTypoCorrections then checks this against the limit in
   /// the language options.
   bool shouldPerformTypoCorrection();
-  
-private:
-  /// Register the given generic signature builder to be used as the canonical
-  /// generic signature builder for the given signature, if we don't already
-  /// have one.
-  void registerGenericSignatureBuilder(GenericSignature sig,
-                                       GenericSignatureBuilder &&builder);
-  friend class GenericSignatureBuilder;
 
 private:
   friend class IntrinsicInfo;
@@ -1270,11 +1275,6 @@ private:
   llvm::LLVMContext &getIntrinsicScratchContext() const;
 
 public:
-  /// Retrieve or create the stored generic signature builder for the given
-  /// canonical generic signature and module.
-  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
-                                                     CanGenericSignature sig);
-
   rewriting::RewriteContext &getRewriteContext();
 
   /// This is a hack to break cycles. Don't introduce new callers of this

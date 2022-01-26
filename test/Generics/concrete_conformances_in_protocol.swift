@@ -8,7 +8,7 @@ struct S : P {
 }
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).R0@
-// CHECK-LABEL: Requirement signature: <Self where Self.A == S>
+// CHECK-LABEL: Requirement signature: <Self where Self.[R0]A == S>
 
 protocol R0 {
   associatedtype A where A : P, A == S
@@ -19,7 +19,7 @@ protocol R0 {
 struct G<T> : P {}
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).R1@
-// CHECK-LABEL: Requirement signature: <Self where Self.B == G<Self.A>>
+// CHECK-LABEL: Requirement signature: <Self where Self.[R1]B == G<Self.[R1]A>>
 
 protocol R1 {
   associatedtype A
@@ -27,7 +27,7 @@ protocol R1 {
 }
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).R2@
-// CHECK-LABEL: Requirement signature: <Self where Self.A == G<Self.B>>
+// CHECK-LABEL: Requirement signature: <Self where Self.[R2]A == G<Self.[R2]B>>
 
 protocol R2 {
   associatedtype A where A : P, A == G<B>
@@ -43,7 +43,7 @@ protocol PP {
 struct GG<T : P> : PP {}
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).RR3@
-// CHECK-LABEL: Requirement signature: <Self where Self.A : P, Self.B == GG<Self.A>>
+// CHECK-LABEL: Requirement signature: <Self where Self.[RR3]A : P, Self.[RR3]B == GG<Self.[RR3]A>>
 
 protocol RR3 {
   associatedtype A : P
@@ -51,7 +51,7 @@ protocol RR3 {
 }
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).RR4@
-// CHECK-LABEL: Requirement signature: <Self where Self.A == GG<Self.B>, Self.B : P>
+// CHECK-LABEL: Requirement signature: <Self where Self.[RR4]A == GG<Self.[RR4]B>, Self.[RR4]B : P>
 
 protocol RR4 {
   associatedtype A where A : PP, A == GG<B>
@@ -59,7 +59,7 @@ protocol RR4 {
 }
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).RR5@
-// CHECK-LABEL: Requirement signature: <Self where Self.A : PP, Self.B == GG<Self.A.T>>
+// CHECK-LABEL: Requirement signature: <Self where Self.[RR5]A : PP, Self.[RR5]B == GG<Self.[RR5]A.[PP]T>>
 
 protocol RR5 {
   associatedtype A : PP
@@ -67,7 +67,7 @@ protocol RR5 {
 }
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).RR6@
-// CHECK-LABEL: Requirement signature: <Self where Self.A == GG<Self.B.T>, Self.B : PP>
+// CHECK-LABEL: Requirement signature: <Self where Self.[RR6]A == GG<Self.[RR6]B.[PP]T>, Self.[RR6]B : PP>
 
 protocol RR6 {
   associatedtype A where A : PP, A == GG<B.T>

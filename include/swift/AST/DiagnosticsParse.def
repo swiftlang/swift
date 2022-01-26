@@ -251,8 +251,11 @@ ERROR(enum_case_dot_prefix,none,
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(computed_property_no_accessors, none,
-      "%select{computed property|subscript}0 must have accessors specified", (bool))
+ERROR(unexpected_curly_braces_in_decl, none,
+      "unexpected '{' in declaration", ())
+ERROR(missing_accessor_return_decl,none,
+      "missing return in %select{accessor|subscript}0 expected to return %1",
+      (bool, TypeRepr*))
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
 ERROR(unexpected_getset_implementation_in_protocol,none,
@@ -312,6 +315,8 @@ ERROR(decl_expected_module_name,none,
 ERROR(expected_module_alias,none,
       "cannot refer to module as %0 because it has been aliased; use %1 "
       "instead", (Identifier, Identifier))
+ERROR(unexpected_operator_in_import_path,none,
+      "cannot include postfix operator in import declaration",())
 
 // Extension
 ERROR(expected_lbrace_extension,PointsToFirstBadToken,
@@ -1405,6 +1410,11 @@ ERROR(mutually_exclusive_attrs,none,
 
 ERROR(invalid_infix_on_func,none,
       "'infix' modifier is not required or allowed on func declarations", ())
+
+ERROR(error_in_effects_attribute,none,
+      "error in effects attribute: %0", (StringRef))
+WARNING(warning_in_effects_attribute,none,
+      "effects attribute ignored: %0", (StringRef))
 
 ERROR(expected_in_attribute_list,none,
       "expected ']' or ',' in attribute list", ())

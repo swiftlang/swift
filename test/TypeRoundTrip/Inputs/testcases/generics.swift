@@ -9,7 +9,7 @@ protocol First {
 }
 
 protocol Second {
-  associatedtype Assoc : Second
+  associatedtype Assoc : Second where Assoc.Assoc.Assoc == Self
 }
 
 struct OuterFirst<A : First, B : First> {
@@ -69,9 +69,15 @@ struct FS1: First, Second {
 }
 
 struct FS2: First, Second {
-  typealias Assoc = FS1
+  typealias Assoc = FS3
 
   func Assoc(_ x: Int) -> Int { return x / 2 }
+}
+
+struct FS3: First, Second {
+  typealias Assoc = FS1
+
+  func Assoc(_ x: Int) -> Int { return x * 2 }
 }
 
 public func test() {

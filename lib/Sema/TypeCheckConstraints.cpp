@@ -538,29 +538,6 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
-  // Bind a property with an opaque return type to the underlying type
-  // given by the initializer.
-  if (auto var = pattern->getSingleVar()) {
-    SubstitutionMap substitutions;
-    if (auto opaque = var->getOpaqueResultTypeDecl()) {
-      init->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (auto coercionExpr = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
-          auto newSubstitutions =
-              coercionExpr->substitutions.mapReplacementTypesOutOfContext();
-          if (substitutions.empty()) {
-            substitutions = newSubstitutions;
-          } else {
-            assert(substitutions.getCanonical() ==
-                       newSubstitutions.getCanonical());
-          }
-        }
-        return expr;
-      });
-
-      opaque->setUnderlyingTypeSubstitutions(substitutions);
-    }
-  }
-
   if (hadError)
     PBD->setInvalid();
 
@@ -715,14 +692,15 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
         return found->second;
 
       if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
-        auto root = archetypeType->getRoot();
         // We leave opaque types and their nested associated types alone here.
         // They're globally available.
-        if (isa<OpaqueTypeArchetypeType>(root))
+        if (isa<OpaqueTypeArchetypeType>(archetypeType))
           return origType;
+
+        auto root = archetypeType->getRoot();
         // For other nested types, fail here so the default logic in subst()
         // for nested types applies.
-        else if (root != archetypeType)
+        if (root != archetypeType)
           return Type();
         
         auto locator = cs.getConstraintLocator({});
@@ -1735,13 +1713,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //   }
     // }
     //
+    auto constraint = fromType;
+    if (auto existential = constraint->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
     if (auto *protocolDecl =
-          dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())) {
+          dyn_cast_or_null<ProtocolDecl>(constraint->getAnyNominal())) {
       if (!couldDynamicallyConformToProtocol(toType, protocolDecl, module)) {
         return failed();
       }
     } else if (auto protocolComposition =
-                   fromType->getAs<ProtocolCompositionType>()) {
+                   constraint->getAs<ProtocolCompositionType>()) {
       if (llvm::any_of(protocolComposition->getMembers(),
                        [&](Type protocolType) {
                          if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
@@ -1994,6 +1975,12 @@ static bool checkForDynamicAttribute(CanType ty,
       if (hasAttribute(superclass))
         return true;
     }
+  }
+
+  // If this is an existential type, check if its constraint type
+  // has the attribute.
+  if (auto existential = ty->getAs<ExistentialType>()) {
+    return hasAttribute(existential->getConstraintType());
   }
 
   // If this is a protocol composition, check if any of its members have the

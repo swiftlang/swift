@@ -184,6 +184,10 @@ OPERAND_OWNERSHIP(TrivialUse, UncheckedRefCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
 OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
 
+// The dealloc_stack_ref operand needs to have NonUse ownership because
+// this use comes after the last consuming use (which is usually a dealloc_ref).
+OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
+
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
 OPERAND_OWNERSHIP(InstantaneousUse, FixLifetime)

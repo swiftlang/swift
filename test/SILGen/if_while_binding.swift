@@ -175,7 +175,8 @@ func if_multi() {
   // CHECK:   [[BORROWED_A:%.*]] = begin_borrow [lexical] [[A]]
   // CHECK:   debug_value [[BORROWED_A]] : $String, let, name "a"
   // CHECK:   [[B:%[0-9]+]] = alloc_box ${ var String }, var, name "b"
-  // CHECK:   [[PB:%[0-9]+]] = project_box [[B]]
+  // CHECK:   [[B_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[B]]
+  // CHECK:   [[PB:%[0-9]+]] = project_box [[B_LIFETIME]]
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt: [[IF_BODY:bb.*]], case #Optional.none!enumelt: [[IF_EXIT1a:bb[0-9]+]]
 
   // CHECK: [[IF_EXIT1a]]:
@@ -187,6 +188,7 @@ func if_multi() {
   if let a = foo(), var b = bar() {
     // CHECK:   store [[BVAL]] to [init] [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
+    // CHECK:   end_borrow [[B_LIFETIME]]
     // CHECK:   destroy_value [[B]]
     // CHECK:   destroy_value [[A]]
     // CHECK:   br [[IF_DONE]]
@@ -207,7 +209,8 @@ func if_multi_else() {
   // CHECK:   [[BORROWED_A:%.*]] = begin_borrow [lexical] [[A]]
   // CHECK:   debug_value [[BORROWED_A]] : $String, let, name "a"
   // CHECK:   [[B:%[0-9]+]] = alloc_box ${ var String }, var, name "b"
-  // CHECK:   [[PB:%[0-9]+]] = project_box [[B]]
+  // CHECK:   [[B_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[B]]
+  // CHECK:   [[PB:%[0-9]+]] = project_box [[B_LIFETIME]]
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt: [[IF_BODY:bb.*]], case #Optional.none!enumelt: [[IF_EXIT1a:bb[0-9]+]]
   
     // CHECK: [[IF_EXIT1a]]:
@@ -219,6 +222,7 @@ func if_multi_else() {
   if let a = foo(), var b = bar() {
     // CHECK:   store [[BVAL]] to [init] [[PB]] : $*String
     // CHECK:   debug_value {{.*}} : $String, let, name "c"
+    // CHECK:   end_borrow [[B_LIFETIME]]
     // CHECK:   destroy_value [[B]]
     // CHECK:   destroy_value [[A]]
     // CHECK:   br [[IF_DONE:bb[0-9]+]]
@@ -244,7 +248,8 @@ func if_multi_where() {
   // CHECK:   [[BORROWED_A:%.*]] = begin_borrow [lexical] [[A]]
   // CHECK:   debug_value [[BORROWED_A]] : $String, let, name "a"
   // CHECK:   [[BBOX:%[0-9]+]] = alloc_box ${ var String }, var, name "b"
-  // CHECK:   [[PB:%[0-9]+]] = project_box [[BBOX]]
+  // CHECK:   [[BBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BBOX]]
+  // CHECK:   [[PB:%[0-9]+]] = project_box [[BBOX_LIFETIME]]
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt: [[CHECK_WHERE:bb.*]], case #Optional.none!enumelt: [[IF_EXIT1a:bb[0-9]+]]
   // CHECK: [[IF_EXIT1a]]:
   // CHECK:   dealloc_box {{.*}} ${ var String }
@@ -256,12 +261,14 @@ func if_multi_where() {
   // CHECK:   cond_br {{.*}}, [[IF_BODY:bb[0-9]+]], [[IF_EXIT3:bb[0-9]+]]
   if let a = foo(), var b = bar(), a == b {
     // CHECK: [[IF_BODY]]:
+    // CHECK:   end_borrow [[BBOX_LIFETIME]]
     // CHECK:   destroy_value [[BBOX]]
     // CHECK:   destroy_value [[A]]
     // CHECK:   br [[DONE]]
     let c = a
   }
   // CHECK: [[IF_EXIT3]]:
+  // CHECK:   end_borrow [[BBOX_LIFETIME]]
   // CHECK:   destroy_value [[BBOX]]
   // CHECK:   destroy_value [[A]]
   // CHECK:   br [[DONE]]

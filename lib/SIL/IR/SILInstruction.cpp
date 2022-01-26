@@ -371,6 +371,10 @@ namespace {
       return true;
     }
 
+    bool visitDeallocStackRefInst(const DeallocStackRefInst *RHS) {
+      return true;
+    }
+
     bool visitAllocStackInst(const AllocStackInst *RHS) {
       return true;
     }
@@ -1020,12 +1024,12 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
       auto IAttrs = IInfo.getOrCreateAttributes(getModule().getASTContext());
       // Read-only.
-      if (IAttrs.hasFnAttribute(llvm::Attribute::ReadOnly) &&
-          IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind))
+      if (IAttrs.hasFnAttr(llvm::Attribute::ReadOnly) &&
+          IAttrs.hasFnAttr(llvm::Attribute::NoUnwind))
         return MemoryBehavior::MayRead;
       // Read-none?
-      return IAttrs.hasFnAttribute(llvm::Attribute::ReadNone) &&
-                     IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind)
+      return IAttrs.hasFnAttr(llvm::Attribute::ReadNone) &&
+                     IAttrs.hasFnAttr(llvm::Attribute::NoUnwind)
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }
@@ -1285,13 +1289,8 @@ bool SILInstruction::isAllocatingStack() const {
 }
 
 bool SILInstruction::isDeallocatingStack() const {
-  if (isa<DeallocStackInst>(this))
+  if (isa<DeallocStackInst>(this) || isa<DeallocStackRefInst>(this))
     return true;
-
-  if (auto *DRI = dyn_cast<DeallocRefInst>(this)) {
-    if (DRI->canAllocOnStack())
-      return true;
-  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     if (BI->getBuiltinKind() == BuiltinValueKind::StackDealloc) {

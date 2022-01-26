@@ -15,7 +15,6 @@ from .PatternNodes import PATTERN_NODES  # noqa: I201
 from .StmtNodes import STMT_NODES  # noqa: I201
 from .Trivia import TRIVIAS  # noqa: I201
 from .TypeNodes import TYPE_NODES  # noqa: I201
-from .kinds import syntax_buildable_child_type
 
 
 # Re-export global constants
@@ -180,42 +179,3 @@ def calculate_node_hash():
         _digest_trivia(trivia)
 
     return digest.hexdigest()
-
-
-def syntax_collection_element_to_collection_mapping():
-    """
-    Generates a lookup table to find syntax collection type by syntax collection
-    element type.
-
-    Example:
-    {
-        'SyntaxBuildable': [
-            'StringLiteralSegments', 
-            'PrecedenceGroupAttributeList', 
-            'AttributeList', 
-            'SpecializeAttributeSpecList', 
-            'SwitchCaseList'
-        ],
-        'IfConfigClause': [
-            'IfConfigClauseList'
-        ],
-    }
-    """
-    collection_map = {}
-
-    for node in SYNTAX_NODES:
-        if node.is_syntax_collection():
-            syntax_collection_syntax_kind = node.syntax_kind
-
-            syntax_child_type = syntax_buildable_child_type(
-                node.collection_element_type, 
-                node.collection_element, 
-                node.is_token())
-
-            if syntax_child_type not in collection_map:
-                collection_map[syntax_child_type] = []
-
-            collection_map[syntax_child_type] \
-                .append(syntax_collection_syntax_kind)
-
-    return collection_map

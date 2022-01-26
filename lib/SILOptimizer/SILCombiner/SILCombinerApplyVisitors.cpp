@@ -616,7 +616,8 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
     if (!VLA.computeFrontier(Frontier, ValueLifetimeAnalysis::DontModifyCFG))
       return false;
     // As we are extending the lifetimes of owned parameters, we have to make
-    // sure that no dealloc_ref instructions are within this extended liferange.
+    // sure that no dealloc_ref or dealloc_stack_ref instructions are
+    // within this extended liferange.
     // It could be that the dealloc_ref is deallocating a parameter and then
     // we would have a release after the dealloc.
     if (VLA.containsDeallocRef(Frontier))

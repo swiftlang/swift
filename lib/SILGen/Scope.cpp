@@ -57,6 +57,9 @@ static void lifetimeExtendAddressOnlyRValueSubValues(
            "addresses must be address only.");
     auto boxTy = SILBoxType::get(v->getType().getASTType());
     SILValue box = SGF.B.createAllocBox(loc, boxTy);
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
+      box = SGF.B.createBeginBorrow(loc, box, /*isLexical=*/true);
+    }
     SILValue addr = SGF.B.createProjectBox(loc, box, 0);
     SGF.B.createCopyAddr(loc, v, addr, IsTake, IsInitialization);
 

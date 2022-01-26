@@ -62,7 +62,7 @@
 #include "swift/Option/Options.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
-#include "swift/PrintAsObjC/PrintAsObjC.h"
+#include "swift/PrintAsClang/PrintAsClang.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -184,6 +184,22 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
                         [&](raw_ostream &out) -> bool {
     return printAsObjC(out, M, bridgingHeader);
   });
+}
+
+/// Prints the C++  "generated header" interface for \p M to \p
+/// outputPath.
+///
+/// ...unless \p outputPath is empty, in which case it does nothing.
+///
+/// \returns true if there were any errors
+///
+/// \see swift::printAsCXX
+static bool printAsCxxIfNeeded(StringRef outputPath, ModuleDecl *M) {
+  if (outputPath.empty())
+    return false;
+  return withOutputFile(
+      M->getDiags(), outputPath,
+      [&](raw_ostream &os) -> bool { return printAsCXX(os, M); });
 }
 
 /// Prints the stable module interface for \p M to \p outputPath.
@@ -826,6 +842,12 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), BridgingHeaderPathForPrint);
   }
+  if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
+      opts.InputsAndOutputs.hasCxxHeaderOutputPath()) {
+    hadAnyError |= printAsCxxIfNeeded(
+        Invocation.getCxxHeaderOutputPathForAtMostOnePrimary(),
+        Instance.getMainModule());
+  }
 
   // Only want the header if there's been any errors, ie. there's not much
   // point outputting a swiftinterface for an invalid module
@@ -1019,7 +1041,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // FIXME: This predicate matches the status quo, but there's no reason
   // indexing cannot run for actions that do not require stdlib e.g. to better
   // facilitate tests.
-  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
+  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action) &&
+      // TODO: indexing often crashes when interop is enabled (rdar://87719859).
+      !Invocation.getLangOptions().EnableCXXInterop) {
     emitIndexData(Instance);
   }
 
@@ -1195,6 +1219,13 @@ static bool performAction(CompilerInstance &Instance,
         Instance, observer, [](CompilerInstance &Instance) {
           getPrimaryOrMainSourceFile(Instance).print(
               llvm::outs(), PrintOptions::printEverything());
+          return Instance.getASTContext().hadError();
+        });
+  case FrontendOptions::ActionType::PrintASTDecl:
+    return withSemanticAnalysis(
+        Instance, observer, [](CompilerInstance &Instance) {
+          getPrimaryOrMainSourceFile(Instance).print(
+              llvm::outs(), PrintOptions::printDeclarations());
           return Instance.getASTContext().hadError();
         });
   case FrontendOptions::ActionType::DumpScopeMaps:
@@ -1525,6 +1556,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILGeneration(*SM);
 
+  // Cancellation check after SILGen.
+  if (Instance.isCancellationRequested())
+    return true;
+
   auto *Stats = Instance.getASTContext().Stats;
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
@@ -1598,6 +1633,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILProcessing(*SM);
 
+  // Cancellation check after SILOptimzation.
+  if (Instance.isCancellationRequested())
+    return true;
+
   if (PSPs.haveModuleSummaryOutputPath()) {
     if (serializeModuleSummary(SM.get(), PSPs, Context)) {
       return true;
@@ -1632,6 +1671,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   runSILLoweringPasses(*SM);
 
+  // Cancellation check after SILLowering.
+  if (Instance.isCancellationRequested())
+    return true;
+
   // TODO: at this point we need to flush any the _tracing and profiling_
   // in the UnifiedStatsReporter, because the those subsystems of the USR
   // retain _pointers into_ the SILModule, and the SILModule's lifecycle is
@@ -1658,6 +1701,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   auto IRModule = generateIR(
       IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
       OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
+
+  // Cancellation check after IRGen.
+  if (Instance.isCancellationRequested())
+    return true;
 
   // If no IRModule is available, bail. This can either happen if IR generation
   // fails, or if parallelIRGen happened correctly (in which case it would have
@@ -1871,15 +1918,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   //
   // Unfortunately it's not really safe to do anything else, since very
   // low-level operations in LLVM can trigger fatal errors.
-  auto diagnoseFatalError = [&PDC](const std::string &reason, bool shouldCrash){
-    static const std::string *recursiveFatalError = nullptr;
+  auto diagnoseFatalError = [&PDC](const char *reason, bool shouldCrash) {
+    static const char *recursiveFatalError = nullptr;
     if (recursiveFatalError) {
       // Report the /original/ error through LLVM's default handler, not
       // whatever we encountered.
       llvm::remove_fatal_error_handler();
-      llvm::report_fatal_error(*recursiveFatalError, shouldCrash);
+      llvm::report_fatal_error(recursiveFatalError, shouldCrash);
     }
-    recursiveFatalError = &reason;
+    recursiveFatalError = reason;
 
     SourceManager dummyMgr;
 
@@ -1895,12 +1942,13 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     if (shouldCrash)
       abort();
   };
-  llvm::ScopedFatalErrorHandler handler([](void *rawCallback,
-                                           const std::string &reason,
-                                           bool shouldCrash) {
-    auto *callback = static_cast<decltype(&diagnoseFatalError)>(rawCallback);
-    (*callback)(reason, shouldCrash);
-  }, &diagnoseFatalError);
+  llvm::ScopedFatalErrorHandler handler(
+      [](void *rawCallback, const char *reason, bool shouldCrash) {
+        auto *callback =
+            static_cast<decltype(&diagnoseFatalError)>(rawCallback);
+        (*callback)(reason, shouldCrash);
+      },
+      &diagnoseFatalError);
 
   std::unique_ptr<CompilerInstance> Instance =
     std::make_unique<CompilerInstance>();

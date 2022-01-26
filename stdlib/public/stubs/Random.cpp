@@ -39,7 +39,7 @@
 
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
-#include "../SwiftShims/Random.h"
+#include "SwiftShims/Random.h"
 
 #include <algorithm> // required for std::min
 

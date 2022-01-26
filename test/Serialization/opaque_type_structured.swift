@@ -9,7 +9,7 @@ func acceptR<T: R>(_: T) { }
 // AST: func f() -> (some P, [some Q])
 
 func passAnX(x: X) {
-  // SIL: $@convention(method) (@in_guaranteed X) -> (@out @_opaqueReturnTypeOf("$s20OpaqueTypeStructured1XV1fQr_SayQrGtyF", 0) __, @owned Array<@_opaqueReturnTypeOf("$s20OpaqueTypeStructured1XV1fQr_SayQrGtyF", 1) __>)
+  // SIL: $@convention(method) (@in_guaranteed X) -> (@out @_opaqueReturnTypeOf("$s20OpaqueTypeStructured1XV1fQr_SayQR_GtyF", 0) __, @owned Array<@_opaqueReturnTypeOf("$s20OpaqueTypeStructured1XV1fQr_SayQR_GtyF", 1) __>)
   acceptR(x)
   let _: X.A = x.f()
 }

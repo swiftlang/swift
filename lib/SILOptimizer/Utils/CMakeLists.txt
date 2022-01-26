@@ -6,6 +6,7 @@ target_sources(swiftSILOptimizer PRIVATE
   CanonicalizeBorrowScope.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp
+  CompileTimeInterpolationUtils.cpp
   ConstantFolding.cpp
   ConstExpr.cpp
   Devirtualize.cpp

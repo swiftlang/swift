@@ -86,7 +86,7 @@ syn keyword swiftKeyword break case continue default do else for if in static sw
 syn keyword swiftKeyword sil internal thunk skipwhite
 syn keyword swiftKeyword public hidden private shared public_external hidden_external skipwhite
 syn keyword swiftKeyword getter setter allocator initializer enumelt destroyer globalaccessor objc skipwhite
-syn keyword swiftKeyword alloc_global alloc_stack alloc_ref alloc_ref_dynamic alloc_box alloc_existential_box dealloc_stack dealloc_box dealloc_existential_box dealloc_ref dealloc_partial_ref skipwhite
+syn keyword swiftKeyword alloc_global alloc_stack alloc_ref alloc_ref_dynamic alloc_box alloc_existential_box dealloc_stack dealloc_stack_ref dealloc_box dealloc_existential_box dealloc_ref dealloc_partial_ref skipwhite
 syn keyword swiftKeyword debug_value debug_value_addr skipwhite
 syn keyword swiftKeyword load load_unowned store assign mark_uninitialized mark_function_escape copy_addr destroy_addr index_addr index_raw_pointer bind_memory to skipwhite
 syn keyword swiftKeyword strong_retain strong_release strong_retain_unowned ref_to_unowned unowned_to_ref unowned_retain unowned_release load_weak store_unowned store_weak fix_lifetime autorelease_value set_deallocating is_unique is_escaping_closure skipwhite

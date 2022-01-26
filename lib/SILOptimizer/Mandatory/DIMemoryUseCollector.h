@@ -102,10 +102,14 @@ public:
   /// with the memory info.
   SingleValueInstruction *getUninitializedValue() const {
     if (IsBox) {
+      SILValue inst = MemoryInst;
+      if (auto *bbi = MemoryInst->getSingleUserOfType<BeginBorrowInst>()) {
+        inst = bbi;
+      }
       // TODO: consider just storing the ProjectBoxInst in this case.
-      auto *pbi = MemoryInst->getSingleUserOfType<ProjectBoxInst>();
-      assert(pbi);
-      return pbi;
+      SingleValueInstruction *svi = inst->getSingleUserOfType<ProjectBoxInst>();
+      assert(svi);
+      return svi;
     }
     return MemoryInst;
   }

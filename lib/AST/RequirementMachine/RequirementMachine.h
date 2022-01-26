@@ -54,7 +54,6 @@ class RequirementMachine final {
 
   CanGenericSignature Sig;
   SmallVector<Type, 2> Params;
-  ArrayRef<const ProtocolDecl *> Protos;
 
   RewriteContext &Context;
   RewriteSystem System;
@@ -130,6 +129,7 @@ public:
   bool isCanonicalTypeInContext(Type type) const;
   Type getCanonicalTypeInContext(Type type,
                       TypeArrayView<GenericTypeParamType> genericParams) const;
+  bool isValidTypeInContext(Type type) const;
   ConformanceAccessPath getConformanceAccessPath(Type type,
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;

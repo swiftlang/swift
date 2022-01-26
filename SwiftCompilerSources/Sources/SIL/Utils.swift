@@ -20,14 +20,19 @@ public protocol ListNode : AnyObject {
   associatedtype Element
   var next: Element? { get }
   var previous: Element? { get }
+  
+  /// The first node in the list. Used to implement `reversed()`.
+  var _firstInList: Element { get }
+
+  /// The last node in the list. Used to implement `reversed()`.
+  var _lastInList: Element { get }
 }
 
 public struct List<NodeType: ListNode> :
-      Sequence, IteratorProtocol, CustomReflectable
-      where NodeType.Element == NodeType {
+      CollectionLikeSequence, IteratorProtocol where NodeType.Element == NodeType {
   private var currentNode: NodeType?
   
-  public init(startAt: NodeType?) { currentNode = startAt }
+  public init(first: NodeType?) { currentNode = first }
 
   public mutating func next() -> NodeType? {
     if let node = currentNode {
@@ -37,18 +42,21 @@ public struct List<NodeType: ListNode> :
     return nil
   }
 
-  public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: nil, value: $0) }
-    return Mirror(self, children: c)
+  public var first: NodeType? { currentNode }
+
+  public func reversed() -> ReverseList<NodeType> {
+    if let node = first {
+      return ReverseList(first: node._lastInList)
+    }
+    return ReverseList(first: nil)
   }
 }
 
 public struct ReverseList<NodeType: ListNode> :
-      Sequence, IteratorProtocol, CustomReflectable
-      where NodeType.Element == NodeType {
+      CollectionLikeSequence, IteratorProtocol where NodeType.Element == NodeType {
   private var currentNode: NodeType?
   
-  public init(startAt: NodeType?) { currentNode = startAt }
+  public init(first: NodeType?) { currentNode = first }
 
   public mutating func next() -> NodeType? {
     if let node = currentNode {
@@ -58,21 +66,168 @@ public struct ReverseList<NodeType: ListNode> :
     return nil
   }
 
-  public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: nil, value: $0) }
-    return Mirror(self, children: c)
+  public var first: NodeType? { currentNode }
+
+  public func reversed() -> ReverseList<NodeType> {
+    if let node = first {
+      return ReverseList(first: node._firstInList)
+    }
+    return ReverseList(first: nil)
   }
 }
 
 
 //===----------------------------------------------------------------------===//
-//                            General Utilities
+//                            Sequence Utilities
 //===----------------------------------------------------------------------===//
 
-extension Sequence {
-  public var isEmpty: Bool {
-    !contains(where: { _ in true })
+/// Types conforming to `HasName` will be displayed by their name (instead of the
+/// full object) in collection descriptions.
+///
+/// This is useful to make collections, e.g. of BasicBlocks or Functions, readable.
+public protocol HasName {
+  var name: String { get }
+}
+
+private struct CustomMirrorChild : CustomStringConvertible, CustomReflectable {
+  public var description: String
+  public var customMirror: Mirror { Mirror(self, children: []) }
+  
+  public init(description: String) { self.description = description }
+}
+
+/// Makes a Sequence's `description` and `customMirror` formatted like Array, e.g. [a, b, c].
+public protocol FormattedLikeArray : Sequence, CustomStringConvertible, CustomReflectable {
+}
+
+extension FormattedLikeArray {
+  /// Display a Sequence in an array like format, e.g. [a, b, c]
+  public var description: String {
+    "[" + map {
+      if let named = $0 as? HasName {
+        return named.name
+      }
+      return String(describing: $0)
+    }.joined(separator: ", ") + "]"
   }
+  
+  /// The mirror which adds the children of a Sequence, similar to `Array`.
+  public var customMirror: Mirror {
+    // If the one-line description is not too large, print that instead of the
+    // children in separate lines.
+    if description.count <= 80 {
+      return Mirror(self, children: [])
+    }
+    let c: [Mirror.Child] = map {
+      let val: Any
+      if let named = $0 as? HasName {
+        val = CustomMirrorChild(description: named.name)
+      } else {
+        val = $0
+      }
+      return (label: nil, value: val)
+    }
+    return Mirror(self, children: c, displayStyle: .collection)
+  }
+}
+
+/// A Sequence which is not consuming and therefore behaves like a Collection.
+///
+/// Many sequences in SIL and the optimizer should be collections but cannot
+/// because their Index cannot conform to Comparable. Those sequences conform
+/// to CollectionLikeSequence.
+///
+/// For convenience it also inherits from FormattedLikeArray.
+public protocol CollectionLikeSequence : FormattedLikeArray {
+}
+
+public extension CollectionLikeSequence {
+  var isEmpty: Bool { !contains(where: { _ in true }) }
+}
+
+// Also make the lazy sequences a CollectionLikeSequence if the underlying sequence is one.
+
+extension LazySequence : CollectionLikeSequence,
+                         FormattedLikeArray, CustomStringConvertible, CustomReflectable
+                         where Base: CollectionLikeSequence {}
+
+extension FlattenSequence : CollectionLikeSequence,
+                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
+                            where Base: CollectionLikeSequence {}
+
+extension LazyMapSequence : CollectionLikeSequence,
+                            FormattedLikeArray, CustomStringConvertible, CustomReflectable
+                            where Base: CollectionLikeSequence {}
+
+extension LazyFilterSequence : CollectionLikeSequence,
+                               FormattedLikeArray, CustomStringConvertible, CustomReflectable
+                               where Base: CollectionLikeSequence {}
+
+//===----------------------------------------------------------------------===//
+//                            String parsing
+//===----------------------------------------------------------------------===//
+
+public struct StringParser {
+  private var s: Substring
+  private let originalLength: Int
+  
+  private mutating func consumeWhitespace() {
+    s = s.drop { $0.isWhitespace }
+  }
+
+  public init(_ string: String) {
+    s = Substring(string)
+    originalLength = string.count
+  }
+  
+  mutating func isEmpty() -> Bool {
+    consumeWhitespace()
+    return s.isEmpty
+  }
+
+  public mutating func consume(_ str: String) -> Bool {
+    consumeWhitespace()
+    if !s.starts(with: str) { return false }
+    s = s.dropFirst(str.count)
+    return true
+  }
+
+  public mutating func consumeInt(withWhiteSpace: Bool = true) -> Int? {
+    if withWhiteSpace {
+      consumeWhitespace()
+    }
+    var intStr = ""
+    s = s.drop {
+      if $0.isNumber {
+        intStr.append($0)
+        return true
+      }
+      return false
+    }
+    return Int(intStr)
+  }
+  
+  public mutating func consumeIdentifier() -> String? {
+    consumeWhitespace()
+    var name = ""
+    s = s.drop {
+      if $0.isLetter {
+        name.append($0)
+        return true
+      }
+      return false
+    }
+    return name.isEmpty ? nil : name
+  }
+  
+  public func throwError(_ message: StaticString) throws -> Never {
+    throw ParsingError(message: message, position: originalLength - s.count)
+  }
+}
+
+public struct ParsingError : Error {
+  public let message: StaticString
+  public let position: Int
 }
 
 //===----------------------------------------------------------------------===//
@@ -84,7 +239,7 @@ extension BridgedStringRef {
     let buffer = UnsafeBufferPointer<UInt8>(start: data, count: Int(length))
     return String(decoding: buffer, as: UTF8.self)
   }
-  
+
   func takeString() -> String {
     let str = string
     freeBridgedStringRef(self)
@@ -117,7 +272,7 @@ extension UnsafeMutablePointer where Pointee == BridgedSwiftObject {
     let ptr = Unmanaged.passUnretained(object).toOpaque()
     self = ptr.bindMemory(to: BridgedSwiftObject.self, capacity: 1)
   }
-  
+
   func getAs<T: AnyObject>(_ objectType: T.Type) -> T {
     return Unmanaged<T>.fromOpaque(self).takeUnretainedValue()
   }
@@ -132,3 +287,11 @@ extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
   }
 }
 
+extension BridgedArrayRef {
+  func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
+    return data.withMemoryRebound(to: ty, capacity: numElements) { (ptr: UnsafePointer<T>) -> R in
+      let buffer = UnsafeBufferPointer(start: ptr, count: numElements)
+      return c(buffer)
+    }
+  }
+}

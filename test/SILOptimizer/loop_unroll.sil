@@ -341,9 +341,9 @@ class B {}
 
 // CHECK-LABEL: sil @unroll_with_stack_allocation
 // CHECK: = alloc_ref [stack]
-// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack_ref
 // CHECK: = alloc_ref [stack]
-// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack_ref
 // CHECK: }
 sil @unroll_with_stack_allocation : $@convention(thin) () -> () {
 bb0:
@@ -361,7 +361,7 @@ bb2:
   %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
   %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
-  dealloc_ref [stack] %a : $B
+  dealloc_stack_ref %a : $B
   cond_br %7, bb4, bb3
 
 bb3:
@@ -375,9 +375,9 @@ bb4:
 // CHECK-LABEL: sil @dont_copy_stack_allocation_with_dealloc_outside_loop
 // CHECK:   = alloc_ref [stack]
 // CHECK: bb2:
-// CHECK:   dealloc_ref [stack]
+// CHECK:   dealloc_stack_ref
 // CHECK: bb3:
-// CHECK:   dealloc_ref [stack]
+// CHECK:   dealloc_stack_ref
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @dont_copy_stack_allocation_with_dealloc_outside_loop : $@convention(thin) () -> () {
@@ -396,11 +396,11 @@ bb1(%4 : $Builtin.Int64):
   cond_br %7, bb3, bb2
 
 bb2:
-  dealloc_ref [stack] %a : $B
+  dealloc_stack_ref %a : $B
   br bb1(%6 : $Builtin.Int64)
 
 bb3:
-  dealloc_ref [stack] %a : $B
+  dealloc_stack_ref %a : $B
   %8 = tuple()
   return %8 : $()
 }

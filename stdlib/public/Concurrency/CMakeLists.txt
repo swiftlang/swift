@@ -103,6 +103,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskLocal.swift
   TaskSleep.swift
   ThreadSanitizer.cpp
+  TracingSignpost.cpp
   Mutex.cpp
   AsyncStreamBuffer.swift
   AsyncStream.swift

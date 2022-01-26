@@ -16,7 +16,7 @@
 #ifndef NORMALIZATION_DATA_H
 #define NORMALIZATION_DATA_H
 
-#include "../SwiftShims/SwiftStdint.h"
+#include "SwiftShims/SwiftStdint.h"
 
 static const __swift_uint16_t _swift_stdlib_normData_data[66] = {
   0x4, 0x358, 0xA0, 0x50, 0x6C0, 0x44, 0x80, 0x48, 0x720, 0x3, 0x733, 0x88, 0xC8, 0x3C, 0xD0, 0xF0,

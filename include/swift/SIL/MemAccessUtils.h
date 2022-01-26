@@ -948,7 +948,7 @@ namespace swift {
 /// The index of ref_element_addr is part of the storage identity and does
 /// not contribute to the access path indices.
 ///
-/// A well-formed path has at most one offset component at the begining of the
+/// A well-formed path has at most one offset component at the beginning of the
 /// path (chained index_addrs are merged into one offset). In other words,
 /// taking an offset from a subobject projection is not well-formed access
 /// path. However, it is possible (however undesirable) for programmers to

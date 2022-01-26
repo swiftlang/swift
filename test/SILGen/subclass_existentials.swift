@@ -2,6 +2,9 @@
 // RUN: %target-swift-emit-silgen -module-name subclass_existentials -Xllvm -sil-full-demangle -parse-as-library -primary-file %s -verify | %FileCheck %s
 // RUN: %target-swift-emit-ir -module-name subclass_existentials -parse-as-library -primary-file %s
 
+// RUN: %target-swift-emit-silgen -module-name subclass_existentials -Xllvm -sil-full-demangle -parse-as-library -enable-explicit-existential-types -primary-file %s -verify | %FileCheck %s
+// RUN: %target-swift-emit-ir -module-name subclass_existentials -parse-as-library -enable-explicit-existential-types -primary-file %s
+
 // Note: we pass -verify above to ensure there are no spurious
 // compiler warnings relating to casts.
 
@@ -88,23 +91,23 @@ func conversions(
 
   // Metatypes
 
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") (Base<Int> & P)).Type
-  // CHECK: [[RESULT:%.*]] = upcast [[PAYLOAD]] : $@thick (@opened("{{.*}}") (Base<Int> & P)).Type to $@thick Base<Int>.Type
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
+  // CHECK: [[RESULT:%.*]] = upcast [[PAYLOAD]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type to $@thick Base<Int>.Type
   let _: Base<Int>.Type = baseAndPType
 
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") (Base<Int> & P)).Type
-  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}") (Base<Int> & P)).Type, $@thick P.Type
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
+  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type, $@thick P.Type
   let _: P.Type = baseAndPType
 
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") (Base<Int> & P)).Type
-  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}") (Base<Int> & P)).Type, $@thick Q.Type
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %3 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
+  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type, $@thick Q.Type
   let _: Q.Type = baseAndPType
 
   // CHECK: [[RESULT:%.*]] = init_existential_metatype %4 : $@thick Derived.Type, $@thick (Base<Int> & P).Type
   let _: (Base<Int> & P).Type = derivedType
 
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %5 : $@thick (Derived & R).Type to $@thick (@opened("{{.*}}") (Derived & R)).Type
-  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}") (Derived & R)).Type, $@thick (Base<Int> & P).Type
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_metatype %5 : $@thick (Derived & R).Type to $@thick (@opened("{{.*}}") Derived & R).Type
+  // CHECK: [[RESULT:%.*]] = init_existential_metatype [[PAYLOAD]] : $@thick (@opened("{{.*}}") Derived & R).Type, $@thick (Base<Int> & P).Type
   let _: (Base<Int> & P).Type = derivedAndRType
 
   // CHECK: return
@@ -132,32 +135,36 @@ func methodCalls(
   // CHECK: store_borrow [[PAYLOAD]] to [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") Base<Int> & P, #P.protocolSelfReturn : <Self where Self : P> (Self) -> () -> Self, [[PAYLOAD]] : $@opened("{{.*}}") Base<Int> & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_box
-  // CHECK: [[RESULT_BUF:%.*]] = project_box [[RESULT_BOX]]
+  // CHECK: [[RESULT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[RESULT_BOX]]
+  // CHECK: [[RESULT_BUF:%.*]] = project_box [[RESULT_LIFETIME]]
   // CHECK: apply [[METHOD]]<@opened("{{.*}}") Base<Int> & P>([[RESULT_BUF]], [[SELF_BOX]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: dealloc_stack [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}") Base<Int> & P
   // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]] : $Base<Int> & P
+  // CHECK: end_borrow [[RESULT_LIFETIME]]
   // CHECK: dealloc_box [[RESULT_BOX]]
   let _: Base<Int> & P = baseAndP.protocolSelfReturn()
 
-  // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") (Base<Int> & P)).Type
-  // CHECK: [[METATYPE_REF:%.*]] = upcast [[METATYPE]] : $@thick (@opened("{{.*}}") (Base<Int> & P)).Type to $@thick Base<Int>.Type
+  // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
+  // CHECK: [[METATYPE_REF:%.*]] = upcast [[METATYPE]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type to $@thick Base<Int>.Type
   // CHECK: [[METHOD:%.*]] = function_ref @$s21subclass_existentials4BaseC15classSelfReturnACyxGXDyFZ : $@convention(method) <τ_0_0> (@thick Base<τ_0_0>.Type) -> @owned Base<τ_0_0>
   // CHECK: [[RESULT_REF2:%.*]] = apply [[METHOD]]<Int>([[METATYPE_REF]])
-  // CHECK: [[RESULT_REF:%.*]] = unchecked_ref_cast [[RESULT_REF2]] : $Base<Int> to $@opened("{{.*}}") (Base<Int> & P)
-  // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") (Base<Int> & P) : $@opened("{{.*}}") (Base<Int> & P), $Base<Int> & P
+  // CHECK: [[RESULT_REF:%.*]] = unchecked_ref_cast [[RESULT_REF2]] : $Base<Int> to $@opened("{{.*}}") Base<Int> & P
+  // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]]
   let _: Base<Int> & P = baseAndPType.classSelfReturn()
 
-  // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") (Base<Int> & P)).Type
-  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") (Base<Int> & P), #P.protocolSelfReturn : <Self where Self : P> (Self.Type) -> () -> Self, [[METATYPE]] : $@thick (@opened("{{.*}}") (Base<Int> & P)).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") Base<Int> & P).Type
+  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") Base<Int> & P, #P.protocolSelfReturn : <Self where Self : P> (Self.Type) -> () -> Self, [[METATYPE]] : $@thick (@opened("{{.*}}") Base<Int> & P).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_box
+  // CHECK: [[RESULT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[RESULT_BOX]]
   // CHECK: [[RESULT_BUF:%.*]] = project_box
-  // CHECK: apply [[METHOD]]<@opened("{{.*}}") (Base<Int> & P)>([[RESULT_BUF]], [[METATYPE]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
-  // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}") (Base<Int> & P)
-  // CHECK: [[RESULT_VALUE:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") (Base<Int> & P) : $@opened("{{.*}}") (Base<Int> & P), $Base<Int> & P
+  // CHECK: apply [[METHOD]]<@opened("{{.*}}") Base<Int> & P>([[RESULT_BUF]], [[METATYPE]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK: [[RESULT_REF:%.*]] = load [take] [[RESULT_BUF]] : $*@opened("{{.*}}") Base<Int> & P
+  // CHECK: [[RESULT_VALUE:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
   // CHECK: destroy_value [[RESULT_VALUE]]
+  // CHECK: end_borrow [[RESULT_LIFETIME]]
   // CHECK: dealloc_box [[RESULT_BOX]]
   let _: Base<Int> & P = baseAndPType.protocolSelfReturn()
 

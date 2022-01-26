@@ -91,7 +91,7 @@ protocol AsExistentialB {
 }
 
 protocol AsExistentialAssocTypeA {
-  var delegate : AsExistentialAssocTypeB? { get }
+  var delegate : AsExistentialAssocTypeB? { get } // expected-warning {{protocol 'AsExistentialAssocTypeB' as a type must be explicitly marked as 'any'}}
 }
 protocol AsExistentialAssocTypeB {
   func aMethod(_ object : AsExistentialAssocTypeA)
@@ -103,7 +103,7 @@ protocol AsExistentialAssocTypeAgainA {
   associatedtype Bar
 }
 protocol AsExistentialAssocTypeAgainB {
-  func aMethod(_ object : AsExistentialAssocTypeAgainA)
+  func aMethod(_ object : AsExistentialAssocTypeAgainA) // expected-warning {{protocol 'AsExistentialAssocTypeAgainA' as a type must be explicitly marked as 'any'}}
 }
 
 // SR-547

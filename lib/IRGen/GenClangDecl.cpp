@@ -40,6 +40,7 @@ public:
         isa<clang::VarDecl>(DRE->getDecl())) {
       callback(DRE->getDecl());
     }
+
     return true;
   }
 
@@ -56,6 +57,17 @@ public:
     callback(CXXCE->getConstructor());
     return true;
   }
+
+  bool VisitVarDecl(clang::VarDecl *VD) {
+    if (auto cxxRecord = VD->getType()->getAsCXXRecordDecl())
+      if (auto dtor = cxxRecord->getDestructor())
+        callback(dtor);
+
+    return true;
+  }
+
+  bool shouldVisitTemplateInstantiations() const { return true; }
+  bool shouldVisitImplicitCode() const { return true; }
 };
 
 // If any (re)declaration of `decl` contains executable code, returns that
@@ -65,6 +77,11 @@ public:
 // the initializer of the variable.
 clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
   if (auto fd = dyn_cast<clang::FunctionDecl>(decl)) {
+    // If this is a potentially not-yet-instanciated template, we might
+    // still have a body.
+    if (fd->getTemplateInstantiationPattern())
+      return fd;
+
     const clang::FunctionDecl *definition;
     if (fd->hasBody(definition)) {
       return const_cast<clang::FunctionDecl *>(definition);
@@ -100,7 +117,7 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
   SmallVector<const clang::Decl *, 8> stack;
   stack.push_back(decl);
 
-  ClangDeclFinder refFinder([&](const clang::Decl *D) {
+  auto callback = [&](const clang::Decl *D) {
     for (auto *DC = D->getDeclContext();; DC = DC->getParent()) {
       // Check that this is not a local declaration inside a function.
       if (DC->isFunctionOrMethod()) {
@@ -117,14 +134,46 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     if (!GlobalClangDecls.insert(D->getCanonicalDecl()).second) {
       return;
     }
+
     stack.push_back(D);
-  });
+  };
+
+  ClangDeclFinder refFinder(callback);
 
   while (!stack.empty()) {
     auto *next = const_cast<clang::Decl *>(stack.pop_back_val());
+
+    // If a function calls another method in a class template specialization, we
+    // need to instantiate that other function. Do that here.
+    if (auto *fn = dyn_cast<clang::FunctionDecl>(next)) {
+      // Make sure that this method is part of a class template specialization.
+      if (fn->getTemplateInstantiationPattern())
+        Context.getClangModuleLoader()
+            ->getClangSema()
+            .InstantiateFunctionDefinition(fn->getLocation(), fn);
+    }
+
     if (clang::Decl *executableDecl = getDeclWithExecutableCode(next)) {
         refFinder.TraverseDecl(executableDecl);
         next = executableDecl;
+    }
+
+    // Unfortunately, implicitly defined CXXDestructorDecls don't have a real
+    // body, so we need to traverse these manually.
+    if (auto *dtor = dyn_cast<clang::CXXDestructorDecl>(next)) {
+      auto cxxRecord = dtor->getParent();
+
+      for (auto field : cxxRecord->fields()) {
+        if (auto fieldCxxRecord = field->getType()->getAsCXXRecordDecl())
+          if (auto *fieldDtor = fieldCxxRecord->getDestructor())
+            callback(fieldDtor);
+      }
+
+      for (auto base : cxxRecord->bases()) {
+        if (auto baseCxxRecord = base.getType()->getAsCXXRecordDecl())
+          if (auto *baseDtor = baseCxxRecord->getDestructor())
+            callback(baseDtor);
+      }
     }
 
     if (auto var = dyn_cast<clang::VarDecl>(next))
@@ -133,15 +182,7 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     if (isa<clang::FieldDecl>(next)) {
       continue;
     }
-    // If a method calls another method in a class template specialization, we
-    // need to instantiate that other method. Do that here.
-    if (auto *method = dyn_cast<clang::CXXMethodDecl>(next)) {
-      // Make sure that this method is part of a class template specialization.
-      if (method->getTemplateInstantiationPattern())
-        Context.getClangModuleLoader()
-            ->getClangSema()
-            .InstantiateFunctionDefinition(method->getLocation(), method);
-    }
+
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }
 }

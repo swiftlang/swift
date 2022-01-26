@@ -104,7 +104,7 @@ public:
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
     DistributedThunk,
-    DistributedMethodAccessor,
+    DistributedAccessor,
     AccessibleFunctionRecord
   };
 
@@ -365,6 +365,11 @@ protected:
                                      ModuleDecl *fromModule);
   void appendImplFunctionType(SILFunctionType *fn, GenericSignature sig,
                               const ValueDecl *forDecl = nullptr);
+  void appendOpaqueTypeArchetype(ArchetypeType *archetype,
+                                 OpaqueTypeDecl *opaqueDecl,
+                                 SubstitutionMap subs,
+                                 GenericSignature sig,
+                                 const ValueDecl *forDecl);
 
   void appendContextOf(const ValueDecl *decl);
 

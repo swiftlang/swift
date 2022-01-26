@@ -44,11 +44,13 @@ func test0(c c: C) {
   var a: A
   // CHECK:   [[A1:%.*]] = alloc_box ${ var A }, var, name "a"
   // CHECK:   [[MARKED_A1:%.*]] = mark_uninitialized [var] [[A1]]
-  // CHECK:   [[PBA:%.*]] = project_box [[MARKED_A1]]
+  // CHECK:   [[MARKED_A1_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_A1]]
+  // CHECK:   [[PBA:%.*]] = project_box [[MARKED_A1_LIFETIME]]
 
   unowned var x = c
   // CHECK:   [[X:%.*]] = alloc_box ${ var @sil_unowned C }
-  // CHECK:   [[PBX:%.*]] = project_box [[X]]
+  // CHECK:   [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+  // CHECK:   [[PBX:%.*]] = project_box [[X_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   [[T2:%.*]] = ref_to_unowned [[ARG_COPY]] : $C  to $@sil_unowned C
   // CHECK:   [[T2_COPY:%.*]] = copy_value [[T2]] : $@sil_unowned C
@@ -75,7 +77,9 @@ func test0(c c: C) {
   // CHECK:   [[T4_COPY:%.*]] = copy_value [[T4]] : $@sil_unowned C  
   // CHECK:   assign [[T4_COPY]] to [[XP]] : $*@sil_unowned C
   // CHECK:   destroy_value [[T3]] : $C
+  // CHECK:   end_borrow [[X_LIFETIME]]
   // CHECK:   destroy_value [[X]]
+  // CHECK:   end_borrow [[MARKED_A1_LIFETIME]]
   // CHECK:   destroy_value [[MARKED_A1]]
 }
 // CHECK: } // end sil function '$s7unowned5test01cyAA1CC_tF'
@@ -87,7 +91,8 @@ func testunowned_local() -> C {
 
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [lexical] [[C]]
   // CHECK: [[UC:%.*]] = alloc_box ${ var @sil_unowned C }, let, name "uc"
-  // CHECK: [[PB_UC:%.*]] = project_box [[UC]]
+  // CHECK: [[UC_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UC]]
+  // CHECK: [[PB_UC:%.*]] = project_box [[UC_LIFETIME]]
   // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
   // CHECK: [[tmp1:%.*]] = ref_to_unowned [[C_COPY]] : $C to $@sil_unowned C
   // CHECK: [[tmp1_copy:%.*]] = copy_value [[tmp1]]
@@ -100,6 +105,7 @@ func testunowned_local() -> C {
   // CHECK: end_borrow [[tmp2]]
   return uc
 
+  // CHECK: end_borrow [[UC_LIFETIME]]
   // CHECK: destroy_value [[UC]]
   // CHECK: destroy_value [[C]]
   // CHECK: return [[tmp3]]

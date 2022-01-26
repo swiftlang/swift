@@ -6523,6 +6523,8 @@ unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
 
 unsigned getCaseIndex(EnumElementDecl *enumElement);
 
+unsigned getNumFieldsInNominal(NominalTypeDecl *decl);
+
 /// Get the property for a struct or class by its unique index, or nullptr if
 /// the index does not match a property declared in this struct or class or
 /// one its superclasses.
@@ -7072,7 +7074,7 @@ public:
     auto exType = getType().getASTType();
     auto concreteType = getOperand()->getType().getASTType();
     while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
-      exType = exMetatype.getInstanceType();
+      exType = exMetatype->getExistentialInstanceType()->getCanonicalType();
       concreteType = cast<MetatypeType>(concreteType).getInstanceType();
     }
     assert(exType.isExistentialType());
@@ -7619,6 +7621,18 @@ class DeallocStackInst :
       : UnaryInstructionBase(DebugLoc, operand) {}
 };
 
+/// Like DeallocStackInst, but for `alloc_ref [stack]`.
+class DeallocStackRefInst
+    : public UnaryInstructionBase<SILInstructionKind::DeallocStackRefInst,
+                                  DeallocationInst> {
+  friend SILBuilder;
+
+  DeallocStackRefInst(SILDebugLocation DebugLoc, SILValue Operand)
+      : UnaryInstructionBase(DebugLoc, Operand) {}
+public:
+  AllocRefInst *getAllocRef() { return cast<AllocRefInst>(getOperand()); }
+};
+
 /// Deallocate memory for a reference type instance from a destructor or
 /// failure path of a constructor.
 ///
@@ -7632,21 +7646,8 @@ class DeallocRefInst :
                               DeallocationInst> {
   friend SILBuilder;
 
-private:
-  DeallocRefInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 bool canBeOnStack = false)
-      : UnaryInstructionBase(DebugLoc, Operand) {
-    SILNode::Bits.DeallocRefInst.OnStack = canBeOnStack;
-  }
-
-public:
-  bool canAllocOnStack() const {
-    return SILNode::Bits.DeallocRefInst.OnStack;
-  }
-
-  void setStackAllocatable(bool OnStack) {
-    SILNode::Bits.DeallocRefInst.OnStack = OnStack;
-  }
+  DeallocRefInst(SILDebugLocation DebugLoc, SILValue Operand)
+      : UnaryInstructionBase(DebugLoc, Operand) { }
 };
 
 /// Deallocate memory for a reference type instance from a failure path of a

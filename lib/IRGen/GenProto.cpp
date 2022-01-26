@@ -2321,6 +2321,7 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::CXXMethod:
     // May be polymorphic at the SIL level, but no type metadata is actually
     // passed.
     return false;
@@ -3648,10 +3649,8 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
                                      /*varargs*/ false);
   }
 
-  auto attrs = llvm::AttributeList::get(getLLVMContext(),
-                                       llvm::AttributeList::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
-
+  auto attrs = llvm::AttributeList().addFnAttribute(getLLVMContext(),
+                                                    llvm::Attribute::NoUnwind);
   return Signature(fnType, attrs, SwiftCC);
 }
 
@@ -3730,6 +3729,11 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
                                                false)
                           .getIntValue());
         });
+
+        // Need to pad the structure after generic parameters
+        // up to four bytes because generic requirements that
+        // follow expect that alignment.
+        fields.addAlignmentPadding(Alignment(4));
 
         // Generic requirements
         irgen::addGenericRequirements(*this, fields, signature,

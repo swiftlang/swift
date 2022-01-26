@@ -428,9 +428,6 @@ public:
 private:
   DiagnosticWalker Walker;
 
-  /// The Swift lookup table for the bridging header.
-  std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
-
   /// The Swift lookup tables, per module.
   ///
   /// Annoyingly, we list this table early so that it gets torn down after
@@ -494,6 +491,9 @@ private:
   llvm::SmallDenseMap<ModuleDecl *, SourceFile *> ClangSwiftAttrSourceFiles;
 
 public:
+  /// The Swift lookup table for the bridging header.
+  std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
+
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
 
@@ -1738,7 +1738,7 @@ public:
         buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
-  llvm::hash_code hashExtension(llvm::hash_code code) const override;
+  void hashExtension(ExtensionHashBuilder &HBuilder) const override;
 
   std::unique_ptr<clang::ModuleFileExtensionWriter>
   createExtensionWriter(clang::ASTWriter &writer) override;

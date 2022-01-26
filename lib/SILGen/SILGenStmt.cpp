@@ -303,11 +303,27 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     SGF.LocalAuxiliaryDecls.clear();
   }
 
+  bool didDiagnoseUnreachableElements = false;
   for (auto &ESD : S->getElements()) {
     
-    if (auto D = ESD.dyn_cast<Decl*>())
+    if (auto D = ESD.dyn_cast<Decl*>()) {
       if (isa<IfConfigDecl>(D))
         continue;
+
+      // Hoisted declarations are emitted at the top level by emitSourceFile().
+      if (D->isHoisted())
+        continue;
+
+      // PatternBindingBecls represent local variable bindings that execute
+      // as part of the function's execution.
+      if (!isa<PatternBindingDecl>(D)) {
+        // Other decls define entities that may be used by the program, such as
+        // local function declarations. So handle them here, before checking for
+        // reachability, and then continue looping.
+        SGF.visit(D);
+        continue;
+      }
+    }
     
     // If we ever reach an unreachable point, stop emitting statements and issue
     // an unreachable code diagnostic.
@@ -357,6 +373,10 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
           continue;
       }
       
+      if (didDiagnoseUnreachableElements)
+        continue;
+      didDiagnoseUnreachableElements = true;
+      
       if (StmtType != UnknownStmtType) {
         diagnose(getASTContext(), ESD.getStartLoc(),
                  diag::unreachable_code_after_stmt, StmtType);
@@ -383,7 +403,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
           }
         }
       }
-      return;
+      continue;
     }
 
     // Process children.
@@ -402,11 +422,11 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     } else {
       auto *D = ESD.get<Decl*>();
 
-      // Hoisted declarations are emitted at the top level by emitSourceFile().
-      if (D->isHoisted())
-        continue;
+      // Only PatternBindingDecls should be emitted here.
+      // Other decls were handled above.
+      auto PBD = cast<PatternBindingDecl>(D);
 
-      SGF.visit(D);
+      SGF.visit(PBD);
     }
   }
 }

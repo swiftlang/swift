@@ -549,6 +549,24 @@ static bool typeSpellingIsAmbiguous(Type type,
       auto argType = arg.getAsType();
       if (argType && argType->getWithoutParens().getPointer() != type.getPointer() &&
           argType->getWithoutParens().getString(PO) == type.getString(PO)) {
+        // Currently, existential types are spelled the same way
+        // as protocols and compositions. We can remove this once
+        // existenials are printed with 'any'.
+        if (type->is<ExistentialType>() || argType->isExistentialType()) {
+          auto constraint = type;
+          if (auto existential = type->getAs<ExistentialType>())
+            constraint = existential->getConstraintType();
+
+          auto argConstraint = argType;
+          if (auto existential = argType->getAs<ExistentialType>())
+            argConstraint = existential->getConstraintType();
+
+          if (constraint.getPointer() != argConstraint.getPointer())
+            return true;
+
+          continue;
+        }
+
         return true;
       }
     }
@@ -570,6 +588,10 @@ static bool isMainActor(Type type) {
 
 void swift::printClangDeclName(const clang::NamedDecl *ND,
                                llvm::raw_ostream &os) {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return; // not needed for the parser library.
+#endif
+
   ND->getNameForDiagnostic(os, ND->getASTContext().getPrintingPolicy(), false);
 }
 
@@ -687,7 +709,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
       type = type->getWithoutSyntaxSugar();
     }
 
-    if (needsQualification && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
+    if (needsQualification &&
+        isa<OpaqueTypeArchetypeType>(type.getPointer()) &&
+        cast<ArchetypeType>(type.getPointer())->isRoot()) {
       auto opaqueTypeDecl = type->castTo<OpaqueTypeArchetypeType>()->getDecl();
 
       llvm::SmallString<256> NamingDeclText;

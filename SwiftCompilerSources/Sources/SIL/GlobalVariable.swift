@@ -12,7 +12,7 @@
 
 import SILBridging
 
-final public class GlobalVariable : CustomStringConvertible {
+final public class GlobalVariable : CustomStringConvertible, HasName {
   public var name: String {
     return SILGlobalVariable_getName(bridged).string
   }

@@ -394,9 +394,11 @@ bb3:
 // CHECK:        [[ALLOC:%.*]] = alloc_ref $C
 // CHECK-NEXT:   [[B1:%.*]] = begin_borrow [[ALLOC]]
 // CHECK-NOT:    copy
+// CHECK:        [[B2:%.*]] = begin_borrow [[ALLOC]]
 // CHECK-NOT:    copy
 // CHECK:        end_borrow [[B1]] : $C
-// CHECK:        apply %0([[ALLOC]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:        apply %0([[B2]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:        end_borrow [[B2]] : $C
 // CHECK-NEXT:   return [[ALLOC]] : $C
 // CHECK-LABEL: } // end sil function 'testInterleavedBorrow'
 sil [ossa] @testInterleavedBorrow : $@convention(thin) () -> @owned C {
@@ -426,11 +428,14 @@ bb0:
 // CHECK:        [[B1:%.*]] = begin_borrow [[ALLOC]]
 // CHECK:        apply %{{.*}}([[B1]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   end_borrow [[B1]] : $C
+// CHECK-NEXT:   [[B2:%.*]] = begin_borrow [[ALLOC]]
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
-// CHECK:        apply %{{.*}}([[ALLOC]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:        apply %{{.*}}([[B2]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   end_borrow [[B2]] : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
+// CHECK-NEXT:   end_borrow [[B2]] : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   return [[ALLOC]] : $C

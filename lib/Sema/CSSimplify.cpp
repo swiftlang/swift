@@ -2849,14 +2849,12 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Handle opaque archetypes.
   if (auto arch1 = type1->getAs<ArchetypeType>()) {
     auto arch2 = type2->castTo<ArchetypeType>();
-    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1->getRoot());
-    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2->getRoot());
-    assert(arch1->getInterfaceType()->getCanonicalType(
-                      opaque1->getGenericEnvironment()->getGenericSignature())
-        == arch2->getInterfaceType()->getCanonicalType(
-                      opaque2->getGenericEnvironment()->getGenericSignature()));
+    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1);
+    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2);
     assert(opaque1->getDecl() == opaque2->getDecl());
-    
+    assert(opaque1->getCanonicalInterfaceType(arch1->getInterfaceType())->isEqual(
+               opaque2->getCanonicalInterfaceType(arch2->getInterfaceType())));
+
     auto args1 = opaque1->getSubstitutions().getReplacementTypes();
     auto args2 = opaque2->getSubstitutions().getReplacementTypes();
 
@@ -2888,42 +2886,40 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     return result;
   }
 
-  // Handle protocol compositions.
-  if (auto existential1 = type1->getAs<ProtocolCompositionType>()) {
-    if (auto existential2 = type2->getAs<ProtocolCompositionType>()) {
-      auto layout1 = existential1->getExistentialLayout();
-      auto layout2 = existential2->getExistentialLayout();
+  // Handle existential types.
+  if (type1->isExistentialType() && type2->isExistentialType()) {
+    auto layout1 = type1->getExistentialLayout();
+    auto layout2 = type2->getExistentialLayout();
 
-      // Explicit AnyObject and protocols must match exactly.
-      if (layout1.hasExplicitAnyObject != layout2.hasExplicitAnyObject)
+    // Explicit AnyObject and protocols must match exactly.
+    if (layout1.hasExplicitAnyObject != layout2.hasExplicitAnyObject)
+      return getTypeMatchFailure(locator);
+
+    if (layout1.getProtocols().size() != layout2.getProtocols().size())
+      return getTypeMatchFailure(locator);
+
+    for (unsigned i: indices(layout1.getProtocols())) {
+      if (!layout1.getProtocols()[i]->isEqual(layout2.getProtocols()[i]))
         return getTypeMatchFailure(locator);
-
-      if (layout1.getProtocols().size() != layout2.getProtocols().size())
-        return getTypeMatchFailure(locator);
-
-      for (unsigned i: indices(layout1.getProtocols())) {
-        if (!layout1.getProtocols()[i]->isEqual(layout2.getProtocols()[i]))
-          return getTypeMatchFailure(locator);
-      }
-
-      // This is the only interesting case. We might have type variables
-      // on either side of the superclass constraint, so make sure we
-      // recursively call matchTypes() here.
-      if (layout1.explicitSuperclass || layout2.explicitSuperclass) {
-        if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
-          return getTypeMatchFailure(locator);
-
-        auto result = matchTypes(layout1.explicitSuperclass,
-                                 layout2.explicitSuperclass,
-                                 ConstraintKind::Bind, subflags,
-                                 locator.withPathElement(
-                                   ConstraintLocator::ExistentialSuperclassType));
-        if (result.isFailure())
-          return result;
-      }
-
-      return getTypeMatchSuccess();
     }
+
+    // This is the only interesting case. We might have type variables
+    // on either side of the superclass constraint, so make sure we
+    // recursively call matchTypes() here.
+    if (layout1.explicitSuperclass || layout2.explicitSuperclass) {
+      if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
+        return getTypeMatchFailure(locator);
+
+      auto result = matchTypes(layout1.explicitSuperclass,
+                               layout2.explicitSuperclass,
+                               ConstraintKind::Bind, subflags,
+                               locator.withPathElement(
+                                 ConstraintLocator::ExistentialSuperclassType));
+      if (result.isFailure())
+        return result;
+    }
+
+    return getTypeMatchSuccess();
   }
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
@@ -5888,35 +5884,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       break;
     }
     
-    // Same for nested archetypes rooted in opaque types.
-    case TypeKind::NestedArchetype: {
-      auto nested1 = cast<NestedArchetypeType>(desugar1);
-      auto nested2 = cast<NestedArchetypeType>(desugar2);
-      
-      auto rootOpaque1 = dyn_cast<OpaqueTypeArchetypeType>(nested1->getRoot());
-      auto rootOpaque2 = dyn_cast<OpaqueTypeArchetypeType>(nested2->getRoot());
-      if (rootOpaque1 && rootOpaque2) {
-        auto interfaceTy1 = nested1->getInterfaceType()
-          ->getCanonicalType(rootOpaque1->getGenericEnvironment()
-                                        ->getGenericSignature());
-        auto interfaceTy2 = nested2->getInterfaceType()
-          ->getCanonicalType(rootOpaque2->getGenericEnvironment()
-                                        ->getGenericSignature());
-        if (interfaceTy1 == interfaceTy2
-            && rootOpaque1->getDecl() == rootOpaque2->getDecl()) {
-          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
-          break;
-        }
-      }
-
-      // Before failing, let's give repair a chance to run in diagnostic mode.
-      if (shouldAttemptFixes())
-        break;
-
-      // If the archetypes aren't rooted in an opaque type, or are rooted in
-      // completely different decls, then there's nothing else we can do.
-      return getTypeMatchFailure(locator);
-    }
     case TypeKind::Pack: {
       auto tmpPackLoc = locator.withPathElement(LocatorPathElt::PackType(type1));
       auto packLoc = tmpPackLoc.withPathElement(LocatorPathElt::PackType(type2));
@@ -6037,8 +6004,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               return true;
           return false;
         };
+
+        auto constraintType = meta1->getInstanceType();
+        if (auto existential = constraintType->getAs<ExistentialType>())
+          constraintType = existential->getConstraintType();
         
-        if (auto protoTy = meta1->getInstanceType()->getAs<ProtocolType>()) {
+        if (auto protoTy = constraintType->getAs<ProtocolType>()) {
           if (protoTy->getDecl()->isObjC()
               && isProtocolClassType(type2)) {
             increaseScore(ScoreKind::SK_UserConversion);
@@ -6477,7 +6448,6 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::BoundGenericStruct:
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
   case TypeKind::DynamicSelf:
@@ -7011,7 +6981,7 @@ static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
   if (!nilLiteral)
     return false;
 
-  return toType->isEqual(nilLiteral->getDeclaredType()) &&
+  return toType->isEqual(nilLiteral->getExistentialType()) &&
          fromType->getOptionalObjectType();
 }
 
@@ -8812,8 +8782,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             baseTy->getMetatypeInstanceType()->getAs<ArchetypeType>()) {
       if (auto genericTy =
               archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
-        for (auto param :
-             archetype->getGenericEnvironment()->getGenericParams()) {
+        for (auto param : DC->getGenericSignatureOfContext()
+                              .getGenericParams()) {
           // Find a param at the same depth and one index past the type we're
           // dealing with
           if (param->getDepth() != genericTy->getDepth() ||
@@ -9812,10 +9782,10 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
     auto instanceTy = type2;
     if (auto metaTy = type2->getAs<ExistentialMetatypeType>()) {
       isMetatype = true;
-      instanceTy = metaTy->getInstanceType();
+      instanceTy = metaTy->getExistentialInstanceType();
     }
     assert(instanceTy->isExistentialType());
-    Type openedTy = OpenedArchetypeType::get(instanceTy);
+    Type openedTy = OpenedArchetypeType::get(instanceTy->getCanonicalType());
     if (isMetatype)
       openedTy = MetatypeType::get(openedTy, getASTContext());
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);

@@ -15,7 +15,7 @@
 // Convert all reference counting operations into non-atomic ones.
 //
 // To get read of most atomic reference counting operations, the standard
-// library should be compiled in this mode as well 
+// library should be compiled in this mode as well
 //
 // This pass affects only reference counting operations resulting from SIL
 // instructions. It wouldn't affect places in the runtime C++ code which
@@ -49,11 +49,9 @@ class AssumeSingleThreaded : public swift::SILFunctionTransform {
     }
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
-
 };
 } // end anonymous namespace
 
-
-SILTransform *swift::createAssumeSingleThreaded() {
+SILTransform *swift::createLegacyAssumeSingleThreaded() {
   return new AssumeSingleThreaded();
 }

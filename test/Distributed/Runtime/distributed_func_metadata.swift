@@ -145,10 +145,10 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
   static func test_returnType() {
     print("~~ \(#function)")
     // CHECK: _getReturnTypeInfo: empty() = ()
-    print("_getReturnTypeInfo: empty() = \(String(reflecting: _getReturnTypeInfo(mangledMethodName: empty)!))")
+    print("_getReturnTypeInfo: empty() = \(String(reflecting: _getReturnTypeInfo(mangledMethodName: empty, genericEnv: nil, genericArguments: nil)!))")
 
     // CHECK: _getReturnTypeInfo: one(s:) = Swift.Int
-    print("_getReturnTypeInfo: one(s:) = \(String(reflecting: _getReturnTypeInfo(mangledMethodName: one)!))")
+    print("_getReturnTypeInfo: one(s:) = \(String(reflecting: _getReturnTypeInfo(mangledMethodName: one, genericEnv: nil, genericArguments: nil)!))")
   }
 
   static func test_paramTypes() {
@@ -185,7 +185,7 @@ func _withParameterTypeInfo(
 ) {
   let nameUTF8 = Array(name.utf8)
 
-  return try  nameUTF8.withUnsafeBufferPointer { nameUTF8  in
+  return nameUTF8.withUnsafeBufferPointer { nameUTF8  in
     // 1) demangle to get the expected parameter count of the func
     let paramCount = __getParameterCount(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
 
@@ -195,7 +195,7 @@ func _withParameterTypeInfo(
     }
 
     // prepare buffer for the parameter types to be decoded into:
-    var infoBuffer = UnsafeMutableRawBufferPointer
+    let infoBuffer = UnsafeMutableRawBufferPointer
         .allocate(byteCount: MemoryLayout<Any.Type>.size * Int(paramCount),
                   alignment: MemoryLayout<Any.Type>.alignment) // TODO: is this right always?
     defer {
@@ -205,6 +205,8 @@ func _withParameterTypeInfo(
     // 2) demangle and write all parameter types into the prepared buffer
     let decodedNum = __getParameterTypeInfo(
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
+        /*genericEnvironment=*/nil,
+        /*genericArguments=*/nil,
         infoBuffer.baseAddress!._rawValue, Int(paramCount))
 
     // if we failed demangling the types, return an empty array

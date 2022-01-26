@@ -965,6 +965,7 @@ ManglingError Remangler::mangleDependentAssociatedTypeRef(Node *node,
 ManglingError
 Remangler::mangleDependentGenericConformanceRequirement(Node *node,
                                                         unsigned depth) {
+  DEMANGLER_ASSERT(node->getNumChildren() == 2, node);
   Node *ProtoOrClass = node->getChild(1);
   if (ProtoOrClass->getFirstChild()->getKind() == Node::Kind::Protocol) {
     RETURN_IF_ERROR(manglePureProtocol(ProtoOrClass, depth + 1));
@@ -1407,6 +1408,9 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
     case FunctionSigSpecializationParamKind::BoxToStack:
       Buffer << 's';
       break;
+    case FunctionSigSpecializationParamKind::InOutToOut:
+      Buffer << 'r';
+      break;
     case FunctionSigSpecializationParamKind::SROA:
       Buffer << 'x';
       break;
@@ -1611,7 +1615,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::DirectMethodReferenceAttribute:
       case Node::Kind::MergedFunction:
       case Node::Kind::DistributedThunk:
-      case Node::Kind::DistributedMethodAccessor:
+      case Node::Kind::DistributedAccessor:
       case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -1965,6 +1969,12 @@ ManglingError Remangler::mangleIsolated(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleCompileTimeConst(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Yt";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleShared(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << 'h';
@@ -2251,7 +2261,7 @@ Remangler::mangleDistributedThunk(Node *node, unsigned depth) {
 }
 
 ManglingError
-Remangler::mangleDistributedMethodAccessor(Node *node, unsigned depth) {
+Remangler::mangleDistributedAccessor(Node *node, unsigned depth) {
   Buffer << "TF";
   return ManglingError::Success;
 }
@@ -3278,6 +3288,11 @@ ManglingError Remangler::mangleSugaredParen(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleOpaqueReturnType(Node *node, unsigned depth) {
   Buffer << "Qr";
+  return ManglingError::Success;
+}
+ManglingError Remangler::mangleOpaqueReturnTypeIndexed(Node *node, unsigned depth) {
+  Buffer << "QR";
+  mangleIndex(node->getIndex());
   return ManglingError::Success;
 }
 ManglingError Remangler::mangleOpaqueReturnTypeOf(Node *node, unsigned depth) {

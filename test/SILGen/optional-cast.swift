@@ -7,7 +7,8 @@ class B : A {}
 // CHECK-LABEL: sil hidden [ossa] @$s4main3fooyyAA1ACSgF : $@convention(thin) (@guaranteed Optional<A>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Optional<A>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
-// CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
+// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK-NEXT: [[PB:%.*]] = project_box [[X_LIFETIME]]
 //   Check whether the temporary holds a value.
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:      switch_enum [[ARG_COPY]] : $Optional<A>, case #Optional.some!enumelt: [[IS_PRESENT:bb[0-9]+]], case #Optional.none!enumelt: [[NOT_PRESENT:bb[0-9]+]]
@@ -35,6 +36,7 @@ class B : A {}
 //
 //   Finish.
 // CHECK:    [[RETURN_BB]]:
+// CHECK-NEXT: end_borrow [[X_LIFETIME]]
 // CHECK-NEXT: destroy_value [[X]]
 // CHECK-NOT: destroy_value [[ARG]]
 // CHECK-NEXT: tuple
@@ -51,7 +53,8 @@ func foo(_ y : A?) {
 // CHECK-LABEL: sil hidden [ossa] @$s4main3baryyAA1ACSgSgSgSgF : $@convention(thin) (@guaranteed Optional<Optional<Optional<Optional<A>>>>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Optional<Optional<Optional<Optional<A>>>>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<Optional<Optional<B>>> }, var, name "x"
-// CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
+// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK-NEXT: [[PB:%.*]] = project_box [[X_LIFETIME]]
 // -- Check for some(...)
 // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT: switch_enum [[ARG_COPY]] : ${{.*}}, case #Optional.some!enumelt: [[P:bb[0-9]+]], case #Optional.none!enumelt: [[NIL_DEPTH_1:bb[0-9]+]]
@@ -110,6 +113,7 @@ func foo(_ y : A?) {
 // CHECK-NEXT: enum $Optional<Optional<Optional<B>>>, #Optional.some!enumelt,
 // CHECK:      br [[DONE_DEPTH2:bb[0-9]+]]
 // CHECK:    [[DONE_DEPTH2]]
+// CHECK-NEXT: end_borrow [[X_LIFETIME]]
 // CHECK-NEXT: destroy_value [[X]]
 // CHECK-NOT: destroy_value %0
 // CHECK:      return
@@ -136,7 +140,8 @@ func bar(_ y : A????) {
 // CHECK-LABEL: sil hidden [ossa] @$s4main3bazyyyXlSgF : $@convention(thin) (@guaranteed Optional<AnyObject>) -> () {
 // CHECK:       bb0([[ARG:%.*]] : @guaranteed $Optional<AnyObject>):
 // CHECK:         [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
-// CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
+// CHECK:         [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK-NEXT:    [[PB:%.*]] = project_box [[X_LIFETIME]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:         switch_enum [[ARG_COPY]]
 // CHECK:       bb1([[VAL:%.*]] : @owned $AnyObject):
@@ -196,8 +201,10 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
 // CHECK-NEXT: [[X:%.*]] = alloc_box ${ var Optional<Int> }, var, name "x"
-// CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
+// CHECK-NEXT: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK-NEXT: [[PB:%.*]] = project_box [[X_LIFETIME]]
 // CHECK-NEXT: store %0 to [trivial] [[PB]] : $*Optional<Int>
+// CHECK-NEXT: end_borrow [[X_LIFETIME]]
 // CHECK-NEXT: destroy_value [[X]] : ${ var Optional<Int> }
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a

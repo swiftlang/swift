@@ -1,5 +1,98 @@
 include_guard(GLOBAL)
 
+include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/SwiftUtils.cmake)
+precondition(SWIFT_HOST_VARIANT_SDK)
+precondition(SWIFT_DARWIN_PLATFORMS)
+
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "HAIKU")
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "WASI")
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
+else()
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default TRUE)
+endif()
+
+option(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
+       "Build stdlib assuming the runtime environment provides the backtrace(3) API."
+       "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default}")
+
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_HAS_ASL_default TRUE)
+else()
+  set(SWIFT_STDLIB_HAS_ASL_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_HAS_ASL
+       "Build stdlib assuming we can use the asl_log API."
+       "${SWIFT_STDLIB_HAS_ASL_default}")
+
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
+  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "HAIKU")
+  set(SWIFT_STDLIB_HAS_LOCALE_default FALSE)
+else()
+  set(SWIFT_STDLIB_HAS_LOCALE_default TRUE)
+endif()
+
+option(SWIFT_STDLIB_HAS_LOCALE
+       "Build stdlib assuming the platform has locale support."
+       "${SWIFT_STDLIB_HAS_LOCALE_default}")
+
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  # All Darwin platforms have ABI stability.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OPENBSD")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+  # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+  set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
+else()
+  # Any new platform should have non-stable ABI to start with.
+  set(SWIFT_STDLIB_STABLE_ABI_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_STABLE_ABI
+       "Should stdlib be built with stable ABI (library evolution, resilience)."
+       "${SWIFT_STDLIB_STABLE_ABI_default}")
+
+option(SWIFT_ENABLE_MODULE_INTERFACES
+       "Generate .swiftinterface files alongside .swiftmodule files"
+       "${SWIFT_STDLIB_STABLE_ABI}")
+
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
+else()
+  set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
+       "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on Linux."
+       "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
+ 
+option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
+       "Should stdlib be built with full unicode support"
+       TRUE)
+
 option(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
        "Support back-deployment of built binaries to older OS versions."
        TRUE)
@@ -61,6 +154,16 @@ option(SWIFT_STDLIB_HAS_ENVIRON
 option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
+
+if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
+else()
+  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
+endif()
+
+set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
+    "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
+    "Build the concurrency library to use the given global executor (options: dispatch, singlethreaded, hooked)")
 
 option(SWIFT_STDLIB_OS_VERSIONING
        "Build stdlib with availability based on OS versions (Darwin only)."

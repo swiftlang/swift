@@ -289,6 +289,7 @@ namespace {
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
       case clang::BuiltinType::Char8:
+      case clang::BuiltinType::Ibm128:
         return Type();
 
       // Objective-C types that aren't mapped directly; rather, pointers to
@@ -1049,9 +1050,10 @@ namespace {
               if (memberTypes.empty())
                 hasExplicitAnyObject = true;
 
-              Type importedTypeArg = ProtocolCompositionType::get(
-                  Impl.SwiftContext, memberTypes,
-                  hasExplicitAnyObject);
+              Type importedTypeArg = ExistentialType::get(
+                  ProtocolCompositionType::get(
+                      Impl.SwiftContext, memberTypes,
+                      hasExplicitAnyObject));
               importedTypeArgs.push_back(importedTypeArg);
             }
           }
@@ -1180,6 +1182,9 @@ namespace {
             }
           }
 
+          if (bridgedType->isConstraintType())
+            bridgedType = ExistentialType::get(bridgedType);
+
           return { importedType,
                    ImportHint(ImportHint::ObjCBridged, bridgedType) };
         }
@@ -1200,9 +1205,9 @@ namespace {
           members.push_back(proto->getDeclaredInterfaceType());
         }
 
-        importedType = ProtocolCompositionType::get(Impl.SwiftContext,
-                                                    members,
-                                                    /*HasExplicitAnyObject=*/false);
+        importedType = ExistentialType::get(
+            ProtocolCompositionType::get(Impl.SwiftContext, members,
+                                         /*HasExplicitAnyObject=*/false));
       }
 
       // Class or Class<P> maps to an existential metatype.
@@ -1897,7 +1902,11 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   // imported into Swift as static methods that have an additional
   // parameter for the left-hand side operand instead of the receiver object.
   if (auto CMD = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
-    if (clangDecl->isOverloadedOperator() && isImportedAsStatic(clangDecl->getOverloadedOperator())) {
+    // Subscripts and call operators are imported as normal methods.
+    bool staticOperator = clangDecl->isOverloadedOperator() &&
+                          clangDecl->getOverloadedOperator() != clang::OO_Call &&
+                          clangDecl->getOverloadedOperator() != clang::OO_Subscript;
+    if (staticOperator) {
       auto param = new (SwiftContext)
           ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
                     SwiftContext.getIdentifier("lhs"), dc);
@@ -2493,7 +2502,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     bool paramIsIUO;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
-      swiftParamTy = SwiftContext.getNSCopyingType();
+      swiftParamTy = ExistentialType::get(SwiftContext.getNSCopyingType());
       if (!swiftParamTy)
         return {Type(), false};
       if (optionalityOfParam != OTK_None)

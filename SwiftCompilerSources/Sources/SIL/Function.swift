@@ -12,7 +12,9 @@
 
 import SILBridging
 
-final public class Function : CustomStringConvertible {
+final public class Function : CustomStringConvertible, HasName {
+  public private(set) var effects = FunctionEffects()
+
   public var name: String {
     return SILFunction_getName(bridged).string
   }
@@ -26,36 +28,143 @@ final public class Function : CustomStringConvertible {
   }
 
   public var blocks : List<BasicBlock> {
-    return List(startAt: SILFunction_firstBlock(bridged).block)
-  }
-
-  public var reverseBlocks : ReverseList<BasicBlock> {
-    return ReverseList(startAt: SILFunction_lastBlock(bridged).block)
+    return List(first: SILFunction_firstBlock(bridged).block)
   }
 
   public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {
     entryBlock.arguments.lazy.map { $0 as! FunctionArgument }
   }
-  
+
   public var numIndirectResultArguments: Int {
     SILFunction_numIndirectResultArguments(bridged)
   }
-  
+
   public var hasSelfArgument: Bool {
     SILFunction_getSelfArgumentIndex(bridged) >= 0
   }
-  
+
   public var selfArgumentIndex: Int {
     let selfIdx = SILFunction_getSelfArgumentIndex(bridged)
     assert(selfIdx >= 0)
     return selfIdx
   }
+  
+  public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
+  public var resultType: Type { SILFunction_getSILResultType(bridged).type }
+
+  // Only to be called by PassContext
+  public func _modifyEffects(_ body: (inout FunctionEffects) -> ()) {
+    body(&effects)
+  }
+
+  static func register() {
+    func checkLayout(_ p: UnsafeMutablePointer<FunctionEffects>,
+                     data: UnsafeMutableRawPointer, size: Int) {
+      assert(MemoryLayout<FunctionEffects>.size <= size, "wrong FunctionInfo size")
+      assert(UnsafeMutableRawPointer(p) == data, "wrong FunctionInfo layout")
+    }
+
+    let metatype = unsafeBitCast(Function.self, to: SwiftMetatype.self)
+    Function_register(metatype,
+      // initFn
+      { (f: BridgedFunction, data: UnsafeMutableRawPointer, size: Int) in
+        checkLayout(&f.function.effects, data: data, size: size)
+        data.initializeMemory(as: FunctionEffects.self, repeating: FunctionEffects(), count: 1)
+      },
+      // destroyFn
+      { (f: BridgedFunction, data: UnsafeMutableRawPointer, size: Int) in
+        checkLayout(&f.function.effects, data: data, size: size)
+        data.assumingMemoryBound(to: FunctionEffects.self).deinitialize(count: 1)
+      },
+      // writeFn
+      { (f: BridgedFunction, os: BridgedOStream, idx: Int) in
+        let s = f.function.effects.argumentEffects[idx].description
+        s.withBridgedStringRef { OStream_write(os, $0) }
+      },
+      // parseFn:
+      { (f: BridgedFunction, str: BridgedStringRef, fromSIL: Int, isDerived: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
+        do {
+          var parser = StringParser(str.string)
+          let effect: ArgumentEffect
+          if fromSIL != 0 {
+            effect = try parser.parseEffectFromSIL(for: f.function, isDerived: isDerived != 0)
+          } else {
+            let paramToIdx = paramNames.withElements(ofType: BridgedStringRef.self) {
+                (buffer: UnsafeBufferPointer<BridgedStringRef>) -> Dictionary<String, Int> in
+              let keyValPairs = buffer.enumerated().lazy.map { ($0.1.string, $0.0) }
+              return Dictionary(uniqueKeysWithValues: keyValPairs)
+            }
+            effect = try parser.parseEffectFromSource(for: f.function, params: paramToIdx)
+          }
+          if !parser.isEmpty() { try parser.throwError("syntax error") }
+
+          f.function.effects.argumentEffects.append(effect)
+        } catch let error as ParsingError {
+          return BridgedParsingError(message: error.message.utf8Start, position: error.position)
+        } catch {
+          fatalError()
+        }
+        return BridgedParsingError(message: nil, position: 0)
+      },
+      // copyEffectsFn
+      { (toFunc: BridgedFunction, fromFunc: BridgedFunction) -> Int in
+        let srcFunc = fromFunc.function
+        let destFunc = toFunc.function
+        let srcResultArgs = srcFunc.numIndirectResultArguments
+        let destResultArgs = destFunc.numIndirectResultArguments
+        
+        // We only support reabstraction (indirect -> direct) of a single
+        // return value.
+        if srcResultArgs != destResultArgs &&
+           (srcResultArgs > 1 || destResultArgs > 1) {
+          return 0
+        }
+        destFunc.effects =
+          FunctionEffects(copiedFrom: srcFunc.effects,
+                          resultArgDelta: destResultArgs - srcResultArgs)
+        return 1
+      },
+      // getEffectFlags
+      {  (f: BridgedFunction, idx: Int) -> Int in
+        let argEffects = f.function.effects.argumentEffects
+        if idx >= argEffects.count { return 0 }
+        let effect = argEffects[idx]
+        var flags = 0
+        switch effect.kind {
+          case .notEscaping, .escaping:
+            flags |= Int(EffectsFlagEscape)
+        }
+        if effect.isDerived {
+          flags |= Int(EffectsFlagDerived)
+        }
+        return flags
+      }
+    )
+  }
 
   public var bridged: BridgedFunction { BridgedFunction(obj: SwiftObject(self)) }
+}
+
+public func == (lhs: Function, rhs: Function) -> Bool { lhs === rhs }
+public func != (lhs: Function, rhs: Function) -> Bool { lhs !== rhs }
+
+public struct ArgumentTypeArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let function: Function
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { SILFunction_getNumSILArguments(function.bridged) }
+
+  public subscript(_ index: Int) -> Type {
+    SILFunction_getSILArgumentType(function.bridged, index).type
+  }
 }
 
 // Bridging utilities
 
 extension BridgedFunction {
   public var function: Function { obj.getAs(Function.self) }
+}
+
+extension OptionalBridgedFunction {
+  public var function: Function? { obj.getAs(Function.self) }
 }

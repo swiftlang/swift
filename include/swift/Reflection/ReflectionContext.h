@@ -1372,8 +1372,8 @@ public:
     Chunk.Length = Slab->CurrentOffset;
     Chunk.Kind = AsyncTaskAllocationChunk::ChunkKind::Unknown;
 
-    // Total slab size is the slab's capacity plus the slab struct itself.
-    StoredPointer SlabSize = Slab->Capacity + sizeof(*Slab);
+    // Total slab size is the slab's capacity plus the header.
+    StoredPointer SlabSize = Slab->Capacity + HeaderSize;
 
     return {llvm::None, {Slab->Next, SlabSize, {Chunk}}};
   }

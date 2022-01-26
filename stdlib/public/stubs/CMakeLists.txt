@@ -26,7 +26,7 @@ set(LLVM_OPTIONAL_SOURCES
 
 set(swift_stubs_c_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 list(APPEND swift_stubs_c_compile_flags -DswiftCore_EXPORTS)
-list(APPEND swift_stubs_c_compile_flags -I${SWIFT_SOURCE_DIR}/include)
+list(APPEND swift_stubs_c_compile_flags -I${SWIFT_SOURCE_DIR}/include -I${SWIFT_SOURCE_DIR}/stdlib/public)
 
 add_swift_target_library(swiftStdlibStubs
                   OBJECT_LIBRARY

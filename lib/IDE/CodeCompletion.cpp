@@ -1354,18 +1354,6 @@ void CodeCompletionResultBuilder::finishResult() {
     Sink.Results.push_back(takeResult());
 }
 
-
-MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
-  // Copy pointers to the results.
-  const size_t Count = CurrentResults.Results.size();
-  CodeCompletionResult **Results =
-      CurrentResults.Allocator->Allocate<CodeCompletionResult *>(Count);
-  std::copy(CurrentResults.Results.begin(), CurrentResults.Results.end(),
-            Results);
-  CurrentResults.Results.clear();
-  return MutableArrayRef<CodeCompletionResult *>(Results, Count);
-}
-
 Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     bool includeLeadingPunctuation) const {
   for (auto i : indices(getChunks())) {
@@ -1451,8 +1439,11 @@ CodeCompletionString::getFirstTextChunk(bool includeLeadingPunctuation) const {
   return StringRef();
 }
 
-void CodeCompletionContext::sortCompletionResults(
-    MutableArrayRef<CodeCompletionResult *> Results) {
+std::vector<CodeCompletionResult *>
+CodeCompletionContext::sortCompletionResults(
+    ArrayRef<CodeCompletionResult *> Results) {
+  std::vector<CodeCompletionResult *> SortedResults(Results.begin(),
+                                                    Results.end());
   struct ResultAndName {
     CodeCompletionResult *result;
     std::string name;
@@ -1460,16 +1451,17 @@ void CodeCompletionContext::sortCompletionResults(
 
   // Caching the name of each field is important to avoid unnecessary calls to
   // CodeCompletionString::getName().
-  std::vector<ResultAndName> nameCache(Results.size());
-  for (unsigned i = 0, n = Results.size(); i < n; ++i) {
-    auto *result = Results[i];
+  std::vector<ResultAndName> nameCache(SortedResults.size());
+  for (unsigned i = 0, n = SortedResults.size(); i < n; ++i) {
+    auto *result = SortedResults[i];
     nameCache[i].result = result;
     llvm::raw_string_ostream OS(nameCache[i].name);
     printCodeCompletionResultFilterName(*result, OS);
     OS.flush();
   }
 
-  // Sort nameCache, and then transform Results to return the pointers in order.
+  // Sort nameCache, and then transform SortedResults to return the pointers in
+  // order.
   std::sort(nameCache.begin(), nameCache.end(),
             [](const ResultAndName &LHS, const ResultAndName &RHS) {
               int Result = StringRef(LHS.name).compare_insensitive(RHS.name);
@@ -1480,8 +1472,9 @@ void CodeCompletionContext::sortCompletionResults(
               return Result < 0;
             });
 
-  llvm::transform(nameCache, Results.begin(),
+  llvm::transform(nameCache, SortedResults.begin(),
                   [](const ResultAndName &entry) { return entry.result; });
+  return SortedResults;
 }
 
 namespace {
@@ -2449,7 +2442,8 @@ public:
       // and not both.
       if (auto *archetypeType = t->getAs<ArchetypeType>()) {
         // Don't erase opaque archetype.
-        if (isa<OpaqueTypeArchetypeType>(archetypeType))
+        if (isa<OpaqueTypeArchetypeType>(archetypeType) &&
+            archetypeType->isRoot())
           return t;
 
         auto protos = archetypeType->getConformsTo();
@@ -4106,7 +4100,7 @@ public:
 
     if (!ExprType->getMetatypeInstanceType()->isAnyObject())
       if (ExprType->isAnyExistentialType())
-        ExprType = OpenedArchetypeType::getAny(ExprType);
+        ExprType = OpenedArchetypeType::getAny(ExprType->getCanonicalType());
 
     if (!IsSelfRefExpr && !IsSuperRefExpr && ExprType->getAnyNominal() &&
         ExprType->getAnyNominal()->isActor()) {

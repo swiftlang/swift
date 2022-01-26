@@ -16,6 +16,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/Debug.h"
 
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -188,6 +189,8 @@ public:
   virtual Identifier
   getDiscriminatorForPrivateValue(const ValueDecl *D) const = 0;
 
+  virtual bool shouldCollectDisplayDecls() const { return true; }
+
   /// Finds all top-level decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -307,6 +310,9 @@ public:
   virtual StringRef getExportedModuleName() const {
     return getParentModule()->getRealName().str();
   }
+
+  SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
+  SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
 
   /// Traverse the decls within this file.
   ///

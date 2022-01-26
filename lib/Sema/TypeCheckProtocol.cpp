@@ -4158,35 +4158,6 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   }
 }
 
-static bool isSwiftRawRepresentableEnum(Type adoptee) {
-  auto *enumDecl = dyn_cast<EnumDecl>(adoptee->getAnyNominal());
-  return (enumDecl && enumDecl->hasRawType() && !enumDecl->isObjC());
-}
-
-// If the given witness matches a generic RawRepresentable function conforming
-// with a given protocol e.g. `func == <T : RawRepresentable>(lhs: T, rhs: T) ->
-// Bool where T.RawValue : Equatable`
-static bool isRawRepresentableGenericFunction(
-    ASTContext &ctx, const ValueDecl *witness,
-    const NormalProtocolConformance *conformance) {
-  auto *fnDecl = dyn_cast<AbstractFunctionDecl>(witness);
-  if (!fnDecl || !fnDecl->isStdlibDecl())
-    return false;
-
-  return fnDecl->isGeneric() && fnDecl->getGenericParams()->size() == 1 &&
-         fnDecl->getGenericRequirements().size() == 2 &&
-         llvm::all_of(
-             fnDecl->getGenericRequirements(), [&](Requirement genericReq) {
-               if (genericReq.getKind() != RequirementKind::Conformance)
-                 return false;
-               return genericReq.getProtocolDecl() ==
-                          ctx.getProtocol(
-                              KnownProtocolKind::RawRepresentable) ||
-                      genericReq.getProtocolDecl() ==
-                          conformance->getProtocol();
-             });
-}
-
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
@@ -4239,9 +4210,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       !canDerive && !requirement->getAttrs().hasAttribute<OptionalAttr>() &&
       !requirement->getAttrs().isUnavailable(getASTContext());
 
-  auto &ctx = getASTContext();
-  bool isEquatableConformance = (Conformance->getProtocol() ==
-                                 ctx.getProtocol(KnownProtocolKind::Equatable));
   if (findBestWitness(requirement,
                       considerRenames ? &ignoringNames : nullptr,
                       Conformance,
@@ -4249,28 +4217,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                       matches, numViable, bestIdx, doNotDiagnoseMatches)) {
     const auto &best = matches[bestIdx];
     auto witness = best.Witness;
-
-    if (canDerive &&
-        isEquatableConformance &&
-        isSwiftRawRepresentableEnum(Adoptee) &&
-        !Conformance->getDeclContext()->getParentModule()->isResilient()) {
-      // For swift enum types that can derive an Equatable conformance,
-      // if the best witness is the default implementation
-      //
-      //   func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
-      //     where T.RawValue : Equatable
-      //
-      // let's return as missing and derive the conformance, since it will be
-      // more efficient than comparing rawValues.
-      //
-      // However, we only do this if the module is non-resilient. If it is
-      // resilient, this change can break ABI by publishing a synthesized ==
-      // declaration that may not exist in versions of the framework built
-      // with an older compiler.
-      if (isRawRepresentableGenericFunction(ctx, witness, Conformance)) {
-        return ResolveWitnessResult::Missing;
-      }
-    }
 
     // If the name didn't actually line up, complain.
     if (ignoringNames &&
@@ -4349,9 +4295,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                        protoAccessScope.accessLevelForDiagnostics(),
                        proto->getName());
 
-        if (auto *decl = dyn_cast<AbstractFunctionDecl>(witness))
-          if (decl->isMemberwiseInitializer())
-            return;
+        auto *decl = dyn_cast<AbstractFunctionDecl>(witness);
+        if (decl && decl->isSynthesized())
+          return;
 
         diagnoseWitnessFixAccessLevel(diags, witness, requiredAccess,
                                       isSetter);
@@ -4746,14 +4692,30 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       continue;
 
     // As a narrow fix for a source compatibility issue with SwiftUI's
-    // swiftinterface, allow the conformance if the underlying type of
-    // the typealias is Never.
+    // swiftinterface, allow a 'typealias' type witness with an underlying type
+    // of 'Never' if it is declared in a context that does not satisfy the
+    // requirements of the conformance context.
     //
-    // FIXME: This should be conditionalized on a new language version.
+    // FIXME: If SwiftUI redeclares the typealias under the correct constraints,
+    // this can be removed.
     bool skipRequirementCheck = false;
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (typeAliasDecl->getUnderlyingType()->isUninhabited())
-        skipRequirementCheck = true;
+      if (typeAliasDecl->getUnderlyingType()->isNever()) {
+        if (typeAliasDecl->getParentModule()->getName().is("SwiftUI")) {
+          if (typeAliasDecl->getDeclContext()->getSelfNominalTypeDecl() ==
+              Adoptee->getAnyNominal()) {
+            const auto reqs =
+                typeAliasDecl->getGenericSignature().requirementsNotSatisfiedBy(
+                    DC->getGenericSignatureOfContext());
+            if (!reqs.empty()) {
+              SwiftUIInvalidTyWitness = {assocType, typeAliasDecl,
+                                         reqs.front()};
+
+              skipRequirementCheck = true;
+            }
+          }
+        }
+      }
     }
 
     // Skip typealiases with an unbound generic type as their underlying type.
@@ -4783,6 +4745,19 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
     auto memberType = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
                                                            typeDecl, Adoptee);
+
+    // Type witnesses that resolve to constraint types are always
+    // existential types. This can only happen when the type witness
+    // is explicitly written with a type alias. The type alias itself
+    // is still a constraint type because it can be used as both a
+    // type witness and as a generic constraint.
+    //
+    // With SE-0335, using a type alias as both a type witness and a generic
+    // constraint will be disallowed in Swift 6, because existential types
+    // must be explicit, and a generic constraint isn't a valid type witness.
+    if (memberType->isConstraintType()) {
+      memberType = ExistentialType::get(memberType);
+    }
 
     if (!viableTypes.insert(memberType->getCanonicalType()).second)
       continue;
@@ -5210,6 +5185,36 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
       }
     }
   }
+
+  if (Conformance->isInvalid()) {
+    return;
+  }
+
+  // As a narrow fix for a source compatibility issue with SwiftUI's
+  // swiftinterface, but only if the conformance succeeds, warn about an
+  // actually malformed conformance if we recorded a 'typealias' type witness
+  // with an underlying type of 'Never', which resides in a context that does
+  // not satisfy the requirements of the conformance context.
+  //
+  // FIXME: If SwiftUI redeclares the typealias under the correct constraints,
+  // this can be removed.
+  if (SwiftUIInvalidTyWitness) {
+    const auto &info = SwiftUIInvalidTyWitness.getValue();
+    const auto &failedReq = info.FailedReq;
+
+    auto &diags = getASTContext().Diags;
+    diags.diagnose(Loc, diag::type_does_not_conform_swiftui_warning, Adoptee,
+                   Proto->getDeclaredInterfaceType());
+    diags.diagnose(info.AssocTypeDecl, diag::no_witnesses_type,
+                   info.AssocTypeDecl->getName());
+
+    if (failedReq.getKind() != RequirementKind::Layout) {
+      diags.diagnose(info.TypeWitnessDecl,
+                     diag::protocol_type_witness_missing_requirement,
+                     failedReq.getFirstType(), failedReq.getSecondType(),
+                     (unsigned)failedReq.getKind());
+    }
+  }
 }
 
 /// Retrieve the Objective-C method key from the given function.
@@ -5263,8 +5268,11 @@ void swift::diagnoseConformanceFailure(Type T,
       TypeChecker::containsProtocol(T, Proto, DC->getParentModule())) {
 
     if (!T->isObjCExistentialType()) {
+      Type constraintType = T;
+      if (auto existential = T->getAs<ExistentialType>())
+        constraintType = existential->getConstraintType();
       diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
-                     T, T->isEqual(Proto->getDeclaredInterfaceType()), 
+                     T, constraintType->isEqual(Proto->getDeclaredInterfaceType()),
                      Proto->getDeclaredInterfaceType());
       diags.diagnose(ComplainLoc,
                      diag::only_concrete_types_conform_to_protocols);
@@ -5397,7 +5405,10 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
   if (T->isExistentialType()) {
     // Handle the special case of the Error protocol, which self-conforms
     // *and* has a witness table.
-    if (T->isEqual(Proto->getDeclaredInterfaceType()) &&
+    auto constraint = T;
+    if (auto existential = T->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
+    if (constraint->isEqual(Proto->getDeclaredInterfaceType()) &&
         Proto->requiresSelfConformanceWitnessTable()) {
       auto &ctx = M->getASTContext();
       return ProtocolConformanceRef(ctx.getSelfConformance(Proto));

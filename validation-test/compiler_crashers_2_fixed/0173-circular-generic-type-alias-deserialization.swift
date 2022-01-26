@@ -7,7 +7,7 @@ public struct X<T: P> {
 }
 
 // CHECK-LABEL: main.(file).Q@
-// CHECK-NEXT: Requirement signature: <Self where Self.A : P, Self.C : Collection, Self.C.Element == X<Self.A>>
+// CHECK-NEXT: Requirement signature: <Self where Self.[Q]A : P, Self.[Q]C : Collection, Self.[Q]C.[Sequence]Element == X<Self.[Q]A>>
 public protocol Q {
   associatedtype A: P
   associatedtype C: Collection where C.Element == MyX

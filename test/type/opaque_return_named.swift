@@ -107,7 +107,8 @@ protocol DefaultInitializable {
 extension String: DefaultInitializable { }
 extension Int: DefaultInitializable { }
 
-struct Generic<T: P1 & Equatable & DefaultInitializable> {
+struct Generic<T: P1 & Equatable & DefaultInitializable>
+    where T.A: DefaultInitializable {
   var value: T
 
   func f() -> <U: Q1, V: P1 where U: Equatable, V: Equatable> (U, V) {
@@ -130,6 +131,18 @@ struct Generic<T: P1 & Equatable & DefaultInitializable> {
     didSet {
       print("here")
     }
+  }
+
+  // FIXME: expected-warning@+2{{redundant same-type constraint 'C.Element' == 'T.A'}}
+  // FIXME: expected-note@+1{{previous same-type constraint 'C.Element' == 'T.A' written here}}
+  func sameTypeParams() -> <C: Collection where C.Element == T.A> C {
+    [ T.A(), T.A() ]
+  }
+
+  // FIXME: expected-warning@+2{{redundant same-type constraint 'C.Element' == 'T.A'}}
+  // FIXME: expected-note@+1{{previous same-type constraint 'C.Element' == 'T.A' written here}}
+  func sameTypeParamsBad() -> <C: Collection where C.Element == T.A> C {
+    [ T() ] // expected-error{{cannot convert value of type 'T' to expected element type 'T.A'}}
   }
 }
 

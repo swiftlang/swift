@@ -437,6 +437,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     M = Impl.getStdlibModule();
   else
     M = Impl.getNamedModule(SwiftModuleName);
+
   if (!M) {
     // User did not import the library module that contains the type we want to
     // substitute.
@@ -445,8 +446,18 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   }
 
   Type SwiftType = Impl.getNamedSwiftType(M, SwiftTypeName);
+
+  if (!SwiftType && CTypeKind == MappedCTypeKind::CGFloat) {
+    // Look for CGFloat in CoreFoundation.
+    M = Impl.getNamedModule("CoreFoundation");
+    SwiftType = Impl.getNamedSwiftType(M, SwiftTypeName);
+  }
+
   if (!SwiftType && !CanBeMissing) {
     // The required type is not defined in the standard library.
+    // The required type is not defined in the library, or the user has not
+    // imported the library that defines it (so `M` was null and
+    // `getNamedSwiftType()` returned early).
     *IsError = true;
     return std::make_pair(Type(), "");
   }
@@ -2473,6 +2484,12 @@ namespace {
       for (auto redecl : decl->redecls())
         Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
 
+      // Because a namespaces's decl context is the bridging header, make sure
+      // we add them to the bridging header lookup table.
+      addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
+                            const_cast<clang::NamespaceDecl *>(decl),
+                            Impl.getNameImporter());
+
       return enumDecl;
     }
 
@@ -3087,7 +3104,7 @@ namespace {
         if (!result)
           return nullptr;
 
-        // HACK: Make sure PrintAsObjC always omits the 'enum' tag for
+        // HACK: Make sure PrintAsClang always omits the 'enum' tag for
         // option set enums.
         Impl.DeclsWithSuperfluousTypedefs.insert(decl);
         break;
@@ -4085,18 +4102,20 @@ namespace {
             templateParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
+          // Subscripts and call operators are imported as normal methods.
+          bool staticOperator = mdecl->isOverloadedOperator() &&
+                                mdecl->getOverloadedOperator() != clang::OO_Call &&
+                                mdecl->getOverloadedOperator() != clang::OO_Subscript;
           if (mdecl->isStatic() ||
               // C++ operators that are implemented as non-static member
               // functions get imported into Swift as static member functions
               // that use an additional parameter for the left-hand side operand
               // instead of the receiver object.
-              (mdecl->getDeclName().getNameKind() ==
-                  clang::DeclarationName::CXXOperatorName &&
-                  isImportedAsStatic(mdecl->getOverloadedOperator()))) {
+              staticOperator) {
             selfIdx = None;
           } else {
-            selfIdx = 0;
-            // Don't import members of a class decl as mutating.
+            // Swift imports the "self" param last, even for clang functions.
+            selfIdx = bodyParams ? bodyParams->size() : 0;
             // If the method is imported as mutating, this implicitly makes the
             // parameter indirect.
             selfIsInOut =
@@ -6242,6 +6261,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // Local function to add a known protocol only when the
   // underlying type conforms to it.
   auto computedNominal = computedPropertyUnderlyingType->getAnyNominal();
+  if (auto existential =
+          computedPropertyUnderlyingType->getAs<ExistentialType>())
+    computedNominal = existential->getConstraintType()->getAnyNominal();
   auto transferKnown = [&](KnownProtocolKind kind) {
     if (!computedNominal)
       return false;
@@ -9864,13 +9886,21 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   llvm::SmallVector<Decl *, 16> members;
   for (const clang::Decl *m : clangRecord->decls()) {
     auto nd = dyn_cast<clang::NamedDecl>(m);
+    if (!nd)
+      continue;
+
     // Currently, we don't import unnamed bitfields.
     if (isa<clang::FieldDecl>(m) &&
         cast<clang::FieldDecl>(m)->isUnnamedBitfield())
       continue;
 
-    if (nd && nd == nd->getCanonicalDecl() &&
-        nd->getDeclContext() == clangRecord &&
+    // Make sure we always pull in record fields. Everything else had better
+    // be canonical. Note that this check mostly catches nested C++ types since
+    // we import nested C struct types by C's usual convention of chucking them
+    // into the global namespace.
+    const bool isCanonicalInContext =
+        (isa<clang::FieldDecl>(nd) || nd == nd->getCanonicalDecl());
+    if (isCanonicalInContext && nd->getDeclContext() == clangRecord &&
         isVisibleClangEntry(nd))
       insertMembersAndAlternates(nd, members);
   }

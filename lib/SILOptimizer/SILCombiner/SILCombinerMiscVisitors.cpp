@@ -740,7 +740,7 @@ SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
     ++UI;
     auto *User = Op->getUser();
     if (!isa<DeallocRefInst>(User) && !isa<SetDeallocatingInst>(User) &&
-        !isa<FixLifetimeInst>(User)) {
+        !isa<FixLifetimeInst>(User) && !isa<DeallocStackRefInst>(User)) {
       HasNonRemovableUses = true;
       break;
     }

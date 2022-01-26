@@ -1,6 +1,9 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s
 
+// RUN: %target-swift-emit-silgen -enable-explicit-existential-types %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-explicit-existential-types %s
+
 // Protocols with superclass-constrained Self.
 
 class Concrete {

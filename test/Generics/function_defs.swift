@@ -34,7 +34,7 @@ func min<T : MethodLessComparable>(_ x: T, y: T) -> T {
 //===----------------------------------------------------------------------===//
 
 func existential<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) {
-  var eqComp : EqualComparable = t1 // Ok
+  var eqComp : EqualComparable = t1 // expected-warning {{protocol 'EqualComparable' as a type must be explicitly marked as 'any'}}
   eqComp = u
   if t1.isEqual(eqComp) {} // expected-error{{cannot convert value of type 'EqualComparable' to expected argument type 'T'}}
   if eqComp.isEqual(t2) {} // expected-error{{member 'isEqual' cannot be used on value of protocol type 'EqualComparable'; use a generic constraint instead}}
@@ -49,11 +49,11 @@ func otherExistential<T : EqualComparable>(_ t1: T) {
   otherEqComp = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp
   
-  var otherEqComp2 : OtherEqualComparable // Ok
+  var otherEqComp2 : any OtherEqualComparable // Ok
   otherEqComp2 = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp2
 
-  _ = t1 as EqualComparable & OtherEqualComparable // expected-error{{value of type 'T' does not conform to 'EqualComparable & OtherEqualComparable' in coercion}}
+  _ = t1 as any EqualComparable & OtherEqualComparable // expected-error{{value of type 'T' does not conform to 'EqualComparable & OtherEqualComparable' in coercion}}
 }
 
 //===----------------------------------------------------------------------===//

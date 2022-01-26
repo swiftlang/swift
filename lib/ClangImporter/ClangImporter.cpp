@@ -1130,6 +1130,10 @@ ClangImporter::create(ASTContext &ctx,
 
   // Create a compiler instance.
   {
+    // The Clang modules produced by ClangImporter are always embedded in an
+    // ObjectFilePCHContainer and contain -gmodules debug info.
+    importer->Impl.Invocation->getCodeGenOpts().DebugTypeExtRefs = true;
+
     auto PCHContainerOperations =
       std::make_shared<clang::PCHContainerOperations>();
     PCHContainerOperations->registerWriter(
@@ -3119,6 +3123,9 @@ public:
   }
 };
 } // unnamed namespace
+
+// FIXME: should submodules still be crawled for the symbol graph? (SR-15753)
+bool ClangModuleUnit::shouldCollectDisplayDecls() const { return isTopLevel(); }
 
 void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   VectorDeclPtrConsumer consumer(results);

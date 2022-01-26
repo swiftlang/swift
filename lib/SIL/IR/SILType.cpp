@@ -45,7 +45,7 @@ CanArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
 }
 
 SILType SILType::getExceptionType(const ASTContext &C) {
-  return SILType::getPrimitiveObjectType(C.getExceptionType());
+  return SILType::getPrimitiveObjectType(C.getErrorExistentialType());
 }
 
 SILType SILType::getNativeObjectType(const ASTContext &C) {

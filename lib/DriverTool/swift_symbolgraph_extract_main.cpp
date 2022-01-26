@@ -23,6 +23,7 @@
 #include "swift/Option/Options.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;

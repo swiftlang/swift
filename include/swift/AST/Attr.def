@@ -323,7 +323,7 @@ CONTEXTUAL_DECL_ATTR(weak, ReferenceOwnership,
 CONTEXTUAL_DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
 DECL_ATTR(_effects, Effects,
   OnAbstractFunction |
-  UserInaccessible |
+  AllowMultipleAttributes | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   50)
 DECL_ATTR(__objc_bridged, ObjCBridged,
@@ -704,6 +704,11 @@ DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIStableToRemove,
   127)
+
+DECL_ATTR(exclusivity, Exclusivity,
+  OnVar |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  128)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.

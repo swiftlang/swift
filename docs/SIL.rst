@@ -1090,6 +1090,30 @@ from the command line.
 The specified memory effects of the function.
 ::
 
+  sil-function-attribute ::= '[' 'escapes' escape-list ']'
+  sil-function-attribute ::= '[' 'defined_escapes' escape-list ']'
+  escape-list ::= (escape-list ',')? escape
+  escape ::= '!' arg-selection                 // not-escaping
+  escape ::= arg-selection '=>' arg-selection  // exclusive escaping
+  escape ::= arg-selection '->' arg-selection  // not-exclusive escaping
+  arg-selection ::= arg-or-return ('.' projection-path)?
+  arg-or-return ::= '%' [0-9]+
+  arg-or-return ::= '%r'
+  projection-path ::= (projection-path '.')? path-component
+  path-component ::= 's' [0-9]+        // struct field
+  path-component ::= 'c' [0-9]+        // class field
+  path-component ::= 'ct'              // class tail element
+  path-component ::= 'e' [0-9]+        // enum case
+  path-component ::= [0-9]+            // tuple element
+  path-component ::= 'v**'             // any value fields
+  path-component ::= 'c*'              // any class field
+  path-component ::= '**'              // anything
+
+The escaping effects for function arguments. For details see the documentation
+in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
+
+::
+
   sil-function-attribute ::= '[_semantics "' [A-Za-z._0-9]+ '"]'
 
 The specified high-level semantics of the function. The optimizer can use this
@@ -3143,8 +3167,8 @@ optional ``objc`` attribute indicates that the object should be
 allocated using Objective-C's allocation methods (``+allocWithZone:``).
 
 The optional ``stack`` attribute indicates that the object can be allocated
-on the stack instead on the heap. In this case the instruction must have
-balanced with a ``dealloc_ref [stack]`` instruction to mark the end of the
+on the stack instead on the heap. In this case the instruction must be
+balanced with a ``dealloc_stack_ref`` instruction to mark the end of the
 object's lifetime.
 Note that the ``stack`` attribute only specifies that stack allocation is
 possible. The final decision on stack allocation is done during llvm IR
@@ -3381,13 +3405,25 @@ project_box
 
 Given a ``@box T`` reference, produces the address of the value inside the box.
 
+dealloc_stack_ref
+`````````````````
+::
+
+  sil-instruction ::= 'dealloc_stack_ref' sil-operand
+
+  dealloc_stack_ref %0 : $T
+  // $T must be a class type
+  // %0 must be an 'alloc_ref [stack]' instruction
+
+Marks the deallocation of the stack space for an ``alloc_ref [stack]``.
+
 dealloc_ref
 ```````````
 ::
 
-  sil-instruction ::= 'dealloc_ref' ('[' 'stack' ']')? sil-operand
+  sil-instruction ::= 'dealloc_ref' sil-operand
 
-  dealloc_ref [stack] %0 : $T
+  dealloc_ref %0 : $T
   // $T must be a class type
 
 Deallocates an uninitialized class type instance, bypassing the reference

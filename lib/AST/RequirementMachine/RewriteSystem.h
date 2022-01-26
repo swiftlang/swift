@@ -190,6 +190,11 @@ class RewriteSystem final {
   /// Rewrite context for memory allocation.
   RewriteContext &Context;
 
+  /// If this is a rewrite system for a connected component of protocols,
+  /// this array is non-empty. Otherwise, it is a rewrite system for a
+  /// top-level generic signature and this array is empty.
+  ArrayRef<const ProtocolDecl *> Protos;
+
   /// The rules added so far, including rules from our client, as well
   /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
@@ -197,6 +202,17 @@ class RewriteSystem final {
   /// A prefix trie of rule left hand sides to optimize lookup. The value
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
+
+  /// The set of protocols known to this rewrite system. The boolean associated
+  /// with each key is true if the protocol is part of the 'Protos' set above,
+  /// otherwies it is false.
+  ///
+  /// See RuleBuilder::ProtocolMap for a more complete explanation. For the most
+  /// part, this is only used while building the rewrite system, but conditional
+  /// requirement inference forces us to be able to add new protocols to the
+  /// rewrite system after the fact, so this little bit of RuleBuilder state
+  /// outlives the initialization phase.
+  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
 
   DebugOptions Debug;
 
@@ -228,11 +244,23 @@ public:
   /// Return the rewrite context used for allocating memory.
   RewriteContext &getRewriteContext() const { return Context; }
 
+  llvm::DenseMap<const ProtocolDecl *, bool> &getProtocolMap() {
+    return ProtocolMap;
+  }
+
   DebugOptions getDebugOptions() const { return Debug; }
 
-  void initialize(bool recordLoops,
+  void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
+
+  ArrayRef<const ProtocolDecl *> getProtocols() const {
+    return Protos;
+  }
+
+  bool isKnownProtocol(const ProtocolDecl *proto) const {
+    return ProtocolMap.find(proto) != ProtocolMap.end();
+  }
 
   unsigned getRuleID(const Rule &rule) const {
     assert((unsigned)(&rule - &*Rules.begin()) < Rules.size());
@@ -320,85 +348,38 @@ private:
 
   //////////////////////////////////////////////////////////////////////////////
   ///
-  /// "Pseudo-rules" for the property map
+  /// Relations are "pseudo-rules" introduced by the property map
   ///
   //////////////////////////////////////////////////////////////////////////////
 
 public:
   /// The left hand side is known to be smaller than the right hand side.
-  using Relation = std::pair<Symbol, Symbol>;
+  using Relation = std::pair<Term, Term>;
 
 private:
   llvm::DenseMap<Relation, unsigned> RelationMap;
   std::vector<Relation> Relations;
 
 public:
-  unsigned recordRelation(Symbol lhs, Symbol rhs);
+  unsigned recordRelation(Term lhs, Term rhs);
   Relation getRelation(unsigned index) const;
 
-  /// A type witness has a subject type, stored in LHS, which takes the form:
-  ///
-  /// T.[concrete: C : P].[P:X]
-  ///
-  /// For some concrete type C, protocol P and associated type X.
-  ///
-  /// The type witness of X in the conformance C : P is either a concrete type,
-  /// or an abstract type parameter.
-  ///
-  /// If it is a concrete type, then RHS stores the concrete type symbol.
-  ///
-  /// If it is an abstract type parameter, then RHS stores the type term.
-  ///
-  /// Think of these as rewrite rules which are lazily created, but always
-  /// "there" -- they encode information about concrete conformances, which
-  /// are solved outside of the requirement machine itself.
-  ///
-  /// We don't want to eagerly pull in all concrete conformances and walk
-  /// them recursively introducing rewrite rules.
-  ///
-  /// The RewriteStep::{Concrete,Same,Abstract}TypeWitness rewrite step kinds
-  /// reference TypeWitnesses via their RuleID field.
-  ///
-  /// Type witnesses are recorded lazily in property map construction, in
-  /// PropertyMap::computeConstraintTermForTypeWitness().
-  struct TypeWitness {
-    Term LHS;
-    llvm::PointerUnion<Symbol, Term> RHS;
+  unsigned recordRelation(Symbol lhs, Symbol rhs);
 
-    TypeWitness(Term lhs, llvm::PointerUnion<Symbol, Term> rhs);
+  unsigned recordConcreteConformanceRelation(
+      Symbol concreteSymbol, Symbol protocolSymbol,
+      Symbol concreteConformanceSymbol);
 
-    friend bool operator==(const TypeWitness &lhs,
-                           const TypeWitness &rhs);
+  unsigned recordConcreteTypeWitnessRelation(
+      Symbol concreteConformanceSymbol,
+      Symbol associatedTypeSymbol,
+      Symbol typeWitnessSymbol);
 
-    Symbol getConcreteConformance() const {
-      return *(LHS.end() - 2);
-    }
-
-    Symbol getAssocType() const {
-      return *(LHS.end() - 1);
-    }
-
-    Symbol getConcreteType() const {
-      return RHS.get<Symbol>();
-    }
-
-    Term getAbstractType() const {
-      return RHS.get<Term>();
-    }
-
-    void dump(llvm::raw_ostream &out) const;
-  };
+  unsigned recordSameTypeWitnessRelation(
+      Symbol concreteConformanceSymbol,
+      Symbol associatedTypeSymbol);
 
 private:
-  /// Cache for concrete type witnesses. The value in the map is an index
-  /// into the vector.
-  llvm::DenseMap<Term, unsigned> TypeWitnessMap;
-  std::vector<TypeWitness> TypeWitnesses;
-
-public:
-  unsigned recordTypeWitness(TypeWitness witness);
-  const TypeWitness &getTypeWitness(unsigned index) const;
-
   //////////////////////////////////////////////////////////////////////////////
   ///
   /// Homotopy reduction
@@ -421,20 +402,10 @@ public:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
-  void recordRewriteLoop(RewriteLoop loop) {
-    if (!RecordLoops)
-      return;
-
-    Loops.push_back(loop);
-  }
+  bool isInMinimizationDomain(ArrayRef<const ProtocolDecl *> protos) const;
 
   void recordRewriteLoop(MutableTerm basepoint,
-                         RewritePath path) {
-    if (!RecordLoops)
-      return;
-
-    Loops.emplace_back(basepoint, path);
-  }
+                         RewritePath path);
 
   void propagateExplicitBits();
 
@@ -460,7 +431,7 @@ public:
   bool hadError() const;
 
   llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
-  getMinimizedProtocolRules(ArrayRef<const ProtocolDecl *> protos) const;
+  getMinimizedProtocolRules() const;
 
   std::vector<unsigned> getMinimizedGenericSignatureRules() const;
 

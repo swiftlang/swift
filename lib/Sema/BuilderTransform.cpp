@@ -367,10 +367,34 @@ protected:
     if (!cs || hadError)
       return nullptr;
 
-    // Call Builder.buildBlock(... args ...)
-    auto call = buildCallIfWanted(braceStmt->getStartLoc(),
-                                  ctx.Id_buildBlock, expressions,
-                                  /*argLabels=*/{ });
+    Expr *call = nullptr;
+    // If the builder supports `buildBlock(combining:into:)`, use this to
+    // combine subexpressions pairwise.
+    if (ctx.LangOpts.EnableExperimentalPairwiseBuildBlock &&
+        !expressions.empty() &&
+        builderSupports(ctx.Id_buildBlock, {ctx.Id_combining, ctx.Id_into})) {
+      // NOTE: The current implementation uses one-way constraints in between
+      // subexpressions. It's functionally equivalent to the following:
+      //   let v0 = Builder.buildBlock(arg_0)
+      //   let v1 = Builder.buildBlock(combining: arg_1, into: v0)
+      //   ...
+      //   return Builder.buildBlock(combining: arg_n, into: ...)
+      call = buildCallIfWanted(braceStmt->getStartLoc(), ctx.Id_buildBlock,
+                               {expressions.front()}, /*argLabels=*/{});
+      for (auto *expr : llvm::drop_begin(expressions)) {
+        call = buildCallIfWanted(braceStmt->getStartLoc(), ctx.Id_buildBlock,
+                                 {expr, new (ctx) OneWayExpr(call)},
+                                 {ctx.Id_combining, ctx.Id_into});
+      }
+    }
+    // Otherwise, call `buildBlock` on all subexpressions.
+    else {
+      // Call Builder.buildBlock(... args ...)
+      call = buildCallIfWanted(braceStmt->getStartLoc(),
+                               ctx.Id_buildBlock, expressions,
+                               /*argLabels=*/{ });
+    }
+
     if (!call)
       return nullptr;
 
@@ -914,14 +938,14 @@ protected:
 
   /// Visit a throw statement, which never produces a result.
   VarDecl *visitThrowStmt(ThrowStmt *throwStmt) {
-    Type exnType = ctx.getErrorDecl()->getDeclaredInterfaceType();
-    if (!exnType) {
+    if (!ctx.getErrorDecl()) {
       hadError = true;
     }
 
     if (cs) {
      SolutionApplicationTarget target(
-         throwStmt->getSubExpr(), dc, CTP_ThrowStmt, exnType,
+         throwStmt->getSubExpr(), dc, CTP_ThrowStmt,
+         ctx.getErrorExistentialType(),
          /*isDiscarded=*/false);
      if (cs->generateConstraints(target, FreeTypeVariableBinding::Disallow))
        hadError = true;

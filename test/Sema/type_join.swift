@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -parse-stdlib
+// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-explicit-existential-types
 
 import Swift
 

@@ -52,7 +52,7 @@ struct RewriteStep {
     /// The StartOffset field encodes the offset where to apply the rule.
     ///
     /// The Arg field encodes the rule to apply.
-    ApplyRewriteRule,
+    Rule,
 
     /// The term at the top of the primary stack must be a term ending with a
     /// superclass or concrete type symbol.
@@ -98,58 +98,7 @@ struct RewriteStep {
     ///
     /// The Arg field stores the result of calling
     /// RewriteSystem::recordRelation().
-    Relation,
-
-    /// If not inverted: the top of the primary stack must be a term ending in
-    /// a concrete type symbol [concrete: C] followed by a protocol symbol [P].
-    /// These two symbols are combined into a single concrete conformance
-    /// symbol [concrete: C : P].
-    ///
-    /// If inverted: the top of the primary stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
-    /// with the concrete type symbol [concrete: C] followed by the protocol
-    /// symbol [P].
-    ConcreteConformance,
-
-    /// If not inverted: the top of the primary stack must be a term ending in
-    /// a superclass symbol [superclass: C] followed by a protocol symbol [P].
-    /// These two symbols are combined into a single concrete conformance
-    /// symbol [concrete: C : P].
-    ///
-    /// If inverted: the top of the primary stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
-    /// with the superclass symbol [superclass: C] followed by the protocol
-    /// symbol [P].
-    SuperclassConformance,
-
-    /// If not inverted: the top of the primary stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P] followed by an associated
-    /// type symbol [P:X], and the concrete type symbol [concrete: C.X] for the
-    /// type witness of 'X' in the conformance 'C : P'. The concrete type symbol
-    /// is eliminated.
-    ///
-    /// If inverted: the concrete type symbol [concrete: C.X] is introduced.
-    ///
-    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
-    ConcreteTypeWitness,
-
-    /// If not inverted: the top of the primary stack must be a term ending in a
-    /// concrete conformance symbol [concrete: C : P] followed by an associated
-    /// type symbol [P:X]. The associated type symbol is eliminated.
-    ///
-    /// If inverted: the associated type symbol [P:X] is introduced.
-    ///
-    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
-    SameTypeWitness,
-
-    /// If not inverted: replaces the abstract type witness term with the
-    /// subject type term.
-    ///
-    /// If inverted: replaces the subject type term with the abstract type
-    /// term.
-    ///
-    /// The Arg field stores the result of RewriteSystem::recordTypeWitness().
-    AbstractTypeWitness,
+    Relation
   };
 
   /// The rewrite step kind.
@@ -167,7 +116,7 @@ struct RewriteStep {
   /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
   unsigned EndOffset : 16;
 
-  /// If Kind is ApplyRewriteRule, the index of the rule in the rewrite system.
+  /// If Kind is Rule, the index of the rule in the rewrite system.
   ///
   /// If Kind is AdjustConcreteType, the length of the prefix to add or remove
   /// at the beginning of each concrete substitution.
@@ -190,7 +139,7 @@ struct RewriteStep {
 
   static RewriteStep forRewriteRule(unsigned startOffset, unsigned endOffset,
                                     unsigned ruleID, bool inverse) {
-    return RewriteStep(ApplyRewriteRule, startOffset, endOffset, ruleID, inverse);
+    return RewriteStep(Rule, startOffset, endOffset, ruleID, inverse);
   }
 
   static RewriteStep forAdjustment(unsigned offset, unsigned endOffset,
@@ -209,34 +158,10 @@ struct RewriteStep {
                        /*arg=*/numSubstitutions, inverse);
   }
 
-  static RewriteStep forRelation(unsigned relationID, bool inverse) {
-    return RewriteStep(Relation, /*startOffset=*/0, /*endOffset=*/0,
+  static RewriteStep forRelation(unsigned startOffset, unsigned relationID,
+                                 bool inverse) {
+    return RewriteStep(Relation, startOffset, /*endOffset=*/0,
                        /*arg=*/relationID, inverse);
-  }
-
-  static RewriteStep forConcreteConformance(bool inverse) {
-    return RewriteStep(ConcreteConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/0, inverse);
-  }
-
-  static RewriteStep forSuperclassConformance(bool inverse) {
-    return RewriteStep(SuperclassConformance, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/0, inverse);
-  }
-
-  static RewriteStep forConcreteTypeWitness(unsigned witnessID, bool inverse) {
-    return RewriteStep(ConcreteTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/witnessID, inverse);
-  }
-
-  static RewriteStep forSameTypeWitness(unsigned witnessID, bool inverse) {
-    return RewriteStep(SameTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/witnessID, inverse);
-  }
-
-  static RewriteStep forAbstractTypeWitness(unsigned witnessID, bool inverse) {
-    return RewriteStep(AbstractTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
-                       /*arg=*/witnessID, inverse);
   }
 
   bool isInContext() const {
@@ -248,7 +173,7 @@ struct RewriteStep {
   }
 
   unsigned getRuleID() const {
-    assert(Kind == RewriteStep::ApplyRewriteRule);
+    assert(Kind == RewriteStep::Rule);
     return Arg;
   }
 
@@ -374,15 +299,16 @@ struct AppliedRewriteStep {
 
 /// A rewrite path is a list of instructions for a two-stack interpreter.
 ///
-/// - ApplyRewriteRule and AdjustConcreteType manipulate the term at the top of
-///   the primary stack.
-///
 /// - Shift moves a term from A to B (if not inverted) or B to A (if inverted).
 ///
 /// - Decompose splits off the substitutions from a superclass or concrete type
 ///   symbol at the top of the primary stack (if not inverted) or assembles a
 ///   new superclass or concrete type symbol at the top of the primary stack
 ///   (if inverted).
+///
+/// - All other rewrite step kinds manipulate the term at the top of the primary
+///   stack.
+///
 struct RewritePathEvaluator {
   /// The primary stack. Most rewrite steps operate on the top of this stack.
   SmallVector<MutableTerm, 2> Primary;
@@ -420,22 +346,14 @@ struct RewritePathEvaluator {
   void applyShift(const RewriteStep &step,
                   const RewriteSystem &system);
 
-  void applyRelation(const RewriteStep &step,
-                     const RewriteSystem &system);
-
   void applyDecompose(const RewriteStep &step,
                       const RewriteSystem &system);
 
+  AppliedRewriteStep
+  applyRelation(const RewriteStep &step,
+                const RewriteSystem &system);
+
   void applyConcreteConformance(const RewriteStep &step,
-                                const RewriteSystem &system);
-
-  void applyConcreteTypeWitness(const RewriteStep &step,
-                                const RewriteSystem &system);
-
-  void applySameTypeWitness(const RewriteStep &step,
-                            const RewriteSystem &system);
-
-  void applyAbstractTypeWitness(const RewriteStep &step,
                                 const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;

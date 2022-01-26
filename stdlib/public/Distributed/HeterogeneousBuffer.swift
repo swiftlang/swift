@@ -73,8 +73,19 @@ struct HeterogeneousBuffer: Sequence {
         return nil
       }
 
-      func nextOffset<T>(_: T.Type) -> Int {
-        return MemoryLayout<T>.nextAlignedOffset(offset)
+      func alignedOffsetAndSize<T>(_: T.Type) -> (offset: Int, size: Int) {
+        return (MemoryLayout<T>.nextAlignedOffset(offset), MemoryLayout<T>.size)
+      }
+
+      // Retrieve aligned offset and element size info
+      let info = _openExistential(hbuf.types[i], do: alignedOffsetAndSize)
+      // Adjust current offset
+      offset = info.offset
+
+      defer {
+        // Advance offset by the size of the current element
+        offset += info.size
+        i += 1
       }
       offset = _openExistential(hbuf.types[i], do: nextOffset)
       i += 1

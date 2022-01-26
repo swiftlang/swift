@@ -157,6 +157,7 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::SetDeallocatingInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::EndBorrowInst:

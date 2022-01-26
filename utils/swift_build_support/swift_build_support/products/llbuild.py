@@ -34,7 +34,7 @@ class LLBuild(product.Product):
     def is_before_build_script_impl_product(cls):
         """is_before_build_script_impl_product -> bool
 
-        Whether this product is build before any build-script-impl products.
+        Whether this product is built before any build-script-impl products.
         """
         return False
 

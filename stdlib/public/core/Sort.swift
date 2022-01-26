@@ -337,6 +337,7 @@ extension MutableCollection where Self: BidirectionalCollection {
 /// - Precondition: `buffer` must point to a region of memory at least as large
 ///   as `min(mid - lo, hi - mid)`.
 /// - Postcondition: `lo..<hi` is sorted according to `areInIncreasingOrder`.
+@discardableResult
 @inlinable
 internal func _merge<Element>(
   low: UnsafeMutablePointer<Element>,
@@ -439,7 +440,6 @@ internal func _merge<Element>(
     }
   }
 
-  // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
   return true
 }
 
@@ -512,6 +512,7 @@ extension UnsafeMutableBufferPointer {
   /// - Precondition: `runs.count > 1` and `i > 0`
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
+  @discardableResult
   @inlinable
   public mutating func _mergeRuns(
     _ runs: inout [Range<Index>],
@@ -524,7 +525,7 @@ extension UnsafeMutableBufferPointer {
     let middle = runs[i].lowerBound
     let high = runs[i].upperBound
     
-    let result = try _merge(
+    try _merge(
       low: baseAddress! + low,
       mid: baseAddress! + middle,
       high: baseAddress! + high,
@@ -534,8 +535,7 @@ extension UnsafeMutableBufferPointer {
     runs[i - 1] = low..<high
     runs.remove(at: i)
 
-    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
-    return result
+    return true
   }
   
   /// Merges upper elements of `runs` until the required invariants are
@@ -545,6 +545,7 @@ extension UnsafeMutableBufferPointer {
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
   /// - Precondition: The ranges in `runs` must be consecutive, such that for
   ///   any i, `runs[i].upperBound == runs[i + 1].lowerBound`.
+  @discardableResult
   @inlinable
   public mutating func _mergeTopRuns(
     _ runs: inout [Range<Index>],
@@ -571,9 +572,6 @@ extension UnsafeMutableBufferPointer {
     // If W > X + Y, X > Y + Z, and Y > Z, then the invariants are satisfied
     // for the entirety of `runs`.
     
-    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
-    var result = true
-
     // The invariant is always in place for a single element.
     while runs.count > 1 {
       var lastIndex = runs.count - 1
@@ -607,11 +605,11 @@ extension UnsafeMutableBufferPointer {
       }
       
       // Merge the runs at `i` and `i - 1`.
-      result = try result && _mergeRuns(
+      try _mergeRuns(
         &runs, at: lastIndex, buffer: buffer, by: areInIncreasingOrder)
     }
 
-    return result
+    return true
   }
   
   /// Merges elements of `runs` until only one run remains.
@@ -620,19 +618,19 @@ extension UnsafeMutableBufferPointer {
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
   /// - Precondition: The ranges in `runs` must be consecutive, such that for
   ///   any i, `runs[i].upperBound == runs[i + 1].lowerBound`.
+  @discardableResult
   @inlinable
   public mutating func _finalizeRuns(
     _ runs: inout [Range<Index>],
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows -> Bool {
-    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
-    var result = true
     while runs.count > 1 {
-      result = try result && _mergeRuns(
+      try _mergeRuns(
         &runs, at: runs.count - 1, buffer: buffer, by: areInIncreasingOrder)
     }
-    return result
+
+    return true
   }
   
   /// Sorts the elements of this buffer according to `areInIncreasingOrder`,
@@ -650,9 +648,6 @@ extension UnsafeMutableBufferPointer {
         within: startIndex..<endIndex, by: areInIncreasingOrder)
       return
     }
-
-    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
-    var result = true
 
     // Use array's allocating initializer to create a temporary buffer---this
     // keeps the buffer allocation going through the same tail-allocated path
@@ -685,17 +680,14 @@ extension UnsafeMutableBufferPointer {
         // Append this run and merge down as needed to maintain the `runs`
         // invariants.
         runs.append(start..<end)
-        result = try result && _mergeTopRuns(
+        try _mergeTopRuns(
           &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
         start = end
       }
       
-      result = try result && _finalizeRuns(
+      try _finalizeRuns(
         &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
       _internalInvariant(runs.count == 1, "Didn't complete final merge")
     }
-
-    // FIXME: Remove this, it works around SR-14750 (rdar://45044610)
-    _precondition(result)
   }
 }

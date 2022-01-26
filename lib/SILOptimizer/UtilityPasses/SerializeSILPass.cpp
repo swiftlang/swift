@@ -276,6 +276,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::CheckedCastAddrBranchInst:
   case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::DeallocBoxInst:

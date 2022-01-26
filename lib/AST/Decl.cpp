@@ -985,7 +985,7 @@ GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
     : _GenericContext(), DeclContext(Kind, Parent) {
   if (Params) {
     Params->setDeclContext(this);
-    GenericParamsAndBit.setPointerAndInt(Params, false);
+    GenericParamsAndState.setPointerAndInt(Params, GenericParamsState::Parsed);
   }
 }
 
@@ -1006,9 +1006,14 @@ GenericParamList *GenericContext::getGenericParams() const {
 }
 
 GenericParamList *GenericContext::getParsedGenericParams() const {
-  if (GenericParamsAndBit.getInt())
+  switch (GenericParamsAndState.getInt()) {
+  case GenericParamsState::Parsed:
+  case GenericParamsState::ParsedAndTypeChecked:
+    return GenericParamsAndState.getPointer();
+
+  case GenericParamsState::TypeChecked:
     return nullptr;
-  return GenericParamsAndBit.getPointer();
+  }
 }
 
 bool GenericContext::hasComputedGenericSignature() const {
@@ -2708,7 +2713,7 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
       if (type->is<FunctionType>()) {
         return mapSignatureFunctionType(ctx, type, false, false, false, 1);
       }
-      
+
       return type;
     });
 }
@@ -2850,12 +2855,11 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 CanType ValueDecl::getOverloadSignatureType() const {
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
     bool isMethod = afd->hasImplicitSelfDecl();
-    return mapSignatureFunctionType(
-                           getASTContext(), getInterfaceType(),
-                           /*topLevelFunction=*/true,
-                           isMethod,
-                           /*isInitializer=*/isa<ConstructorDecl>(afd),
-                           getNumCurryLevels())->getCanonicalType();
+    return mapSignatureFunctionType(getASTContext(), getInterfaceType(),
+                                    /*topLevelFunction=*/true, isMethod,
+                                    /*isInitializer=*/isa<ConstructorDecl>(afd),
+                                    getNumCurryLevels())
+        ->getMinimalCanonicalType();
   }
 
   if (isa<AbstractStorageDecl>(this)) {
@@ -2866,12 +2870,12 @@ CanType ValueDecl::getOverloadSignatureType() const {
     if (isa<VarDecl>(this)) {
       defaultSignatureType = TupleType::getEmpty(getASTContext());
     } else {
-      defaultSignatureType = mapSignatureFunctionType(
-          getASTContext(), getInterfaceType(),
-          /*topLevelFunction=*/true,
-          /*isMethod=*/false,
-          /*isInitializer=*/false,
-          getNumCurryLevels())->getCanonicalType();
+      defaultSignatureType =
+          mapSignatureFunctionType(getASTContext(), getInterfaceType(),
+                                   /*topLevelFunction=*/true,
+                                   /*isMethod=*/false,
+                                   /*isInitializer=*/false, getNumCurryLevels())
+              ->getMinimalCanonicalType();
     }
 
     // We want to curry the default signature type with the 'self' type of the
@@ -2879,14 +2883,14 @@ CanType ValueDecl::getOverloadSignatureType() const {
     // is unique across different contexts, such as between a protocol extension
     // and struct decl.
     return defaultSignatureType->addCurriedSelfType(getDeclContext())
-                               ->getCanonicalType();
+        ->getMinimalCanonicalType();
   }
 
   if (isa<EnumElementDecl>(this)) {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
-    return mappedType->getCanonicalType();
+    return mappedType->getMinimalCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the
@@ -2943,7 +2947,9 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
   if (getOpaqueResultTypeRepr() == nullptr) {
-    if (isa<ModuleDecl>(this))
+    if (!isa<VarDecl>(this) &&
+        !isa<FuncDecl>(this) &&
+        !isa<SubscriptDecl>(this))
       return nullptr;
     auto file = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
     // Don't look up when the decl is from source, otherwise a cycle will happen.
@@ -3057,7 +3063,7 @@ bool ValueDecl::isNativeMethodReplacement() const {
   if (isNativeDynamic())
     return true;
 
-  if (isObjCDynamicInGenericClass())
+  if (replacedDecl->isObjCDynamicInGenericClass())
     return replacedDecl->getModuleContext()->isImplicitDynamicEnabled();
 
   return false;
@@ -5162,7 +5168,10 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
     return SelfReferenceInfo::forSelfRef(SelfReferencePosition::Invariant);
 
   // Protocol compositions preserve variance.
-  if (auto *comp = type->getAs<ProtocolCompositionType>()) {
+  auto constraint = type;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+  if (auto *comp = constraint->getAs<ProtocolCompositionType>()) {
     // 'Self' may be referenced only in a superclass component.
     if (const auto superclass = comp->getSuperclass()) {
       return findProtocolSelfReferences(proto, superclass, position);
@@ -6549,7 +6558,7 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc,
               /*IsStatic*/ false,
               VarDecl::Introducer::Let, parameterNameLoc, parameterName, dc,
               StorageIsNotMutable),
-      ArgumentNameAndDestructured(argumentName, false),
+      ArgumentNameAndFlags(argumentName, None),
       ParameterNameLoc(parameterNameLoc),
       ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
   Bits.ParamDecl.SpecifierComputed = false;
@@ -8881,16 +8890,16 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   // Without this distinction, a nominal can have non-async initializers
   // with various kinds of isolation, so an impossible constraint can be
   // created. See SE-0327 for details.
-  if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
-    if (auto *var =
-          init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
+  if (auto *var = dc->getNonLocalVarDecl()) {
 
-      if (var->isInstanceMember() &&
-          !var->getAttrs().hasAttribute<LazyAttr>())
-        return ActorIsolation::forUnspecified();
-
-      return getActorIsolation(var);
+    // Isolation officially changes, as described above, in Swift 6+
+    if (dc->getASTContext().isSwiftVersionAtLeast(6) &&
+        var->isInstanceMember() &&
+        !var->getAttrs().hasAttribute<LazyAttr>()) {
+      return ActorIsolation::forUnspecified();
     }
+
+     return getActorIsolation(var);
   }
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {

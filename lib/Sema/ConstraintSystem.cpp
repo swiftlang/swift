@@ -837,7 +837,8 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
 
 Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
                                       ConstraintLocatorBuilder locator) {
-  auto opaqueLocatorKey = getOpenOpaqueLocator(locator, opaque->getDecl());
+  auto opaqueDecl = opaque->getDecl();
+  auto opaqueLocatorKey = getOpenOpaqueLocator(locator, opaqueDecl);
 
   // If we have already opened this opaque type, look in the known set of
   // replacements.
@@ -858,9 +859,22 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
   // corresponding to the underlying type should be the constraints on the
   // underlying return type.
   auto opaqueLocator = locator.withPathElement(
-      LocatorPathElt::OpenedOpaqueArchetype(opaque->getDecl()));
+      LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl));
   OpenedTypeMap replacements;
-  openGeneric(DC, opaque->getBoundSignature(), opaqueLocator, replacements);
+  openGeneric(DC, opaqueDecl->getOpaqueInterfaceGenericSignature(),
+              opaqueLocator, replacements);
+
+  // If there is an outer generic signature, bind the outer parameters based
+  // on the substitutions in the opaque type.
+  auto subs = opaque->getSubstitutions();
+  if (auto genericSig = subs.getGenericSignature()) {
+    for (auto *genericParamPtr : genericSig.getGenericParams()) {
+      Type genericParam(genericParamPtr);
+      addConstraint(
+          ConstraintKind::Bind, openType(genericParam, replacements),
+          genericParam.subst(subs), opaqueLocator);
+    }
+  }
 
   recordOpenedTypes(opaqueLocatorKey, replacements);
 
@@ -1753,6 +1767,13 @@ ConstraintSystem::getTypeOfMemberReference(
     auto memberTy = TypeChecker::substMemberTypeWithBase(DC->getParentModule(),
                                                          typeDecl, baseObjTy);
 
+    // If the member type is a constraint, e.g. because the
+    // reference is to a typealias with an underlying protocol
+    // or composition type, the member reference has existential
+    // type.
+    if (memberTy->isConstraintType())
+      memberTy = ExistentialType::get(memberTy);
+
     checkNestedTypeConstraints(*this, memberTy, locator);
 
     // Convert any placeholders and open any generics.
@@ -1886,7 +1907,8 @@ ConstraintSystem::getTypeOfMemberReference(
       }
     }
   } else if (baseObjTy->isExistentialType()) {
-    auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
+    auto openedArchetype = OpenedArchetypeType::get(
+        baseObjTy->getCanonicalType());
     OpenedExistentialTypes.insert(
         {getConstraintLocator(locator), openedArchetype});
     baseOpenedTy = openedArchetype;
@@ -1981,8 +2003,12 @@ ConstraintSystem::getTypeOfMemberReference(
         if (t->isEqual(selfTy))
           return baseObjTy;
       if (auto *metatypeTy = t->getAs<MetatypeType>())
-        if (metatypeTy->getInstanceType()->isEqual(selfTy))
-          return ExistentialMetatypeType::get(baseObjTy);
+        if (metatypeTy->getInstanceType()->isEqual(selfTy)) {
+          auto constraint = baseObjTy;
+          if (auto existential = baseObjTy->getAs<ExistentialType>())
+            constraint = existential->getConstraintType();
+          return ExistentialMetatypeType::get(constraint);
+        }
       return t;
     });
   }
@@ -2132,7 +2158,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
-           !overload.getBaseType()->getAnyNominal()))
+           (!overload.getBaseType()->getAnyNominal() &&
+            !overload.getBaseType()->is<ExistentialType>())))
         return Type();
 
       // Cope with 'Self' returns.
@@ -2492,14 +2519,16 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       // Okay, now it should be safe to coerce the pattern.
       // Pull the top-level pattern back out.
       pattern = LabelItem.getPattern();
-      Type exnType = DC->getASTContext().getErrorDecl()->getDeclaredInterfaceType();
 
-      if (!exnType)
+      auto &ctx = DC->getASTContext();
+      if (!ctx.getErrorDecl())
         return false;
+
       auto contextualPattern =
           ContextualPattern::forRawPattern(pattern, DC);
       pattern = TypeChecker::coercePatternToType(
-        contextualPattern, exnType, TypeResolverContext::InExpression);
+        contextualPattern, ctx.getErrorExistentialType(),
+        TypeResolverContext::InExpression);
       if (!pattern)
         return false;
 
@@ -5930,8 +5959,13 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
     return false;
 
   auto &ctx = closure->getASTContext();
-  return !closure->hasEmptyBody() &&
-         ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
+  if (closure->hasEmptyBody() ||
+      !ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
+    return false;
+
+  // If body is nested in a parent that has a function builder applied,
+  // let's prevent inference until result builders.
+  return !isInResultBuilderContext(closure);
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)

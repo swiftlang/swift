@@ -42,6 +42,7 @@ namespace swift {
   class AutoClosureExpr;
   class ASTContext;
   class ClassDecl;
+  class EffectsAttr;
   class FileUnit;
   class SILFunctionType;
   enum IsSerialized_t : unsigned char;
@@ -240,10 +241,14 @@ struct SILDeclRef {
   /// Produces a SILDeclRef for the entry-point of a main FileUnit.
   static SILDeclRef getMainFileEntryPoint(FileUnit *file);
 
+  /// Produces a SILDeclRef for the entry-point of an async main FileUnit.
+  static SILDeclRef getAsyncMainFileEntryPoint(FileUnit *file);
+
   bool isNull() const { return loc.isNull(); }
   explicit operator bool() const { return !isNull(); }
-  
+
   bool hasDecl() const { return loc.is<ValueDecl *>(); }
+  bool hasFileUnit() const { return loc.is<FileUnit *>(); }
   bool hasClosureExpr() const;
   bool hasAutoClosureExpr() const;
   bool hasFuncDecl() const;
@@ -260,11 +265,14 @@ struct SILDeclRef {
     return loc.get<FileUnit *>();
   }
 
+  /// Get ModuleDecl that contains the SILDeclRef
+  ModuleDecl *getModuleContext() const;
+
   /// Retrieves the ASTContext from the underlying AST node being stored.
   ASTContext &getASTContext() const;
 
   llvm::Optional<AnyFunctionRef> getAnyFunctionRef() const;
-  
+
   SILLocation getAsRegularLocation() const;
 
   enum class ManglingKind {
@@ -337,12 +345,6 @@ struct SILDeclRef {
   /// True if the function has __always inline attribute.
   bool isAlwaysInline() const;
   
-  /// \return True if the function has an effects attribute.
-  bool hasEffectsAttribute() const;
-
-  /// \return the effects kind of the function.
-  EffectsKind getEffectsAttribute() const;
-
   /// Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
 

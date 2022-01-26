@@ -1,4 +1,5 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s --check-prefixes='CHECK,SYNC-CHECK'
+// RUN: %target-swift-emit-silgen -enable-experimental-async-top-level %s | %FileCheck %s --check-prefixes='CHECK,ASYNC-CHECK'
 
 enum MyError : Error {
   case A, B
@@ -17,7 +18,10 @@ throw MyError.A
 // CHECK: br bb2([[ERR2]] : $Error)
 
 // CHECK: bb1([[T0:%.*]] : $Int32):
-// CHECK: return [[T0]] : $Int32
+// SYNC-CHECK: return [[T0]] : $Int32
+// ASYNC-CHECK: [[EXITFUNC:%[0-9]+]] = function_ref @exit
+// ASYNC-CHECK: {{[0-9]+}} = apply [[EXITFUNC]]([[T0]])
+// ASYNC-CHECK: unreachable
 
 // CHECK: bb2([[T0:%.*]] : @owned $Error):
 // CHECK: builtin "errorInMain"([[T0]] : $Error)

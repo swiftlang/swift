@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -requirement-machine=verify
+// RUN: %target-swift-emit-silgen %s
 
 public class C<Key, Value> {
   public func method() -> Value { fatalError() }

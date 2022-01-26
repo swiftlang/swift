@@ -260,8 +260,7 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  attrs = attrs.addAttributes(IGM.getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
 
 static void addInoutParameterAttributes(IRGenModule &IGM,
@@ -276,8 +275,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM,
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  attrs = attrs.addAttributes(IGM.getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
 
 static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
@@ -293,6 +291,7 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
   switch (convention) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::Block:
     return llvm::CallingConv::C;
 
@@ -319,25 +318,21 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
     assert(storageType);
     b.addStructRetAttr(storageType);
   }
-  attrs = attrs.addAttributes(IGM.getLLVMContext(),
-                              paramIndex + llvm::AttributeList::FirstArgIndex,
-                              b);
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), paramIndex, b);
 }
 
 void IRGenModule::addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
                                                  unsigned argIndex) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::SwiftAsync);
-  attrs = attrs.addAttributes(this->getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
 void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
                                          unsigned argIndex) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::SwiftSelf);
-  attrs = attrs.addAttributes(this->getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
 void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
@@ -355,9 +350,8 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
   b.addAttribute(llvm::Attribute::NoAlias);
   b.addAttribute(llvm::Attribute::NoCapture);
   b.addDereferenceableAttr(getPointerSize().getValue());
-  
-  auto attrIndex = argIndex + llvm::AttributeList::FirstArgIndex;
-  attrs = attrs.addAttributes(this->getLLVMContext(), attrIndex, b);
+
+  attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
@@ -368,18 +362,13 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
   b.addByValAttr(storageType);
   b.addAttribute(llvm::Attribute::getWithAlignment(
       IGM.getLLVMContext(), llvm::Align(align.getValue())));
-  attrs = attrs.addAttributes(IGM.getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
 
-void irgen::addExtendAttribute(IRGenModule &IGM, llvm::AttributeList &attrs,
-                               unsigned index, bool signExtend) {
-  llvm::AttrBuilder b;
+static llvm::Attribute::AttrKind attrKindForExtending(bool signExtend) {
   if (signExtend)
-    b.addAttribute(llvm::Attribute::SExt);
-  else
-    b.addAttribute(llvm::Attribute::ZExt);
-  attrs = attrs.addAttributes(IGM.getLLVMContext(), index, b);
+    return llvm::Attribute::SExt;
+  return llvm::Attribute::ZExt;
 }
 
 namespace swift {
@@ -1131,6 +1120,8 @@ namespace {
         return convertFloatingType(Ctx.getTargetInfo().getBFloat16Format());
       case clang::BuiltinType::Float128:
         return convertFloatingType(Ctx.getTargetInfo().getFloat128Format());
+      case clang::BuiltinType::Ibm128:
+        return convertFloatingType(Ctx.getTargetInfo().getIbm128Format());
 
       // nullptr_t -> void*
       case clang::BuiltinType::NullPtr:
@@ -1326,6 +1317,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangCtx.VoidPtrTy);
     break;
 
+  case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     // No implicit arguments.
     break;
@@ -1366,7 +1358,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     bool signExt = clangResultTy->hasSignedIntegerRepresentation();
     assert((signExt || clangResultTy->hasUnsignedIntegerRepresentation()) &&
            "Invalid attempt to add extension attribute to argument!");
-    addExtendAttribute(IGM, Attrs, llvm::AttributeList::ReturnIndex, signExt);
+    Attrs = Attrs.addRetAttribute(IGM.getLLVMContext(),
+                                  attrKindForExtending(signExt));
   }
 
   // If we return indirectly, that is the first parameter type.
@@ -1396,8 +1389,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       bool signExt = paramTys[i]->hasSignedIntegerRepresentation();
       assert((signExt || paramTys[i]->hasUnsignedIntegerRepresentation()) &&
              "Invalid attempt to add extension attribute to argument!");
-      addExtendAttribute(IGM, Attrs, getCurParamIndex() +
-                         llvm::AttributeList::FirstArgIndex, signExt);
+      Attrs = Attrs.addParamAttribute(IGM.getLLVMContext(), getCurParamIndex(),
+                                      attrKindForExtending(signExt));
       LLVM_FALLTHROUGH;
     }
     case clang::CodeGen::ABIArgInfo::Direct: {
@@ -1642,6 +1635,7 @@ void SignatureExpansion::expandParameters() {
       case SILFunctionType::Representation::Method:
       case SILFunctionType::Representation::WitnessMethod:
       case SILFunctionType::Representation::ObjCMethod:
+      case SILFunctionType::Representation::CXXMethod:
       case SILFunctionType::Representation::Thin:
       case SILFunctionType::Representation::Closure:
         return FnType->hasErrorResult();
@@ -1809,6 +1803,7 @@ void SignatureExpansion::expandAsyncEntryType() {
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::Thin:
       case SILFunctionType::Representation::Closure:
+      case SILFunctionType::Representation::CXXMethod:
         return false;
 
       case SILFunctionType::Representation::Thick:
@@ -2147,8 +2142,7 @@ public:
 
       assert(LastArgWritten > 0);
       Args[--LastArgWritten] = errorResultSlot.getAddress();
-      addAttribute(LastArgWritten + llvm::AttributeList::FirstArgIndex,
-                   llvm::Attribute::NoCapture);
+      addParamAttribute(LastArgWritten, llvm::Attribute::NoCapture);
       IGF.IGM.addSwiftErrorAttributes(CurCallee.getMutableAttributes(),
                                       LastArgWritten);
 
@@ -2203,7 +2197,20 @@ public:
       break;
 
     case SILFunctionTypeRepresentation::Block:
-      adjusted.add(getCallee().getBlockObject());
+    case SILFunctionTypeRepresentation::CXXMethod:
+      if (getCallee().getRepresentation() == SILFunctionTypeRepresentation::Block) {
+        adjusted.add(getCallee().getBlockObject());
+      } else {
+        auto selfParam = origCalleeType->getSelfParameter();
+        auto *arg = getCallee().getCXXMethodSelf();
+        // We might need to fix the level of indirection for foreign reference types.
+        if (selfParam.getInterfaceType().isForeignReferenceType() &&
+            isIndirectFormalParameter(selfParam.getConvention()))
+            arg = IGF.Builder.CreateLoad(arg, IGF.IGM.getPointerAlignment());
+
+        adjusted.add(arg);
+      }
+
       LLVM_FALLTHROUGH;
 
     case SILFunctionTypeRepresentation::CFunctionPointer:
@@ -2462,14 +2469,9 @@ public:
     // Translate the formal arguments and handle any special arguments.
     switch (getCallee().getRepresentation()) {
     case SILFunctionTypeRepresentation::ObjCMethod:
-      assert(false && "Should not reach this");
-      break;
-
     case SILFunctionTypeRepresentation::Block:
-      assert(false && "Should not reach this");
-      break;
-
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::CXXMethod:
       assert(false && "Should not reach this");
       break;
 
@@ -2847,12 +2849,12 @@ fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
     auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
     if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
         paramTy->getPointerElementType() != attrList.getParamStructRetType(i))
-      attrList = attrList.replaceAttributeType(
+      attrList = attrList.replaceAttributeTypeAtIndex(
           context, attrListIndex, llvm::Attribute::StructRet,
           paramTy->getPointerElementType());
     if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
         paramTy->getPointerElementType() != attrList.getParamByValType(i))
-      attrList = attrList.replaceAttributeType(
+      attrList = attrList.replaceAttributeTypeAtIndex(
           context, attrListIndex, llvm::Attribute::ByVal,
           paramTy->getPointerElementType());
   }
@@ -3148,6 +3150,9 @@ Callee::Callee(CalleeInfo &&info, const FunctionPointer &fn,
   case SILFunctionTypeRepresentation::CFunctionPointer:
     assert(!FirstData && !SecondData);
     break;
+  case SILFunctionTypeRepresentation::CXXMethod:
+    assert(FirstData && !SecondData);
+    break;
   }
 #endif
 
@@ -3160,6 +3165,7 @@ llvm::Value *Callee::getSwiftContext() const {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::CXXMethod:
     return nullptr;
 
   case SILFunctionTypeRepresentation::WitnessMethod:
@@ -3179,6 +3185,14 @@ llvm::Value *Callee::getBlockObject() const {
            SILFunctionTypeRepresentation::Block &&
          "not a block");
   assert(FirstData && "no block object set on callee");
+  return FirstData;
+}
+
+llvm::Value *Callee::getCXXMethodSelf() const {
+  assert(Info.OrigFnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::CXXMethod &&
+         "not a C++ method");
+  assert(FirstData && "no self object set on callee");
   return FirstData;
 }
 
@@ -3496,6 +3510,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   // The index of the first "physical" parameter from paramTys/FI that
   // corresponds to a logical parameter from params.
   unsigned firstParam = 0;
+  unsigned paramEnd = FI.arg_size();
 
   // Handle the ObjC prefix.
   if (callee.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
@@ -3509,14 +3524,19 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                 == SILFunctionTypeRepresentation::Block) {
     // Ignore the physical block-object parameter.
     firstParam += 1;
-    // Or the indirect result parameter.
-  } else if (fnType->getNumResults() > 0 &&
+  } else if (callee.getRepresentation() ==
+             SILFunctionTypeRepresentation::CXXMethod) {
+    // Skip the "self" param.
+    paramEnd--;
+  }
+
+  if (fnType->getNumResults() > 0 &&
              fnType->getSingleResult().isFormalIndirect()) {
     // Ignore the indirect result parameter.
     firstParam += 1;
   }
 
-  for (unsigned i = firstParam, e = FI.arg_size(); i != e; ++i) {
+  for (unsigned i = firstParam; i != paramEnd; ++i) {
     auto clangParamTy = FI.arg_begin()[i].type;
     auto &AI = FI.arg_begin()[i].info;
 
@@ -4104,11 +4124,17 @@ void CallEmission::setArgs(Explosion &adjusted, bool isOutlined,
   }
 }
 
-void CallEmission::addAttribute(unsigned index,
-                                llvm::Attribute::AttrKind attr) {
+void CallEmission::addFnAttribute(llvm::Attribute::AttrKind attr) {
   assert(state == State::Emitting);
   auto &attrs = CurCallee.getMutableAttributes();
-  attrs = attrs.addAttribute(IGF.IGM.getLLVMContext(), index, attr);
+  attrs = attrs.addFnAttribute(IGF.IGM.getLLVMContext(), attr);
+}
+
+void CallEmission::addParamAttribute(unsigned paramIndex,
+                                     llvm::Attribute::AttrKind attr) {
+  assert(state == State::Emitting);
+  auto &attrs = CurCallee.getMutableAttributes();
+  attrs = attrs.addParamAttribute(IGF.IGM.getLLVMContext(), paramIndex, attr);
 }
 
 /// Initialize an Explosion with the parameters of the current

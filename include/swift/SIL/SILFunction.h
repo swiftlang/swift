@@ -150,8 +150,9 @@ class SILFunction
   : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction>,
     public SwiftObjectHeader {
     
-  static SwiftMetatype registeredMetatype;
-    
+private:
+  void *libswiftSpecificData[1];
+
 public:
   using BlockListType = llvm::iplist<SILBasicBlock>;
 
@@ -418,10 +419,6 @@ private:
   void setHasOwnership(bool newValue) { HasOwnership = newValue; }
 
 public:
-  static void registerBridgedMetatype(SwiftMetatype metatype) {
-    registeredMetatype = metatype;
-  }
-
   ~SILFunction();
 
   SILModule &getModule() const { return Module; }
@@ -943,6 +940,19 @@ public:
     EffectsKindAttr = unsigned(E);
   }
   
+  enum class ArgEffectKind {
+    Unknown,
+    Escape
+  };
+  
+  std::pair<const char *, int>  parseEffects(StringRef attrs, bool fromSIL,
+                                             bool isDerived,
+                                             ArrayRef<StringRef> paramNames);
+  void writeEffect(llvm::raw_ostream &OS, int effectIdx) const;
+  void copyEffects(SILFunction *from);
+  bool hasArgumentEffects() const;
+  void visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const;
+
   Purpose getSpecialPurpose() const { return specialPurpose; }
 
   /// Get this function's global_init attribute.
@@ -1055,6 +1065,19 @@ public:
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
   SubstitutionMap getForwardingSubstitutionMap();
+
+  /// Returns true if this SILFunction must be a defer statement.
+  ///
+  /// NOTE: This may return false for defer statements that have been
+  /// deserialized without a DeclContext. This means that this is guaranteed to
+  /// be correct for SILFunctions in Raw SIL that were not deserialized as
+  /// canonical. Thus one can use it for diagnostics.
+  bool isDefer() const {
+    if (auto *dc = getDeclContext())
+      if (auto *decl = dyn_cast_or_null<FuncDecl>(dc->getAsDecl()))
+        return decl->isDeferBody();
+    return false;
+  }
 
   //===--------------------------------------------------------------------===//
   // Block List Access

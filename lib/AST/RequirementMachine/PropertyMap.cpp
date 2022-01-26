@@ -152,9 +152,9 @@ PropertyBag::getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const {
 Type PropertyBag::getSuperclassBound(
     TypeArrayView<GenericTypeParamType> genericParams,
     const MutableTerm &lookupTerm,
-    RewriteContext &ctx) const {
+    const PropertyMap &map) const {
   MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
-  return ctx.getTypeFromSubstitutionSchema(Superclass->getSuperclass(),
+  return map.getTypeFromSubstitutionSchema(Superclass->getSuperclass(),
                                            Superclass->getSubstitutions(),
                                            genericParams, prefix);
 }
@@ -171,9 +171,9 @@ Type PropertyBag::getSuperclassBound(
 Type PropertyBag::getConcreteType(
     TypeArrayView<GenericTypeParamType> genericParams,
     const MutableTerm &lookupTerm,
-    RewriteContext &ctx) const {
+    const PropertyMap &map) const {
   MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
-  return ctx.getTypeFromSubstitutionSchema(ConcreteType->getConcreteType(),
+  return map.getTypeFromSubstitutionSchema(ConcreteType->getConcreteType(),
                                            ConcreteType->getSubstitutions(),
                                            genericParams, prefix);
 }
@@ -235,15 +235,24 @@ PropertyMap::~PropertyMap() {
   clear();
 }
 
+/// Look for a property bag corresponding to a suffix of the given range.
+///
+/// Returns nullptr if no information is known about this key.
+PropertyBag *
+PropertyMap::lookUpProperties(std::reverse_iterator<const Symbol *> begin,
+                              std::reverse_iterator<const Symbol *> end) const {
+  if (auto result = Trie.find(begin, end))
+    return *result;
+
+  return nullptr;
+}
+
 /// Look for a property bag corresponding to a suffix of the given key.
 ///
 /// Returns nullptr if no information is known about this key.
 PropertyBag *
 PropertyMap::lookUpProperties(const MutableTerm &key) const {
-  if (auto result = Trie.find(key.rbegin(), key.rend()))
-    return *result;
-
-  return nullptr;
+  return lookUpProperties(key.rbegin(), key.rend());
 }
 
 /// Look for a property bag corresponding to the given key, creating a new
@@ -304,23 +313,6 @@ void PropertyMap::clear() {
 
   Trie.clear();
   Entries.clear();
-  ConcreteTypeInDomainMap.clear();
-}
-
-/// Record a protocol conformance, layout or superclass constraint on the given
-/// key. Must be called in monotonically non-decreasing key order.
-///
-/// If there was a conflict, returns the conflicting rule ID; otherwise
-/// returns None.
-Optional<unsigned> PropertyMap::addProperty(
-    Term key, Symbol property, unsigned ruleID,
-    SmallVectorImpl<InducedRule> &inducedRules) {
-  assert(property.isProperty());
-  assert(*System.getRule(ruleID).isPropertyRule() == property);
-  auto *props = getOrCreateProperties(key);
-  bool debug = Debug.contains(DebugFlags::ConcreteUnification);
-  return props->addProperty(property, ruleID, System,
-                            inducedRules, debug);
 }
 
 /// Build the property map from all rules of the form T.[p] => T, where
@@ -356,7 +348,11 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
     if (rule.isSimplified())
       continue;
 
-    if (rule.isPermanent())
+    // Identity conformances ([P].[P] => [P]) are permanent rules, but we
+    // keep them around to ensure that concrete conformance introduction
+    // works in the case where the protocol's Self type is itself subject
+    // to a superclass or concrete type requirement.
+    if (rule.isPermanent() && !rule.isIdentityConformanceRule())
       continue;
 
     // Collect all rules of the form T.[p] => T where T is canonical.
@@ -375,51 +371,28 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   // Merging multiple superclass or concrete type rules can induce new rules
   // to unify concrete type constructor arguments.
-  SmallVector<InducedRule, 3> inducedRules;
+  unsigned ruleCount = System.getRules().size();
 
   for (const auto &bucket : properties) {
     for (auto property : bucket) {
-      auto existingRuleID = addProperty(property.key, property.symbol,
-                                        property.ruleID, inducedRules);
-      if (existingRuleID) {
-        // The GSB only dropped the new rule in the case of a conflicting
-        // superclass requirement, so maintain that behavior here.
-        auto &existingRule = System.getRule(*existingRuleID);
-        if (existingRule.isPropertyRule()->getKind() !=
-            Symbol::Kind::Superclass) {
-          if (existingRule.getRHS().size() == property.key.size())
-            existingRule.markConflicting();
-        }
-
-        auto &newRule = System.getRule(property.ruleID);
-        assert(newRule.getRHS().size() == property.key.size());
-        newRule.markConflicting();
-      }
+      addProperty(property.key, property.symbol,
+                  property.ruleID);
     }
   }
 
-  // We collect terms with fully concrete types so that we can re-use them
-  // to tie off recursion in the next step.
-  computeConcreteTypeInDomainMap();
+  // Now, check for conflicts between superclass and concrete type rules.
+  checkConcreteTypeRequirements();
 
   // Now, we merge concrete type rules with conformance rules, by adding
   // relations between associated type members of type parameters with
   // the concrete type witnesses in the concrete type's conformance.
-  concretizeNestedTypesFromConcreteParents(inducedRules);
+  concretizeNestedTypesFromConcreteParents();
 
-  // Some of the induced rules might be trivial; only count the induced rules
-  // where the left hand side is not already equivalent to the right hand side.
-  unsigned addedNewRules = 0;
-  for (auto pair : inducedRules) {
-    // FIXME: Eventually, all induced rules will have a rewrite path.
-    if (System.addRule(pair.LHS, pair.RHS,
-                       pair.Path.empty() ? nullptr : &pair.Path)) {
-      ++addedNewRules;
-
-      const auto &newRule = System.getRules().back();
-      if (newRule.getDepth() > maxDepth)
-        return std::make_pair(CompletionResult::MaxDepth, addedNewRules);
-    }
+  unsigned addedNewRules = System.getRules().size() - ruleCount;
+  for (unsigned i = ruleCount, e = System.getRules().size(); i < e; ++i) {
+    const auto &newRule = System.getRule(i);
+    if (newRule.getDepth() > maxDepth)
+      return std::make_pair(CompletionResult::MaxDepth, addedNewRules);
   }
 
   // Check invariants of the constructed property map.

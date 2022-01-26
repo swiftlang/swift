@@ -76,11 +76,12 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RuleBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, System.getProtocolMap());
   builder.addRequirements(sig.getRequirements());
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
+                    /*protos=*/ArrayRef<const ProtocolDecl *>(),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -104,8 +105,6 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 /// Returns failure if completion fails within the configured number of steps.
 CompletionResult
 RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
-  Protos = protos;
-
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
   if (Dump) {
@@ -116,11 +115,11 @@ RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
     llvm::dbgs() << " {\n";
   }
 
-  RuleBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, System.getProtocolMap());
   builder.addProtocols(protos);
 
   // Add the initial set of rewrite rules to the rewrite system.
-  System.initialize(/*recordLoops=*/true,
+  System.initialize(/*recordLoops=*/true, protos,
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -158,11 +157,12 @@ void RequirementMachine::initWithAbstractRequirements(
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RuleBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, System.getProtocolMap());
   builder.addRequirements(requirements);
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
+                    /*protos=*/ArrayRef<const ProtocolDecl *>(),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -200,11 +200,12 @@ RequirementMachine::initWithWrittenRequirements(
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RuleBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, System.getProtocolMap());
   builder.addRequirements(requirements);
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
+                    /*protos=*/ArrayRef<const ProtocolDecl *>(),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
@@ -291,9 +292,10 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
     for (auto paramTy : Params)
       out << " " << Type(paramTy);
   } else {
-    assert(!Protos.empty());
+    auto protos = System.getProtocols();
+    assert(!protos.empty());
     out << "protocols [";
-    for (auto *proto : Protos) {
+    for (auto *proto : protos) {
       out << " " << proto->getName();
     }
     out << " ]";

@@ -149,16 +149,79 @@ func testInvalidAny() {
   let _: any ((S) -> Void) = generic // expected-error{{'any' has no effect on concrete type '(S) -> Void'}}
 }
 
-func testRedundantAnyWarning() {
-  let _: any Any // expected-warning {{'any' is redundant on type 'Any'}}
-  let _: any AnyObject // expected-warning {{'any' is redundant on type 'AnyObject'}}
+func anyAny() {
+  let _: any Any
+  let _: any AnyObject
 }
 
 protocol P1 {}
 protocol P2 {}
+do {
+  // Test that we don't accidentally misparse an 'any' type as a 'some' type
+  // and vice versa.
+  let _: P1 & any P2 // expected-error {{'any' should appear at the beginning of a composition}}
+  let _: any P1 & any P2 // expected-error {{'any' should appear at the beginning of a composition}}
+  let _: any P1 & some P2 // expected-error {{'some' should appear at the beginning of a composition}}
+  let _: some P1 & any P2
+  // expected-error@-1 {{'some' type can only be declared on a single property declaration}}
+  // expected-error@-2 {{'any' should appear at the beginning of a composition}}
+}
+
 struct ConcreteComposition: P1, P2 {}
 
 func testMetatypes() {
   let _: any P1.Type = ConcreteComposition.self
   let _: any (P1 & P2).Type = ConcreteComposition.self
+}
+
+func generic<T: any P1>(_ t: T) {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'any P1'}}
+
+protocol RawRepresentable {
+  associatedtype RawValue
+  var rawValue: RawValue { get }
+}
+
+enum E1: RawRepresentable {
+  typealias RawValue = P1
+
+  var rawValue: P1 {
+    return ConcreteComposition()
+  }
+}
+
+enum E2: RawRepresentable {
+  typealias RawValue = any P1
+
+  var rawValue: any P1 {
+    return ConcreteComposition()
+  }
+}
+
+public protocol MyError {}
+
+extension MyError {
+  static func ~=(lhs: any Error, rhs: Self) -> Bool {
+    return true
+  }
+}
+
+struct Wrapper {
+  typealias E = Error
+}
+
+func typealiasMemberReferences(metatype: Wrapper.Type) {
+  let _: Wrapper.E.Protocol = metatype.E.self
+  let _: (any Wrapper.E).Type = metatype.E.self
+}
+
+func testAnyTypeExpr() {
+  let _: (any P).Type = (any P).self
+
+  func test(_: (any P).Type) {}
+  test((any P).self)
+
+  // expected-error@+2 {{expected member name or constructor call after type name}}
+  // expected-note@+1 {{use '.self' to reference the type object}}
+  let invalid = any P
+  test(invalid)
 }

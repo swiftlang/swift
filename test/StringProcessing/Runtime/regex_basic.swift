@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-string-processing)
 
-// REQUIRES: libswift,string_processing,executable_test
+// REQUIRES: swift_in_compiler,string_processing,executable_test
 
 import StdlibUnittest
 
@@ -25,11 +25,11 @@ RegexBasicTests.test("Basic") {
 
   let match1 = input.expectMatch('/aabcc./')
   expectEqual("aabccd", input[match1.range])
-  expectTrue(() == match1.captures)
+  expectTrue("aabccd" == match1.match)
 
   let match2 = input.expectMatch('/a*b.+./')
   expectEqual("aabccd", input[match2.range])
-  expectTrue(() == match2.captures)
+  expectTrue("aabccd" == match2.match)
 }
 
 RegexBasicTests.test("Modern") {
@@ -37,7 +37,7 @@ RegexBasicTests.test("Modern") {
 
   let match1 = input.expectMatch('|a a  bc c /*hello*/ .|')
   expectEqual("aabccd", input[match1.range])
-  expectTrue(() == match1.captures)
+  expectTrue("aabccd" == match1.match)
 }
 
 RegexBasicTests.test("Captures") {
@@ -47,12 +47,14 @@ RegexBasicTests.test("Captures") {
     """
   let regex = '/([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s+;\s+(\w+).*/'
   // Test inferred type.
-  let _: Regex<(Substring, Substring?, Substring)>.Type = type(of: regex)
+  let _: Regex<Tuple4<Substring, Substring, Substring?, Substring>>.Type
+    = type(of: regex)
   let match1 = input.expectMatch(regex)
   expectEqual(input[...], input[match1.range])
-  expectTrue("A6F0" == match1.captures.0)
-  expectTrue("A6F1" == match1.captures.1)
-  expectTrue("Extend" == match1.captures.2)
+  expectTrue(input == match1.0)
+  expectTrue("A6F0" == match1.1)
+  expectTrue("A6F1" == match1.2)
+  expectTrue("Extend" == match1.3)
 }
 
 runAllTests()

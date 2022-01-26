@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -requirement-machine=verify
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 @override // expected-error {{'override' can only be specified on class members}} {{1-11=}} expected-error {{'override' is a declaration modifier, not an attribute}} {{1-2=}}
 func virtualAttributeCanNotBeUsedInSource() {}

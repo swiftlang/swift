@@ -51,13 +51,25 @@ struct Unrelated {}
 // FIXME: Not implemented yet.
 //
 
-func alreadyConforms<T>(_: Base<T>) {} // expected-note {{'alreadyConforms' previously declared here}}
-func alreadyConforms<T>(_: Base<T> & P1) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T>) {} // expected-note 3 {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T> & P1) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 func alreadyConforms<T>(_: Base<T> & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 func alreadyConforms<T>(_: Base<T> & P1 & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 
-func alreadyConforms(_: P3) {}
-func alreadyConforms(_: P3 & AnyObject) {}
+func alreadyConformsMeta<T>(_: Base<T>.Type) {} // expected-note 7 {{'alreadyConformsMeta' previously declared here}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1).Protocol) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (any Base<T> & P1).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (Base<T> & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (Base<T> & P1 & AnyObject).Protocol) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+func alreadyConformsMeta<T>(_: (any Base<T> & P1 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
+
+func alreadyConforms(_: P3) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms(_: P3 & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
+
+func alreadyConformsMeta(_: P3.Type) {} // expected-note {{'alreadyConformsMeta' previously declared here}}
+func alreadyConformsMeta(_: (P3 & AnyObject).Type) {} // expected-error {{invalid redeclaration of 'alreadyConformsMeta'}}
 
 // SE-0156 stipulates that a composition can contain multiple classes, as long
 // as they are all the same.

@@ -709,9 +709,8 @@ void swift::ide::CompletionInstance::codeComplete(
           CancellationFlag->load(std::memory_order_relaxed)) {
         Callback(ResultType::cancelled());
       } else {
-        MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
         assert(SwiftContext.swiftASTContext);
-        Callback(ResultType::success({Results, SwiftContext}));
+        Callback(ResultType::success({context.getResultSink(), SwiftContext}));
       }
     }
   };
@@ -736,7 +735,8 @@ void swift::ide::CompletionInstance::codeComplete(
                 SwiftCompletionInfo Info{&CI.getASTContext(),
                                          &CI.getInvocation(),
                                          &CompletionContext};
-                DeliverTransformed(ResultType::success({/*Results=*/{}, Info}));
+                CodeCompletionResultSink ResultSink;
+                DeliverTransformed(ResultType::success({ResultSink, Info}));
                 return;
               }
 
@@ -753,7 +753,8 @@ void swift::ide::CompletionInstance::codeComplete(
                 SwiftCompletionInfo Info{&CI.getASTContext(),
                                          &CI.getInvocation(),
                                          &CompletionContext};
-                DeliverTransformed(ResultType::success({/*Results=*/{}, Info}));
+                CodeCompletionResultSink ResultSink;
+                DeliverTransformed(ResultType::success({ResultSink, Info}));
               }
             },
             Callback);

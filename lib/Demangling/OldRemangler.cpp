@@ -736,7 +736,7 @@ Remangler::mangleDistributedThunk(Node *node, unsigned depth) {
 }
 
 ManglingError
-Remangler::mangleDistributedMethodAccessor(Node *node, unsigned depth) {
+Remangler::mangleDistributedAccessor(Node *node, unsigned depth) {
   Buffer << "TF";
   return ManglingError::Success;
 }
@@ -1823,6 +1823,11 @@ ManglingError Remangler::mangleIsolated(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
+ManglingError Remangler::mangleCompileTimeConst(Node *node, unsigned depth) {
+  Buffer << "Yt";
+  return mangleSingleChildNode(node, depth + 1); // type
+}
+
 ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   Buffer << 'k';
   return mangleSingleChildNode(node, depth + 1); // type
@@ -2641,6 +2646,11 @@ ManglingError Remangler::mangleSugaredParen(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleOpaqueReturnType(Node *node, unsigned depth) {
   Buffer << "Qu";
+  return ManglingError::Success;
+}
+ManglingError Remangler::mangleOpaqueReturnTypeIndexed(Node *node, unsigned depth) {
+  Buffer << "QU";
+  mangleIndex(node->getIndex());
   return ManglingError::Success;
 }
 ManglingError Remangler::mangleOpaqueReturnTypeOf(Node *node,

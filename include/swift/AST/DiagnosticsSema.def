@@ -1108,7 +1108,7 @@ WARNING(conditional_downcast_same_type,none,
         "bridging conversion; did you mean to use 'as'?}2",
         (Type, Type, unsigned))
 WARNING(is_expr_same_type,none,
-        "checking a value with optional type %0 against dynamic type %1 "
+        "checking a value with optional type %0 against type %1 "
         "succeeds whenever the value is non-nil; did you mean to use "
         "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
@@ -1514,6 +1514,9 @@ ERROR(access_control_extension_open,none,
 ERROR(access_control_open_bad_decl,none,
       "only classes and overridable class members can be declared 'open';"
       " use 'public'", ())
+WARNING(access_control_non_objc_open_member,none,
+      "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
+      (DescriptiveDeclKind))
 
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
@@ -1922,6 +1925,11 @@ NOTE(invalid_nominal_extension_rewrite,none,
 // Protocols
 ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
+
+// FIXME: SwiftUI source compatibility hack; see usage for details.
+WARNING(type_does_not_conform_swiftui_warning,none,
+        "type %0 does not conform to protocol %1", (Type, Type))
+
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))
 
@@ -2297,6 +2305,10 @@ NOTE(protocol_witness_type_conflict,none,
 NOTE(protocol_witness_missing_requirement,none,
      "candidate would match if %0 %select{conformed to|subclassed|"
      "was the same type as}2 %1", (Type, Type, unsigned))
+NOTE(protocol_type_witness_missing_requirement,none,
+     "candidate would match if the conformance required that %0 "
+     "%select{conformed to|subclassed|was the same type as}2 %1",
+     (Type, Type, unsigned))
 
 NOTE(protocol_witness_optionality_conflict,none,
      "candidate %select{type has|result type has|parameter type has|"
@@ -2438,8 +2450,8 @@ ERROR(protocol_composition_one_class,none,
       "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
-      "type %0 constrained to non-protocol, non-class type %1",
-      (Type, Type))
+      "type %0 constrained to non-protocol, non-class type '%1'",
+      (Type, StringRef))
 NOTE(requires_conformance_nonprotocol_fixit,none,
      "use '%0 == %1' to require '%0' to be '%1'",
      (StringRef, StringRef))
@@ -4483,6 +4495,10 @@ ERROR(global_actor_from_nonactor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
       " from %select{this|a non-isolated}3%select{| synchronous}5 context",
       (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
+ERROR(global_actor_from_initializing_expr,none,
+      "expression requiring global actor %0 cannot appear in "
+        "default-value expression of %1 %2",
+      (Type, DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_call,none,
       "call to %0 function in a synchronous %1 context",
       (ActorIsolation, ActorIsolation))
@@ -4651,8 +4667,6 @@ ERROR(unchecked_not_inheritance_clause,none,
 ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
-WARNING(unnecessary_any,none,
-         "'any' is redundant on type %0", (Type))
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))
@@ -4778,6 +4792,9 @@ ERROR(string_processing_lib_missing,none,
 ERROR(regex_capture_types_failed_to_decode,none,
       "failed to decode capture types for regular expression literal; this may "
       "be a compiler bug", ())
+ERROR(regex_too_many_captures,none,
+      "too many captures in regular expression literal; the current limit is "
+      "%0", (unsigned))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
@@ -5311,6 +5328,17 @@ ERROR(nonobjc_not_allowed,none,
 #undef OBJC_DIAG_SELECT_2
 #undef OBJC_DIAG_SELECT
 #undef OBJC_ATTR_SELECT
+
+//------------------------------------------------------------------------------
+// MARK: @exclusivity
+//------------------------------------------------------------------------------
+ERROR(exclusivity_on_wrong_decl,none,
+      "@exclusivity can only be used on class properties, static properties and global variables",
+      ())
+
+ERROR(exclusivity_on_computed_property,none,
+      "@exclusivity can only be used on stored properties",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: @_borrowed

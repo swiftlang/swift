@@ -86,18 +86,17 @@ static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  auto root = A->getRoot();
-  if (!isa<PrimaryArchetypeType>(root) && !isa<SequenceArchetypeType>(root))
+  if (!isa<PrimaryArchetypeType>(A) && !isa<SequenceArchetypeType>(A))
     return true;
-  if (isa<OpenedArchetypeType>(A->getRoot()))
+  if (isa<OpenedArchetypeType>(A))
     return true;
-  if (isa<OpaqueTypeArchetypeType>(A->getRoot()))
+  if (isa<OpaqueTypeArchetypeType>(A))
     return true;
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (root->getGenericEnvironment() == genericEnv)
+    if (A->getGenericEnvironment() == genericEnv)
       return true;
 
   return false;
@@ -2963,8 +2962,19 @@ public:
             "value_metatype instruction must have a metatype representation");
     require(MI->getOperand()->getType().isAnyExistentialType(),
             "existential_metatype operand must be of protocol type");
+
+    // The result of an existential_metatype instruction is an existential
+    // metatype with the same constraint type as its existential operand.
     auto formalInstanceTy
       = MI->getType().castTo<ExistentialMetatypeType>().getInstanceType();
+    if (M->getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+        formalInstanceTy->isConstraintType() &&
+        !(formalInstanceTy->isAny() || formalInstanceTy->isAnyObject())) {
+      require(MI->getOperand()->getType().is<ExistentialType>(),
+              "existential_metatype operand must be an existential type");
+      formalInstanceTy =
+          ExistentialType::get(formalInstanceTy)->getCanonicalType();
+    }
     require(isLoweringOf(MI->getOperand()->getType(), formalInstanceTy),
             "existential_metatype result must be formal metatype of "
             "lowered operand type");
@@ -2995,11 +3005,9 @@ public:
     auto *cd = DI->getOperand()->getType().getClassOrBoundGenericClass();
     require(cd, "Operand of dealloc_ref must be of class type");
 
-    if (!DI->canAllocOnStack()) {
-      require(!checkResilience(cd, F.getModule().getSwiftModule(),
-                               F.getResilienceExpansion()),
-              "cannot directly deallocate resilient class");
-    }
+    require(!checkResilience(cd, F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot directly deallocate resilient class");
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),
@@ -5257,7 +5265,7 @@ public:
       require(AACI->getErrorBB()->getNumArguments() == 1,
               "error successor must take one argument");
       auto arg = AACI->getErrorBB()->getArgument(0);
-      auto errorType = C.getErrorDecl()->getDeclaredType()->getCanonicalType();
+      auto errorType = C.getErrorExistentialType();
       requireSameType(arg->getType(),
                       SILType::getPrimitiveObjectType(errorType),
               "error successor argument must have Error type");

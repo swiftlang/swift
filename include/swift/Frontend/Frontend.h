@@ -174,6 +174,11 @@ public:
     SearchPathOpts.setImportSearchPaths(Paths);
   }
 
+  void setSerializedPathObfuscator(const PathObfuscator &obfuscator) {
+    FrontendOpts.serializedPathObfuscator = obfuscator;
+    SearchPathOpts.DeserializedPathRecoverer = obfuscator;
+  }
+
   ArrayRef<std::string> getImportSearchPaths() const {
     return SearchPathOpts.getImportSearchPaths();
   }
@@ -388,6 +393,7 @@ public:
   std::string getOutputFilenameForAtMostOnePrimary() const;
   std::string getMainInputFilenameForDebugInfoForAtMostOnePrimary() const;
   std::string getObjCHeaderOutputPathForAtMostOnePrimary() const;
+  std::string getCxxHeaderOutputPathForAtMostOnePrimary() const;
   std::string getModuleOutputPathForAtMostOnePrimary() const;
   std::string
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
@@ -669,6 +675,9 @@ public:
 
   /// If \p fn returns true, exits early and returns true.
   bool forEachFileToTypeCheck(llvm::function_ref<bool(SourceFile &)> fn);
+
+  /// Whether the cancellation of the current operation has been requested.
+  bool isCancellationRequested() const;
 
 private:
   /// Compute the parsing options for a source file in the main module.

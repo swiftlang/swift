@@ -263,6 +263,11 @@ bool CompileInstance::setupCI(
     return false;
   }
 
+  // Since LLVM arguments are parsed into a global state, LLVM can't handle
+  // multiple argument sets in a process simultaneously. So let's ignore them.
+  // FIXME: Remove this if possible.
+  invocation.getFrontendOptions().LLVMArgs.clear();
+
   /// Declare the frontend to be used for multiple compilations.
   invocation.getFrontendOptions().ReuseFrontendForMutipleCompilations = true;
 
@@ -289,7 +294,7 @@ void CompileInstance::performSema(
   if (CI && ArgsHash == CachedArgHash &&
       CachedReuseCount < Opts.MaxASTReuseCount) {
     CI->getASTContext().CancellationFlag = CancellationFlag;
-    if (performCachedSemaIfPossible(DiagC)) {
+    if (!performCachedSemaIfPossible(DiagC)) {
       // If we compileted cacehd Sema operation. We're done.
       ++CachedReuseCount;
       return;
@@ -307,6 +312,9 @@ void CompileInstance::performSema(
     return;
   }
 
+  CI->addDiagnosticConsumer(DiagC);
+  SWIFT_DEFER { CI->removeDiagnosticConsumer(DiagC); };
+
   // CI is potentially reusable.
   CachedArgHash = ArgsHash;
 
@@ -321,11 +329,18 @@ bool CompileInstance::performCompile(
     DiagnosticConsumer *DiagC,
     std::shared_ptr<std::atomic<bool>> CancellationFlag) {
 
+  // Cancellation check. This gives a chance to cancel queued up requests before
+  // processing anything.
+  if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
+    return true;
+
   performSema(Args, fileSystem, DiagC, CancellationFlag);
   if (CI->getDiags().hadAnyError())
     return true;
 
-  // TODO: Cancellation check.
+  // Cancellation check after Sema.
+  if (CI->isCancellationRequested())
+    return true;
 
   int ReturnValue = 0;
   return performCompileStepsPostSema(*CI, ReturnValue, /*observer=*/nullptr);

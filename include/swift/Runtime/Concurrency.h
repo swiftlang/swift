@@ -17,9 +17,9 @@
 #ifndef SWIFT_RUNTIME_CONCURRENCY_H
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
+#include "swift/ABI/AsyncLet.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
-#include "swift/ABI/AsyncLet.h"
 #include "swift/ABI/TaskStatus.h"
 
 #pragma clang diagnostic push
@@ -466,40 +466,6 @@ void swift_asyncLet_consume_throwing(SWIFT_ASYNC_CONTEXT AsyncContext *,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_taskGroup_hasTaskGroupRecord();
 
-/// Add a status record to a task.  The record should not be
-/// modified while it is registered with a task.
-///
-/// This must be called synchronously with the task.
-///
-/// If the task is already cancelled, returns `false` but still adds
-/// the status record.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_addStatusRecord(TaskStatusRecord *record);
-
-/// Add a status record to a task if the task has not already
-/// been cancelled.   The record should not be modified while it is
-/// registered with a task.
-///
-/// This must be called synchronously with the task.
-///
-/// If the task is already cancelled, returns `false` and does not
-/// add the status record.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_tryAddStatusRecord(TaskStatusRecord *record);
-
-/// Remove a status record from a task.  After this call returns,
-/// the record's memory can be freely modified or deallocated.
-///
-/// This must be called synchronously with the task.  The record must
-/// be registered with the task or else this may crash.
-///
-/// The given record need not be the last record added to
-/// the task, but the operation may be less efficient if not.
-///
-/// Returns false if the task has been cancelled.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_removeStatusRecord(TaskStatusRecord *record);
-
 /// Signifies whether the current task is in the middle of executing the
 /// operation block of a `with(Throwing)TaskGroup(...) { <operation> }`.
 ///
@@ -509,23 +475,24 @@ bool swift_task_removeStatusRecord(TaskStatusRecord *record);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_hasTaskGroupStatusRecord();
 
-/// Attach a child task to its parent task and return the newly created
-/// `ChildTaskStatusRecord`.
-///
-/// The record must be removed with by the parent invoking
-/// `swift_task_detachChild` when the child has completed.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ChildTaskStatusRecord* swift_task_attachChild(AsyncTask *child);
-
-/// Remove a child task from the parent tracking it.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_detachChild(ChildTaskStatusRecord *record);
-
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
+
+/// Returns the current priority of the task which is >= base priority of the
+/// task. This function does not exist in the base ABI of this library and must
+/// be deployment limited
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+JobPriority
+swift_task_currentPriority(AsyncTask *task);
+
+/// Returns the base priority of the task. This function does not exist in the
+/// base ABI of this library and must be deployment limited.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+JobPriority
+swift_task_basePriority(AsyncTask *task);
 
 /// Create and add an cancellation record to the task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/mangle_conformance_access_path_helper.swift -emit-module-path %t/mangle_conformance_access_path_helper.swiftmodule
-// RUN: %target-swift-frontend -emit-silgen %s -I %t -requirement-machine=verify | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -I %t | %FileCheck %s
 
 import mangle_conformance_access_path_helper
 

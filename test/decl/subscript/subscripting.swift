@@ -222,11 +222,17 @@ struct RetOverloadedSubscript {
 
 struct MissingGetterSubscript1 {
   subscript (i : Int) -> Int {
-  } // expected-error {{subscript must have accessors specified}}
+  } // expected-error {{missing return in subscript expected to return 'Int'}}
 }
 struct MissingGetterSubscript2 {
   subscript (i : Int, j : Int) -> Int {
     set {} // expected-error{{subscript with a setter must also have a getter}}
+  }
+}
+
+struct MissingReturnTypeAndEmptyBodySubscript {
+  subscript(i: Int) { // expected-error{{expected '->' for subscript element type}}
+  // expected-error@-1{{expected subscripting element type}}
   }
 }
 

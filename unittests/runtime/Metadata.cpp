@@ -13,8 +13,6 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Concurrent.h"
-#include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Once.h"
 #include "gtest/gtest.h"
 #include <iterator>

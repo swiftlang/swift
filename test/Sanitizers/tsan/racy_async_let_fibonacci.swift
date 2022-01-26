@@ -14,6 +14,9 @@
 // rdar://75365575 (Failing to start atos external symbolizer)
 // UNSUPPORTED: OS=watchos
 
+// rdar://86825277
+// UNSUPPORTED: CPU=arm64e
+
 func fib(_ n: Int) -> Int {
   var first = 0
   var second = 1
