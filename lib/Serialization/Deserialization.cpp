@@ -6322,6 +6322,34 @@ Decl *handleErrorAndSupplyMissingMember(ASTContext &context, Decl *container,
   return handleErrorAndSupplyMissingMiscMember(std::move(error));
 }
 
+static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error) {
+    // Missing module errors are most likely caused by an
+    // implementation-only import hiding types and decls.
+    // rdar://problem/60291019
+    if (error.isA<XRefNonLoadedModuleError>()) {
+      consumeError(std::move(error));
+      return llvm::Error::success();
+    }
+
+    // Some of these errors may manifest as a TypeError with an
+    // XRefNonLoadedModuleError underneath. Catch those as well.
+    // rdar://66491720
+    if (error.isA<TypeError>()) {
+      auto errorInfo = takeErrorInfo(std::move(error));
+      auto *TE = static_cast<TypeError*>(errorInfo.get());
+
+      if (TE->underlyingReasonIsA<XRefNonLoadedModuleError>()) {
+        consumeError(std::move(errorInfo));
+        return llvm::Error::success();
+      }
+
+      return std::move(errorInfo);
+    }
+
+    return std::move(error);
+}
+
+
 void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   PrettyStackTraceDecl trace("loading members for", container);
   ++NumMemberListsLoaded;
@@ -6359,13 +6387,17 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
       assert(next.get() && "unchecked error deserializing next member");
       members.push_back(next.get());
     } else {
-      if (!getContext().LangOpts.EnableDeserializationRecovery)
-        fatal(next.takeError());
+      auto unconsumedError =
+          consumeErrorIfXRefNonLoadedModule(next.takeError());
+      if (unconsumedError) {
+        if (!getContext().LangOpts.EnableDeserializationRecovery)
+          fatal(std::move(unconsumedError));
 
-      Decl *suppliedMissingMember = handleErrorAndSupplyMissingMember(
-          getContext(), container, next.takeError());
-      if (suppliedMissingMember)
-        members.push_back(suppliedMissingMember);
+        Decl *suppliedMissingMember = handleErrorAndSupplyMissingMember(
+            getContext(), container, std::move(unconsumedError));
+        if (suppliedMissingMember)
+          members.push_back(suppliedMissingMember);
+      }
     }
   }
 
@@ -6385,33 +6417,6 @@ void ModuleFile::diagnoseMissingNamedMember(const IterableDeclContext *IDC,
   // TODO: Implement diagnostics for failed member lookups from module files.
   llvm_unreachable(
       "Missing member diangosis is not implemented for module files.");
-}
-
-static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error) {
-    // Missing module errors are most likely caused by an
-    // implementation-only import hiding types and decls.
-    // rdar://problem/60291019
-    if (error.isA<XRefNonLoadedModuleError>()) {
-      consumeError(std::move(error));
-      return llvm::Error::success();
-    }
-
-    // Some of these errors may manifest as a TypeError with an
-    // XRefNonLoadedModuleError underneath. Catch those as well.
-    // rdar://66491720
-    if (error.isA<TypeError>()) {
-      auto errorInfo = takeErrorInfo(std::move(error));
-      auto *TE = static_cast<TypeError*>(errorInfo.get());
-
-      if (TE->underlyingReasonIsA<XRefNonLoadedModuleError>()) {
-        consumeError(std::move(errorInfo));
-        return llvm::Error::success();
-      }
-
-      return std::move(errorInfo);
-    }
-
-    return std::move(error);
 }
 
 void
