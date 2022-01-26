@@ -22,7 +22,8 @@ struct FakeActorSystem: DistributedActorSystem {
   // expected-note@-2{{protocol 'FakeActorSystem' requires function 'remoteCall' with signature:}}
 
   typealias ActorID = ActorAddress
-  typealias Invocation = FakeInvocation
+  typealias InvocationDecoder = FakeInvocation
+  typealias InvocationEncoder = FakeInvocation
   typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
@@ -44,14 +45,12 @@ struct FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocation() -> Invocation {
-    .init()
+  func makeInvocationEncoder() -> InvocationEncoder {
   }
 
 }
 
-struct FakeInvocation: DistributedTargetInvocation {
-  typealias ArgumentDecoder = FakeArgumentDecoder
+struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
@@ -62,18 +61,13 @@ struct FakeInvocation: DistributedTargetInvocation {
 
   // === Receiving / decoding -------------------------------------------------
 
-  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  func makeArgumentDecoder() -> FakeArgumentDecoder { .init() }
-  mutating func decodeReturnType() throws -> Any.Type? { nil }
-  mutating func decodeErrorType() throws -> Any.Type? { nil }
-
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = FakeInvocation.SerializationRequirement
-    mutating func decodeNext<Argument>(
-      _ argumentType: Argument.Type,
-      into pointer: UnsafeMutablePointer<Argument>
-    ) throws {}
-  }
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func decodeNextArgument<Argument>(
+    _ argumentType: Argument.Type,
+    into pointer: UnsafeMutablePointer<Argument>
+  ) throws {}
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
 }
 
 @available(SwiftStdlib 5.5, *)

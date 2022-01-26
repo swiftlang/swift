@@ -1127,20 +1127,13 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           auto argTemp = emitTemporaryAllocation(loc, paramValue->getType());
           argValue = emitManagedBufferWithCleanup(argTemp);
 
-          fprintf(stderr, "[%s:%d] (%s) ----------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-          F.dump();
-          fprintf(stderr, "[%s:%d] (%s) ----------------------------\n", __FILE__, __LINE__, __FUNCTION__);
-
           if (paramValue->getType().isAddressOnly(F)) {
-            fprintf(stderr, "[%s:%d] (%s) createCopyAddr\n", __FILE__, __LINE__, __FUNCTION__);
             B.createCopyAddr(loc, paramValue, argTemp, IsNotTake, IsInitialization);
           } else {
             if (paramValue->getType().isAddress()) {
-              fprintf(stderr, "[%s:%d] (%s) createTrivialLoadOr\n", __FILE__, __LINE__, __FUNCTION__);
               paramValue = B.createTrivialLoadOr(loc, paramValue,
                                                  LoadOwnershipQualifier::Take);
             } else {
-              fprintf(stderr, "[%s:%d] (%s) emitCopyValueOperation\n", __FILE__, __LINE__, __FUNCTION__);
               paramValue = B.emitCopyValueOperation(loc, paramValue);
             }
 
