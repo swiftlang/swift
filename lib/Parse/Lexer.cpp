@@ -1992,26 +1992,12 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart,
     return T.isAny(tok::l_angle, tok::l_brace, tok::l_paren, tok::l_square,
                    tok::oper_prefix, tok::amp_prefix, tok::period_prefix);
   };
-  auto isValidNextTok = [&](const Token &T) -> bool {
-    if (isSequencedWithExpr(T))
-      return true;
-    return T.isAny(tok::r_angle, tok::r_brace, tok::r_paren, tok::r_square,
-                   tok::oper_postfix, tok::exclaim_postfix,
-                   tok::question_postfix);
-  };
 
-  bool CheckTrailingTok = false;
   if (LeadingTriviaStart != BufferStart) {
     auto PrevToken = NextToken;
     assert(!PrevToken.is(tok::NUM_TOKENS) && "Need access to previous token");
-    if (!isValidPreviousTok(PrevToken)) {
-      // We can forgive an unsuitable previous token if we're starting a
-      // new line. However, we'll need to make sure the trailing token is
-      // suitable.
-      if (!NextToken.isAtStartOfLine())
-        return bail();
-      CheckTrailingTok = true;
-    }
+    if (!NextToken.isAtStartOfLine() && !isValidPreviousTok(PrevToken))
+      return bail();
   }
 
   while (true) {
@@ -2035,14 +2021,6 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart,
   if (*CurPtr == '*' || *CurPtr == '/')
     return bail();
 
-  // If we need to validate the trailing token, do so.
-  if (CheckTrailingTok) {
-    // Okay yes this is awful.
-    Lexer NextLexer(*this, LexerState(SourceLoc(llvm::SMLoc::getFromPointer(CurPtr))),
-                    LexerState(SourceLoc(llvm::SMLoc::getFromPointer(BufferEnd))));
-    if (!isValidNextTok(NextLexer.NextToken))
-      return bail();
-  }
   formToken(tok::regex_literal, TokStart);
   return true;
 }
