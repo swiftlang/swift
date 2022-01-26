@@ -676,6 +676,9 @@ public:
   /// If \p fn returns true, exits early and returns true.
   bool forEachFileToTypeCheck(llvm::function_ref<bool(SourceFile &)> fn);
 
+  /// Whether the cancellation of the current operation has been requested.
+  bool isCancellationRequested() const;
+
 private:
   /// Compute the parsing options for a source file in the main module.
   SourceFile::ParsingOptions getSourceFileParsingOptions(bool forPrimary) const;

@@ -470,7 +470,16 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     replacedFunctionID =
         S.addUniquedStringRef(F.getObjCReplacement().str());
   }
-  unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
+
+  unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
+
+  auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
+  F.visitArgEffects(
+    [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
+      if (isDerived && resilience == ResilienceStrategy::Resilient)
+        return;
+      numAttrs++;
+    });
 
   Optional<llvm::VersionTuple> available;
   auto availability = F.getAvailabilityForLinkage();
@@ -487,11 +496,27 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(),
       (unsigned)F.hasCReferences(), (unsigned)F.getEffectsKind(),
-      (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
+      (unsigned)numAttrs, (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
       (unsigned)F.isDynamicallyReplaceable(), (unsigned)F.isExactSelfClass(),
       (unsigned)F.isDistributed(), FnID, replacedFunctionID, genericSigID,
       clangNodeOwnerID, SemanticsIDs);
+
+  F.visitArgEffects(
+    [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
+      if (isDerived && resilience == ResilienceStrategy::Resilient)
+        return;
+
+      llvm::SmallString<64> buffer;
+      llvm::raw_svector_ostream OS(buffer);
+      F.writeEffect(OS, effectIdx);
+
+      IdentifierID effectsStrID = S.addUniquedStringRef(OS.str());
+      unsigned abbrCode = SILAbbrCodes[SILArgEffectsAttrLayout::Code];
+
+      SILArgEffectsAttrLayout::emitRecord(
+          Out, ScratchRecord, abbrCode, effectsStrID, (unsigned)isDerived);
+    });
 
   if (NoBody)
     return;
@@ -2832,6 +2857,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILTwoOperandsLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
   registerSILAbbr<SILSpecializeAttrLayout>();
+  registerSILAbbr<SILArgEffectsAttrLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionLayout>();
   registerSILAbbr<SILInstLinearFunctionLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
@@ -2948,12 +2974,19 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Now write function declarations for every function we've
   // emitted a reference to without emitting a function body for.
+  auto resilience = SILMod->getSwiftModule()->getResilienceStrategy();
   for (const SILFunction &F : *SILMod) {
     auto iter = FuncsToEmit.find(&F);
-    if (iter != FuncsToEmit.end() && iter->second) {
-      assert((emitDeclarationsForOnoneSupport ||
-              !shouldEmitFunctionBody(&F)) &&
-             "Should have emitted function body earlier");
+    if (iter != FuncsToEmit.end()) {
+      if (iter->second) {
+        assert((emitDeclarationsForOnoneSupport ||
+                !shouldEmitFunctionBody(&F)) &&
+               "Should have emitted function body earlier");
+        writeSILFunction(F, true);
+      }
+    } else if (F.getLinkage() == SILLinkage::Public &&
+               resilience != ResilienceStrategy::Resilient &&
+               F.hasArgumentEffects()) {
       writeSILFunction(F, true);
     }
   }

@@ -44,21 +44,6 @@ namespace rewriting {
 class MutableTerm;
 class Term;
 
-/// A new rule introduced during property map construction, as a result of
-/// unifying two property symbols that apply to the same common suffix term.
-struct InducedRule {
-  MutableTerm LHS;
-  MutableTerm RHS;
-  RewritePath Path;
-
-  InducedRule(MutableTerm LHS, MutableTerm RHS, RewritePath Path)
-    : LHS(LHS), RHS(RHS), Path(Path) {}
-
-  // FIXME: Eventually all induced rules will have a rewrite path.
-  InducedRule(MutableTerm LHS, MutableTerm RHS)
-    : LHS(LHS), RHS(RHS) {}
-};
-
 /// Stores a convenient representation of all "property-like" rewrite rules of
 /// the form T.[p] => T, where [p] is a property symbol, for some term 'T'.
 class PropertyBag {
@@ -258,14 +243,11 @@ private:
   bool checkRuleOnce(unsigned ruleID);
   bool checkRulePairOnce(unsigned firstRuleID, unsigned secondRuleID);
 
-  void addProperty(Term key, Symbol property, unsigned ruleID,
-                   SmallVectorImpl<InducedRule> &inducedRules);
+  void addProperty(Term key, Symbol property, unsigned ruleID);
 
-  void checkConcreteTypeRequirements(
-                   SmallVectorImpl<InducedRule> &inducedRules);
+  void checkConcreteTypeRequirements();
 
-  void concretizeNestedTypesFromConcreteParents(
-                   SmallVectorImpl<InducedRule> &inducedRules);
+  void concretizeNestedTypesFromConcreteParents();
 
   void concretizeNestedTypesFromConcreteParent(
                    Term key, RequirementKind requirementKind,
@@ -274,15 +256,17 @@ private:
                    ArrayRef<Term> substitutions,
                    ArrayRef<unsigned> conformsToRules,
                    ArrayRef<const ProtocolDecl *> conformsTo,
-                   llvm::TinyPtrVector<ProtocolConformance *> &conformances,
-                   SmallVectorImpl<InducedRule> &inducedRules);
+                   llvm::TinyPtrVector<ProtocolConformance *> &conformances);
 
   void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
                    Symbol concreteConformanceSymbol,
                    ProtocolConformance *concrete,
-                   AssociatedTypeDecl *assocType,
-                   SmallVectorImpl<InducedRule> &inducedRules) const;
+                   AssociatedTypeDecl *assocType) const;
+
+  void inferConditionalRequirements(
+                   ProtocolConformance *concrete,
+                   ArrayRef<Term> substitutions) const;
 
   MutableTerm computeConstraintTermForTypeWitness(
       Term key, RequirementKind requirementKind,
@@ -295,8 +279,7 @@ private:
     unsigned concreteRuleID,
     unsigned conformanceRuleID,
     RequirementKind requirementKind,
-    Symbol concreteConformanceSymbol,
-    SmallVectorImpl<InducedRule> &inducedRules) const;
+    Symbol concreteConformanceSymbol) const;
 
   void verify() const;
 };

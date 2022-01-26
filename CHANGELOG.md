@@ -3,7 +3,7 @@ CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
-## Swift Next
+## Swift 5.7
 
 * [SE-0328][]:
 
@@ -11,7 +11,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   within a result type, including having multiple opaque types in the same
   result. For example:
 
-  ```
+  ```swift
   func getSomeDictionary() -> [some Hashable: some Codable] {
     return [ 1: "One", 2: "Two" ]
   }

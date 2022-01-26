@@ -66,6 +66,10 @@ ATTRIBUTE_NODES = [
                              kind='DerivativeRegistrationAttributeArguments'),
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
+                       # TokenList for custom effects which are parsed by
+                       # `FunctionEffects.parse()` in swift.
+                       Child('TokenList', kind='TokenList',
+                             collection_element_name='Token'),
                    ], description='''
                    The arguments of the attribute. In case the attribute
                    takes multiple arguments, they are gather in the

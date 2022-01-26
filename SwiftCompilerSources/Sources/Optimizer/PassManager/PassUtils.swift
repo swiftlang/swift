@@ -123,6 +123,11 @@ struct PassContext {
   func getContextSubstitutionMap(for type: Type) -> SubstitutionMap {
     SubstitutionMap(PassContext_getContextSubstitutionMap(_bridged, type.bridged))
   }
+
+  func modifyEffects(in function: Function, _ body: (inout FunctionEffects) -> ()) {
+    function._modifyEffects(body)
+    // TODO: do we need to notify any changes?
+  }
 }
 
 struct FunctionPass {

@@ -1,0 +1,11 @@
+// RUN: %target-sil-opt %s -run-unit-tests -o /dev/null
+
+// REQUIRES: swift_in_compiler
+
+// The RunUnitTests is a function pass. Therefore we need one function is this file to trigger the pass run.
+sil @trigger_test_run : $@convention(thin) () -> () {
+bb0:
+  %r = tuple()
+  return %r : $()
+}
+

@@ -1556,6 +1556,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILGeneration(*SM);
 
+  // Cancellation check after SILGen.
+  if (Instance.isCancellationRequested())
+    return true;
+
   auto *Stats = Instance.getASTContext().Stats;
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
@@ -1629,6 +1633,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (observer)
     observer->performedSILProcessing(*SM);
 
+  // Cancellation check after SILOptimzation.
+  if (Instance.isCancellationRequested())
+    return true;
+
   if (PSPs.haveModuleSummaryOutputPath()) {
     if (serializeModuleSummary(SM.get(), PSPs, Context)) {
       return true;
@@ -1663,6 +1671,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
   runSILLoweringPasses(*SM);
 
+  // Cancellation check after SILLowering.
+  if (Instance.isCancellationRequested())
+    return true;
+
   // TODO: at this point we need to flush any the _tracing and profiling_
   // in the UnifiedStatsReporter, because the those subsystems of the USR
   // retain _pointers into_ the SILModule, and the SILModule's lifecycle is
@@ -1689,6 +1701,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   auto IRModule = generateIR(
       IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
       OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
+
+  // Cancellation check after IRGen.
+  if (Instance.isCancellationRequested())
+    return true;
 
   // If no IRModule is available, bail. This can either happen if IR generation
   // fails, or if parallelIRGen happened correctly (in which case it would have

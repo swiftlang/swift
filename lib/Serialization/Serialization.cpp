@@ -900,6 +900,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY);
   BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
   BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
+  BLOCK_RECORD(sil_block, SIL_ARG_EFFECTS_ATTR);
   BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
@@ -2520,11 +2521,24 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_Exclusivity: {
+      auto *theAttr = cast<ExclusivityAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ExclusivityDeclAttrLayout::Code];
+      ExclusivityDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                            (unsigned)theAttr->getMode());
+      return;
+    }
+
     case DAK_Effects: {
       auto *theAttr = cast<EffectsAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[EffectsDeclAttrLayout::Code];
+      IdentifierID customStringID = 0;
+      if (theAttr->getKind() == EffectsKind::Custom) {
+        customStringID = S.addUniquedStringRef(theAttr->getCustomString());
+      }
       EffectsDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                       (unsigned)theAttr->getKind());
+                                        (unsigned)theAttr->getKind(),
+                                        customStringID);
       return;
     }
 

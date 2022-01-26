@@ -499,6 +499,11 @@ public:
   /// associated types, or type parameters that have been made concrete.
   CanType getCanonicalType(GenericSignature sig);
 
+  /// Canonical protocol composition types are minimized only to a certain
+  /// degree to preserve ABI compatibility. This routine enables performing
+  /// slower, but stricter minimization at need (e.g. redeclaration checking).
+  CanType getMinimalCanonicalType() const;
+
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
   TypeBase *reconstituteSugar(bool Recursive);
@@ -5175,7 +5180,12 @@ public:
   /// given set of members.
   static Type get(const ASTContext &C, ArrayRef<Type> Members,
                   bool HasExplicitAnyObject);
-  
+
+  /// Canonical protocol composition types are minimized only to a certain
+  /// degree to preserve ABI compatibility. This routine enables performing
+  /// slower, but stricter minimization at need (e.g. redeclaration checking).
+  CanType getMinimalCanonicalType() const;
+
   /// Retrieve the set of members composed to create this type.
   ///
   /// For non-canonical types, this can contain classes, protocols and
@@ -5598,15 +5608,21 @@ enum class OpaqueSubstitutionKind {
 /// archetypes with underlying types visible at a given resilience expansion
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
-public:
-  const DeclContext *inContext;
   ResilienceExpansion contextExpansion;
-  bool isContextWholeModule;
+  llvm::PointerIntPair<const DeclContext *, 1, bool> inContextAndIsWholeModule;
+  llvm::SmallPtrSetImpl<OpaqueTypeDecl *> *seenDecls;
+
+public:
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
                                         ResilienceExpansion contextExpansion,
                                         bool isWholeModuleContext)
-      : inContext(inContext), contextExpansion(contextExpansion),
-        isContextWholeModule(isWholeModuleContext) {}
+      : contextExpansion(contextExpansion),
+        inContextAndIsWholeModule(inContext, isWholeModuleContext),
+        seenDecls(nullptr) {}
+
+  ReplaceOpaqueTypesWithUnderlyingTypes(
+      const DeclContext *inContext, ResilienceExpansion contextExpansion,
+      bool isWholeModuleContext, llvm::SmallPtrSetImpl<OpaqueTypeDecl *> &seen);
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -5622,6 +5638,13 @@ public:
   static OpaqueSubstitutionKind
   shouldPerformSubstitution(OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
                             ResilienceExpansion contextExpansion);
+
+private:
+  const DeclContext *getContext() const {
+    return inContextAndIsWholeModule.getPointer();
+  }
+
+  bool isWholeModule() const { return inContextAndIsWholeModule.getInt(); }
 };
 
 /// An archetype that represents the dynamic type of an opened existential.

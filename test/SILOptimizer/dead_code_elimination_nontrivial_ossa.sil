@@ -938,3 +938,37 @@ exit(%lifetime_2 : @guaranteed $Klass, %struct_lifetime_2 : @guaranteed $NonTriv
   %retval = tuple ()
   return %retval : $()
 }
+
+sil [ossa] @testBorrowedSwitch : $@convention(thin) (Optional<@sil_unmanaged AnyObject>) -> () {
+bb0(%0 : $Optional<@sil_unmanaged AnyObject>):
+  switch_enum %0 : $Optional<@sil_unmanaged AnyObject>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%2 : $@sil_unmanaged AnyObject):
+  %3 = unmanaged_to_ref %2 : $@sil_unmanaged AnyObject to $AnyObject
+  %4 = unchecked_ownership_conversion %3 : $AnyObject, @unowned to @guaranteed
+  %5 = begin_borrow [lexical] %4 : $AnyObject
+  end_borrow %5 : $AnyObject
+  end_borrow %4 : $AnyObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %242 = tuple ()
+  return %242 : $()
+}
+
+// rdar://87985420 - crash in nullptr returned by findGuaranteedReferenceRoots
+// Test that a boorrow scope introduced by unchecked_ownership_conversion is not
+// deleted by DCE.
+sil [ossa] @testUncheckedConvertToGuaranteed : $@convention(thin) (@sil_unmanaged AnyObject) -> () {
+bb0(%0 : $@sil_unmanaged AnyObject):
+  %3 = unmanaged_to_ref %0 : $@sil_unmanaged AnyObject to $AnyObject
+  %4 = unchecked_ownership_conversion %3 : $AnyObject, @unowned to @guaranteed
+  %5 = begin_borrow [lexical] %4 : $AnyObject
+  end_borrow %5 : $AnyObject
+  end_borrow %4 : $AnyObject
+  %242 = tuple ()
+  return %242 : $()
+}

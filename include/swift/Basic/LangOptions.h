@@ -484,7 +484,7 @@ namespace swift {
         ASTVerifierOverrideKind::NoOverride;
 
     /// Enables merged associated type support, which might go away.
-    bool RequirementMachineMergedAssociatedTypes = true;
+    bool RequirementMachineMergedAssociatedTypes = false;
 
     /// Enables dumping rewrite systems from the requirement machine.
     bool DumpRequirementMachine = false;

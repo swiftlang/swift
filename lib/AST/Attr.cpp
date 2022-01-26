@@ -883,8 +883,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
+  case DAK_Exclusivity:
   case DAK_NonSendable:
-    if (DeclAttribute::isDeclModifier(getKind())) {
+    if (getKind() == DAK_Effects &&
+        cast<EffectsAttr>(this)->getKind() == EffectsKind::Custom) {
+      Printer.printAttrName("@_effects");
+      Printer << "(" << cast<EffectsAttr>(this)->getCustomString() << ")";
+    } else if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
     } else if (Options.IsForSwiftInterface && getKind() == DAK_ResultBuilder) {
       // Use @_functionBuilder in Swift interfaces to maintain backward
@@ -1289,6 +1294,16 @@ StringRef DeclAttribute::getAttrName() const {
       llvm_unreachable("Invalid optimization kind");
     }
   }
+  case DAK_Exclusivity: {
+    switch (cast<ExclusivityAttr>(this)->getMode()) {
+    case ExclusivityAttr::Checked:
+      return "exclusivity(checked)";
+    case ExclusivityAttr::Unchecked:
+      return "exclusivity(unchecked)";
+    default:
+      llvm_unreachable("Invalid optimization kind");
+    }
+  }
   case DAK_Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
@@ -1301,6 +1316,8 @@ StringRef DeclAttribute::getAttrName() const {
         return "_effects(readwrite)";
       case EffectsKind::Unspecified:
         return "_effects(unspecified)";
+      case EffectsKind::Custom:
+        return "_effects";
     }
   case DAK_AccessControl:
   case DAK_SetterAccess: {
