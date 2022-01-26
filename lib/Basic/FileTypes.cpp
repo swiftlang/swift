@@ -74,6 +74,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_RawSIL:
   case file_types::TY_LLVM_IR:
   case file_types::TY_ObjCHeader:
+  case file_types::TY_CXXHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_ImportedModules:
   case file_types::TY_TBD:
@@ -132,6 +133,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
   case file_types::TY_ObjCHeader:
+  case file_types::TY_CXXHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_Image:
   case file_types::TY_dSYM:
@@ -182,6 +184,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_Object:
   case file_types::TY_Dependencies:
   case file_types::TY_ObjCHeader:
+  case file_types::TY_CXXHeader:
   case file_types::TY_AutolinkFile:
   case file_types::TY_PCH:
   case file_types::TY_ImportedModules:
