@@ -902,3 +902,17 @@ function(set_swift_llvm_is_available name)
   target_compile_definitions(${name} PRIVATE
     $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SWIFT_LLVM_SUPPORT_IS_AVAILABLE>)
 endfunction()
+
+# Given the conditions to check to apply the linker flags
+# are not trivial and can be easily forgotten,
+# we preferred to provide a function to configure the targets
+# that on Darwin can skip the IR optimizations when
+# linking with ThinLTO
+function(target_thinlto_ld64_add_flto_codegen_only target)
+  if (SWIFT_TOOLS_ENABLE_LTO STREQUAL "thin" AND
+      LLVM_LINKER_IS_LD64 AND
+      SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS
+      )
+    target_link_options(${target} PRIVATE "LINKER:-flto-codegen-only")
+  endif()
+endfunction()

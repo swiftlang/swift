@@ -13,3 +13,4 @@ if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swift-frontend clang-resource-headers)
 endif()
 
+target_thinlto_ld64_add_flto_codegen_only(swift-remoteast-test)

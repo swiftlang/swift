@@ -8,3 +8,4 @@ target_link_libraries(swift-dependency-tool
                         swiftParse
                         swiftClangImporter)
 
+target_thinlto_ld64_add_flto_codegen_only(swift-dependency-tool)

@@ -9,3 +9,5 @@ target_link_libraries(swift-ast-script
                       PRIVATE
                         swiftAST
                         swiftFrontendTool)
+
+target_thinlto_ld64_add_flto_codegen_only(swift-ast-script)

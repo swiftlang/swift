@@ -21,6 +21,8 @@ if(LLVM_ENABLE_LIBXML2)
   endif()
 endif()
 
+target_thinlto_ld64_add_flto_codegen_only(swift-ide-test)
+
 # Create a symlink for swift-api-dump.py in the bin directory
 swift_create_post_build_symlink(swift-ide-test
   SOURCE "${SWIFT_SOURCE_DIR}/utils/swift-api-dump.py"
