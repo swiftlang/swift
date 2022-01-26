@@ -213,6 +213,16 @@ BridgedType SILFunction_getSILResultType(BridgedFunction function) {
   return {resTy.getOpaqueValue()};
 }
 
+SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  if (f->getResilienceExpansion() != ResilienceExpansion::Maximal)
+    return 0;
+
+  ASTContext &ctxt = f->getModule().getASTContext();
+  return AvailabilityContext::forDeploymentTarget(ctxt).isContainedIn(
+    ctxt.getSwift51Availability());
+}
+
 //===----------------------------------------------------------------------===//
 //                               SILBasicBlock
 //===----------------------------------------------------------------------===//
