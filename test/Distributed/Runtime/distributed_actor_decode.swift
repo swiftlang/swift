@@ -11,7 +11,6 @@ import _Distributed
 
 distributed actor DA: CustomStringConvertible {
   typealias ActorSystem = FakeActorSystem
-//  typealias ID = FakeActorSystem.ActorID
 
   nonisolated var description: String {
     "DA(\(self.id))"

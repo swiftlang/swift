@@ -917,8 +917,19 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       if (systemLoaded->getType().isAddress())
         B.createEndLifetime(loc, systemLoaded);
 
-      B.createStore(loc, invocationEncoderValue, invocationEncoder.getValue(),
-                    StoreOwnershipQualifier::Init);
+      // FIXME(distributed): cannot deal with class yet
+      // TODO(distributed): make into "emit apropriate store"
+      if (invocationEncoderTy.isTrivial(F)) {
+        B.createTrivialStoreOr(loc,
+                               /*src=*/invocationEncoderValue,
+                               /*dest=*/invocationEncoder.getValue(),
+                               StoreOwnershipQualifier::Init);
+      } else {
+        B.createStore(loc,
+                      /*src=*/invocationEncoderValue,
+                      /*dest=*/invocationEncoder.getValue(),
+                      StoreOwnershipQualifier::Init);
+      }
     }
 
     // === -------------------------------------------------------------------
