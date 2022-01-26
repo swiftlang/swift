@@ -883,22 +883,41 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     // var encoder = actorSystem.makeInvocationEncoder()
     SILValue invocationEncoderBuf;
     ManagedValue invocationEncoder;
+
+    SILValue actorSystemBuf;
+    ManagedValue actorSystem;
     {
       invocationEncoderBuf = emitTemporaryAllocation(loc, invocationEncoderTy);
       invocationEncoder = emitManagedBufferWithCleanup(invocationEncoderBuf);
+
       // === get the actorSystem property
       // %16 = ref_element_addr %2 : $MyDistActor, #MyDistActor.actorSystem // user: %17
       auto systemRef = emitActorPropertyReference(
           *this, loc, selfValue.getValue(),
           lookupProperty(selfTyDecl, ctx.Id_actorSystem));
-      // %17 = load %16 : $*FakeActorSystem // users: %21, %20, %18
-//      auto systemLoaded = emitSimpleLoad(*this, loc, systemRef);
-      // auto systemLoaded = emitLoad(loc, systemRef, getTypeLowering(invocationEncoderTy), SGFContext(), IsNotTake);
-//      auto systemLoaded = B.createLoad(loc, systemRef, );
-      auto systemLoaded = B.createTrivialLoadOr(loc, systemRef, LoadOwnershipQualifier::Copy, true);
 
-      // retain_value %17 : $FakeActorSystem // id: %18
-      // B.createRetainValue(loc, systemLoaded, RefCountingInst::Atomicity::Atomic);
+      auto actorSystemTy = systemRef->getType();
+
+      // FIXME: this is wrong for struct with values, and classes?
+      // %17 = load %16 : $*FakeActorSystem // users: %21, %20, %18
+      SILValue systemLoaded;
+      if (actorSystemTy.isAddressOnly(F)) {
+        assert(false && "isAddressOnly");
+      } else {
+        if (actorSystemTy.isAddress()) {
+          systemLoaded = B.createTrivialLoadOr(
+              loc, systemRef, LoadOwnershipQualifier::Copy);
+        } else {
+          assert(false);
+        }
+      }
+
+//            if (!actorSystemTy.isAddressOnly(F) &&
+//                !actorSystemTy.isTrivial(F)) {
+//              // retain_value %17 : $FakeActorSystem // id: %18
+//              B.createRetainValue(loc, systemLoaded,
+//                                  RefCountingInst::Atomicity::Atomic);
+//            }
 
       // function_ref FakeActorSystem.makeInvocationEncoder()
       // %19 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV21makeInvocationEncoderAA0aG0VyF : $@convention(method) (@guaranteed FakeActorSystem) -> FakeInvocation // user: %20
@@ -913,9 +932,9 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           /*subs=*/SubstitutionMap(),
           /*args=*/{systemLoaded});
 
-      // B.emitReleaseValue(loc, systemLoaded);
-      if (systemLoaded->getType().isAddress())
-        B.createEndLifetime(loc, systemLoaded);
+      if (!systemLoaded->getType().isTrivial(F))
+        B.createDestroyValue(loc, systemLoaded);
+        // B.createEndLifetime(loc, systemLoaded);
 
       // FIXME(distributed): cannot deal with class yet
       // TODO(distributed): make into "emit apropriate store"
@@ -1111,19 +1130,12 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         // === Prepare the argument
         SILType argType = paramValue->getType();
         if (paramValue->getType().hasArchetype()) {
-          fprintf(stderr, "[%s:%d] (%s) HAS ARCHETYPE\n", __FILE__, __LINE__, __FUNCTION__);
-          auto out = paramValue->getType().mapTypeOutOfContext();
-          out.dump();
-          argType = out;
+          argType = paramValue->getType().mapTypeOutOfContext();
         }
 
+        // FIXME: something is off here
         llvm::Optional<ManagedValue> argValue;
         {
-          fprintf(stderr, "[%s:%d] (%s) paramValue->getType()\n", __FILE__, __LINE__, __FUNCTION__);
-          paramValue->getType().dump();
-          paramValue->getType().getASTType().dump();
-          getLoweredType(paramValue->getType().getASTType()).dump();
-
           auto argTemp = emitTemporaryAllocation(loc, paramValue->getType());
           argValue = emitManagedBufferWithCleanup(argTemp);
 
@@ -1140,7 +1152,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
             B.emitStoreValueOperation(loc, paramValue, argTemp,
                                       StoreOwnershipQualifier::Init);
           }
-
         }
 
         // === Prepare generic signature
@@ -1424,7 +1435,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto systemRef = emitActorPropertyReference(
           *this, loc, selfValue.getValue(),
           lookupProperty(selfTyDecl, ctx.Id_actorSystem));
-      remoteCallSystemSelf = B.createTrivialLoadOr(loc, systemRef, LoadOwnershipQualifier::Copy, true);
+      remoteCallSystemSelf = B.createTrivialLoadOr(loc, systemRef, LoadOwnershipQualifier::Copy);
 
       // --- Prepare 'throwing' type, Error or Never depending on throws of the target
       SILValue thrownErrorMetatypeValue;
@@ -1560,8 +1571,12 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       B.createDestroyAddr(loc, result);
 //      B.createDeallocStack(loc, result);
 
+      // FIXME: these are very hacky, how to do properly?
+      if (!remoteCallSystemSelf->getType().isTrivial(F))
+        B.createDestroyValue(loc, remoteCallSystemSelf);
       if (remoteCallSystemSelf->getType().isAddress())
         B.createEndLifetime(loc, remoteCallSystemSelf);
+
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
       Cleanups.emitCleanupsForReturn(CleanupLocation(loc), NotForUnwind);
       B.createBranch(loc, returnBB, {resultLoaded});
@@ -1578,17 +1593,14 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
       auto result = remoteCallReturnValue.getValue();
 
-      auto methodTy =
-          SGM.Types.getConstantOverrideType(getTypeExpansionContext(), thunk);
-      auto derivativeFnSILTy = SILType::getPrimitiveObjectType(methodTy);
-      auto silFnType = derivativeFnSILTy.castTo<SILFunctionType>();
-      SILFunctionConventions fnConv(silFnType, SGM.M);
-
-
+      // FIXME: this should be done by emitting the block, before we create the buffer, this way the cleanup won't be here to be flushed yet
 //      B.createDeallocStack(loc, result); // FIXME: the reason this is manual is because I could not figure out how to NOT destroy_addr the result on this error exit path
 
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
 
+      // FIXME: these are very hacky, how to do properly?
+      if (!remoteCallSystemSelf->getType().isTrivial(F))
+        B.createDestroyValue(loc, remoteCallSystemSelf);
       if (remoteCallSystemSelf->getType().isAddress())
         B.createEndLifetime(loc, remoteCallSystemSelf);
 
@@ -1616,10 +1628,4 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
     B.createThrow(loc, error);
   }
-
-  fprintf(stderr, "[%s:%d] (%s) ===========================================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ===========================================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  F.dump();
-  fprintf(stderr, "[%s:%d] (%s) ===========================================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ===========================================================================\n", __FILE__, __LINE__, __FUNCTION__);
 }
