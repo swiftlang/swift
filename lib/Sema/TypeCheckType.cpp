@@ -3892,6 +3892,10 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
   if (constraintType->is<ExistentialMetatypeType>())
     return constraintType;
 
+  // If we already failed, don't diagnose again.
+  if (constraintType->hasError())
+    return ErrorType::get(getASTContext());
+
   auto anyStart = repr->getAnyLoc();
   auto anyEnd = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, anyStart);
   if (!constraintType->isExistentialType()) {
