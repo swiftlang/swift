@@ -1091,6 +1091,24 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Obtain the invocation decoder associated with the given distributed actor.
+class GetDistributedActorInvocationDecoderRequest :
+  public SimpleRequest<GetDistributedActorInvocationDecoderRequest,
+                       NominalTypeDecl *(NominalTypeDecl *),
+                       RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///
