@@ -299,7 +299,8 @@ extension Task where Success == Never, Failure == Never {
   internal static func _sleep(
     until seconds: Int64, _ nanoseconds: Int64, 
     tolerance: Duration?, 
-    clock: swift_clock_id) async throws {
+    clock: swift_clock_id
+  ) async throws {
     // Allocate storage for the storage word.
     let wordPtr = UnsafeMutablePointer<Builtin.Word>.allocate(capacity: 1)
 
