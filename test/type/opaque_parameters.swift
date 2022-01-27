@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-opaque-parameters -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-opaque-parameters -enable-parametrized-protocol-types -disable-availability-checking
 
 protocol P { }
 
@@ -49,4 +49,40 @@ func testTakeMultiple(
 ) {
   takeMultiple(d, arrayOfInts, i)
   takeMultiple(d, arrayOfInts, arrayOfInts) // expected-error{{global function 'takeMultiple' requires that '[Int]' conform to 'P'}}
+}
+
+// Combine with parameterized protocol types
+protocol PrimaryCollection: Collection {
+  @_primaryAssociatedType associatedtype Element
+}
+
+extension Array: PrimaryCollection { }
+extension Set: PrimaryCollection { }
+
+func takePrimaryCollections(
+  _ strings: some PrimaryCollection<String>,
+  _ ints : some PrimaryCollection<Int>
+) {
+  for s in strings {
+    let _: String = s
+  }
+
+  for i in ints {
+    let _: Int = i
+  }
+}
+
+func takeMatchedPrimaryCollections<T: Equatable>(
+  _ first: some PrimaryCollection<T>, _ second: some PrimaryCollection<T>
+) -> Bool {
+  first.elementsEqual(second)
+}
+
+func testPrimaries(
+  arrayOfInts: [Int], setOfStrings: Set<String>, setOfInts: Set<Int>
+) {
+  takePrimaryCollections(setOfStrings, setOfInts)
+  takePrimaryCollections(setOfStrings, arrayOfInts)
+  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
+  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without more context}}
 }
