@@ -58,64 +58,6 @@ struct State {
   static constexpr unsigned NumStates = 2;
 };
 
-/// a ritzy wrapper for a SILInstruction* that includes a high-level description
-//struct NonIsolatedUse {
-//  // NOTE: these enum values correspond to messages in diagnostics
-//  enum Kind {
-//    Uncategorized = 0,
-//    SelfCopy = 1,
-//    InvokeFunc = 2,
-//  };
-//
-//  SILInstruction* inst;
-//  Kind kind;
-//
-//  NonIsolatedUse() : inst(nullptr), kind(Uncategorized) {}
-//  NonIsolatedUse(SILInstruction *i, Kind c) : inst(i), kind(c) {}
-//  NonIsolatedUse(std::pair<SILInstruction*, Kind> const& other) {
-//    inst = other.first;
-//    kind = other.second;
-//  }
-//
-//  /// Returns an ID corresponding to a selector in a diagnostic suitable
-//  /// for describing this use kind.
-//  unsigned descriptionID() const {
-//    return (unsigned)kind;
-//  }
-//
-//  /// Returns an identifier describing the subject of the use kind.
-//  DeclName descriptionSubject() const {
-//    switch (kind) {
-//      // subject is 'self'
-//      case SelfCopy:
-//      case Uncategorized: {
-//        auto &ctx = inst->getModule().getASTContext();
-//        return ctx.Id_self;
-//        break;
-//      }
-//
-//      // subject is the callee function
-//      case MethodCall:
-//      case ExplicitArgInCall: {
-//        auto apply = ApplySite::isa(inst);
-//        if (auto *fn = apply.getReferencedFunctionOrNull())
-//          if (auto *declCxt = fn->getDeclContext())
-//            if (auto *astDecl = dyn_cast<ValueDecl>(declCxt->getAsDecl()))
-//              return astDecl->getName();
-//      }
-//    };
-//  }
-//
-//  operator bool() const {
-//    return inst;
-//  }
-//
-//  void dump() const LLVM_ATTRIBUTE_USED {
-//    inst->dump();
-//    llvm::dbgs() << "(" << descriptionID() << ")\n";
-//  }
-//};
-
 /// Information gathered for analysis that is specific to a block.
 struct Info {
   using UseSet = SmallPtrSet<SILInstruction*, 8>;
@@ -827,10 +769,12 @@ void checkFlowIsolation(SILFunction *fn) {
   info.verifyIsolation();
 }
 
-/// The FlowIsolation pass performs flow-sensitive actor-isolation checking in the body of actor member
-/// functions that treat `self` as `nonisolated` after the first `nonisolated` use. This pass uses a simple
-/// forward dataflow analysis to track these changes and emits diagnostics if an isolated use of `self` appears
-/// when `self` may be `nonisolated` at that point in the function.
+/// The FlowIsolation pass performs flow-sensitive actor-isolation checking in
+/// the body of actor member functions that treat `self` as `nonisolated` after
+/// the first `nonisolated` use. This pass uses a simple forward dataflow
+/// analysis to track these changes and emits diagnostics if an isolated use of
+/// `self` appears when `self` may be `nonisolated` at that point in the
+/// function.
 class FlowIsolation : public SILFunctionTransform {
 
   /// The entry point to the checker.
