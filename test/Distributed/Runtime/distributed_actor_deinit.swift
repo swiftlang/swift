@@ -120,7 +120,6 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
 }
 
 struct FakeDistributedInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
-  typealias  ArgumentDecoder = FakeDistributedTargetInvocationArgumentDecoder
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws { }
@@ -146,10 +145,6 @@ struct FakeDistributedInvocation: DistributedTargetInvocationEncoder, Distribute
   func decodeErrorType() throws -> Any.Type? {
     nil
   }
-}
-
-struct FakeDistributedTargetInvocationArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-  typealias SerializationRequirement = Codable
 }
 
 typealias DefaultDistributedActorSystem = FakeActorSystem

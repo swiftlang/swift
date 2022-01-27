@@ -104,10 +104,6 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
   ) throws { /* ... */ }
   func decodeReturnType() throws -> Any.Type? { nil }
   func decodeErrorType() throws -> Any.Type? { nil }
-
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
-  }
 }
 
 @available(SwiftStdlib 5.5, *)

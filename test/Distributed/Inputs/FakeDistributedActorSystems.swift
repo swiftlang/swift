@@ -121,10 +121,6 @@ public struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTar
   ) throws { /* ... */ }
   public func decodeReturnType() throws -> Any.Type? { nil }
   public func decodeErrorType() throws -> Any.Type? { nil }
-
-  public struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    public typealias SerializationRequirement = Codable
-  }
 }
 
 // ==== Fake Roundtrip Transport -----------------------------------------------

@@ -466,15 +466,6 @@ public protocol DistributedTargetInvocationDecoder {
   func decodeReturnType() throws -> Any.Type?
 }
 
-///
-/// It will be called exactly `N` times where `N` is the known number of arguments
-/// to the target invocation.
-@available(SwiftStdlib 5.6, *)
-public protocol DistributedTargetInvocationArgumentDecoder {
-
-
-}
-
 @available(SwiftStdlib 5.6, *)
 public protocol DistributedTargetInvocationResultHandler {
   associatedtype SerializationRequirement
