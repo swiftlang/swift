@@ -872,7 +872,7 @@ public:
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
     _require(type1 == type2, complaint,
-             [&] { llvm::dbgs() << " " << type1 << "\n " << type2 << '\n'; });
+             [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
   }
 
   /// Require two function types to be ABI-compatible.
@@ -1641,10 +1641,6 @@ public:
 
     // Check that the arguments and result match.
     SILFunctionConventions substConv(substTy, F.getModule());
-    if (site.getArguments().size() != substConv.getNumSILArguments()) {
-      fprintf(stderr, "[%s:%d] (%s) site arguments size: %d\n", __FILE__, __LINE__, __FUNCTION__, site.getArguments().size());
-      fprintf(stderr, "[%s:%d] (%s) substConv.getNumSILArguments(): %d\n", __FILE__, __LINE__, __FUNCTION__, substConv.getNumSILArguments());
-    }
     require(site.getNumArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = site.getNumArguments(); i < size; ++i) {
