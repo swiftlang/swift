@@ -476,9 +476,7 @@ void RewriteSystem::simplifyLeftHandSides() {
 
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
-    if (rule.isLHSSimplified() ||
-        rule.isRHSSimplified() ||
-        rule.isSubstitutionSimplified())
+    if (rule.isLHSSimplified())
       continue;
 
     // First, see if the left hand side of this rule can be reduced using
@@ -494,9 +492,7 @@ void RewriteSystem::simplifyLeftHandSides() {
 
         // Ignore other deleted rules.
         const auto &otherRule = getRule(*otherRuleID);
-        if (otherRule.isLHSSimplified() ||
-            otherRule.isRHSSimplified() ||
-            otherRule.isSubstitutionSimplified())
+        if (otherRule.isLHSSimplified())
           continue;
 
         if (Debug.contains(DebugFlags::Completion)) {
@@ -523,9 +519,7 @@ void RewriteSystem::simplifyRightHandSides() {
 
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
-    if (rule.isLHSSimplified() ||
-        rule.isRHSSimplified() ||
-        rule.isSubstitutionSimplified())
+    if (rule.isRHSSimplified())
       continue;
 
     // Now, try to reduce the right hand side.
@@ -577,9 +571,7 @@ void RewriteSystem::simplifyRightHandSides() {
 void RewriteSystem::simplifyLeftHandSideSubstitutions() {
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
-    if (rule.isLHSSimplified() ||
-        rule.isRHSSimplified() ||
-        rule.isSubstitutionSimplified())
+    if (rule.isSubstitutionSimplified())
       continue;
 
     auto lhs = rule.getLHS();
