@@ -5304,7 +5304,7 @@ move_value
 
 ::
 
-   sil-instruction ::= 'move_value' sil-operand
+   sil-instruction ::= 'move_value' '[lexical]'? sil-operand
 
    %1 = move_value %0 : $@_moveOnly A
 
@@ -5326,6 +5326,9 @@ associated with a let binding).
 NOTE: This instruction is used in an experimental feature called 'move only
 values'. A move_value instruction is an instruction that introduces (or injects)
 a type `T` into the move only value space.
+
+The ``lexical`` attribute specifies that the value corresponds to a local
+variable in the Swift source.
 
 release_value
 `````````````
