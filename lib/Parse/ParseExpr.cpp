@@ -1627,7 +1627,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
     // 'any' followed by another identifier is an existential type.
     if (Tok.isContextualKeyword("any") &&
-        peekToken().is(tok::identifier)) {
+        peekToken().is(tok::identifier) &&
+        !peekToken().isAtStartOfLine()) {
       ParserResult<TypeRepr> ty = parseType();
       auto *typeExpr = new (Context) TypeExpr(ty.get());
       return makeParserResult(typeExpr);
