@@ -2778,40 +2778,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
 }
 
 void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
-  switch (Pat->getKind()) {
-  case PatternKind::Tuple:
-    for (auto &field : cast<TuplePattern>(Pat)->getElements())
-      checkPattern(field.getPattern(), Reason);
-    return;
-  case PatternKind::Paren:
-  case PatternKind::Typed:
-  case PatternKind::Binding:
-    return checkPattern(Pat->getSemanticsProvidingPattern(), Reason);
-  case PatternKind::Named:
-    return checkValueDecl(cast<NamedPattern>(Pat)->getDecl(), Reason);
-  case PatternKind::EnumElement: {
-    auto *OP = cast<EnumElementPattern>(Pat);
-    if (OP->hasSubPattern())
-      checkPattern(OP->getSubPattern(), Reason);
-    return;
-  }
-  case PatternKind::OptionalSome:
-    checkPattern(cast<OptionalSomePattern>(Pat)->getSubPattern(), Reason);
-    return;
-
-  case PatternKind::Is: {
-    auto *isPat = cast<IsPattern>(Pat);
-    if (isPat->hasSubPattern())
-      checkPattern(isPat->getSubPattern(), Reason);
-    return;
-  }
-
-  // Handle non-vars.
-  case PatternKind::Bool:
-  case PatternKind::Expr:
-  case PatternKind::Any:
-    return;
-  }
+  Pat->forEachVariable([&](VarDecl *VD) { checkValueDecl(VD, Reason); });
 }
 void FindLocalVal::checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
   if (!D)
