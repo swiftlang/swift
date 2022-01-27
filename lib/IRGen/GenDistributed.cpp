@@ -66,11 +66,6 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
 
 namespace {
 
-struct AllocationInfo {
-  unsigned ArgumentIdx;
-  StackAddress Addr;
-};
-
 struct ArgumentDecoderInfo {
   CanSILFunctionType Type;
   FunctionPointer Fn;
@@ -97,7 +92,7 @@ class DistributedAccessor {
   ArgumentDecoderInfo ArgumentDecoder;
 
   /// The list of all arguments that were allocated on the stack.
-  SmallVector<AllocationInfo, 4> AllocatedArguments;
+  SmallVector<StackAddress, 4> AllocatedArguments;
 
 public:
   DistributedAccessor(IRGenFunction &IGF, SILFunction *target,
@@ -106,33 +101,17 @@ public:
   void emit();
 
 private:
-  void computeArguments(llvm::Value *argumentBuffer,
-                        llvm::Value *argumentTypes,
-                        Explosion &arguments);
+  void decodeArguments(llvm::Value *decoder, llvm::Value *argumentTypes,
+                       Explosion &arguments);
 
-  /// Load an argument value from the given buffer \c argumentSlot
-  /// to the given explosion \c arguments. Type of the argument is
-  /// the same as parameter type.
-  ///
-  /// Returns a pair of aligned offset and value size.
-  std::pair<llvm::Value *, llvm::Value *>
-  loadArgument(unsigned argumentIdx,
-               llvm::Value *argumentSlot,
-               SILType paramType,
-               ParameterConvention convention,
-               Explosion &arguments);
-
-  /// Load an argument value from the given buffer \c argumentSlot
+  /// Load an argument value from the given decoder \c decoder
   /// to the given explosion \c arguments. Information describing
   /// the type of argument comes from runtime metadata.
   ///
   /// Returns a pair of aligned offset and value size.
-  std::pair<llvm::Value *, llvm::Value *>
-  loadArgument(unsigned argumentIdx,
-               llvm::Value *argumentSlot,
-               llvm::Value *argumentType,
-               const SILParameterInfo &param,
-               Explosion &arguments);
+  void decodeArgument(unsigned argumentIdx, llvm::Value *decoder,
+                      llvm::Value *argumentType, const SILParameterInfo &param,
+                      Explosion &arguments);
 
   /// Load witness table addresses (if any) from the given buffer
   /// into the given argument explosion.
@@ -261,9 +240,9 @@ DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
               FunctionPointer::BasicKind::AsyncFunctionPointer))),
       ArgumentDecoder(findArgumentDecoder(IGM, target)) {}
 
-void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
-                                           llvm::Value *argumentTypes,
-                                           Explosion &arguments) {
+void DistributedAccessor::decodeArguments(llvm::Value *decoder,
+                                          llvm::Value *argumentTypes,
+                                          Explosion &arguments) {
   auto fnType = Target->getLoweredFunctionType();
 
   // Cover all of the arguments except to `self` of the actor.
@@ -273,13 +252,6 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
   if (parameters.empty())
     return;
 
-  auto offset =
-      IGF.createAlloca(IGM.Int8PtrTy, IGM.getPointerAlignment(), "offset");
-  IGF.Builder.CreateLifetimeStart(offset, IGM.getPointerSize());
-
-  // Initialize "offset" with the address of the base of the argument buffer.
-  IGF.Builder.CreateStore(argumentBuffer, offset);
-
   // Cast type buffer to `swift.type**`
   argumentTypes =
       IGF.Builder.CreateBitCast(argumentTypes, IGM.TypeMetadataPtrPtrTy);
@@ -288,75 +260,78 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
     const auto &param = parameters[i];
     auto paramTy = param.getSILStorageInterfaceType();
 
-    // The size of the loaded argument value
-    llvm::Value *valueSize;
+    // Check whether the native representation is empty e.g.
+    // this happens for empty enums, and if so - continue to
+    // the next argument.
+    if (paramTy.isObject()) {
+      auto &typeInfo = IGM.getTypeInfo(paramTy);
+      auto &nativeSchema = typeInfo.nativeParameterValueSchema(IGM);
 
-    // Load current offset
-    llvm::Value *currentOffset = IGF.Builder.CreateLoad(offset, "elt_offset");
-
-    if (paramTy.hasTypeParameter()) {
-      auto offset =
-          Size(i * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
-      auto alignment =
-          IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
-
-      // Load metadata describing argument value from argument types buffer.
-      auto typeLoc = IGF.emitAddressAtOffset(
-          argumentTypes, Offset(offset), IGM.TypeMetadataPtrTy,
-          Alignment(alignment), "arg_type_loc");
-
-      auto *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
-
-      // Load argument value based using loaded type metadata.
-      std::tie(currentOffset, valueSize) =
-          loadArgument(i, currentOffset, argumentTy, param, arguments);
-    } else {
-      std::tie(currentOffset, valueSize) = loadArgument(
-          i, currentOffset, paramTy, param.getConvention(), arguments);
+      if (nativeSchema.empty())
+        continue;
     }
 
-    // Move the offset to the beginning of the next element, unless
-    // this is the last element
-    if (param != parameters.back()) {
-      llvm::Value *addr = IGF.Builder.CreatePtrToInt(currentOffset, IGM.IntPtrTy);
-      llvm::Value *nextOffset = IGF.Builder.CreateIntToPtr(
-          IGF.Builder.CreateAdd(addr, valueSize), IGM.Int8PtrTy);
-      IGF.Builder.CreateStore(nextOffset, offset);
-    }
+    auto offset =
+        Size(i * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
+    auto alignment = IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
+
+    // Load metadata describing argument value from argument types buffer.
+    auto typeLoc = IGF.emitAddressAtOffset(
+        argumentTypes, Offset(offset), IGM.TypeMetadataPtrTy,
+        Alignment(alignment), "arg_type_loc");
+
+    auto *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
+
+    // Decode and load argument value using loaded type metadata.
+    decodeArgument(i, decoder, argumentTy, param, arguments);
   }
-
-  IGF.Builder.CreateLifetimeEnd(offset, IGM.getPointerSize());
 }
 
-std::pair<llvm::Value *, llvm::Value *>
-DistributedAccessor::loadArgument(unsigned argumentIdx,
-                                  llvm::Value *argumentSlot,
-                                  llvm::Value *argumentType,
-                                  const SILParameterInfo &param,
-                                  Explosion &arguments) {
+void DistributedAccessor::decodeArgument(unsigned argumentIdx,
+                                         llvm::Value *decoder,
+                                         llvm::Value *argumentType,
+                                         const SILParameterInfo &param,
+                                         Explosion &arguments) {
+  auto &paramInfo = IGM.getTypeInfo(param.getSILStorageInterfaceType());
   // TODO: `emitLoad*` would actually load value witness table every
   // time it's called, which is sub-optimal but all of the APIs that
   // deal with value witness tables are currently hidden in GenOpaque.cpp
   llvm::Value *valueSize = emitLoadOfSize(IGF, argumentType);
 
-  llvm::Value *isInline, *flags;
-  std::tie(isInline, flags) = emitLoadOfIsInline(IGF, argumentType);
+  Callee callee = ArgumentDecoder.getCallee(decoder);
 
-  llvm::Value *alignmentMask = emitAlignMaskFromFlags(IGF, flags);
+  std::unique_ptr<CallEmission> emission =
+      getCallEmission(IGF, callee.getSwiftContext(), std::move(callee));
 
-  // Align argument value offset as required by its type metadata.
-  llvm::Value *alignedSlot =
-      IGF.Builder.CreatePtrToInt(argumentSlot, IGM.IntPtrTy);
+  StackAddress resultValue = IGF.emitDynamicAlloca(
+      IGM.Int8Ty, valueSize, paramInfo.getBestKnownAlignment());
+
+  llvm::Value *resultAddr = resultValue.getAddress().getAddress();
+
+  resultAddr = IGF.Builder.CreateBitCast(resultAddr, IGM.OpaquePtrTy);
+
+  Explosion decodeArgs;
+  // indirect result buffer as `swift.opaque*`
+  decodeArgs.add(resultAddr);
+  // substitution Argument -> <argument metadata>
+  decodeArgs.add(argumentType);
+
+  emission->begin();
   {
-    alignedSlot = IGF.Builder.CreateNUWAdd(alignedSlot, alignmentMask);
+    emission->setArgs(decodeArgs, /*isOutlined=*/false,
+                      /*witnessMetadata=*/nullptr);
 
-    llvm::Value *invertedMask = IGF.Builder.CreateNot(alignmentMask);
-    alignedSlot = IGF.Builder.CreateAnd(alignedSlot, invertedMask);
-    alignedSlot =
-        IGF.Builder.CreateIntToPtr(alignedSlot, IGM.OpaquePtrTy);
+    Explosion result;
+    emission->emitToExplosion(result, /*isOutlined=*/false);
+    assert(result.empty());
+
+    // TODO: Add error handling a new block that uses `emitAsyncReturn`
+    // if error slot is non-null.
   }
+  emission->end();
 
-  Address argumentAddr(alignedSlot, IGM.getPointerAlignment());
+  // Remember to deallocate later.
+  AllocatedArguments.push_back(resultValue);
 
   switch (param.getConvention()) {
   case ParameterConvention::Indirect_In:
@@ -367,22 +342,19 @@ DistributedAccessor::loadArgument(unsigned argumentIdx,
 
     auto stackAddr =
         IGF.emitDynamicAlloca(IGM.Int8Ty, valueSize, Alignment(16));
-    auto argPtr = stackAddr.getAddress().getAddress();
 
     emitInitializeWithCopyCall(IGF, argumentType, stackAddr.getAddress(),
-                               argumentAddr);
+                               resultValue.getAddress());
 
-    arguments.add(argPtr);
-
-    // Remember to deallocate later.
-    AllocatedArguments.push_back({argumentIdx, stackAddr});
+    // Remember to deallocate a copy.
+    AllocatedArguments.push_back(stackAddr);
     break;
   }
 
   case ParameterConvention::Indirect_In_Guaranteed: {
     // The argument is +0, so we can use the address of the param in
     // the context directly.
-    arguments.add(alignedSlot);
+    arguments.add(resultAddr);
     break;
   }
 
@@ -393,95 +365,20 @@ DistributedAccessor::loadArgument(unsigned argumentIdx,
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned: {
     auto paramTy = param.getSILStorageInterfaceType();
-    auto &typeInfo = IGM.getTypeInfo(paramTy);
     Address eltPtr = IGF.Builder.CreateBitCast(
-        argumentAddr, IGM.getStoragePointerType(paramTy));
+        resultValue.getAddress(), IGM.getStoragePointerType(paramTy));
 
-    cast<LoadableTypeInfo>(typeInfo).loadAsTake(IGF, eltPtr, arguments);
+    cast<LoadableTypeInfo>(paramInfo).loadAsTake(IGF, eltPtr, arguments);
     break;
   }
 
   case ParameterConvention::Direct_Owned: {
-    auto &typeInfo = IGM.getTypeInfo(param.getSILStorageInterfaceType());
     // Copy the value out at +1.
-    cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, argumentAddr, arguments);
+    cast<LoadableTypeInfo>(paramInfo).loadAsCopy(IGF, resultValue.getAddress(),
+                                                 arguments);
     break;
   }
   }
-
-  return {alignedSlot, valueSize};
-}
-
-std::pair<llvm::Value *, llvm::Value *>
-DistributedAccessor::loadArgument(unsigned argumentIdx,
-                                  llvm::Value *argumentSlot,
-                                  SILType paramTy,
-                                  ParameterConvention convention,
-                                  Explosion &arguments) {
-  const TypeInfo &typeInfo = IGF.getTypeInfo(paramTy);
-
-  // 1. Check whether the native representation is empty e.g.
-  //    this happens for empty enums.
-  if (paramTy.isObject()) {
-    auto &nativeSchema = typeInfo.nativeParameterValueSchema(IGM);
-    // If schema is empty, skip to the next argument.
-    if (nativeSchema.empty())
-      return {argumentSlot, typeInfo.getSize(IGF, paramTy)};
-  }
-
-  // 2. Cast the pointer to the type of the element.
-  Address eltPtr = IGF.Builder.CreateBitCast(
-      Address(argumentSlot, IGM.getPointerAlignment()),
-      IGM.getStoragePointerType(paramTy));
-
-  // 3. Adjust typed pointer to the alignment of the type.
-  auto alignedOffset = typeInfo.roundUpToTypeAlignment(IGF, eltPtr, paramTy);
-
-  // 4. Create an exploded version of the type to pass as an
-  //    argument to distributed method.
-
-  switch (convention) {
-  case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant: {
-    // The +1 argument is passed indirectly, so we need to copy it into
-    // a temporary.
-
-    auto stackAddr = typeInfo.allocateStack(IGF, paramTy, "arg.temp");
-    auto argPtr = stackAddr.getAddress().getAddress();
-
-    typeInfo.initializeWithCopy(IGF, stackAddr.getAddress(), alignedOffset,
-                                paramTy, /*isOutlined=*/false);
-    arguments.add(argPtr);
-
-    // Remember to deallocate later.
-    AllocatedArguments.push_back({argumentIdx, stackAddr});
-    break;
-  }
-
-  case ParameterConvention::Indirect_In_Guaranteed: {
-    // The argument is +0, so we can use the address of the param in
-    // the context directly.
-    arguments.add(alignedOffset.getAddress());
-    break;
-  }
-
-  case ParameterConvention::Indirect_Inout:
-  case ParameterConvention::Indirect_InoutAliasable:
-    llvm_unreachable("indirect 'inout' parameters are not supported");
-
-  case ParameterConvention::Direct_Guaranteed:
-  case ParameterConvention::Direct_Unowned: {
-    cast<LoadableTypeInfo>(typeInfo).loadAsTake(IGF, alignedOffset, arguments);
-    break;
-  }
-
-  case ParameterConvention::Direct_Owned:
-    // Copy the value out at +1.
-    cast<LoadableTypeInfo>(typeInfo).loadAsCopy(IGF, alignedOffset, arguments);
-    break;
-  }
-
-  return {alignedOffset.getAddress(), typeInfo.getSize(IGF, paramTy)};
 }
 
 void DistributedAccessor::emitLoadOfWitnessTables(llvm::Value *witnessTables,
@@ -575,7 +472,7 @@ void DistributedAccessor::emit() {
 
   // Step one is to load all of the data from argument buffer,
   // so it could be forwarded to the distributed method.
-  computeArguments(argBuffer, argTypes, arguments);
+  decodeArguments(argDecoder, argTypes, arguments);
 
   // Add all of the substitutions to the explosion
   if (auto *genericEnvironment = Target->getGenericEnvironment()) {
@@ -647,19 +544,12 @@ void DistributedAccessor::emit() {
 
     emission->end();
 
-    // Deallocate all of the copied arguments.
+    // Deallocate all of the copied arguments. Since allocations happened
+    // on stack they have to be deallocated in reverse order.
     {
-      auto targetType = Target->getLoweredFunctionType();
-      for (auto &alloca : AllocatedArguments) {
-        const auto &param = targetType->getParameters()[alloca.ArgumentIdx];
-        auto paramTy = param.getSILStorageInterfaceType();
-
-        if (paramTy.hasTypeParameter()) {
-          IGF.emitDeallocateDynamicAlloca(alloca.Addr);
-        } else {
-          auto &typeInfo = IGF.getTypeInfo(paramTy);
-          typeInfo.deallocateStack(IGF, alloca.Addr, paramTy);
-        }
+      while (!AllocatedArguments.empty()) {
+        auto argument = AllocatedArguments.pop_back_val();
+        IGF.emitDeallocateDynamicAlloca(argument);
       }
     }
 
