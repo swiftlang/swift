@@ -92,6 +92,7 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
 /********************* COMMON CONFORMANCE SIL PATTERNS ************************/
 /******************************************************************************/
 
+// FIXME(distributed): should be implemented by getting the SerializationRequirement
 static void getSerializationRequirements(
     SILGenFunction &SGF, ASTContext &ctx, NominalTypeDecl actorDecl,
     SmallVectorImpl<ProtocolDecl *> &requirementProtocolDecls) {
@@ -104,30 +105,15 @@ static void getSerializationRequirements(
   requirementProtocolDecls.push_back(decodableDecl);
 }
 
-// FIXME: this isn't actually implemented
+// FIXME(distributed): this isn't actually implemented
 static void pushSerializationRequirementConformance(
     SILGenFunction &SGF, ASTContext &ctx,
     SILType type,
     SmallVectorImpl<Type> &subTypes,
     SmallVectorImpl<ProtocolConformanceRef> &subConformances) {
   auto &B = SGF.B;
-  auto module = B.getModule().getSwiftModule();
 
-  //        auto resultEncodableTypeConfRef =
-  //            module->lookupConformance(resultType.getASTType(),
-  //                                      encodableRequirementTy);
-  //        assert(!distributedActorConfRef.isInvalid() &&
-  //               "Missing conformance to `SerializationRequirement`");
   subTypes.push_back(type.getASTType());
-  //        subConformances.push_back(resultEncodableTypeConfRef);
-
-  //        auto decodableRequirementTy =
-  //            ctx.getProtocol(KnownProtocolKind::Decodable);
-  //        auto resultDecodableTypeConfRef =
-  //            module->lookupConformance(resultType.getASTType(),
-  //                                      encodableRequirementTy);
-  //        subTypes.push_back(resultType.getASTType());
-  //        subConformances.push_back(resultDecodableTypeConfRef);
 }
 
 /// Push `Type` and `ProtocolConformanceRef` for the `Error` protocol to

@@ -44,6 +44,7 @@ SubstitutionMap::Storage::Storage(
   : genericSig(genericSig),
     numConformanceRequirements(genericSig->getNumConformanceRequirements())
 {
+  assert(replacementTypes.size() == getNumReplacementTypes());
   assert(conformances.size() == numConformanceRequirements);
 
   std::copy(replacementTypes.begin(), replacementTypes.end(),

@@ -51,14 +51,6 @@ void emitDistributedActorSystemWitnessCall(
     llvm::Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
         llvm::None);
 
-/// Emit a call to a witness of the passed 'proto' protocol.
-void emitDistributedWitnessCall(
-    SILBuilder &B, SILLocation loc, DeclName methodName,
-    SILValue base, ProtocolDecl *proto, SILType actorType,
-    llvm::ArrayRef<SILValue> args,
-    llvm::Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
-        llvm::None);
-
 /// Emits code that notifies the distributed actor's actorSystem that the
 /// actor is ready for execution.
 /// \param B the builder to use when emitting the code.
