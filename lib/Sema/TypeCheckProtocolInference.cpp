@@ -1131,14 +1131,10 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   auto requirements = proto->getRequirementSignature().getRequirements();
   sanitizeProtocolRequirements(proto, requirements,
                                sanitizedRequirements);
-  auto result =
-    TypeChecker::checkGenericArguments(dc->getParentModule(), SourceLoc(),
-                                       SourceLoc(), typeInContext,
-                                       { proto->getSelfInterfaceType() },
-                                       sanitizedRequirements,
-                                       QuerySubstitutionMap{substitutions},
-                                       options);
-  switch (result) {
+
+  switch (TypeChecker::checkGenericArguments(
+      dc->getParentModule(), sanitizedRequirements,
+      QuerySubstitutionMap{substitutions}, options)) {
   case RequirementCheckResult::Failure:
     ++NumSolutionStatesFailedCheck;
     return true;
@@ -1180,11 +1176,8 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
 
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
   switch (TypeChecker::checkGenericArguments(
-                       dc->getParentModule(), SourceLoc(), SourceLoc(), adoptee,
-                       ext->getGenericSignature().getGenericParams(),
-                       ext->getGenericSignature().getRequirements(),
-                       QueryTypeSubstitutionMap{subs},
-                       options)) {
+      dc->getParentModule(), ext->getGenericSignature().getRequirements(),
+      QueryTypeSubstitutionMap{subs}, options)) {
   case RequirementCheckResult::Success:
   case RequirementCheckResult::SubstitutionFailure:
     return false;
