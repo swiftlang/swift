@@ -1658,7 +1658,7 @@ public:
 } // end anonymous namespace
 
 // TODO: move onto SGF directly and reuse in SILGenDistributed and other places
-static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
+static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation E,
                                            StringRef Str, SGFContext C,
                                         StringLiteralExpr::Encoding encoding) {
   uint64_t Length;
@@ -1694,7 +1694,6 @@ static PreparedArguments emitStringLiteral(SILGenFunction &SGF, Expr *E,
   // The 'isascii' bit is lowered as an integer_literal.
   auto Int1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
   auto *isASCIIInst = SGF.B.createIntegerLiteral(E, Int1Ty, isASCII);
-
 
   ManagedValue EltsArray[] = {
     ManagedValue::forUnmanaged(string),
@@ -1840,7 +1839,7 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
 static inline PreparedArguments
 buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         StringLiteralExpr *stringLiteral) {
-  return emitStringLiteral(SGF, stringLiteral, stringLiteral->getValue(), C,
+  return emitStringLiteralArgs(SGF, stringLiteral, stringLiteral->getValue(), C,
                            stringLiteral->getEncoding());
 }
 
@@ -1902,7 +1901,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         RegexLiteralExpr *expr) {
   auto &ctx = SGF.getASTContext();
   // %0 = string_literal <regex text>
-  auto strLiteralArgs = emitStringLiteral(SGF, expr, expr->getRegexText(), C,
+  auto strLiteralArgs = emitStringLiteralArgs(SGF, expr, expr->getRegexText(), C,
                                           StringLiteralExpr::Encoding::UTF8);
   // %1 = function_ref String.init(
   //   _builtinStringLiteral:utf8CodeUnitCount:isASCII:)
@@ -1949,20 +1948,20 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
   case MagicIdentifierLiteralExpr::FileID: {
     std::string value = loc.isValid() ? SGF.getMagicFileIDString(loc) : "";
-    return emitStringLiteral(SGF, magicLiteral, value, C,
+    return emitStringLiteralArgs(SGF, magicLiteral, value, C,
                              magicLiteral->getStringEncoding());
   }
 
   case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
   case MagicIdentifierLiteralExpr::FilePath: {
     StringRef value = loc.isValid() ? SGF.getMagicFilePathString(loc) : "";
-    return emitStringLiteral(SGF, magicLiteral, value, C,
+    return emitStringLiteralArgs(SGF, magicLiteral, value, C,
                              magicLiteral->getStringEncoding());
   }
 
   case MagicIdentifierLiteralExpr::Function: {
     StringRef value = loc.isValid() ? SGF.getMagicFunctionString() : "";
-    return emitStringLiteral(SGF, magicLiteral, value, C,
+    return emitStringLiteralArgs(SGF, magicLiteral, value, C,
                              magicLiteral->getStringEncoding());
   }
 
@@ -2010,6 +2009,24 @@ static inline PreparedArguments buildBuiltinLiteralArgs(SILGenFunction &SGF,
     return buildBuiltinLiteralArgs(
         SGF, C, cast<MagicIdentifierLiteralExpr>(literal));
   }
+}
+
+ManagedValue SILGenFunction::emitStringLiteral(SILLocation loc,
+                                           StringRef text,
+                                           StringLiteralExpr::Encoding encoding,
+                                           SGFContext ctx) {
+  auto &C = getASTContext();
+
+  // === Prepare the arguments
+  auto args = emitStringLiteralArgs(*this, loc, text, ctx, encoding);
+
+  // === Find the constructor
+  auto strInitDecl = C.getStringBuiltinInitDecl(C.getStringDecl());
+
+  RValue r = emitApplyAllocatingInitializer(loc, strInitDecl, std::move(args),
+                                 /*overriddenSelfType*/ Type(), ctx);
+
+  return std::move(r).getScalarValue();
 }
 
 //===----------------------------------------------------------------------===//

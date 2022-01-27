@@ -1072,6 +1072,13 @@ public:
   SourceLocArgs
   emitSourceLocationArgs(SourceLoc loc, SILLocation emitLoc);
 
+  ManagedValue
+  emitStringLiteral(SILLocation loc,
+                    StringRef text,
+                    StringLiteralExpr::Encoding encoding = StringLiteralExpr::Encoding::UTF8,
+                    SGFContext ctx = SGFContext());
+
+
   /// Emit a call to the library intrinsic _doesOptionalHaveValue.
   ///
   /// The result is a Builtin.Int1.
