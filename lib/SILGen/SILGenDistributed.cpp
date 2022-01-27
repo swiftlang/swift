@@ -199,22 +199,6 @@ static void createVoidPhiArgument(SILGenFunction &SGF,
       SGF.getLoweredType(ctx.getVoidType()), OwnershipKind::Owned);
 }
 
-static SILValue emitSimpleLoad(SILGenFunction &SGF,
-                               SILLocation loc,
-                               SILValue valueRef) {
-  ASTContext &ctx = SGF.getASTContext();
-
-  if (valueRef->getType().isAddress()) {
-    auto value = SGF.B.createTrivialLoadOr(
-        loc, valueRef, LoadOwnershipQualifier::Unqualified, true);
-    // TODO: push a release cleanup?
-    return value;
-  } else {
-    auto value = SGF.B.emitCopyValueOperation(loc, valueRef);
-    return value;
-  }
-}
-
 /// Emit the following branch SIL instruction:
 /// \verbatim
 /// if __isRemoteActor(self) {
@@ -223,8 +207,7 @@ static SILValue emitSimpleLoad(SILGenFunction &SGF,
 ///   <isLocalBB>
 /// }
 /// \endverbatim
-static void emitDistributedIfRemoteBranch(SILGenFunction &SGF,
-                                          SILLocation Loc,
+static void emitDistributedIfRemoteBranch(SILGenFunction &SGF, SILLocation Loc,
                                           ManagedValue selfValue, Type selfTy,
                                           SILBasicBlock *isRemoteBB,
                                           SILBasicBlock *isLocalBB) {
@@ -235,31 +218,24 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF,
   assert(isRemoteFn && "Could not find 'is remote' function, is the "
                        "'_Distributed' module available?");
 
-  ManagedValue selfAnyObject =
-      B.createInitExistentialRef(Loc, SGF.getLoweredType(ctx.getAnyObjectType()),
-                                 CanType(selfTy), selfValue, {});
+  ManagedValue selfAnyObject = B.createInitExistentialRef(
+      Loc, SGF.getLoweredType(ctx.getAnyObjectType()), CanType(selfTy),
+      selfValue, {});
   auto result = SGF.emitApplyOfLibraryIntrinsic(
       Loc, isRemoteFn, SubstitutionMap(), {selfAnyObject}, SGFContext());
 
-  SILValue isRemoteResult =
-      std::move(result).forwardAsSingleValue(SGF, Loc);
+  SILValue isRemoteResult = std::move(result).forwardAsSingleValue(SGF, Loc);
   SILValue isRemoteResultUnwrapped =
       SGF.emitUnwrapIntegerResult(Loc, isRemoteResult);
 
   B.createCondBranch(Loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
 }
 
-/// Emit a value of `RemoteCallTarget' with the appropriate information for this
-/// distributed method.
-static SILValue *emitDistributedRemoteCallTargetValue(SILGenFunction &SGF,
-                                                      SILLocation loc) {
-  assert(false); // FIXME(!!)!!!!(!!)!!!!(!!)!!!!(!!)!!!!(!!)!!!!(!!)!!!!
-}
-
+// ==== ------------------------------------------------------------------------
 // MARK: local instance initialization
 
-/// For the initialization of a local distributed actor instance, emits code to initialize the instance's
-/// stored property corresponding to the system.
+/// For the initialization of a local distributed actor instance, emits code to
+/// initialize the instance's stored property corresponding to the system.
 static void emitActorSystemInit(SILGenFunction &SGF,
                                         ConstructorDecl *ctor,
                                         SILLocation loc,
