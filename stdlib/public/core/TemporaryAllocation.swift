@@ -90,7 +90,7 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
 
   // Finally, take a slow path through the standard library to see if the
   // current environment can accept a larger stack allocation.
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) //SwiftStdlib 5.6
+  guard #available(macOS 12.3, iOS 15.4, watchOS 8.5, tvOS 15.4, *) //SwiftStdlib 5.6
   else {
     return false
   }
