@@ -1072,12 +1072,15 @@ public:
   SourceLocArgs
   emitSourceLocationArgs(SourceLoc loc, SILLocation emitLoc);
 
+  /// Emit a 'String' literal for the passed 'text'.
+  ///
+  /// See also: 'emitLiteral' which works with various types of literals,
+  /// however requires an expression to base the creation on.
   ManagedValue
   emitStringLiteral(SILLocation loc,
                     StringRef text,
                     StringLiteralExpr::Encoding encoding = StringLiteralExpr::Encoding::UTF8,
                     SGFContext ctx = SGFContext());
-
 
   /// Emit a call to the library intrinsic _doesOptionalHaveValue.
   ///

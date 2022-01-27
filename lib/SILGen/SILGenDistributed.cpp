@@ -1354,8 +1354,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // --- Prepare storage for the return value
       // %38 = alloc_stack $String // users: %54, %56, %50, %75
       auto remoteCallReturnBuf = emitTemporaryAllocation(loc, resultType);
-//      remoteCallReturnValue = emitManagedBufferWithCleanup(remoteCallReturnBuf); // FIXME: !!!!!!!!!!!!!!!!!!!!!!!!!!
-      remoteCallReturnValue = ManagedValue::forUnmanaged(remoteCallReturnBuf); // FIXME: !!!!!!!!!!!!!!!!!!!!!!!!!!
+      remoteCallReturnValue = emitManagedBufferWithCleanup(remoteCallReturnBuf);
 
       auto systemRef = emitActorPropertyReference(
           *this, loc, selfValue.getValue(),
@@ -1465,7 +1464,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       SmallVector<SILValue, 7> remoteCallArgs;
       // 'out' arguments:
       if (!resultType.isVoid())
-        remoteCallArgs.push_back(remoteCallReturnValue.getValue()); // return value buffer
+        remoteCallArgs.push_back(remoteCallReturnValue.forward(*this)); // return value buffer
       // function arguments:
       remoteCallArgs.push_back(selfValue.getValue()); // on actor
       remoteCallArgs.push_back(remoteCallTargetValue.getValue()); // target
@@ -1518,9 +1517,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
       auto result = remoteCallReturnValue.getValue();
 
-      // FIXME: this should be done by emitting the block, before we create the buffer, this way the cleanup won't be here to be flushed yet
-//      B.createDeallocStack(loc, result); // FIXME: the reason this is manual is because I could not figure out how to NOT destroy_addr the result on this error exit path
-
+      // TODO(distributed): make those into cleanups
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
 
       // FIXME: these are very hacky, how to do properly?
