@@ -86,8 +86,6 @@ void SILPassManager_registerFunctionPass(BridgedStringRef name,
 void SILCombine_registerInstructionPass(BridgedStringRef name,
                                         BridgedInstructionPassRunFn runFn);
 
-SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context);
-
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context);
 
 BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
