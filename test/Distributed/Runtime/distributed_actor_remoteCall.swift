@@ -135,16 +135,29 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: InvocationDecoder,
+    invocationDecoder: inout InvocationDecoder,
     throwing: Err.Type,
     returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
-    Act.ID == ActorID,
-    Res: SerializationRequirement {
+          Err: Error,
+//          Act.ID == ActorID,
+          Res: SerializationRequirement {
     fatalError("INVOKED REMOTE CALL")
   }
 
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+//          Act.ID == ActorID,
+          Err: Error
+  {
+    fatalError("not implemented: \(#function)")
+  }
 }
 
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
@@ -190,6 +203,7 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
     }
 
     pointer.initialize(to: argument)
+    pointer.pointee = argument
     argumentIndex += 1
   }
 

@@ -3364,13 +3364,17 @@ public:
                                           OptionSet<LookupDirectFlags> flags =
                                           OptionSet<LookupDirectFlags>());
 
-  /// Find the '_remote_<...>' counterpart function to a 'distributed func'.
-  ///
-  /// If the passed in function is not distributed this function returns null.
-  AbstractFunctionDecl* lookupDirectRemoteFunc(AbstractFunctionDecl *func);
+  /// Find the distributed actor system instance of this distributed actor.
+  VarDecl *getDistributedActorSystemProperty() const;
 
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
-  ValueDecl *getDistributedActorIDProperty() const;
+  VarDecl *getDistributedActorIDProperty() const;
+
+  /// Find the 'makeInvocation' function.
+  AbstractFunctionDecl* getDistributedActorSystemMakeInvocationEncoderFunction() const;
+
+  /// Find the 'RemoteCallTarget.init(_mangledName:)' initializer function
+  ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -6245,10 +6249,6 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
-  /// Get (or synthesize)  the associated remote function for this one.
-  /// For example, for `distributed func hi()` get `func _remote_hi()`.
-  AbstractFunctionDecl *getDistributedActorRemoteFuncDecl() const;
-
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
@@ -6387,6 +6387,11 @@ public:
     return getBodyKind() == BodyKind::SILSynthesize
     && getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
   }
+
+  /// Determines whether this function is a 'remoteCall' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedActorSystem' protocol.
+  bool isDistributedActorSystemRemoteCall(bool isVoidReturn) const;
 
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
