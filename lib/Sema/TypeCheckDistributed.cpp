@@ -285,23 +285,6 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
     }
   }
 
-  // === Check _remote functions
-  auto actorDecl = func->getParent()->getSelfNominalTypeDecl();
-  assert(actorDecl && actorDecl->isDistributedActor());
-
-  // _remote function for a distributed instance method must not be implemented by end-users,
-  // it must be the specific implementation synthesized by the compiler.
-  auto remoteFuncDecl = actorDecl->lookupDirectRemoteFunc(func);
-  if (remoteFuncDecl && !remoteFuncDecl->isSynthesized()) {
-    if (diagnose) {
-      func->diagnose(diag::distributed_actor_remote_func_implemented_manually,
-                     func->getBaseIdentifier(),
-                     // TODO: make general function to get the _remote identifier
-                     C.getIdentifier("_remote_" + func->getBaseIdentifier().str().str()));
-    }
-    return true;
-  }
-
   return false;
 }
 

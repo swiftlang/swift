@@ -872,7 +872,7 @@ public:
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
     _require(type1 == type2, complaint,
-             [&] { llvm::dbgs() << "     Got: " << type1 << "\n  Wanted: " << type2 << '\n'; });
+             [&] { llvm::dbgs() << " " << type1 << "\n " << type2 << '\n'; });
   }
 
   /// Require two function types to be ABI-compatible.
@@ -5524,16 +5524,8 @@ public:
           state.GotAsyncContinuation = gaci;
         } else if (auto term = dyn_cast<TermInst>(&i)) {
           if (term->isFunctionExiting()) {
-            for (const auto &item : state.Stack) {
-              item->dump();
-            }
             require(state.Stack.empty(),
                     "return with stack allocs that haven't been deallocated");
-            if (!state.ActiveOps.empty()) {
-              for (const auto &op : state.ActiveOps) {
-                op->dump();
-              }
-            }
             require(state.ActiveOps.empty(),
                     "return with operations still active");
             require(!state.GotAsyncContinuation,
@@ -5621,14 +5613,6 @@ public:
             require(state.Stack == foundState.Stack || isUnreachable(),
                     "inconsistent stack heights entering basic block");
 
-            if (!(state.ActiveOps == foundState.ActiveOps || isUnreachable())) {
-              fprintf(stderr, "[%s:%d] (%s) STATE OPS:\n", __FILE__, __LINE__, __FUNCTION__);
-              for (auto op : state.ActiveOps)
-                op->dump();
-              fprintf(stderr, "[%s:%d] (%s) FOUND STATE OPS:\n", __FILE__, __LINE__, __FUNCTION__);
-              for (auto op : foundState.ActiveOps)
-                op->dump();
-            }
             require(state.ActiveOps == foundState.ActiveOps || isUnreachable(),
                     "inconsistent active-operations sets entering basic block");
             require(state.CFG == foundState.CFG,

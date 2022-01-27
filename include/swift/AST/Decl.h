@@ -3364,11 +3364,6 @@ public:
                                           OptionSet<LookupDirectFlags> flags =
                                           OptionSet<LookupDirectFlags>());
 
-  /// Find the '_remote_<...>' counterpart function to a 'distributed func'.
-  ///
-  /// If the passed in function is not distributed this function returns null.
-  AbstractFunctionDecl* lookupDirectRemoteFunc(AbstractFunctionDecl *func);
-
   /// Find the distributed actor system instance of this distributed actor.
   VarDecl *getDistributedActorSystemProperty() const;
 

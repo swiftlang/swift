@@ -179,9 +179,6 @@ public:
                                SILLocation l) {
     switch (KIND) {
     case ImplodeKind::Unmanaged:
-      if (!v.hasCleanup()){
-          v.dump();
-      }
       assert(!v.hasCleanup());
       return v.unmanagedBorrow();
     case ImplodeKind::Forward:

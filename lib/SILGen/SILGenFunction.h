@@ -818,7 +818,6 @@ public:
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
   SILBasicBlock *createBasicBlock();
-  SILBasicBlock *createBasicBlock(llvm::StringRef debugComment);
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
