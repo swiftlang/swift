@@ -514,7 +514,9 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     // For every rule, looking for other rules that overlap with this rule.
     for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
       const auto &lhs = getRule(i);
-      if (lhs.isSimplified())
+      if (lhs.isLHSSimplified() ||
+          lhs.isRHSSimplified() ||
+          lhs.isSubstitutionSimplified())
         continue;
 
       // Look up every suffix of this rule in the trie using findAll(). This
@@ -527,7 +529,9 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       while (from < to) {
         Trie.findAll(from, to, [&](unsigned j) {
           const auto &rhs = getRule(j);
-          if (rhs.isSimplified())
+          if (rhs.isLHSSimplified() ||
+              rhs.isRHSSimplified() ||
+              rhs.isSubstitutionSimplified())
             return;
 
           if (from == lhs.getLHS().begin()) {
@@ -619,7 +623,8 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     resolvedCriticalPairs.clear();
     resolvedLoops.clear();
 
-    simplifyRightHandSidesAndSubstitutions();
+    simplifyRightHandSides();
+    simplifyLeftHandSideSubstitutions();
 
     // If the added rules merged any associated types, process the merges now
     // before we continue with the completion procedure. This is important

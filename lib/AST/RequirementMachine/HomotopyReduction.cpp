@@ -486,7 +486,9 @@ void RewriteSystem::minimizeRewriteSystem() {
   performHomotopyReduction([&](unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
-    if (rule.isSimplified() &&
+    if ((rule.isLHSSimplified() ||
+         rule.isRHSSimplified() ||
+         rule.isSubstitutionSimplified()) &&
         !rule.isAnyConformanceRule())
       return true;
 
@@ -696,7 +698,9 @@ void RewriteSystem::verifyMinimizedRules(
     // rules, which unfortunately might no be redundant, because we try to keep
     // them in the original protocol definition for compatibility with the
     // GenericSignatureBuilder's minimization algorithm.
-    if (rule.isSimplified() &&
+    if ((rule.isLHSSimplified() ||
+         rule.isRHSSimplified() ||
+         rule.isSubstitutionSimplified()) &&
         !rule.isRedundant() &&
         !rule.isProtocolConformanceRule()) {
       llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
