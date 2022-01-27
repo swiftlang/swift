@@ -3424,7 +3424,8 @@ public:
         S.Out, S.ScratchRecord, abbrCode,
         S.addDeclBaseNameRef(genericParam->getName()),
         genericParam->isImplicit(), genericParam->isTypeSequence(),
-        genericParam->getDepth(), genericParam->getIndex());
+        genericParam->getDepth(), genericParam->getIndex(),
+        genericParam->isOpaqueType());
   }
 
   void visitAssociatedTypeDecl(const AssociatedTypeDecl *assocType) {

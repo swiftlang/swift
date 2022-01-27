@@ -492,12 +492,15 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
   SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16+1,
+  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16+1+1,
     : NumPadBits,
 
     Depth : 16,
     Index : 16,
-    TypeSequence : 1
+    TypeSequence : 1,
+
+    /// Whether this generic parameter represents an opaque type.
+    IsOpaqueType : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
@@ -2786,7 +2789,8 @@ public:
   /// Get the ordinal of the anonymous opaque parameter of this decl with type
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
   /// position e.g. `func f() -> some P`. Returns -1 if `repr` is not found.
-  unsigned getAnonymousOpaqueParamOrdinal(OpaqueReturnTypeRepr *repr) const;
+  Optional<unsigned> getAnonymousOpaqueParamOrdinal(
+      OpaqueReturnTypeRepr *repr) const;
 
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
@@ -2993,9 +2997,14 @@ public:
 /// \code
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
-class GenericTypeParamDecl : public AbstractTypeParamDecl {
-public:
-  static const unsigned InvalidDepth = 0xFFFF;
+class GenericTypeParamDecl final :
+    public AbstractTypeParamDecl,
+    private llvm::TrailingObjects<GenericTypeParamDecl, OpaqueReturnTypeRepr *>{
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<OpaqueReturnTypeRepr *>) const {
+    return isOpaqueType() ? 1 : 0;
+  }
 
   /// Construct a new generic type parameter.
   ///
@@ -3006,7 +3015,29 @@ public:
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       bool isTypeSequence, unsigned depth, unsigned index);
+                       bool isTypeSequence, unsigned depth, unsigned index,
+                       bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr);
+
+public:
+  /// Construct a new generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param nameLoc The location of the name.
+  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+                       bool isTypeSequence, unsigned depth, unsigned index)
+      : GenericTypeParamDecl(dc, name, nameLoc, isTypeSequence, depth, index,
+                             false, nullptr) { }
+
+  static const unsigned InvalidDepth = 0xFFFF;
+
+  static GenericTypeParamDecl *
+  create(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+         bool isTypeSequence, unsigned depth, unsigned index,
+         bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr);
 
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
@@ -3034,8 +3065,32 @@ public:
   /// \code
   /// func foo<@_typeSequence T>(_ : T...) { }
   /// struct Foo<@_typeSequence T> { }
-  /// \encode
+  /// \endcode
   bool isTypeSequence() const { return Bits.GenericTypeParamDecl.TypeSequence; }
+
+  /// Determine whether this generic parameter represents an opaque type.
+  ///
+  /// \code
+  /// // "some P" is representated by a generic type parameter.
+  /// func f() -> [some P] { ... }
+  /// \endcode
+  bool isOpaqueType() const {
+    return Bits.GenericTypeParamDecl.IsOpaqueType;
+  }
+
+  /// Retrieve the opaque return type representation described by this
+  /// generic parameter, or NULL if any of the following are true:
+  ///   - the generic parameter does not describe an opaque type
+  ///   - the opaque type was introduced via the "named opaque parameters"
+  ///     extension, meaning that it was specified explicitly
+  ///   - the enclosing declaration was deserialized, in which case it lost
+  ///     the source location information and has no type representation.
+  OpaqueReturnTypeRepr *getOpaqueTypeRepr() const {
+    if (!isOpaqueType())
+      return nullptr;
+
+    return *getTrailingObjects<OpaqueReturnTypeRepr *>();
+  }
 
   /// The index of this generic type parameter within its generic parameter
   /// list.

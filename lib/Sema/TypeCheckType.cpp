@@ -2108,10 +2108,22 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     // evaluation of an `OpaqueResultTypeRequest`.
     auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
     auto *DC = getDeclContext();
-    if (isa<OpaqueTypeDecl>(DC)) {
-      auto opaqueDecl = cast<OpaqueTypeDecl>(DC);
-      unsigned ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr);
-      return getIdentityOpaqueTypeArchetypeType(opaqueDecl, ordinal);
+    if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
+      if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr))
+        return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
+    }
+
+    // Check whether any of the generic parameters in the context represents
+    // this opaque type. If so, return that generic parameter.
+    if (auto declDC = DC->getAsDecl()) {
+      if (auto genericContext = declDC->getAsGenericContext()) {
+        if (auto genericParams = genericContext->getGenericParams()) {
+          for (auto genericParam : *genericParams) {
+            if (genericParam->getOpaqueTypeRepr() == opaqueRepr)
+              return genericParam->getDeclaredInterfaceType();
+          }
+        }
+      }
     }
 
     // We are not inside an `OpaqueTypeDecl`, so diagnose an error.

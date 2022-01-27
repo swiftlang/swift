@@ -78,28 +78,6 @@ TypeChecker::gatherGenericParamBindingsText(
   return result.str().str();
 }
 
-// An alias to avoid repeating the `SmallVector`'s size parameter.
-using CollectedOpaqueReprs = SmallVector<OpaqueReturnTypeRepr *, 2>;
-
-/// Walk `repr` recursively, collecting any `OpaqueReturnTypeRepr`s.
-static CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *repr) {
-  class Walker : public ASTWalker {
-    CollectedOpaqueReprs &Reprs;
-
-  public:
-    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
-
-    bool walkToTypeReprPre(TypeRepr *repr) override {
-      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
-        Reprs.push_back(opaqueRepr);
-      return true;
-    }
-  };
-
-  CollectedOpaqueReprs reprs;
-  repr->walk(Walker(reprs));
-  return reprs;
-}
 
 //
 // Generic functions
@@ -206,7 +184,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
   } else {
-    opaqueReprs = collectOpaqueReturnTypeReprs(repr);
+    opaqueReprs = repr->collectOpaqueReturnTypeReprs();
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> requirements;
     for (unsigned i = 0; i < opaqueReprs.size(); ++i) {

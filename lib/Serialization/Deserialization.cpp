@@ -1047,9 +1047,9 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
       auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
       if (!name.empty()) {
-        auto paramDecl = createDecl<GenericTypeParamDecl>(
+        auto paramDecl = GenericTypeParamDecl::create(
             getAssociatedModule(), name, SourceLoc(), paramTy->isTypeSequence(),
-            paramTy->getDepth(), paramTy->getIndex());
+            paramTy->getDepth(), paramTy->getIndex(), false, nullptr);
         paramTy = paramDecl->getDeclaredInterfaceType()
                    ->castTo<GenericTypeParamType>();
       }
@@ -2680,16 +2680,18 @@ public:
     bool isTypeSequence;
     unsigned depth;
     unsigned index;
+    bool isOpaqueType;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, isTypeSequence, depth, index);
+        scratch, nameID, isImplicit, isTypeSequence, depth, index,
+        isOpaqueType);
 
     // Always create GenericTypeParamDecls in the associated file; the real
     // context will reparent them.
     auto *DC = MF.getFile();
-    auto genericParam = MF.createDecl<GenericTypeParamDecl>(
+    auto genericParam = GenericTypeParamDecl::create(
         DC, MF.getIdentifier(nameID), SourceLoc(), isTypeSequence, depth,
-        index);
+        index, isOpaqueType, /*opaqueTypeRepr=*/nullptr);
     declOrOffset = genericParam;
 
     if (isImplicit)

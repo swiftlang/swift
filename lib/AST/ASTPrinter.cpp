@@ -1660,7 +1660,42 @@ void PrintAST::printSingleDepthOfGenericSignature(
       });
   };
 
-  if (printParams) {
+  /// Separate the explicit generic parameters from the implicit, opaque
+  /// generic parameters. We only print the former.
+  TypeArrayView<GenericTypeParamType> opaqueGenericParams;
+  for (unsigned index : indices(genericParams)) {
+    auto gpDecl = genericParams[index]->getDecl();
+    if (!gpDecl)
+      continue;
+
+    if (gpDecl->isOpaqueType() && gpDecl->isImplicit()) {
+      // We found the first implicit opaque type parameter. Split the
+      // generic parameters array at this position.
+      opaqueGenericParams = genericParams.slice(index);
+      genericParams = genericParams.slice(0, index);
+      break;
+    }
+  }
+
+  // Determines whether a given type is based on one of the opaque generic
+  // parameters.
+  auto dependsOnOpaque = [&](Type type) {
+    if (opaqueGenericParams.empty())
+      return false;
+
+    if (!type->isTypeParameter())
+      return false;
+
+    auto rootGP = type->getRootGenericParam();
+    for (auto opaqueGP : opaqueGenericParams) {
+      if (rootGP->isEqual(opaqueGP))
+        return true;
+    }
+
+    return false;
+  };
+
+  if (printParams && !genericParams.empty()) {
     // Print the generic parameters.
     Printer << "<";
     llvm::interleave(
@@ -1688,10 +1723,17 @@ void PrintAST::printSingleDepthOfGenericSignature(
         continue;
 
       auto first = req.getFirstType();
+
+      if (dependsOnOpaque(first))
+        continue;
+
       Type second;
 
-      if (req.getKind() != RequirementKind::Layout)
+      if (req.getKind() != RequirementKind::Layout) {
         second = req.getSecondType();
+        if (dependsOnOpaque(second))
+          continue;
+      }
 
       if (!subMap.empty()) {
         Type subFirst = substParam(first);
@@ -1750,7 +1792,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
     }
   }
 
-  if (printParams)
+  if (printParams && !genericParams.empty())
     Printer << ">";
 }
 
@@ -6033,7 +6075,8 @@ public:
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
-    if (T->getDecl() == nullptr) {
+    auto decl = T->getDecl();
+    if (!decl) {
       // If we have an alternate name for this type, use it.
       if (Options.AlternativeTypeNames) {
         auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
@@ -6047,6 +6090,25 @@ public:
       // canonical types to sugared types.
       if (Options.GenericSig)
         T = Options.GenericSig->getSugaredType(T);
+    }
+
+    // Print opaque types as "some ..."
+    if (decl && decl->isOpaqueType()) {
+      // If we have and should print based on the type representation, do so.
+      if (auto opaqueRepr = decl->getOpaqueTypeRepr()) {
+        if (willUseTypeReprPrinting(opaqueRepr, Type(), Options)) {
+          opaqueRepr->print(Printer, Options);
+          return;
+        }
+      }
+
+      // Print based on the type.
+      Printer << "some ";
+      if (auto inheritedType = decl->getInherited().front().getType())
+        inheritedType->print(Printer, Options);
+      else
+        Printer << "Any";
+      return;
     }
 
     const auto Name = T->getName();
