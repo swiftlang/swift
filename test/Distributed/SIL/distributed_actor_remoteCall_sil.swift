@@ -26,7 +26,7 @@ distributed actor MyDistActor {
 // CHECK:  %4 = struct_extract %3 : $Bool, #Bool._value // user: %5
 // CHECK:  cond_br %4, bb1, bb4 // id: %5
 
-// CHECK: bb1: // Preds: bb0 /// isRemoteBB
+// CHECK: bb1: // Preds: bb0
 // CHECK:  %6 = alloc_stack $FakeInvocation // users: %13, %60, %53, %37, %14
 // CHECK:  %7 = ref_element_addr %0 : $MyDistActor, #MyDistActor.actorSystem // user: %8
 // CHECK:  %8 = load %7 : $*FakeActorSystem // users: %12, %11, %9
@@ -41,7 +41,7 @@ distributed actor MyDistActor {
 // CHECK:  %15 = function_ref @$s27FakeDistributedActorSystems0A10InvocationV13doneRecordingyyKF : $@convention(method) (@inout FakeInvocation) -> @error Error // user: %16
 // CHECK:  try_apply %15(%14) : $@convention(method) (@inout FakeInvocation) -> @error Error, normal bb2, error bb3 // id: %16
 
-// CHECK: bb2(%17 : $()): // Preds: bb1 /// makeRemoteCallTargetBB
+// CHECK: bb2(%17 : $()): // Preds: bb1
 // CHECK:  %18 = alloc_stack $RemoteCallTarget // users: %59, %58, %52, %51, %34, %27
 // CHECK:  %19 = metatype $@thin RemoteCallTarget.Type // user: %27
 // CHECK:  %20 = string_literal utf8 "$s10remoteCall11MyDistActorC4testyyFTE" // user: %25
@@ -64,28 +64,28 @@ distributed actor MyDistActor {
 // CHECK:  try_apply %33<MyDistActor, Never>(%0, %18, %14, %31, %29) : $@convention(method) @async <τ_0_0, τ_0_1 where τ_0_0 : DistributedActor, τ_0_1 : Error, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, @guaranteed FakeActorSystem) -> @error Error, normal bb8, error bb9 // id: %34
 
 // CHECK: // %35 // user: %38
-// CHECK: bb3(%35 : $Error): // Preds: bb1 /// recordingDoneErrorBB
+// CHECK: bb3(%35 : $Error): // Preds: bb1
 // CHECK:  end_access %14 : $*FakeInvocation // id: %36
 // CHECK:  dealloc_stack %6 : $*FakeInvocation // id: %37
 // CHECK:  br bb7(%35 : $Error) // id: %38
 
-// CHECK: bb4: // Preds: bb0 /// isLocalBB
+// CHECK: bb4: // Preds: bb0
 // CHECK:  %39 = class_method %0 : $MyDistActor, #MyDistActor.test : (isolated MyDistActor) -> () -> (), $@convention(method) (@guaranteed MyDistActor) -> () // user: %40
 // CHECK:  %40 = apply %39(%0) : $@convention(method) (@guaranteed MyDistActor) -> () // user: %42
 // CHECK:  br bb5 // id: %41
 
-// CHECK: bb5: // Preds: bb4 /// localReturnBB
+// CHECK: bb5: // Preds: bb4
 // CHECK:  br bb6(%40 : $()) // id: %42
 
 // CHECK: // %43 // user: %44
-// CHECK: bb6(%43 : $()): // Preds: bb8 bb5 /// returnBB
+// CHECK: bb6(%43 : $()): // Preds: bb8 bb5
 // CHECK:  return %43 : $() // id: %44
 
 // CHECK: // %45 // user: %46
-// CHECK: bb7(%45 : $Error): // Preds: bb9 bb3 /// errorBB
+// CHECK: bb7(%45 : $Error): // Preds: bb9 bb3 
 // CHECK:  throw %45 : $Error // id: %46
 
-// CHECK: bb8(%47 : $()): // Preds: bb2 /// remoteCallReturnBB
+// CHECK: bb8(%47 : $()): // Preds: bb2 
 // CHECK:  %48 = tuple () // user: %54
 // CHECK:  release_value %29 : $FakeActorSystem // id: %49
 // CHECK:  end_access %14 : $*FakeInvocation // id: %50
@@ -95,7 +95,7 @@ distributed actor MyDistActor {
 // CHECK:  br bb6(%48 : $()) // id: %54
 
 // CHECK: // %55 // user: %61
-// CHECK: bb9(%55 : $Error): // Preds: bb2 /// remoteCallErrorBB
+// CHECK: bb9(%55 : $Error): // Preds: bb2 
 // CHECK:  end_access %14 : $*FakeInvocation // id: %56
 // CHECK:  release_value %29 : $FakeActorSystem // id: %57
 // CHECK:  destroy_addr %18 : $*RemoteCallTarget // id: %58

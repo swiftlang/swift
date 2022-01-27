@@ -135,13 +135,14 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: InvocationDecoder,
+    invocationDecoder: inout InvocationDecoder,
     throwing: Err.Type,
     returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
+          Err: Error,
 //          Act.ID == ActorID,
-    Res: SerializationRequirement {
+          Res: SerializationRequirement {
     fatalError("INVOKED REMOTE CALL")
   }
 
@@ -152,8 +153,8 @@ struct FakeActorSystem: DistributedActorSystem {
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-    Err: Error
-//          Act.ID == ActorID
+//          Act.ID == ActorID,
+          Err: Error
   {
     fatalError("not implemented: \(#function)")
   }
@@ -242,8 +243,6 @@ let generic2Name = "$s4main7GreeterC8generic21a1byx_q_tSeRzSERzSeR_SER_r0_lFTE"
 let generic3Name = "$s4main7GreeterC8generic31a1b1cyx_Sayq_Gq0_tSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
 let generic4Name = "$s4main7GreeterC8generic41a1b1cyx_AA1SVyq_GSayq0_GtSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
 let generic5Name = "$s4main7GreeterC8generic51a1b1c1dyx_AA1SVyq_Gq0_q1_tSeRzSERzSeR_SER_SeR0_SER0_SeR1_SER1_r2_lFTE"
-
-let echoName = "$s4main7GreeterC4echo4nameS2S_tFTE"
 
 func test() async throws {
   let system = FakeActorSystem()

@@ -87,8 +87,6 @@ struct HeterogeneousBuffer: Sequence {
         offset += info.size
         i += 1
       }
-      offset = _openExistential(hbuf.types[i], do: nextOffset)
-      i += 1
 
       return hbuf.buffer.advanced(by: offset)
     }

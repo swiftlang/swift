@@ -437,11 +437,11 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
   auto returnTy = getLoweredType(selfTy);
 
   // ==== Prepare all the basic blocks
-  auto returnBB = createBasicBlock("returnBB");
-  auto resolvedBB = createBasicBlock("resolvedBB");
-  auto makeProxyBB = createBasicBlock("makeProxyBB");
-  auto switchBB = createBasicBlock("switchBB");
-  auto errorBB = createBasicBlock("errorBB");
+  auto returnBB = createBasicBlock();
+  auto resolvedBB = createBasicBlock();
+  auto makeProxyBB = createBasicBlock();
+  auto switchBB = createBasicBlock();
+  auto errorBB = createBasicBlock();
 
   SILFunctionConventions fnConv = F.getConventions();
 
@@ -570,8 +570,8 @@ SILGenFunction::emitConditionalResignIdentityCall(SILLocation loc,
   
   // we only system.resignID if we are a local actor,
   // and thus the address was created by system.assignID.
-  auto isRemoteBB = createBasicBlock("isRemoteBB");
-  auto isLocalBB = createBasicBlock("isLocalBB");
+  auto isRemoteBB = createBasicBlock();
+  auto isLocalBB = createBasicBlock();
 
   // if __isRemoteActor(self) {
   //   ...
@@ -610,8 +610,8 @@ void SILGenFunction::emitDistributedActorClassMemberDestruction(
 
   Scope scope(Cleanups, CleanupLocation(cleanupLoc));
 
-  auto isLocalBB = createBasicBlock("isLocalBB");
-  auto remoteMemberDestroyBB = createBasicBlock("remoteMemberDestroyBB");
+  auto isLocalBB = createBasicBlock();
+  auto remoteMemberDestroyBB = createBasicBlock();
 
   // if __isRemoteActor(self) {
   //   ...
@@ -740,8 +740,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   auto shouldRecordErrorType = fd->hasThrows();
   auto shouldRecordReturnType = !resultType.isVoid();
 
-  auto errorBB = createBasicBlock("errorBB");
-  auto returnBB = createBasicBlock("returnBB");
+  auto errorBB = createBasicBlock();
+  auto returnBB = createBasicBlock();
 
   auto *selfVarDecl = fd->getImplicitSelfDecl();
 
@@ -792,8 +792,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   // } else {
   //   ...
   // }
-  auto isLocalBB = createBasicBlock("isLocalBB");
-  auto isRemoteBB = createBasicBlock("isRemoteBB");
+  auto isLocalBB = createBasicBlock();
+  auto isRemoteBB = createBasicBlock();
   {
     FuncDecl* isRemoteFn = ctx.getIsRemoteDistributedActor();
     assert(isRemoteFn &&
@@ -826,8 +826,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     auto nativeFnSILTy = SILType::getPrimitiveObjectType(nativeMethodTy);
     auto nativeSilFnType = nativeFnSILTy.castTo<SILFunctionType>();
 
-    localReturnBB = createBasicBlock("localReturnBB");
-    localCallErrorBB = nativeSilFnType->hasErrorResult() ? createBasicBlock("localCalLErrorBB") : nullptr;
+    localReturnBB = createBasicBlock();
+    localCallErrorBB = nativeSilFnType->hasErrorResult() ? createBasicBlock() : nullptr;
 
     bool isClassMethod = false;
     if (auto classDecl = dyn_cast<ClassDecl>(fd->getDeclContext())) {
@@ -1003,10 +1003,10 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       anyRecordBlocks = true;
       assert(false);
       if (!firstOfThrowingApplyBBs) {
-        recordGenericSubstitutionsBB = createBasicBlock("recordGenericSubstitutionsBB");
+        recordGenericSubstitutionsBB = createBasicBlock();
         firstOfThrowingApplyBBs = false;
       }
-      recordErrorGenericSubstitutionsBB = createBasicBlock("recordErrorGenericSubstitutionsBB");
+      recordErrorGenericSubstitutionsBB = createBasicBlock();
     }
 
     if (shouldRecordArguments) {
@@ -1019,10 +1019,10 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     if (shouldRecordErrorType) {
       anyRecordBlocks = true;
       if (!firstOfThrowingApplyBBs) {
-        recordErrorTypeBB = createBasicBlock("recordErrorTypeBB");
+        recordErrorTypeBB = createBasicBlock();
       }
       firstOfThrowingApplyBBs = false;
-      recordErrorTypeErrorBB = createBasicBlock("recordErrorTypeErrorBB");
+      recordErrorTypeErrorBB = createBasicBlock();
     }
 
     SILBasicBlock *recordReturnTypeBB = nullptr;
@@ -1030,19 +1030,19 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     if (shouldRecordReturnType) {
       anyRecordBlocks = true;
       if (!firstOfThrowingApplyBBs) {
-        recordReturnTypeBB = createBasicBlock("recordReturnTypeBB");
+        recordReturnTypeBB = createBasicBlock();
       }
       firstOfThrowingApplyBBs = false;
-      recordReturnTypeErrorBB = createBasicBlock("recordReturnTypeErrorBB");
+      recordReturnTypeErrorBB = createBasicBlock();
     }
 
     firstOfThrowingApplyBBs = false;
     SILBasicBlock *recordingDoneBB = nullptr;
-    SILBasicBlock *recordingDoneErrorBB = createBasicBlock("recordingDoneErrorBB");
+    SILBasicBlock *recordingDoneErrorBB = createBasicBlock();
     if (anyRecordBlocks) {
       // If any previous record* calls have been made, we need a BB to jump to
       // on the normal path to the recordingDone call:
-      recordingDoneBB = createBasicBlock("recordingDoneBB");
+      recordingDoneBB = createBasicBlock();
     }
 
     // === All calls on invocationEncoder need Access:
@@ -1116,7 +1116,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
         // 'nextNormalBB'.
         SILBasicBlock *nextRecordArgumentNormalBB;
         if (!isLastParam) {
-          nextRecordArgumentNormalBB = createBasicBlock("nextRecordArgumentNormalBB");
+          nextRecordArgumentNormalBB = createBasicBlock();
         } else if (shouldRecordErrorType) {
           nextRecordArgumentNormalBB = recordErrorTypeBB;
         } else if (shouldRecordReturnType) {
@@ -1125,7 +1125,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           nextRecordArgumentNormalBB = recordingDoneBB;
         }
         nextNormalBB = nextRecordArgumentNormalBB;
-        auto recordArgumentErrorBB = createBasicBlock("recordArgumentErrorBB");
+        auto recordArgumentErrorBB = createBasicBlock();
 
         // === Prepare the argument
         SILType argType = paramValue->getType();
@@ -1315,7 +1315,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     }
 
     // === encoder.doneRecording() ---------------------------------------------
-    SILBasicBlock *makeRemoteCallTargetBB = createBasicBlock("makeRemoteCallTargetBB");
+    SILBasicBlock *makeRemoteCallTargetBB = createBasicBlock();
     {
       if (recordingDoneBB) {
         B.emitBlock(recordingDoneBB);
@@ -1351,8 +1351,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     auto remoteCallTargetTy = F.mapTypeIntoContext(remoteCallTargetDecl->getDeclaredInterfaceType());
     ManagedValue remoteCallTargetValue;
     LoadInst *remoteCallSystemSelf = nullptr;
-    SILBasicBlock *remoteCallReturnBB = createBasicBlock("remoteCallReturnBB");
-    SILBasicBlock *remoteCallErrorBB = createBasicBlock("remoteCallErrorBB");
+    SILBasicBlock *remoteCallReturnBB = createBasicBlock();
+    SILBasicBlock *remoteCallErrorBB = createBasicBlock();
     ManagedValue remoteCallReturnValue;
     {
       B.emitBlock(makeRemoteCallTargetBB);

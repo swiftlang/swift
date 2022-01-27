@@ -223,7 +223,6 @@ extension DistributedActorSystem {
     }
 
     // Prepare buffer for the parameter types to be decoded into:
-    let paramTypesBuffer = UnsafeMutableRawBufferPointer
     let argumentTypesBuffer = UnsafeMutableBufferPointer<Any.Type>.allocate(capacity: Int(paramCount))
     defer {
       argumentTypesBuffer.deallocate()

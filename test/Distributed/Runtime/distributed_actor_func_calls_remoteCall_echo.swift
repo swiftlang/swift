@@ -24,7 +24,6 @@ distributed actor Greeter {
 
 }
 
-
 // ==== Fake Transport ---------------------------------------------------------
 struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
