@@ -20,7 +20,7 @@ public struct Duration: Sendable {
   @usableFromInline
   internal var _high: Int64
 
-  internal init(_attoseconds: _DoubleWidth<Int64>) {
+  internal init(_attoseconds: _Int128) {
     self._low = _attoseconds.low
     self._high = _attoseconds.high
   }
@@ -29,8 +29,8 @@ public struct Duration: Sendable {
     self = Duration.seconds(_seconds) + Duration.nanoseconds(nanoseconds)
   }
 
-  internal var _attoseconds: _DoubleWidth<Int64> {
-    _DoubleWidth((high: _high, low: _low))
+  internal var _attoseconds: _Int128 {
+    _Int128(high: _high, low: _low)
   }
 
   public var seconds: Int64 {
@@ -47,43 +47,43 @@ public struct Duration: Sendable {
 
 extension Duration {
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
-    return Duration(_attoseconds: _DoubleWidth<Int64>(seconds) *
+    return Duration(_attoseconds: _Int128(seconds) *
                                  1_000_000_000_000_000_000)
   }
 
   public static func seconds(_ seconds: Double) -> Duration {
-    return Duration(_attoseconds: _DoubleWidth<Int64>(seconds *
+    return Duration(_attoseconds: _Int128(seconds *
                                  1_000_000_000_000_000_000))
   }
 
   public static func milliseconds<T: BinaryInteger>(
     _ milliseconds: T
   ) -> Duration {
-    return Duration(_attoseconds: _DoubleWidth<Int64>(milliseconds) *
+    return Duration(_attoseconds: _Int128(milliseconds) *
                                  1_000_000_000_000_000)
   }
 
   public static func milliseconds(_ milliseconds: Double) -> Duration {
-    return Duration(_attoseconds: _DoubleWidth<Int64>(milliseconds *
+    return Duration(_attoseconds: _Int128(milliseconds *
                                  1_000_000_000_000_000))
   }
 
   public static func microseconds<T: BinaryInteger>(
     _ microseconds: T
   ) -> Duration {
-    return Duration(_attoseconds: _DoubleWidth<Int64>(microseconds) *
+    return Duration(_attoseconds: _Int128(microseconds) *
                                  1_000_000_000_000)
   }
 
   public static func microseconds(_ microseconds: Double) -> Duration {
-    return Duration(_attoseconds: _DoubleWidth<Int64>(microseconds *
+    return Duration(_attoseconds: _Int128(microseconds *
                                  1_000_000_000_000))
   }
 
   public static func nanoseconds<T: BinaryInteger>(
     _ nanoseconds: T
   ) -> Duration {
-    return Duration(_attoseconds: _DoubleWidth<Int64>(nanoseconds) *
+    return Duration(_attoseconds: _Int128(nanoseconds) *
                                  1_000_000_000)
   }
 }
@@ -145,7 +145,7 @@ extension Duration: AdditiveArithmetic {
 extension Duration {
   public static func / (_ lhs: Duration, _ rhs: Double) -> Duration {
     return Duration(_attoseconds:
-      _DoubleWidth<Int64>(Double(lhs._attoseconds) / rhs))
+      _Int128(Double(lhs._attoseconds) / rhs))
   }
 
   public static func /= (_ lhs: inout Duration, _ rhs: Double) {
@@ -155,7 +155,7 @@ extension Duration {
   public static func / <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
-    Duration(_attoseconds: lhs._attoseconds / _DoubleWidth<Int64>(rhs))
+    Duration(_attoseconds: lhs._attoseconds / _Int128(rhs))
   }
 
   public static func /= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {
@@ -167,13 +167,13 @@ extension Duration {
   }
 
   public static func * (_ lhs: Duration, _ rhs: Double) -> Duration {
-    Duration(_attoseconds: _DoubleWidth<Int64>(Double(lhs._attoseconds) * rhs))
+    Duration(_attoseconds: _Int128(Double(lhs._attoseconds) * rhs))
   }
 
   public static func * <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
-    Duration(_attoseconds: lhs._attoseconds * _DoubleWidth<Int64>(rhs))
+    Duration(_attoseconds: lhs._attoseconds * _Int128(rhs))
   }
 
   public static func *= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {

@@ -234,7 +234,7 @@
     "LegacyABI.swift",
     "MigrationSupport.swift",
     "PtrAuth.swift",
-    "DoubleWide.swift",
+    "Int128.swift",
     "Duration.swift",
     "DurationProtocol.swift",
     "Instant.swift"

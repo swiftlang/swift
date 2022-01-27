@@ -215,7 +215,6 @@ set(SWIFTLIB_SOURCES
   CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift
-  DoubleWide.swift
   Duration.swift
   DurationProtocol.swift
   FloatingPointRandom.swift
@@ -224,6 +223,7 @@ set(SWIFTLIB_SOURCES
   PlaygroundDisplay.swift
   CommandLine.swift
   SliceBuffer.swift
+  SIMDVector.swift
   UnfoldSequence.swift
   VarArgs.swift
   Zip.swift
@@ -232,14 +232,11 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  Int128.swift.gyb
+  SIMDConcreteOperations.swift.gyb
+  SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
-
-if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
-  list(APPEND SWIFTLIB_SOURCES SIMDVector.swift)
-  list(APPEND SWIFTLIB_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
-endif()
-
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)
