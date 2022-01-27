@@ -933,13 +933,14 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 RequirementCheckResult
 TypeChecker::checkGenericArguments(ModuleDecl *module,
                                    ArrayRef<Requirement> requirements,
-                                   TypeSubstitutionFn substitutions) {
+                                   TypeSubstitutionFn substitutions,
+                                   SubstOptions options) {
   SmallVector<Requirement, 4> worklist;
   bool valid = true;
 
   for (auto req : requirements) {
     if (auto resolved = req.subst(substitutions,
-                                  LookUpConformanceInModule(module))) {
+                                  LookUpConformanceInModule(module), options)) {
       worklist.push_back(*resolved);
     } else {
       valid = false;

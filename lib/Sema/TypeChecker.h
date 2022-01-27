@@ -484,7 +484,8 @@ RequirementCheckResult checkGenericArguments(
 RequirementCheckResult checkGenericArguments(
     ModuleDecl *module,
     ArrayRef<Requirement> requirements,
-    TypeSubstitutionFn substitutions);
+    TypeSubstitutionFn substitutions,
+    SubstOptions options = None);
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
