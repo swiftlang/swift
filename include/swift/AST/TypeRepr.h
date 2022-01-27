@@ -47,6 +47,9 @@ enum class TypeReprKind : uint8_t {
 enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
+class OpaqueReturnTypeRepr;
+using CollectedOpaqueReprs = SmallVector<OpaqueReturnTypeRepr *, 2>;
+
 /// Representation of a type as written in source.
 class alignas(1 << TypeReprAlignInBits) TypeRepr
     : public ASTAllocated<TypeRepr> {
@@ -164,6 +167,10 @@ public:
   /// Check recursively whether this type repr or any of its decendants are
   /// opaque return type reprs.
   bool hasOpaque();
+
+  /// Walk the type representation recursively, collecting any
+  /// `OpaqueReturnTypeRepr`s.
+  CollectedOpaqueReprs collectOpaqueReturnTypeReprs();
 
   //*** Allocation Routines ************************************************/
 
