@@ -375,6 +375,10 @@ void MinimalConformances::collectConformanceRules() {
     if (rule.isRedundant())
       continue;
 
+    if (rule.isRHSSimplified() ||
+        rule.isSubstitutionSimplified())
+      continue;
+
     if (rule.containsUnresolvedSymbols())
       continue;
 
