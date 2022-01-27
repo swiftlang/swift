@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # check-incremental - Check if incremental compilation works -*- python -*-
 #
 # This source file is part of the Swift.org open source project
@@ -17,8 +17,6 @@ multiple times and checks if the output object file is only written once.
 The main purpose of the check is to ensure that the compiler is
 deterministic.
 """
-
-from __future__ import print_function
 
 import os
 import subprocess
