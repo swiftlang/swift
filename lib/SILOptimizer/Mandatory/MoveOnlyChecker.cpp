@@ -58,13 +58,13 @@ struct MoveOnlyChecker {
 
 bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                             DominanceInfo *domTree) {
-  SmallSetVector<MoveValueInst *, 32> moveIntroducersToProcess;
+  SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
 
   for (auto &block : *fn) {
     for (auto &ii : block) {
-      auto *mvi = dyn_cast<MoveValueInst>(&ii);
+      auto *mvi = dyn_cast<MarkMustCheckInst>(&ii);
       // For now only handle move_only.
-      if (!mvi)
+      if (!mvi || !mvi->isNoImplicitCopy())
         continue;
       auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand());
       if (!cvi)
@@ -78,7 +78,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
 
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
-        if (auto *mvi = dyn_cast<MoveValueInst>(instToDelete))
+        if (auto *mvi = dyn_cast<MarkMustCheckInst>(instToDelete))
           moveIntroducersToProcess.remove(mvi);
         instToDelete->eraseFromParent();
       });
@@ -99,16 +99,16 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       domTree, deleter, foundConsumingUseNeedingCopy,
       foundConsumingUseNotNeedingCopy);
   auto &astContext = fn->getASTContext();
-  auto movesToProcess = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
-                                           moveIntroducersToProcess.end());
-  while (!movesToProcess.empty()) {
+  auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
+                                            moveIntroducersToProcess.end());
+  while (!moveIntroducers.empty()) {
     SWIFT_DEFER {
       consumingUsesNeedingCopy.clear();
       consumingUsesNotNeedingCopy.clear();
     };
 
-    SILValue movedValue = movesToProcess.front();
-    movesToProcess = movesToProcess.drop_front(1);
+    SILValue movedValue = moveIntroducers.front();
+    moveIntroducers = moveIntroducers.drop_front(1);
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *movedValue);
     changed |= canonicalizer.canonicalizeValueLifetime(movedValue);
 
@@ -144,13 +144,16 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     }
   }
 
-  // Now go back through all of the move_value and change their copy_value to be
-  // on the operand of the lexical begin_borrow that introduced it.
+  // Ok, we have success. All of our marker instructions were proven as
+  // safe. Now we need to clean up the IR by eliminating our marker instructions
+  // to signify that the checked SIL is correct.
+  //
+  // NOTE: This is enforced in the verifier by only allowing MarkMustCheckInst
+  // in Raw SIL.
   while (!moveIntroducersToProcess.empty()) {
     auto *mvi = moveIntroducersToProcess.pop_back_val();
-    auto *cvi = cast<CopyValueInst>(mvi->getOperand());
-    auto *bbi = cast<BeginBorrowInst>(cvi->getOperand());
-    cvi->setOperand(bbi->getOperand());
+    mvi->replaceAllUsesWith(mvi->getOperand());
+    mvi->eraseFromParent();
     changed = true;
   }
 
