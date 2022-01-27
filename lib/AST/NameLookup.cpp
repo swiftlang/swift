@@ -2594,31 +2594,31 @@ createOpaqueParameterGenericParams(
   SmallVector<GenericTypeParamDecl *, 2> implicitGenericParams;
   auto dc = value->getInnermostDeclContext();
   for (auto param : *params) {
-    // Don't permit variadic or inout parameters.
-    if (param->isVariadic() || param->isInOut())
+    // Don't permit variadic parameters.
+    if (param->isVariadic())
       continue;
 
     auto typeRepr = param->getTypeRepr();
     if (!typeRepr)
       continue;
 
-    // FIXME: Do we want to allow any structure here? Optionals?
-    auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(typeRepr);
-    if (!opaqueRepr)
-      continue;
+    auto opaqueTypeReprs = typeRepr->collectOpaqueReturnTypeReprs();
+    for (auto opaqueRepr : opaqueTypeReprs) {
+      // Allocate a new generic parameter to represent this opaque type.
+      auto gp = GenericTypeParamDecl::create(
+          dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
+          GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
+          opaqueRepr);
+      gp->setImplicit();
 
-    // Allocate a new generic parameter to represent this opaque type.
-    auto gp = GenericTypeParamDecl::create(
-        dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
-        GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
-        opaqueRepr);
-    gp->setImplicit();
+      // Use the underlying constraint as the constraint on the generic parameter.
+      InheritedEntry inherited[1] = {
+        { TypeLoc(opaqueRepr->getConstraint()) }
+      };
+      gp->setInherited(ctx.AllocateCopy(inherited));
 
-    // Use the underlying constraint as the constraint on the generic parameter.
-    InheritedEntry inherited[1] = { { TypeLoc(opaqueRepr->getConstraint()) } };
-    gp->setInherited(ctx.AllocateCopy(inherited));
-
-    implicitGenericParams.push_back(gp);
+      implicitGenericParams.push_back(gp);
+    }
   }
 
   return implicitGenericParams;

@@ -51,6 +51,22 @@ func testTakeMultiple(
   takeMultiple(d, arrayOfInts, arrayOfInts) // expected-error{{global function 'takeMultiple' requires that '[Int]' conform to 'P'}}
 }
 
+// inout
+
+func anyInOut(_: inout some P) { }
+
+func testAnyInOut() {
+  var i = 17
+  anyInOut(&i)
+}
+
+// In structural positions.
+func anyDictionary(_ dict: [some Hashable: some Any]) { }
+
+func testAnyDictionary(numberNames: [Int: String]) {
+  anyDictionary(numberNames)
+}
+
 // Combine with parameterized protocol types
 protocol PrimaryCollection: Collection {
   @_primaryAssociatedType associatedtype Element
