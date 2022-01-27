@@ -386,12 +386,6 @@ void MinimalConformances::collectConformanceRules() {
 
     ConformanceRules.push_back(ruleID);
 
-    // Initially, every non-redundant conformance rule can be expressed
-    // as itself.
-    SmallVector<unsigned, 2> path;
-    path.push_back(ruleID);
-    ConformancePaths[ruleID].push_back(path);
-
     // Save protocol refinement relations in a side table.
     if (rule.isProtocolRefinementRule()) {
       ProtocolRefinements.insert(ruleID);
@@ -642,7 +636,8 @@ bool MinimalConformances::isValidConformancePath(
       visited.insert(ruleID);
 
       auto found = ConformancePaths.find(ruleID);
-      assert(found != ConformancePaths.end());
+      if (found == ConformancePaths.end())
+        return false;
 
       bool foundValidConformancePath = false;
       for (const auto &otherPath : found->second) {
@@ -814,7 +809,8 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
 void MinimalConformances::computeMinimalConformances(bool firstPass) {
   for (unsigned ruleID : ConformanceRules) {
     auto found = ConformancePaths.find(ruleID);
-    assert(found != ConformancePaths.end());
+    if (found == ConformancePaths.end())
+      continue;
 
     const auto &paths = found->second;
 
@@ -925,11 +921,11 @@ void MinimalConformances::dumpMinimalConformances(
     llvm::raw_ostream &out) const {
   out << "Minimal conformances:\n";
 
-  for (const auto &pair : ConformancePaths) {
-    if (RedundantConformances.count(pair.first) > 0)
+  for (unsigned ruleID : ConformanceRules) {
+    if (RedundantConformances.count(ruleID) > 0)
       continue;
 
-    out << "- " << System.getRule(pair.first) << "\n";
+    out << "- " << System.getRule(ruleID) << "\n";
   }
 }
 
