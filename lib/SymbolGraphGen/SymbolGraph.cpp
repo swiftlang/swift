@@ -99,6 +99,10 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   ExcludeAttrs.insert(std::make_pair("DAK_Postfix", DAK_Postfix));
   ExcludeAttrs.insert(std::make_pair("DAK_Infix", DAK_Infix));
 
+  // In "emit modules separately" jobs, access modifiers show up as attributes,
+  // but we don't want them to be printed in declarations
+  ExcludeAttrs.insert(std::make_pair("DAK_AccessControl", DAK_AccessControl));
+
   for (const auto &Entry : ExcludeAttrs) {
     Opts.ExcludeAttrList.push_back(Entry.getValue());
   }
