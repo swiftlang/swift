@@ -799,3 +799,14 @@ Expr *swift::buildPropertyWrapperInitCall(
 
   return initializer;
 }
+
+bool swift::isWrappedValueOfPropWrapper(VarDecl *var) {
+  if (!var->isStatic())
+    if (auto *dc = var->getDeclContext())
+      if (auto *nominal = dc->getSelfNominalTypeDecl())
+        if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())
+          if (var->getName() == var->getASTContext().Id_wrappedValue)
+            return true;
+
+  return false;
+}

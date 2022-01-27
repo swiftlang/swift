@@ -299,7 +299,7 @@ struct WrapperOnActor<Wrapped: Sendable> {
     stored = wrappedValue
   }
 
-  @MainActor var wrappedValue: Wrapped {
+  @MainActor var wrappedValue: Wrapped { // expected-note {{property declared here}}
     get { }
     set { }
   }
@@ -314,7 +314,19 @@ struct WrapperOnActor<Wrapped: Sendable> {
 @propertyWrapper
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
-  public var wrappedValue: Wrapped
+  
+  public var wrappedValue: Wrapped // expected-note {{property declared here}}
+
+  public var accessCount: Int
+
+  nonisolated public init(wrappedValue: Wrapped) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+@propertyWrapper
+public struct WrapperOnMainActor2<Wrapped> {
+  @MainActor public var wrappedValue: Wrapped
 
   public init(wrappedValue: Wrapped) {
     self.wrappedValue = wrappedValue
@@ -340,15 +352,36 @@ actor WrapperActor<Wrapped: Sendable> {
   }
 }
 
+struct HasMainActorWrappedProp {
+  @WrapperOnMainActor var thing: Int = 1 // expected-note {{property declared here}}
+
+  var plainStorage: Int
+
+  var computedProp: Int { 0 } // expected-note {{property declared here}}
+
+  nonisolated func testErrors() {
+    _ = thing // expected-error {{property 'thing' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
+    _ = _thing.wrappedValue // expected-error {{property 'wrappedValue' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
+
+    _ = _thing
+    _ = _thing.accessCount
+
+    _ = plainStorage
+
+    _ = computedProp // expected-error {{property 'computedProp' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
+  }
+}
+
 struct HasWrapperOnActor {
   @WrapperOnActor var synced: Int = 0
   // expected-note@-1 2{{property declared here}}
 
-  // expected-note@+1 2{{to make instance method 'testErrors()'}}
+  // expected-note@+1 3{{to make instance method 'testErrors()'}}
   func testErrors() {
     _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
     _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
     _ = _synced
+    _ = _synced.wrappedValue // expected-error{{property 'wrappedValue' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
   }
 
   @MainActor mutating func testOnMain() {

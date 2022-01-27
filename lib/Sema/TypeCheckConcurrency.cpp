@@ -359,7 +359,7 @@ GlobalActorAttributeRequest::evaluate(
       // ... and not if it's the instance storage of a struct
       if (!var->isStatic() && var->isOrdinaryStoredProperty()) {
         if (auto *nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
-          if (isa<StructDecl>(nominal)) {
+          if (isa<StructDecl>(nominal) && !isWrappedValueOfPropWrapper(var)) {
 
             var->diagnose(diag::global_actor_on_storage_of_value_type,
                           var->getName(), nominal->getDescriptiveKind())
@@ -3631,7 +3631,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
         if (!var->isStatic() && var->isOrdinaryStoredProperty())
           if (auto *varDC = var->getDeclContext())
             if (auto *nominal = varDC->getSelfNominalTypeDecl())
-              if (isa<StructDecl>(nominal))
+              if (isa<StructDecl>(nominal) && !isWrappedValueOfPropWrapper(var))
                 return ActorIsolation::forUnspecified();
 
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
