@@ -4727,6 +4727,18 @@ public:
   }
 
   void
+  visitParametrizedProtocolType(const ParametrizedProtocolType *type) {
+    using namespace decls_block;
+
+    unsigned abbrCode =
+        S.DeclTypeAbbrCodes[ParametrizedProtocolTypeLayout::Code];
+    ParametrizedProtocolTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(type->getBaseType()),
+        S.addTypeRef(type->getArgumentType()));
+  }
+
+  void
   visitExistentialType(const ExistentialType *existential) {
     using namespace decls_block;
     serializeSimpleWrapper<ExistentialTypeLayout>(existential->getConstraintType());

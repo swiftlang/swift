@@ -7004,6 +7004,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Struct:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
+  case TypeKind::ParametrizedProtocol:
   case TypeKind::Existential:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
@@ -7020,6 +7021,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Existential:
   case TypeKind::ExistentialMetatype:
   case TypeKind::ProtocolComposition:
+  case TypeKind::ParametrizedProtocol:
   case TypeKind::Protocol:
     return coerceExistential(expr, toType);
 

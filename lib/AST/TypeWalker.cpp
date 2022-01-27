@@ -174,6 +174,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
+  bool visitParametrizedProtocolType(ParametrizedProtocolType *ty) {
+    if (doIt(ty->getBaseType()))
+      return true;
+
+    return doIt(ty->getArgumentType());
+  }
+
   bool visitExistentialType(ExistentialType *ty) {
     return doIt(ty->getConstraintType());
   }

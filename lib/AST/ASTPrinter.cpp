@@ -753,6 +753,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
       FreshOptions.ExclusiveAttrList = options.ExclusiveAttrList;
       FreshOptions.PrintOptionalAsImplicitlyUnwrapped = options.PrintOptionalAsImplicitlyUnwrapped;
       FreshOptions.TransformContext = options.TransformContext;
+      FreshOptions.CurrentModule = options.CurrentModule;
+      FreshOptions.FullyQualifiedTypesIfAmbiguous = options.FullyQualifiedTypesIfAmbiguous;
       T.print(Printer, FreshOptions);
       return;
     }
@@ -5875,6 +5877,13 @@ public:
       if (T->hasExplicitAnyObject())
         Printer << " & AnyObject";
     }
+  }
+
+  void visitParametrizedProtocolType(ParametrizedProtocolType *T) {
+    visit(T->getBaseType());
+    Printer << "<";
+    visit(T->getArgumentType());
+    Printer << ">";
   }
 
   void visitExistentialType(ExistentialType *T) {

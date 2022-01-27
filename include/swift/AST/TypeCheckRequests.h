@@ -313,6 +313,26 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Find the primary associated type of the given protocol.
+class PrimaryAssociatedTypeRequest :
+    public SimpleRequest<PrimaryAssociatedTypeRequest,
+                         AssociatedTypeDecl *(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  AssociatedTypeDecl *
+  evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class PolymorphicEffectRequirementsRequest :
     public SimpleRequest<PolymorphicEffectRequirementsRequest,
                          PolymorphicEffectRequirementList(EffectKind, ProtocolDecl *),

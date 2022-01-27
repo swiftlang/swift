@@ -305,6 +305,27 @@ class TypeMatcher {
     TRIVIAL_CASE(SILBoxType)
     TRIVIAL_CASE(ProtocolCompositionType)
 
+    bool visitParametrizedProtocolType(CanParametrizedProtocolType firstParametrizedProto,
+                                       Type secondType,
+                                       Type sugaredFirstType) {
+      if (auto secondParametrizedProto = secondType->getAs<ParametrizedProtocolType>()) {
+        if (!this->visit(firstParametrizedProto.getBaseType(),
+                         secondParametrizedProto->getBaseType(),
+                         sugaredFirstType->castTo<ParametrizedProtocolType>()
+                             ->getBaseType())) {
+          return false;
+        }
+
+        return this->visit(firstParametrizedProto.getArgumentType(),
+                           secondParametrizedProto->getArgumentType(),
+                           sugaredFirstType->castTo<ParametrizedProtocolType>()
+                               ->getArgumentType());
+      }
+
+      return mismatch(firstParametrizedProto.getPointer(), secondType,
+                      sugaredFirstType);
+    }
+
     bool visitExistentialType(CanExistentialType firstExistential,
                               Type secondType,
                               Type sugaredFirstType) {
