@@ -741,23 +741,22 @@ public:
     return bits;
   }
 
+  // Treat the provided value as a mask, `and` it with
+  // the part of the mask at the provided byte offset.
+  // Bits outside the specified area are unchanged.
   template<typename IntegerType>
   void andMask(IntegerType value, unsigned byteOffset) {
-    if (byteOffset >= size) {
-      makeZero();
-    } else {
-      andMask((void *)&value, sizeof(value), byteOffset);
-    }
+    andMask((void *)&value, sizeof(value), byteOffset);
   }
 
+  // As above, but using the provided bitmask instead
+  // of an integer.
   void andMask(BitMask mask, unsigned offset) {
-    if (offset >= size) {
-      makeZero();
-    } else {
-      andMask(mask.mask, mask.size, offset);
-    }
+    andMask(mask.mask, mask.size, offset);
   }
 
+  // As above, but using the complement of the
+  // provided mask.
   void andNotMask(BitMask mask, unsigned offset) {
     if (offset < size) {
       andNotMask(mask.mask, mask.size, offset);
@@ -839,12 +838,12 @@ public:
 
 private:
   void andMask(void *maskData, unsigned len, unsigned offset) {
-    // Bits beyond the current size are implicitly zero
-    assert(offset < size);
-    unsigned common = std::min(len, size - offset);
-    uint8_t *maskBytes = (uint8_t *)maskData;
-    for (unsigned i = 0; i < common; ++i) {
-      mask[i + offset] &= maskBytes[i];
+    if (offset < size) {
+      unsigned common = std::min(len, size - offset);
+      uint8_t *maskBytes = (uint8_t *)maskData;
+      for (unsigned i = 0; i < common; ++i) {
+        mask[i + offset] &= maskBytes[i];
+      }
     }
   }
 
