@@ -41,6 +41,17 @@
 #endif
 #endif
 
+// Does the runtime provide priority escalation support?
+#ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
+    __has_include(<dispatch/swift_concurrency_private.h>) && __APPLE__ && \
+    SWIFT_POINTER_IS_8_BYTES
+#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 1
+#else
+#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
+#endif
+#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
+
 namespace swift {
 class DefaultActor;
 class TaskOptionRecord;

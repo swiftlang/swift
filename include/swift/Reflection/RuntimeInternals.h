@@ -94,28 +94,34 @@ struct StackAllocator {
 };
 
 template <typename Runtime>
-struct ActiveTaskStatus {
+struct ActiveTaskStatusWithEscalation {
+  uint32_t Flags;
+  uint32_t DrainLock[(sizeof(typename Runtime::StoredPointer) == 8) ? 1 : 2];
   typename Runtime::StoredPointer Record;
-  typename Runtime::StoredSize Flags;
 };
 
 template <typename Runtime>
+struct ActiveTaskStatusWithoutEscalation {
+  uint32_t Flags[sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
+  typename Runtime::StoredPointer Record;
+};
+
+template <typename Runtime, typename ActiveTaskStatus>
 struct AsyncTaskPrivateStorage {
-  ActiveTaskStatus<Runtime> Status;
+  ActiveTaskStatus Status;
   StackAllocator<Runtime> Allocator;
   typename Runtime::StoredPointer Local;
   typename Runtime::StoredPointer ExclusivityAccessSet[2];
   uint32_t Id;
 };
 
-template <typename Runtime>
+template <typename Runtime, typename ActiveTaskStatus>
 struct AsyncTask: Job<Runtime> {
-  // On 64-bit, there's a Reserved64 after ResumeContext.  
+  // On 64-bit, there's a Reserved64 after ResumeContext.
   typename Runtime::StoredPointer ResumeContextAndReserved[
     sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
-
   union {
-    AsyncTaskPrivateStorage<Runtime> PrivateStorage;
+    AsyncTaskPrivateStorage<Runtime, ActiveTaskStatus> PrivateStorage;
     typename Runtime::StoredPointer PrivateStorageRaw[14];
   };
 };

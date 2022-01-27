@@ -106,6 +106,7 @@ class ReflectionContext
   typename super::StoredPointer target_future_adapter = 0;
   typename super::StoredPointer target_task_wait_throwing_resume_adapter = 0;
   typename super::StoredPointer target_task_future_wait_resume_adapter = 0;
+  bool supportsPriorityEscalation = false;
 
 public:
   using super::getBuilder;
@@ -164,7 +165,7 @@ public:
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
-  
+
   MemoryReader &getReader() {
     return *this->Reader;
   }
@@ -367,7 +368,7 @@ public:
 
         auto Begin = RemoteRef<void>(Addr, BufStart);
         auto Size = COFFSec->VirtualSize;
-        
+
         // FIXME: This code needs to be cleaned up and updated
         // to make it work for 32 bit platforms.
         Begin = Begin.atByteOffset(8);
@@ -605,7 +606,7 @@ public:
   }
 
   /// Parses metadata information from an ELF image. Because the Section
-  /// Header Table maybe be missing (for example, when reading from a 
+  /// Header Table maybe be missing (for example, when reading from a
   /// process) this method optionally receives a buffer with the contents
   /// of the image's file, from where it will the necessary information.
   ///
@@ -652,19 +653,19 @@ public:
     auto Magic = this->getReader().readBytes(ImageStart, sizeof(uint32_t));
     if (!Magic)
       return false;
-    
+
     uint32_t MagicWord;
     memcpy(&MagicWord, Magic.get(), sizeof(MagicWord));
-    
+
     // 32- and 64-bit Mach-O.
     if (MagicWord == llvm::MachO::MH_MAGIC) {
       return readMachOSections<MachOTraits<4>>(ImageStart);
     }
-    
+
     if (MagicWord == llvm::MachO::MH_MAGIC_64) {
       return readMachOSections<MachOTraits<8>>(ImageStart);
     }
-    
+
     // PE. (This just checks for the DOS header; `readPECOFF` will further
     // validate the existence of the PE header.)
     auto MagicBytes = (const char*)Magic.get();
@@ -739,7 +740,7 @@ public:
       return true;
     return ownsAddress(RemoteAddress(*MetadataAddress));
   }
-  
+
   /// Returns true if the address falls within a registered image.
   bool ownsAddressRaw(RemoteAddress Address) {
     for (auto Range : imageRanges) {
@@ -1214,7 +1215,7 @@ public:
     }
     return llvm::None;
   }
-  
+
   /// Fetch the metadata pointer from a metadata allocation, or 0 if this
   /// allocation's tag is not handled or an error occurred.
   StoredPointer allocationMetadataPointer(
@@ -1312,7 +1313,7 @@ public:
       getReader().readPointer(AllocationPoolAddrAddr, sizeof(StoredPointer));
     if (!AllocationPoolAddr)
       return "failed to read value of " + AllocationPoolPointerName;
-    
+
     struct PoolRange {
       StoredPointer Begin;
       StoredSize Remaining;
@@ -1358,10 +1359,10 @@ public:
         Allocation.Ptr = RemoteAddr;
         Allocation.Size = Header->Size;
         Call(Allocation);
-        
+
         Offset += sizeof(AllocationHeader) + Header->Size;
       }
-      
+
       TrailerPtr = Trailer->PrevTrailer;
     }
     return llvm::None;
@@ -1442,13 +1443,20 @@ public:
 
   std::pair<llvm::Optional<std::string>, AsyncTaskInfo>
   asyncTaskInfo(StoredPointer AsyncTaskPtr) {
-    auto AsyncTaskObj = readObj<AsyncTask<Runtime>>(AsyncTaskPtr);
+    loadTargetPointers();
+
+    if (supportsPriorityEscalation) {
+      return {std::string("Failure reading async task with escalation support"), {}};
+    }
+
+    using AsyncTask = AsyncTask<Runtime, ActiveTaskStatusWithoutEscalation<Runtime>>;
+    auto AsyncTaskObj = readObj<AsyncTask>(AsyncTaskPtr);
     if (!AsyncTaskObj)
       return {std::string("failure reading async task"), {}};
 
     AsyncTaskInfo Info{};
     Info.JobFlags = AsyncTaskObj->Flags;
-    Info.TaskStatusFlags = AsyncTaskObj->PrivateStorage.Status.Flags;
+    Info.TaskStatusFlags = AsyncTaskObj->PrivateStorage.Status.Flags[0];
     Info.Id =
         AsyncTaskObj->Id | ((uint64_t)AsyncTaskObj->PrivateStorage.Id << 32);
     Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
@@ -1482,7 +1490,7 @@ public:
         Info.ChildTasks.push_back(ChildTask);
 
         StoredPointer ChildFragmentAddr =
-            ChildTask + sizeof(AsyncTask<Runtime>);
+            ChildTask + sizeof(AsyncTask);
         auto ChildFragmentObj =
             readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
         if (ChildFragmentObj)
@@ -1499,8 +1507,8 @@ public:
     // that's available.
     int IsCancelledFlag = 0x100;
     int IsRunningFlag = 0x800;
-    if (!(AsyncTaskObj->PrivateStorage.Status.Flags & IsCancelledFlag) &&
-        !(AsyncTaskObj->PrivateStorage.Status.Flags & IsRunningFlag)) {
+    if (!(AsyncTaskObj->PrivateStorage.Status.Flags[0] & IsCancelledFlag) &&
+        !(AsyncTaskObj->PrivateStorage.Status.Flags[0] & IsRunningFlag)) {
       auto ResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
       while (ResumeContext) {
         auto ResumeContextObj = readObj<AsyncContext<Runtime>>(ResumeContext);
@@ -1551,7 +1559,7 @@ public:
 private:
   // Get the most human meaningful "run job" function pointer from the task,
   // like AsyncTask::getResumeFunctionForLogging does.
-  StoredPointer getRunJob(const AsyncTask<Runtime> *AsyncTaskObj) {
+  StoredPointer getRunJob(const AsyncTask<Runtime, ActiveTaskStatusWithoutEscalation<Runtime>> *AsyncTaskObj) {
     auto Fptr = stripSignedPointer(AsyncTaskObj->RunJob);
 
     loadTargetPointers();
@@ -1610,6 +1618,11 @@ private:
         getFunc("_swift_concurrency_debug_task_wait_throwing_resume_adapter");
     target_task_future_wait_resume_adapter =
         getFunc("_swift_concurrency_debug_task_future_wait_resume_adapter");
+    auto supportsPriorityEscalationAddr = getReader().getSymbolAddress("_swift_concurrency_debug_supportsPriorityEscalation");
+    if (supportsPriorityEscalationAddr) {
+      getReader().readInteger(supportsPriorityEscalationAddr, &supportsPriorityEscalation);
+    }
+
     setupTargetPointers = true;
   }
 

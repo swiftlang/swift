@@ -27,6 +27,7 @@
 #include "Tracing.h"
 #include "Debug.h"
 #include "Error.h"
+#include <atomic>
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
@@ -72,6 +73,9 @@ using TaskGroup = swift::TaskGroup;
 Metadata swift::TaskAllocatorSlabMetadata;
 const void *const swift::_swift_concurrency_debug_asyncTaskSlabMetadata =
     &TaskAllocatorSlabMetadata;
+
+bool swift::_swift_concurrency_debug_supportsPriorityEscalation =
+    SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
