@@ -712,9 +712,7 @@ public:
   }
 
   void makeZero() {
-    for (unsigned i = 0; i < size; ++i) {
-      mask[i] = 0;
-    }
+    memset(mask, 0, size * sizeof(mask[0]));
   }
 
   void complement() {
