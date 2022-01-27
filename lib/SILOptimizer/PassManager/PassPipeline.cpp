@@ -173,6 +173,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
                                          //   value.
   P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
 
+  // Now that we have run move only checking, eliminate SILMoveOnly wrapped
+  // trivial types from the IR. We cannot introduce extra "copies" of trivial
+  // things so we can simplify our implementation by eliminating them here.
+  P.addTrivialMoveOnlyTypeEliminator();
+
   // This phase performs optimizations necessary for correct interoperation of
   // Swift os log APIs with C os_log ABIs.
   // Pass dependencies: this pass depends on MandatoryInlining and Mandatory
