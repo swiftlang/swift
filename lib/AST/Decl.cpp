@@ -736,8 +736,8 @@ bool Decl::preconcurrency() const {
   // Variables declared in top-level code are @_predatesConcurrency
   if (const VarDecl *var = dyn_cast<VarDecl>(this)) {
     const LangOptions &langOpts = getASTContext().LangOpts;
-    return !langOpts.isSwiftVersionAtLeast(6) &&
-           langOpts.EnableExperimentalAsyncTopLevel && var->isTopLevelGlobal();
+    return !langOpts.isSwiftVersionAtLeast(6) && var->isTopLevelGlobal() &&
+           var->getDeclContext()->isAsyncContext();
   }
 
   return false;
@@ -8946,9 +8946,8 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   }
 
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
-    ASTContext &ctx = dc->getASTContext();
-    if (ctx.LangOpts.EnableExperimentalAsyncTopLevel) {
-      if (Type mainActor = ctx.getMainActorType())
+    if (dc->isAsyncContext()) {
+      if (Type mainActor = dc->getASTContext().getMainActorType())
         return ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/false);
     }
   }
