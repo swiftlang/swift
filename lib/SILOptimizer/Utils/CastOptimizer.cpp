@@ -1547,7 +1547,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
     auto &Ctx = Mod.getASTContext();
     auto *SM = Mod.getSwiftModule();
 
-    auto Proto = dyn_cast<ProtocolDecl>(TargetType->getAnyNominal());
+    auto *Proto = dyn_cast_or_null<ProtocolDecl>(TargetType->getAnyNominal());
     if (!Proto)
       return false;
 
