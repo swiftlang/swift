@@ -438,6 +438,10 @@ PASS(MoveOnlyChecker, "sil-move-only-checker",
 PASS(MoveKillsCopyableValuesChecker, "sil-move-kills-copyable-values-checker",
      "Pass that checks that any copyable (non-move only) value that is passed "
      "to _move do not have any uses later than the _move")
+PASS(TrivialMoveOnlyTypeEliminator, "sil-trivial-move-only-type-eliminator",
+     "Pass that rewrites SIL to remove move only types from values of trivial type")
+PASS(MoveOnlyTypeEliminator, "sil-move-only-type-eliminator",
+     "Pass that rewrites SIL to remove move only types from all values")
 PASS(LexicalLifetimeEliminator, "sil-lexical-lifetime-eliminator",
      "Pass that removes lexical lifetime markers from borrows and alloc stack")
 PASS(MoveKillsCopyableAddressesChecker, "sil-move-kills-copyable-addresses-checker",
