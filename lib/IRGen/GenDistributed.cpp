@@ -71,6 +71,15 @@ struct AllocationInfo {
   StackAddress Addr;
 };
 
+struct ArgumentDecoderInfo {
+  CanSILFunctionType Type;
+  FunctionPointer Fn;
+
+  /// Given the decoder instance, form a callee to a
+  /// decode method - `decodeNextArgument`.
+  Callee getCallee(llvm::Value *decoder) const;
+};
+
 class DistributedAccessor {
   IRGenModule &IGM;
   IRGenFunction &IGF;
@@ -82,6 +91,10 @@ class DistributedAccessor {
   CanSILFunctionType AccessorType;
   /// The asynchronous context associated with this accessor.
   AsyncContextLayout AsyncLayout;
+
+  /// The argument decoder associated with the distributed actor
+  /// this accessor belong to.
+  ArgumentDecoderInfo ArgumentDecoder;
 
   /// The list of all arguments that were allocated on the stack.
   SmallVector<AllocationInfo, 4> AllocatedArguments;
@@ -134,9 +147,21 @@ private:
   FunctionPointer getPointerToTarget() const;
 
   Callee getCalleeForDistributedTarget(llvm::Value *self) const;
+
+  /// Given a distributed thunk, find argument coder that should
+  /// could be used to decode argument values to pass to its invocation.
+  static ArgumentDecoderInfo findArgumentDecoder(IRGenModule &IGM,
+                                                 SILFunction *thunk);
 };
 
 } // end namespace
+
+static NominalTypeDecl *getDistributedActorOf(SILFunction *thunk) {
+  assert(thunk->isDistributed() && thunk->isThunk());
+  return thunk->getDeclContext()
+      ->getInnermostTypeContext()
+      ->getSelfNominalTypeDecl();
+}
 
 /// Compute a type of a distributed method accessor function based
 /// on the provided distributed method.
@@ -145,9 +170,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   auto &Context = IGM.Context;
 
   auto getInvocationDecoderParameter = [&]() {
-    auto *actor = Target->getDeclContext()
-                      ->getInnermostTypeContext()
-                      ->getSelfNominalTypeDecl();
+    auto *actor = getDistributedActorOf(Target);
     auto *decoder = Context.getDistributedActorInvocationDecoder(actor);
     auto decoderTy = decoder->getInterfaceType()->getMetatypeInstanceType();
     auto paramType = IGM.getLoweredType(decoderTy);
@@ -235,7 +258,8 @@ DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
           IGM, AccessorType, AccessorType, SubstitutionMap(),
           /*suppress generics*/ true,
           FunctionPointer::Kind(
-              FunctionPointer::BasicKind::AsyncFunctionPointer))) {}
+              FunctionPointer::BasicKind::AsyncFunctionPointer))),
+      ArgumentDecoder(findArgumentDecoder(IGM, target)) {}
 
 void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
                                            llvm::Value *argumentTypes,
@@ -665,4 +689,32 @@ DistributedAccessor::getCalleeForDistributedTarget(llvm::Value *self) const {
   auto fnType = Target->getLoweredFunctionType();
   CalleeInfo info{fnType, fnType, SubstitutionMap()};
   return {std::move(info), getPointerToTarget(), self};
+}
+
+ArgumentDecoderInfo
+DistributedAccessor::findArgumentDecoder(IRGenModule &IGM, SILFunction *thunk) {
+  auto *actor = getDistributedActorOf(thunk);
+
+  auto *decodeFn = IGM.Context.getDistributedActorArgumentDecodingMethod(actor);
+  assert(decodeFn && "no suitable decoder?");
+
+  auto methodTy = IGM.getSILTypes().getConstantFunctionType(
+      IGM.getMaximalTypeExpansionContext(), SILDeclRef(decodeFn));
+
+  auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+  auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
+                                         /*isDynamicallyReplacible=*/false);
+
+  auto signature = IGM.getSignature(methodTy, /*useSpecialConvention=*/false);
+
+  auto methodPtr =
+      FunctionPointer::forDirect(classifyFunctionPointerKind(decodeSIL), fnPtr,
+                                 /*secondaryValue=*/nullptr, signature);
+
+  return {.Type = methodTy, .Fn = methodPtr};
+}
+
+Callee ArgumentDecoderInfo::getCallee(llvm::Value *decoder) const {
+  CalleeInfo info(Type, Type, SubstitutionMap());
+  return {std::move(info), Fn, decoder};
 }
