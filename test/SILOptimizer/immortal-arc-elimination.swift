@@ -11,9 +11,12 @@
 // Check that the optimizer can remove "unbalanced" retains for immortal objects.
 // But only with a Swift 5.1 runtime (which supports immortal objects).
 
+// Check if the optimization is disbled.
+// rdar://87898692
+
 // CHECK-LABEL: sil hidden [noinline] @$s4test10emptyArraySaySiGyF
 // CHECK:       global_addr
-// CHECK-NOT:   retain
+// CHECK:       retain
 // CHECK: } // end sil function '$s4test10emptyArraySaySiGyF'
 @inline(never)
 func emptyArray() -> [Int] {
@@ -23,7 +26,7 @@ func emptyArray() -> [Int] {
 
 // CHECK-LABEL: sil hidden [noinline] @$s4test13constantArraySaySiGyF
 // CHECK:       global_value
-// CHECK-NOT:   retain
+// CHECK:       retain
 // CHECK: } // end sil function '$s4test13constantArraySaySiGyF'
 @inline(never)
 func constantArray() -> [Int] {

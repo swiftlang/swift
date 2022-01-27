@@ -23,7 +23,10 @@ struct PassContext {
   fileprivate let passContext: BridgedPassContext
   
   var isSwift51RuntimeAvailable: Bool {
-    PassContext_isSwift51RuntimeAvailable(passContext) != 0
+    // Temporarily disable optimizations based on deployment target.
+    // rdar://87898692
+    return false
+    // PassContext_isSwift51RuntimeAvailable(passContext) != 0
   }
   
   var aliasAnalysis: AliasAnalysis {
