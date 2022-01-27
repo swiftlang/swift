@@ -381,6 +381,9 @@ void MinimalConformances::collectConformanceRules() {
     if (!rule.isAnyConformanceRule())
       continue;
 
+    if (!System.isInMinimizationDomain(rule.getLHS().getRootProtocols()))
+      continue;
+
     ConformanceRules.push_back(ruleID);
 
     // Initially, every non-redundant conformance rule can be expressed
@@ -810,7 +813,10 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
 /// made redundant by concrete conformances.
 void MinimalConformances::computeMinimalConformances(bool firstPass) {
   for (unsigned ruleID : ConformanceRules) {
-    const auto &paths = ConformancePaths[ruleID];
+    auto found = ConformancePaths.find(ruleID);
+    assert(found != ConformancePaths.end());
+
+    const auto &paths = found->second;
 
     if (firstPass) {
       bool derivedViaConcrete = false;
