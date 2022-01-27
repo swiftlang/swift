@@ -97,22 +97,19 @@ struct FakeActorSystem: DistributedActorSystem {
 
 }
 
-struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
-  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
-  mutating func doneRecording() throws {}
+  func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  func doneRecording() throws {}
 
   // === Receiving / decoding -------------------------------------------------
 
   func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-  ) throws { /* ... */ }
+  func decodeNextArgument<Argument>() throws -> Argument { fatalError() }
   func decodeReturnType() throws -> Any.Type? { nil }
   func decodeErrorType() throws -> Any.Type? { nil }
 }
