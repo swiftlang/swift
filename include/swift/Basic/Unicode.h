@@ -68,6 +68,12 @@ bool isSingleUnicodeScalar(StringRef S);
 
 unsigned extractFirstUnicodeScalar(StringRef S);
 
+/// Returns true if \p S does not contain any ill-formed subsequences. This does
+/// not check whether all of the characters in it are actually allocated or
+/// used correctly; it just checks that every byte can be grouped into a code
+/// unit (Unicode scalar).
+bool isWellFormedUTF8(StringRef S);
+
 } // end namespace unicode
 } // end namespace swift
 

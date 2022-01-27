@@ -1045,6 +1045,15 @@ StringLiteralInst::StringLiteralInst(SILDebugLocation Loc, StringRef Text,
   SILNode::Bits.StringLiteralInst.TheEncoding = unsigned(encoding);
   SILNode::Bits.StringLiteralInst.Length = Text.size();
   memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
+
+  // It is undefined behavior to feed ill-formed UTF-8 into `Swift.String`;
+  // however, the compiler creates string literals in many places, so there's a
+  // risk of a mistake. StringLiteralInsts can be optimized into
+  // IntegerLiteralInsts before reaching IRGen, so this constructor is the best
+  // chokepoint to validate *all* string literals that may eventually end up in
+  // a binary.
+  assert((encoding == Encoding::Bytes || unicode::isWellFormedUTF8(Text))
+            && "Created StringLiteralInst with ill-formed UTF-8");
 }
 
 StringLiteralInst *StringLiteralInst::create(SILDebugLocation Loc,
