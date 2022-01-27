@@ -1094,6 +1094,14 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   if (!rawTy) {
     return std::make_tuple<>();
   }
+  
+  // Avoid computing raw values for enum cases in swiftinterface files since raw
+  // values are intentionally omitted from them (unless the enum is @objc).
+  // Without bailing here, incorrect raw values can be automatically generated
+  // and incorrect diagnostics may be omitted for some decls.
+  SourceFile *Parent = ED->getDeclContext()->getParentSourceFile();
+  if (Parent && Parent->Kind == SourceFileKind::Interface && !ED->isObjC())
+    return std::make_tuple<>();
 
   if (!computeAutomaticEnumValueKind(ED)) {
     return std::make_tuple<>();
