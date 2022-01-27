@@ -29,7 +29,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 
@@ -1320,9 +1319,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       B.emitBlock(makeRemoteCallTargetBB);
       createVoidPhiArgument(*this, ctx, makeRemoteCallTargetBB);
 
-      auto mangledName = thunk.mangle(SILDeclRef::ManglingKind::Default);
-      auto mangledNameRef = llvm::StringRef(mangledName.c_str(), mangledName.size()); // FIXME(distributed): can just pass the mangledName?
-
       // --- Get the `RemoteCallTarget` type
 
       // %28 = alloc_stack $RemoteCallTarget, let, name "target" // users: %58, %57, %50, %77, %76, %37
@@ -1333,43 +1329,10 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto remoteCallTargetMetatype = getLoweredType(MetatypeType::get(remoteCallTargetTy));
       auto remoteCallTargetMetatypeValue = B.createMetatype(loc, remoteCallTargetMetatype);
 
-      // %30 = string_literal utf8 "MANGLED_NAME" // user: %35
-      auto mangledNameLiteral =
-          B.createStringLiteral(loc, mangledNameRef,
-                                StringLiteralInst::Encoding::UTF8);
+      auto mangledName = thunk.mangle(SILDeclRef::ManglingKind::Default);
+      auto mangledNameRef = llvm::StringRef(mangledName.c_str(), mangledName.size()); // FIXME(distributed): can just pass the mangledName?
 
-      // %31 = integer_literal $Builtin.Word, 12 // user: %35
-      auto codeUnitCountLiteral =
-          B.createIntegerLiteral(loc,
-                                 SILType::getBuiltinWordType(ctx),
-                                 mangledName.size());
-
-      // %32 = integer_literal $Builtin.Int1, -1 // user: %35
-      auto isAsciiLiteral =
-          B.createIntegerLiteral(loc,
-                                 SILType::getBuiltinIntegerType(1, ctx),
-                                 -1);
-
-      // %33 = metatype $@thin String.Type // user: %35
-      auto StringMetaTy = CanMetatypeType::get(CanType(ctx.getStringType()), MetatypeRepresentation::Thin);
-      auto stringSelf =
-          B.createMetatype(loc,
-                           SILType::getPrimitiveObjectType(StringMetaTy));
-
-      // // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
-      // %34 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %35
-      auto stringInitDeclRef = ctx.getStringBuiltinInitDecl(ctx.getStringDecl());
-      auto stringInitRef = SILDeclRef(stringInitDeclRef.getDecl(), SILDeclRef::Kind::Allocator);
-      // NotForDefinition since it seems the body of the init function is not there yet:
-       auto stringInitFn = builder.getOrCreateFunction(loc, stringInitRef, NotForDefinition);
-      auto stringInitFnRef = B.createFunctionRef(loc, stringInitFn);
-
-      // %35 = apply %34(%30, %31, %32, %33) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %37
-      // auto x = std::move(mangledNameLiteral).getScalarValue()
-      auto mangledNameStringValue =
-          B.createApply(loc, stringInitFnRef, {},
-                        /*args*/{mangledNameLiteral, codeUnitCountLiteral,
-                         isAsciiLiteral, stringSelf});
+      auto mangledNameString = emitStringLiteral(loc, mangledNameRef); // FIXME(distributed): trouble with the cleanups running in error BB too...
 
       // --- Create the RemoteCallTarget instance, passing the mangledNameString
       // function_ref RemoteCallTarget.init(_mangledName:)
@@ -1384,7 +1347,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // %37 = apply %36(%28, %35, %29) : $@convention(method) (@owned String, @thin RemoteCallTarget.Type) -> @out RemoteCallTarget
       B.createApply(
           loc, remoteCallTargetInitFn, {},
-          {/*out*/ remoteCallTargetValue.getValue(), mangledNameStringValue,
+          {/*out*/ remoteCallTargetValue.getValue(), mangledNameString.forward(*this),
            remoteCallTargetMetatypeValue});
 
       // === Prepare `actorSystem.remoteCall()` --------------------------------
