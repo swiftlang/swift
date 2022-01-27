@@ -79,16 +79,6 @@ struct RuntimeTarget<4> {
   using StoredSize = uint32_t;
   using StoredPointerDifference = int32_t;
   static constexpr size_t PointerSize = 4;
-
-#if SWIFT_OBJC_INTEROP
-  static constexpr bool ObjCInterop = true;
-  template <typename T>
-  using TargetAnyClassMetadata = TargetAnyClassMetadataObjCInterop<T>;
-#else
-  static constexpr bool ObjCInterop = false;
-  template <typename T>
-  using TargetAnyClassMetadata = TargetAnyClassMetadata<T>;
-#endif
 };
 
 template <>
@@ -101,16 +91,6 @@ struct RuntimeTarget<8> {
   using StoredSize = uint64_t;
   using StoredPointerDifference = int64_t;
   static constexpr size_t PointerSize = 8;
-
-#if SWIFT_OBJC_INTEROP
-  static constexpr bool ObjCInterop = true;
-  template <typename T>
-  using TargetAnyClassMetadata = TargetAnyClassMetadataObjCInterop<T>;
-#else
-  static constexpr bool ObjCInterop = false;
-  template <typename T>
-  using TargetAnyClassMetadata = TargetAnyClassMetadata<T>;
-#endif
 };
 
 namespace reflection {

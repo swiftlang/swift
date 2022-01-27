@@ -859,6 +859,43 @@ private:
       return typeName;
     }
 
+    std::string readProtocolNameFromProtocolDescriptor(const char *protocolDescriptorAddress) {
+      std::string protocolName;
+      auto protocolDescriptorBytes =
+          OpaqueByteReader(remote::RemoteAddress(protocolDescriptorAddress),
+                           sizeof(ExternalProtocolDescriptor<PointerSize>));
+      if (!protocolDescriptorBytes.get()) {
+        Error = "Error reading protocol descriptor.";
+        return protocolName;
+      }
+      const ExternalProtocolDescriptor<PointerSize> *protocolDescriptor =
+          (const ExternalProtocolDescriptor<PointerSize> *)
+              protocolDescriptorBytes.get();
+
+      // Compute the address of the protocol descriptor's name field and read
+      // the offset
+      auto protocolNameOffsetAddress = detail::applyRelativeOffset(
+          (const char *)protocolDescriptorAddress,
+          (int32_t)protocolDescriptor->getNameOffset());
+      auto protocolNameOfsetBytes = OpaqueByteReader(
+          remote::RemoteAddress(protocolNameOffsetAddress), sizeof(uint32_t));
+      if (!protocolNameOfsetBytes.get()) {
+        Error = "Failed to read type name offset in a protocol descriptor.";
+        return protocolName;
+      }
+      auto protocolNameOffset =
+          (const uint32_t *)protocolNameOfsetBytes.get();
+
+      // Using the offset above, compute the address of the name field itsel
+      // and read it.
+      auto protocolNameAddress =
+          detail::applyRelativeOffset((const char *)protocolNameOffsetAddress,
+                                      (int32_t)*protocolNameOffset);
+      OpaqueStringReader(remote::RemoteAddress(protocolNameAddress),
+                         protocolName);
+      return protocolName;
+    }
+
     std::string getConformanceProtocol(
         const char *conformanceDescriptorAddress,
         const ExternalProtocolConformanceDescriptor<PointerSize>
@@ -888,52 +925,26 @@ private:
             (const void *)((uint64_t)protocolDescriptorTarget & ~(0x1));
         if (auto symbol = OpaquePointerReader(
                 remote::RemoteAddress(adjustedProtocolDescriptorTarget), 8)) {
-
-          Demangle::Context Ctx;
-          auto demangledRoot =
-              Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
-          assert(demangledRoot->getKind() == Node::Kind::Global);
-          assert(demangledRoot->getChild(0)->getKind() ==
-                 Node::Kind::ProtocolDescriptor);
-          protocolName = nodeToString(demangledRoot->getChild(0)->getChild(0));
+          if (!symbol->getSymbol().empty()) {
+            Demangle::Context Ctx;
+            auto demangledRoot =
+                Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
+            assert(demangledRoot->getKind() == Node::Kind::Global);
+            assert(demangledRoot->getChild(0)->getKind() ==
+                   Node::Kind::ProtocolDescriptor);
+            protocolName = nodeToString(demangledRoot->getChild(0)->getChild(0));
+          } else {
+            // This is an absolute address offset.
+            auto protocolDescriptorAddress = symbol->getOffset();
+            protocolName = readProtocolNameFromProtocolDescriptor((const char*)protocolDescriptorAddress);
+          }
         } else {
           Error = "Error reading external protocol address.";
           return protocolName;
         }
         // If direct, read the protocol descriptor and get symbol name
       } else {
-        auto protocolDescriptorBytes =
-            OpaqueByteReader(remote::RemoteAddress(protocolDescriptorTarget),
-                             sizeof(ExternalProtocolDescriptor<PointerSize>));
-        if (!protocolDescriptorBytes.get()) {
-          Error = "Error reading protocol descriptor.";
-          return protocolName;
-        }
-        const ExternalProtocolDescriptor<PointerSize> *protocolDescriptor =
-            (const ExternalProtocolDescriptor<PointerSize> *)
-                protocolDescriptorBytes.get();
-
-        // Compute the address of the protocol descriptor's name field and read
-        // the offset
-        auto protocolNameOffsetAddress = detail::applyRelativeOffset(
-            (const char *)protocolDescriptorTarget,
-            (int32_t)protocolDescriptor->getNameOffset());
-        auto protocolNameOfsetBytes = OpaqueByteReader(
-            remote::RemoteAddress(protocolNameOffsetAddress), sizeof(uint32_t));
-        if (!protocolNameOfsetBytes.get()) {
-          Error = "Failed to read type name offset in a protocol descriptor.";
-          return protocolName;
-        }
-        auto protocolNameOffset =
-            (const uint32_t *)protocolNameOfsetBytes.get();
-
-        // Using the offset above, compute the address of the name field itsel
-        // and read it.
-        auto protocolNameAddress =
-            detail::applyRelativeOffset((const char *)protocolNameOffsetAddress,
-                                        (int32_t)*protocolNameOffset);
-        OpaqueStringReader(remote::RemoteAddress(protocolNameAddress),
-                           protocolName);
+        protocolName = readProtocolNameFromProtocolDescriptor((const char*)protocolDescriptorTarget);
       }
 
       return protocolName;

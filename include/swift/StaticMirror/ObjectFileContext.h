@@ -1,4 +1,4 @@
-//===---------------- ObjectFileCOntext.h - Swift Compiler ---------------===//
+//===---------------- ObjectFileContext.h - Swift Compiler ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
