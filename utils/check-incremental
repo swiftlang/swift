@@ -35,7 +35,7 @@ def compile_and_stat(compile_args, output_file):
     """
     subprocess.check_call(compile_args)
 
-    md5 = subprocess.check_output(["md5", "-q", output_file])
+    md5 = subprocess.check_output(["md5", "-q", output_file], text=True)
     mtime = time.ctime(os.path.getmtime(output_file))
 
     if VERBOSE:
