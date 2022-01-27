@@ -4286,10 +4286,6 @@ bool NominalTypeDecl::isAnyActor() const {
   return isActor() || isDistributedActor();
 }
 
-bool NominalTypeDecl::isValueType() const {
-  return isa<StructDecl>(this) || isa<EnumDecl>(this);
-}
-
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  ArrayRef<InheritedEntry> inherited,

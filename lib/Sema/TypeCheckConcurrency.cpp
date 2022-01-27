@@ -356,10 +356,10 @@ GlobalActorAttributeRequest::evaluate(
         return None;
       }
 
-      // ... and not if it's the instance storage of a value type
+      // ... and not if it's the instance storage of a struct
       if (!var->isStatic() && var->isOrdinaryStoredProperty()) {
         if (auto *nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
-          if (nominal->isValueType()) {
+          if (isa<StructDecl>(nominal)) {
 
             var->diagnose(diag::global_actor_on_storage_of_value_type,
                           var->getName(), nominal->getDescriptiveKind())
@@ -3626,12 +3626,12 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
     case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor: {
-      // Stored properties of a value type don't need global-actor isolation.
+      // Stored properties of a struct don't need global-actor isolation.
       if (auto *var = dyn_cast<VarDecl>(value))
         if (!var->isStatic() && var->isOrdinaryStoredProperty())
           if (auto *varDC = var->getDeclContext())
             if (auto *nominal = varDC->getSelfNominalTypeDecl())
-              if (nominal->isValueType())
+              if (isa<StructDecl>(nominal))
                 return ActorIsolation::forUnspecified();
 
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);

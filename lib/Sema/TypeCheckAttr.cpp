@@ -5629,8 +5629,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
           return;
         }
 
-        // 'nonisolated' is redundant for the stored properties of a value type.
-        if (nominal->isValueType() && !var->isStatic() &&
+        // 'nonisolated' is redundant for the stored properties of a struct.
+        if (isa<StructDecl>(nominal) && !var->isStatic() &&
             var->isOrdinaryStoredProperty()) {
           diagnoseAndRemoveAttr(attr, diag::nonisolated_storage_value_type,
                                 nominal->getDescriptiveKind())
