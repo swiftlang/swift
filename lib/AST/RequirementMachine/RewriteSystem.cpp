@@ -643,9 +643,6 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
   }
 
   for (const auto &rule : Rules) {
-    if (rule.isSimplified() || rule.isPermanent())
-      continue;
-
     const auto &lhs = rule.getLHS();
     const auto &rhs = rule.getRHS();
 
@@ -661,7 +658,10 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      if (index != 0 && index != lhs.size() - 1) {
+      // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
+      // which are immediately simplified away.
+      if (!rule.isSimplified() &&
+          index != 0 && index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
@@ -669,11 +669,16 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(rhs)) {
       auto symbol = rhs[index];
 
-      // This is only true if the input requirements were valid.
-      if (policy == DisallowInvalidRequirements) {
-        ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
-      } else {
-        // FIXME: Assert that we diagnosed an error
+      // Permanent rules contain name symbols at the end, like
+      // [P].T => [P:T].
+      if (!rule.isSimplified() &&
+          (!rule.isPermanent() || index == rhs.size() - 1)) {
+        // This is only true if the input requirements were valid.
+        if (policy == DisallowInvalidRequirements) {
+          ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
+        } else {
+          // FIXME: Assert that we diagnosed an error
+        }
       }
 
       ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
@@ -681,6 +686,12 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       if (index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
+      }
+
+      // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
+      // which are immediately simplified away.
+      if (!rule.isSimplified() &&
+          index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
