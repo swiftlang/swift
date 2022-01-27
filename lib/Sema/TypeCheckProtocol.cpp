@@ -3562,6 +3562,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.SkipAttributes = true;
     Options.FunctionDefinitions = true;
     Options.PrintAccessorBodiesInProtocols = true;
+    Options.FullyQualifiedTypesIfAmbiguous = true;
 
     bool AdopterIsClass = Adopter->getSelfClassDecl() != nullptr;
     // Skip 'mutating' only inside classes: mutating methods usually
