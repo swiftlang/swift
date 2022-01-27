@@ -776,7 +776,7 @@ public:
   /// Get the unsubstituted capture types for a closure context.
   ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
 
-  /// Get the multipayload enum projection informaion for a given TR
+  /// Get the multipayload enum projection information for a given TR
   RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR);
 
   ///
