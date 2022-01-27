@@ -35,6 +35,7 @@
 #define UTF8_STRING u8"Swift 🏃"
 #define OBJC_STRING @"Unicode! ✨"
 #define CF_STRING CFSTR("Swift")
+#define INVALID_UTF8_STRING "\xFF\xFF\xFF\xFF\xFF\xFF"
 
 #define INVALID_INTEGER_LITERAL_1 10_9
 #define INVALID_INTEGER_LITERAL_2 10abc
