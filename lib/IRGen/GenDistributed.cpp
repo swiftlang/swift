@@ -144,6 +144,17 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
                                           SILFunction *Target) {
   auto &Context = IGM.Context;
 
+  auto getInvocationDecoderParameter = [&]() {
+    auto *actor = Target->getDeclContext()
+                      ->getInnermostTypeContext()
+                      ->getSelfNominalTypeDecl();
+    auto *decoder = Context.getDistributedActorInvocationDecoder(actor);
+    auto decoderTy = decoder->getInterfaceType()->getMetatypeInstanceType();
+    auto paramType = IGM.getLoweredType(decoderTy);
+    return SILParameterInfo(paramType.getASTType(),
+                            ParameterConvention::Direct_Guaranteed);
+  };
+
   auto getRawPointerParameter = [&]() {
     auto ptrType = Context.getUnsafeRawPointerType();
     return SILParameterInfo(ptrType->getCanonicalType(),
@@ -173,7 +184,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   return SILFunctionType::get(
       /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Guaranteed,
-      {/*argumentBuffer=*/getRawPointerParameter(),
+      {/*argumentDecoder=*/getInvocationDecoderParameter(),
        /*argumentTypes=*/getRawPointerParameter(),
        /*resultBuffer=*/getRawPointerParameter(),
        /*substitutions=*/getRawPointerParameter(),
@@ -497,8 +508,9 @@ void DistributedAccessor::emit() {
       (unsigned)AsyncFunctionArgumentIndex::Context + 1;
   (void)params.claim(numAsyncContextParams);
 
-  // UnsafeRawPointer that holds all of the argument values.
-  auto *argBuffer = params.claimNext();
+  // A container that produces argument values based on the given set of
+  // argument types (supplied as a next argument).
+  auto *argDecoder = params.claimNext();
   // `swift.type**` that holds the argument types that correspond to values.
   auto *argTypes = params.claimNext();
   // UnsafeRawPointer that is used to store the result.
