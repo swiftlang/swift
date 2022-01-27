@@ -469,10 +469,29 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
 
   auto decoderTy = decoder->getInterfaceType()->getMetatypeInstanceType();
 
-  DeclName methodName(ctx, {ctx.Id_decodeNextArgument}, {ctx.Id_type});
   auto members = TypeChecker::lookupMember(actor->getDeclContext(), decoderTy,
-                                           DeclNameRef(methodName));
+                                           DeclNameRef(ctx.Id_decodeNextArgument));
 
-  assert(members.size() == 1);
-  return cast<FuncDecl>(members[0].getValueDecl());
+  // Looking for `decodeNextArgument<Arg>() throws -> Arg`
+  for (auto &member : members) {
+    auto *FD = dyn_cast<FuncDecl>(member.getValueDecl());
+    if (!FD || FD->hasAsync() || !FD->hasThrows())
+      continue;
+
+    auto *params = FD->getParameters();
+    if (params->size() != 0)
+      continue;
+
+    auto genericParamList = FD->getGenericParams();
+    if (genericParamList->size() == 1) {
+      auto paramTy = genericParamList->getParams()[0]
+                         ->getInterfaceType()
+                         ->getMetatypeInstanceType();
+
+      if (FD->getResultInterfaceType()->isEqual(paramTy))
+        return FD;
+    }
+  }
+
+  return nullptr;
 }
