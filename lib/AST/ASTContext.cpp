@@ -2503,10 +2503,6 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   return result;
 }
 
-bool ASTContext::isLazyContext(const DeclContext *dc) {
-  return getImpl().LazyContexts.count(dc) != 0;
-}
-
 LazyContextData *ASTContext::getOrCreateLazyContextData(
                                                 const DeclContext *dc,
                                                 LazyMemberLoader *lazyLoader) {
