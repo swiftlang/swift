@@ -6,6 +6,24 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.6
 ---------
 
+* [SE-0335][]:
+
+  Swift now allows existential types to be explicitly written with the `any`
+  keyword, creating a syntactic distinction between existential types and
+  protocol conformance constraints. For example:
+
+  ```swift
+  protocol P {}
+
+  func generic<T>(value: T) where T: P {
+    ...
+  }
+
+  func existential(value: any P) {
+     ...
+  }
+  ```
+
 * [SE-0337][]:
 
   Swift now provides an incremental migration path to data race safety, allowing
@@ -8852,6 +8870,7 @@ Swift 1.0
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
 [SE-0331]: <https://github.com/apple/swift-evolution/blob/main/proposals/0331-remove-sendable-from-unsafepointer.md>
 [SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
+[SE-0335]: <https://github.com/apple/swift-evolution/blob/main/proposals/0335-existential-any.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
