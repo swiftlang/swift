@@ -6,6 +6,60 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.6
 ---------
 
+* [SE-0337][]:
+
+  Swift now provides an incremental migration path to data race safety, allowing
+  APIs to adopt concurrency without breaking their clients that themselves have
+  not adopted concurrency. An existing declaration can introduce
+  concurrency-related annotations (such as making its closure parameters
+  `@Sendable`) and use the `@preconcurrency` attribute to maintain its behavior
+  for clients who have not themselves adopted concurrency:
+
+  ```swift
+  // module A
+  @preconcurrency func runOnSeparateTask(_ workItem: @Sendable () -> Void)
+
+  // module B
+  import A
+
+  class MyCounter {
+    var value = 0
+  }
+
+  func doesNotUseConcurrency(counter: MyCounter) {
+    runOnSeparateTask {
+      counter.value += 1 // no warning, because this code hasn't adopted concurrency
+    }
+  }
+
+  func usesConcurrency(counter: MyCounter) async {
+    runOnSeparateTask {
+      counter.value += 1 // warning: capture of non-Sendable type 'MyCounter'
+    }
+  }
+  ```
+
+  One can enable warnings about data race safety within a module with the
+  `-warn-concurrency` compiler option. When using a module that does not yet
+  provide `Sendable` annotations, one can suppress warnings for types from that
+  module by marking the import with `@preconcurrency`:
+
+  ```swift
+  /// module C
+  public struct Point {
+    public var x, y: Double
+  }
+
+  // module D
+  @preconcurrency import C
+
+  func centerView(at location: Point) {
+    Task {
+      await mainView.center(at: location) // no warning about non-Sendable 'Point' because the @preconcurrency import suppresses it
+    }
+  }
+  ```
+
 * [SE-0302][]:
 
   Swift will now produce warnings to indicate potential data races when
@@ -8782,6 +8836,7 @@ Swift 1.0
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
 [SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
+[SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
