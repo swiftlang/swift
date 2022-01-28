@@ -524,12 +524,13 @@ InferredGenericSignatureRequestRQM::evaluate(
       parentSig.getGenericParams().end());
 
   SmallVector<StructuralRequirement, 4> requirements;
+  SmallVector<RequirementError, 4> errors;
   for (const auto &req : parentSig.getRequirements())
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
 
   const auto visitRequirement = [&](const Requirement &req,
                                     RequirementRepr *reqRepr) {
-    realizeRequirement(req, reqRepr, parentModule, requirements);
+    realizeRequirement(req, reqRepr, parentModule, requirements, errors);
     return false;
   };
 
@@ -561,7 +562,7 @@ InferredGenericSignatureRequestRQM::evaluate(
         genericParams.push_back(gpType);
 
         realizeInheritedRequirements(gpDecl, gpType, parentModule,
-                                     requirements);
+                                     requirements, errors);
       }
 
       auto *lookupDC = (*gpList->begin())->getDeclContext();
@@ -625,7 +626,9 @@ InferredGenericSignatureRequestRQM::evaluate(
     machine->computeMinimalGenericSignatureRequirements();
 
   auto result = GenericSignature::get(genericParams, minimalRequirements);
-  bool hadError = machine->hadError();
+  bool hadError = machine->hadError() || !errors.empty();
+
+  diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
 
   // FIXME: Handle allowConcreteGenericParams
 

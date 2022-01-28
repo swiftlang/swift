@@ -47,11 +47,17 @@ void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
 
 void realizeRequirement(Requirement req, RequirementRepr *reqRepr,
                         ModuleDecl *moduleForInference,
-                        SmallVectorImpl<StructuralRequirement> &result);
+                        SmallVectorImpl<StructuralRequirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
 
 void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   ModuleDecl *moduleForInference,
-                                  SmallVectorImpl<StructuralRequirement> &result);
+                                  SmallVectorImpl<StructuralRequirement> &result,
+                                  SmallVectorImpl<RequirementError> &errors);
+
+void diagnoseRequirementErrors(ASTContext &ctx,
+                               SmallVectorImpl<RequirementError> &errors,
+                               bool allowConcreteGenericParams);
 
 std::pair<MutableTerm, MutableTerm>
 getRuleForRequirement(const Requirement &req,

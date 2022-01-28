@@ -229,7 +229,8 @@ swift::rewriting::desugarRequirement(Requirement req,
 
 static void realizeTypeRequirement(Type subjectType, Type constraintType,
                                    SourceLoc loc,
-                                   SmallVectorImpl<StructuralRequirement> &result) {
+                                   SmallVectorImpl<StructuralRequirement> &result,
+                                   SmallVectorImpl<RequirementError> &errors) {
   SmallVector<Requirement, 2> reqs;
 
   if (constraintType->isConstraintType()) {
@@ -239,7 +240,10 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
     // Handle superclass requirements.
     desugarSuperclassRequirement(subjectType, constraintType, reqs);
   } else {
-    // FIXME: Diagnose
+    errors.push_back(
+        RequirementError::forInvalidConformance(subjectType,
+                                                constraintType,
+                                                loc));
     return;
   }
 
@@ -373,7 +377,8 @@ void swift::rewriting::inferRequirements(
 void swift::rewriting::realizeRequirement(
     Requirement req, RequirementRepr *reqRepr,
     ModuleDecl *moduleForInference,
-    SmallVectorImpl<StructuralRequirement> &result) {
+    SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<RequirementError> &errors) {
   auto firstType = req.getFirstType();
   auto loc = (reqRepr ? reqRepr->getSeparatorLoc() : SourceLoc());
 
@@ -391,7 +396,7 @@ void swift::rewriting::realizeRequirement(
       inferRequirements(secondType, secondLoc, moduleForInference, result);
     }
 
-    realizeTypeRequirement(firstType, secondType, loc, result);
+    realizeTypeRequirement(firstType, secondType, loc, result, errors);
     break;
   }
 
@@ -437,7 +442,8 @@ void swift::rewriting::realizeRequirement(
 /// AssociatedTypeDecl or GenericTypeParamDecl.
 void swift::rewriting::realizeInheritedRequirements(
     TypeDecl *decl, Type type, ModuleDecl *moduleForInference,
-    SmallVectorImpl<StructuralRequirement> &result) {
+    SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<RequirementError> &errors) {
   auto &ctx = decl->getASTContext();
   auto inheritedTypes = decl->getInherited();
 
@@ -455,7 +461,57 @@ void swift::rewriting::realizeInheritedRequirements(
       inferRequirements(inheritedType, loc, moduleForInference, result);
     }
 
-    realizeTypeRequirement(type, inheritedType, loc, result);
+    realizeTypeRequirement(type, inheritedType, loc, result, errors);
+  }
+}
+
+void swift::rewriting::diagnoseRequirementErrors(
+    ASTContext &ctx, SmallVectorImpl<RequirementError> &errors,
+    bool allowConcreteGenericParams) {
+  if (ctx.LangOpts.RequirementMachineProtocolSignatures !=
+      RequirementMachineMode::Enabled)
+    return;
+
+  for (auto error : errors) {
+    SourceLoc loc = error.loc;
+
+    switch (error.kind) {
+    case RequirementError::Kind::InvalidConformance: {
+      Type subjectType = error.invalidConformance.subjectType;
+      Type constraint = error.invalidConformance.constraint;
+
+      // FIXME: The constraint string is printed directly here because
+      // the current default is to not print `any` for existential
+      // types, but this error message is super confusing without `any`
+      // if the user wrote it explicitly.
+      PrintOptions options;
+      options.PrintExplicitAny = true;
+      auto constraintString = constraint.getString(options);
+
+      ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
+                         subjectType, constraintString);
+
+      auto getNameWithoutSelf = [&](std::string subjectTypeName) {
+        std::string selfSubstring = "Self.";
+
+        if (subjectTypeName.rfind(selfSubstring, 0) == 0) {
+          return subjectTypeName.erase(0, selfSubstring.length());
+        }
+
+        return subjectTypeName;
+      };
+
+      if (allowConcreteGenericParams) {
+        auto subjectTypeName = subjectType.getString();
+        auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
+        ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
+                           subjectTypeNameWithoutSelf, constraintString)
+             .fixItReplace(loc, " == ");
+      }
+
+      break;
+    }
+    }
   }
 }
 
@@ -465,19 +521,22 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   assert(!proto->hasLazyRequirementSignature());
 
   SmallVector<StructuralRequirement, 4> result;
+  SmallVector<RequirementError, 4> errors;
 
   auto &ctx = proto->getASTContext();
 
   auto selfTy = proto->getSelfInterfaceType();
 
   realizeInheritedRequirements(proto, selfTy,
-                               /*moduleForInference=*/nullptr, result);
+                               /*moduleForInference=*/nullptr,
+                               result, errors);
 
   // Add requirements from the protocol's own 'where' clause.
   WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         realizeRequirement(req, reqRepr,
-                           /*moduleForInference=*/nullptr, result);
+                           /*moduleForInference=*/nullptr,
+                           result, errors);
         return false;
       });
 
@@ -502,7 +561,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     auto assocType = assocTypeDecl->getDeclaredInterfaceType();
     realizeInheritedRequirements(assocTypeDecl, assocType,
                                  /*moduleForInference=*/nullptr,
-                                 result);
+                                 result, errors);
 
     // Add requirements from this associated type's where clause.
     WhereClauseOwner(assocTypeDecl).visitRequirements(
@@ -510,7 +569,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
         [&](const Requirement &req, RequirementRepr *reqRepr) {
           realizeRequirement(req, reqRepr,
                              /*moduleForInference=*/nullptr,
-                             result);
+                             result, errors);
           return false;
         });
   }

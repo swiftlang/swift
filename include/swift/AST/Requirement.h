@@ -124,6 +124,40 @@ struct StructuralRequirement {
   bool inferred = false;
 };
 
+/// Represents an invalid requirement, such as `T: Int`.
+///
+/// Invalid requirements are recorded while computing the
+/// generic signature of a declaration, and diagnosed via
+/// \c diagnoseRequirementErrors .
+struct RequirementError {
+  enum class Kind {
+    InvalidConformance,
+  } kind;
+
+  union {
+    struct {
+      Type subjectType;
+      Type constraint;
+    } invalidConformance;
+  };
+
+  SourceLoc loc;
+
+private:
+  RequirementError(Kind kind, SourceLoc loc)
+  : kind(kind), loc(loc) {}
+
+public:
+  static RequirementError forInvalidConformance(Type subjectType,
+                                                Type constraint,
+                                                SourceLoc loc) {
+    RequirementError error(Kind::InvalidConformance, loc);
+    error.invalidConformance.subjectType = subjectType;
+    error.invalidConformance.constraint = constraint;
+    return error;
+  }
+};
+
 } // end namespace swift
 
 #endif
