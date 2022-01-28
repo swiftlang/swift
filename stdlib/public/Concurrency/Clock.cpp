@@ -16,6 +16,11 @@
 #define HAS_TIME 1
 #include <time.h>
 #endif
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
 
 using namespace swift;
 
@@ -37,17 +42,33 @@ void swift_get_time(
       clock_gettime(CLOCK_MONOTONIC, &continuous);
       *seconds = continuous.tv_sec;
       *nanoseconds = continuous.tv_nsec;
+#elif defined(_WIN32)
+      LARGE_INTEGER freq;
+      QueryPerformanceFrequency(&freq);
+      LARGE_INTEGER count;
+      QueryPerformanceCounter(&count);
+      *seconds = count.QuadPart / freq.QuadPart;
+      if (freq.QuadPart < 1000000000) {
+        *nanoseconds = 
+            ((count.QuadPart % freq.QuadPart) * 1000000000) / freq.QuadPart;
+      } else {
+        *nanoseconds = 
+            (count.QuadPart % freq.QuadPart) * (1000000000.0 / freq.QuadPart);
+      }
 #else
 #error Missing platform continuous time definition
 #endif
       break;
     }
+    // This case is not used currently
     case swift_clock_id_realtime: {
 #if HAS_TIME
       struct timespec realtime;
       clock_gettime(CLOCK_REALTIME, &realtime);
       *seconds = realtime.tv_sec;
       *nanoseconds = realtime.tv_nsec;
+#elif defined(_WIN32)
+      
 #else
 #error Missing platform continuous time definition
 #endif
@@ -63,6 +84,19 @@ void swift_get_time(
       clock_gettime(CLOCK_UPTIME_RAW, &continuous);
       *seconds = continuous.tv_sec;
       *nanoseconds = continuous.tv_nsec;
+#elif defined(_WIN32)
+      LARGE_INTEGER freq;
+      QueryPerformanceFrequency(&freq);
+      LARGE_INTEGER count;
+      QueryPerformanceCounter(&count);
+      *seconds = count.QuadPart / freq.QuadPart;
+      if (freq.QuadPart < 1000000000) {
+        *nanoseconds = 
+            ((count.QuadPart % freq.QuadPart) * 1000000000) / freq.QuadPart;
+      } else {
+        *nanoseconds = 
+            (count.QuadPart % freq.QuadPart) * (1000000000.0 / freq.QuadPart);
+      }
 #else
 #error Missing platform continuous time definition
 #endif
@@ -89,17 +123,23 @@ switch (clock_id) {
       clock_getres(CLOCK_MONOTONIC, &continuous);
       *seconds = continuous.tv_sec;
       *nanoseconds = continuous.tv_nsec;
+#elif defined(_WIN32)
+      *seconds = 0;
+      *nanoseconds = 1000;
 #else
 #error Missing platform continuous time definition
 #endif
       break;
     }
+    // This case is not used currently
     case swift_clock_id_realtime: {
 #if HAS_TIME
       struct timespec realtime;
       clock_getres(CLOCK_REALTIME, &realtime);
       *seconds = realtime.tv_sec;
       *nanoseconds = realtime.tv_nsec;
+#elif defined(_WIN32)
+      
 #else
 #error Missing platform continuous time definition
 #endif
@@ -115,6 +155,9 @@ switch (clock_id) {
       clock_gettime(CLOCK_UPTIME_RAW, &continuous);
       *seconds = continuous.tv_sec;
       *nanoseconds = continuous.tv_nsec;
+#elif defined(_WIN32)
+      *seconds = 0;
+      *nanoseconds = 1000;
 #else
 #error Missing platform continuous time definition
 #endif
