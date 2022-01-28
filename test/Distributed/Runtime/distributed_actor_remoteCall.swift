@@ -96,6 +96,9 @@ distributed actor Greeter {
   distributed func genericOptional<T: Codable>(t: T?) {
     print("---> T = \(t!), type(of:) = \(type(of: t))")
   }
+
+  distributed func expectsDecodeError(v: Int???) {
+  }
 }
 
 
@@ -203,6 +206,11 @@ class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvoc
       fatalError("Cannot cast argument\(anyArgument) to expected \(Argument.self)")
     }
 
+    if (argumentIndex == 0 && Argument.self == Int???.self) {
+      throw ExecuteDistributedTargetError(message: "Failed to decode of Int??? (for a test)")
+    }
+
+
     argumentIndex += 1
     return argument
   }
@@ -244,6 +252,7 @@ let generic3Name = "$s4main7GreeterC8generic31a1b1cyx_Sayq_Gq0_tSeRzSERzSeR_SER_
 let generic4Name = "$s4main7GreeterC8generic41a1b1cyx_AA1SVyq_GSayq0_GtSeRzSERzSeR_SER_SeR0_SER0_r1_lFTE"
 let generic5Name = "$s4main7GreeterC8generic51a1b1c1dyx_AA1SVyq_Gq0_q1_tSeRzSERzSeR_SER_SeR0_SER0_SeR1_SER1_r2_lFTE"
 let genericOptionalName = "$s4main7GreeterC15genericOptional1tyxSg_tSeRzSERzlFTE"
+let expectsDecodeErrorName = "$s4main7GreeterC18expectsDecodeError1vySiSgSgSg_tFTE"
 
 func test() async throws {
   let system = DefaultDistributedActorSystem()
@@ -418,6 +427,19 @@ func test() async throws {
   )
   // CHECK: ---> T = [0.0, 3737844653.0], type(of:) = Optional<Array<Double>>
   // CHECK-NEXT: RETURN: ()
+
+  let decodeErrInvocation = system.makeInvocationEncoder()
+
+  try decodeErrInvocation.recordArgument(42)
+  try decodeErrInvocation.doneRecording()
+
+  try await system.executeDistributedTarget(
+    on: local,
+    mangledTargetName: expectsDecodeErrorName,
+    invocationDecoder: decodeErrInvocation,
+    handler: FakeResultHandler()
+  )
+  // CHECK: ERROR: ExecuteDistributedTargetError(message: "Failed to decode of Int??? (for a test)")
 
   print("done")
   // CHECK-NEXT: done

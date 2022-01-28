@@ -123,6 +123,10 @@ private:
                                unsigned expectedWitnessTables,
                                Explosion &arguments);
 
+  /// Emit an async return from accessor which does cleanup of
+  /// all the argument allocations.
+  void emitReturn(llvm::Value *errorValue);
+
   FunctionPointer getPointerToTarget() const;
 
   Callee getCalleeForDistributedTarget(llvm::Value *self) const;
@@ -131,6 +135,12 @@ private:
   /// could be used to decode argument values to pass to its invocation.
   static ArgumentDecoderInfo findArgumentDecoder(IRGenModule &IGM,
                                                  SILFunction *thunk);
+
+  /// The result type of the accessor.
+  SILType getResultType() const;
+
+  /// The error type of this accessor.
+  SILType getErrorType() const;
 };
 
 } // end namespace
@@ -316,6 +326,9 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
   // substitution Argument -> <argument metadata>
   decodeArgs.add(argumentType);
 
+  Address calleeErrorSlot;
+  llvm::Value *decodeError = nullptr;
+
   emission->begin();
   {
     emission->setArgs(decodeArgs, /*isOutlined=*/false,
@@ -325,13 +338,42 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
     emission->emitToExplosion(result, /*isOutlined=*/false);
     assert(result.empty());
 
-    // TODO: Add error handling a new block that uses `emitAsyncReturn`
-    // if error slot is non-null.
+    // Load error from the slot to emit an early return if necessary.
+    {
+      SILFunctionConventions conv(ArgumentDecoder.Type, IGM.getSILModule());
+      SILType errorType =
+          conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+
+      calleeErrorSlot =
+          emission->getCalleeErrorSlot(errorType, /*isCalleeAsync=*/true);
+      decodeError = IGF.Builder.CreateLoad(calleeErrorSlot);
+    }
   }
   emission->end();
 
   // Remember to deallocate later.
   AllocatedArguments.push_back(resultValue);
+
+  // Check whether the error slot has been set and if so
+  // emit an early return from accessor.
+  {
+    auto contBB = IGF.createBasicBlock("");
+    auto errorBB = IGF.createBasicBlock("on-error");
+
+    auto nullError = llvm::Constant::getNullValue(decodeError->getType());
+    auto hasError = IGF.Builder.CreateICmpNE(decodeError, nullError);
+
+    IGF.Builder.CreateCondBr(hasError, errorBB, contBB);
+    {
+      IGF.Builder.emitBlock(errorBB);
+      // Emit an early return if argument decoding failed.
+      emitReturn(decodeError);
+    }
+
+    IGF.Builder.emitBlock(contBB);
+    // Reset value of the slot back to `null`
+    IGF.Builder.CreateStore(nullError, calleeErrorSlot);
+  }
 
   switch (param.getConvention()) {
   case ParameterConvention::Indirect_In:
@@ -412,10 +454,28 @@ void DistributedAccessor::emitLoadOfWitnessTables(llvm::Value *witnessTables,
   }
 }
 
+void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
+  // Deallocate all of the copied arguments. Since allocations happened
+  // on stack they have to be deallocated in reverse order.
+  {
+    for (auto alloca = AllocatedArguments.rbegin();
+         alloca != AllocatedArguments.rend(); ++alloca) {
+      IGF.emitDeallocateDynamicAlloca(*alloca);
+    }
+  }
+
+  Explosion voidResult;
+
+  Explosion error;
+  error.add(errorValue);
+
+  emitAsyncReturn(IGF, AsyncLayout, getResultType(), AccessorType, voidResult,
+                  error);
+}
+
 void DistributedAccessor::emit() {
   auto targetTy = Target->getLoweredFunctionType();
   SILFunctionConventions targetConv(targetTy, IGF.getSILModule());
-  SILFunctionConventions accessorConv(AccessorType, IGF.getSILModule());
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
 
   auto params = IGF.collectParameters();
@@ -510,7 +570,7 @@ void DistributedAccessor::emit() {
   // using computed argument explosion.
   {
     Explosion result;
-    Explosion error;
+    llvm::Value *targetError = nullptr;
 
     auto callee = getCalleeForDistributedTarget(actorSelf);
     auto emission =
@@ -536,27 +596,16 @@ void DistributedAccessor::emit() {
     {
       assert(targetTy->hasErrorResult());
 
-      SILType errorType = accessorConv.getSILErrorType(expansionContext);
       Address calleeErrorSlot =
-          emission->getCalleeErrorSlot(errorType, /*isCalleeAsync=*/true);
-      error.add(IGF.Builder.CreateLoad(calleeErrorSlot));
+          emission->getCalleeErrorSlot(getErrorType(), /*isCalleeAsync=*/true);
+      targetError = IGF.Builder.CreateLoad(calleeErrorSlot);
     }
 
     emission->end();
 
-    // Deallocate all of the copied arguments. Since allocations happened
-    // on stack they have to be deallocated in reverse order.
-    {
-      while (!AllocatedArguments.empty()) {
-        auto argument = AllocatedArguments.pop_back_val();
-        IGF.emitDeallocateDynamicAlloca(argument);
-      }
-    }
-
-    Explosion voidResult;
-    emitAsyncReturn(IGF, AsyncLayout,
-                    accessorConv.getSILResultType(expansionContext),
-                    AccessorType, voidResult, error);
+    // Emit an async return that does allocation cleanup and propagates error
+    // (if any) back to the caller.
+    emitReturn(targetError);
   }
 }
 
@@ -602,6 +651,16 @@ DistributedAccessor::findArgumentDecoder(IRGenModule &IGM, SILFunction *thunk) {
                                  /*secondaryValue=*/nullptr, signature);
 
   return {.Type = methodTy, .Fn = methodPtr};
+}
+
+SILType DistributedAccessor::getResultType() const {
+  SILFunctionConventions conv(AccessorType, IGF.getSILModule());
+  return conv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+}
+
+SILType DistributedAccessor::getErrorType() const {
+  SILFunctionConventions conv(AccessorType, IGF.getSILModule());
+  return conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
 }
 
 Callee ArgumentDecoderInfo::getCallee(llvm::Value *decoder) const {
