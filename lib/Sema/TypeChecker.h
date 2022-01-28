@@ -496,23 +496,6 @@ void checkProtocolSelfRequirements(ValueDecl *decl);
 /// declaration's type, otherwise we have no way to infer them.
 void checkReferencedGenericParams(GenericContext *dc);
 
-/// Create a text string that describes the bindings of generic parameters
-/// that are relevant to the given set of types, e.g.,
-/// "[with T = Bar, U = Wibble]".
-///
-/// \param types The types that will be scanned for generic type parameters,
-/// which will be used in the resulting type.
-///
-/// \param genericParams The generic parameters to use to resugar any
-/// generic parameters that occur within the types.
-///
-/// \param substitutions The generic parameter -> generic argument
-/// substitutions that will have been applied to these types.
-/// These are used to produce the "parameter = argument" bindings in the test.
-std::string gatherGenericParamBindingsText(
-    ArrayRef<Type> types, TypeArrayView<GenericTypeParamType> genericParams,
-    TypeSubstitutionFn substitutions);
-
 /// Diagnose a requirement failure.
 ///
 /// \param errorLoc The location at which an error shall be emitted.

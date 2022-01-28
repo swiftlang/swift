@@ -30,55 +30,6 @@
 
 using namespace swift;
 
-///
-/// Common code for generic functions, generic types
-///
-
-std::string
-TypeChecker::gatherGenericParamBindingsText(
-                              ArrayRef<Type> types,
-                              TypeArrayView<GenericTypeParamType> genericParams,
-                              TypeSubstitutionFn substitutions) {
-  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
-  for (auto type : types) {
-    if (type.isNull()) continue;
-
-    type.visit([&](Type type) {
-      if (auto gp = type->getAs<GenericTypeParamType>()) {
-        knownGenericParams.insert(
-            gp->getCanonicalType()->castTo<GenericTypeParamType>());
-      }
-    });
-  }
-
-  if (knownGenericParams.empty())
-    return "";
-
-  SmallString<128> result;
-  for (auto gp : genericParams) {
-    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
-    if (!knownGenericParams.count(canonGP))
-      continue;
-
-    if (result.empty())
-      result += " [with ";
-    else
-      result += ", ";
-    result += gp->getName().str();
-    result += " = ";
-
-    auto type = substitutions(canonGP);
-    if (!type)
-      return "";
-
-    result += type.getString();
-  }
-
-  result += "]";
-  return result.str().str();
-}
-
-
 //
 // Generic functions
 //
@@ -817,6 +768,61 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 /// Checking bound generic type arguments
 ///
 
+/// Create a text string that describes the bindings of generic parameters
+/// that are relevant to the given set of types, e.g.,
+/// "[with T = Bar, U = Wibble]".
+///
+/// \param types The types that will be scanned for generic type parameters,
+/// which will be used in the resulting type.
+///
+/// \param genericParams The generic parameters to use to resugar any
+/// generic parameters that occur within the types.
+///
+/// \param substitutions The generic parameter -> generic argument
+/// substitutions that will have been applied to these types.
+/// These are used to produce the "parameter = argument" bindings in the test.
+static std::string gatherGenericParamBindingsText(
+    ArrayRef<Type> types, TypeArrayView<GenericTypeParamType> genericParams,
+    TypeSubstitutionFn substitutions) {
+  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
+  for (auto type : types) {
+    if (type.isNull()) continue;
+
+    type.visit([&](Type type) {
+      if (auto gp = type->getAs<GenericTypeParamType>()) {
+        knownGenericParams.insert(
+            gp->getCanonicalType()->castTo<GenericTypeParamType>());
+      }
+    });
+  }
+
+  if (knownGenericParams.empty())
+    return "";
+
+  SmallString<128> result;
+  for (auto gp : genericParams) {
+    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
+    if (!knownGenericParams.count(canonGP))
+      continue;
+
+    if (result.empty())
+      result += " [with ";
+    else
+      result += ", ";
+    result += gp->getName().str();
+    result += " = ";
+
+    auto type = substitutions(canonGP);
+    if (!type)
+      return "";
+
+    result += type.getString();
+  }
+
+  result += "]";
+  return result.str().str();
+}
+
 void TypeChecker::diagnoseRequirementFailure(
     const CheckGenericArgumentsResult::RequirementFailureInfo &reqFailureInfo,
     SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
@@ -871,9 +877,8 @@ void TypeChecker::diagnoseRequirementFailure(
   ctx.Diags.diagnose(errorLoc, diagnostic, targetTy, substReq.getFirstType(),
                      substSecondTy);
 
-  const auto genericParamBindingsText =
-      TypeChecker::gatherGenericParamBindingsText(
-          {req.getFirstType(), secondTy}, genericParams, substitutions);
+  const auto genericParamBindingsText = gatherGenericParamBindingsText(
+      {req.getFirstType(), secondTy}, genericParams, substitutions);
 
   ctx.Diags.diagnose(noteLoc, diagnosticNote, req.getFirstType(), secondTy,
                      genericParamBindingsText);
