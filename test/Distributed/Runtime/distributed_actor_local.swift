@@ -72,7 +72,7 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
+    invocation invocationEncoder: inout InvocationEncoder,
     throwing: Err.Type,
     returning: Res.Type
   ) async throws -> Res
@@ -86,7 +86,7 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
+    invocation invocationEncoder: inout InvocationEncoder,
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
@@ -127,14 +127,14 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test_initializers() {
   let address = ActorAddress(parse: "")
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   _ = SomeSpecificDistributedActor(system: system)
   _ = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
 }
 
 func test_address() {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   let actor = SomeSpecificDistributedActor(system: system)
   _ = actor.id

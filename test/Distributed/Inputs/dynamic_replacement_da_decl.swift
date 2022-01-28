@@ -67,7 +67,7 @@ final class FakeActorSystem: DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
       on actor: Act,
       target: RemoteCallTarget,
-      invocationDecoder: InvocationDecoder,
+      invocation: InvocationDecoder,
       throwing: Err.Type,
       returning: Res.Type
   ) async throws -> Res

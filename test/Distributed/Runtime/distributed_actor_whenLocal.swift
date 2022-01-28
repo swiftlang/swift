@@ -61,7 +61,7 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
+    invocation invocationEncoder: inout InvocationEncoder,
     throwing: Err.Type,
     returning: Res.Type
   ) async throws -> Res
@@ -75,7 +75,7 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
+    invocation invocationEncoder: inout InvocationEncoder,
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
@@ -114,7 +114,7 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test() async throws {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   let local = Capybara(system: system)
   // await local.eat() // SHOULD ERROR

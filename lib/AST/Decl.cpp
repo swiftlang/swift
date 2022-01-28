@@ -7428,17 +7428,14 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
 
   // Check the name
-  if (this->getBaseName() != callId)
+  if (getBaseName() != callId)
     return false;
 
-  auto params = this->getParameters();
+  auto params = getParameters();
+  unsigned int expectedParamNum = isVoidReturn ? 4 : 5;
 
-  // Check the expected argument count
-  // - for value returning remoteCall:
-  if (!params || (!isVoidReturn && params->size() != 5))
-    return false;
-  // - for void returning remoteCallVoid:
-  if (!params || (isVoidReturn && params->size() != 4))
+  // Check the expected argument count:
+  if (!params || params->size() != expectedParamNum)
     return false;
 
   // Check API names of the arguments
@@ -7448,7 +7445,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   auto thrownTypeParam = params->get(3);
   if (actorParam->getArgumentName() != C.Id_on ||
       targetParam->getArgumentName() != C.Id_target ||
-      invocationParam->getArgumentName() != C.Id_invocationDecoder ||
+      invocationParam->getArgumentName() != C.Id_invocation ||
       thrownTypeParam->getArgumentName() != C.Id_throwing)
     return false;
 
@@ -7458,6 +7455,26 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
       return false;
   }
 
+  if (!isGeneric())
+    return false;
+
+  auto genericParams = getGenericParams();
+  unsigned int expectedGenericParamNum = isVoidReturn ? 2 : 3;
+
+  // We expect: Act, Err, Res?
+  if (genericParams->size() != expectedGenericParamNum) {
+    return false;
+  }
+
+  // FIXME(distributed): check the exact generic requirements
+
+  // === check the return type
+  if (isVoidReturn) {
+    if (auto func = dyn_cast<FuncDecl>(this))
+      if (!func->getResultInterfaceType()->isVoid())
+        return false;
+  }
+
   // FIXME(distributed): check the right types of the args and generics...
   // FIXME(distributed): check access level actually is ok, i.e. not private etc
 
@@ -7465,34 +7482,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
 }
 
 bool AbstractFunctionDecl::isDistributed() const {
-  return this->getAttrs().hasAttribute<DistributedActorAttr>();
-}
-
-AbstractFunctionDecl*
-NominalTypeDecl::getDistributedActorSystemMakeInvocationEncoderFunction() const {
-  auto &C = this->getASTContext();
-  NominalTypeDecl *system = const_cast<NominalTypeDecl *>(this);
-  if (this->isDistributedActor()) {
-    auto var = this->getDistributedActorSystemProperty();
-    system = var->getInterfaceType()->getAnyNominal();
-  }
-
-  // FIXME(distributed): implement more properly...
-  for (auto value : system->lookupDirect(C.Id_makeInvocationEncoder)) {
-    auto func = dyn_cast<AbstractFunctionDecl>(value);
-    if (!func)
-      continue;
-
-    if (func->getParameters()->size() != 0)
-      continue;
-
-    // TODO(distriuted): return type must conform to our expected protocol
-
-    return func;
-  }
-
-  // TODO(distributed): make a Request for it?
-  return nullptr;
+  return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
 ConstructorDecl*

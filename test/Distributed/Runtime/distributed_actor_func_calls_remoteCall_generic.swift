@@ -71,7 +71,7 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
+    invocation invocationEncoder: inout InvocationEncoder,
     throwing errorType: Err.Type,
     returning returnType: Res.Type
   ) async throws -> Res
@@ -86,7 +86,7 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
+    invocation invocationEncoder: inout InvocationEncoder,
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
@@ -170,17 +170,8 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-// actual mangled name:
-let emptyName = "$s4main7GreeterC5emptyyyFTE"
-let helloName = "$s4main7GreeterC5helloSSyFTE"
-let answerName = "$s4main7GreeterC6answerSiyFTE"
-let largeResultName = "$s4main7GreeterC11largeResultAA11LargeStructVyFTE"
-let enumResultName = "$s4main7GreeterC10enumResultAA1EOyFTE"
-
-let echoName = "$s4main7GreeterC4echo4nameS2S_tFTE"
-
 func test() async throws {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   let local = Greeter(system: system)
   let ref = try Greeter.resolve(id: local.id, using: system)

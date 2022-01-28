@@ -129,29 +129,28 @@ struct FakeActorSystem: DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
-    throwing: Err.Type,
-    returning: Res.Type
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing errorType: Err.Type,
+    returning returnType: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
-    Err: Error,
-//          Act.ID == ActorID,
-    Res: SerializationRequirement {
-    print("remoteCall: on:\(actor), target:\(target), invocation:\(invocationDecoder), throwing:\(throwing), returning:\(returning)")
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    print("remoteCall: on:\(actor), target:\(target), invocation:\(invocationEncoder), throwing:\(errorType), returning:\(returnType)")
     return "<REMOTE CALL>" as! Res
   }
 
   func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
-    throwing: Err.Type
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing errorType: Err.Type
   ) async throws
     where Act: DistributedActor,
-    Err: Error
-//          Act.ID == ActorID
-  {
-    print("remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocationDecoder), throwing:\(throwing)")
+          Act.ID == ActorID,
+          Err: Error {
+    print("remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocationEncoder), throwing:\(errorType)")
     return ()
   }
 }

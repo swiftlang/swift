@@ -122,7 +122,7 @@ public protocol DistributedActorSystem: Sendable {
 //  func remoteCall<Act, Err, Res>(
 //      on actor: Act,
 //      target: RemoteCallTarget,
-//      invocationDecoder: inout InvocationDecoder,
+//      invocation: inout InvocationEncoder,
 //      throwing: Err.Type,
 //      returning: Res.Type
 //  ) async throws -> Res
@@ -157,7 +157,7 @@ extension DistributedActorSystem {
     invocationDecoder: inout InvocationDecoder,
     handler: ResultHandler
   ) async throws where Act: DistributedActor,
-                       Act.ID == ActorID,
+                       // Act.ID == ActorID, // FIXME(distributed): can we bring this back?
                        ResultHandler: DistributedTargetInvocationResultHandler {
     // NOTE: this implementation is not the most efficient, nor final, version of this func
     // we end up demangling the name multiple times, perform more heap allocations than
