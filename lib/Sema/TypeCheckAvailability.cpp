@@ -2863,6 +2863,12 @@ public:
         return skipChildren();
       }
     }
+    
+    if (auto EE = dyn_cast<ErasureExpr>(E)) {
+      for (ProtocolConformanceRef C : EE->getConformances()) {
+        diagnoseConformanceAvailability(E->getLoc(), C, Where);
+      }
+    }
 
     return visitChildren();
   }
