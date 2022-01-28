@@ -214,6 +214,56 @@ enum class RequirementCheckResult {
   Success, Failure, SubstitutionFailure
 };
 
+class CheckGenericArgumentsResult {
+public:
+  enum Kind { Success, RequirementFailure, SubstitutionFailure };
+
+  struct RequirementFailureInfo {
+    /// The failed requirement.
+    Requirement Req;
+
+    /// The failed requirement with substitutions applied.
+    Requirement SubstReq;
+
+    /// The chain of conditional conformances that leads to the failed
+    /// requirement \c Req. Accordingly, \c Req is a conditional requirement of
+    /// the last conformance in the chain (if any).
+    SmallVector<ParentConditionalConformance, 2> ReqPath;
+  };
+
+private:
+  Kind Knd;
+  Optional<RequirementFailureInfo> ReqFailureInfo;
+
+  CheckGenericArgumentsResult(Kind Knd,
+                              Optional<RequirementFailureInfo> ReqFailureInfo)
+      : Knd(Knd), ReqFailureInfo(ReqFailureInfo) {}
+
+public:
+  static CheckGenericArgumentsResult createSuccess() {
+    return CheckGenericArgumentsResult(Success, None);
+  }
+
+  static CheckGenericArgumentsResult createSubstitutionFailure() {
+    return CheckGenericArgumentsResult(SubstitutionFailure, None);
+  }
+
+  static CheckGenericArgumentsResult createRequirementFailure(
+      Requirement Req, Requirement SubstReq,
+      SmallVector<ParentConditionalConformance, 2> ReqPath) {
+    return CheckGenericArgumentsResult(
+        RequirementFailure, RequirementFailureInfo{Req, SubstReq, ReqPath});
+  }
+
+  const RequirementFailureInfo &getRequirementFailureInfo() const {
+    assert(Knd == RequirementFailure);
+
+    return ReqFailureInfo.getValue();
+  }
+
+  operator Kind() const { return Knd; }
+};
+
 /// Describes the kind of checked cast operation being performed.
 enum class CheckedCastContextKind {
   /// None: we're just establishing how to perform the checked cast. This
@@ -480,7 +530,18 @@ RequirementCheckResult checkGenericArguments(
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
     SubstOptions options = None);
 
-/// A lower-level version of the above without diagnostic emission.
+/// Check the given generic parameter substitutions against the given
+/// requirements and report on any requirement failures in detail for
+/// diagnostic needs.
+CheckGenericArgumentsResult
+checkGenericArgumentsForDiagnostics(ModuleDecl *module,
+                                    ArrayRef<Requirement> requirements,
+                                    TypeSubstitutionFn substitutions);
+
+/// Check the given generic parameter substitutions against the given
+/// requirements. Unlike \c checkAndDiagnoseGenericArguments, this version
+/// reports just the result of the check and doesn't provide additional
+/// information on requirement failures that is warranted for diagnostics.
 RequirementCheckResult checkGenericArguments(
     ModuleDecl *module,
     ArrayRef<Requirement> requirements,

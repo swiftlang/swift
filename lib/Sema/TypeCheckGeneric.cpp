@@ -930,6 +930,76 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   return RequirementCheckResult::SubstitutionFailure;
 }
 
+CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
+    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions) {
+  using ParentConditionalConformances =
+      SmallVector<ParentConditionalConformance, 2>;
+
+  struct WorklistItem {
+    /// The set of requirements to check. These are either the primary set
+    /// of requirements, or the conditional requirements of the last conformance
+    /// in \c ReqsPath (if any).
+    ArrayRef<Requirement> Requirements;
+
+    /// The chain of conditional conformances that leads to the above
+    /// requirement set.
+    ParentConditionalConformances ReqsPath;
+
+    WorklistItem(ArrayRef<Requirement> Requirements,
+                 ParentConditionalConformances ReqsPath)
+        : Requirements(Requirements), ReqsPath(ReqsPath) {}
+  };
+
+  bool hadSubstFailure = false;
+  SmallVector<WorklistItem, 4> worklist;
+
+  worklist.emplace_back(requirements, ParentConditionalConformances{});
+  while (!worklist.empty()) {
+    const auto item = worklist.pop_back_val();
+
+    const bool isPrimaryReq = item.ReqsPath.empty();
+    for (const auto &req : item.Requirements) {
+      Requirement substReq = req;
+      if (isPrimaryReq) {
+        // Primary requirements do not have substitutions applied.
+        if (auto resolved =
+                req.subst(substitutions, LookUpConformanceInModule(module))) {
+          substReq = *resolved;
+        } else {
+          // Another requirement might fail later; just continue.
+          hadSubstFailure = true;
+          continue;
+        }
+      }
+
+      ArrayRef<Requirement> conditionalRequirements;
+      if (!substReq.isSatisfied(conditionalRequirements,
+                                /*allowMissing=*/true)) {
+        return CheckGenericArgumentsResult::createRequirementFailure(
+            req, substReq, std::move(item.ReqsPath));
+      }
+
+      if (conditionalRequirements.empty()) {
+        continue;
+      }
+
+      assert(req.getKind() == RequirementKind::Conformance);
+
+      auto reqsPath = item.ReqsPath;
+      reqsPath.push_back({substReq.getFirstType(), substReq.getProtocolDecl()});
+
+      worklist.emplace_back(conditionalRequirements, std::move(reqsPath));
+    }
+  }
+
+  if (hadSubstFailure) {
+    return CheckGenericArgumentsResult::createSubstitutionFailure();
+  }
+
+  return CheckGenericArgumentsResult::createSuccess();
+}
+
 RequirementCheckResult
 TypeChecker::checkGenericArguments(ModuleDecl *module,
                                    ArrayRef<Requirement> requirements,
