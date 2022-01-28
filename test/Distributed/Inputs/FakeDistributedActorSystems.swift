@@ -41,7 +41,7 @@ public struct FakeActorSystem: DistributedActorSystem {
   public typealias InvocationEncoder = FakeInvocation
   public typealias SerializationRequirement = Codable
 
-  // just so that the struct does not get optimized away entirely
+  // just so that the struct does not become "trivial"
   let someValue: String = ""
   let someValue2: String = ""
   let someValue3: String = ""
@@ -71,8 +71,35 @@ public struct FakeActorSystem: DistributedActorSystem {
   public func resignID(_ id: ActorID) {
   }
 
-  public func makeInvocationEncoder() -> InvocationDecoder {
+  public func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  public func remoteCall<Act, Err, Res>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocationDecoder: inout InvocationDecoder,
+      throwing: Err.Type,
+      returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Err: Error,
+//        Act.ID == ActorID,
+          Res: SerializationRequirement {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+
   }
 }
 

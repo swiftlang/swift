@@ -1037,10 +1037,10 @@ public:
     bool isCached() const { return true; }
 };
 
-/// Obtain the 'remote' counterpart of a 'distributed func'.
-class GetDistributedRemoteFuncRequest :
-    public SimpleRequest<GetDistributedRemoteFuncRequest,
-                         AbstractFunctionDecl *(AbstractFunctionDecl *),
+/// Obtain the 'remoteCall' function of a 'DistributedActorSystem'.
+class GetDistributedActorSystemRemoteCallFunctionRequest :
+    public SimpleRequest<GetDistributedActorSystemRemoteCallFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *, bool voidReturn),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1048,7 +1048,25 @@ public:
 private:
   friend SimpleRequest;
 
-  AbstractFunctionDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actorSystem, bool voidReturn) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'actorSystem' property of a 'distributed actor'.
+class GetDistributedActorSystemPropertyRequest :
+    public SimpleRequest<GetDistributedActorSystemPropertyRequest,
+                         VarDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
 
 public:
     // Caching
@@ -1058,7 +1076,7 @@ public:
 /// Obtain the 'id' property of a 'distributed actor'.
 class GetDistributedActorIDPropertyRequest :
     public SimpleRequest<GetDistributedActorIDPropertyRequest,
-                         ValueDecl *(NominalTypeDecl *),
+                         VarDecl *(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1066,7 +1084,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ValueDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
 
 public:
     // Caching
