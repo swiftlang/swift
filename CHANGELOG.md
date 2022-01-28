@@ -6,6 +6,26 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.6
 ---------
 
+* [SE-0302][]:
+
+  Swift will now produce warnings to indicate potential data races when
+  non-`Sendable` types are passed across actor or task boundaries. For
+  example:
+
+  ```swift
+  class MyCounter {
+    var value = 0
+  }
+
+  func f() -> MyCounter {
+    let counter = MyCounter()
+    Task {
+      counter.value += 1  // warning: capture of non-Sendable type 'MyCounter'
+    }
+    return counter
+  }
+  ```
+
 * References to `Self` or so-called "`Self` requirements" in the type signatures
   of protocol members are now correctly detected in the parent of a nested type.
   As a result, protocol members that fall under this overlooked case are no longer
@@ -26,7 +46,7 @@ Swift 5.6
     // protocol type (use a generic constraint instead).
     _ = p.method
   }
-  ``` 
+  ```
 
 * [SE-0324][]:
 
@@ -8753,6 +8773,7 @@ Swift 1.0
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
 [SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
 [SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
+[SE-0302]: <https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 [SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
