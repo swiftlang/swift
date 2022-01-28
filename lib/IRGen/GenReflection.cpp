@@ -1062,46 +1062,45 @@ public:
   }
 
   void layout() override {
-    // TODO: Don't try to emit MPE descriptors for non-fixed-layout generic enums
-    // if (type is non-fixed-layout) {
-    //   return;
-    // }
-
-    addTypeRef(type, CanGenericSignature());
-
     auto &strategy = getEnumImplStrategy(IGM, getFormalTypeInContext(type));
     bool isMPE = strategy.getElementsWithPayload().size() > 1;
-    assert(isMPE && "");
+    assert(isMPE && "Cannot emit Multi-Payload Enum data for an enum that doesn't have multiple payloads");
 
     const TypeInfo &TI = strategy.getTypeInfo();
-    auto bits = strategy.getTagBitsForPayloads();
-    // FIXME: `bits` here is clearly not the spare bit mask
-    // needed by the runtime:
-    // On x86_64, an MPE with only class payloads, `bits` here
-    // is 0xe000000000000000 (which is definitely wrong)
-    // instead of 0xff00000000000007 (which I believe is right).
+    if (auto fixedTI = dyn_cast<FixedTypeInfo>(&TI)) {
+      addTypeRef(type, CanGenericSignature());
 
-    // Maybe there's a clue in EnumImplStrategy::emitGetEnumTag ??
+      // Get the spare bits mask for the enum payloads.
+      // The enum machinery currently exposes this broken
+      // into two parts; reassemble them to get what the runtime
+      // expects.
+      // TODO: Is there a better way to do this?
+      // Should we instead iterate over the payloads
+      // and build up a spare bit mask that way?
+      SpareBitVector spareBits;
+      fixedTI->applyFixedSpareBitsMask(IGM, spareBits);
+      spareBits |= strategy.getTagBitsForPayloads();
 
-    llvm::APInt bits = bits.asAPInt();
-    auto bitCount = bits.getActiveBits();
-    auto usesSpareBitMask = bitCount > 0;
-    auto byteCount = (bitCount + 7) / 8;
-    auto payloadSize = ti->getFixedSize().getValue();
-    if (byteCount > payloadSize) {
-      byteCount = payloadSize;
-      bitCount = byteCount / 8;
-    }
-    auto wordCount = (byteCount + 3) / 4;
-    bits = bits.zextOrTrunc(wordCount * 32);
+      llvm::APInt bits = spareBits.asAPInt();
+      auto bitCount = bits.getActiveBits();
+      auto usesSpareBitMask = bitCount > 0;
+      auto byteCount = (bitCount + 7) / 8;
+      auto payloadSize = ti->getFixedSize().getValue();
+      if (byteCount > payloadSize) {
+        byteCount = payloadSize;
+        bitCount = byteCount / 8;
+      }
+      auto wordCount = (byteCount + 3) / 4;
+      bits = bits.zextOrTrunc(wordCount * 32);
 
-    uint32_t flags = usesSpareBitMask ? 1 : 0;
-    B.addInt32(flags);
-    B.addInt32(bitCount);
-    for (unsigned i = 0; i < wordCount; ++i) {
-      uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
-      B.addInt32(nextWord);
-      bits.lshrInPlace(32);
+      uint32_t flags = usesSpareBitMask ? 1 : 0;
+      B.addInt32(flags);
+      B.addInt32(bitCount);
+      for (unsigned i = 0; i < wordCount; ++i) {
+        uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
+        B.addInt32(nextWord);
+        bits.lshrInPlace(32);
+      }
     }
   }
 
