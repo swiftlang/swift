@@ -150,7 +150,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // ==== Execute ----------------------------------------------------------------
 
 func test() async {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   // NOTE: All allocated distributed actors should be saved in this array, so
   // that they will be deallocated together at the end of this test!

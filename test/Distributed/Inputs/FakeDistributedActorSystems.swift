@@ -169,6 +169,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
   }
 
   private var remoteCallResult: Any? = nil
+  private var remoteCallError: Error? = nil
 
   public func remoteCall<Act, Err, Res>(
     on actor: Act,
@@ -191,7 +192,13 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         fatalError("Attempted to call mock 'roundtrip' on unknown actor: \(actor.id), known: \(active.id)")
       }
 
-      let resultHandler = FakeRoundtripResultHandler { self.remoteCallResult = $0 }
+      let resultHandler = FakeRoundtripResultHandler { value in
+        self.remoteCallResult = value
+        self.remoteCallError = nil
+      } onError: { error in
+        self.remoteCallResult = nil
+        self.remoteCallError = error
+      }
       try await executeDistributedTarget(
         on: active,
         mangledTargetName: target.mangledName,
@@ -199,8 +206,16 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         handler: resultHandler
       )
 
-      print("  << remoteCall return: \(remoteCallResult!)")
-      return remoteCallResult! as! Res
+      switch (remoteCallResult, remoteCallError) {
+      case (.some(let value), nil):
+        print("  << remoteCall return: \(value)")
+        return remoteCallResult! as! Res
+      case (nil, .some(let error)):
+        print("  << remoteCall throw: \(error)")
+        throw error
+      default:
+        fatalError("No reply!")
+      }
     }
     return try await _openExistential(targetActor, do: doIt)
   }
@@ -209,13 +224,46 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
     on actor: Act,
     target: RemoteCallTarget,
     invocation: inout InvocationEncoder,
-    throwing: Err.Type
+    throwing errorType: Err.Type
   ) async throws
     where Act: DistributedActor,
           Act.ID == ActorID,
           Err: Error {
-    print("remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocation), throwing:\(throwing)")
-    return ()
+    print("  >> remoteCallVoid: on:\(actor)), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType))")
+    guard let targetActor = activeActors[actor.id] else {
+      fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor")
+    }
+
+    func doIt<A: DistributedActor>(active: A) async throws {
+      guard (actor.id) == active.id as! ActorID else {
+        fatalError("Attempted to call mock 'roundtrip' on unknown actor: \(actor.id), known: \(active.id)")
+      }
+
+      let resultHandler = FakeRoundtripResultHandler { value in
+        self.remoteCallResult = value
+        self.remoteCallError = nil
+      } onError: { error in
+        self.remoteCallResult = nil
+        self.remoteCallError = error
+      }
+      try await executeDistributedTarget(
+        on: active,
+        mangledTargetName: target.mangledName,
+        invocationDecoder: &invocation,
+        handler: resultHandler
+      )
+
+      switch (remoteCallResult, remoteCallError) {
+      case (.some, nil):
+        return
+      case (nil, .some(let error)):
+        print("  << remoteCall throw: \(error)")
+        throw error
+      default:
+        fatalError("No reply!")
+      }
+    }
+    try await _openExistential(targetActor, do: doIt)
   }
 
 }
@@ -290,19 +338,22 @@ public struct FakeRoundtripInvocation: DistributedTargetInvocationEncoder, Distr
 public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandler {
   public typealias SerializationRequirement = Codable
 
-  let store: (Any) -> Void
-  init(_ store: @escaping (Any) -> Void) {
-    self.store = store
+  let storeReturn: (any Any) -> Void
+  let storeError: (any Error) -> Void
+  init(_ storeReturn: @escaping (Any) -> Void, onError storeError: @escaping (Error) -> Void) {
+    self.storeReturn = storeReturn
+    self.storeError = storeError
   }
 
+  // FIXME(distributed): can we return void here?
   public func onReturn<Res>(value: Res) async throws {
     print(" << onReturn: \(value)")
-    store(value)
+    storeReturn(value)
   }
 
   public func onThrow<Err: Error>(error: Err) async throws {
     print(" << onThrow: \(error)")
-    store(error)
+    storeError(error)
   }
 }
 
