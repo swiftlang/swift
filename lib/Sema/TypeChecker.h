@@ -513,6 +513,20 @@ std::string gatherGenericParamBindingsText(
     ArrayRef<Type> types, TypeArrayView<GenericTypeParamType> genericParams,
     TypeSubstitutionFn substitutions);
 
+/// Diagnose a requirement failure.
+///
+/// \param errorLoc The location at which an error shall be emitted.
+/// \param noteLoc The location at which any notes shall be emitted.
+/// \param targetTy The type whose generic arguments caused the requirement
+/// failure.
+/// \param genericParams The generic parameters that were substituted.
+/// \param substitutions The substitutions that caused the requirement failure.
+void diagnoseRequirementFailure(
+    const CheckGenericArgumentsResult::RequirementFailureInfo &reqFailureInfo,
+    SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
+    TypeArrayView<GenericTypeParamType> genericParams,
+    TypeSubstitutionFn substitutions, ModuleDecl *module);
+
 /// Check the given set of generic arguments against the requirements in a
 /// generic signature.
 ///

@@ -817,6 +817,71 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 /// Checking bound generic type arguments
 ///
 
+void TypeChecker::diagnoseRequirementFailure(
+    const CheckGenericArgumentsResult::RequirementFailureInfo &reqFailureInfo,
+    SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
+    TypeArrayView<GenericTypeParamType> genericParams,
+    TypeSubstitutionFn substitutions, ModuleDecl *module) {
+  assert(errorLoc.isValid() && noteLoc.isValid());
+
+  const auto &req = reqFailureInfo.Req;
+  const auto &substReq = reqFailureInfo.SubstReq;
+
+  Diag<Type, Type, Type> diagnostic;
+  Diag<Type, Type, StringRef> diagnosticNote;
+
+  const auto reqKind = req.getKind();
+  switch (reqKind) {
+  case RequirementKind::Conformance: {
+    diagnoseConformanceFailure(substReq.getFirstType(),
+                               substReq.getProtocolDecl(), module, errorLoc);
+
+    if (reqFailureInfo.ReqPath.empty())
+      return;
+
+    diagnostic = diag::type_does_not_conform_owner;
+    diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+    break;
+  }
+
+  case RequirementKind::Layout:
+    diagnostic = diag::type_is_not_a_class;
+    diagnosticNote = diag::anyobject_requirement;
+    break;
+
+  case RequirementKind::Superclass:
+    diagnostic = diag::type_does_not_inherit;
+    diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+    break;
+
+  case RequirementKind::SameType:
+    diagnostic = diag::types_not_equal;
+    diagnosticNote = diag::types_not_equal_requirement;
+    break;
+  }
+
+  Type secondTy, substSecondTy;
+  if (req.getKind() != RequirementKind::Layout) {
+    secondTy = req.getSecondType();
+    substSecondTy = substReq.getSecondType();
+  }
+
+  ASTContext &ctx = module->getASTContext();
+  // FIXME: Poor source-location information.
+  ctx.Diags.diagnose(errorLoc, diagnostic, targetTy, substReq.getFirstType(),
+                     substSecondTy);
+
+  const auto genericParamBindingsText =
+      TypeChecker::gatherGenericParamBindingsText(
+          {req.getFirstType(), secondTy}, genericParams, substitutions);
+
+  ctx.Diags.diagnose(noteLoc, diagnosticNote, req.getFirstType(), secondTy,
+                     genericParamBindingsText);
+
+  ParentConditionalConformance::diagnoseConformanceStack(
+      ctx.Diags, noteLoc, reqFailureInfo.ReqPath);
+}
+
 RequirementCheckResult TypeChecker::checkGenericArguments(
     ModuleDecl *module, SourceLoc loc, SourceLoc noteLoc, Type owner,
     TypeArrayView<GenericTypeParamType> genericParams,
