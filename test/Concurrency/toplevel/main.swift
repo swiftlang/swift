@@ -3,6 +3,10 @@
 
 var a = 10
 
+@MainActor
+var b = 14
+// CHECK: top-level code variables cannot have a global actor
+
 func nonIsolatedSynchronous() {
     print(a)
 // Swift6-CHECK: var 'a' isolated to global actor 'MainActor'
