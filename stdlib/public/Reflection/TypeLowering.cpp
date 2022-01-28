@@ -1075,13 +1075,20 @@ static bool populateSpareBitsMask(const std::vector<FieldInfo> &Fields, BitMask 
 static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask) {
   switch (TI->getKind()) {
   case TypeInfoKind::Reference: {
-    // Or else somehow get access to target architecture information?
-    if (TI->getSize() == 8) {
-      // x86_64 masking (ARM64 is different)
-      mask.andMask((uint64_t)0xFF00000000000007ULL, 0);
-    } else {
-      // Common to all 32-bit platforms
-      mask.andMask((uint32_t)0x00000003U, 0);
+    // TODO: The reflection libraries don't have a good
+    // way to identify the actual CPU architecture of the
+    // target.
+    if (TI->getSize() == sizeof(void *)) {
+      // If the target is the same size as the host, assume it's
+      // the same architecture.
+      mask.andMask(_swift_abi_SwiftSpareBitsMask, 0);
+    } else if (TI->getSize() == 8) {
+      // ARM64 masking (x86_64 is different)
+      mask.andMask(SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK, 0);
+    } else /* TI->getSize() == 4 */ {
+      // Note: All 32-bit platforms have the same mask,
+      // so this is actually correct.
+      mask.andMask(SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK, 0);
     }
     break;
   }
@@ -2030,7 +2037,14 @@ public:
               // TEMPORARY: compare our computed spare bit mask to the
               // one we got from the compiler (to verify that the compiler
               // is putting the right data in)
-              assert(t == spareBitsMask);
+              if (t != spareBitsMask) {
+                std::cerr << "Mismatched bit masks: "
+                          << t.str()
+                          << " != "
+                          << spareBitsMask.str()
+                          << std::endl;
+                assert(t == spareBitsMask);
+              }
 
               // Use compiler-provided spare bit information
               return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
