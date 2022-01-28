@@ -60,30 +60,17 @@ void swift_get_time(
 #endif
       break;
     }
-    // This case is not used currently
-    case swift_clock_id_realtime: {
-#if HAS_TIME
-      struct timespec realtime;
-      clock_gettime(CLOCK_REALTIME, &realtime);
-      *seconds = realtime.tv_sec;
-      *nanoseconds = realtime.tv_nsec;
-#elif defined(_WIN32)
-      
-#else
-#error Missing platform continuous time definition
-#endif
-      break;
-    }
     case swift_clock_id_suspending: {
-      struct timespec continuous;
 #if defined(__linux__) && HAS_TIME
-      clock_gettime(CLOCK_MONOTONIC_RAW, &continuous);
-      *seconds = continuous.tv_sec;
-      *nanoseconds = continuous.tv_nsec;
+      struct timespec suspending;
+      clock_gettime(CLOCK_MONOTONIC_RAW, &suspending);
+      *seconds = suspending.tv_sec;
+      *nanoseconds = suspending.tv_nsec;
 #elif defined(__APPLE__) && HAS_TIME
-      clock_gettime(CLOCK_UPTIME_RAW, &continuous);
-      *seconds = continuous.tv_sec;
-      *nanoseconds = continuous.tv_nsec;
+      struct timespec suspending;
+      clock_gettime(CLOCK_UPTIME_RAW, &suspending);
+      *seconds = suspending.tv_sec;
+      *nanoseconds = suspending.tv_nsec;
 #elif defined(_WIN32)
       LARGE_INTEGER freq;
       QueryPerformanceFrequency(&freq);
@@ -98,7 +85,7 @@ void swift_get_time(
             (count.QuadPart % freq.QuadPart) * (1000000000.0 / freq.QuadPart);
       }
 #else
-#error Missing platform continuous time definition
+#error Missing platform suspending time definition
 #endif
       break;
     }
@@ -131,35 +118,21 @@ switch (clock_id) {
 #endif
       break;
     }
-    // This case is not used currently
-    case swift_clock_id_realtime: {
-#if HAS_TIME
-      struct timespec realtime;
-      clock_getres(CLOCK_REALTIME, &realtime);
-      *seconds = realtime.tv_sec;
-      *nanoseconds = realtime.tv_nsec;
-#elif defined(_WIN32)
-      
-#else
-#error Missing platform continuous time definition
-#endif
-      break;
-    }
     case swift_clock_id_suspending: {
-      struct timespec continuous;
+      struct timespec suspending;
 #if defined(__linux__) && HAS_TIME
-      clock_getres(CLOCK_MONOTONIC_RAW, &continuous);
-      *seconds = continuous.tv_sec;
-      *nanoseconds = continuous.tv_nsec;
+      clock_getres(CLOCK_MONOTONIC_RAW, &suspending);
+      *seconds = suspending.tv_sec;
+      *nanoseconds = suspending.tv_nsec;
 #elif defined(__APPLE__) && HAS_TIME
-      clock_gettime(CLOCK_UPTIME_RAW, &continuous);
-      *seconds = continuous.tv_sec;
-      *nanoseconds = continuous.tv_nsec;
+      clock_gettime(CLOCK_UPTIME_RAW, &suspending);
+      *seconds = suspending.tv_sec;
+      *nanoseconds = suspending.tv_nsec;
 #elif defined(_WIN32)
       *seconds = 0;
       *nanoseconds = 1000;
 #else
-#error Missing platform continuous time definition
+#error Missing platform suspending time definition
 #endif
       break;
     }

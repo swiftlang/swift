@@ -24,6 +24,7 @@ public protocol Clock: Sendable {
 
 @available(SwiftStdlib 9999, *)
 extension Clock {
+  @available(SwiftStdlib 9999, *)
   public func measure(_ work: () throws -> Void) rethrows -> Instant.Interval {
     let start = now
     try work()
@@ -31,6 +32,7 @@ extension Clock {
     return start.duration(to: end)
   }
 
+  @available(SwiftStdlib 9999, *)
   public func measure(
     _ work: () async throws -> Void
   ) async rethrows -> Instant.Interval {
@@ -43,10 +45,9 @@ extension Clock {
 
 @available(SwiftStdlib 9999, *)
 @usableFromInline
-enum swift_clock_id: Int32 {
+enum _ClockID: Int32 {
   case continuous = 1
-  case realtime = 2
-  case suspending = 3
+  case suspending = 2
 }
 
 @available(SwiftStdlib 9999, *)
@@ -55,7 +56,7 @@ enum swift_clock_id: Int32 {
 internal func _getTime(
   seconds: UnsafeMutablePointer<Int64>,
   nanoseconds: UnsafeMutablePointer<Int64>,
-  clock: swift_clock_id)
+  clock: _ClockID)
 
 @available(SwiftStdlib 9999, *)
 @_silgen_name("swift_get_clock_res")
@@ -63,4 +64,4 @@ internal func _getTime(
 internal func _getClockRes(
   seconds: UnsafeMutablePointer<Int64>,
   nanoseconds: UnsafeMutablePointer<Int64>,
-  clock: swift_clock_id)
+  clock: _ClockID)
