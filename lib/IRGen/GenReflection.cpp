@@ -1012,6 +1012,42 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
   builder.emit();
 }
 
+ // TODO: This is copied from GenEnum.cpp; should we refactor to eliminate
+ // the duplication?
+static CanType getFormalTypeInContext(CanType abstractType, DeclContext *dc) {
+  // Map the parent of any non-generic nominal type.
+  if (auto nominalType = dyn_cast<NominalType>(abstractType)) {
+    // If it doesn't have a parent, or the parent doesn't need remapping,
+    // do nothing.
+    auto abstractParentType = nominalType.getParent();
+    if (!abstractParentType) return abstractType;
+    auto parentType = getFormalTypeInContext(abstractParentType, dc);
+    if (abstractParentType == parentType) return abstractType;
+
+    // Otherwise, rebuild the type.
+    return CanType(NominalType::get(nominalType->getDecl(), parentType,
+                                    nominalType->getDecl()->getASTContext()));
+
+  // Map unbound types into their defining context.
+  } else if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
+    return dc->mapTypeIntoContext(ugt->getDecl()->getDeclaredInterfaceType())
+        ->getCanonicalType();
+
+  // Everything else stays the same.
+  } else {
+    return abstractType;
+  }
+}
+
+/// Given an abstract type --- a type possibly expressed in terms of
+/// unbound generic types --- return the formal type within the type's
+/// primary defining context.
+static CanType getFormalTypeInContext(CanType abstractType) {
+  if (auto nominal = abstractType.getAnyNominal())
+    return getFormalTypeInContext(abstractType, nominal);
+  return abstractType;
+}
+
 class MultiPayloadEnumDescriptorBuilder : public ReflectionMetadataBuilder {
   CanType type;
   const FixedTypeInfo *ti;
@@ -1026,24 +1062,28 @@ public:
   }
 
   void layout() override {
-    // TODO: Don't try to emit MPE descriptors for unbound generic enums
-    // Related: getEnumImplStrategy() below asserts that `type` is not an unbound generic
-    // if (type is generic) {
+    // TODO: Don't try to emit MPE descriptors for non-fixed-layout generic enums
+    // if (type is non-fixed-layout) {
     //   return;
     // }
 
     addTypeRef(type, CanGenericSignature());
 
-    auto &strategy = getEnumImplStrategy(IGM, type);
+    auto &strategy = getEnumImplStrategy(IGM, getFormalTypeInContext(type));
     bool isMPE = strategy.getElementsWithPayload().size() > 1;
     assert(isMPE && "");
 
     const TypeInfo &TI = strategy.getTypeInfo();
-    auto bits1 = strategy.getTagBitsForPayloads();
-    auto bits2 = strategy.getBitMaskForNoPayloadElements();
-    // Look at EnumImplStrategy::emitGetEnumTag to see how it works
+    auto bits = strategy.getTagBitsForPayloads();
+    // FIXME: `bits` here is clearly not the spare bit mask
+    // needed by the runtime:
+    // On x86_64, an MPE with only class payloads, `bits` here
+    // is 0xe000000000000000 (which is definitely wrong)
+    // instead of 0xff00000000000007 (which I believe is right).
 
-    llvm::APInt bits = bits1.asAPInt();
+    // Maybe there's a clue in EnumImplStrategy::emitGetEnumTag ??
+
+    llvm::APInt bits = bits.asAPInt();
     auto bitCount = bits.getActiveBits();
     auto usesSpareBitMask = bitCount > 0;
     auto byteCount = (bitCount + 7) / 8;
