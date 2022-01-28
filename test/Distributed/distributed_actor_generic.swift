@@ -9,17 +9,6 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-distributed actor DA {
-}
-
-distributed actor First {
-  distributed func one(second: Second) async throws {
-    try await second.two(first: self, second: second)
-  }
-}
-
-distributed actor Second {
-  distributed func two(first: First, second: Second) async {
-    try! await first.one(second: self)
-  }
+distributed actor Worker<WorkItem: Codable> {
+  distributed func test(item: WorkItem) {}
 }

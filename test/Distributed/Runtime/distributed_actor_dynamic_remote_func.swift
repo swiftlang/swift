@@ -23,20 +23,6 @@ distributed actor LocalWorker {
   }
 }
 
-extension LocalWorker {
-  @_dynamicReplacement(for: _remote_function())
-  // TODO(distributed): @_remoteDynamicReplacement(for: function()) - could be a nicer spelling, hiding that we use dynamic under the covers
-  func _cluster_remote_function() async throws -> String {
-    "\(#function):"
-  }
-
-  @_dynamicReplacement(for: _remote_echo(name:))
-  // TODO(distributed): @_remoteDynamicReplacement(for: hello(name:)) - could be a nicer spelling, hiding that we use dynamic under the covers
-  func _cluster_remote_echo(name: String) async throws -> String {
-    "\(#function):\(name)"
-  }
-}
-
 // ==== Fake Transport ---------------------------------------------------------
 
 struct ActorAddress: Sendable, Hashable, Codable {
@@ -76,13 +62,45 @@ struct FakeActorSystem: DistributedActorSystem {
     print("ready id:\(id)")
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+//          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    return "remoteCall: \(target.mangledName)" as! Res
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+//          Act.ID == ActorID,
+          Err: Error {
+    fatalError("not implemented \(#function)")
   }
 }
 
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
+
+  // FIXME(distributed): must support trivial types
+  var xx: [String] = []
+  var x2x: [String] = []
+  var x3x: [String] = []
+  var x4x: [String] = []
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
@@ -129,11 +147,11 @@ func test_remote() async throws {
   let worker = try LocalWorker.resolve(id: address, using: system)
   let x = try await worker.function()
   print("call: \(x)")
-  // CHECK: call: _cluster_remote_function():
+  // CHECK: remoteCall: $s4main11LocalWorkerC8functionSSyYaKFTE
 
   let e = try await worker.echo(name: "Charlie")
   print("call: \(e)")
-  // CHECK: call: _cluster_remote_echo(name:):Charlie
+  // CHECK: remoteCall: $s4main11LocalWorkerC4echo4nameS2S_tYaKFTE
 }
 
 @main struct Main {
