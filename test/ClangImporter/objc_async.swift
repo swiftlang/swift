@@ -4,7 +4,7 @@
 // REQUIRES: concurrency
 import Foundation
 import ObjCConcurrency
-// expected-remark@-1{{add '@_predatesConcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
+// expected-remark@-1{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
 
 if #available(SwiftStdlib 5.5, *) {
 
@@ -97,7 +97,7 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
 }
 
 func testSendable(fn: () -> Void) {
-  doSomethingConcurrently(fn) // okay, due to implicit @_predatesConcurrency
+  doSomethingConcurrently(fn) // okay, due to implicit @preconcurrency
   doSomethingConcurrentlyButUnsafe(fn) // okay, @Sendable not part of the type
 
   var x = 17

@@ -6,8 +6,8 @@
 
 // REQUIRES: asserts
 
-@_predatesConcurrency import NonStrictModule
-@_predatesConcurrency import StrictModule
+@preconcurrency import NonStrictModule
+@preconcurrency import StrictModule
 
 func acceptSendable<T: Sendable>(_: T) { }
 

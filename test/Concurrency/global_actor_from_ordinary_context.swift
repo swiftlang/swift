@@ -137,7 +137,7 @@ func topLevelSyncFunction(_ number: inout Int) { }
 topLevelSyncFunction(&value)
 
 // Strict checking based on inferred Sendable/async/etc.
-@_predatesConcurrency @SomeGlobalActor class Super { }
+@preconcurrency @SomeGlobalActor class Super { }
 
 class Sub: Super {
   func f() { }
