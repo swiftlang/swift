@@ -229,10 +229,12 @@ func inheritequal_bad<U>(_: U) {
 
 struct InheritLess<T> {}
 extension InheritLess: P2 where T: P1 {}
-extension InheritLess: P5 {} // expected-error{{type 'T' does not conform to protocol 'P1'}}
-// expected-error@-1{{'P5' requires that 'T' conform to 'P1'}}
-// expected-note@-2{{requirement specified as 'T' : 'P1'}}
-// expected-note@-3{{requirement from conditional conformance of 'InheritLess<T>' to 'P2'}}
+extension InheritLess: P5 {}
+// expected-error@-1 {{type 'InheritLess<T>' does not conform to protocol 'P5'}}
+// expected-error@-2 {{type 'T' does not conform to protocol 'P1'}}
+// expected-error@-3 {{'P5' requires that 'T' conform to 'P1'}}
+// expected-note@-4 {{requirement specified as 'T' : 'P1'}}
+// expected-note@-5 {{requirement from conditional conformance of 'InheritLess<T>' to 'P2'}}
 
 
 struct InheritMore<T> {}

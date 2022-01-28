@@ -43,6 +43,8 @@ distributed actor DA: DistributedActor {
   typealias ActorSystem = FakeActorSystem
 }
 
+// FIXME: Ideally, we should only emit the tailored conformance error.
+// expected-error@+1 {{type 'A2' does not conform to protocol 'DistributedActor'}}
 actor A2: DistributedActor {
   // expected-error@-1{{non-distributed actor type 'A2' cannot conform to the 'DistributedActor' protocol}} {{1-1=distributed }}
   // expected-error@-2{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
@@ -63,6 +65,8 @@ actor A2: DistributedActor {
   }
 }
 
+// FIXME: Ideally, we should only emit the tailored conformance error.
+// expected-error@+1 {{type 'C2' does not conform to protocol 'DistributedActor'}}
 final class C2: DistributedActor {
   // expected-error@-1{{non-actor type 'C2' cannot conform to the 'Actor' protocol}}
   // expected-error@-2{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}

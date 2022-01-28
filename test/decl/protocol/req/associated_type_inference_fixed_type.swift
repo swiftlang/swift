@@ -66,6 +66,7 @@ do {
   struct Conformer: P8a, P8b {}
   // expected-error@-1 {{'P8b' requires the types 'Conformer.A' (aka 'Never') and 'Bool' be equivalent}}
   // expected-note@-2 {{requirement specified as 'Self.A' == 'Bool' [with Self = Conformer]}}
+  // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P8b'}}
 }
 
 protocol P9a where A == Never {
@@ -75,6 +76,7 @@ protocol P9b: P9a {
   associatedtype A
 }
 struct S9a: P9b {}
+// expected-error@+3 {{type 'S9b' does not conform to protocol 'P9a'}}
 // expected-error@+2 {{'P9a' requires the types 'S9b.A' (aka 'Bool') and 'Never' be equivalent}}
 // expected-note@+1 {{requirement specified as 'Self.A' == 'Never' [with Self = S9b]}}
 struct S9b: P9b {
@@ -94,6 +96,7 @@ extension P10b {
 }
 // FIXME: 'P10 extension.A' should not be considered a viable type witness;
 //  instead, the compiler should infer A := Never and synthesize S10.A.
+// expected-error@+3 {{type 'S10' does not conform to protocol 'P10a'}}
 // expected-error@+2 {{'P10a' requires the types 'S10.A' (aka 'Bool') and 'Never' be equivalent}}
 // expected-note@+1 {{requirement specified as 'Self.A' == 'Never' [with Self = S10]}}
 struct S10: P10b, P10a {}
@@ -323,13 +326,15 @@ do {
   struct Conformer1: Q28a {}
   // expected-error@-1 {{'P28b' requires the types 'Conformer1.A' (aka 'Int') and 'Bool' be equivalent}}
   // expected-note@-2 {{requirement specified as 'Self.A' == 'Bool' [with Self = Conformer1]}}
+  // expected-error@-3 {{type 'Conformer1' does not conform to protocol 'P28b'}}
 
   struct Conformer2: Q28b {}
   // expected-error@-1 {{'P28c' requires the types 'Conformer2.A' (aka 'Int') and 'Never' be equivalent}}
   // expected-error@-2 {{'P28b' requires the types 'Conformer2.A' (aka 'Int') and 'Bool' be equivalent}}
   // expected-note@-3 {{requirement specified as 'Self.A' == 'Never' [with Self = Conformer2]}}
   // expected-note@-4 {{requirement specified as 'Self.A' == 'Bool' [with Self = Conformer2]}}
-
+  // expected-error@-5 {{type 'Conformer2' does not conform to protocol 'P28b'}}
+  // expected-error@-6 {{type 'Conformer2' does not conform to protocol 'P28c'}}
 }
 
 protocol P29a where A == Int {
@@ -353,6 +358,7 @@ do {
   struct Conformer1: Q29a {}
   // expected-error@-1 {{'P29b' requires the types 'Conformer1.B' (aka 'Int') and 'Never' be equivalent}}
   // expected-note@-2 {{requirement specified as 'Self.B' == 'Never' [with Self = Conformer1]}}
+  // expected-error@-3 {{type 'Conformer1' does not conform to protocol 'P29b'}}
 
 
   struct Conformer2: Q29b {}

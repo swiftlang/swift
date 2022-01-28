@@ -4971,12 +4971,6 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     break;
 
   case CheckGenericArgumentsResult::RequirementFailure:
-    TypeChecker::diagnoseRequirementFailure(
-        result.getRequirementFailureInfo(), Loc, Loc,
-        proto->getDeclaredInterfaceType(), {proto->getSelfInterfaceType()},
-        QuerySubstitutionMap{substitutions}, module);
-    Conformance->setInvalid();
-    return;
   case CheckGenericArgumentsResult::SubstitutionFailure:
     // Diagnose the failure generically.
     // FIXME: Would be nice to give some more context here!
@@ -4984,7 +4978,16 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       diags.diagnose(Loc, diag::type_does_not_conform,
                      Adoptee,
                      Proto->getDeclaredInterfaceType());
+
+      if (result == CheckGenericArgumentsResult::RequirementFailure) {
+        TypeChecker::diagnoseRequirementFailure(
+            result.getRequirementFailureInfo(), Loc, Loc,
+            proto->getDeclaredInterfaceType(), {proto->getSelfInterfaceType()},
+            QuerySubstitutionMap{substitutions}, module);
+      }
+
       Conformance->setInvalid();
+      AlreadyComplained = true;
     }
     return;
   }
