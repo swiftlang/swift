@@ -772,6 +772,9 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
   if (def.getOwnershipKind() != OwnershipKind::Owned)
     return false;
 
+  if (def->isLexical())
+    return false;
+
   if (poisonRefsMode && !shouldCanonicalizeWithPoison(def))
     return false;
 

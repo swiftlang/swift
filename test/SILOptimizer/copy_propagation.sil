@@ -28,6 +28,7 @@ class C {
 }
 
 sil [ossa] @dummy : $@convention(thin) () -> ()
+sil [ossa] @barrier : $@convention(thin) () -> ()
 sil [ossa] @getOwnedC : $@convention(thin) () -> (@owned C)
 sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> ()
 sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
@@ -835,4 +836,27 @@ bb0(%0 : @owned $C):
   %6 = copy_value %0 : $C
   %7 = begin_borrow %6 : $C
   unreachable
+}
+
+// Test that copy propagation doesn't hoist a destroy_value corresponding to
+// a move value [lexical] over a barrier.
+// CHECK-ONONE-LABEL: sil [ossa] @dont_hoist_move_value_lexical_destroy_over_barrier_apply : {{.*}} {
+// CHECK-ONONE:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK-ONONE:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK-ONONE:         [[BARRIER:%[^,]+]] = function_ref @barrier
+// CHECK-ONONE:         [[TAKE_GUARANTEED_C:%[^,]+]] = function_ref @takeGuaranteedC
+// CHECK-ONONE:         apply [[TAKE_GUARANTEED_C]]([[LIFETIME]])
+// CHECK-ONONE:         apply [[BARRIER]]()
+// CHECK-ONONE:         destroy_value [[LIFETIME]]
+// CHECK-ONONE-LABEL: } // end sil function 'dont_hoist_move_value_lexical_destroy_over_barrier_apply'
+sil [ossa] @dont_hoist_move_value_lexical_destroy_over_barrier_apply : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %lifetime = move_value [lexical] %instance : $C
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  %takeGuaranteedC = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  apply %takeGuaranteedC(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  apply %barrier() : $@convention(thin) () -> ()
+  destroy_value %lifetime : $C
+  %retval = tuple ()
+  return %retval : $()
 }
