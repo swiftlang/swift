@@ -3038,6 +3038,24 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName) {
   return nullptr;
 }
 
+bool SourceFile::isAsyncTopLevelSourceFile() const {
+  return isScriptMode() &&
+         (bool)evaluateOrDefault(getASTContext().evaluator,
+                                 GetSourceFileAsyncNode{this}, ASTNode());
+}
+
+ASTNode GetSourceFileAsyncNode::evaluate(Evaluator &eval,
+                                         const SourceFile *sf) const {
+  for (Decl *d : sf->getTopLevelDecls()) {
+    TopLevelCodeDecl *tld = dyn_cast<TopLevelCodeDecl>(d);
+    if (tld && tld->getBody()) {
+      if (ASTNode asyncNode = tld->getBody()->findAsyncNode())
+        return asyncNode;
+    }
+  }
+  return ASTNode();
+}
+
 //===----------------------------------------------------------------------===//
 // SynthesizedFileUnit Implementation
 //===----------------------------------------------------------------------===//

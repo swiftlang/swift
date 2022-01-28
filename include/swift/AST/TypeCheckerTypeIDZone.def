@@ -372,3 +372,6 @@ SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetSourceFileAsyncNode,
+              AwaitExpr *(const SourceFile *),
+              Cached, NoLocationInfo)
