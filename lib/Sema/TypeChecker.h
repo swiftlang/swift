@@ -553,7 +553,7 @@ checkGenericArgumentsForDiagnostics(ModuleDecl *module,
                                     TypeSubstitutionFn substitutions);
 
 /// Check the given generic parameter substitutions against the given
-/// requirements. Unlike \c checkAndDiagnoseGenericArguments, this version
+/// requirements. Unlike \c checkGenericArgumentsForDiagnostics, this version
 /// reports just the result of the check and doesn't provide additional
 /// information on requirement failures that is warranted for diagnostics.
 RequirementCheckResult checkGenericArguments(
