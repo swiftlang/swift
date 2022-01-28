@@ -93,6 +93,12 @@ Swift 5.6
   }
   ```
 
+* [SE-0331][]:
+
+  The conformance of the unsafe pointer types (e.g., `UnsafePointer`,
+  `UnsafeMutableBufferPointer`) to the `Sendable` protocols has been removed,
+  because pointers cannot safely be transferred across task or actor boundaries.
+
 * References to `Self` or so-called "`Self` requirements" in the type signatures
   of protocol members are now correctly detected in the parent of a nested type.
   As a result, protocol members that fall under this overlooked case are no longer
@@ -8850,6 +8856,7 @@ Swift 1.0
 [SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
 [SE-0328]: <https://github.com/apple/swift-evolution/blob/main/proposals/0328-structural-opaque-result-types.md>
+[SE-0331]: <https://github.com/apple/swift-evolution/blob/main/proposals/0331-remove-sendable-from-unsafepointer.md>
 [SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
