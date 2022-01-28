@@ -3016,7 +3016,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   // If this declaration predates concurrency, adjust its type to not
   // contain type features that were not available pre-concurrency. This
   // cannot alter the ABI in any way.
-  if (decl->predatesConcurrency()) {
+  if (decl->preconcurrency()) {
     ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true);
   }
 

@@ -3150,6 +3150,11 @@ ParserStatus Parser::parseDeclAttribute(
     AtLoc = SourceLoc();
   }
 
+  // Temporary name for @preconcurrency
+  checkInvalidAttrName(
+      "_predatesConcurrency", "preconcurrency", DAK_Preconcurrency,
+      diag::attr_renamed_warning);
+
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.

@@ -103,7 +103,7 @@ func testGlobalActor() async {
 // CHECK:   hop_to_executor [[B]] : $MyActor
 // CHECK: }
 @GlobalActor
-@_predatesConcurrency
+@preconcurrency
 func testGlobalActorUnsafe() async {
 }
 
