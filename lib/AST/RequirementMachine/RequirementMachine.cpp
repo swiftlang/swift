@@ -288,9 +288,10 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   if (Sig)
     out << Sig;
   else if (!Params.empty()) {
-    out << "fresh signature ";
+    out << "fresh signature <";
     for (auto paramTy : Params)
       out << " " << Type(paramTy);
+    out << " >";
   } else {
     auto protos = System.getProtocols();
     assert(!protos.empty());
