@@ -3627,12 +3627,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
     case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor: {
       // Stored properties of a struct don't need global-actor isolation.
-      if (auto *var = dyn_cast<VarDecl>(value))
-        if (!var->isStatic() && var->isOrdinaryStoredProperty())
-          if (auto *varDC = var->getDeclContext())
-            if (auto *nominal = varDC->getSelfNominalTypeDecl())
-              if (isa<StructDecl>(nominal) && !isWrappedValueOfPropWrapper(var))
-                return ActorIsolation::forUnspecified();
+      if (ctx.isSwiftVersionAtLeast(6))
+        if (auto *var = dyn_cast<VarDecl>(value))
+          if (!var->isStatic() && var->isOrdinaryStoredProperty())
+            if (auto *varDC = var->getDeclContext())
+              if (auto *nominal = varDC->getSelfNominalTypeDecl())
+                if (isa<StructDecl>(nominal) &&
+                    !isWrappedValueOfPropWrapper(var))
+                  return ActorIsolation::forUnspecified();
 
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
       auto attr = CustomAttr::create(

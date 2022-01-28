@@ -299,7 +299,7 @@ struct WrapperOnActor<Wrapped: Sendable> {
     stored = wrappedValue
   }
 
-  @MainActor var wrappedValue: Wrapped { // expected-note {{property declared here}}
+  @MainActor var wrappedValue: Wrapped {
     get { }
     set { }
   }
@@ -315,7 +315,7 @@ struct WrapperOnActor<Wrapped: Sendable> {
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
   
-  public var wrappedValue: Wrapped // expected-note {{property declared here}}
+  public var wrappedValue: Wrapped
 
   public var accessCount: Int
 
@@ -352,36 +352,15 @@ actor WrapperActor<Wrapped: Sendable> {
   }
 }
 
-struct HasMainActorWrappedProp {
-  @WrapperOnMainActor var thing: Int = 1 // expected-note {{property declared here}}
-
-  var plainStorage: Int
-
-  var computedProp: Int { 0 } // expected-note {{property declared here}}
-
-  nonisolated func testErrors() {
-    _ = thing // expected-error {{property 'thing' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
-    _ = _thing.wrappedValue // expected-error {{property 'wrappedValue' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
-
-    _ = _thing
-    _ = _thing.accessCount
-
-    _ = plainStorage
-
-    _ = computedProp // expected-error {{property 'computedProp' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
-  }
-}
-
 struct HasWrapperOnActor {
   @WrapperOnActor var synced: Int = 0
-  // expected-note@-1 2{{property declared here}}
+  // expected-note@-1 3{{property declared here}}
 
   // expected-note@+1 3{{to make instance method 'testErrors()'}}
   func testErrors() {
     _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
     _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
-    _ = _synced
-    _ = _synced.wrappedValue // expected-error{{property 'wrappedValue' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from this synchronous context}}
   }
 
   @MainActor mutating func testOnMain() {
@@ -540,7 +519,7 @@ struct WrapperOnUnsafeActor<Wrapped> {
 
 struct HasWrapperOnUnsafeActor {
   @WrapperOnUnsafeActor var synced: Int = 0
-  // expected-note@-1 2{{property declared here}}
+  // expected-note@-1 3{{property declared here}}
 
   func testUnsafeOkay() {
     _ = synced
@@ -551,7 +530,7 @@ struct HasWrapperOnUnsafeActor {
   nonisolated func testErrors() {
     _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from}}
     _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from}}
-    _ = _synced
+    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from a non-isolated synchronous context}}
   }
 
   @MainActor mutating func testOnMain() {

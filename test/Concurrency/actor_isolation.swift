@@ -46,7 +46,7 @@ actor MySuperActor {
   }
 }
 
-class Point { // expected-note 3{{class 'Point' does not conform to the 'Sendable' protocol}}
+class Point { // expected-note 5{{class 'Point' does not conform to the 'Sendable' protocol}}
   var x : Int = 0
   var y : Int = 0
 }
@@ -111,14 +111,11 @@ func checkAsyncPropertyAccess() async {
 
 /// ------------------------------------------------------------------
 /// -- Value types do not need isolation on their stored properties --
-
-@available(SwiftStdlib 5.1, *)
 protocol MainCounter {
   @MainActor var counter: Int { get set }
   @MainActor var ticker: Int { get set }
 }
 
-@available(SwiftStdlib 5.1, *)
 struct InferredFromConformance: MainCounter {
   var counter = 0
   var ticker: Int {
@@ -128,7 +125,6 @@ struct InferredFromConformance: MainCounter {
 }
 
 @MainActor
-@available(SwiftStdlib 5.1, *)
 struct InferredFromContext {
   var point = Point()
   var polygon: [Point] {
@@ -144,23 +140,16 @@ struct InferredFromContext {
   static var stuff: [Int] = []
 }
 
-@available(SwiftStdlib 5.1, *)
 func checkIsolationValueType(_ formance: InferredFromConformance,
                              _ ext: InferredFromContext,
                              _ anno: NoGlobalActorValueType) async {
-  // these do not need an await, since it's a value type
-  _ = ext.point
-  _ = formance.counter
-  _ = anno.point
+  // these still do need an await in Swift 5
+  _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
+  _ = await formance.counter
+  _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
   _ = anno.counter
 
-  // make sure it's just a warning if someone was awaiting on it previously
-  _ = await ext.point // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = await formance.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = await anno.point  // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = await anno.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
-
-  // these do need await, regardless of reference or value type
+  // these will always need an await
   _ = await (formance as MainCounter).counter
   _ = await ext[1]
   _ = await formance.ticker
@@ -170,7 +159,6 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
 }
 
 // check for instance members that do not need global-actor protection
-@available(SwiftStdlib 5.1, *)
 struct NoGlobalActorValueType {
   @SomeGlobalActor var point: Point // expected-warning {{stored property 'point' within struct cannot have a global actor; this is an error in Swift 6}}
 

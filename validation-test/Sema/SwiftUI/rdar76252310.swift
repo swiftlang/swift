@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-class Visibility: ObservableObject { // expected-note {{class 'Visibility' does not conform to the 'Sendable' protocol}}
+class Visibility: ObservableObject { // expected-note 2{{class 'Visibility' does not conform to the 'Sendable' protocol}}
     @Published var yes = false // some nonsense
 }
 
@@ -49,5 +49,5 @@ func fromConcurrencyAware() async {
   // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
   _ = view.showDrinkList
 
-  _ = view.storage
+  _ = await view.storage // expected-warning {{non-sendable type 'Visibility' in implicitly asynchronous access to main actor-isolated property 'storage' cannot cross actor boundary}}
 }

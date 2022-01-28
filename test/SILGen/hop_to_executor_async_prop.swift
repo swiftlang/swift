@@ -602,8 +602,11 @@ struct Container {
     // CHECK: [[SOME_BB]]:
     // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
     // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr [[DATA_ADDR]] : $*Container, #Container.iso
+    // CHECK:       [[PREV_AGAIN:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
     // CHECK:       {{%[0-9]+}} = load [trivial] [[ELEM_ADDR]] : $*Float
     // CHECK:       hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor [[PREV_AGAIN]] : $Optional<Builtin.Executor>
     // CHECK: } // end sil function '$s4test9ContainerV10getOrCrashSfyYaFZ'
     static func getOrCrash() async -> Float {
         return await this!.iso
@@ -628,8 +631,11 @@ struct Container {
     // CHECK: [[SOME_BB]]:
     // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
     // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr [[DATA_ADDR]] : $*Container, #Container.iso
+    // CHECK:       [[PREV_AGAIN:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
     // CHECK:       {{%[0-9]+}} = load [copy] [[ELEM_ADDR]] : $*CatBox
     // CHECK:       hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor [[PREV_AGAIN]] : $Optional<Builtin.Executor>
     // CHECK: } // end sil function '$s4test9ContainerV13getRefOrCrashAA6CatBoxCyYaFZ'
     static func getRefOrCrash() async -> CatBox {
         return await this!.isoRef
