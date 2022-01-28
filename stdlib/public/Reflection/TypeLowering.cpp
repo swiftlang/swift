@@ -27,6 +27,7 @@
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
 #include <iostream>
+#include <sstream>
 #include <limits>
 
 #ifdef DEBUG_TYPE_LOWERING
@@ -677,6 +678,15 @@ public:
     memcpy(mask, src.mask, size);
   }
 
+  std::string str() const {
+    std::ostringstream buff;
+    buff << size << ":0x";
+    for (unsigned i = 0; i < size; i++) {
+      buff << std::hex << ((mask[i] >> 4) & 0x0f) << (mask[i] & 0x0f);
+    }
+    return buff.str();
+  }
+
   bool operator==(const BitMask& rhs) const {
     // The two masks may be of different sizes.
     // The common prefix must be identical.
@@ -698,6 +708,10 @@ public:
       }
     }
     return true;
+  }
+
+  bool operator!=(const BitMask& rhs) const {
+    return !(*this == rhs);
   }
 
   bool isNonZero() const { return !isZero(); }
