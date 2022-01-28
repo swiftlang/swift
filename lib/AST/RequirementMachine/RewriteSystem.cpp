@@ -668,8 +668,6 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
       // which are immediately simplified away.
       if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !rule.isSubstitutionSimplified() &&
           index != 0 && index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
@@ -680,9 +678,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       // Permanent rules contain name symbols at the end, like
       // [P].T => [P:T].
-      if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !rule.isSubstitutionSimplified() &&
+      if (!rule.isRHSSimplified() &&
           (!rule.isPermanent() || index == rhs.size() - 1)) {
         // This is only true if the input requirements were valid.
         if (policy == DisallowInvalidRequirements) {
@@ -701,10 +697,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
       // which are immediately simplified away.
-      if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !rule.isSubstitutionSimplified() &&
-          index != 0) {
+      if (!rule.isRHSSimplified() && index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
