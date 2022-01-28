@@ -31,6 +31,7 @@ public:
   virtual llvm::Optional<llvm::StringRef> getSegmentName() {
     return {};
   }
+  /// Predicate to identify if the named section can contain reflection data.
   virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) {
     return getSectionName(fieldmd) == sectionName ||
            getSectionName(assocty) == sectionName ||
@@ -43,8 +44,6 @@ public:
 
 /// Responsible for providing the Mach-O reflection section identifiers.
 class SwiftObjectFileFormatMachO : public SwiftObjectFileFormat {
-  using super = SwiftObjectFileFormat;
-
 public:
   llvm::StringRef getSectionName(ReflectionSectionKind section) override {
     switch (section) {
@@ -68,7 +67,7 @@ public:
   }
 
   bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
-    return super::sectionContainsReflectionData(sectionName) ||
+    return sectionName.startswith("__swift5_") ||
            sectionName == "__DATA_CONST,__const";
   }
 };
