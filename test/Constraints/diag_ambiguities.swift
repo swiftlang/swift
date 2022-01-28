@@ -76,6 +76,5 @@ func SR15053<T : Numeric>(_ a: T, _ b: T) -> T {
 }
 
 func SR15053<T : Numeric>(_ a: T, _ b: T) {
-  (a + b) / 2 // expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int)}}
-  // expected-error@-1 {{binary operator '/' cannot be applied to operands of type 'T' and 'Int'}}
+  (a + b) / 2 // expected-error {{cannot convert value of type 'T' to expected argument type 'Int'}}
 }
