@@ -134,10 +134,21 @@ public:
     // Default implementation returns the read value as is.
     return RemoteAbsolutePointer("", readValue);
   }
-  
+
+  /// Atempt to resolve the pointer to a symbol for the given remote address.
+  virtual llvm::Optional<RemoteAbsolutePointer>
+  resolvePointerAsSymbol(RemoteAddress address) {
+    return llvm::None;
+  }
+
   /// Attempt to read and resolve a pointer value at the given remote address.
   llvm::Optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
                                                     unsigned pointerSize) {
+    // Try to resolve the pointer as a symbol first, as reading memory
+    // may potentially be expensive.
+    if (auto symbolPointer = resolvePointerAsSymbol(address))
+      return symbolPointer;
+
     auto result = readBytes(address, pointerSize);
     if (!result)
       return llvm::None;
