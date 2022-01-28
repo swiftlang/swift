@@ -353,7 +353,7 @@ public:
 #endif
   }
 
-  /// Is there an active lock on the cancellation information?
+  /// Is there a lock on the linked list of status records?
   bool isStatusRecordLocked() const { return Flags & IsStatusRecordLocked; }
   ActiveTaskStatus withLockingRecord(TaskStatusRecord *lockRecord) const {
     assert(!isStatusRecordLocked());
@@ -362,6 +362,19 @@ public:
     return ActiveTaskStatus(lockRecord, Flags | IsStatusRecordLocked, ExecutionLock);
 #else
     return ActiveTaskStatus(lockRecord, Flags | IsStatusRecordLocked);
+#endif
+  }
+
+  ActiveTaskStatus withoutLockingRecord() const {
+    assert(isStatusRecordLocked());
+    assert(Record->getKind() == TaskStatusRecordKind::Private_RecordLock);
+
+    // Remove the lock record, and put the next one as the head
+    auto newRecord = Record->Parent;
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(newRecord, Flags & ~IsStatusRecordLocked, ExecutionLock);
+#else
+    return ActiveTaskStatus(newRecord, Flags & ~IsStatusRecordLocked);
 #endif
   }
 
@@ -543,13 +556,6 @@ inline void AsyncTask::flagAsRunning() {
   auto oldStatus = _private().Status.load(std::memory_order_relaxed);
   while (true) {
     assert(!oldStatus.isRunning());
-    if (oldStatus.isStatusRecordLocked()) {
-      flagAsRunning_slow();
-      adoptTaskVoucher(this);
-      swift_task_enterThreadLocalContext(
-          (char *)&_private().ExclusivityAccessSet[0]);
-      return;
-    }
 
     auto newStatus = oldStatus.withRunning(true);
     if (newStatus.isStoredPriorityEscalated()) {
@@ -559,8 +565,8 @@ inline void AsyncTask::flagAsRunning() {
     }
 
     if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
-                                                std::memory_order_relaxed,
-                                                std::memory_order_relaxed)) {
+             /* success */ std::memory_order_relaxed,
+             /* failure */ std::memory_order_relaxed)) {
       newStatus.traceStatusChanged(this);
       adoptTaskVoucher(this);
       swift_task_enterThreadLocalContext(
@@ -575,13 +581,6 @@ inline void AsyncTask::flagAsSuspended() {
   auto oldStatus = _private().Status.load(std::memory_order_relaxed);
   while (true) {
     assert(oldStatus.isRunning());
-    if (oldStatus.isStatusRecordLocked()) {
-      flagAsSuspended_slow();
-      swift_task_exitThreadLocalContext(
-          (char *)&_private().ExclusivityAccessSet[0]);
-      restoreTaskVoucher(this);
-      return;
-    }
 
     auto newStatus = oldStatus.withRunning(false);
     if (newStatus.isStoredPriorityEscalated()) {
@@ -591,15 +590,16 @@ inline void AsyncTask::flagAsSuspended() {
     }
 
     if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
-                                                std::memory_order_relaxed,
-                                                std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(this);
-      swift_task_exitThreadLocalContext(
-          (char *)&_private().ExclusivityAccessSet[0]);
-      restoreTaskVoucher(this);
-      return;
+            /* success */std::memory_order_relaxed,
+            /* failure */std::memory_order_relaxed)) {
+      break;
     }
   }
+
+  newStatus.traceStatusChanged(this);
+  swift_task_exitThreadLocalContext((char *)&_private().ExclusivityAccessSet[0]);
+  restoreTaskVoucher(this);
+  return;
 }
 
 // READ ME: This is not a dead function! Do not remove it! This is a function

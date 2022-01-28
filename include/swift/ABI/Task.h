@@ -297,7 +297,6 @@ public:
   /// Generally this should be done immediately after updating
   /// ActiveTask.
   void flagAsRunning();
-  void flagAsRunning_slow();
 
   /// Flag that this task is now suspended.  This can update the
   /// priority stored in the job flags if the priority hsa been
@@ -306,7 +305,6 @@ public:
   /// somewhere.  TODO: record where the task is enqueued if
   /// possible.
   void flagAsSuspended();
-  void flagAsSuspended_slow();
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
