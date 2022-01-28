@@ -334,6 +334,9 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     auto OptArg = inputArgs.getLastArgNoClaim(options::OPT_O_Group);
     if (!OptArg || OptArg->getOption().matches(options::OPT_Onone))
       arguments.push_back("-enable-anonymous-context-mangled-names");
+
+    // TODO: Should we support -fcoverage-compilation-dir?
+    inputArgs.AddAllArgs(arguments, options::OPT_file_compilation_dir);
   }
 
   // Pass through any subsystem flags.
