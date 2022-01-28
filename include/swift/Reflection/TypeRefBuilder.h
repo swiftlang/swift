@@ -241,11 +241,8 @@ struct FieldTypeInfo {
 struct ProtocolConformanceInfo {
   std::string typeName;
   std::string protocolName;
-
   // TODO:
-  // const TypeRef *type;
   // std::string mangledTypeName;
-  // std::string mangledProtocolName;
 };
 
 /// An implementation of MetadataReader's BuilderType concept for
@@ -790,83 +787,158 @@ private:
           OpaqueStringReader(stringReader), OpaquePointerReader(pointerReader) {
     }
 
-    std::string getConformingTypeName(
-        const char *conformanceDescriptorAddress,
-        const ExternalProtocolConformanceDescriptor<PointerSize>
-            &conformanceDescriptor) {
-      std::string typeName;
-      // Compute the address of the type descriptor as follows:
-      //    - Compute the address of the TypeRef field in the protocol
-      //    descriptor
-      //    - Read the TypeRef field to compute the offset to the type
-      //    descriptor
-      //    - Address of the type descriptor is found at the (2) offset from the
-      //      conformance descriptor address
-      auto contextDescriptorFieldAddress = detail::applyRelativeOffset(
-          conformanceDescriptorAddress,
-          (int32_t)conformanceDescriptor.getTypeDescriptorOffset());
-      auto contextDescriptorOffsetBytes =
-          OpaqueByteReader(remote::RemoteAddress(contextDescriptorFieldAddress),
-                           sizeof(uint32_t));
-      if (!contextDescriptorOffsetBytes.get()) {
-        Error = "Failed to read type descriptor field in conformance descriptor.";
-        return typeName;
-      }
-      auto contextDescriptorOffset =
-          (const uint32_t *)contextDescriptorOffsetBytes.get();
-
-      // Read the type descriptor itself using the address computed above
-      auto contextDescriptorAddress = detail::applyRelativeOffset(
-          (const char *)contextDescriptorFieldAddress,
-          (int32_t)*contextDescriptorOffset);
-      auto contextDescriptorBytes =
+    llvm::Optional<std::string>
+    getParentContextName(uintptr_t contextDescriptorAddress) {
+      llvm::Optional<std::string> optionalParentContextName;
+      auto contextTypeDescriptorBytes =
           OpaqueByteReader(remote::RemoteAddress(contextDescriptorAddress),
                            sizeof(ExternalContextDescriptor<PointerSize>));
-      if (!contextDescriptorBytes.get()) {
+      if (!contextTypeDescriptorBytes.get()) {
         Error = "Failed to read context descriptor.";
-        return typeName;
+        return llvm::None;
       }
       const ExternalContextDescriptor<PointerSize> *contextDescriptor =
           (const ExternalContextDescriptor<PointerSize> *)
-              contextDescriptorBytes.get();
+              contextTypeDescriptorBytes.get();
 
-      auto typeDescriptor =
-          dyn_cast<ExternalTypeContextDescriptor<PointerSize>>(
-              contextDescriptor);
-      if (!typeDescriptor) {
-        Error = "Unexpected type of context descriptor.";
-        return typeName;
+      auto parentOffsetAddress = detail::applyRelativeOffset(
+          (const char *)contextDescriptorAddress,
+          (int32_t)contextDescriptor->getParentOffset());
+      auto parentOfsetBytes = OpaqueByteReader(
+          remote::RemoteAddress(parentOffsetAddress), sizeof(uint32_t));
+      if (!parentOfsetBytes.get()) {
+        Error = "Failed to parent offset in a type descriptor.";
+        return llvm::None;
       }
+      auto parentFieldOffset = (const int32_t *)parentOfsetBytes.get();
+      auto parentTargetAddress = detail::applyRelativeOffset(
+          (const char *)parentOffsetAddress, *parentFieldOffset);
 
-      // Compute the address of the type descriptor's name field and read the
-      // offset
+      //
+      auto readContextParentName =
+          [&](uintptr_t descriptorAddress) -> llvm::Optional<std::string> {
+        llvm::Optional<std::string> optionalParentName;
+        auto parentContextDescriptorBytes =
+            OpaqueByteReader(remote::RemoteAddress(descriptorAddress),
+                             sizeof(ExternalContextDescriptor<PointerSize>));
+        if (!parentContextDescriptorBytes.get()) {
+          Error = "Failed to read context descriptor.";
+          return llvm::None;
+        }
+        const ExternalContextDescriptor<PointerSize> *parentContextDescriptor =
+            (const ExternalContextDescriptor<PointerSize> *)
+                parentContextDescriptorBytes.get();
+
+        if (auto moduleDescriptor =
+                dyn_cast<ExternalModuleContextDescriptor<PointerSize>>(
+                    parentContextDescriptor)) {
+          auto moduleDescriptorName = readModuleNameFromModuleDescriptor(
+                                                                         moduleDescriptor, parentTargetAddress);
+          if (!moduleDescriptorName.hasValue())
+            return llvm::None;
+          else
+            optionalParentName = moduleDescriptorName;
+        } else if (auto typeDescriptor =
+                       dyn_cast<ExternalTypeContextDescriptor<PointerSize>>(
+                           parentContextDescriptor)) {
+          auto typeDescriptorName = readTypeNameFromTypeDescriptor(typeDescriptor,
+                                                               parentTargetAddress);
+          if (!typeDescriptorName.hasValue())
+            return llvm::None;
+          else
+            optionalParentName = typeDescriptorName;
+          // Recurse to get this type's parent.
+          auto optionalParentParentName =
+              getParentContextName(descriptorAddress);
+          if (optionalParentParentName.hasValue()) {
+            optionalParentName = optionalParentParentName.getValue() + "." +
+                                 optionalParentName.getValue();
+          }
+        } else {
+          Error = "Unexpected type of parent context descriptor.";
+          return llvm::None;
+        }
+
+        return optionalParentName;
+      };
+
+      // Set low bit indicates that this is an indirect
+      // reference
+      if (parentTargetAddress & 0x1) {
+        auto adjustedParentTargetAddress = parentTargetAddress & ~0x1;
+        if (auto symbol = OpaquePointerReader(
+                remote::RemoteAddress(adjustedParentTargetAddress),
+                PointerSize)) {
+          if (!symbol->getSymbol().empty()) {
+            Demangle::Context Ctx;
+            auto demangledRoot =
+                Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
+            assert(demangledRoot->getKind() == Node::Kind::Global);
+            optionalParentContextName =
+                nodeToString(demangledRoot->getChild(0)->getChild(0));
+          } else {
+            optionalParentContextName =
+                readContextParentName(adjustedParentTargetAddress);
+          }
+        } else {
+          Error = "Error reading external symbol address.";
+          return llvm::None;
+        }
+      } else {
+        optionalParentContextName = readContextParentName(parentTargetAddress);
+      }
+      return optionalParentContextName;
+    }
+
+    llvm::Optional<std::string> readTypeNameFromTypeDescriptor(
+        const ExternalTypeContextDescriptor<PointerSize> *typeDescriptor,
+        uintptr_t typeDescriptorAddress) {
       auto typeNameOffsetAddress =
-          detail::applyRelativeOffset((const char *)contextDescriptorAddress,
+          detail::applyRelativeOffset((const char *)typeDescriptorAddress,
                                       (int32_t)typeDescriptor->getNameOffset());
       auto typeNameOfsetBytes = OpaqueByteReader(
           remote::RemoteAddress(typeNameOffsetAddress), sizeof(uint32_t));
       if (!typeNameOfsetBytes.get()) {
         Error = "Failed to read type name offset in a type descriptor.";
-        return typeName;
+        return llvm::None;
       }
       auto typeNameOffset = (const uint32_t *)typeNameOfsetBytes.get();
-
-      // Using the offset above, compute the address of the name field itsel
-      // and read it.
       auto typeNameAddress = detail::applyRelativeOffset(
           (const char *)typeNameOffsetAddress, (int32_t)*typeNameOffset);
+      std::string typeName;
       OpaqueStringReader(remote::RemoteAddress(typeNameAddress), typeName);
       return typeName;
     }
 
-    std::string readProtocolNameFromProtocolDescriptor(const char *protocolDescriptorAddress) {
+    llvm::Optional<std::string> readModuleNameFromModuleDescriptor(
+        const ExternalModuleContextDescriptor<PointerSize> *moduleDescriptor,
+        uintptr_t moduleDescriptorAddress) {
+      auto parentNameOffsetAddress = detail::applyRelativeOffset(
+          (const char *)moduleDescriptorAddress,
+          (int32_t)moduleDescriptor->getNameOffset());
+      auto parentNameOfsetBytes = OpaqueByteReader(
+          remote::RemoteAddress(parentNameOffsetAddress), sizeof(uint32_t));
+      if (!parentNameOfsetBytes.get()) {
+        Error = "Failed to read parent name offset in a module descriptor.";
+        return llvm::None;
+      }
+      auto parentNameOfset = (const uint32_t *)parentNameOfsetBytes.get();
+      auto parentNameAddress = detail::applyRelativeOffset(
+          (const char *)parentNameOffsetAddress, (int32_t)*parentNameOfset);
+      std::string parentName;
+      OpaqueStringReader(remote::RemoteAddress(parentNameAddress), parentName);
+      return parentName;
+    }
+
+    llvm::Optional<std::string> readProtocolNameFromProtocolDescriptor(
+        uintptr_t protocolDescriptorAddress) {
       std::string protocolName;
       auto protocolDescriptorBytes =
           OpaqueByteReader(remote::RemoteAddress(protocolDescriptorAddress),
                            sizeof(ExternalProtocolDescriptor<PointerSize>));
       if (!protocolDescriptorBytes.get()) {
         Error = "Error reading protocol descriptor.";
-        return protocolName;
+        return llvm::None;
       }
       const ExternalProtocolDescriptor<PointerSize> *protocolDescriptor =
           (const ExternalProtocolDescriptor<PointerSize> *)
@@ -881,10 +953,9 @@ private:
           remote::RemoteAddress(protocolNameOffsetAddress), sizeof(uint32_t));
       if (!protocolNameOfsetBytes.get()) {
         Error = "Failed to read type name offset in a protocol descriptor.";
-        return protocolName;
+        return llvm::None;
       }
-      auto protocolNameOffset =
-          (const uint32_t *)protocolNameOfsetBytes.get();
+      auto protocolNameOffset = (const uint32_t *)protocolNameOfsetBytes.get();
 
       // Using the offset above, compute the address of the name field itsel
       // and read it.
@@ -896,21 +967,91 @@ private:
       return protocolName;
     }
 
-    std::string getConformanceProtocol(
-        const char *conformanceDescriptorAddress,
+    /// Extract conforming type's name from a Conformance Descriptor
+    llvm::Optional<std::string> getConformingTypeName(
+        const uintptr_t conformanceDescriptorAddress,
         const ExternalProtocolConformanceDescriptor<PointerSize>
             &conformanceDescriptor) {
-      std::string protocolName = "";
+      std::string typeName;
+      // Compute the address of the type descriptor as follows:
+      //    - Compute the address of the TypeRef field in the protocol
+      //    descriptor
+      //    - Read the TypeRef field to compute the offset to the type
+      //    descriptor
+      //    - Address of the type descriptor is found at the (2) offset from the
+      //      conformance descriptor address
+      auto contextDescriptorFieldAddress = detail::applyRelativeOffset(
+          (const char *)conformanceDescriptorAddress,
+          (int32_t)conformanceDescriptor.getTypeRefDescriptorOffset());
+      auto contextDescriptorOffsetBytes =
+          OpaqueByteReader(remote::RemoteAddress(contextDescriptorFieldAddress),
+                           sizeof(uint32_t));
+      if (!contextDescriptorOffsetBytes.get()) {
+        Error =
+            "Failed to read type descriptor field in conformance descriptor.";
+        return llvm::None;
+      }
+      auto contextDescriptorOffset =
+          (const uint32_t *)contextDescriptorOffsetBytes.get();
+
+      // Read the type descriptor itself using the address computed above
+      auto contextTypeDescriptorAddress = detail::applyRelativeOffset(
+          (const char *)contextDescriptorFieldAddress,
+          (int32_t)*contextDescriptorOffset);
+
+      auto contextTypeDescriptorBytes =
+          OpaqueByteReader(remote::RemoteAddress(contextTypeDescriptorAddress),
+                           sizeof(ExternalContextDescriptor<PointerSize>));
+      if (!contextTypeDescriptorBytes.get()) {
+        Error = "Failed to read context descriptor.";
+        return llvm::None;
+      }
+      const ExternalContextDescriptor<PointerSize> *contextDescriptor =
+          (const ExternalContextDescriptor<PointerSize> *)
+              contextTypeDescriptorBytes.get();
+
+      auto typeDescriptor =
+          dyn_cast<ExternalTypeContextDescriptor<PointerSize>>(
+              contextDescriptor);
+      if (!typeDescriptor) {
+        Error = "Unexpected type of context descriptor.";
+        return llvm::None;
+      }
+
+      auto optionalTypeName = readTypeNameFromTypeDescriptor(
+          typeDescriptor, contextTypeDescriptorAddress);
+            if (!optionalTypeName.hasValue())
+              return llvm::None;
+            else
+      typeName = optionalTypeName.getValue();
+
+      // Prepend the parent context name
+      auto optionalParentName =
+          getParentContextName(contextTypeDescriptorAddress);
+      if (optionalParentName.hasValue()) {
+        typeName = optionalParentName.getValue() + "." + typeName;
+      }
+
+      return typeName;
+    }
+
+    /// Extract protocol name from a Conformance Descriptor
+    llvm::Optional<std::string> getConformanceProtocolName(
+        const uintptr_t conformanceDescriptorAddress,
+        const ExternalProtocolConformanceDescriptor<PointerSize>
+            &conformanceDescriptor) {
+      llvm::Optional<std::string> protocolName;
       auto protocolDescriptorFieldAddress = detail::applyRelativeOffset(
-          conformanceDescriptorAddress,
+          (const char *)conformanceDescriptorAddress,
           (int32_t)conformanceDescriptor.getProtocolDescriptorOffset());
 
       auto protocolDescriptorOffsetBytes = OpaqueByteReader(
           remote::RemoteAddress(protocolDescriptorFieldAddress),
           sizeof(uint32_t));
       if (!protocolDescriptorOffsetBytes.get()) {
-        Error = "Error reading protocol descriptor field in conformance descriptor.";
-        return protocolName;
+        Error = "Error reading protocol descriptor field in conformance "
+                "descriptor.";
+        return llvm::None;
       }
       auto protocolDescriptorOffset =
           (const uint32_t *)protocolDescriptorOffsetBytes.get();
@@ -919,12 +1060,13 @@ private:
           (const char *)protocolDescriptorFieldAddress,
           (int32_t)*protocolDescriptorOffset);
 
-      // If indirect, attempt to get symbol name from external bindings
-      if ((uint64_t)protocolDescriptorTarget & 0x1) {
-        auto adjustedProtocolDescriptorTarget =
-            (const void *)((uint64_t)protocolDescriptorTarget & ~(0x1));
+      // Set low bit indicates that this is an indirect
+      // reference
+      if (protocolDescriptorTarget & 0x1) {
+        auto adjustedProtocolDescriptorTarget = protocolDescriptorTarget & ~0x1;
         if (auto symbol = OpaquePointerReader(
-                remote::RemoteAddress(adjustedProtocolDescriptorTarget), 8)) {
+                remote::RemoteAddress(adjustedProtocolDescriptorTarget),
+                PointerSize)) {
           if (!symbol->getSymbol().empty()) {
             Demangle::Context Ctx;
             auto demangledRoot =
@@ -932,33 +1074,50 @@ private:
             assert(demangledRoot->getKind() == Node::Kind::Global);
             assert(demangledRoot->getChild(0)->getKind() ==
                    Node::Kind::ProtocolDescriptor);
-            protocolName = nodeToString(demangledRoot->getChild(0)->getChild(0));
+            protocolName =
+                nodeToString(demangledRoot->getChild(0)->getChild(0));
           } else {
-            // This is an absolute address offset.
+            // This is an absolute address of a protocol descriptor
             auto protocolDescriptorAddress = symbol->getOffset();
-            protocolName = readProtocolNameFromProtocolDescriptor((const char*)protocolDescriptorAddress);
+            protocolName = readProtocolNameFromProtocolDescriptor(
+                protocolDescriptorAddress);
+            // Prepend the parent context name
+            auto optionalParentName =
+                getParentContextName(protocolDescriptorAddress);
+            if (optionalParentName.hasValue()) {
+              protocolName =
+                  optionalParentName.getValue() + "." + *protocolName;
+            }
           }
         } else {
           Error = "Error reading external protocol address.";
-          return protocolName;
+          return llvm::None;
         }
-        // If direct, read the protocol descriptor and get symbol name
       } else {
-        protocolName = readProtocolNameFromProtocolDescriptor((const char*)protocolDescriptorTarget);
+        // If this is a direct reference, get symbol name from the protocol
+        // descriptor.
+        protocolName =
+            readProtocolNameFromProtocolDescriptor(protocolDescriptorTarget);
+        // Prepend the parent context name
+        auto optionalParentName =
+            getParentContextName(protocolDescriptorTarget);
+        if (optionalParentName.hasValue()) {
+          protocolName = optionalParentName.getValue() + "." + *protocolName;
+        }
       }
 
       return protocolName;
     }
 
     /// Given the address of a conformance descriptor, attempt to read it.
-    ProtocolConformanceInfo
+    llvm::Optional<ProtocolConformanceInfo>
     readConformanceDescriptor(RemoteRef<void> conformanceRecordRef) {
       const ExternalProtocolConformanceRecord<PointerSize> *CD =
           (const ExternalProtocolConformanceRecord<PointerSize> *)
               conformanceRecordRef.getLocalBuffer();
       // Read the Protocol Conformance Descriptor by getting its address from
       // the conformance record.
-      auto conformanceDescriptorAddress = (const char *)CD->getRelative(
+      auto conformanceDescriptorAddress = (uintptr_t)CD->getRelative(
           (void *)conformanceRecordRef.getAddressData());
 
       auto descriptorBytes = OpaqueByteReader(
@@ -966,24 +1125,25 @@ private:
           sizeof(ExternalProtocolConformanceDescriptor<PointerSize>));
       if (!descriptorBytes.get()) {
         Error = "Failed to read protocol conformance descriptor.";
-        return ProtocolConformanceInfo();
+        return llvm::None;
       }
       const ExternalProtocolConformanceDescriptor<PointerSize>
           *conformanceDescriptorPtr =
               (const ExternalProtocolConformanceDescriptor<PointerSize> *)
                   descriptorBytes.get();
 
-      auto conformingTypeName = getConformingTypeName(
+      auto optionalConformingTypeName = getConformingTypeName(
           conformanceDescriptorAddress, *conformanceDescriptorPtr);
-      auto conformanceProtocol = getConformanceProtocol(
+      if (!optionalConformingTypeName.hasValue())
+        return llvm::None;
+
+      auto optionalConformanceProtocol = getConformanceProtocolName(
           conformanceDescriptorAddress, *conformanceDescriptorPtr);
+      if (!optionalConformanceProtocol.hasValue())
+        return llvm::None;
 
-      return ProtocolConformanceInfo{conformingTypeName,
-                                     conformanceProtocol};
-    }
-
-    bool hasError() {
-      return !Error.empty();
+      return ProtocolConformanceInfo{optionalConformingTypeName.getValue(),
+                                     optionalConformanceProtocol.getValue()};
     }
   };
 
@@ -1001,14 +1161,14 @@ public:
       for (auto conformanceAddr = ConformanceBegin;
            conformanceAddr != ConformanceEnd;
            conformanceAddr = conformanceAddr.atByteOffset(4)) {
-        auto conformanceInfo =
+        auto optionalConformanceInfo =
             conformanceReader.readConformanceDescriptor(conformanceAddr);
-        if (conformanceReader.hasError()) {
+        if (!optionalConformanceInfo.hasValue()) {
           stream << "Error reading conformance descriptor: "
                  << conformanceReader.Error << "\n";
           continue;
         }
-
+        auto conformanceInfo = optionalConformanceInfo.getValue();
         if (typeConformances.count(conformanceInfo.typeName) != 0) {
           typeConformances[conformanceInfo.typeName].push_back(
               conformanceInfo.protocolName);

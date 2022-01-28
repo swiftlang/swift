@@ -2739,7 +2739,7 @@ public:
   }
 
   constexpr inline auto
-  getTypeDescriptorOffset() const -> typename Runtime::StoredSize {
+  getTypeRefDescriptorOffset() const -> typename Runtime::StoredSize {
     return offsetof(typename std::remove_reference<decltype(*this)>::type, TypeRef);
   }
 
@@ -2918,6 +2918,11 @@ struct TargetContextDescriptor {
               : 0;
   }
 
+  constexpr inline auto
+  getParentOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Parent);
+  }
+
 #ifndef NDEBUG
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use in the debugger");
@@ -2957,12 +2962,25 @@ struct TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
     return isCImportedModuleName(Name.get());
   }
 
+  constexpr inline auto
+  getNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Name);
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Module;
   }
 };
 
 using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
+
+template<unsigned PointerSize>
+using ExternalModuleContextDescriptor
+#if SWIFT_OBJC_INTEROP
+= TargetModuleContextDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
+#else
+= TargetModuleContextDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
+#endif
 
 template<typename Runtime>
 inline bool TargetContextDescriptor<Runtime>::isCImportedContext() const {

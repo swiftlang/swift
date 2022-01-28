@@ -739,10 +739,3 @@
 // CHECK: (generic_type_parameter depth=0 index=1)
 // CHECK: (generic_argument index=0
 // CHECK:   (reference_capture index=0))
-
-// CHECK: CONFORMANCES:
-// CHECK: =============
-// CHECK: E4 : P1, P2, P3
-// CHECK: S4 : P1, P2
-// CHECK: C4 : P1, P2
-// CHECK: C1 : ClassBoundP
