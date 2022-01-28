@@ -153,6 +153,12 @@ Swift 5.6
   allocation within a limited scope, which will be optimized to use stack
   allocation when possible.
 
+* [SE-0320][]:
+
+  Dictionaries with keys of any type conforming to the new protocol
+  `CodingKeyRepresentable` can now be encoded and decoded. Formerly, encoding
+  and decoding was limited to keys of type `String` or `Int`.
+
 * [SE-0315][]:
 
   Type expressions and annotations can now include "type placeholders" which
@@ -8860,6 +8866,7 @@ Swift 1.0
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
 [SE-0315]: <https://github.com/apple/swift-evolution/blob/main/proposals/0315-placeholder-types.md>
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
+[SE-0320]: <https://github.com/apple/swift-evolution/blob/main/proposals/0320-codingkeyrepresentable.md>
 [SE-0322]: <https://github.com/apple/swift-evolution/blob/main/proposals/0322-temporary-buffers.md>
 [SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
