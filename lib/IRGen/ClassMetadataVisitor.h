@@ -116,7 +116,17 @@ private:
       if (superclassDecl->hasClangNode()) {
         // Nothing to do; Objective-C classes do not add new members to
         // Swift class metadata.
-      } else if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal)) {
+
+      // Super class metadata is resilient if
+      // the superclass is resilient when viewed from the currrent module.
+      // But not if the current class is defined in an external module and
+      //    not publically accessible (e.g private or internal). This would
+      //    normally not happen except if we compile theClass's module with
+      //    enable-testing.
+      } else if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal) &&
+                 (theClass->getModuleContext() == IGM.getSwiftModule() ||
+                 theClass->getFormalAccessScope(/*useDC=*/nullptr,
+                            /*treatUsableFromInlineAsPublic=*/true).isPublic())) {
         // Runtime metadata instantiation will initialize our field offset
         // vector and vtable entries.
         //
