@@ -509,7 +509,7 @@ namespace swift {
 
     /// Maximum term length for requirement machine Knuth-Bendix completion
     /// algorithm.
-    unsigned RequirementMachineDepthLimit = 10;
+    unsigned RequirementMachineDepthLimit = 12;
 
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.
