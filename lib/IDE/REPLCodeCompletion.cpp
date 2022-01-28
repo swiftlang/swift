@@ -127,6 +127,7 @@ static void toDisplayString(CodeCompletionResult *Result,
         case CodeCompletionDeclKind::Module:
         case CodeCompletionDeclKind::PrecedenceGroup:
         case CodeCompletionDeclKind::Class:
+        case CodeCompletionDeclKind::Actor:
         case CodeCompletionDeclKind::Struct:
         case CodeCompletionDeclKind::Enum:
           continue;
