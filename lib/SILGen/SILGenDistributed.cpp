@@ -724,8 +724,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
   // === `InvocationEncoder` types
   AbstractFunctionDecl *makeInvocationEncoderFnDecl =
-      selfTyDecl->getDistributedActorSystemMakeInvocationEncoderFunction();
-  assert(makeInvocationEncoderFnDecl && "no remoteCall func found!");
+      ctx.getMakeInvocationEncoderOnDistributedActorSystem(selfTyDecl);
+  assert(makeInvocationEncoderFnDecl && "no 'makeInvocationEncoder' func found!");
   auto makeInvocationEncoderFnRef = SILDeclRef(makeInvocationEncoderFnDecl);
 
   ProtocolDecl *invocationEncoderProto =
@@ -882,7 +882,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
       // function_ref FakeActorSystem.makeInvocationEncoder()
       // %19 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV21makeInvocationEncoderAA0aG0VyF : $@convention(method) (@guaranteed FakeActorSystem) -> FakeInvocation // user: %20
-      auto makeInvocationEncoderFnSIL =
+      SILFunction *makeInvocationEncoderFnSIL =
           builder.getOrCreateFunction(loc, makeInvocationEncoderFnRef, NotForDefinition);
       SILValue makeInvocationEncoderFn =
           B.createFunctionRefFor(loc, makeInvocationEncoderFnSIL);
@@ -1395,7 +1395,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       }
       assert(returnMetatypeValue);
 
-      // function_ref FakeActorSystem.remoteCall<A, B, C>(on:target:invocationDecoder:throwing:returning:)
+      // function_ref FakeActorSystem.remoteCall<A, B, C>(on:target:invocation:throwing:returning:)
       // %49 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10remoteCall2on6target17invocationDecoder8throwing9returningq0_x_01_B006RemoteG6TargetVAA0A10InvocationVzq_mq0_mSgtYaKAJ0bC0RzSeR0_SER0_AA0C7AddressV2IDRtzr1_lF : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error) // user: %50
       auto remoteCallFnDecl =
           ctx.getRemoteCallOnDistributedActorSystem(selfTyDecl, /*isVoid=*/resultType.isVoid());

@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color --dump-input=always
+// RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope --color
+
+// X: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library -Xfrontend -I -Xfrontend %t ) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -22,17 +24,23 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
-final class SomeClass: Sendable, Codable {}
-
-distributed actor Greeter {
-  distributed func take(name: String, int: Int) {
-    print("take: \(name), int: \(int)")
+distributed actor Greeter: CustomStringConvertible {
+  distributed func echo(name: String) -> String {
+    return "Echo: \(name) (impl on: \(self.id))"
   }
 
-  distributed func take(name: String, int: Int, clazz: SomeClass) {
-    print("take: \(name), int: \(int), clazz: \(clazz)")
+  distributed func error() throws -> String {
+    throw SomeError()
+  }
+
+  nonisolated var description: String {
+    "\(Self.self)(\(id))"
   }
 }
+
+struct SomeError: Error {}
+
+// ==== Test -------------------------------------------------------------------
 
 func test() async throws {
   let system = DefaultDistributedActorSystem()
@@ -40,11 +48,18 @@ func test() async throws {
   let local = Greeter(system: system)
   let ref = try Greeter.resolve(id: local.id, using: system)
 
-  try await ref.take(name: "Caplin", int: 1337)
-  // CHECK: >> remoteCallVoid: on:main.Greeter), target:RemoteCallTarget(_mangledName: "$s4main7GreeterC4take4name3intySS_SitFTE"), invocation:FakeRoundtripInvocation(genericSubs: [], arguments: ["Caplin", 1337], returnType: nil, errorType: nil, argumentIndex: 0), throwing:Swift.Never
+  let reply = try await ref.echo(name: "Caplin")
+  // CHECK: > encode argument: Caplin
+  // CHECK-NOT: > encode error type
+  // CHECK: > encode return type: String
+  // CHECK: > done recording
+  // CHECK: >> remoteCall
+  // CHECK: > decode argument: Caplin
+  // CHECK: > decode return type: String
+  // CHECK: << onReturn: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
 
-  // try await ref.take(name: "Caplin", int: 1337, clazz: .init()) // FIXME(distributed): crashes
-
+  print("got: \(reply)")
+  // CHECK: got: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
 }
 
 @main struct Main {
@@ -52,4 +67,3 @@ func test() async throws {
     try! await test()
   }
 }
-

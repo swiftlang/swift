@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name remoteCall -primary-file %s -emit-sil -enable-experimental-distributed -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --color
+// RUN: %target-swift-frontend -module-name remoteCall -primary-file %s -emit-sil -enable-experimental-distributed -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --color --dump-input=always
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -59,8 +59,8 @@ distributed actor MyDistActor {
 // CHECK:  retain_value %29 : $FakeActorSystem // id: %30
 // CHECK:  %31 = metatype $@thick Never.Type // user: %34
 // CHECK:  %32 = metatype $@thick ().Type
-// CHECK:  // function_ref FakeActorSystem.remoteCallVoid<A, B>(on:target:invocationDecoder:throwing:)
-// CHECK:  %33 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV14remoteCallVoid2on6target17invocationDecoder8throwingyx_01_B006RemoteG6TargetVAA0A10InvocationVzq_mtYaKAI0bC0Rzs5ErrorR_AA0C7AddressV2IDRtzr0_lF : $@convention(method) @async <τ_0_0, τ_0_1 where τ_0_0 : DistributedActor, τ_0_1 : Error, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, @guaranteed FakeActorSystem) -> @error Error // user: %34
+// CHECK:  // function_ref FakeActorSystem.remoteCallVoid<A, B>(on:target:invocation:throwing:)
+// CHECK:  %33 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV14remoteCallVoid2on6target10invocation8throwingyx_01_B006RemoteG6TargetVAA0A10InvocationVzq_mtYaKAI0bC0Rzs5ErrorR_AA0C7AddressV2IDRtzr0_lF : $@convention(method) @async <τ_0_0, τ_0_1 where τ_0_0 : DistributedActor, τ_0_1 : Error, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, @guaranteed FakeActorSystem) -> @error Error // user: %34
 // CHECK:  try_apply %33<MyDistActor, Never>(%0, %18, %14, %31, %29) : $@convention(method) @async <τ_0_0, τ_0_1 where τ_0_0 : DistributedActor, τ_0_1 : Error, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, @guaranteed FakeActorSystem) -> @error Error, normal bb8, error bb9 // id: %34
 
 // CHECK: // %35 // user: %38
@@ -82,10 +82,10 @@ distributed actor MyDistActor {
 // CHECK:  return %43 : $() // id: %44
 
 // CHECK: // %45 // user: %46
-// CHECK: bb7(%45 : $Error): // Preds: bb9 bb3 
+// CHECK: bb7(%45 : $Error): // Preds: bb9 bb3
 // CHECK:  throw %45 : $Error // id: %46
 
-// CHECK: bb8(%47 : $()): // Preds: bb2 
+// CHECK: bb8(%47 : $()): // Preds: bb2
 // CHECK:  %48 = tuple () // user: %54
 // CHECK:  release_value %29 : $FakeActorSystem // id: %49
 // CHECK:  end_access %14 : $*FakeInvocation // id: %50
@@ -95,7 +95,7 @@ distributed actor MyDistActor {
 // CHECK:  br bb6(%48 : $()) // id: %54
 
 // CHECK: // %55 // user: %61
-// CHECK: bb9(%55 : $Error): // Preds: bb2 
+// CHECK: bb9(%55 : $Error): // Preds: bb2
 // CHECK:  end_access %14 : $*FakeInvocation // id: %56
 // CHECK:  release_value %29 : $FakeActorSystem // id: %57
 // CHECK:  destroy_addr %18 : $*RemoteCallTarget // id: %58

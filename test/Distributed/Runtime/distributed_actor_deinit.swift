@@ -95,7 +95,7 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
+    invocation invocationEncoder: inout InvocationEncoder,
     throwing: Err.Type,
     returning: Res.Type
   ) async throws -> Res
@@ -109,7 +109,7 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
-    invocationDecoder: inout InvocationDecoder,
+    invocation invocationEncoder: inout InvocationEncoder,
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
@@ -157,7 +157,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // ==== Execute ----------------------------------------------------------------
 
 func test() {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   // no lifecycle things make sense for a normal actor, double check we didn't emit them
   print("before A")

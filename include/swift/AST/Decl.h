@@ -3425,9 +3425,6 @@ public:
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
   VarDecl *getDistributedActorIDProperty() const;
 
-  /// Find the 'makeInvocation' function.
-  AbstractFunctionDecl* getDistributedActorSystemMakeInvocationEncoderFunction() const;
-
   /// Find the 'RemoteCallTarget.init(_mangledName:)' initializer function
   ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
 
