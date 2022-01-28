@@ -21,11 +21,11 @@ actor A2 {
     self.localVar = value
   }
 
-  convenience init(forwardSync value: NotConcurrent) {
+  init(forwardSync value: NotConcurrent) {
     self.init(value: value)
   }
 
-  convenience init(delegatingSync value: NotConcurrent) {
+  init(delegatingSync value: NotConcurrent) {
     self.init(forwardSync: value)
   }
 
@@ -33,11 +33,11 @@ actor A2 {
     self.localVar = value
   }
 
-  convenience init(forwardAsync value: NotConcurrent) async {
+  init(forwardAsync value: NotConcurrent) async {
     await self.init(valueAsync: value)
   }
 
-  nonisolated convenience init(nonisoAsync value: NotConcurrent, _ c: Int) async {
+  nonisolated init(nonisoAsync value: NotConcurrent, _ c: Int) async {
     if c == 0 {
       await self.init(valueAsync: value)
     } else {
@@ -45,7 +45,7 @@ actor A2 {
     }
   }
 
-  convenience init(delegatingAsync value: NotConcurrent, _ c: Int) async {
+  init(delegatingAsync value: NotConcurrent, _ c: Int) async {
     if c == 0 {
       await self.init(valueAsync: value)
     } else if c == 1 {
