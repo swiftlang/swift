@@ -1375,8 +1375,13 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
     switch (elt.getKind()) {
     case StmtConditionElement::CK_PatternBinding: {
-      InitializationPtr initialization =
-        emitPatternBindingInitialization(elt.getPattern(), FalseDest);
+          // Begin a new binding scope, which is popped when the next innermost debug
+          // scope ends. The cleanup location loc isn't the perfect source location
+          // but it's close enough.
+          B.getSILGenFunction().enterDebugScope(loc,
+                                                      /*isBindingScope=*/true);
+        InitializationPtr initialization =
+          emitPatternBindingInitialization(elt.getPattern(), FalseDest);
 
       // Emit the initial value into the initialization.
       FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
