@@ -22,6 +22,7 @@
 #include "ClassTypeInfo.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
+#include "GenClass.h"
 #include "GenDecl.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
@@ -67,12 +68,17 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
 namespace {
 
 struct ArgumentDecoderInfo {
-  CanSILFunctionType Type;
-  FunctionPointer Fn;
+  llvm::Value *Decoder;
 
-  /// Given the decoder instance, form a callee to a
-  /// decode method - `decodeNextArgument`.
-  Callee getCallee(llvm::Value *decoder) const;
+  struct {
+    CanSILFunctionType Type;
+    FunctionPointer Fn;
+  } DecodeMethod;
+
+  CanSILFunctionType getMethodType() const { return DecodeMethod.Type; }
+
+  /// Form a callee to a decode method - `decodeNextArgument`.
+  Callee getCallee() const;
 };
 
 class DistributedAccessor {
@@ -86,10 +92,6 @@ class DistributedAccessor {
   CanSILFunctionType AccessorType;
   /// The asynchronous context associated with this accessor.
   AsyncContextLayout AsyncLayout;
-
-  /// The argument decoder associated with the distributed actor
-  /// this accessor belong to.
-  ArgumentDecoderInfo ArgumentDecoder;
 
   /// The list of all arguments that were allocated on the stack.
   SmallVector<StackAddress, 4> AllocatedArguments;
@@ -109,7 +111,7 @@ private:
   /// the type of argument comes from runtime metadata.
   ///
   /// Returns a pair of aligned offset and value size.
-  void decodeArgument(unsigned argumentIdx, llvm::Value *decoder,
+  void decodeArgument(unsigned argumentIdx, const ArgumentDecoderInfo &decoder,
                       llvm::Value *argumentType, const SILParameterInfo &param,
                       Explosion &arguments);
 
@@ -131,10 +133,8 @@ private:
 
   Callee getCalleeForDistributedTarget(llvm::Value *self) const;
 
-  /// Given a distributed thunk, find argument coder that should
-  /// could be used to decode argument values to pass to its invocation.
-  static ArgumentDecoderInfo findArgumentDecoder(IRGenModule &IGM,
-                                                 SILFunction *thunk);
+  /// Given an instance of argument decoder, find `decodeNextArgument`.
+  ArgumentDecoderInfo findArgumentDecoder(llvm::Value *decoder);
 
   /// The result type of the accessor.
   SILType getResultType() const;
@@ -247,8 +247,7 @@ DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
           IGM, AccessorType, AccessorType, SubstitutionMap(),
           /*suppress generics*/ true,
           FunctionPointer::Kind(
-              FunctionPointer::BasicKind::AsyncFunctionPointer))),
-      ArgumentDecoder(findArgumentDecoder(IGM, target)) {}
+              FunctionPointer::BasicKind::AsyncFunctionPointer))) {}
 
 void DistributedAccessor::decodeArguments(llvm::Value *decoder,
                                           llvm::Value *argumentTypes,
@@ -265,6 +264,10 @@ void DistributedAccessor::decodeArguments(llvm::Value *decoder,
   // Cast type buffer to `swift.type**`
   argumentTypes =
       IGF.Builder.CreateBitCast(argumentTypes, IGM.TypeMetadataPtrPtrTy);
+
+  /// The argument decoder associated with the distributed actor
+  /// this accessor belong to.
+  ArgumentDecoderInfo decoderInfo = findArgumentDecoder(decoder);
 
   for (unsigned i = 0, n = parameters.size(); i != n; ++i) {
     const auto &param = parameters[i];
@@ -293,12 +296,12 @@ void DistributedAccessor::decodeArguments(llvm::Value *decoder,
     auto *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
 
     // Decode and load argument value using loaded type metadata.
-    decodeArgument(i, decoder, argumentTy, param, arguments);
+    decodeArgument(i, decoderInfo, argumentTy, param, arguments);
   }
 }
 
 void DistributedAccessor::decodeArgument(unsigned argumentIdx,
-                                         llvm::Value *decoder,
+                                         const ArgumentDecoderInfo &decoder,
                                          llvm::Value *argumentType,
                                          const SILParameterInfo &param,
                                          Explosion &arguments) {
@@ -308,7 +311,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
   // deal with value witness tables are currently hidden in GenOpaque.cpp
   llvm::Value *valueSize = emitLoadOfSize(IGF, argumentType);
 
-  Callee callee = ArgumentDecoder.getCallee(decoder);
+  Callee callee = decoder.getCallee();
 
   std::unique_ptr<CallEmission> emission =
       getCallEmission(IGF, callee.getSwiftContext(), std::move(callee));
@@ -340,7 +343,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
 
     // Load error from the slot to emit an early return if necessary.
     {
-      SILFunctionConventions conv(ArgumentDecoder.Type, IGM.getSILModule());
+      SILFunctionConventions conv(decoder.getMethodType(), IGM.getSILModule());
       SILType errorType =
           conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
 
@@ -631,26 +634,44 @@ DistributedAccessor::getCalleeForDistributedTarget(llvm::Value *self) const {
 }
 
 ArgumentDecoderInfo
-DistributedAccessor::findArgumentDecoder(IRGenModule &IGM, SILFunction *thunk) {
-  auto *actor = getDistributedActorOf(thunk);
+DistributedAccessor::findArgumentDecoder(llvm::Value *decoder) {
+  auto *actor = getDistributedActorOf(Target);
+  auto expansionContext = IGM.getMaximalTypeExpansionContext();
 
   auto *decodeFn = IGM.Context.getDistributedActorArgumentDecodingMethod(actor);
   assert(decodeFn && "no suitable decoder?");
 
+  auto *decoderDecl = decodeFn->getDeclContext()->getSelfNominalTypeDecl();
   auto methodTy = IGM.getSILTypes().getConstantFunctionType(
-      IGM.getMaximalTypeExpansionContext(), SILDeclRef(decodeFn));
-
-  auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
-  auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
-                                         /*isDynamicallyReplacible=*/false);
+      expansionContext, SILDeclRef(decodeFn));
 
   auto signature = IGM.getSignature(methodTy, /*useSpecialConvention=*/false);
 
-  auto methodPtr =
-      FunctionPointer::forDirect(classifyFunctionPointerKind(decodeSIL), fnPtr,
-                                 /*secondaryValue=*/nullptr, signature);
+  // If the decoder class is `final`, let's emit a direct reference.
+  if (decoderDecl->isFinal()) {
+    auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+    auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
+                                           /*isDynamicallyReplacible=*/false);
 
-  return {.Type = methodTy, .Fn = methodPtr};
+    auto methodPtr = FunctionPointer::forDirect(
+        classifyFunctionPointerKind(decodeSIL), fnPtr,
+        /*secondaryValue=*/nullptr, signature);
+
+    return {.Decoder = decoder,
+            .DecodeMethod = {.Type = methodTy, .Fn = methodPtr}};
+  }
+
+  auto selfTy = methodTy->getSelfParameter().getSILStorageType(
+      IGM.getSILModule(), methodTy, expansionContext);
+
+  auto *metadata = emitHeapMetadataRefForHeapObject(IGF, decoder, selfTy,
+                                                    /*suppress cast*/ true);
+
+  auto methodPtr =
+      emitVirtualMethodValue(IGF, metadata, SILDeclRef(decodeFn), methodTy);
+
+  return {.Decoder = decoder,
+          .DecodeMethod = {.Type = methodTy, .Fn = methodPtr}};
 }
 
 SILType DistributedAccessor::getResultType() const {
@@ -663,7 +684,7 @@ SILType DistributedAccessor::getErrorType() const {
   return conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
 }
 
-Callee ArgumentDecoderInfo::getCallee(llvm::Value *decoder) const {
-  CalleeInfo info(Type, Type, SubstitutionMap());
-  return {std::move(info), Fn, decoder};
+Callee ArgumentDecoderInfo::getCallee() const {
+  CalleeInfo info(DecodeMethod.Type, DecodeMethod.Type, SubstitutionMap());
+  return {std::move(info), DecodeMethod.Fn, Decoder};
 }
