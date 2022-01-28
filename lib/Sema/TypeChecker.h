@@ -510,23 +510,6 @@ void diagnoseRequirementFailure(
     TypeArrayView<GenericTypeParamType> genericParams,
     TypeSubstitutionFn substitutions, ModuleDecl *module);
 
-/// Check the given set of generic arguments against the requirements in a
-/// generic signature.
-///
-/// \param module The module to use for conformace lookup.
-/// \param loc The location at which any diagnostics should be emitted.
-/// \param noteLoc The location at which any notes will be printed.
-/// \param owner The type that owns the generic signature.
-/// \param genericParams The generic parameters being substituted.
-/// \param requirements The requirements against which the generic arguments
-/// should be checked.
-/// \param substitutions Substitutions from interface types of the signature.
-RequirementCheckResult checkGenericArguments(
-    ModuleDecl *module, SourceLoc loc, SourceLoc noteLoc, Type owner,
-    TypeArrayView<GenericTypeParamType> genericParams,
-    ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
-    SubstOptions options = None);
-
 /// Check the given generic parameter substitutions against the given
 /// requirements and report on any requirement failures in detail for
 /// diagnostic needs.
