@@ -3099,7 +3099,8 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
       return true;
   }
 
-  diagnoseDeclAvailability(D, R, call, Where, Flags);
+  if (diagnoseDeclAvailability(D, R, call, Where, Flags))
+      return true;
 
   if (R.isValid()) {
     if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
