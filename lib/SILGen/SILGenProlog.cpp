@@ -552,11 +552,23 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
     return false;
   };
 
-  // Initialize ExpectedExecutor if the function is an async
-  // function or closure.
+  // Initialize ExpectedExecutor if:
+  // - this function is async or
+  // - this function is sync and isolated to an actor, and we want to
+  //   dynamically check that we're on the right executor.
+  //
+  // Actor destructors are isolated in the sense that we now have a
+  // unique reference to the actor, but we probably aren't running on
+  // the actor's executor, so we cannot safely do this check.
+  //
+  // Defer bodies are always called synchronously within their enclosing
+  // function, so the check is unnecessary; in addition, we cannot
+  // necessarily perform the check because the defer may not have
+  // captured the isolated parameter of the enclosing function.
   bool wantDataRaceChecks = getOptions().EnableActorDataRaceChecks &&
       !F.isAsync() &&
-      !isInActorDestructor(FunctionDC);
+      !isInActorDestructor(FunctionDC) &&
+      !F.isDefer();
 
   // Local function to load the expected executor from a local actor
   auto loadExpectedExecutorForLocalVar = [&](VarDecl *var) {
