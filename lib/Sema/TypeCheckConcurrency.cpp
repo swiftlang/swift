@@ -271,7 +271,12 @@ GlobalActorAttributeRequest::evaluate(
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     // Subscripts and properties are fine...
     if (auto var = dyn_cast<VarDecl>(storage)) {
-      if (var->getDeclContext()->isLocalContext() && !var->isTopLevelGlobal()) {
+      if (var->isTopLevelGlobal() &&
+          var->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel) {
+        var->diagnose(diag::global_actor_top_level_var)
+            .highlight(globalActorAttr->getRangeWithAt());
+        return None;
+      } else if (var->getDeclContext()->isLocalContext()) {
         var->diagnose(diag::global_actor_on_local_variable, var->getName())
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
@@ -3505,6 +3510,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
+    ASTContext &ctx = var->getASTContext();
+    if (var->isTopLevelGlobal() &&
+        ctx.LangOpts.EnableExperimentalAsyncTopLevel) {
+      if (Type mainActor = ctx.getMainActorType())
+        return inferredIsolation(
+            ActorIsolation::forGlobalActor(mainActor,
+                                           /*unsafe=*/var->preconcurrency()));
+    }
     if (auto isolation = getActorIsolationFromWrappedProperty(var))
       return inferredIsolation(isolation);
   }

@@ -199,6 +199,8 @@ public:
   }
 
   /// Determine the isolation rules for a given declaration.
+  /// The isolation restriction represents the isolation requirement of the
+  /// using context.
   ///
   /// \param fromExpression Indicates that the reference is coming from an
   /// expression.

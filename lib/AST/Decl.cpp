@@ -733,9 +733,15 @@ bool Decl::preconcurrency() const {
   if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
     return true;
 
+  // Variables declared in top-level code are @_predatesConcurrency
+  if (const VarDecl *var = dyn_cast<VarDecl>(this)) {
+    const LangOptions &langOpts = getASTContext().LangOpts;
+    return !langOpts.isSwiftVersionAtLeast(6) &&
+           langOpts.EnableExperimentalAsyncTopLevel && var->isTopLevelGlobal();
+  }
+
   return false;
 }
-
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
@@ -8936,6 +8942,14 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       assert(actorClass && "Bad closure actor isolation?");
       return ActorIsolation::forActorInstance(actorClass);
     }
+    }
+  }
+
+  if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
+    ASTContext &ctx = dc->getASTContext();
+    if (ctx.LangOpts.EnableExperimentalAsyncTopLevel) {
+      if (Type mainActor = ctx.getMainActorType())
+        return ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/false);
     }
   }
 
