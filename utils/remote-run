@@ -18,6 +18,10 @@ import os
 import posixpath
 import subprocess
 import sys
+import tarfile
+import tempfile
+import shutil
+import errno
 
 def quote(arg):
     return repr(arg)
@@ -26,6 +30,7 @@ class CommandRunner(object):
     def __init__(self):
         self.verbose = False
         self.dry_run = False
+        self.ignore_tar_failure = False
 
     @staticmethod
     def _dirnames(files):
@@ -39,17 +44,48 @@ class CommandRunner(object):
         return subprocess.Popen(command, **kwargs)
 
     def send(self, local_to_remote_files):
-        # Prepare the remote directory structure.
-        # FIXME: This could be folded into the sftp connection below.
-        dirs_to_make = self._dirnames(local_to_remote_files.values())
-        self.run_remote(['/bin/mkdir', '-p'] + dirs_to_make)
+        # Use tar to transfer the files we want
+        tmpdirname = tempfile.mkdtemp()
+        try:
+            archivename = os.path.join(tmpdirname, 'sent.tar.bz2')
+            with tarfile.open(name=archivename, mode='w:bz2') as archive:
+                for local_file, remote_file in local_to_remote_files.items():
+                    try:
+                        archive.add(local_file, arcname=remote_file)
+                    except OSError as e:
+                        if e.errno == errno.ENOENT:
+                            print("warning: {} not found".format(local_file),
+                                  file=sys.stderr)
 
-        # Send the local files.
-        sftp_commands = ("-put {0} {1}".format(quote(local_file), 
-                                               quote(remote_file))
-                         for local_file, remote_file
-                         in local_to_remote_files.items())
-        self.run_sftp(sftp_commands)
+                            # In this case, we need to add the containing
+                            # directory to the tar file if we haven't already
+                            dirname = posixpath.dirname(remote_file)
+                            try:
+                                dirinfo = archive.getmember(dirname)
+                            except KeyError:
+                                dirinfo = tarfile.TarInfo(posixpath.dirname(remote_file))
+                                dirinfo.type = tarfile.DIRTYPE
+                                dirinfo.mode = 0o755
+                                archive.addfile(dirinfo)
+                        else:
+                            raise
+
+            invocation = self.remote_invocation(['/usr/bin/tar', '-x', '-j', '-P',
+                                                 '-C', '/', '-f', '-'],
+                                                block_stdin=False)
+            with open(archivename, 'rb') as archive:
+                untar = self.popen(invocation, stdin=archive)
+                if self.dry_run:
+                    return
+                _, _ = untar.communicate()
+                if untar.returncode:
+                    if self.ignore_tar_failure:
+                        print("warning: /usr/bin/tar failed with code {}"\
+                              .format(untar.returncode))
+                    else:
+                        sys.exit(untar.returncode)
+        finally:
+            shutil.rmtree(tmpdirname)
 
     def fetch(self, local_to_remote_files):
         # Prepare the local directory structure.
@@ -95,6 +131,7 @@ class CommandRunner(object):
 
 class RemoteCommandRunner(CommandRunner):
     def __init__(self, host, identity_path, ssh_options, config_file):
+        super(RemoteCommandRunner, self).__init__()
         if ':' in host:
             (self.remote_host, self.port) = host.rsplit(':', 1)
         else:
@@ -104,8 +141,9 @@ class RemoteCommandRunner(CommandRunner):
         self.ssh_options = ssh_options
         self.config_file = config_file
 
-    def common_options(self, port_flag):
+    def common_options(self, port_flag, block_stdin=False):
         port_option = [port_flag, self.port] if self.port else []
+        stdin_option = ['-n'] if block_stdin else []
         config_option = ['-F', self.config_file] if self.config_file else []
         identity_option = (
             ['-i', self.identity_path] if self.identity_path else [])
@@ -115,11 +153,12 @@ class RemoteCommandRunner(CommandRunner):
         # https://spapas.github.io/2016/04/27/python-nested-list-comprehensions/
         extra_options = [arg for option in self.ssh_options
                              for arg in ["-o", option]]
-        return port_option + identity_option + config_option + extra_options
+        return (stdin_option + port_option + identity_option +
+                config_option + extra_options)
 
-    def remote_invocation(self, command):
-        return (['/usr/bin/ssh', '-n'] +
-                self.common_options(port_flag='-p') +
+    def remote_invocation(self, command, block_stdin=True):
+        return (['/usr/bin/ssh'] +
+                self.common_options(port_flag='-p', block_stdin=block_stdin) +
                 [self.remote_host, '--'] +
                 [quote(arg) for arg in command])
 
@@ -130,9 +169,10 @@ class RemoteCommandRunner(CommandRunner):
 
 class LocalCommandRunner(CommandRunner):
     def __init__(self, sftp_server_path):
+        super(LocalCommandRunner, self).__init__()
         self.sftp_server_path = sftp_server_path
 
-    def remote_invocation(self, command):
+    def remote_invocation(self, command, block_stdin=True):
         return command
 
     def sftp_invocation(self):
@@ -183,6 +223,9 @@ def main():
                         help='run commands locally instead of over SSH, for '
                              'debugging purposes. The "host" argument is '
                              'omitted.')
+    parser.add_argument('--ignore-tar-failure', action='store_true',
+                        dest='ignore_tar_failure',
+                        help='ignore error returns from tar (for debugging).')
 
     parser.add_argument('host',
                         help='the host to connect to, in the form '
@@ -202,6 +245,7 @@ def main():
                                      args.config_file)
     runner.dry_run = args.dry_run
     runner.verbose = args.verbose or args.dry_run
+    runner.ignore_tar_failure = args.ignore_tar_failure
 
     assert not args.remote_dir == '/'
 

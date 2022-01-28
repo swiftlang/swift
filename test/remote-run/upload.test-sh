@@ -32,8 +32,5 @@ CHECK: {{^1.txt$}}
 CHECK-NEXT: {{^2.txt$}}
 CHECK-NOT: BAD
 
-VERBOSE-NESTED: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/input/upload
-VERBOSE-NESTED-NEXT: /usr/bin/sftp
-VERBOSE-NESTED-DAG: -put '{{.+}}/Inputs/upload/1.txt' '{{.+}}-REMOTE/input/upload/1.txt'
-VERBOSE-NESTED-DAG: -put '{{.+}}/Inputs/upload/2.txt' '{{.+}}-REMOTE/input/upload/2.txt'
-VERBOSE-NESTED: /usr/bin/env ls
+VERBOSE-NESTED: /usr/bin/tar
+VERBOSE-NESTED: /usr/bin/env {{.*}} ls
