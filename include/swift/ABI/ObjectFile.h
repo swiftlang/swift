@@ -68,7 +68,8 @@ public:
 
   bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
     return sectionName.startswith("__swift5_") ||
-           sectionName == "__DATA_CONST,__const";
+           sectionName == "__DATA_CONST,__const" ||
+           sectionName == "__DATA,__const";
   }
 };
 
