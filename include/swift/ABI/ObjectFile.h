@@ -31,10 +31,20 @@ public:
   virtual llvm::Optional<llvm::StringRef> getSegmentName() {
     return {};
   }
+  virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) {
+    return getSectionName(fieldmd) == sectionName ||
+           getSectionName(assocty) == sectionName ||
+           getSectionName(builtin) == sectionName ||
+           getSectionName(capture) == sectionName ||
+           getSectionName(typeref) == sectionName ||
+           getSectionName(reflstr) == sectionName;
+  }
 };
 
 /// Responsible for providing the Mach-O reflection section identifiers.
 class SwiftObjectFileFormatMachO : public SwiftObjectFileFormat {
+  using super = SwiftObjectFileFormat;
+
 public:
   llvm::StringRef getSectionName(ReflectionSectionKind section) override {
     switch (section) {
@@ -55,6 +65,11 @@ public:
   }
   llvm::Optional<llvm::StringRef> getSegmentName() override {
     return {"__TEXT"};
+  }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return super::sectionContainsReflectionData(sectionName) ||
+           sectionName == "__DATA_CONST,__const";
   }
 };
 
