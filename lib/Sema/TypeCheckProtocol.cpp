@@ -2908,7 +2908,7 @@ bool ConformanceChecker::checkActorIsolation(
   bool isCrossActor = false;
   bool witnessIsUnsafe = false;
   DiagnosticBehavior behavior = SendableCheckContext(
-      witness->getInnermostDeclContext()).defaultDiagnosticBehavior();
+      Conformance->getDeclContext()).defaultDiagnosticBehavior();
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(
