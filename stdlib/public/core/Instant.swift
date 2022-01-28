@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 public protocol InstantProtocol: Comparable, Hashable, Sendable {
   associatedtype Interval: DurationProtocol
   func advanced(by duration: Interval) -> Self

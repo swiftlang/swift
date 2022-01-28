@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(SwiftStdlib 9999, *)
 @frozen
 public struct Duration: Sendable {
   /// The low 64 bits of a 128-bit signed integer value counting attoseconds.
@@ -45,17 +46,21 @@ public struct Duration: Sendable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Duration {
+  @available(SwiftStdlib 9999, *)
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
     return Duration(_attoseconds: _Int128(seconds) *
                                  1_000_000_000_000_000_000)
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func seconds(_ seconds: Double) -> Duration {
     return Duration(_attoseconds: _Int128(seconds *
                                  1_000_000_000_000_000_000))
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func milliseconds<T: BinaryInteger>(
     _ milliseconds: T
   ) -> Duration {
@@ -63,11 +68,13 @@ extension Duration {
                                  1_000_000_000_000_000)
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func milliseconds(_ milliseconds: Double) -> Duration {
     return Duration(_attoseconds: _Int128(milliseconds *
                                  1_000_000_000_000_000))
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func microseconds<T: BinaryInteger>(
     _ microseconds: T
   ) -> Duration {
@@ -75,11 +82,13 @@ extension Duration {
                                  1_000_000_000_000)
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func microseconds(_ microseconds: Double) -> Duration {
     return Duration(_attoseconds: _Int128(microseconds *
                                  1_000_000_000_000))
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func nanoseconds<T: BinaryInteger>(
     _ nanoseconds: T
   ) -> Duration {
@@ -88,103 +97,109 @@ extension Duration {
   }
 }
 
-extension Duration: Codable {
-  private enum CodingKeys: String, CodingKey {
-    case seconds = "seconds"
-    case nanoseconds = "nanoseconds"
-  }
+@available(SwiftStdlib 9999, *)
+extension Duration: Codable { }
 
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    let seconds = try container.decode(Int64.self, forKey: .seconds)
-    let nanoseconds = try container.decode(Int64.self, forKey: .nanoseconds)
-    self.init(_seconds: seconds, nanoseconds: nanoseconds)
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(seconds, forKey: .seconds)
-    try container.encode(nanoseconds, forKey: .nanoseconds)
-  }
-}
-
+@available(SwiftStdlib 9999, *)
 extension Duration: Hashable { }
 
+@available(SwiftStdlib 9999, *)
 extension Duration: Equatable {
+  @available(SwiftStdlib 9999, *)
   public static func == (_ lhs: Duration, _ rhs: Duration) -> Bool {
     return lhs._attoseconds == rhs._attoseconds
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Duration: Comparable {
+  @available(SwiftStdlib 9999, *)
   public static func < (_ lhs: Duration, _ rhs: Duration) -> Bool {
     return lhs._attoseconds < rhs._attoseconds
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Duration: AdditiveArithmetic {
+  @available(SwiftStdlib 9999, *)
   public static var zero: Duration { Duration(_attoseconds: 0) }
 
+  @available(SwiftStdlib 9999, *)
   public static func + (_ lhs: Duration, _ rhs: Duration) -> Duration {
     return Duration(_attoseconds: lhs._attoseconds + rhs._attoseconds)
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func - (_ lhs: Duration, _ rhs: Duration) -> Duration {
     return Duration(_attoseconds: lhs._attoseconds - rhs._attoseconds)
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func += (_ lhs: inout Duration, _ rhs: Duration) {
     lhs = lhs + rhs
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func -= (_ lhs: inout Duration, _ rhs: Duration) {
     lhs = lhs - rhs
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Duration {
+  @available(SwiftStdlib 9999, *)
   public static func / (_ lhs: Duration, _ rhs: Double) -> Duration {
     return Duration(_attoseconds:
       _Int128(Double(lhs._attoseconds) / rhs))
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func /= (_ lhs: inout Duration, _ rhs: Double) {
     lhs = lhs / rhs
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func / <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
     Duration(_attoseconds: lhs._attoseconds / _Int128(rhs))
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func /= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {
     lhs = lhs / rhs
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func / (_ lhs: Duration, _ rhs: Duration) -> Double {
     Double(lhs._attoseconds) / Double(rhs._attoseconds)
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func * (_ lhs: Duration, _ rhs: Double) -> Duration {
     Duration(_attoseconds: _Int128(Double(lhs._attoseconds) * rhs))
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func * <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
     Duration(_attoseconds: lhs._attoseconds * _Int128(rhs))
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func *= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {
     lhs = lhs * rhs
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Duration: CustomStringConvertible {
+  @available(SwiftStdlib 9999, *)
   public var description: String {
     return (Double(_attoseconds) / 1e18).description + " seconds"
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Duration: DurationProtocol { }

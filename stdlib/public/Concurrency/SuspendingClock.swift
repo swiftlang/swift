@@ -26,15 +26,18 @@ public struct SuspendingClock {
 
 @available(SwiftStdlib 9999, *)
 extension Clock where Self == SuspendingClock {
+  @available(SwiftStdlib 9999, *)
   public static var suspending: SuspendingClock { return SuspendingClock() }
 }
 
 @available(SwiftStdlib 9999, *)
 extension SuspendingClock: Clock {
+  @available(SwiftStdlib 9999, *)
   public var now: SuspendingClock.Instant {
     SuspendingClock.now
   }
 
+  @available(SwiftStdlib 9999, *)
   public static var now: SuspendingClock.Instant {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
@@ -46,6 +49,7 @@ extension SuspendingClock: Clock {
       .seconds(seconds) + .nanoseconds(nanoseconds))
   }
 
+  @available(SwiftStdlib 9999, *)
   public var minimumResolution: Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
@@ -56,6 +60,7 @@ extension SuspendingClock: Clock {
     return .seconds(seconds) + .nanoseconds(nanoseconds)
   }
 
+  @available(SwiftStdlib 9999, *)
   public func sleep(
     until deadline: Instant, tolerance: Duration? = nil
   ) async throws {
@@ -68,66 +73,67 @@ extension SuspendingClock: Clock {
 
 @available(SwiftStdlib 9999, *)
 extension SuspendingClock.Instant: InstantProtocol {
+  @available(SwiftStdlib 9999, *)
   public static var now: SuspendingClock.Instant { SuspendingClock().now }
 
+  @available(SwiftStdlib 9999, *)
   public func advanced(by duration: Duration) -> SuspendingClock.Instant {
     SuspendingClock.Instant(_value: _value + duration)
   }
 
+  @available(SwiftStdlib 9999, *)
   public func duration(to other: SuspendingClock.Instant) -> Duration {
     other._value - _value
   }
 
+  @available(SwiftStdlib 9999, *)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_value)
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func == (
     _ lhs: SuspendingClock.Instant, _ rhs: SuspendingClock.Instant
   ) -> Bool {
     return lhs._value == rhs._value
   }
 
+  @available(SwiftStdlib 9999, *)
   public static func < (
     _ lhs: SuspendingClock.Instant, _ rhs: SuspendingClock.Instant
   ) -> Bool {
     return lhs._value < rhs._value
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @available(SwiftStdlib 9999, *)
   public static func + (
     _ lhs: SuspendingClock.Instant, _ rhs: Duration
   ) -> SuspendingClock.Instant {
     lhs.advanced(by: rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @available(SwiftStdlib 9999, *)
   public static func += (
     _ lhs: inout SuspendingClock.Instant, _ rhs: Duration
   ) {
     lhs = lhs.advanced(by: rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @available(SwiftStdlib 9999, *)
   public static func - (
     _ lhs: SuspendingClock.Instant, _ rhs: Duration
   ) -> SuspendingClock.Instant {
     lhs.advanced(by: .zero - rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @available(SwiftStdlib 9999, *)
   public static func -= (
     _ lhs: inout SuspendingClock.Instant, _ rhs: Duration
   ) {
     lhs = lhs.advanced(by: .zero - rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @available(SwiftStdlib 9999, *)
   public static func - (
     _ lhs: SuspendingClock.Instant, _ rhs: SuspendingClock.Instant
   ) -> Duration {
