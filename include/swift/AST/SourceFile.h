@@ -84,9 +84,9 @@ private:
   /// This is \c None until it is filled in by the import resolution phase.
   Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
 
-  /// Which imports have made use of @_predatesConcurrency.
+  /// Which imports have made use of @preconcurrency.
   llvm::SmallDenseSet<AttributedImport<ImportedModule>>
-      PredatesConcurrencyImportsUsed;
+      PreconcurrencyImportsUsed;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -297,12 +297,12 @@ public:
   /// resolution.
   void setImports(ArrayRef<AttributedImport<ImportedModule>> imports);
 
-  /// Whether the given import has used @_predatesConcurrency.
-  bool hasImportUsedPredatesConcurrency(
+  /// Whether the given import has used @preconcurrency.
+  bool hasImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import) const;
 
-  /// Note that the given import has used @_predatesConcurrency/
-  void setImportUsedPredatesConcurrency(
+  /// Note that the given import has used @preconcurrency/
+  void setImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import);
 
   enum ImportQueryKind {
