@@ -115,11 +115,20 @@ public func classAssignToVar5(_ x: Klass) {
     print(x3)
 }
 
-public func classAccessField(_ x: Klass) {
+public func classAccessAccessField(_ x: Klass) {
     @_noImplicitCopy let x2 = x
-    print(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k!)
     for _ in 0..<1024 {
-        print(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!)
+    }
+}
+
+public func classAccessConsumeField(_ x: Klass) {
+    @_noImplicitCopy let x2 = x
+    // Since a class is a reference type, we do not emit an error here.
+    classConsume(x2.k!)
+    for _ in 0..<1024 {
+        classConsume(x2.k!)
     }
 }
 
@@ -232,21 +241,37 @@ public func finalClassAssignToVar5(_ x: FinalKlass) {
 
 public func finalClassAccessField(_ x: FinalKlass) {
     @_noImplicitCopy let x2 = x
-    print(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k!)
     for _ in 0..<1024 {
-        print(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!)
     }
 }
 
+public func finalClassConsumeField(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+
+    // No diagnostic here since class is a reference type and we are not copying
+    // the class, we are copying its field.
+    classConsume(x2.k!)
+    for _ in 0..<1024 {
+        classConsume(x2.k!)
+    }
+}
 
 //////////////////////
 // Aggregate Struct //
 //////////////////////
 
+public struct KlassPair {
+    var lhs: Klass
+    var rhs: Klass
+}
+
 public struct AggStruct {
     var lhs: Klass
     var center: Builtin.Int32
     var rhs: Klass
+    var pair: KlassPair
 }
 
 public func aggStructUseMoveOnlyWithoutEscaping(_ x: AggStruct) {
@@ -315,9 +340,33 @@ public func aggStructDiamondInLoop(_ x: AggStruct) {
 
 public func aggStructAccessField(_ x: AggStruct) {
     @_noImplicitCopy let x2 = x
-    print(x2.lhs)
+    classUseMoveOnlyWithoutEscaping(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs)
+        classUseMoveOnlyWithoutEscaping(x2.lhs)
+    }
+}
+
+public func aggStructConsumeField(_ x: AggStruct) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.lhs) // expected-note {{consuming use}}
+    }
+}
+
+public func aggStructAccessGrandField(_ x: AggStruct) {
+    @_noImplicitCopy let x2 = x
+    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    for _ in 0..<1024 {
+        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    }
+}
+
+public func aggStructConsumeGrandField(_ x: AggStruct) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -328,6 +377,7 @@ public func aggStructAccessField(_ x: AggStruct) {
 public struct AggGenericStruct<T> {
     var lhs: Klass
     var rhs: Builtin.RawPointer
+    var pair: KlassPair
 }
 
 public func aggGenericStructUseMoveOnlyWithoutEscaping(_ x: AggGenericStruct<Klass>) {
@@ -396,9 +446,33 @@ public func aggGenericStructDiamondInLoop(_ x: AggGenericStruct<Klass>) {
 
 public func aggGenericStructAccessField(_ x: AggGenericStruct<Klass>) {
     @_noImplicitCopy let x2 = x
-    print(x2.lhs)
+    classUseMoveOnlyWithoutEscaping(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs)
+        classUseMoveOnlyWithoutEscaping(x2.lhs)
+    }
+}
+
+public func aggGenericStructConsumeField(_ x: AggGenericStruct<Klass>) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.lhs) // expected-note {{consuming use}}
+    }
+}
+
+public func aggGenericStructAccessGrandField(_ x: AggGenericStruct<Klass>) {
+    @_noImplicitCopy let x2 = x
+    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    for _ in 0..<1024 {
+        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    }
+}
+
+public func aggGenericStructConsumeGrandField(_ x: AggGenericStruct<Klass>) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -472,9 +546,33 @@ public func aggGenericStructDiamondInLoop<T>(_ x: AggGenericStruct<T>) {
 
 public func aggGenericStructAccessField<T>(_ x: AggGenericStruct<T>) {
     @_noImplicitCopy let x2 = x
-    print(x2.lhs)
+    classUseMoveOnlyWithoutEscaping(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs)
+        classUseMoveOnlyWithoutEscaping(x2.lhs)
+    }
+}
+
+public func aggGenericStructConsumeField<T>(_ x: AggGenericStruct<T>) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.lhs) // expected-note {{consuming use}}
+    }
+}
+
+public func aggGenericStructAccessGrandField<T>(_ x: AggGenericStruct<T>) {
+    @_noImplicitCopy let x2 = x
+    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    for _ in 0..<1024 {
+        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    }
+}
+
+public func aggGenericStructConsumeGrandField<T>(_ x: AggGenericStruct<T>) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
