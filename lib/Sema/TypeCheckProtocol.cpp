@@ -5676,11 +5676,11 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
         M, *condReqs,
         [](SubstitutableType *dependentType) { return Type(dependentType); });
     switch (conditionalCheckResult) {
-    case RequirementCheckResult::Success:
+    case CheckGenericArgumentsResult::Success:
       break;
 
-    case RequirementCheckResult::Failure:
-    case RequirementCheckResult::SubstitutionFailure:
+    case CheckGenericArgumentsResult::RequirementFailure:
+    case CheckGenericArgumentsResult::SubstitutionFailure:
       return ProtocolConformanceRef::forInvalid();
     }
   }

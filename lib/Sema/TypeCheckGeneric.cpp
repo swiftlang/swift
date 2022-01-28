@@ -957,11 +957,9 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
   return CheckGenericArgumentsResult::createSuccess();
 }
 
-RequirementCheckResult
-TypeChecker::checkGenericArguments(ModuleDecl *module,
-                                   ArrayRef<Requirement> requirements,
-                                   TypeSubstitutionFn substitutions,
-                                   SubstOptions options) {
+CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
+    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions, SubstOptions options) {
   SmallVector<Requirement, 4> worklist;
   bool valid = true;
 
@@ -978,15 +976,15 @@ TypeChecker::checkGenericArguments(ModuleDecl *module,
     auto req = worklist.pop_back_val();
     ArrayRef<Requirement> conditionalRequirements;
     if (!req.isSatisfied(conditionalRequirements, /*allowMissing=*/true))
-      return RequirementCheckResult::Failure;
+      return CheckGenericArgumentsResult::RequirementFailure;
 
     worklist.append(conditionalRequirements.begin(),
                     conditionalRequirements.end());
   }
 
   if (valid)
-    return RequirementCheckResult::Success;
-  return RequirementCheckResult::SubstitutionFailure;
+    return CheckGenericArgumentsResult::Success;
+  return CheckGenericArgumentsResult::SubstitutionFailure;
 }
 
 Requirement

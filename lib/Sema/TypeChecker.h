@@ -209,11 +209,6 @@ struct ParentConditionalConformance {
                            ArrayRef<ParentConditionalConformance> conformances);
 };
 
-/// The result of `checkGenericRequirement`.
-enum class RequirementCheckResult {
-  Success, Failure, SubstitutionFailure
-};
-
 class CheckGenericArgumentsResult {
 public:
   enum Kind { Success, RequirementFailure, SubstitutionFailure };
@@ -522,11 +517,10 @@ checkGenericArgumentsForDiagnostics(ModuleDecl *module,
 /// requirements. Unlike \c checkGenericArgumentsForDiagnostics, this version
 /// reports just the result of the check and doesn't provide additional
 /// information on requirement failures that is warranted for diagnostics.
-RequirementCheckResult checkGenericArguments(
-    ModuleDecl *module,
-    ArrayRef<Requirement> requirements,
-    TypeSubstitutionFn substitutions,
-    SubstOptions options = None);
+CheckGenericArgumentsResult::Kind
+checkGenericArguments(ModuleDecl *module, ArrayRef<Requirement> requirements,
+                      TypeSubstitutionFn substitutions,
+                      SubstOptions options = None);
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
