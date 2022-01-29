@@ -91,7 +91,7 @@ func _vjpFmod${generic_signature} (
   return (fmod(x, y), { v in (v, -v * ((x / y).rounded(.towardZero))) })
 }
 
-%  for derivative_kind in ['jvp', 'vjp']:
+%  for derivative_kind in ['vjp', 'jvp']:
 %    linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
 @inlinable
 @derivative(of: sqrt)
@@ -133,11 +133,11 @@ func _${derivative_kind}Trunc${generic_signature} (
 ) -> (value: ${T}, ${linear_map_kind}: (${T}) -> ${T}) ${constraint} {
   return (trunc(x), { v in 0 })
 }
-%  end # for derivative_kind in ['jvp', 'vjp']:
+%  end # for derivative_kind in ['vjp', 'jvp']:
 %end # for T in ['T', 'Double']:
 
 // Unary functions
-%for derivative_kind in ['jvp', 'vjp']:
+%for derivative_kind in ['vjp', 'jvp']:
 %  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
 %  for T in ['Float', 'Double', 'Float80']:
 %    if T == 'Float80':
@@ -277,7 +277,7 @@ func _${derivative_kind}Erfc(_ x: ${T}) -> (value: ${T}, ${linear_map_kind}: (${
 #endif
 %    end # if T == 'Float80':
 %  end # for T in ['Float', 'Double', 'Float80']:
-%end # for derivative_kind in ['jvp', 'vjp']:
+%end # for derivative_kind in ['vjp', 'jvp']:
 
 // Binary functions
 %for T in ['Float', 'Double', 'Float80']:
