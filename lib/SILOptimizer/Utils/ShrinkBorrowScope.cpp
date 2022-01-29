@@ -88,35 +88,6 @@ public:
   bool rewrite();
   bool createEndBorrow(SILInstruction *insertionPoint);
 
-  bool isBarrierApply(SILInstruction *instruction) {
-    // For now, treat every apply (that doesn't use the borrowed value) as a
-    // barrier.
-    return isa<ApplySite>(instruction);
-  }
-
-  bool mayAccessPointer(SILInstruction *instruction) {
-    if (!instruction->mayReadOrWriteMemory())
-      return false;
-    bool fail = false;
-    visitAccessedAddress(instruction, [&fail](Operand *operand) {
-      auto accessStorage = AccessStorage::compute(operand->get());
-      if (accessStorage.getKind() != AccessRepresentation::Kind::Unidentified)
-        fail = true;
-    });
-    return fail;
-  }
-
-  bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
-    // TODO: It is possible to do better here by looking at the address that is
-    //       being loaded.
-    return isa<LoadWeakInst>(instruction) || isa<LoadUnownedInst>(instruction);
-  }
-
-  bool isDeinitBarrier(SILInstruction *instruction) {
-    return isBarrierApply(instruction) || instruction->maySynchronize() ||
-           mayAccessPointer(instruction) || mayLoadWeakOrUnowned(instruction);
-  }
-
   bool canReplaceValueWithBorrowee(SILValue value) {
     while (true) {
       auto *instruction = value.getDefiningInstruction();
