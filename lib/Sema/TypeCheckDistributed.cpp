@@ -472,6 +472,7 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
   auto members = TypeChecker::lookupMember(actor->getDeclContext(), decoderTy,
                                            DeclNameRef(ctx.Id_decodeNextArgument));
 
+  SmallVector<FuncDecl *, 2> candidates;
   // Looking for `decodeNextArgument<Arg>() throws -> Arg`
   for (auto &member : members) {
     auto *FD = dyn_cast<FuncDecl>(member.getValueDecl());
@@ -489,9 +490,12 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
                          ->getMetatypeInstanceType();
 
       if (FD->getResultInterfaceType()->isEqual(paramTy))
-        return FD;
+        candidates.push_back(FD);
     }
   }
 
-  return nullptr;
+  // Type-checker should reject any definition of invocation decoder
+  // that doesn't have a correct version of `decodeNextArgument` declared.
+  assert(candidates.size() == 1);
+  return candidates.front();
 }
