@@ -179,8 +179,6 @@ extension _UnsafeBitset: Sequence {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 extension _UnsafeBitset {
   @frozen
   @usableFromInline
