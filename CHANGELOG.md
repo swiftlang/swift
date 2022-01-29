@@ -6,6 +6,31 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.6
 ---------
 
+* Actor isolation checking now understands that `defer` bodies share the isolation of their enclosing function.
+
+  ```swift
+  // Works on global actors
+  @MainActor
+  func runAnimation(controller: MyViewController) async {
+    controller.hasActiveAnimation = true
+    defer { controller.hasActiveAnimation = false }
+
+    // do the animation here...
+  }
+
+  // Works on actor instances
+  actor OperationCounter {
+    var activeOperationCount = 0
+
+    func operate() async {
+      activeOperationCount += 1
+      defer { activeOperationCount -= 1 }
+
+      // do work here...
+    }
+  }
+  ```
+
 * [SE-0335][]:
 
   Swift now allows existential types to be explicitly written with the `any`
