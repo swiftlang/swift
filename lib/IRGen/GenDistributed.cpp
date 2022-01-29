@@ -70,12 +70,14 @@ namespace {
 struct ArgumentDecoderInfo {
   llvm::Value *Decoder;
 
-  struct {
-    CanSILFunctionType Type;
-    FunctionPointer Fn;
-  } DecodeMethod;
+  CanSILFunctionType MethodType;
+  FunctionPointer MethodPtr;
 
-  CanSILFunctionType getMethodType() const { return DecodeMethod.Type; }
+  ArgumentDecoderInfo(llvm::Value *decoder, CanSILFunctionType decodeMethodTy,
+                      FunctionPointer decodePtr)
+      : Decoder(decoder), MethodType(decodeMethodTy), MethodPtr(decodePtr) {}
+
+  CanSILFunctionType getMethodType() const { return MethodType; }
 
   /// Form a callee to a decode method - `decodeNextArgument`.
   Callee getCallee() const;
@@ -109,8 +111,6 @@ private:
   /// Load an argument value from the given decoder \c decoder
   /// to the given explosion \c arguments. Information describing
   /// the type of argument comes from runtime metadata.
-  ///
-  /// Returns a pair of aligned offset and value size.
   void decodeArgument(unsigned argumentIdx, const ArgumentDecoderInfo &decoder,
                       llvm::Value *argumentType, const SILParameterInfo &param,
                       Explosion &arguments);
@@ -657,8 +657,7 @@ DistributedAccessor::findArgumentDecoder(llvm::Value *decoder) {
         classifyFunctionPointerKind(decodeSIL), fnPtr,
         /*secondaryValue=*/nullptr, signature);
 
-    return {.Decoder = decoder,
-            .DecodeMethod = {.Type = methodTy, .Fn = methodPtr}};
+    return {decoder, methodTy, methodPtr};
   }
 
   auto selfTy = methodTy->getSelfParameter().getSILStorageType(
@@ -670,8 +669,7 @@ DistributedAccessor::findArgumentDecoder(llvm::Value *decoder) {
   auto methodPtr =
       emitVirtualMethodValue(IGF, metadata, SILDeclRef(decodeFn), methodTy);
 
-  return {.Decoder = decoder,
-          .DecodeMethod = {.Type = methodTy, .Fn = methodPtr}};
+  return {decoder, methodTy, methodPtr};
 }
 
 SILType DistributedAccessor::getResultType() const {
@@ -685,6 +683,6 @@ SILType DistributedAccessor::getErrorType() const {
 }
 
 Callee ArgumentDecoderInfo::getCallee() const {
-  CalleeInfo info(DecodeMethod.Type, DecodeMethod.Type, SubstitutionMap());
-  return {std::move(info), DecodeMethod.Fn, Decoder};
+  CalleeInfo info(MethodType, MethodType, SubstitutionMap());
+  return {std::move(info), MethodPtr, Decoder};
 }
