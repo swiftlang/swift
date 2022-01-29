@@ -6,9 +6,6 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// SR-15252
-// XFAIL: OS=windows-msvc
-
 import _Concurrency
 import StdlibUnittest
 
