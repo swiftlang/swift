@@ -367,12 +367,10 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
     newChildTaskStatus = newChildTaskStatus.withCancelled();
   }
 
-  // Propagate max priority of parent to child task's active status and the Job
-  // header
+  // Propagate max priority of parent to child task's active status
   JobPriority pri = parentStatus.getStoredPriority();
   newChildTaskStatus =
       newChildTaskStatus.withNewPriority(withUserInteractivePriorityDowngrade(pri));
-  child->Flags.setPriority(pri);
 
   child->_private().Status.store(newChildTaskStatus, std::memory_order_relaxed);
 }
@@ -551,18 +549,21 @@ SWIFT_CC(swift)
 JobPriority
 static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
 
+  SWIFT_TASK_DEBUG_LOG("Escalating %p to %#x priority", task, newPriority);
   auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
 
   while (true) {
     // Fast path: check that the stored priority is already at least
     // as high as the desired priority.
-    if (oldStatus.getStoredPriority() >= newPriority)
+    if (oldStatus.getStoredPriority() >= newPriority) {
+      SWIFT_TASK_DEBUG_LOG("Task is already at %x priority", oldStatus.getStoredPriority());
       return oldStatus.getStoredPriority();
+    }
 
     // Regardless of whether status record is locked or not, update the priority
     // and RO bit on the task status
-    if (oldStatus.isRunning()) {
+    if (oldStatus.isRunning() || oldStatus.isEnqueued()) {
       newStatus = oldStatus.withEscalatedPriority(newPriority);
     } else {
       newStatus = oldStatus.withNewPriority(newPriority);
@@ -575,6 +576,31 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     }
   }
 
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  if (newStatus.isRunning()) {
+    // The task is running, escalate the thread that is running it.
+    ActiveTaskStatus *taskStatus;
+    dispatch_lock_t *executionLock;
+
+    taskStatus = (ActiveTaskStatus *) &task->_private().Status;
+    executionLock = (dispatch_lock_t *) ((char*)taskStatus + ActiveTaskStatus::executionLockOffset());
+
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x to %#x", task, newStatus.currentExecutionLockOwner(), newPriority);
+    swift_dispatch_lock_override_start_with_debounce(executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
+  } else if (newStatus.isEnqueued()) {
+    //  Task is not running, it's enqueued somewhere waiting to be run
+    //
+    // TODO (rokhinip): Add a stealer to escalate the thread request for
+    // the task. Still mark the task has having been escalated so that the
+    // thread will self override when it starts draining the task
+    //
+    // TODO (rokhinip): Add a signpost to flag that this is a potential
+    // priority inversion
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is enqueued", task);
+  } else {
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
+  }
+#endif
 
   if (newStatus.getInnermostRecord() == NULL) {
     return newStatus.getStoredPriority();
@@ -586,6 +612,11 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
       performEscalationAction(cur, newPriority);
     }
   });
+  // TODO (rokhinip): If the task is awaiting on another task that is not a
+  // child task, we need to escalate whoever we are already awaiting on
+  //
+  // rdar://88093007 (Task escalation does not propagate to a future that it is
+  // waiting on)
 
   return newStatus.getStoredPriority();
 }

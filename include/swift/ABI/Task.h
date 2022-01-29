@@ -290,6 +290,22 @@ public:
     return ResumeTask(ResumeContext); // 'return' forces tail call
   }
 
+  /// A task can have the following states:
+  ///   * suspended: In this state, a task is considered not runnable
+  ///   * enqueued: In this state, a task is considered runnable
+  ///   * running on a thread
+  ///   * completed
+  ///
+  /// The following state transitions are possible:
+  ///       suspended -> enqueued
+  ///       suspended -> running
+  ///       enqueued -> running
+  ///       running -> suspended
+  ///       running -> completed
+  ///       running -> enqueued
+  ///
+  /// The 4 methods below are how a task switches from one state to another.
+
   /// Flag that this task is now running.  This can update
   /// the priority stored in the job flags if the priority has been
   /// escalated.
@@ -298,13 +314,11 @@ public:
   /// ActiveTask.
   void flagAsRunning();
 
-  /// Flag that this task is now suspended.  This can update the
-  /// priority stored in the job flags if the priority hsa been
-  /// escalated.  Generally this should be done immediately after
-  /// clearing ActiveTask and immediately before enqueuing the task
-  /// somewhere.  TODO: record where the task is enqueued if
-  /// possible.
+  /// Flag that this task is now suspended.
   void flagAsSuspended();
+
+  /// Flag that the task is to be enqueued on the provided executor
+  void flagAsEnqueuedOnExecutor(ExecutorRef newExecutor);
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.

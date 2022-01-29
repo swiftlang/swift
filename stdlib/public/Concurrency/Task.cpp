@@ -145,9 +145,12 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
             queueHead, newQueueHead,
             /*success*/ std::memory_order_release,
             /*failure*/ std::memory_order_acquire)) {
+
       // Escalate the priority of this task based on the priority
       // of the waiting task.
-      swift_task_escalate(this, waitingTask->Flags.getPriority());
+      auto status = waitingTask->_private().Status.load(std::memory_order_relaxed);
+      swift_task_escalate(this, status.getStoredPriority());
+
       _swift_task_clearCurrent();
       return FutureFragment::Status::Executing;
     }
@@ -231,7 +234,7 @@ void AsyncTask::completeFuture(AsyncContext *context) {
 
     // Enqueue the waiter on the global executor.
     // TODO: allow waiters to fill in a suggested executor
-    swift_task_enqueueGlobal(waitingTask);
+    waitingTask->flagAsEnqueuedOnExecutor(ExecutorRef::generic());
 
     // Move to the next task.
     waitingTask = nextWaitingTask;
@@ -649,12 +652,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
      basePriority = JobPriority::Default;
   }
 
-  SWIFT_TASK_DEBUG_LOG("Task's base priority = %d", basePriority);
-
-  // TODO (rokhinip): Figure out the semantics of the job priority and where
-  // it ought to be set conclusively - seems like it ought to be at enqueue
-  // time. For now, maintain current semantics of setting jobPriority as well.
-  jobFlags.setPriority(basePriority);
+  SWIFT_TASK_DEBUG_LOG("Task's base priority = %#x", basePriority);
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
@@ -849,7 +847,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // If we're supposed to enqueue the task, do so now.
   if (taskCreateFlags.enqueueJob()) {
     swift_retain(task);
-    swift_task_enqueue(task, executor);
+    task->flagAsEnqueuedOnExecutor(executor);
   }
 
   return {task, initialContext};
@@ -1019,6 +1017,13 @@ static AsyncTask *swift_task_suspendImpl() {
 }
 
 SWIFT_CC(swift)
+static void
+swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task, ExecutorRef executor)
+{
+  task->flagAsEnqueuedOnExecutor(executor);
+}
+
+SWIFT_CC(swift)
 static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
                                               AsyncContinuationFlags flags) {
   context->Flags = AsyncContextKind::Continuation;
@@ -1146,7 +1151,7 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
   // to make a stronger best-effort attempt to catch racing attempts to
   // resume the continuation?
 
-  swift_task_enqueue(task, context->ResumeToExecutor);
+  task->flagAsEnqueuedOnExecutor(context->ResumeToExecutor);
 }
 
 SWIFT_CC(swift)

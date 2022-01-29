@@ -23,6 +23,7 @@
 #include "swift/ABI/Task.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/DispatchShims.h"
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
@@ -39,10 +40,6 @@
 #define VC_EXTRA_LEAN
 #define NOMINMAX
 #include <Windows.h>
-#endif
-
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-#include <dispatch/swift_concurrency_private.h>
 #endif
 
 namespace swift {
@@ -173,7 +170,6 @@ public:
 
 /// The current state of a task's status records.
 ///
-///
 /// The runtime needs to track the following state about the task in within the
 /// same atomic:
 ///
@@ -246,8 +242,8 @@ class alignas(sizeof(void*) * 2) ActiveTaskStatus {
     /// from the drain lock of the task.
     IsStatusRecordLocked = 0x200,
 
-    /// Whether the running priority has been escalated above the
-    /// priority recorded in the Job header.
+    /// Whether the running priority has been escalated above the previous max
+    /// priority in the task status
     IsEscalated = 0x400,
 
 #if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -258,6 +254,10 @@ class alignas(sizeof(void*) * 2) ActiveTaskStatus {
     IsRunning = 0x800,
 #endif
 
+    /// Task is enqueued somewhere - either in the cooperative pool, or in an
+    /// actor. This bit is cleared when a starts running on a thread, suspends
+    /// or is completed.
+    IsEnqueued = 0x1000,
   };
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
@@ -313,7 +313,25 @@ public:
 #endif
   }
 
-  /// Is the task currently running?
+  bool isEnqueued() const { return Flags & IsEnqueued; }
+  ActiveTaskStatus withEnqueued() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags | IsEnqueued, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags | IsEnqueued);
+#endif
+  }
+  ActiveTaskStatus withoutEnqueued() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags & ~IsEnqueued, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags & ~IsEnqueued);
+#endif
+  }
+
+  /// Is the task currently running? Also known as whether it is drain locked.
+  /// IsRunning() = true implies isEnqueued()
+  ///
   /// Eventually we'll track this with more specificity, like whether
   /// it's running on a specific thread, enqueued on a specific actor,
   /// etc.
@@ -393,6 +411,7 @@ public:
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     assert(ExecutionLock == DLOCK_OWNER_NULL);
 #endif
+    assert(!isEnqueued());
     return ActiveTaskStatus(Record,
                             (Flags & ~PriorityMask) | uintptr_t(priority));
   }
@@ -502,7 +521,40 @@ struct AsyncTask::PrivateStorage {
       : Status(ActiveTaskStatus(basePri)), Allocator(slab, slabCapacity),
         Local(TaskLocal::Storage()), BasePriority(basePri) {}
 
+  /// Called on the thread that was previously executing the task that we are
+  /// now trying to complete.
   void complete(AsyncTask *task) {
+    // Drain unlock the task and remove any overrides on thread as a
+    // result of the task
+    auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
+    while (true) {
+      // Task is completing, it shouldn't have any records and therefore
+      // cannot be status record locked.
+      assert(oldStatus.getInnermostRecord() == NULL);
+      assert(!oldStatus.isStatusRecordLocked());
+
+      assert(oldStatus.isRunning());
+
+      // Remove drainer, enqueued and override bit if any
+      auto newStatus = oldStatus.withRunning(false);
+      newStatus = newStatus.withoutStoredPriorityEscalation();
+      newStatus = newStatus.withoutEnqueued();
+
+      // This can fail since the task can still get concurrently cancelled or
+      // escalated.
+      if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
+              /* success */ std::memory_order_relaxed,
+              /* failure */ std::memory_order_relaxed)) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+        if (oldStatus.isStoredPriorityEscalated()) {
+          SWIFT_TASK_DEBUG_LOG("[Override] Reset override %#x on thread from task %p", oldStatus.getStoredPriority(), this);
+          swift_dispatch_lock_override_end((qos_class_t) oldStatus.getStoredPriority());
+        }
+#endif
+        break;
+      }
+    }
+
     // Destroy and deallocate any remaining task local items.
     // We need to do this before we destroy the task local deallocator.
     Local.destroy(task);
@@ -553,16 +605,36 @@ inline bool AsyncTask::isCancelled() const {
 
 inline void AsyncTask::flagAsRunning() {
   SWIFT_TASK_DEBUG_LOG("%p->flagAsRunning()", this);
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  dispatch_thread_override_info_s threadOverrideInfo;
+  threadOverrideInfo = swift_dispatch_thread_get_current_override_qos_floor();
+  qos_class_t overrideFloor = threadOverrideInfo.override_qos_floor;
+retry:;
+#endif
   auto oldStatus = _private().Status.load(std::memory_order_relaxed);
   while (true) {
+    // We can get here from being suspended or being enqueued
     assert(!oldStatus.isRunning());
 
-    auto newStatus = oldStatus.withRunning(true);
-    if (newStatus.isStoredPriorityEscalated()) {
-      newStatus = newStatus.withoutStoredPriorityEscalation();
-      Flags.setPriority(oldStatus.getStoredPriority());
-      concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    // Task's priority is greater than the thread's - do a self escalation
+    qos_class_t maxTaskPriority = (qos_class_t) oldStatus.getStoredPriority();
+    if (threadOverrideInfo.can_override && (maxTaskPriority > overrideFloor)) {
+      SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x",
+          overrideFloor, this, maxTaskPriority);
+
+      (void) swift_dispatch_thread_override_self(maxTaskPriority);
+      overrideFloor = maxTaskPriority;
+      goto retry;
     }
+#endif
+
+    // Set self as executor and remove escalation bit if any - the task's
+    // priority escalation has already been reflected on the thread.
+    auto newStatus = oldStatus.withRunning(true);
+    newStatus = newStatus.withoutStoredPriorityEscalation();
+    newStatus = newStatus.withoutEnqueued();
 
     if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
              /* success */ std::memory_order_relaxed,
@@ -576,18 +648,39 @@ inline void AsyncTask::flagAsRunning() {
   }
 }
 
-inline void AsyncTask::flagAsSuspended() {
-  SWIFT_TASK_DEBUG_LOG("%p->flagAsSuspended()", this);
-  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
-  while (true) {
-    assert(oldStatus.isRunning());
+/// TODO (rokhinip): We need the handoff of the thread to the next executor to be
+/// done while the current thread still holds the voucher and the priority from the
+/// task. Otherwise, if we reset the voucher and priority escalation too early, the
+/// thread may be preempted immediately before we can finish the enqueue of the
+/// high priority task to the next location. We will then have a priority inversion
+/// of waiting for a low priority thread to enqueue a high priorty task.
+///
+/// In order to do this correctly, we need enqueue-ing of a task to the next
+/// executor, to have a "hand-over-hand locking" type of behaviour - until the
+/// enqueue completes to the new location, the original thread does not let go of
+/// the task and the execution properties of the task. This involves rethinking
+/// some of the enqueue logic and being able to handle races of a new thread
+/// expecting to execute an enqueued task, while the task is still held onto by the
+/// original enqueueing thread.
+///
+/// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
+inline void AsyncTask::flagAsEnqueuedOnExecutor(ExecutorRef newExecutor) {
 
-    auto newStatus = oldStatus.withRunning(false);
-    if (newStatus.isStoredPriorityEscalated()) {
-      newStatus = newStatus.withoutStoredPriorityEscalation();
-      Flags.setPriority(oldStatus.getStoredPriority());
-      concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
-    }
+  SWIFT_TASK_DEBUG_LOG("%p->flagAsEnqueuedOnExecutor()", this);
+  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
+  auto newStatus = oldStatus;
+
+  while (true) {
+    // The task could either be running or suspended when it switches to an
+    // enqueued state but it cannot be enqueued somewhere else
+    assert(!oldStatus.isEnqueued());
+
+    // If the task was running, drop execution lock and any override the thread
+    // might have received as a result of executing it previously. Mark the task
+    // as being enqueued
+    newStatus = oldStatus.withRunning(false);
+    newStatus = newStatus.withoutStoredPriorityEscalation();
+    newStatus = newStatus.withEnqueued();
 
     if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
             /* success */std::memory_order_relaxed,
@@ -595,6 +688,56 @@ inline void AsyncTask::flagAsSuspended() {
       break;
     }
   }
+  newStatus.traceStatusChanged(this);
+
+  if (oldStatus.isRunning()) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    // The thread was previously running the task, now that we aren't, we need
+    // to remove any task escalation on the thread as a result of the task.
+    if (oldStatus.isStoredPriorityEscalated()) {
+      SWIFT_TASK_DEBUG_LOG("[Override] Reset override %#x on thread from task %p",
+        oldStatus.getStoredPriority(), this);
+      swift_dispatch_lock_override_end((qos_class_t) oldStatus.getStoredPriority());
+    }
+#endif
+    swift_task_exitThreadLocalContext((char *)&_private().ExclusivityAccessSet[0]);
+    restoreTaskVoucher(this);
+  }
+
+  // Set up task for enqueue to next location by setting the Job priority field
+  Flags.setPriority(newStatus.getStoredPriority());
+  concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
+
+  swift_task_enqueue(this, newExecutor);
+}
+
+inline void AsyncTask::flagAsSuspended() {
+  SWIFT_TASK_DEBUG_LOG("%p->flagAsSuspended()", this);
+  auto oldStatus = _private().Status.load(std::memory_order_relaxed);
+  auto newStatus = oldStatus;
+  while (true) {
+    // We can only be suspended if we were previously running. See state
+    // transitions listed out in Task.h
+    assert(oldStatus.isRunning() && !oldStatus.isEnqueued());
+
+    newStatus = oldStatus.withRunning(false);
+    newStatus = newStatus.withoutStoredPriorityEscalation();
+
+    if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
+            /* success */std::memory_order_relaxed,
+            /* failure */std::memory_order_relaxed)) {
+      break;
+    }
+  }
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  // Successfully dropped task drain lock, make sure to remove override on
+  // thread due to task
+  if (oldStatus.isStoredPriorityEscalated()) {
+     SWIFT_TASK_DEBUG_LOG("[Override] Reset override %#x on thread from task %p",
+       oldStatus.getStoredPriority(), this);
+     swift_dispatch_lock_override_end((qos_class_t) oldStatus.getStoredPriority());
+  }
+#endif
 
   newStatus.traceStatusChanged(this);
   swift_task_exitThreadLocalContext((char *)&_private().ExclusivityAccessSet[0]);
