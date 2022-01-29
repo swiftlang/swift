@@ -1733,6 +1733,12 @@ namespace {
           }
         }
 
+        // Look through defers.
+        // FIXME: should this be covered automatically by the logic below?
+        if (auto func = dyn_cast<FuncDecl>(dc))
+          if (func->isDeferBody())
+            continue;
+
         if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
           // @Sendable functions are nonisolated.
           if (func->isSendable())
@@ -1784,12 +1790,26 @@ namespace {
       return nullptr;
     }
 
+    static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
+      auto fn = dyn_cast<FuncDecl>(dc);
+      if (!fn) return nullptr;
+      if (fn->isDeferBody())
+        return findAnnotatableFunction(fn->getDeclContext());
+      return fn;
+    }
+
     /// Note when the enclosing context could be put on a global actor.
     void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
       // If we are in a synchronous function on the global actor,
       // suggest annotating with the global actor itself.
-      if (auto fn = dyn_cast<FuncDecl>(dc)) {
-        if (!isa<AccessorDecl>(fn) && !fn->isAsyncContext()) {
+      if (auto fn = findAnnotatableFunction(dc)) {
+        // Suppress this for accesssors because you can't change the
+        // actor isolation of an individual accessor.  Arguably we could
+        // add this to the entire storage declaration, though.
+        // Suppress this for async functions out of caution; but don't
+        // suppress it if we looked through a defer.
+        if (!isa<AccessorDecl>(fn) &&
+            (!fn->isAsyncContext() || fn != dc)) {
           switch (getActorIsolation(fn)) {
           case ActorIsolation::ActorInstance:
           case ActorIsolation::DistributedActorInstance:
@@ -3468,6 +3488,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If this is a local function, inherit the actor isolation from its
   // context if it global or was captured.
   if (auto func = dyn_cast<FuncDecl>(value)) {
+    // If this is a defer body, inherit unconditionally; we don't
+    // care if the enclosing function captures the isolated parameter.
+    if (func->isDeferBody()) {
+      auto enclosingIsolation =
+                        getActorIsolationOfContext(func->getDeclContext());
+      return inferredIsolation(enclosingIsolation);
+    }
+
     if (func->isLocalCapture() && !func->isSendable()) {
       switch (auto enclosingIsolation =
                   getActorIsolationOfContext(func->getDeclContext())) {
