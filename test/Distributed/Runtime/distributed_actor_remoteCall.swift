@@ -112,8 +112,8 @@ struct ActorAddress: Sendable, Hashable, Codable {
 
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
-  typealias InvocationDecoder = FakeInvocation
-  typealias InvocationEncoder = FakeInvocation
+  typealias InvocationDecoder = FakeInvocationDecoder
+  typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
@@ -135,7 +135,7 @@ struct FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 
@@ -167,7 +167,7 @@ struct FakeActorSystem: DistributedActorSystem {
   }
 }
 
-class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
 
   var substitutions: [Any.Type] = []
@@ -175,22 +175,53 @@ class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvoc
   var returnType: Any.Type? = nil
   var errorType: Any.Type? = nil
 
-  func recordGenericSubstitution<T>(_ type: T.Type) throws {
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
     substitutions.append(type)
   }
-  func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
     arguments.append(argument)
   }
-  func recordErrorType<E: Error>(_ type: E.Type) throws {
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
     self.errorType = type
   }
-  func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {
     self.returnType = type
   }
-  func doneRecording() throws {}
+  mutating func doneRecording() throws {}
+
+  // For testing only
+  func makeDecoder() -> FakeInvocationDecoder {
+    return .init(
+      args: arguments,
+      substitutions: substitutions,
+      returnType: returnType,
+      errorType: errorType
+    )
+  }
+}
+
+
+class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
+
+  var arguments: [Any] = []
+  var substitutions: [Any.Type] = []
+  var returnType: Any.Type? = nil
+  var errorType: Any.Type? = nil
+
+  init(
+    args: [Any],
+    substitutions: [Any.Type] = [],
+    returnType: Any.Type? = nil,
+    errorType: Any.Type? = nil
+  ) {
+    self.arguments = args
+    self.substitutions = substitutions
+    self.returnType = returnType
+    self.errorType = errorType
+  }
 
   // === Receiving / decoding -------------------------------------------------
-
   func decodeGenericSubstitutions() throws -> [Any.Type] {
     return substitutions
   }
@@ -260,7 +291,7 @@ func test() async throws {
   let local = Greeter(system: system)
 
   // act as if we decoded an Invocation:
-  let emptyInvocation = FakeInvocation()
+  let emptyInvocation = FakeInvocationDecoder(args: [])
 
   try await system.executeDistributedTarget(
       on: local,
@@ -302,34 +333,37 @@ func test() async throws {
   )
   // CHECK: RETURN: bar
 
-  let echoInvocation = system.makeInvocationEncoder()
+  var echoInvocation = system.makeInvocationEncoder()
   try echoInvocation.recordArgument("Caplin")
   try echoInvocation.recordArgument(42)
   try echoInvocation.doneRecording()
+
+  let echoDecoder = echoInvocation.makeDecoder()
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: echoName,
-      invocationDecoder: echoInvocation,
+      invocationDecoder: echoDecoder,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: Echo: name: Caplin, age: 42
 
-  let generic1Invocation = system.makeInvocationEncoder()
+  var generic1Invocation = system.makeInvocationEncoder()
 
   try generic1Invocation.recordGenericSubstitution(Int.self)
   try generic1Invocation.recordArgument(42)
   try generic1Invocation.doneRecording()
 
+  let generic1Decoder = generic1Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic1Name,
-    invocationDecoder: generic1Invocation,
+    invocationDecoder: generic1Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
   // CHECK-NEXT: RETURN: ()
 
-  let generic2Invocation = system.makeInvocationEncoder()
+  var generic2Invocation = system.makeInvocationEncoder()
 
   try generic2Invocation.recordGenericSubstitution(Int.self)
   try generic2Invocation.recordGenericSubstitution(String.self)
@@ -337,17 +371,18 @@ func test() async throws {
   try generic2Invocation.recordArgument("Ultimate Question!")
   try generic2Invocation.doneRecording()
 
+  let generic2Decoder = generic2Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic2Name,
-    invocationDecoder: generic2Invocation,
+    invocationDecoder: generic2Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
   // CHECK-NEXT: ---> B = Ultimate Question!, type(of:) = String
   // CHECK-NEXT: RETURN: ()
 
-  let generic3Invocation = system.makeInvocationEncoder()
+  var generic3Invocation = system.makeInvocationEncoder()
 
   try generic3Invocation.recordGenericSubstitution(Int.self)
   try generic3Invocation.recordGenericSubstitution(String.self)
@@ -357,10 +392,11 @@ func test() async throws {
   try generic3Invocation.recordArgument(S(data: 42))
   try generic3Invocation.doneRecording()
 
+  let generic3Decoder = generic3Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic3Name,
-    invocationDecoder: generic3Invocation,
+    invocationDecoder: generic3Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
@@ -368,7 +404,7 @@ func test() async throws {
   // CHECK-NEXT: ---> C = S<Int>(data: 42), type(of:) = S<Int>
   // CHECK-NEXT: RETURN: ()
 
-  let generic4Invocation = system.makeInvocationEncoder()
+  var generic4Invocation = system.makeInvocationEncoder()
 
   try generic4Invocation.recordGenericSubstitution(Int.self)
   try generic4Invocation.recordGenericSubstitution(Int.self)
@@ -378,10 +414,11 @@ func test() async throws {
   try generic4Invocation.recordArgument(["a", "b", "c"])
   try generic4Invocation.doneRecording()
 
+  let generic4Decoder = generic4Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic4Name,
-    invocationDecoder: generic4Invocation,
+    invocationDecoder: generic4Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
@@ -389,7 +426,7 @@ func test() async throws {
   // CHECK-NEXT: ---> C = ["a", "b", "c"], type(of:) = Array<String>
   // CHECK-NEXT: RETURN: ()
 
-  let generic5Invocation = system.makeInvocationEncoder()
+  var generic5Invocation = system.makeInvocationEncoder()
 
   try generic5Invocation.recordGenericSubstitution(Int.self)
   try generic5Invocation.recordGenericSubstitution(Int.self)
@@ -401,10 +438,11 @@ func test() async throws {
   try generic5Invocation.recordArgument([0.0, 0xdecafbad])
   try generic5Invocation.doneRecording()
 
+  let generic5Decoder = generic5Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic5Name,
-    invocationDecoder: generic5Invocation,
+    invocationDecoder: generic5Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
@@ -413,30 +451,32 @@ func test() async throws {
   // CHECK-NEXT: ---> D = [0.0, 3737844653.0], type(of:) = Array<Double>
   // CHECK-NEXT: RETURN: ()
 
-  let genericOptInvocation = system.makeInvocationEncoder()
+  var genericOptInvocation = system.makeInvocationEncoder()
 
   try genericOptInvocation.recordGenericSubstitution([Double].self)
   try genericOptInvocation.recordArgument([0.0, 0xdecafbad])
   try genericOptInvocation.doneRecording()
 
+  let genericOptDecoder = genericOptInvocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: genericOptionalName,
-    invocationDecoder: genericOptInvocation,
+    invocationDecoder: genericOptDecoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> T = [0.0, 3737844653.0], type(of:) = Optional<Array<Double>>
   // CHECK-NEXT: RETURN: ()
 
-  let decodeErrInvocation = system.makeInvocationEncoder()
+  var decodeErrInvocation = system.makeInvocationEncoder()
 
   try decodeErrInvocation.recordArgument(42)
   try decodeErrInvocation.doneRecording()
 
+  let decodeErrDecoder = decodeErrInvocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: expectsDecodeErrorName,
-    invocationDecoder: decodeErrInvocation,
+    invocationDecoder: decodeErrDecoder,
     handler: FakeResultHandler()
   )
   // CHECK: ERROR: ExecuteDistributedTargetError(message: "Failed to decode of Int??? (for a test)")
