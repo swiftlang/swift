@@ -5080,10 +5080,6 @@ void ConformanceChecker::resolveValueWitnesses() {
       continue;
     }
 
-    // If this is an accessor for a storage decl, ignore it.
-    if (isa<AccessorDecl>(requirement))
-      continue;
-
     // If this requirement is part of a pair of imported async requirements,
     // where one has already been witnessed, we can skip it.
     //
