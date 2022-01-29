@@ -15,6 +15,9 @@
 // FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
 // UNSUPPORTED: linux
 
+// rdar://87568630 - segmentation fault on 32-bit WatchOS simulator
+// UNSUPPORTED: OS=watchos && CPU=i386
+
 // XFAIL: *
 // FIXME(distributed): generics will come very shortly
 
