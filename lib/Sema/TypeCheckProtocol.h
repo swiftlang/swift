@@ -788,6 +788,10 @@ private:
   ResolveWitnessResult resolveTypeWitnessViaLookup(
                          AssociatedTypeDecl *assocType);
 
+  /// Check whether all of the protocol's generic requirements are satisfied by
+  /// the chosen type witnesses.
+  void ensureRequirementsAreSatisfied();
+
   /// Diagnose or defer a diagnostic, as appropriate.
   ///
   /// \param requirement The requirement with which this diagnostic is
@@ -845,10 +849,6 @@ public:
   /// Resolve the type witness for the given associated type as
   /// directly as possible.
   void resolveSingleTypeWitness(AssociatedTypeDecl *assocType);
-
-  /// Check all of the protocols requirements are actually satisfied by a
-  /// the chosen type witnesses.
-  void ensureRequirementsAreSatisfied();
 
   /// Check the entire protocol conformance, ensuring that all
   /// witnesses are resolved and emitting any diagnostics.
