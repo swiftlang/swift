@@ -2078,6 +2078,81 @@ Parser::parseDocumentationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   return makeParserResult(new (Context) DocumentationAttr(Loc, range, FinalMetadata, Visibility, false));
 }
 
+enum class SingleAttrOptionParseStatus : uint8_t {
+  Success,
+  ExpectedLParen,
+  ExpectedIdentifier,
+  ExpectedRParen
+};
+
+void diagnoseSingleAttrOptionParseStatus(
+      Parser &P, SingleAttrOptionParseStatus status,
+      SourceLoc Loc,  StringRef AttrName,
+      DeclAttrKind DK, Diagnostic nonIdentifierDiagnostic) {
+  bool isDeclModifier = DeclAttribute::isDeclModifier(DK);
+  
+  switch (status) {
+  case SingleAttrOptionParseStatus::Success:
+    break;
+    
+  case SingleAttrOptionParseStatus::ExpectedLParen:
+    P.diagnose(Loc, diag::attr_expected_lparen, AttrName, isDeclModifier);
+    break;
+    
+  case SingleAttrOptionParseStatus::ExpectedIdentifier:
+    P.diagnose(Loc, nonIdentifierDiagnostic);
+    break;
+    
+  case SingleAttrOptionParseStatus::ExpectedRParen:
+    P.diagnose(Loc, diag::attr_expected_rparen, AttrName, isDeclModifier);
+    break;
+  }
+}
+
+/// Parses an attribute argument list that allows a single identifier with a
+/// known set of permitted options:
+///
+/// \verbatim
+///     '(' identifier ')'
+/// \endverbatim
+///
+/// Returns an object of type \c AttrOptionSwitch, a type loosely inspired by
+/// \c llvm::StringSwitch which can be used in a fluent style to map each
+/// permitted identifier to a value. Together, they will automatically
+/// diagnose \c diag::attr_expected_lparen,
+/// \c diag::attr_expected_option_such_as, \c diag::attr_unknown_option, and
+/// \c diag::attr_expected_rparen when needed.
+///
+/// \seealso AttrOptionSwitch
+static SingleAttrOptionParseStatus
+parseSingleAttrOptionImpl(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
+                          DeclAttrKind DK, StringRef &Result) {
+  Result = "";
+  SWIFT_DEFER {
+    AttrRange = SourceRange(Loc, P.PreviousLoc);
+  };
+  
+  if (!P.Tok.is(tok::l_paren))
+    return SingleAttrOptionParseStatus::ExpectedLParen;
+
+  llvm::Optional<SyntaxParsingContext> ModDetailContext;
+  if (DK == DAK_ReferenceOwnership) {
+    ModDetailContext.emplace(P.SyntaxContext, SyntaxKind::DeclModifierDetail);
+  }
+
+  P.consumeToken(tok::l_paren);
+
+  StringRef parsedName = P.Tok.getText();
+  if (!P.consumeIf(tok::identifier))
+    return SingleAttrOptionParseStatus::ExpectedIdentifier;
+  
+  if (!P.consumeIf(tok::r_paren))
+    return SingleAttrOptionParseStatus::ExpectedRParen;
+
+  Result = parsedName;
+  return SingleAttrOptionParseStatus::Success;
+}
+
 /// Processes a parsed option name by attempting to match it to a list of
 /// alternative name/value pairs provided by a chain of \c when() calls, ending
 /// in either \c whenOmitted() if omitting the option is allowed, or
@@ -2085,32 +2160,32 @@ Parser::parseDocumentationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 template<typename T, typename R = T>
 class LLVM_NODISCARD AttrOptionSwitch {
   // Inputs:
-  Optional<StringRef> parsedName;         // None: parse error, empty: omitted
+  StringRef parsedName;                   // empty: omitted or parse error
   Parser &P;
   SourceLoc loc;
-  StringRef attrName;                     // empty: error already diagnosed
-  bool isDeclModifier;
+  StringRef attrName;
+  SingleAttrOptionParseStatus parseStatus;
+  DeclAttrKind attrKind;
 
   // State:
   StringRef exampleName;                  // empty: when() was never called
   Optional<R> result;                     // None: no when() has matched
 
 public:
-  /// \param parsedName The name of the option parsed out of the source code. If
-  ///        \c None, there was some sort of parse error; this will normally be
-  ///        diagnosed as \c diag::attr_expected_option_such_as using the name
-  ///        from the first \c when() call as an example.
+  /// \param parseStatus The status of the option parse (whether it succeeded or expeienced
+  ///        some error). If
+  /// \param parsedName The name of the option parsed out of the source code. If \p parseStatus is
+  ///        an error, this should be empty.
   /// \param P The parser used to diagnose errors concerning this attribute
   ///        option.
   /// \param loc The source location to diagnose errors at.
-  /// \param attrName The name of the attribute, used in diagnostics. If empty,
-  ///        an error has already been diagnosed and the AttrOptionSwitch should
-  ///        just fall through.
-  /// \param isDeclModifier Are we parsing an attribute or a modifier?
-  AttrOptionSwitch(Optional<StringRef> parsedName, Parser &P, SourceLoc loc,
-                   StringRef attrName, bool isDeclModifier)
+  /// \param attrName The name of the attribute, used in diagnostics.
+  /// \param attrKind The kind of the attribute, used in diagnostics.
+  AttrOptionSwitch(SingleAttrOptionParseStatus parseStatus,
+                   StringRef parsedName, Parser &P, SourceLoc loc,
+                   StringRef attrName, DeclAttrKind attrKind)
     :  parsedName(parsedName), P(P), loc(loc), attrName(attrName),
-       isDeclModifier(isDeclModifier) { }
+       parseStatus(parseStatus), attrKind(attrKind) { }
 
   /// If the option has the identifier \p name, give it value \p value.
   AttrOptionSwitch<R, T> &when(StringLiteral name, T value) {
@@ -2119,7 +2194,8 @@ public:
       exampleName = name;
 
     // Does this string match?
-    if (parsedName && *parsedName == name) {
+    if (parseStatus == SingleAttrOptionParseStatus::Success
+        && parsedName == name) {
       assert(!result && "overlapping AttrOptionSwitch::when()s?");
       result = std::move(value);
     }
@@ -2132,22 +2208,16 @@ public:
   Optional<R> diagnoseWhenOmitted() {
     assert(!exampleName.empty() && "No AttrOptionSwitch::when() calls");
 
-    if (attrName.empty())
-      // An error has already been diagnosed; nothing to do.
-      return None;
-
-    if (!result) {
-      if (!parsedName)
-        // We parsed a non-identifier; diagnose it with `exampleName`.
-        P.diagnose(loc, diag::attr_expected_option_such_as, attrName,
-                   exampleName);
-      else if (*parsedName == "")
-        // Option list was omitted; apparently this attr doesn't allow that.
-        P.diagnose(loc, diag::attr_expected_lparen, attrName, isDeclModifier);
-      else
-        // The identifier didn't match any of the when() calls.
-        P.diagnose(loc, diag::attr_unknown_option, *parsedName, attrName);
+    if (parseStatus != SingleAttrOptionParseStatus::Success) {
+      // Any sort of parse error (other than an ExpectedLParen permitted by
+      // whenOmitted().)
+      diagnoseSingleAttrOptionParseStatus(
+          P, parseStatus, loc, attrName, attrKind,
+          { diag::attr_expected_option_such_as, attrName, exampleName });
     }
+    else if (!result)
+      // We parsed an identifier, but it didn't match any of the when() calls.
+      P.diagnose(loc, diag::attr_unknown_option, parsedName, attrName);
 
     return result;
   }
@@ -2157,6 +2227,10 @@ public:
   /// \returns \c None if an error was diagnosed; \p value if the option was
   /// omitted; the value the option was matched to otherwise.
   Optional<R> whenOmitted(T value) {
+    // Treat an ExpectedLParen as successful.
+    if (parseStatus == SingleAttrOptionParseStatus::ExpectedLParen)
+      parseStatus = SingleAttrOptionParseStatus::Success;
+    
     return when("", value).diagnoseWhenOmitted();
   }
 };
@@ -2180,36 +2254,36 @@ template<typename R>
 static AttrOptionSwitch<R>
 parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
                       StringRef AttrName, DeclAttrKind DK) {
-  bool isModifier = DeclAttribute::isDeclModifier(DK);
-  if (!P.Tok.is(tok::l_paren)) {
-    AttrRange = SourceRange(Loc);
-    // Create an AttrOptionSwitch with an empty value. The calls on it will
-    // decide whether or not that's valid.
-    return AttrOptionSwitch<R>(StringRef(), P, Loc, AttrName, isModifier);
+  StringRef parsedName;
+  auto status = parseSingleAttrOptionImpl(P, Loc, AttrRange, DK, parsedName);
+  return AttrOptionSwitch<R>(status, parsedName, P, Loc, AttrName, DK);
+}
+
+static Optional<Identifier>
+parseSingleAttrOptionIdentifier(Parser &P, SourceLoc Loc,
+                                SourceRange &AttrRange, StringRef AttrName,
+                                DeclAttrKind DK, bool allowOmitted = false) {
+  StringRef parsedName;
+  auto status = parseSingleAttrOptionImpl(P, Loc, AttrRange, DK, parsedName);
+  
+  switch (status) {
+  case SingleAttrOptionParseStatus::Success:
+    break;
+    
+  case SingleAttrOptionParseStatus::ExpectedLParen:
+    if (allowOmitted)
+      break;
+    LLVM_FALLTHROUGH;
+    
+  case SingleAttrOptionParseStatus::ExpectedRParen:
+  case SingleAttrOptionParseStatus::ExpectedIdentifier:
+    diagnoseSingleAttrOptionParseStatus(
+        P, status, Loc, AttrName, DK,
+        { diag::attr_expected_option_identifier, AttrName });
+    return None;
   }
 
-  llvm::Optional<SyntaxParsingContext> ModDetailContext;
-  if (DK == DAK_ReferenceOwnership) {
-    ModDetailContext.emplace(P.SyntaxContext, SyntaxKind::DeclModifierDetail);
-  }
-
-  P.consumeToken(tok::l_paren);
-
-  StringRef parsedName = P.Tok.getText();
-  if (!P.consumeIf(tok::identifier)) {
-    // Once we have an example of a valid option, diagnose this with
-    // diag::attr_expected_option_such_as.
-    return AttrOptionSwitch<R>(None, P, Loc, AttrName, isModifier);
-  }
-
-  if (!P.consumeIf(tok::r_paren)) {
-    P.diagnose(Loc, diag::attr_expected_rparen, AttrName, isModifier);
-    // Pass through the switch without diagnosing anything.
-    return AttrOptionSwitch<R>(None, P, Loc, "", isModifier);
-  }
-
-  AttrRange = SourceRange(Loc, P.PreviousLoc);
-  return AttrOptionSwitch<R>(parsedName, P, Loc, AttrName, isModifier);
+  return P.Context.getIdentifier(parsedName);
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -2632,29 +2706,13 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
   
   case DAK_SwiftNativeObjCRuntimeBase: {
-    if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
+    SourceRange range;
+    auto name = parseSingleAttrOptionIdentifier(*this, Loc, range, AttrName,
+                                                DK);
+    if (!name)
       return false;
-    }
 
-    if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::swift_native_objc_runtime_base_must_be_identifier);
-      return false;
-    }
-    
-    Identifier name;
-    consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
-
-    auto range = SourceRange(Loc, Tok.getRange().getStart());
-
-    if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
-    
-    Attributes.add(new (Context) SwiftNativeObjCRuntimeBaseAttr(name,
+    Attributes.add(new (Context) SwiftNativeObjCRuntimeBaseAttr(*name,
                                             AtLoc, range, /*implicit*/ false));
     break;
   }
@@ -2895,30 +2953,13 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
   case DAK_ObjCRuntimeName: {
-    if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
+    SourceRange range;
+    auto name =
+        parseSingleAttrOptionIdentifier(*this, Loc, range, AttrName, DK);
+    if (!name)
       return false;
-    }
 
-    if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::objc_runtime_name_must_be_identifier);
-      return false;
-    }
-
-    auto name = Tok.getText();
-
-    consumeToken(tok::identifier);
-
-    auto range = SourceRange(Loc, Tok.getRange().getStart());
-
-    if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
-
-    Attributes.add(new (Context) ObjCRuntimeNameAttr(name, AtLoc, range,
+    Attributes.add(new (Context) ObjCRuntimeNameAttr(name->str(), AtLoc, range,
                                                      /*implicit*/ false));
     break;
   }
@@ -3063,30 +3104,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_ProjectedValueProperty: {
-    if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
+    SourceRange range;
+    auto name =
+        parseSingleAttrOptionIdentifier(*this, Loc, range, AttrName, DK);
+    if (!name)
       return false;
-    }
-
-    if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::projection_value_property_not_identifier);
-      return false;
-    }
-
-    Identifier name;
-    consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
-
-    auto range = SourceRange(Loc, Tok.getRange().getStart());
-
-    if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
 
     Attributes.add(new (Context) ProjectedValuePropertyAttr(
-        name, AtLoc, range, /*implicit*/ false));
+        *name, AtLoc, range, /*implicit*/ false));
     break;
   }
   case DAK_TypeSequence: {
