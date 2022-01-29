@@ -420,7 +420,8 @@ public:
           return nullptr;
         }
       } else {
-        resolved = RemoteAbsolutePointer("", remoteAddress);
+        resolved =
+            Reader->resolvePointer(RemoteAddress(remoteAddress), remoteAddress);
       }
 
       switch (kind) {
