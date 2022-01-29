@@ -874,10 +874,21 @@ public:
   void emitConstructorPrologActorHop(SILLocation loc,
                                      Optional<ActorIsolation> actorIso);
 
+  /// Set the given global actor as the isolation for this function
+  /// (generally a thunk) and hop to it.
+  void emitPrologGlobalActorHop(SILLocation loc, Type globalActor);
+
   /// Emit the executor for the given actor isolation.
   Optional<SILValue> emitExecutor(SILLocation loc,
                                   ActorIsolation isolation,
                                   Optional<ManagedValue> maybeSelf);
+
+  /// Emit the executor value that corresponds to the generic (concurrent)
+  /// executor.
+  SILValue emitGenericExecutor(SILLocation loc);
+
+  /// Emit the executor value that corresponds to the main actor.
+  SILValue emitMainExecutor(SILLocation loc);
 
   /// Emit a precondition check to ensure that the function is executing in
   /// the expected isolation context.
@@ -1071,6 +1082,16 @@ public:
   /// - The fourth argument is the line number.
   SourceLocArgs
   emitSourceLocationArgs(SourceLoc loc, SILLocation emitLoc);
+
+  /// Emit a 'String' literal for the passed 'text'.
+  ///
+  /// See also: 'emitLiteral' which works with various types of literals,
+  /// however requires an expression to base the creation on.
+  ManagedValue
+  emitStringLiteral(SILLocation loc,
+                    StringRef text,
+                    StringLiteralExpr::Encoding encoding = StringLiteralExpr::Encoding::UTF8,
+                    SGFContext ctx = SGFContext());
 
   /// Emit a call to the library intrinsic _doesOptionalHaveValue.
   ///
@@ -2029,20 +2050,20 @@ public:
   void emitDistributedActorReady(
       SILLocation loc, ConstructorDecl *ctor, ManagedValue actorSelf);
   
-  /// For a distributed actor, emits code to invoke the transport's
+  /// For a distributed actor, emits code to invoke the system's
   /// resignID function.
   ///
   /// Specifically, this code emits SIL that performs the call
   ///
   /// \verbatim
-  ///   self.system.resignID(self.id)
+  ///   self.actorSystem.resignID(self.id)
   /// \endverbatim
   ///
   /// using the current builder's state as the injection point.
   ///
   /// \param actorDecl the declaration corresponding to the actor
   /// \param actorSelf the SIL value representing the distributed actor instance
-  void emitResignIDCall(SILLocation loc,
+  void emitDistributedActorSystemResignIDCall(SILLocation loc,
                               ClassDecl *actorDecl, ManagedValue actorSelf);
   
   /// Emit code that tests whether the distributed actor is local, and if so,

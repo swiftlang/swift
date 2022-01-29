@@ -88,8 +88,34 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
     print("resign address:\(id)")
   }
 
-  @inlinable func makeInvocationEncoder() throws -> InvocationEncoder {
+  @inlinable func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+    Act.ID == ActorID,
+    Err: Error,
+    Res: SerializationRequirement {
+    fatalError("not implemented: \(#function)")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Act.ID == ActorID,
+    Err: Error {
+    fatalError("not implemented: \(#function)")
   }
 }
 
@@ -131,7 +157,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // ==== Execute ----------------------------------------------------------------
 
 func test() {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   // no lifecycle things make sense for a normal actor, double check we didn't emit them
   print("before A")

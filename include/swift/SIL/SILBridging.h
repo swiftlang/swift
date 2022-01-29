@@ -205,6 +205,7 @@ SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function);
 SwiftInt SILFunction_getNumSILArguments(BridgedFunction function);
 BridgedType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt idx);
 BridgedType SILFunction_getSILResultType(BridgedFunction function);
+SwiftInt SILFunction_isSwift51RuntimeAvailable(BridgedFunction function);
 
 BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 BridgedStringRef SILGlobalVariable_debugDescription(BridgedGlobalVar global);

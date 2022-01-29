@@ -2499,6 +2499,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=(
                         -DICU_ROOT:PATH=${ICU_ROOT}
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
+                        -DICU_DATA_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
@@ -2969,6 +2973,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=(
                         -DICU_ROOT:PATH=${ICU_ROOT}
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
+                        -DICU_DATA_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so

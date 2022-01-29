@@ -923,36 +923,8 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   jobResult = wrapCallArgs(jobResult, swiftJobRunFuncDecl, 0);
 
   ModuleDecl * moduleDecl = entryPoint.getModuleContext();
-  // Get main executor
-  FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
-  if (!getMainExecutorFuncDecl) {
-    // If it doesn't exist due to an SDK-compiler mismatch, we can conjure one
-    // up instead of crashing:
-    // @available(SwiftStdlib 5.1, *)
-    // @_silgen_name("swift_task_getMainExecutor")
-    // internal func _getMainExecutor() -> Builtin.Executor
 
-    ParameterList *emptyParams = ParameterList::createEmpty(ctx);
-    getMainExecutorFuncDecl = FuncDecl::createImplicit(
-        ctx, StaticSpellingKind::None,
-        DeclName(
-            ctx,
-            DeclBaseName(ctx.getIdentifier("_getMainExecutor")),
-            /*Arguments*/ emptyParams),
-        {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
-        ctx.TheExecutorType,
-        moduleDecl);
-    getMainExecutorFuncDecl->getAttrs().add(
-        new (ctx)
-            SILGenNameAttr("swift_task_getMainExecutor", /*implicit*/ true));
-  }
-
-  SILFunction *getMainExeutorSILFunc = SGM.getFunction(
-      SILDeclRef(getMainExecutorFuncDecl, SILDeclRef::Kind::Func),
-      NotForDefinition);
-  SILValue getMainExeutorFunc =
-      B.createFunctionRefFor(moduleLoc, getMainExeutorSILFunc);
-  SILValue mainExecutor = B.createApply(moduleLoc, getMainExeutorFunc, {}, {});
+  SILValue mainExecutor = emitMainExecutor(moduleLoc);
   mainExecutor = wrapCallArgs(mainExecutor, swiftJobRunFuncDecl, 1);
 
   // Run first part synchronously

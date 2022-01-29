@@ -22,6 +22,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Expr.h"
@@ -194,7 +195,11 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   if (!importTy)
     return nullptr;
 
-  return Impl.createConstant(name, DC, importTy, parsed->getString(),
+  StringRef text = parsed->getString();
+  if (!unicode::isWellFormedUTF8(text))
+    return nullptr;
+
+  return Impl.createConstant(name, DC, importTy, text,
                              ConstantConvertKind::None, /*static*/ false,
                              ClangN);
 }

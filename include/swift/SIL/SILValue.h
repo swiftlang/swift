@@ -540,6 +540,8 @@ public:
   /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
   ValueOwnershipKind getOwnershipKind() const;
 
+  bool isLexical() const;
+
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
            node->getKind() <= SILNodeKind::Last_ValueBase;

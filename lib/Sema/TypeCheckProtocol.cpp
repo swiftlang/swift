@@ -21,6 +21,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "TypeCheckObjC.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -2908,7 +2909,7 @@ bool ConformanceChecker::checkActorIsolation(
   bool isCrossActor = false;
   bool witnessIsUnsafe = false;
   DiagnosticBehavior behavior = SendableCheckContext(
-      witness->getInnermostDeclContext()).defaultDiagnosticBehavior();
+      Conformance->getDeclContext()).defaultDiagnosticBehavior();
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(
@@ -5082,6 +5083,12 @@ void ConformanceChecker::resolveValueWitnesses() {
       break;
     }
   }
+
+  // Finally, check some ad-hoc protocol requirements
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
+    checkDistributedActorSystemAdHocProtocolRequirements(
+        Context, Proto, Conformance, Adoptee, /*diagnose=*/true);
+  }
 }
 
 ValueDecl *ConformanceChecker::getObjCRequirementSibling(ValueDecl *requirement,
@@ -6112,7 +6119,7 @@ static bool isImpliedByConformancePredatingConcurrency(
     return false;
 
   auto impliedProto = implied->getProtocol();
-  if (impliedProto->predatesConcurrency() ||
+  if (impliedProto->preconcurrency() ||
       impliedProto->isSpecificProtocol(KnownProtocolKind::Error) ||
       impliedProto->isSpecificProtocol(KnownProtocolKind::CodingKey))
     return true;
@@ -6146,7 +6153,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   ProtocolConformance *SendableConformance = nullptr;
   bool sendableConformanceIsUnchecked = false;
-  bool sendableConformancePredatesConcurrency = false;
+  bool sendableConformancePreconcurrency = false;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
     // Check and record normal conformances.
@@ -6180,7 +6187,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         if (normal->isUnchecked())
           sendableConformanceIsUnchecked = true;
         else if (isImpliedByConformancePredatingConcurrency(normal))
-          sendableConformancePredatesConcurrency = true;
+          sendableConformancePreconcurrency = true;
         else if (isa<InheritedProtocolConformance>(conformance))
           sendableConformanceIsUnchecked = true;
       }
@@ -6218,7 +6225,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   // Check constraints of Sendable.
   if (SendableConformance && !sendableConformanceIsUnchecked) {
     SendableCheck check = SendableCheck::Explicit;
-    if (sendableConformancePredatesConcurrency)
+    if (sendableConformancePreconcurrency)
       check = SendableCheck::ImpliedByStandardProtocol;
     else if (SendableConformance->getSourceKind() ==
                  ConformanceEntryKind::Synthesized)

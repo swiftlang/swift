@@ -1986,12 +1986,16 @@ public:
 
       sgm.TopLevelSGF->prepareEpilog(None, true, moduleCleanupLoc);
 
-      // emitAsyncMainThreadStart will handle creating argc argv
-      // for the async case
-      if (!sf->isAsyncContext()) {
+      auto prologueLoc = RegularLocation::getModuleLocation();
+      prologueLoc.markAsPrologue();
+      if (sf->isAsyncContext()) {
+        // emitAsyncMainThreadStart will create argc and argv.
+        // Just set the main actor as the expected executor; we should
+        // already be running on it.
+        sgm.TopLevelSGF->ExpectedExecutor =
+          sgm.TopLevelSGF->emitMainExecutor(prologueLoc);
+      } else {
         // Create the argc and argv arguments.
-        auto prologueLoc = RegularLocation::getModuleLocation();
-        prologueLoc.markAsPrologue();
         auto entry = sgm.TopLevelSGF->B.getInsertionBB();
         auto context = sgm.TopLevelSGF->getTypeExpansionContext();
         auto paramTypeIter = sgm.TopLevelSGF->F.getConventions()

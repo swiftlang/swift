@@ -49,7 +49,7 @@ final class FakeActorSystem: DistributedActorSystem {
   func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor,
       Act.ID == ActorID {
-    ActorAddress(parse: "xxx")
+    ActorAddress(parse: "fake://\(actorType)")
   }
 
   func actorReady<Act>(_ actor: Act)
@@ -60,9 +60,26 @@ final class FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
+
+  func remoteCall<Act, Err, Res>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: InvocationDecoder,
+      throwing: Err.Type,
+      returning: Res.Type
+  ) async throws -> Res
+      where Act: DistributedActor,
+            Act.ID == ActorID,
+            Res: SerializationRequirement {
+    throw FakeDistributedSystemError(message: "mock impl")
+  }
+}
+
+struct FakeDistributedSystemError: DistributedActorSystemError {
+  let message: String
 }
 
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
@@ -86,6 +103,12 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
 
   struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
     typealias SerializationRequirement = Codable
+
+    // FIXME(distributed): should have 'Argument: SerializationRequirement'
+    mutating func decodeNext<Argument>(
+      _ argumentType: Argument.Type,
+      into pointer: UnsafeMutablePointer<Argument>
+    ) throws { }
   }
 }
 

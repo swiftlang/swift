@@ -1007,17 +1007,12 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
 
-    // Write the producer's Swift revision only for resilient modules.
-    if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
-      auto revision = version::getSwiftRevision();
-
-      static const char* forcedDebugRevision =
-        ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
-      if (forcedDebugRevision)
-        revision = forcedDebugRevision;
-
-      Revision.emit(ScratchRecord, revision);
-    }
+    // Write the producer's Swift revision.
+    static const char* forcedDebugRevision =
+      ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
+    auto revision = forcedDebugRevision ?
+      forcedDebugRevision : version::getSwiftRevision();
+    Revision.emit(ScratchRecord, revision);
 
     IsOSSA.emit(ScratchRecord, options.IsOSSA);
 
@@ -3424,7 +3419,8 @@ public:
         S.Out, S.ScratchRecord, abbrCode,
         S.addDeclBaseNameRef(genericParam->getName()),
         genericParam->isImplicit(), genericParam->isTypeSequence(),
-        genericParam->getDepth(), genericParam->getIndex());
+        genericParam->getDepth(), genericParam->getIndex(),
+        genericParam->isOpaqueType());
   }
 
   void visitAssociatedTypeDecl(const AssociatedTypeDecl *assocType) {

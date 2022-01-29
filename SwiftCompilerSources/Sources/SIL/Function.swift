@@ -52,6 +52,13 @@ final public class Function : CustomStringConvertible, HasName {
   public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
   public var resultType: Type { SILFunction_getSILResultType(bridged).type }
 
+  /// True, if the function runs with a swift 5.1 runtime.
+  /// Note that this is function specific, because inlinable functions are de-serialized
+  /// in a client module, which might be compiled with a different deployment target.
+  public var isSwift51RuntimeAvailable: Bool {
+    SILFunction_isSwift51RuntimeAvailable(bridged) != 0
+  }
+
   // Only to be called by PassContext
   public func _modifyEffects(_ body: (inout FunctionEffects) -> ()) {
     body(&effects)

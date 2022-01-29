@@ -54,8 +54,35 @@ struct FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+    Err: Error,
+//          Act.ID == ActorID,
+    Res: SerializationRequirement {
+    fatalError("Not implemented")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Err: Error
+//          Act.ID == ActorID
+  {
+    fatalError("Not implemented")
   }
 }
 
@@ -87,7 +114,7 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test() async throws {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   let local = Capybara(system: system)
   // await local.eat() // SHOULD ERROR

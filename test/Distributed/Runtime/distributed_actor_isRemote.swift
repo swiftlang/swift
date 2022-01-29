@@ -16,14 +16,6 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-extension SomeSpecificDistributedActor {
-
-  @_dynamicReplacement(for: _remote_hello())
-  nonisolated func _remote_impl_hello() async throws -> String {
-    return "remote impl (address: \(self.id))"
-  }
-}
-
 // ==== Fake Transport ---------------------------------------------------------
 
 struct FakeActorID: Sendable, Hashable, Codable {
@@ -70,13 +62,41 @@ struct FakeActorSystem: DistributedActorSystem {
     print("assignID id:\(id)")
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+//          Act.ID == ActorID,
+    Err: Error,
+    Res: SerializationRequirement {
+    return "remote impl (address: \(actor.id)" as! Res
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+//          Act.ID == ActorID,
+    Err: Error {
+    fatalError("not implemented \(#function)")
   }
 }
 
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
+
+  let string: String = "" // FIXME(distributed): cannot deal with trivial types yet
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
@@ -114,7 +134,7 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   let local = SomeSpecificDistributedActor(system: system)
   assert(__isLocalActor(local) == true, "should be local")

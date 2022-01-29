@@ -78,8 +78,35 @@ struct FakeActorSystem: DistributedActorSystem {
     print("assignID id:\(id)")
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+    Err: Error,
+//          Act.ID == ActorID,
+    Res: SerializationRequirement {
+    fatalError("not implemented: \(#function)")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Err: Error
+//          Act.ID == ActorID
+  {
+    fatalError("not implemented: \(#function)")
   }
 }
 
@@ -113,7 +140,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   var remote: SomeSpecificDistributedActor? =
       try! SomeSpecificDistributedActor.resolve(id: address, using: system)

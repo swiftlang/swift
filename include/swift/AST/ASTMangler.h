@@ -70,7 +70,7 @@ protected:
   /// Whether the mangling predates concurrency, and therefore shouldn't
   /// include concurrency features such as global actors or @Sendable
   /// function types.
-  bool PredatesConcurrency = false;
+  bool Preconcurrency = false;
 
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
