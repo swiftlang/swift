@@ -4847,12 +4847,6 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
-
-  if (CheckedRequirementSignature)
-    return;
-
-  CheckedRequirementSignature = true;
-
   auto &diags = proto->getASTContext().Diags;
 
   auto DC = Conformance->getDeclContext();

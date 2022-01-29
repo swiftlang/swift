@@ -716,9 +716,6 @@ private:
   /// Whether we've already complained about problems with this conformance.
   bool AlreadyComplained = false;
 
-  /// Whether we checked the requirement signature already.
-  bool CheckedRequirementSignature = false;
-
   /// Mapping from Objective-C methods to the set of requirements within this
   /// protocol that have the same selector and instance/class designation.
   llvm::SmallDenseMap<ObjCMethodKey, TinyPtrVector<AbstractFunctionDecl *>, 4>
