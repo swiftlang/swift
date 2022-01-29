@@ -110,6 +110,110 @@ bool IsDistributedActorRequest::evaluate(
 
 // ==== ------------------------------------------------------------------------
 
+bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
+    ASTContext &C,
+    ProtocolDecl *Proto,
+    NormalProtocolConformance *Conformance,
+    Type Adoptee,
+    bool diagnose) {
+  auto decl = Adoptee->getAnyNominal();
+
+  // ==== ----------------------------------------------------------------------
+  // Check the ad-hoc requirements of 'DistributedActorSystem":
+  // - remoteCall
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
+    auto remoteCallDecl =
+        C.getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/false);
+    if (!remoteCallDecl && diagnose) {
+      decl->diagnose(
+          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getDescriptiveKind(), decl->getName(), C.Id_remoteCall);
+      decl->diagnose(
+          diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getName(), C.Id_remoteCall,
+          "func remoteCall<Act, Err, Res>(\n"
+          "    on actor: Act,\n"
+          "    target: RemoteCallTarget,\n"
+          "    invocation: inout InvocationEncoder,\n"
+          "    throwing: Err.Type,\n"
+          "    returning: Res.Type\n"
+          ") async throws -> Res\n"
+          "  where Act: DistributedActor,\n"
+          "        Act.ID == ActorID,\n"
+          "        Err: Error,\n"
+          "        Res: SerializationRequirement\n");
+      return true;
+    }
+
+    auto remoteCallVoidDecl =
+        C.getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/true);
+    if (!remoteCallVoidDecl && diagnose) {
+      decl->diagnose(
+          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getDescriptiveKind(), decl->getName(), C.Id_remoteCallVoid);
+      decl->diagnose(
+          diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getName(), C.Id_remoteCallVoid,
+          "func remoteCallVoid<Act, Err>(\n"
+          "    on actor: Act,\n"
+          "    target: RemoteCallTarget,\n"
+          "    invocation: inout InvocationEncoder,\n"
+          "    throwing: Err.Type\n"
+          ") async throws\n"
+          "  where Act: DistributedActor,\n"
+          "        Act.ID == ActorID,\n"
+          "        Err: Error\n");
+      return true;
+    }
+
+    return false;
+  }
+
+  // ==== ----------------------------------------------------------------------
+  // Check the ad-hoc requirements of 'DistributedTargetInvocation'
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder)) {
+    // FIXME(distributed): implement finding this the requirements here
+    auto anyMissingAdHocRequirements = false;
+
+    if (!C.getRecordArgumentOnDistributedInvocationEncoder(decl)) {
+      decl->diagnose(
+          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getDescriptiveKind(), decl->getName(), C.Id_recordArgument);
+      // TODO: add note to add signature
+      anyMissingAdHocRequirements = true;
+    }
+
+    if (!C.getRecordErrorTypeOnDistributedInvocationEncoder(decl)) {
+      decl->diagnose(
+          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getDescriptiveKind(), decl->getName(), C.Id_recordErrorType);
+      // TODO: add note to add signature
+      anyMissingAdHocRequirements = true;
+    }
+
+    if (!C.getRecordReturnTypeOnDistributedInvocationEncoder(decl)) {
+      decl->diagnose(
+          diag::distributed_actor_system_conformance_missing_adhoc_requirement,
+          decl->getDescriptiveKind(), decl->getName(), C.Id_recordReturnType);
+      // TODO: add note to add signature
+      anyMissingAdHocRequirements = true;
+    }
+
+    if (anyMissingAdHocRequirements)
+      return true; // found errors
+  }
+
+  // ==== ----------------------------------------------------------------------
+  // Check the ad-hoc requirements of 'DistributedTargetInvocationArgumentDecoder'
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler)) {
+    // FIXME(distributed): implement finding this the requirements here
+//
+//    return true;
+  }
+
+  return false;
+}
+
 /// Check whether the function is a proper distributed function
 ///
 /// \param diagnose Whether to emit a diagnostic when a problem is encountered.
@@ -179,23 +283,6 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
       }
       return true;
     }
-  }
-
-  // === Check _remote functions
-  auto actorDecl = func->getParent()->getSelfNominalTypeDecl();
-  assert(actorDecl && actorDecl->isDistributedActor());
-
-  // _remote function for a distributed instance method must not be implemented by end-users,
-  // it must be the specific implementation synthesized by the compiler.
-  auto remoteFuncDecl = actorDecl->lookupDirectRemoteFunc(func);
-  if (remoteFuncDecl && !remoteFuncDecl->isSynthesized()) {
-    if (diagnose) {
-      func->diagnose(diag::distributed_actor_remote_func_implemented_manually,
-                     func->getBaseIdentifier(),
-                     // TODO: make general function to get the _remote identifier
-                     C.getIdentifier("_remote_" + func->getBaseIdentifier().str().str()));
-    }
-    return true;
   }
 
   return false;

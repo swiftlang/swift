@@ -264,9 +264,9 @@ struct ASTContext::Implementation {
   FuncDecl *ArrayReserveCapacityDecl = nullptr;
 
   /// func _stdlib_isOSVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word)
-  //    -> Builtin.Int1
+  ///    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
-  
+
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -1024,7 +1024,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     break;
   case KnownProtocolKind::DistributedActor:
   case KnownProtocolKind::DistributedActorSystem:
-  case KnownProtocolKind::ActorIdentity:
+  case KnownProtocolKind::DistributedTargetInvocationEncoder:
+  case KnownProtocolKind::DistributedTargetInvocationDecoder:
+  case KnownProtocolKind::DistributedTargetInvocationResultHandler:
     M = getLoadedModule(Id_Distributed);
     break;
   default:
@@ -1276,6 +1278,134 @@ FuncDecl *ASTContext::getLessThanIntDecl() const {
 }
 FuncDecl *ASTContext::getEqualIntDecl() const {
   return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
+}
+
+AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
+    NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
+  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
+  const NominalTypeDecl *system = actorOrSystem;
+  if (actorOrSystem->isDistributedActor()) {
+    auto var = actorOrSystem->getDistributedActorSystemProperty();
+    system = var->getInterfaceType()->getAnyNominal();
+  }
+
+  if (!system)
+    system = getProtocol(KnownProtocolKind::DistributedActorSystem);
+
+  auto mutableSystem = const_cast<NominalTypeDecl *>(system);
+  return evaluateOrDefault(
+      system->getASTContext().evaluator,
+      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem, /*isVoidReturn=*/isVoidReturn},
+      nullptr);
+}
+
+FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
+    NominalTypeDecl *actorOrSystem) const {
+  NominalTypeDecl *system = actorOrSystem;
+  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
+  if (actorOrSystem->isDistributedActor()) {
+    auto var = actorOrSystem->getDistributedActorSystemProperty();
+    system = var->getInterfaceType()->getAnyNominal();
+  }
+
+  for (auto result : system->lookupDirect(Id_makeInvocationEncoder)) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+    if (fd->getParameters()->size() != 0)
+      continue;
+    if (fd->hasAsync())
+      continue;
+    if (fd->hasThrows())
+      continue;
+    // TODO(distributed): more checks, return type etc
+
+    return fd;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) const {
+  for (auto result : nominal->lookupDirect(Id_recordArgument)) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+    if (fd->getParameters()->size() != 1)
+      continue;
+    if (fd->hasAsync())
+      continue;
+    if (!fd->hasThrows())
+      continue;
+    // TODO(distributed): more checks
+
+    if (fd->getResultInterfaceType()->isVoid())
+      return fd;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) const {
+  for (auto result : nominal->lookupDirect(Id_recordErrorType)) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+    if (fd->getParameters()->size() != 1)
+      continue;
+    if (fd->hasAsync())
+      continue;
+    if (!fd->hasThrows())
+      continue;
+    // TODO(distributed): more checks
+
+    if (fd->getResultInterfaceType()->isVoid())
+      return fd;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getRecordReturnTypeOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) const {
+  for (auto result : nominal->lookupDirect(Id_recordReturnType)) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+    if (fd->getParameters()->size() != 1)
+      continue;
+    if (fd->hasAsync())
+      continue;
+    if (!fd->hasThrows())
+      continue;
+    // TODO(distributed): more checks
+
+    if (fd->getResultInterfaceType()->isVoid())
+      return fd;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) const {
+  for (auto result : nominal->lookupDirect(Id_doneRecording)) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+
+    if (fd->getParameters()->size() != 0)
+      continue;
+
+    if (fd->getResultInterfaceType()->isVoid() &&
+        fd->hasThrows() &&
+        !fd->hasAsync())
+      return fd;
+  }
+
+  return nullptr;
 }
 
 FuncDecl *ASTContext::getHashValueForDecl() const {

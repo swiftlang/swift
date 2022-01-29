@@ -1958,11 +1958,11 @@ NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
 REMARK(add_predates_concurrency_import,none,
-     "add '@_predatesConcurrency' to %select{suppress|treat}0 "
+     "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
 REMARK(remove_predates_concurrency_import,none,
-     "'@_predatesConcurrency' attribute on module %0 is unused", (Identifier))
+     "'@preconcurrency' attribute on module %0 is unused", (Identifier))
 WARNING(public_decl_needs_sendable,none,
         "public %0 %1 does not specify whether it is 'Sendable' or not",
         (DescriptiveDeclKind, DeclName))
@@ -4460,6 +4460,12 @@ ERROR(distributed_actor_protocol_illegal_inheritance,none,
       (DeclName))
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
+ERROR(distributed_actor_system_conformance_missing_adhoc_requirement,none,
+      "%0 %1 is missing witness for protocol requirement %2"
+      "", (DescriptiveDeclKind, DeclName, DeclName))
+NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
+      "protocol %0 requires function %1 with signature:\n%2",
+     (DeclName, DeclName, StringRef))
 
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
@@ -4765,7 +4771,9 @@ ERROR(global_actor_non_unsafe_init,none,
       "global actor attribute %0 argument can only be '(unsafe)'", (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
-      
+ERROR(global_actor_top_level_var,none,
+      "top-level code variables cannot have a global actor", ())
+
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
       (DescriptiveDeclKind, DeclName, StringRef, StringRef))

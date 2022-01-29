@@ -38,8 +38,9 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-std::string toolchains::WebAssembly::sanitizerRuntimeLibName(StringRef Sanitizer,
-                                                         bool shared) const {
+std::string
+toolchains::WebAssembly::sanitizerRuntimeLibName(StringRef Sanitizer,
+                                                 bool shared) const {
   return (Twine("clang_rt.") + Sanitizer + "-" +
           this->getTriple().getArchName() + ".lib")
       .str();
@@ -66,7 +67,7 @@ ToolChain::InvocationInfo toolchains::WebAssembly::constructInvocation(
 
 ToolChain::InvocationInfo
 toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
-                                         const JobContext &context) const {
+                                             const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
 
@@ -97,7 +98,6 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
   }
   if (!Linker.empty())
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
-
 
   const char *Clang = "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
@@ -216,8 +216,7 @@ void validateLinkerArguments(DiagnosticEngine &diags,
                              ArgStringList linkerArgs) {
   for (auto arg : linkerArgs) {
     if (StringRef(arg).startswith("--global-base=")) {
-      diags.diagnose(SourceLoc(), diag::error_conflicting_options, arg,
-                     "wasm32 target");
+      diags.diagnose(SourceLoc(), diag::error_wasm_doesnt_support_global_base);
     }
   }
 }
@@ -231,8 +230,8 @@ void toolchains::WebAssembly::validateArguments(DiagnosticEngine &diags,
 
 ToolChain::InvocationInfo
 toolchains::WebAssembly::constructInvocation(const StaticLinkJobAction &job,
-                                         const JobContext &context) const {
-   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+                                             const JobContext &context) const {
+  assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
 
   ArgStringList Arguments;

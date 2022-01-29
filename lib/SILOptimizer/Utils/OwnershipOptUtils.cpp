@@ -300,6 +300,12 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
                                                 SILValue newValue) {
   auto newOwnershipKind = newValue.getOwnershipKind();
 
+  // If the either value is lexical, replacing its uses may result in
+  // shortening or lengthening its lifetime in ways that don't respect lexical
+  // scope and deinit barriers.
+  if (oldValue->isLexical() || newValue->isLexical())
+    return false;
+
   // If our new kind is ValueOwnershipKind::None, then we are fine. We
   // trivially support that. This check also ensures that we can always
   // replace any value with a ValueOwnershipKind::None value.

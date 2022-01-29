@@ -107,7 +107,7 @@ public protocol DistributedActorSystem: Sendable {
   /// arguments, generic substitutions, and specific error and return types
   /// that are associated with this specific invocation.
   @inlinable
-  func makeInvocationEncoder() throws -> InvocationEncoder
+  func makeInvocationEncoder() -> InvocationEncoder
 
   /// Invoked by the Swift runtime when making a remote call.
   ///
@@ -122,13 +122,15 @@ public protocol DistributedActorSystem: Sendable {
 //  func remoteCall<Act, Err, Res>(
 //      on actor: Act,
 //      target: RemoteCallTarget,
-//      invocation: inout InvocationDecoder,
+//      invocation: inout InvocationEncoder,
 //      throwing: Err.Type,
 //      returning: Res.Type
 //  ) async throws -> Res
 //      where Act: DistributedActor,
 //            Act.ID == ActorID,
+//            Err: Error,
 //            Res: SerializationRequirement
+
 }
 
 // ==== ----------------------------------------------------------------------------------------------------------------
@@ -155,7 +157,7 @@ extension DistributedActorSystem {
     invocationDecoder: inout InvocationDecoder,
     handler: ResultHandler
   ) async throws where Act: DistributedActor,
-                       Act.ID == ActorID,
+                       // Act.ID == ActorID, // FIXME(distributed): can we bring this back?
                        ResultHandler: DistributedTargetInvocationResultHandler {
     // NOTE: this implementation is not the most efficient, nor final, version of this func
     // we end up demangling the name multiple times, perform more heap allocations than
@@ -288,6 +290,7 @@ extension DistributedActorSystem {
 
     do {
       // Decode the invocation and pack arguments into the h-buffer
+
       // TODO(distributed): decode the generics info
       // TODO(distributed): move this into the IRGen synthesized funcs, so we don't need hargs at all and can specialize the decodeNextArgument calls
       do {
@@ -355,15 +358,20 @@ func _executeDistributedTarget(
 /// A distributed 'target' can be a `distributed func` or `distributed` computed property.
 @available(SwiftStdlib 5.6, *)
 public struct RemoteCallTarget {
-  let mangledName: String
+  let _mangledName: String // TODO: StaticString would be better here; no arc, codesize of cleanups
 
   // Only intended to be created by the _Distributed library.
+  // TODO(distributed): make this internal and only allow calling by the synthesized code?
   public init(_mangledName: String) {
-    self.mangledName = _mangledName
+    self._mangledName = _mangledName
+  }
+
+  public var mangledName: String {
+    _mangledName
   }
 
   // <module>.Base.hello(hi:)
-  var fullName: String {
+  public var fullName: String {
     fatalError("NOT IMPLEMENTED YET: \(#function)")
   }
 }
@@ -410,8 +418,10 @@ public protocol DistributedTargetInvocationEncoder {
 //  ///
 //  /// Record an argument of `Argument` type in this arguments storage.
 //  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
+  // TODO: offer recordArgument(label:type:)
 
-  mutating func recordErrorType<E: Error>(_ type: E.Type) throws
+//  /// Ad-hoc requirement
+//  mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
 //  /// Ad-hoc requirement
 //  ///
@@ -444,6 +454,7 @@ public protocol DistributedTargetInvocationDecoder {
 //  mutating func decodeNextArgument<Argument: SerializationRequirement>(
 //      into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
 //  ) throws
+
   // FIXME(distributed): remove this since it must have the ': SerializationRequirement'
   mutating func decodeNextArgument<Argument>(
     _ argumentType: Argument.Type,
@@ -499,7 +510,7 @@ public struct DistributedActorCodingError: DistributedActorSystemError {
   }
 
   public static func missingActorSystemUserInfo<Act>(_ actorType: Act.Type) -> Self
-    where Act: DistributedActor {
+      where Act: DistributedActor {
     .init(message: "Missing DistributedActorSystem userInfo while decoding")
   }
 }

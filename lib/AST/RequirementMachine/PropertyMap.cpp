@@ -345,7 +345,9 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
   SmallVector<std::vector<Property>, 4> properties;
 
   for (const auto &rule : System.getRules()) {
-    if (rule.isSimplified())
+    if (rule.isLHSSimplified() ||
+        rule.isRHSSimplified() ||
+        rule.isSubstitutionSimplified())
       continue;
 
     // Identity conformances ([P].[P] => [P]) are permanent rules, but we

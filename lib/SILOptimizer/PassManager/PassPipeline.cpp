@@ -157,6 +157,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // SSA based diagnostics.
   P.addPredictableMemoryAccessOptimizations();
 
+  // Now that we have promoted simple loads for SSA based diagnostics, perform
+  // SSA based move function checking and no implicit copy checking.
+  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
+                                         //   value.
+  P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
+
   // This phase performs optimizations necessary for correct interoperation of
   // Swift os log APIs with C os_log ABIs.
   // Pass dependencies: this pass depends on MandatoryInlining and Mandatory
@@ -172,11 +178,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Now that we have emitted constant propagation diagnostics, try to eliminate
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
-
-  // Now perform move semantic checking.
-  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
-                                         //   value.
-  P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
 
   // Now that we have finished performing diagnostics that rely on lexical
   // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.

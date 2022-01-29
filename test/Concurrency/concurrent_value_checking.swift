@@ -137,7 +137,7 @@ func testConcurrency() {
   }
 }
 
-@_predatesConcurrency func acceptUnsafeSendable(_ fn: @Sendable () -> Void) { }
+@preconcurrency func acceptUnsafeSendable(_ fn: @Sendable () -> Void) { }
 
 func testUnsafeSendableNothing() {
   var x = 5

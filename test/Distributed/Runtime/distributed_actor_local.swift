@@ -65,9 +65,36 @@ struct FakeActorSystem: DistributedActorSystem {
 
   func resignID(_ id: ActorID) {}
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+//          Act.ID == ActorID,
+    Err: Error,
+    Res: SerializationRequirement {
+    return "remoteCall: \(target.mangledName)" as! Res
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+//          Act.ID == ActorID,
+    Err: Error {
+    fatalError("not implemented \(#function)")
+  }
+
 }
 
 struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
@@ -100,14 +127,14 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test_initializers() {
   let address = ActorAddress(parse: "")
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   _ = SomeSpecificDistributedActor(system: system)
   _ = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
 }
 
 func test_address() {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   let actor = SomeSpecificDistributedActor(system: system)
   _ = actor.id

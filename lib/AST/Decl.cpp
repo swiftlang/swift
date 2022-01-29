@@ -725,17 +725,23 @@ Optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
                            None);
 }
 
-bool Decl::predatesConcurrency() const {
-  if (getAttrs().hasAttribute<PredatesConcurrencyAttr>())
+bool Decl::preconcurrency() const {
+  if (getAttrs().hasAttribute<PreconcurrencyAttr>())
     return true;
 
   // Imported C declarations always predate concurrency.
   if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
     return true;
 
+  // Variables declared in top-level code are @_predatesConcurrency
+  if (const VarDecl *var = dyn_cast<VarDecl>(this)) {
+    const LangOptions &langOpts = getASTContext().LangOpts;
+    return !langOpts.isSwiftVersionAtLeast(6) &&
+           langOpts.EnableExperimentalAsyncTopLevel && var->isTopLevelGlobal();
+  }
+
   return false;
 }
-
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
@@ -4102,16 +4108,21 @@ AbstractTypeParamDecl::getConformingProtocols() const {
   return { };
 }
 
-GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
-                                           SourceLoc nameLoc,
-                                           bool isTypeSequence, unsigned depth,
-                                           unsigned index)
-    : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
+GenericTypeParamDecl::GenericTypeParamDecl(
+    DeclContext *dc, Identifier name, SourceLoc nameLoc,
+    bool isTypeSequence, unsigned depth, unsigned index,
+    bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr
+  ) : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
   Bits.GenericTypeParamDecl.Index = index;
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
   Bits.GenericTypeParamDecl.TypeSequence = isTypeSequence;
+  Bits.GenericTypeParamDecl.IsOpaqueType = isOpaqueType;
+  assert(isOpaqueType || !opaqueTypeRepr);
+  if (isOpaqueType)
+    *getTrailingObjects<OpaqueReturnTypeRepr *>() = opaqueTypeRepr;
+
   auto &ctx = dc->getASTContext();
   RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
   if (this->isTypeSequence())
@@ -4119,6 +4130,21 @@ GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this, props);
   setInterfaceType(MetatypeType::get(type, ctx));
 }
+
+GenericTypeParamDecl *
+GenericTypeParamDecl::create(
+    DeclContext *dc, Identifier name, SourceLoc nameLoc,
+    bool isTypeSequence, unsigned depth, unsigned index,
+    bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr) {
+  ASTContext &ctx = dc->getASTContext();
+  auto mem = ctx.Allocate(
+      totalSizeToAlloc<OpaqueReturnTypeRepr *>(isOpaqueType ? 1 : 0),
+      alignof(GenericTypeParamDecl));
+  return new (mem) GenericTypeParamDecl(
+      dc, name, nameLoc, isTypeSequence, depth, index, isOpaqueType,
+      opaqueTypeRepr);
+}
+
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
   SourceLoc endLoc = getNameLoc();
@@ -7402,23 +7428,107 @@ bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
 }
 
-bool AbstractFunctionDecl::isDistributed() const {
-  return this->getAttrs().hasAttribute<DistributedActorAttr>();
+bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn) const {
+  auto &C = this->getASTContext();
+
+  auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
+
+  // Check the name
+  if (getBaseName() != callId)
+    return false;
+
+  auto params = getParameters();
+  unsigned int expectedParamNum = isVoidReturn ? 4 : 5;
+
+  // Check the expected argument count:
+  if (!params || params->size() != expectedParamNum)
+    return false;
+
+  // Check API names of the arguments
+  auto actorParam = params->get(0);
+  auto targetParam = params->get(1);
+  auto invocationParam = params->get(2);
+  auto thrownTypeParam = params->get(3);
+  if (actorParam->getArgumentName() != C.Id_on ||
+      targetParam->getArgumentName() != C.Id_target ||
+      invocationParam->getArgumentName() != C.Id_invocation ||
+      thrownTypeParam->getArgumentName() != C.Id_throwing)
+    return false;
+
+  if (!isVoidReturn) {
+    auto returnedTypeParam = params->get(4);
+    if (returnedTypeParam->getArgumentName() != C.Id_returning)
+      return false;
+  }
+
+  if (!isGeneric())
+    return false;
+
+  auto genericParams = getGenericParams();
+  unsigned int expectedGenericParamNum = isVoidReturn ? 2 : 3;
+
+  // We expect: Act, Err, Res?
+  if (genericParams->size() != expectedGenericParamNum) {
+    return false;
+  }
+
+  // FIXME(distributed): check the exact generic requirements
+
+  // === check the return type
+  if (isVoidReturn) {
+    if (auto func = dyn_cast<FuncDecl>(this))
+      if (!func->getResultInterfaceType()->isVoid())
+        return false;
+  }
+
+  // FIXME(distributed): check the right types of the args and generics...
+  // FIXME(distributed): check access level actually is ok, i.e. not private etc
+
+  return true;
 }
 
-AbstractFunctionDecl*
-AbstractFunctionDecl::getDistributedActorRemoteFuncDecl() const {
-  if (!this->isDistributed())
+bool AbstractFunctionDecl::isDistributed() const {
+  return getAttrs().hasAttribute<DistributedActorAttr>();
+}
+
+ConstructorDecl*
+NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
+  auto &C = this->getASTContext();
+
+  // FIXME(distributed): implement more properly... do with caching etc
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  for (auto value : mutableThis->getMembers()) {
+    auto ctor = dyn_cast<ConstructorDecl>(value);
+    if (!ctor)
+      continue;
+
+    auto params = ctor->getParameters();
+    if (params->size() != 1)
+      return nullptr;
+
+    if (params->get(0)->getArgumentName() == C.getIdentifier("_mangledName"))
+      return ctor;
+
+    return nullptr;
+  }
+
+  // TODO(distributed): make a Request for it?
+  return nullptr;
+}
+
+VarDecl*
+NominalTypeDecl::getDistributedActorSystemProperty() const {
+  if (!this->isDistributedActor())
     return nullptr;
 
-  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(
       getASTContext().evaluator,
-      GetDistributedRemoteFuncRequest{mutableThis},
+      GetDistributedActorSystemPropertyRequest{mutableThis},
       nullptr);
 }
 
-ValueDecl*
+VarDecl*
 NominalTypeDecl::getDistributedActorIDProperty() const {
   if (!this->isDistributedActor())
     return nullptr;
@@ -7857,7 +7967,7 @@ GenericTypeParamDecl *OpaqueTypeDecl::getExplicitGenericParam(
   return genericParamType->getDecl();
 }
 
-unsigned OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
+Optional<unsigned> OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
     OpaqueReturnTypeRepr *repr) const {
   assert(NamingDeclAndHasOpaqueReturnTypeRepr.getInt() &&
          "can't do opaque param lookup without underlying interface repr");
@@ -7865,7 +7975,7 @@ unsigned OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
   auto found = std::find(opaqueReprs.begin(), opaqueReprs.end(), repr);
   if (found != opaqueReprs.end())
     return found - opaqueReprs.begin();
-  return -1;
+  return None;
 }
 
 Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
@@ -8832,6 +8942,14 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       assert(actorClass && "Bad closure actor isolation?");
       return ActorIsolation::forActorInstance(actorClass);
     }
+    }
+  }
+
+  if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
+    ASTContext &ctx = dc->getASTContext();
+    if (ctx.LangOpts.EnableExperimentalAsyncTopLevel) {
+      if (Type mainActor = ctx.getMainActorType())
+        return ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/false);
     }
   }
 

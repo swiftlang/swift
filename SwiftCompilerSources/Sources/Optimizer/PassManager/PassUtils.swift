@@ -22,10 +22,6 @@ struct PassContext {
 
   let _bridged: BridgedPassContext
 
-  var isSwift51RuntimeAvailable: Bool {
-    PassContext_isSwift51RuntimeAvailable(_bridged) != 0
-  }
-
   var aliasAnalysis: AliasAnalysis {
     let bridgedAA = PassContext_getAliasAnalysis(_bridged)
     return AliasAnalysis(bridged: bridgedAA)

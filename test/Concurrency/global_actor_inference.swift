@@ -516,7 +516,7 @@ func acceptClosure<T>(_: () -> T) { }
 // ----------------------------------------------------------------------
 // Main actor that predates concurrency
 // ----------------------------------------------------------------------
-@_predatesConcurrency func takesUnsafeMainActor(fn: @MainActor () -> Void) { }
+@preconcurrency func takesUnsafeMainActor(fn: @MainActor () -> Void) { }
 
 @MainActor func onlyOnMainActor() { }
 

@@ -226,8 +226,10 @@ class Builder(object):
         if self.version:
             cmake_args += ["-DSWIFT_LIBPARSER_VER:STRING=" + self.version]
         cmake_args += [
-            "-DLLVM_ENABLE_PROJECTS=clang;swift",
+            "-DLLVM_ENABLE_PROJECTS=clang",
             "-DLLVM_EXTERNAL_PROJECTS=swift",
+            '-DLLVM_EXTERNAL_SWIFT_SOURCE_DIR=' + 
+            os.path.join(SWIFT_SOURCE_ROOT, 'swift'),
         ]
         cmake_args += [
             "-DSWIFT_BUILD_ONLY_SYNTAXPARSERLIB=TRUE",
