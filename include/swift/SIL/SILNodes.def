@@ -475,7 +475,12 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // effects relative to other OSSA values like copy_value.
   SINGLE_VALUE_INST(MoveValueInst, move_value, SingleValueInstruction, None,
                     DoesNotRelease)
-  
+  // A canary value inserted by a SIL generating frontend to signal to the move
+  // checker to check a specific value.  Valid only in Raw SIL. The relevant
+  // checkers should remove the mark_must_check instruction after successfully
+  // running the relevant diagnostic.
+  SINGLE_VALUE_INST(MarkMustCheckInst, mark_must_check,
+                    SingleValueInstruction, None, DoesNotRelease)
   // A move_addr is a Raw SIL only instruction that is equivalent to a copy_addr
   // [init]. It is lowered during the diagnostic passes to a copy_addr [init] if
   // the move checker found uses that prevented us from converting this to a

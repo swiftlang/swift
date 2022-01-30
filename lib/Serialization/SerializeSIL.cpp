@@ -1430,6 +1430,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::MarkMustCheckInst:
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::ReleaseValueAddrInst:
@@ -1490,6 +1491,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
       Attr = unsigned(MVI->getAllowDiagnostics()) |
              (unsigned(MVI->isLexical() << 1));
+    } else if (auto *I = dyn_cast<MarkMustCheckInst>(&SI)) {
+      Attr = unsigned(I->getCheckKind());
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;

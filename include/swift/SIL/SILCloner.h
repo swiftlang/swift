@@ -1791,6 +1791,15 @@ void SILCloner<ImplClass>::visitMoveValueInst(MoveValueInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitMarkMustCheckInst(MarkMustCheckInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto *MVI = getBuilder().createMarkMustCheckInst(
+      getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+      Inst->getCheckKind());
+  recordClonedInstruction(Inst, MVI);
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(

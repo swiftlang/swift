@@ -22,6 +22,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -284,7 +285,8 @@ struct ArgumentInitHelper {
         SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
         if (isNoImplicitCopy) {
           value = SGF.B.emitCopyValueOperation(loc, value);
-          value = SGF.B.createMoveValue(loc, value);
+          value = SGF.B.createMarkMustCheckInst(
+              loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
           SGF.enterDestroyCleanup(value);
         }
       }

@@ -6,6 +6,10 @@ public class Klass {
     var k: Klass? = nil
 }
 
+public final class FinalKlass {
+    var k: Klass? = nil
+}
+
 var boolValue: Bool { return true }
 
 public func classUseMoveOnlyWithoutEscaping(_ x: Klass) {
@@ -118,6 +122,122 @@ public func classAccessField(_ x: Klass) {
         print(x2.k!)
     }
 }
+
+/////////////////
+// Final Class //
+/////////////////
+
+public func finalClassUseMoveOnlyWithoutEscaping(_ x: FinalKlass) {
+}
+public func finalClassConsume(_ x: __owned FinalKlass) {
+}
+
+public func finalClassSimpleChainTest(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    let y2 = x2
+    let k2 = y2
+    finalClassUseMoveOnlyWithoutEscaping(k2)
+}
+
+public func finalClassSimpleNonConsumingUseTest(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+}
+
+public func finalClassMultipleNonConsumingUseTest(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+    print(x2)
+}
+
+public func finalClassUseAfterConsume(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+    finalClassConsume(x2) // expected-note {{consuming use}}
+    print(x2) // expected-note {{consuming use}}
+}
+
+public func finalClassDoubleConsume(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x  // expected-error {{'x2' consumed more than once}}
+    finalClassConsume(x2) // expected-note {{consuming use}}
+    finalClassConsume(x2) // expected-note {{consuming use}}
+}
+
+public func finalClassLoopConsume(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+        finalClassConsume(x2) // expected-note {{consuming use}}
+    }
+}
+
+public func finalClassDiamond(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    if boolValue {
+        finalClassConsume(x2)
+    } else {
+        finalClassConsume(x2)
+    }
+}
+
+public func finalClassDiamondInLoop(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+      if boolValue {
+          finalClassConsume(x2) // expected-note {{consuming use}}
+      } else {
+          finalClassConsume(x2) // expected-note {{consuming use}}
+      }
+    }
+}
+
+public func finalClassAssignToVar1(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    x3 = x2 // expected-note {{consuming use}}
+    x3 = x
+    print(x3)
+}
+
+public func finalClassAssignToVar2(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    x3 = x2 // expected-note {{consuming use}}
+    finalClassUseMoveOnlyWithoutEscaping(x3)
+}
+
+public func finalClassAssignToVar3(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    var x3 = x2
+    x3 = x
+    print(x3)
+}
+
+public func finalClassAssignToVar4(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x3 = x2 // expected-note {{consuming use}}
+    print(x2) // expected-note {{consuming use}}
+    print(x3)
+}
+
+public func finalClassAssignToVar5(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    // TODO: Need to mark this as the lifetime extending use. We fail
+    // appropriately though.
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+    x3 = x
+    print(x3)
+}
+
+public func finalClassAccessField(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    print(x2.k!)
+    for _ in 0..<1024 {
+        print(x2.k!)
+    }
+}
+
 
 //////////////////////
 // Aggregate Struct //
