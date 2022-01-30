@@ -36,6 +36,15 @@ bool verifyDependencies(SourceManager &SM, ArrayRef<SourceFile *> SFs);
 // MARK: - DiagnosticVerifier
 struct ExpectedFixIt;
 
+/// A range expressed in terms of line-and-column pairs.
+struct LineColumnRange {
+  static constexpr unsigned NoValue = ~0u;
+
+  unsigned StartCol, EndCol;
+
+  LineColumnRange() : StartCol(NoValue), EndCol(NoValue) {}
+};
+
 struct CapturedDiagnosticInfo {
   llvm::SmallString<128> Message;
   llvm::SmallString<32> FileName;

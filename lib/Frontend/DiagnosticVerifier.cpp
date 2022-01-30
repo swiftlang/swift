@@ -29,8 +29,8 @@ using namespace swift;
 namespace swift {
 struct ExpectedFixIt {
   const char *StartLoc, *EndLoc; // The loc of the {{ and }}'s.
-  unsigned StartCol;
-  unsigned EndCol;
+  LineColumnRange Range;
+
   std::string Text;
 };
 } // end namespace swift
@@ -247,9 +247,10 @@ bool DiagnosticVerifier::checkForFixIt(const ExpectedFixIt &Expected,
       continue;
 
     CharSourceRange Range = ActualFixIt.getRange();
-    if (SM.getColumnInBuffer(Range.getStart(), BufferID) != Expected.StartCol)
+    if (SM.getColumnInBuffer(Range.getStart(), BufferID) !=
+        Expected.Range.StartCol)
       continue;
-    if (SM.getColumnInBuffer(Range.getEnd(), BufferID) != Expected.EndCol)
+    if (SM.getColumnInBuffer(Range.getEnd(), BufferID) != Expected.Range.EndCol)
       continue;
 
     return true;
@@ -544,12 +545,12 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       ExpectedFixIt FixIt;
       FixIt.StartLoc = OpenLoc;
       FixIt.EndLoc = CloseLoc;
-      if (StartColStr.getAsInteger(10, FixIt.StartCol)) {
+      if (StartColStr.getAsInteger(10, FixIt.Range.StartCol)) {
         addError(StartColStr.data(),
                  "invalid column number in fix-it verification");
         continue;
       }
-      if (EndColStr.getAsInteger(10, FixIt.EndCol)) {
+      if (EndColStr.getAsInteger(10, FixIt.Range.EndCol)) {
         addError(EndColStr.data(),
                  "invalid column number in fix-it verification");
         continue;
