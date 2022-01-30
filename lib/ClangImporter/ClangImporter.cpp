@@ -3275,11 +3275,6 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
   if (auto lookupTable = owner.findLookupTable(clangModule)) {
     // Search it.
     owner.lookupValue(*lookupTable, name, *consumer);
-    if (getASTContext().LangOpts.EnableExperimentalClangImporterDiagnostics) {
-      if (results.empty()) {
-        owner.diagnoseValue(*lookupTable, name);
-      }
-    }
   }
 }
 
@@ -4127,7 +4122,7 @@ void ClangImporter::Implementation::lookupVisibleDecls(
     DeclBaseName name = baseName.toDeclBaseName(SwiftContext);
     if (!lookupValue(table, name, consumer) &&
         SwiftContext.LangOpts.EnableExperimentalEagerClangModuleDiagnostics) {
-      diagnoseValue(table, name);
+      diagnoseTopLevelValue(name);
     }
   }
 }
@@ -4183,30 +4178,42 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
-void ClangImporter::Implementation::diagnoseValue(SwiftLookupTable &table,
-                                                  DeclName name) {
-  auto &clangCtx = getClangASTContext();
-  auto clangTU = clangCtx.getTranslationUnitDecl();
-
-  if (name.isOperator()) {
-    for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
-      diagnoseTargetDirectly(entry);
+void ClangImporter::Implementation::diagnoseTopLevelValue(
+    const DeclName &name) {
+  forEachLookupTable([&](SwiftLookupTable &table) -> bool {
+    for (const auto &entry :
+         table.lookup(name.getBaseName(),
+                      EffectiveClangContext(
+                          getClangASTContext().getTranslationUnitDecl()))) {
+      diagnoseTargetDirectly(importDiagnosticTargetFromLookupTableEntry(entry));
     }
-  }
+    return false;
+  });
+}
 
-  for (auto entry : table.lookup(name.getBaseName(), clangTU)) {
-    diagnoseTargetDirectly(importDiagnosticTargetFromLookupTableEntry(entry));
-  }
+void ClangImporter::Implementation::diagnoseMemberValue(
+    const DeclName &name, const clang::DeclContext *container) {
+  forEachLookupTable([&](SwiftLookupTable &table) -> bool {
+    for (const auto &entry :
+         table.lookup(name.getBaseName(), EffectiveClangContext(container))) {
+      if (clang::NamedDecl *nd = entry.get<clang::NamedDecl *>()) {
+        // We are only interested in members of a particular context,
+        // skip other contexts.
+        if (nd->getDeclContext() != container)
+          continue;
+
+        diagnoseTargetDirectly(
+            importDiagnosticTargetFromLookupTableEntry(entry));
+      }
+      // If the entry is not a NamedDecl, it is a form of macro, which cannot be
+      // a member value.
+    }
+    return false;
+  });
 }
 
 void ClangImporter::Implementation::diagnoseTargetDirectly(
     ImportDiagnosticTarget target) {
-  if (!(SwiftContext.LangOpts.EnableExperimentalClangImporterDiagnostics ||
-        SwiftContext.LangOpts.EnableExperimentalEagerClangModuleDiagnostics) ||
-      DiagnosedValues.count(target))
-    return;
-
-  DiagnosedValues.insert(target);
   if (const clang::Decl *decl = target.dyn_cast<const clang::Decl *>()) {
     Walker.TraverseDecl(const_cast<clang::Decl *>(decl));
   } else if (const clang::MacroInfo *macro =
@@ -4363,8 +4370,6 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         recordDecl->getClangDecl()) {
       if (auto import = ctx.getClangModuleLoader()->importDeclDirectly(named))
         result.push_back(cast<ValueDecl>(import));
-      else if (ctx.LangOpts.EnableExperimentalClangImporterDiagnostics)
-        ctx.getClangModuleLoader()->diagnoseDeclDirectly(named);
     }
   }
 
@@ -4495,22 +4500,6 @@ ClangImporter::Implementation::loadNamedMembers(
   }
 
   return Members;
-}
-
-void ClangImporter::Implementation::diagnoseMissingNamedMember(
-    const IterableDeclContext *IDC, DeclName name) {
-  Optional<clang::Module *> containingModule =
-      getClangSubmoduleForDecl(IDC->getDecl()->getClangDecl());
-  assert(containingModule &&
-         "Members should never be loaded from a forward-declared decl");
-  auto allResults = evaluateOrDefault(
-      SwiftContext.evaluator,
-      ClangDirectLookupRequest({const_cast<Decl *>(IDC->getDecl()),
-                                IDC->getDecl()->getClangDecl(), name}),
-      {});
-  for (auto entry : allResults) {
-    diagnoseTargetDirectly(importDiagnosticTargetFromLookupTableEntry(entry));
-  }
 }
 
 EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
@@ -4747,6 +4736,23 @@ Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
   return Impl.importDecl(decl, Impl.CurrentVersion);
 }
 
-void ClangImporter::diagnoseDeclDirectly(const clang::NamedDecl *decl) {
-  Impl.diagnoseTargetDirectly(decl);
+void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
+  Impl.diagnoseTopLevelValue(name);
+}
+
+void ClangImporter::diagnoseMemberValue(const DeclName &name,
+                                        const Type &baseType) {
+  if (!baseType->getAnyNominal())
+    return;
+
+  SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
+  namelookup::extractDirectlyReferencedNominalTypes(baseType,
+                                                    nominalTypesToLookInto);
+  for (auto containerDecl : nominalTypesToLookInto) {
+    const clang::Decl *clangContainerDecl = containerDecl->getClangDecl();
+    if (clangContainerDecl && isa<clang::DeclContext>(clangContainerDecl)) {
+      Impl.diagnoseMemberValue(name,
+                               cast<clang::DeclContext>(clangContainerDecl));
+    }
+  }
 }

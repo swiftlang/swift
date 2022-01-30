@@ -1475,16 +1475,6 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   // Look for a declaration with this name.
   auto known = Table.find(name);
   if (known == Table.end()) {
-    // Diagnose the missing member if:
-    // - The flag enabling ClangImporter diagnostics is passed.
-    // - The containing decl is a ClangDecl.
-    // - The containing decl (and DeclContext) is lazy.
-    if (ctx.LangOpts.EnableExperimentalClangImporterDiagnostics &&
-        ctx.isLazyContext(decl) && decl->getDecl()->getClangDecl()) {
-      auto ci =
-          ctx.getOrCreateLazyIterableContextData(decl, /*lazyLoader=*/nullptr);
-      ci->loader->diagnoseMissingNamedMember(decl, name);
-    }
     return TinyPtrVector<ValueDecl *>();
   }
 
@@ -1601,8 +1591,8 @@ void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
 
 /// Inspect the given type to determine which nominal type declarations it
 /// directly references, to facilitate name lookup into those types.
-static void extractDirectlyReferencedNominalTypes(
-              Type type, SmallVectorImpl<NominalTypeDecl *> &decls) {
+void namelookup::extractDirectlyReferencedNominalTypes(
+    Type type, SmallVectorImpl<NominalTypeDecl *> &decls) {
   if (auto nominal = type->getAnyNominal()) {
     decls.push_back(nominal);
     return;
@@ -1674,7 +1664,8 @@ bool DeclContext::lookupQualified(Type type,
 
   // Figure out which nominal types we will look into.
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
-  extractDirectlyReferencedNominalTypes(type, nominalTypesToLookInto);
+  namelookup::extractDirectlyReferencedNominalTypes(type,
+                                                    nominalTypesToLookInto);
 
   return lookupQualified(nominalTypesToLookInto, member, options, decls);
 }

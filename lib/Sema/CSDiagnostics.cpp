@@ -3626,6 +3626,11 @@ bool MissingMemberFailure::diagnoseAsError() {
     emitDiagnostic(diagnostic, baseType, getName())
         .highlight(getSourceRange())
         .highlight(nameLoc.getSourceRange());
+    const auto &ctx = getSolution().getDC()->getASTContext();
+    if (ctx.LangOpts.EnableExperimentalClangImporterDiagnostics) {
+      ctx.getClangModuleLoader()->diagnoseMemberValue(getName().getFullName(),
+                                                      baseType);
+    }
   };
 
   TypoCorrectionResults corrections(getName(), nameLoc);
