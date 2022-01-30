@@ -970,8 +970,9 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
     for (auto &fixIt : capturedDiag.FixIts) {
       auto newStart = correctSM.getLocForForeignLoc(fixIt.getRange().getStart(),
                                                     SM);
-      fixIt.getRange() = CharSourceRange(newStart,
-                                         fixIt.getRange().getByteLength());
+      auto &mutableRange = fixIt.getRange();
+      mutableRange =
+          CharSourceRange(newStart, fixIt.getRange().getByteLength());
     }
   }
 }
