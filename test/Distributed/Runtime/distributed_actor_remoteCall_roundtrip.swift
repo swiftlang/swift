@@ -57,8 +57,8 @@ func test() async throws {
   // CHECK: > encode return type: String
   // CHECK: > done recording
   // CHECK: >> remoteCall
-  // CHECK: > decode argument: Caplin
   // CHECK: > decode return type: String
+  // CHECK: > decode argument: Caplin
   // CHECK: << onReturn: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
 
   print("got: \(reply)")
