@@ -1,22 +1,14 @@
-// RUN: %target-run-simple-swiftgyb(-Xfrontend -enable-experimental-forward-mode-differentiation)
+// RUN: %target-run-simple-swiftgyb(-Xfrontend -enable-experimental-forward-mode-differentiation -Xfrontend -enable-cross-import-overlays)
 // REQUIRES: executable_test
 
-// TODO(philipturner) Once SwiftCompiler/Sources/ExperimentalRegex isn't broken, 
-//   try removing the explicit overlay imports and pass `-Xfrontend 
-//   -enable-cross-import-overlays` to this test's "RUN"
-
 #if canImport(Darwin)
-  import Darwin
-  import _Darwin_Differentiation
+  import Darwin.C.tgmath
 #elseif canImport(Glibc)
   import Glibc
-  import _Glibc_Differentiation
 #elseif os(WASI)
   import WASILibc
-  import _WASILibc_Differentiation
 #elseif os(Windows)
   import CRT
-  import _CRT_Differentiation
 #else
 #error("Unsupported platform")
 #endif
