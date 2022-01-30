@@ -66,7 +66,9 @@ public protocol DifferentiableCollectionViewProtocol: DifferentiableCollection {
   init(_ base: Base)
 }
 
-public struct DifferentiableCollectionView<Base: DifferentiableCollection>: DifferentiableCollectionViewProtocol {
+public struct DifferentiableCollectionView<Base: DifferentiableCollection>: 
+  DifferentiableCollectionViewProtocol 
+{
   public typealias ElementTangentCollection = Base.ElementTangentCollection
   
   @usableFromInline // IDK if @usableFromInline is a good idea
