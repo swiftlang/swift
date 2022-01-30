@@ -180,9 +180,10 @@ extension ${Self} {
     _ lhs: inout ${Self},
     _ rhs: ${Self}
   ) -> (value: Void, pullback: (inout ${Self}) -> ${Self}) {
-    defer { lhs *= rhs }
-    return ((), { [lhs = lhs] v in
-      let drhs = lhs * v
+    let oldLhs = lhs
+    lhs *= rhs
+    return ((), { v in
+      let drhs = oldLhs * v
       v *= rhs
       return drhs
     })
@@ -227,9 +228,10 @@ extension ${Self} {
     _ lhs: inout ${Self}, 
     _ rhs: ${Self}
   ) -> (value: Void, pullback: (inout ${Self}) -> ${Self}) {
-    defer { lhs /= rhs }
-    return ((), { [lhs = lhs] v in
-      let drhs = -lhs / (rhs * rhs) * v
+    let oldLhs = lhs
+    lhs /= rhs
+    return ((), { v in
+      let drhs = -oldLhs / (rhs * rhs) * v
       v /= rhs
       return drhs
     })
@@ -268,8 +270,26 @@ where
   }
 
   @inlinable
+  @derivative(of: addingProduct)
+  func _jvpAddingProduct(
+    _ lhs: Self, 
+    _ rhs: Self
+  ) -> (value: Self, differential: (Self, Self, Self) -> (Self)) {
+    return (addingProduct(lhs, rhs), { (dSelf, dlhs, drhs) in 
+      dlhs * rhs + drhs * lhs + dSelf 
+    })
+  }
+
+  @inlinable
   @derivative(of: squareRoot)
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
+    let y = squareRoot()
+    return (y, { v in v / (2 * y) })
+  }
+
+  @inlinable
+  @derivative(of: squareRoot)
+  func _jvpSquareRoot() -> (value: Self, differential: (Self) -> Self) {
     let y = squareRoot()
     return (y, { v in v / (2 * y) })
   }
@@ -287,6 +307,18 @@ where
   }
 
   @inlinable
+  @derivative(of: minimum)
+  static func _jvpMinimum(
+    _ x: Self, 
+    _ y: Self
+  ) -> (
+    value: Self, differential: (TangentVector, TangentVector) -> (TangentVector)
+  ) {
+    if x <= y || y.isNaN { return (x, { (dx, _) in dx }) }
+    return (y, { (_, dy) in dy })
+  }
+
+  @inlinable
   @derivative(of: maximum)
   static func _vjpMaximum(
     _ x: Self, 
@@ -296,5 +328,17 @@ where
   ) {
     if x > y || y.isNaN { return (x, { v in (v, .zero) }) }
     return (y, { v in (.zero, v) })
+  }
+
+  @inlinable
+  @derivative(of: maximum)
+  static func _jvpMaximum(
+    _ x: Self, 
+    _ y: Self
+  ) -> (
+    value: Self, differential: (TangentVector, TangentVector) -> (TangentVector)
+  ) {
+    if x > y || y.isNaN { return (x, { (dx, _) in dx }) }
+    return (y, { (_, dy) in dy })
   }
 }
