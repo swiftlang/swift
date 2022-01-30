@@ -21,6 +21,9 @@
 // XFAIL: *
 // FIXME(distributed): generics will come very shortly
 
+// rdar://88228867 - remoteCall_* tests have been disabled due to random failures
+// REQUIRES: rdar88228867
+
 import _Distributed
 
 distributed actor Greeter {

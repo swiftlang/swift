@@ -19,6 +19,9 @@
 // FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
 // UNSUPPORTED: linux
 
+// rdar://88228867 - remoteCall_* tests have been disabled due to random failures
+// REQUIRES: rdar88228867
+
 import _Distributed
 import FakeDistributedActorSystems
 
