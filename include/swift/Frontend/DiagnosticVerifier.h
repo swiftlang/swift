@@ -101,11 +101,11 @@ private:
   Result verifyFile(unsigned BufferID);
 
   bool checkForFixIt(const ExpectedFixIt &Expected,
-                     const CapturedDiagnosticInfo &D, StringRef buffer);
+                     const CapturedDiagnosticInfo &D, unsigned BufferID) const;
 
   // Render the verifier syntax for a given set of fix-its.
   std::string renderFixits(ArrayRef<DiagnosticInfo::FixIt> fixits,
-                           StringRef InputFile);
+                           unsigned BufferID) const;
 
   void printRemainingDiagnostics() const;
 };

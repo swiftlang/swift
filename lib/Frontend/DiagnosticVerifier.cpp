@@ -237,34 +237,19 @@ verifyUnknown(SourceManager &SM,
 }
 } // end anonymous namespace
 
-static unsigned getColumnNumber(StringRef buffer, llvm::SMLoc loc) {
-  assert(loc.getPointer() >= buffer.data());
-  assert((size_t)(loc.getPointer() - buffer.data()) <= buffer.size());
-
-  StringRef UpToLoc = buffer.slice(0, loc.getPointer() - buffer.data());
-
-  size_t ColumnNo = UpToLoc.size();
-  size_t NewlinePos = UpToLoc.find_last_of("\r\n");
-  if (NewlinePos != StringRef::npos)
-    ColumnNo -= NewlinePos;
-
-  return static_cast<unsigned>(ColumnNo);
-}
-
 /// Return true if the given \p ExpectedFixIt is in the fix-its emitted by
 /// diagnostic \p D.
 bool DiagnosticVerifier::checkForFixIt(const ExpectedFixIt &Expected,
                                        const CapturedDiagnosticInfo &D,
-                                       StringRef buffer) {
+                                       unsigned BufferID) const {
   for (auto &ActualFixIt : D.FixIts) {
     if (ActualFixIt.getText() != Expected.Text)
       continue;
 
     CharSourceRange Range = ActualFixIt.getRange();
-    if (getColumnNumber(buffer, getRawLoc(Range.getStart())) !=
-        Expected.StartCol)
+    if (SM.getColumnInBuffer(Range.getStart(), BufferID) != Expected.StartCol)
       continue;
-    if (getColumnNumber(buffer, getRawLoc(Range.getEnd())) != Expected.EndCol)
+    if (SM.getColumnInBuffer(Range.getEnd(), BufferID) != Expected.EndCol)
       continue;
 
     return true;
@@ -275,7 +260,7 @@ bool DiagnosticVerifier::checkForFixIt(const ExpectedFixIt &Expected,
 
 std::string
 DiagnosticVerifier::renderFixits(ArrayRef<DiagnosticInfo::FixIt> fixits,
-                                 StringRef InputFile) {
+                                 unsigned BufferID) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
   interleave(fixits,
@@ -283,9 +268,9 @@ DiagnosticVerifier::renderFixits(ArrayRef<DiagnosticInfo::FixIt> fixits,
                CharSourceRange Range = ActualFixIt.getRange();
 
                OS << "{{"
-                  << getColumnNumber(InputFile, getRawLoc(Range.getStart()))
+                  << SM.getColumnInBuffer(Range.getStart(), BufferID)
                   << '-'
-                  << getColumnNumber(InputFile, getRawLoc(Range.getEnd()))
+                  << SM.getColumnInBuffer(Range.getEnd(), BufferID)
                   << '=';
 
                for (auto C : ActualFixIt.getText()) {
@@ -627,7 +612,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     // Verify that any expected fix-its are present in the diagnostic.
     for (auto fixit : expected.Fixits) {
       // If we found it, we're ok.
-      if (!checkForFixIt(fixit, FoundDiagnostic, InputFile)) {
+      if (!checkForFixIt(fixit, FoundDiagnostic, BufferID)) {
         missedFixitLoc = fixit.StartLoc;
         break;
       }
@@ -644,7 +629,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     auto makeActualFixitsPhrase =
         [&](ArrayRef<DiagnosticInfo::FixIt> actualFixits)
         -> ActualFixitsPhrase {
-      std::string actualFixitsStr = renderFixits(actualFixits, InputFile);
+      std::string actualFixitsStr = renderFixits(actualFixits, BufferID);
 
       return ActualFixitsPhrase{(Twine("actual fix-it") +
                                  (actualFixits.size() >= 2 ? "s" : "") +
