@@ -2,7 +2,7 @@ import _Differentiation
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   @_exported import Darwin.C.tgmath
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   @_exported import Glibc
 #elseif os (WASI)
   @_exported import WASILibc
