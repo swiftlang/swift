@@ -31,6 +31,16 @@ import Swift
 %  constraint = 'where T == T.TangentVector' if T == 'T' else ''
 @inlinable
 @derivative(of: fma)
+func _vjpFma${generic_signature} (
+  _ x: ${T},
+  _ y: ${T},
+  _ z: ${T}
+) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T}, ${T})) ${constraint} {
+  return (fma(x, y, z), { v in (v * y, v * x, v) })
+}
+
+@inlinable
+@derivative(of: fma)
 func _jvpFma${generic_signature} (
   _ x: ${T},
   _ y: ${T},
@@ -40,13 +50,12 @@ func _jvpFma${generic_signature} (
 }
 
 @inlinable
-@derivative(of: fma)
-func _vjpFma${generic_signature} (
+@derivative(of: remainder)
+func _vjpRemainder${generic_signature} (
   _ x: ${T},
-  _ y: ${T},
-  _ z: ${T}
-) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T}, ${T})) ${constraint} {
-  return (fma(x, y, z), { v in (v * y, v * x, v) })
+  _ y: ${T}
+) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T})) ${constraint} {
+  return (remainder(x, y), { v in (v, -v * ((x / y).rounded(.toNearestOrEven))) })
 }
 
 @inlinable
@@ -62,12 +71,12 @@ func _jvpRemainder${generic_signature} (
 }
 
 @inlinable
-@derivative(of: remainder)
-func _vjpRemainder${generic_signature} (
+@derivative(of: fmod)
+func _vjpFmod${generic_signature} (
   _ x: ${T},
   _ y: ${T}
 ) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T})) ${constraint} {
-  return (remainder(x, y), { v in (v, -v * ((x / y).rounded(.toNearestOrEven))) })
+  return (fmod(x, y), { v in (v, -v * ((x / y).rounded(.towardZero))) })
 }
 
 @inlinable
@@ -80,15 +89,6 @@ func _jvpFmod${generic_signature} (
     Unimplemented JVP for 'fmod(_:)'. \
     https://bugs.swift.org/browse/TF-1108 tracks this issue
     """)
-}
-
-@inlinable
-@derivative(of: fmod)
-func _vjpFmod${generic_signature} (
-  _ x: ${T},
-  _ y: ${T}
-) -> (value: ${T}, pullback: (${T}) -> (${T}, ${T})) ${constraint} {
-  return (fmod(x, y), { v in (v, -v * ((x / y).rounded(.towardZero))) })
 }
 
 %  for derivative_kind in ['vjp', 'jvp']:
