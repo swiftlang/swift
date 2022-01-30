@@ -13,6 +13,7 @@
 #include "SILParserFunctionBuilder.h"
 #include "SILParserState.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -3318,6 +3319,34 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     auto *MVI = B.createMoveValue(InstLoc, Val, isLexical);
     MVI->setAllowsDiagnostics(allowsDiagnostics);
+    ResultVal = MVI;
+    break;
+  }
+
+  case SILInstructionKind::MarkMustCheckInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    StringRef AttrName;
+    if (!parseSILOptional(AttrName, *this)) {
+      auto diag = diag::sil_markmustcheck_requires_attribute;
+      P.diagnose(InstLoc.getSourceLoc(), diag);
+      return true;
+    }
+
+    using CheckKind = MarkMustCheckInst::CheckKind;
+    CheckKind CKind = llvm::StringSwitch<CheckKind>(AttrName)
+                          .Case("no_implicit_copy", CheckKind::NoImplicitCopy)
+                          .Default(CheckKind::Invalid);
+
+    if (CKind == CheckKind::Invalid) {
+      auto diag = diag::sil_markmustcheck_invalid_attribute;
+      P.diagnose(InstLoc.getSourceLoc(), diag, AttrName);
+      return true;
+    }
+    auto *MVI = B.createMarkMustCheckInst(InstLoc, Val, CKind);
     ResultVal = MVI;
     break;
   }

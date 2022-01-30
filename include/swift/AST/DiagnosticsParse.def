@@ -653,6 +653,10 @@ ERROR(sil_keypath_no_use_of_operand_in_pattern,none,
       (unsigned))
 ERROR(sil_movevalue_invalid_optional_attribute,none,
       "Optional attribute '[%0]' can not be applied to move_value", (StringRef))
+ERROR(sil_markmustcheck_invalid_attribute,none,
+      "Attribute '[%0]' can not be applied to mark_value_as_moveonly", (StringRef))
+ERROR(sil_markmustcheck_requires_attribute,none,
+      "mark_must_check requires an attribute like 'noImplicitCopy'", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,

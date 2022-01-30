@@ -1901,6 +1901,18 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitMarkMustCheckInst(MarkMustCheckInst *I) {
+    using CheckKind = MarkMustCheckInst::CheckKind;
+    switch (I->getCheckKind()) {
+    case CheckKind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case CheckKind::NoImplicitCopy:
+      *this << "[no_implicit_copy] ";
+      break;
+    }
+    *this << getIDAndType(I->getOperand());
+  }
+
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   void visitStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     *this << getIDAndType(I->getOperand());                                    \

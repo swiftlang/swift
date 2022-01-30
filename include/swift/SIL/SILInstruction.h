@@ -7501,6 +7501,38 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
+/// This is a marker instruction that has no effect that is consumed by a
+/// diagnostic based semantic checker. Example: no implicit copy. Only legal in
+/// Raw SIL so that we can guarantee canonical SIL has had all SSA based
+/// checking by the checkers that rely upon this instruction.
+class MarkMustCheckInst
+    : public UnaryInstructionBase<SILInstructionKind::MarkMustCheckInst,
+                                  SingleValueInstruction>,
+      public OwnershipForwardingMixin {
+  friend class SILBuilder;
+
+public:
+  enum class CheckKind : unsigned {
+    Invalid = 0,
+    NoImplicitCopy,
+  };
+
+private:
+  CheckKind kind;
+
+  MarkMustCheckInst(SILDebugLocation DebugLoc, SILValue operand,
+                    CheckKind checkKind)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
+        OwnershipForwardingMixin(SILInstructionKind::MarkMustCheckInst,
+                                 operand->getOwnershipKind()),
+        kind(checkKind) {}
+
+public:
+  CheckKind getCheckKind() const { return kind; }
+
+  bool isNoImplicitCopy() const { return kind == CheckKind::NoImplicitCopy; }
+};
+
 /// Given an object reference, return true iff it is non-nil and refers
 /// to a native swift object with strong reference count of 1.
 class IsUniqueInst
@@ -9683,7 +9715,8 @@ inline bool OwnershipForwardingMixin::isa(SILInstructionKind kind) {
          OwnershipForwardingTermInst::classof(kind) ||
          OwnershipForwardingConversionInst::classof(kind) ||
          OwnershipForwardingSelectEnumInstBase::classof(kind) ||
-         OwnershipForwardingMultipleValueInstruction::classof(kind);
+         OwnershipForwardingMultipleValueInstruction::classof(kind) ||
+         kind == SILInstructionKind::MarkMustCheckInst;
 }
 
 inline OwnershipForwardingMixin *
@@ -9704,6 +9737,8 @@ OwnershipForwardingMixin::get(SILInstruction *inst) {
     return result;
   if (auto *result =
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(inst))
+    return result;
+  if (auto *result = dyn_cast<MarkMustCheckInst>(inst))
     return result;
   return nullptr;
 }
