@@ -589,3 +589,174 @@ public func klassNoImplicitCopyArgumentError(@_noImplicitCopy _ x: Klass) -> Kla
     print(y)
     return x // expected-note {{consuming use}}
 }
+
+/////////////////////
+// Enum Test Cases //
+/////////////////////
+
+public enum EnumTy {
+    case klass(Klass)
+    case int(Int)
+
+    func doSomething() -> Bool { true }
+}
+
+public func enumUseMoveOnlyWithoutEscaping(_ x: EnumTy) {
+}
+public func enumConsume(_ x: __owned EnumTy) {
+}
+
+public func enumSimpleChainTest(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    let y2 = x2
+    let k2 = y2
+    enumUseMoveOnlyWithoutEscaping(k2)
+}
+
+public func enumSimpleNonConsumingUseTest(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    enumUseMoveOnlyWithoutEscaping(x2)
+}
+
+public func enumMultipleNonConsumingUseTest(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    enumUseMoveOnlyWithoutEscaping(x2)
+    enumUseMoveOnlyWithoutEscaping(x2)
+    print(x2)
+}
+
+public func enumUseAfterConsume(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    enumUseMoveOnlyWithoutEscaping(x2)
+    enumConsume(x2) // expected-note {{consuming use}}
+    print(x2) // expected-note {{consuming use}}
+}
+
+public func enumDoubleConsume(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x  // expected-error {{'x2' consumed more than once}}
+    enumConsume(x2) // expected-note {{consuming use}}
+    enumConsume(x2) // expected-note {{consuming use}}
+}
+
+public func enumLoopConsume(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+        enumConsume(x2) // expected-note {{consuming use}}
+    }
+}
+
+public func enumDiamond(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    if boolValue {
+        enumConsume(x2)
+    } else {
+        enumConsume(x2)
+    }
+}
+
+public func enumDiamondInLoop(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+      if boolValue {
+          enumConsume(x2) // expected-note {{consuming use}}
+      } else {
+          enumConsume(x2) // expected-note {{consuming use}}
+      }
+    }
+}
+
+public func enumAssignToVar1(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    x3 = x2 // expected-note {{consuming use}}
+    x3 = x
+    print(x3)
+}
+
+public func enumAssignToVar2(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    x3 = x2 // expected-note {{consuming use}}
+    enumUseMoveOnlyWithoutEscaping(x3)
+}
+
+public func enumAssignToVar3(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    var x3 = x2
+    x3 = x
+    print(x3)
+}
+
+public func enumAssignToVar4(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x3 = x2 // expected-note {{consuming use}}
+    print(x2) // expected-note {{consuming use}}
+    print(x3)
+}
+
+public func enumAssignToVar5(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    // TODO: Need to mark this as the lifetime extending use. We fail
+    // appropriately though.
+    enumUseMoveOnlyWithoutEscaping(x2)
+    x3 = x
+    print(x3)
+}
+
+public func enumPatternMatchIfLet1(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    if case let .klass(x) = x2 { // expected-note {{consuming use}}
+        classUseMoveOnlyWithoutEscaping(x)
+    }
+    if case let .klass(x) = x2 { // expected-note {{consuming use}}
+        classUseMoveOnlyWithoutEscaping(x)
+    }
+}
+
+public func enumPatternMatchIfLet2(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+        if case let .klass(x) = x2 {  // expected-note {{consuming use}}
+            classUseMoveOnlyWithoutEscaping(x)
+        }
+    }
+}
+
+// This is wrong.
+public func enumPatternMatchSwitch1(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    switch x2 {
+    case let .klass(k):  // expected-note {{consuming use}}
+        classUseMoveOnlyWithoutEscaping(k)
+        // TODO: This should be flagged as a consuming use!
+        enumUseMoveOnlyWithoutEscaping(x2)
+    case .int:
+        break
+    }
+}
+
+// This is wrong.
+public func enumPatternMatchSwitch2(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    switch x2 {
+    case let .klass(k): // expected-note {{consuming use}}
+        classUseMoveOnlyWithoutEscaping(k)
+    case .int:
+        break
+    }
+}
+
+// This is wrong today. We should error on x2.
+public func enumPatternMatchSwitch2WhereClause(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    switch x2 {
+    case let .klass(k) // expected-note {{consuming use}}
+           where x2.doSomething():
+        classUseMoveOnlyWithoutEscaping(k)
+    case .int:
+        break
+    case .klass:
+        break
+    }
+}
