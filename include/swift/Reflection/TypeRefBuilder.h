@@ -241,8 +241,7 @@ struct FieldTypeInfo {
 struct ProtocolConformanceInfo {
   std::string typeName;
   std::string protocolName;
-  // TODO:
-  // std::string mangledTypeName;
+  std::string mangledTypeName;
 };
 
 /// An implementation of MetadataReader's BuilderType concept for
@@ -833,7 +832,7 @@ private:
                 dyn_cast<ExternalModuleContextDescriptor<PointerSize>>(
                     parentContextDescriptor)) {
           auto moduleDescriptorName = readModuleNameFromModuleDescriptor(
-                                                                         moduleDescriptor, parentTargetAddress);
+              moduleDescriptor, parentTargetAddress);
           if (!moduleDescriptorName.hasValue())
             return llvm::None;
           else
@@ -841,8 +840,8 @@ private:
         } else if (auto typeDescriptor =
                        dyn_cast<ExternalTypeContextDescriptor<PointerSize>>(
                            parentContextDescriptor)) {
-          auto typeDescriptorName = readTypeNameFromTypeDescriptor(typeDescriptor,
-                                                               parentTargetAddress);
+          auto typeDescriptorName = readTypeNameFromTypeDescriptor(
+              typeDescriptor, parentTargetAddress);
           if (!typeDescriptorName.hasValue())
             return llvm::None;
           else
@@ -1020,10 +1019,10 @@ private:
 
       auto optionalTypeName = readTypeNameFromTypeDescriptor(
           typeDescriptor, contextTypeDescriptorAddress);
-            if (!optionalTypeName.hasValue())
-              return llvm::None;
-            else
-      typeName = optionalTypeName.getValue();
+      if (!optionalTypeName.hasValue())
+        return llvm::None;
+      else
+        typeName = optionalTypeName.getValue();
 
       // Prepend the parent context name
       auto optionalParentName =
@@ -1111,7 +1110,9 @@ private:
 
     /// Given the address of a conformance descriptor, attempt to read it.
     llvm::Optional<ProtocolConformanceInfo>
-    readConformanceDescriptor(RemoteRef<void> conformanceRecordRef) {
+    readConformanceDescriptor(RemoteRef<void> conformanceRecordRef,
+                              const std::unordered_map<std::string, std::string>
+                                  &typeNameToManglingMap) {
       const ExternalProtocolConformanceRecord<PointerSize> *CD =
           (const ExternalProtocolConformanceRecord<PointerSize> *)
               conformanceRecordRef.getLocalBuffer();
@@ -1142,19 +1143,45 @@ private:
       if (!optionalConformanceProtocol.hasValue())
         return llvm::None;
 
+      std::string mangledTypeName;
+      auto it =
+          typeNameToManglingMap.find(optionalConformingTypeName.getValue());
+      if (it != typeNameToManglingMap.end()) {
+        mangledTypeName = it->second;
+      } else {
+        mangledTypeName = "";
+      }
+
       return ProtocolConformanceInfo{optionalConformingTypeName.getValue(),
-                                     optionalConformanceProtocol.getValue()};
+                                     optionalConformanceProtocol.getValue(),
+                                     mangledTypeName};
     }
   };
 
 public:
   template <unsigned PointerSize>
   void dumpConformanceSection(std::ostream &stream) {
+    // The Fields section has gathered info on types that includes their mangled
+    // names. Use that to build a dictionary from a type's demangled name to its
+    // mangeled name
+    std::unordered_map<std::string, std::string> typeNameToManglingMap;
+    for (const auto &section : ReflectionInfos) {
+      for (auto descriptor : section.Field) {
+        auto TypeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
+        auto OptionalMangledTypeName = normalizeReflectionName(TypeRef);
+        auto TypeName = nodeToString(demangleTypeRef(TypeRef));
+        clearNodeFactory();
+        if (OptionalMangledTypeName.hasValue()) {
+          typeNameToManglingMap[TypeName] =
+              "$s" + OptionalMangledTypeName.getValue();
+        }
+      }
+    }
+
     // Collect all conformances and aggregate them per-conforming-type.
     std::unordered_map<std::string, std::vector<std::string>> typeConformances;
     ProtocolConformanceDescriptorReader<PointerSize> conformanceReader(
         OpaqueByteReader, OpaqueStringReader, OpaquePointerReader);
-
     for (const auto &section : ReflectionInfos) {
       auto ConformanceBegin = section.Conformance.startAddress();
       auto ConformanceEnd = section.Conformance.endAddress();
@@ -1162,19 +1189,22 @@ public:
            conformanceAddr != ConformanceEnd;
            conformanceAddr = conformanceAddr.atByteOffset(4)) {
         auto optionalConformanceInfo =
-            conformanceReader.readConformanceDescriptor(conformanceAddr);
+            conformanceReader.readConformanceDescriptor(conformanceAddr,
+                                                        typeNameToManglingMap);
         if (!optionalConformanceInfo.hasValue()) {
           stream << "Error reading conformance descriptor: "
                  << conformanceReader.Error << "\n";
           continue;
         }
         auto conformanceInfo = optionalConformanceInfo.getValue();
-        if (typeConformances.count(conformanceInfo.typeName) != 0) {
-          typeConformances[conformanceInfo.typeName].push_back(
+        auto typeConformancesKey = conformanceInfo.mangledTypeName + " (" +
+                                   conformanceInfo.typeName + ")";
+        if (typeConformances.count(typeConformancesKey) != 0) {
+          typeConformances[typeConformancesKey].push_back(
               conformanceInfo.protocolName);
         } else {
           typeConformances.emplace(
-              conformanceInfo.typeName,
+              typeConformancesKey,
               std::vector<std::string>{conformanceInfo.protocolName});
         }
       }
