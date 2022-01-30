@@ -21,7 +21,7 @@ bits = self_type.bits
 
 def Availability(bits):
     if bits == 16:
-        return '@available(iOS 14.0, tvOS 14.0, watchOS 7.0, *)'
+        return '@available(SwiftStdlib 5.3, *)'
     return ''
 }%
 
@@ -29,7 +29,7 @@ def Availability(bits):
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
 % if bits == 16:
-#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 % end
 
 //===----------------------------------------------------------------------===//
@@ -40,11 +40,6 @@ ${Availability(bits)}
 extension ${Self}: Differentiable {
   ${Availability(bits)}
   public typealias TangentVector = ${Self}
-
-  ${Availability(bits)}
-  public mutating func move(by offset: TangentVector) {
-    self += offset
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -54,19 +49,19 @@ extension ${Self}: Differentiable {
 /// Derivatives of standard unary operators.
 ${Availability(bits)}
 extension ${Self} {
-  @usableFromInline
-  @_transparent
+  @inlinable
   @derivative(of: -)
-  static func _vjpNegate(x: ${Self})
-    -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
+  static func _vjpNegate(
+    _ x: ${Self}
+  ) -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
     return (-x, { v in -v })
   }
 
-  @usableFromInline
-  @_transparent
+  @inlinable
   @derivative(of: -)
-  static func _jvpNegate(x: ${Self})
-  -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
+  static func _jvpNegate(
+    _ x: ${Self}
+  ) -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
     return (-x, { dx in -dx })
   }
 }
@@ -75,116 +70,116 @@ extension ${Self} {
 ${Availability(bits)}
 extension ${Self} {
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: +)
   static func _vjpAdd(
-    lhs: ${Self}, rhs: ${Self}
+    _ lhs: ${Self}, 
+    _ rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
     return (lhs + rhs, { v in (v, v) })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: +)
   static func _jvpAdd(
-    lhs: ${Self}, rhs: ${Self}
+    _ lhs: ${Self}, 
+    _ rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
     return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: +=)
-  static func _vjpAddAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
-    value: Void, pullback: (inout ${Self}) -> ${Self}
-  ) {
+  static func _vjpAddAssign(
+    _ lhs: inout ${Self}, 
+    _ rhs: ${Self}
+  ) -> (value: Void, pullback: (inout ${Self}) -> ${Self}) {
     lhs += rhs
     return ((), { v in v })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: +=)
-  static func _jvpAddAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
-    value: Void, differential: (inout ${Self}, ${Self}) -> Void
-  ) {
+  static func _jvpAddAssign(
+    _ lhs: inout ${Self}, 
+    _ rhs: ${Self}
+  ) -> (value: Void, differential: (inout ${Self}, ${Self}) -> Void) {
     lhs += rhs
     return ((), { $0 += $1 })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: -)
   static func _vjpSubtract(
-    lhs: ${Self}, rhs: ${Self}
+    _ lhs: ${Self}, 
+    _ rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
     return (lhs - rhs, { v in (v, -v) })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: -)
   static func _jvpSubtract(
-    lhs: ${Self}, rhs: ${Self}
+    _ lhs: ${Self}, 
+    _ rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
     return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: -=)
-  static func _vjpSubtractAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
-    value: Void, pullback: (inout ${Self}) -> ${Self}
-  ) {
+  static func _vjpSubtractAssign(
+    _ lhs: inout ${Self}, 
+    _ rhs: ${Self}
+  ) -> (value: Void, pullback: (inout ${Self}) -> ${Self}) {
     lhs -= rhs
     return ((), { v in -v })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: -=)
-  static func _jvpSubtractAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
-    value: Void, differential: (inout ${Self}, ${Self}) -> Void
-  ) {
+  static func _jvpSubtractAssign(
+    _ lhs: inout ${Self}, 
+    _ rhs: ${Self}
+  ) -> (value: Void, differential: (inout ${Self}, ${Self}) -> Void) {
     lhs -= rhs
     return ((), { $0 -= $1 })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: *)
   static func _vjpMultiply(
-    lhs: ${Self}, rhs: ${Self}
+    _ lhs: ${Self}, 
+    _ rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
     return (lhs * rhs, { v in (rhs * v, lhs * v) })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: *)
   static func _jvpMultiply(
-    lhs: ${Self}, rhs: ${Self}
+    _ lhs: ${Self}, 
+    _ rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
     return (lhs * rhs, { (dlhs, drhs) in lhs * drhs + rhs * dlhs })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: *=)
-  static func _vjpMultiplyAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
-    value: Void, pullback: (inout ${Self}) -> ${Self}
-  ) {
+  static func _vjpMultiplyAssign(
+    _ lhs: inout ${Self},
+    _ rhs: ${Self}
+  ) -> (value: Void, pullback: (inout ${Self}) -> ${Self}) {
     defer { lhs *= rhs }
     return ((), { [lhs = lhs] v in
       let drhs = lhs * v
@@ -194,44 +189,44 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: *=)
-  static func _jvpMultiplyAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
-    value: Void, differential: (inout ${Self}, ${Self}) -> Void
-  ) {
+  static func _jvpMultiplyAssign(
+    _ lhs: inout ${Self}, 
+    _ rhs: ${Self}
+  ) -> (value: Void, differential: (inout ${Self}, ${Self}) -> Void) {
     let oldLhs = lhs
     lhs *= rhs
     return ((), { $0 = $0 * rhs + oldLhs * $1 })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: /)
   static func _vjpDivide(
-    lhs: ${Self}, rhs: ${Self}
+    _ lhs: ${Self}, 
+    _ rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
     return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: /)
   static func _jvpDivide(
-    lhs: ${Self}, rhs: ${Self}
+    _ lhs: ${Self}, 
+    _ rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
     return (lhs / rhs, { (dlhs, drhs) in dlhs / rhs - lhs / (rhs * rhs) * drhs })
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: /=)
-  static func _vjpDivideAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
-    value: Void, pullback: (inout ${Self}) -> ${Self}
-  ) {
+  static func _vjpDivideAssign(
+    _ lhs: inout ${Self}, 
+    _ rhs: ${Self}
+  ) -> (value: Void, pullback: (inout ${Self}) -> ${Self}) {
     defer { lhs /= rhs }
     return ((), { [lhs = lhs] v in
       let drhs = -lhs / (rhs * rhs) * v
@@ -241,12 +236,12 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable
   @derivative(of: /=)
-  static func _jvpDivideAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
-    value: Void, differential: (inout ${Self}, ${Self}) -> Void
-  ) {
+  static func _jvpDivideAssign(
+    _ lhs: inout ${Self}, 
+    _ rhs: ${Self}
+  ) -> (value: Void, differential: (inout ${Self}, ${Self}) -> Void) {
     let oldLhs = lhs
     lhs /= rhs
     return ((), { $0 = ($0 * rhs - oldLhs * $1) / (rhs * rhs)  })
@@ -263,15 +258,16 @@ where
   Self: Differentiable,
   Self == Self.TangentVector
 {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @derivative(of: addingProduct)
   func _vjpAddingProduct(
-    _ lhs: Self, _ rhs: Self
+    _ lhs: Self, 
+    _ rhs: Self
   ) -> (value: Self, pullback: (Self) -> (Self, Self, Self)) {
-    return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
+    return (addingProduct(lhs, rhs), { v in (v, v * rhs, v * lhs) })
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @derivative(of: squareRoot)
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
     let y = squareRoot()
@@ -280,7 +276,10 @@ where
 
   @inlinable
   @derivative(of: minimum)
-  static func _vjpMinimum(_ x: Self, _ y: Self) -> (
+  static func _vjpMinimum(
+    _ x: Self, 
+    _ y: Self
+  ) -> (
     value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
   ) {
     if x <= y || y.isNaN { return (x, { v in (v, .zero) }) }
@@ -289,7 +288,10 @@ where
 
   @inlinable
   @derivative(of: maximum)
-  static func _vjpMaximum(_ x: Self, _ y: Self) -> (
+  static func _vjpMaximum(
+    _ x: Self, 
+    _ y: Self
+  ) -> (
     value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
   ) {
     if x > y || y.isNaN { return (x, { v in (v, .zero) }) }
