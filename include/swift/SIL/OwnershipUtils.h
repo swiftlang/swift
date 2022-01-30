@@ -182,6 +182,11 @@ public:
     return use->getOwnershipConstraint();
   }
 
+  bool isDirectlyForwarding() const {
+    auto &mixin = *OwnershipForwardingMixin::get(use->getUser());
+    return mixin.isDirectlyForwarding();
+  }
+
   ValueOwnershipKind getForwardingOwnershipKind() const;
   void setForwardingOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
