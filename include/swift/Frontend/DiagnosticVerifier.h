@@ -45,6 +45,24 @@ struct LineColumnRange {
   LineColumnRange() : StartCol(NoValue), EndCol(NoValue) {}
 };
 
+class CapturedFixItInfo final {
+  DiagnosticInfo::FixIt FixIt;
+  mutable LineColumnRange LineColRange;
+
+public:
+  CapturedFixItInfo(DiagnosticInfo::FixIt FixIt) : FixIt(FixIt) {}
+
+  CharSourceRange &getSourceRange() { return FixIt.getRange(); }
+  const CharSourceRange &getSourceRange() const { return FixIt.getRange(); }
+
+  StringRef getText() const { return FixIt.getText(); }
+
+  /// Obtain the line-column range corresponding to the fix-it's
+  /// replacement range.
+  const LineColumnRange &getLineColumnRange(const SourceManager &SM,
+                                            unsigned BufferID) const;
+};
+
 struct CapturedDiagnosticInfo {
   llvm::SmallString<128> Message;
   llvm::SmallString<32> FileName;
@@ -52,14 +70,14 @@ struct CapturedDiagnosticInfo {
   SourceLoc Loc;
   unsigned Line;
   unsigned Column;
-  SmallVector<DiagnosticInfo::FixIt, 2> FixIts;
+  SmallVector<CapturedFixItInfo, 2> FixIts;
   SmallVector<std::string, 1> EducationalNotes;
 
   CapturedDiagnosticInfo(llvm::SmallString<128> Message,
                          llvm::SmallString<32> FileName,
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
-                         SmallVector<DiagnosticInfo::FixIt, 2> FixIts,
+                         SmallVector<CapturedFixItInfo, 2> FixIts,
                          SmallVector<std::string, 1> EducationalNotes)
       : Message(Message), FileName(FileName), Classification(Classification),
         Loc(Loc), Line(Line), Column(Column), FixIts(FixIts),
@@ -113,7 +131,7 @@ private:
                      const CapturedDiagnosticInfo &D, unsigned BufferID) const;
 
   // Render the verifier syntax for a given set of fix-its.
-  std::string renderFixits(ArrayRef<DiagnosticInfo::FixIt> fixits,
+  std::string renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
                            unsigned BufferID) const;
 
   void printRemainingDiagnostics() const;

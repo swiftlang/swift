@@ -35,6 +35,22 @@ struct ExpectedFixIt {
 };
 } // end namespace swift
 
+const LineColumnRange &
+CapturedFixItInfo::getLineColumnRange(const SourceManager &SM,
+                                      unsigned BufferID) const {
+  if (LineColRange.StartCol == LineColumnRange::NoValue) {
+    LineColRange.StartCol =
+        SM.getColumnInBuffer(getSourceRange().getStart(), BufferID);
+  }
+
+  if (LineColRange.EndCol == LineColumnRange::NoValue) {
+    LineColRange.EndCol =
+        SM.getColumnInBuffer(getSourceRange().getEnd(), BufferID);
+  }
+
+  return LineColRange;
+}
+
 namespace {
 
 static constexpr StringLiteral fixitExpectationNoneString("none");
@@ -246,11 +262,10 @@ bool DiagnosticVerifier::checkForFixIt(const ExpectedFixIt &Expected,
     if (ActualFixIt.getText() != Expected.Text)
       continue;
 
-    CharSourceRange Range = ActualFixIt.getRange();
-    if (SM.getColumnInBuffer(Range.getStart(), BufferID) !=
-        Expected.Range.StartCol)
+    LineColumnRange ActualRange = ActualFixIt.getLineColumnRange(SM, BufferID);
+    if (ActualRange.StartCol != Expected.Range.StartCol)
       continue;
-    if (SM.getColumnInBuffer(Range.getEnd(), BufferID) != Expected.Range.EndCol)
+    if (ActualRange.EndCol != Expected.Range.EndCol)
       continue;
 
     return true;
@@ -260,31 +275,29 @@ bool DiagnosticVerifier::checkForFixIt(const ExpectedFixIt &Expected,
 }
 
 std::string
-DiagnosticVerifier::renderFixits(ArrayRef<DiagnosticInfo::FixIt> fixits,
+DiagnosticVerifier::renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
                                  unsigned BufferID) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
-  interleave(fixits,
-             [&](const DiagnosticInfo::FixIt &ActualFixIt) {
-               CharSourceRange Range = ActualFixIt.getRange();
+  interleave(
+      ActualFixIts,
+      [&](const CapturedFixItInfo &ActualFixIt) {
+        LineColumnRange ActualRange =
+            ActualFixIt.getLineColumnRange(SM, BufferID);
 
-               OS << "{{"
-                  << SM.getColumnInBuffer(Range.getStart(), BufferID)
-                  << '-'
-                  << SM.getColumnInBuffer(Range.getEnd(), BufferID)
-                  << '=';
+        OS << "{{" << ActualRange.StartCol << '-' << ActualRange.EndCol << '=';
 
-               for (auto C : ActualFixIt.getText()) {
-                 if (C == '\n')
-                   OS << "\\n";
-                 else if (C == '}' || C == '\\')
-                   OS << '\\' << C;
-                 else
-                   OS << C;
-               }
-               OS << "}}";
-             },
-             [&] { OS << ' '; });
+        for (auto C : ActualFixIt.getText()) {
+          if (C == '\n')
+            OS << "\\n";
+          else if (C == '}' || C == '\\')
+            OS << '\\' << C;
+          else
+            OS << C;
+        }
+        OS << "}}";
+      },
+      [&] { OS << ' '; });
   return OS.str();
 }
 
@@ -628,8 +641,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     };
 
     auto makeActualFixitsPhrase =
-        [&](ArrayRef<DiagnosticInfo::FixIt> actualFixits)
-        -> ActualFixitsPhrase {
+        [&](ArrayRef<CapturedFixItInfo> actualFixits) -> ActualFixitsPhrase {
       std::string actualFixitsStr = renderFixits(actualFixits, BufferID);
 
       return ActualFixitsPhrase{(Twine("actual fix-it") +
@@ -933,8 +945,10 @@ void DiagnosticVerifier::printRemainingDiagnostics() const {
 /// file.
 void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
                                           const DiagnosticInfo &Info) {
-  SmallVector<DiagnosticInfo::FixIt, 2> fixIts;
-  std::copy(Info.FixIts.begin(), Info.FixIts.end(), std::back_inserter(fixIts));
+  SmallVector<CapturedFixItInfo, 2> fixIts;
+  for (const auto &fixIt : Info.FixIts) {
+    fixIts.emplace_back(fixIt);
+  }
 
   llvm::SmallVector<std::string, 1> eduNotes;
   for (auto &notePath : Info.EducationalNotePaths) {
@@ -968,11 +982,11 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
 
     capturedDiag.Loc = correctSM.getLocForForeignLoc(capturedDiag.Loc, SM);
     for (auto &fixIt : capturedDiag.FixIts) {
-      auto newStart = correctSM.getLocForForeignLoc(fixIt.getRange().getStart(),
-                                                    SM);
-      auto &mutableRange = fixIt.getRange();
+      auto newStart =
+          correctSM.getLocForForeignLoc(fixIt.getSourceRange().getStart(), SM);
+      auto &mutableRange = fixIt.getSourceRange();
       mutableRange =
-          CharSourceRange(newStart, fixIt.getRange().getByteLength());
+          CharSourceRange(newStart, fixIt.getSourceRange().getByteLength());
     }
   }
 }
