@@ -22,8 +22,8 @@ struct FakeActorSystem: DistributedActorSystem {
   // expected-note@-2{{protocol 'FakeActorSystem' requires function 'remoteCall' with signature:}}
 
   typealias ActorID = ActorAddress
-  typealias InvocationDecoder = FakeInvocation
-  typealias InvocationEncoder = FakeInvocation
+  typealias InvocationDecoder = FakeInvocationDecoder
+  typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type)
@@ -50,29 +50,30 @@ struct FakeActorSystem: DistributedActorSystem {
 
 }
 
-struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+// === Sending / encoding -------------------------------------------------
+struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
+}
 
-  // === Receiving / decoding -------------------------------------------------
+// === Receiving / decoding -------------------------------------------------
+class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
 
   func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument>
-  ) throws {}
+  func decodeNextArgument<Argument>() throws -> Argument { fatalError() }
   func decodeReturnType() throws -> Any.Type? { nil }
   func decodeErrorType() throws -> Any.Type? { nil }
 }
 
 @available(SwiftStdlib 5.5, *)
 struct FakeResultHandler: DistributedTargetInvocationResultHandler {
-  typealias SerializationRequirement = FakeInvocation.SerializationRequirement
+  typealias SerializationRequirement = FakeActorSystem.SerializationRequirement
 
   func onReturn<Res>(value: Res) async throws {
     print("RETURN: \(value)")

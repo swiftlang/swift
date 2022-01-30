@@ -1345,6 +1345,14 @@ public:
   /// alternative specified via the -entry-point-function-name frontend flag.
   std::string getEntryPointFunctionName() const;
 
+  /// Find the concrete invocation decoder associated with the given actor.
+  NominalTypeDecl *
+  getDistributedActorInvocationDecoder(NominalTypeDecl *);
+
+  /// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
+  /// invocation decoder of the given distributed actor.
+  FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
+
 private:
   friend Decl;
 

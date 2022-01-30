@@ -38,8 +38,8 @@ public struct ActorAddress: Hashable, Sendable, Codable {
 
 public struct FakeActorSystem: DistributedActorSystem {
   public typealias ActorID = ActorAddress
-  public typealias InvocationDecoder = FakeInvocation
-  public typealias InvocationEncoder = FakeInvocation
+  public typealias InvocationDecoder = FakeInvocationDecoder
+  public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias SerializationRequirement = Codable
 
   // just so that the struct does not become "trivial"
@@ -103,37 +103,13 @@ public struct FakeActorSystem: DistributedActorSystem {
   }
 }
 
-public struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
-  public typealias SerializationRequirement = Codable
-
-  public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  public mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
-  public mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
-  public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
-  public mutating func doneRecording() throws {}
-
-  // === Receiving / decoding -------------------------------------------------
-
-  public func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  public mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-  ) throws { /* ... */ }
-  public func decodeReturnType() throws -> Any.Type? { nil }
-  public func decodeErrorType() throws -> Any.Type? { nil }
-
-  public struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    public typealias SerializationRequirement = Codable
-  }
-}
-
 // ==== Fake Roundtrip Transport -----------------------------------------------
 
 // TODO: not thread safe...
 public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = ActorAddress
-  public typealias InvocationEncoder = FakeRoundtripInvocation
-  public typealias InvocationDecoder = FakeRoundtripInvocation
+  public typealias InvocationEncoder = FakeInvocationEncoder
+  public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias SerializationRequirement = Codable
 
   var activeActors: [ActorID: any DistributedActor] = [:]
@@ -164,7 +140,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
     print("X resign id: \(id)")
   }
 
-  public func makeInvocationEncoder() -> FakeRoundtripInvocation {
+  public func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
 
@@ -202,7 +178,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
       try await executeDistributedTarget(
         on: active,
         mangledTargetName: target.mangledName,
-        invocationDecoder: &invocation,
+        invocationDecoder: invocation.makeDecoder(),
         handler: resultHandler
       )
 
@@ -249,7 +225,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
       try await executeDistributedTarget(
         on: active,
         mangledTargetName: target.mangledName,
-        invocationDecoder: &invocation,
+        invocationDecoder: invocation.makeDecoder(),
         handler: resultHandler
       )
 
@@ -268,7 +244,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
 }
 
-public struct FakeRoundtripInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
   public typealias SerializationRequirement = Codable
 
   var genericSubs: [Any.Type] = []
@@ -297,18 +273,45 @@ public struct FakeRoundtripInvocation: DistributedTargetInvocationEncoder, Distr
     print(" > done recording")
   }
 
-  // === decoding --------------------------------------------------------------
+  public func makeDecoder() -> FakeInvocationDecoder {
+    return .init(
+      args: arguments,
+      substitutions: genericSubs,
+      returnType: returnType,
+      errorType: errorType
+    )
+  }
+}
+
+// === decoding --------------------------------------------------------------
+public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+    public typealias SerializationRequirement = Codable
+
+  var genericSubs: [Any.Type] = []
+  var arguments: [Any] = []
+  var returnType: Any.Type? = nil
+  var errorType: Any.Type? = nil
+
+  var argumentIndex: Int = 0
+
+  fileprivate init(
+    args: [Any],
+    substitutions: [Any.Type] = [],
+    returnType: Any.Type? = nil,
+    errorType: Any.Type? = nil
+  ) {
+    self.arguments = args
+    self.genericSubs = substitutions
+    self.returnType = returnType
+    self.errorType = errorType
+  }
 
   public func decodeGenericSubstitutions() throws -> [Any.Type] {
     print("  > decode generic subs: \(genericSubs)")
     return genericSubs
   }
 
-  var argumentIndex: Int = 0
-  public mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument>
-  ) throws {
+  public func decodeNextArgument<Argument>() throws -> Argument {
     guard argumentIndex < arguments.count else {
       fatalError("Attempted to decode more arguments than stored! Index: \(argumentIndex), args: \(arguments)")
     }
@@ -319,8 +322,8 @@ public struct FakeRoundtripInvocation: DistributedTargetInvocationEncoder, Distr
     }
 
     print("  > decode argument: \(argument)")
-    pointer.pointee = argument
     argumentIndex += 1
+    return argument
   }
 
   public func decodeErrorType() throws -> Any.Type? {
