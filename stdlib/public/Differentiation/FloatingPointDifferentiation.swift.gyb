@@ -274,7 +274,7 @@ where
   func _jvpAddingProduct(
     _ lhs: Self, 
     _ rhs: Self
-  ) -> (value: Self, differential: (Self, Self, Self) -> (Self)) {
+  ) -> (value: Self, differential: (Self, Self, Self) -> Self) {
     return (addingProduct(lhs, rhs), { (dSelf, dlhs, drhs) in 
       dlhs * rhs + drhs * lhs + dSelf 
     })
@@ -283,15 +283,15 @@ where
   @inlinable
   @derivative(of: squareRoot)
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
-    let y = squareRoot()
-    return (y, { v in v / (2 * y) })
+    let value = squareRoot()
+    return (value, { v in v / (2 * value) })
   }
 
   @inlinable
   @derivative(of: squareRoot)
   func _jvpSquareRoot() -> (value: Self, differential: (Self) -> Self) {
-    let y = squareRoot()
-    return (y, { v in v / (2 * y) })
+    let value = squareRoot()
+    return (value, { dx in dx / (2 * value) })
   }
 
   @inlinable
@@ -299,7 +299,7 @@ where
   static func _vjpMinimum(
     _ x: Self, 
     _ y: Self
-  ) -> (
+  ) -> ( // TODO: try using `Self` instead of `TangentVector` here
     value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
   ) {
     if x <= y || y.isNaN { return (x, { v in (v, .zero) }) }
