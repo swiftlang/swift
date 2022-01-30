@@ -266,3 +266,8 @@ module LocalVsFileScope {
   header "LocalVsFileScope.h"
   export *
 }
+
+module CommonName {
+  header "CommonName.h"
+  export *
+}

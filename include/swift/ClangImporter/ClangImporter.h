@@ -517,8 +517,13 @@ public:
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
-  /// Emits any pending diagnostics associated with the provided decl.
-  void diagnoseDeclDirectly(const clang::NamedDecl *decl) override;
+  /// Emits diagnostics for any declarations named name
+  /// whose direct declaration context is a TU.
+  void diagnoseTopLevelValue(const DeclName &name) override;
+
+  /// Emit diagnostics for declarations named name that are members
+  /// of the provided baseType.
+  void diagnoseMemberValue(const DeclName &name, const Type &baseType) override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
