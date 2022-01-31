@@ -75,8 +75,22 @@ FloatingPointDerivativeTests.test("${Self}./") {
 }
 
 FloatingPointDerivativeTests.test("${Self}.squareRoot") {
-  expectEqual(0.5, gradient(at: 1, of: { $0.squareRoot() }))
-  expectEqual(0.25, gradient(at: 4, of: { $0.squareRoot() }))
+%  for differential_op in ['gradient', 'derivative']:
+  do { // prevent `altSquareRoot` from being declared twice in same scope
+    expectEqual(0.5, ${differential_op}(at: 1, of: { $0.squareRoot() }))
+    expectEqual(0.25, ${differential_op}(at: 4, of: { $0.squareRoot() }))
+
+    @differentiable(reverse)
+    func altSquareRoot(_ x: ${Self}) -> ${Self} {
+      var output = x
+      output.formSquareRoot()
+      return output
+    }
+
+    expectEqual(0.5, ${differential_op}(at: 1, of: { altSquareRoot($0) }))
+    expectEqual(0.25, ${differential_op}(at: 4, of: { altSquareRoot($0) }))
+  }
+%  end # for derivative_op in ['gradient', 'derivative']:
 }
 
 FloatingPointDerivativeTests.test("${Self}.addingProduct") {

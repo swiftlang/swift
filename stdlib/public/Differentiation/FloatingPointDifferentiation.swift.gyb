@@ -68,7 +68,7 @@ extension ${Self} {
   }
 
   @inlinable
-  @derivative(of: formSquareRoot) // TODO: add test for this
+  @derivative(of: formSquareRoot)
   mutating func _${derivative_kind}FormSquareRoot() -> (
     value: Void, ${linear_map_kind}: (inout Self) -> Void
   ) {
@@ -303,19 +303,15 @@ where
     })
   }
 
+%for derivative_kind in ['vjp', 'jvp']:
+%  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
   @inlinable
   @derivative(of: squareRoot)
-  func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
+  func _${derivative_kind}SquareRoot() -> (value: Self, ${linear_map_kind}: (Self) -> Self) {
     let value = squareRoot()
     return (value, { v in v / (2 * value) })
   }
-
-  @inlinable
-  @derivative(of: squareRoot) // TODO: add test for this
-  func _jvpSquareRoot() -> (value: Self, differential: (Self) -> Self) {
-    let value = squareRoot()
-    return (value, { dx in dx / (2 * value) })
-  }
+%end # for derivative_kind in ['jvp', 'vjp']:
 
 %for suffix in ['', 'Magnitude']:
 %  op = 'abs' if suffix == 'Magnitude' else ''
