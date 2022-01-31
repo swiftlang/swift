@@ -8,6 +8,7 @@ add_swift_host_library(swiftIDE STATIC
   CompileInstance.cpp
   CompletionInstance.cpp
   ConformingMethodList.cpp
+  DependencyChecking.cpp
   ExprContextAnalysis.cpp
   Formatting.cpp
   FuzzyStringMatcher.cpp
