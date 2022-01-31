@@ -8802,7 +8802,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       return convertType &&
           !convertType->hasPlaceholder() &&
           !target.isOptionalSomePatternInit() &&
-          !(solution.getType(resultExpr)->isUninhabited() &&
+          !(solution.getResolvedType(resultExpr)->isUninhabited() &&
             cs.getContextualTypePurpose(target.getAsExpr())
               == CTP_ReturnSingleExpr);
     };
