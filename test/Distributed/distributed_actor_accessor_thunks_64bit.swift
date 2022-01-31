@@ -108,7 +108,19 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[ARG_0_SIZE:%.*]] = and i64 [[ARG_0_SIZE_ADJ]], -16
 // CHECK-NEXT: [[ARG_0_VALUE_BUF:%.*]] = call swiftcc i8* @swift_task_alloc(i64 [[ARG_0_SIZE]])
 // CHECK-NEXT: [[ARG_0_RES_SLOT:%.*]] = bitcast i8* [[ARG_0_VALUE_BUF]] to %swift.opaque*
-// CHECK-NEXT: call swiftcc void {{.*}}(%swift.opaque* noalias nocapture sret(%swift.opaque) [[ARG_0_RES_SLOT]], %swift.type* %arg_type, %T27FakeDistributedActorSystems0A17InvocationDecoderC* swiftself %1, %swift.error** noalias nocapture swifterror dereferenceable(8) %swifterror)
+// CHECK-NEXT: [[ENCODABLE_WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %arg_type, %swift.protocol* @"$sSeMp")
+// CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq i8** [[ENCODABLE_WITNESS]], null
+// CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness, label [[CONT:%.*]]
+// CHECK: missing-witness:
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+// CHECK: [[DECODABLE_WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %arg_type, %swift.protocol* @"$sSEMp")
+// CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq i8** [[DECODABLE_WITNESS]], null
+// CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness1, label [[CONT:%.*]]
+// CHECK: missing-witness1:
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+// CHECK: call swiftcc void {{.*}}(%swift.opaque* noalias nocapture sret(%swift.opaque) [[ARG_0_RES_SLOT]], %swift.type* %arg_type, i8** [[ENCODABLE_WITNESS]], i8** [[DECODABLE_WITNESS]], %T27FakeDistributedActorSystems0A17InvocationDecoderC* swiftself %1, %swift.error** noalias nocapture swifterror dereferenceable(8) %swifterror)
 
 // CHECK: store %swift.error* null, %swift.error** %swifterror
 // CHECK-NEXT: [[ARG_0_VAL_ADDR:%.*]] = bitcast i8* [[ARG_0_VALUE_BUF]] to %TSi*

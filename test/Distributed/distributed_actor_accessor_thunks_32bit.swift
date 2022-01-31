@@ -108,7 +108,19 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[ARG_0_SIZE:%.*]] = and i32 [[ARG_0_SIZE_ADJ]], -16
 // CHECK-NEXT: [[ARG_0_VALUE_BUF:%.*]] = call swiftcc i8* @swift_task_alloc(i32 [[ARG_0_SIZE]])
 // CHECK-NEXT: [[ARG_0_RES_SLOT:%.*]] = bitcast i8* [[ARG_0_VALUE_BUF]] to %swift.opaque*
-// CHECK-NEXT: call swiftcc void {{.*}}(%swift.opaque* noalias nocapture sret(%swift.opaque) [[ARG_0_RES_SLOT]], %swift.type* %arg_type, %T27FakeDistributedActorSystems0A17InvocationDecoderC* swiftself %1, %swift.error** noalias nocapture dereferenceable(4) %swifterror)
+// CHECK-NEXT: [[ENCODABLE_WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %arg_type, %swift.protocol* @"$sSeMp")
+// CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq i8** [[ENCODABLE_WITNESS]], null
+// CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness, label [[CONT:%.*]]
+// CHECK: missing-witness:
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+// CHECK: [[DECODABLE_WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %arg_type, %swift.protocol* @"$sSEMp")
+// CHECK-NEXT: [[IS_NULL:%.*]] = icmp eq i8** [[DECODABLE_WITNESS]], null
+// CHECK-NEXT: br i1 [[IS_NULL]], label %missing-witness1, label [[CONT:%.*]]
+// CHECK: missing-witness1:
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+// CHECK: call swiftcc void {{.*}}(%swift.opaque* noalias nocapture sret(%swift.opaque) [[ARG_0_RES_SLOT]], %swift.type* %arg_type, i8** [[ENCODABLE_WITNESS]], i8** [[DECODABLE_WITNESS]], %T27FakeDistributedActorSystems0A17InvocationDecoderC* swiftself %1, %swift.error** noalias nocapture dereferenceable(4) %swifterror)
 
 // CHECK: store %swift.error* null, %swift.error** %swifterror
 // CHECK-NEXT: [[ARG_0_VAL_ADDR:%.*]] = bitcast i8* [[ARG_0_VALUE_BUF]] to %TSi*
@@ -163,10 +175,10 @@ public distributed actor MyOtherActor {
 
 /// Initialize the result buffer with values produced by the thunk
 
-// CHECK: %._guts1 = getelementptr inbounds %TSS, %TSS* [[COERCED_RESULT_SLOT]], i32 0, i32 0
-// CHECK: store i32 {{.*}}, i32* %._guts1._object._count._value
-// CHECK: store i8 {{.*}}, i8* %._guts1._object._discriminator._value
-// CHECK: store i16 {{.*}}, i16* %._guts1._object._flags._value, align 2
+// CHECK: %._guts2 = getelementptr inbounds %TSS, %TSS* [[COERCED_RESULT_SLOT]], i32 0, i32 0
+// CHECK: store i32 {{.*}}, i32* %._guts2._object._count._value
+// CHECK: store i8 {{.*}}, i8* %._guts2._object._discriminator._value
+// CHECK: store i16 {{.*}}, i16* %._guts2._object._flags._value, align 2
 
 // CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
@@ -195,10 +207,10 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[THUNK_ASYNC_CONTEXT:%.*]] = call swiftcc i8* @swift_task_alloc(i32 [[CONTEXT_SIZE]])
 
 // CHECK: [[TMP_STR_ARG:%.*]] = bitcast { i32, i32, i32 }* %temp-coercion.coerced to %TSS*
-// CHECK-NEXT: %._guts1 = getelementptr inbounds %TSS, %TSS* [[TMP_STR_ARG]], i32 0, i32 0
+// CHECK-NEXT: %._guts2 = getelementptr inbounds %TSS, %TSS* [[TMP_STR_ARG]], i32 0, i32 0
 
-// CHECK: store i32 {{.*}}, i32* %._guts1._object._count._value
-// CHECK: [[VARIANT:%.*]] = bitcast %Ts13_StringObjectV7VariantO* %._guts1._object._variant to i32*
+// CHECK: store i32 {{.*}}, i32* %._guts2._object._count._value
+// CHECK: [[VARIANT:%.*]] = bitcast %Ts13_StringObjectV7VariantO* %._guts2._object._variant to i32*
 // CHECK-NEXT: store i32 {{.*}}, i32* [[VARIANT]]
 
 // CHECK: [[STR_ARG_SIZE_PTR:%.*]] = getelementptr inbounds { i32, i32, i32 }, { i32, i32, i32 }* %temp-coercion.coerced, i32 0, i32 0

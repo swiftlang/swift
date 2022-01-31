@@ -111,7 +111,7 @@ public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
   public typealias SerializationRequirement = Codable
 
   public func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  public func decodeNextArgument<Argument>() throws -> Argument { fatalError() }
+  public func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
   public func decodeReturnType() throws -> Any.Type? { nil }
   public func decodeErrorType() throws -> Any.Type? { nil }
 }
