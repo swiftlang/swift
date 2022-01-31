@@ -75,27 +75,41 @@ FloatingPointDerivativeTests.test("${Self}./") {
 }
 
 FloatingPointDerivativeTests.test("${Self}.squareRoot") {
-%  for differential_op in ['gradient', 'derivative']:
-  do { // prevent `altSquareRoot` from being declared twice in same scope
-    expectEqual(0.5, ${differential_op}(at: 1, of: { $0.squareRoot() }))
-    expectEqual(0.25, ${differential_op}(at: 4, of: { $0.squareRoot() }))
-
-    @differentiable(reverse)
-    func altSquareRoot(_ x: ${Self}) -> ${Self} {
-      var output = x
-      output.formSquareRoot()
-      return output
-    }
-
-    expectEqual(0.5, ${differential_op}(at: 1, of: { altSquareRoot($0) }))
-    expectEqual(0.25, ${differential_op}(at: 4, of: { altSquareRoot($0) }))
+  @differentiable(reverse)
+  func altSquareRoot(_ x: ${Self}) -> ${Self} {
+    var output = x
+    output.formSquareRoot()
+    return output
   }
+
+%  for differential_op in ['gradient', 'derivative']:
+  expectEqual(0.5, ${differential_op}(at: 1, of: { $0.squareRoot() }))
+  expectEqual(0.5, ${differential_op}(at: 1, of: { altSquareRoot($0) }))
+
+  expectEqual(0.25, ${differential_op}(at: 4, of: { $0.squareRoot() }))  
+  expectEqual(0.25, ${differential_op}(at: 4, of: { altSquareRoot($0) }))
 %  end # for derivative_op in ['gradient', 'derivative']:
 }
 
 FloatingPointDerivativeTests.test("${Self}.addingProduct") {
   expectEqual((1, 2, 3), gradient(at: ${Self}(10), 3, 2, of: { $0.addingProduct($1, $2) }))
+  expectEqual(6, derivative(at: ${Self}(10), 3, 2, of: { $0.addingProduct($1, $2) }))
 }
+
+// TODO(SR-15793) enable tests of `addProduct` once bug is fixed
+/*
+FloatingPointDerivativeTests.test("${Self}.addProduct") {
+  @differentiable(reverse)
+  func addProduct(_ x: ${Self}, _ y: ${Self}, _ z: ${Self}) -> ${Self} {
+    var output = x
+    output.addProduct(y, z)
+    return output
+  }
+
+  expectEqual((1, 2, 3), gradient(at: ${Self}(10), 3, 2, of: { addProduct($0, $1, $2) }))
+  expectEqual(6, derivative(at: ${Self}(10), 3, 2, of: { addProduct($0, $1, $2) }))
+}
+*/
 
 FloatingPointDerivativeTests.test("${Self}.minimum") {
   expectEqual((1.0, 0.0), gradient(at: ${Self}(1), ${Self}(2), of: { ${Self}.minimum($0, $1) }))

@@ -250,8 +250,10 @@ extension ${Self} {
 /// Derivatives of tertiary operators
 ${Availability(bits)}
 extension ${Self} {
+  // TODO(SR-15793) enable derivative of `addProduct` once bug is fixed
+  /*
   @inlinable
-  @derivative(of: addProduct) // TODO: add test for this
+  @derivative(of: addProduct)
   mutating func _vjpAddProduct(
     _ lhs: Self, 
     _ rhs: Self
@@ -261,16 +263,17 @@ extension ${Self} {
   }
 
   @inlinable
-  @derivative(of: addProduct) // TODO: add test for this
+  @derivative(of: addProduct) 
   mutating func _jvpAddProduct(
     _ lhs: Self, 
     _ rhs: Self
   ) -> (value: Void, differential: (inout Self, Self, Self) -> Void) {
     addProduct(lhs, rhs)
     return ((), { (dSelf, dlhs, drhs) in 
-      dSelf = dlhs * rhs + drhs * lhs + dSelf 
+      dSelf = dSelf + dlhs * rhs + drhs * lhs
     })
   }
+  */
 }
 
 % if bits == 80 or bits == 16:
@@ -284,7 +287,7 @@ where
   Self == Self.TangentVector
 {
   @inlinable
-  @derivative(of: addingProduct) // TODO: change test for this (it passed with incorrect pullback)
+  @derivative(of: addingProduct)
   func _vjpAddingProduct(
     _ lhs: Self, 
     _ rhs: Self
@@ -293,13 +296,13 @@ where
   }
 
   @inlinable
-  @derivative(of: addingProduct) // TODO: add test for this
+  @derivative(of: addingProduct)
   func _jvpAddingProduct(
     _ lhs: Self, 
     _ rhs: Self
   ) -> (value: Self, differential: (Self, Self, Self) -> Self) {
     return (addingProduct(lhs, rhs), { (dSelf, dlhs, drhs) in 
-      dlhs * rhs + drhs * lhs + dSelf 
+      dSelf + dlhs * rhs + drhs * lhs
     })
   }
 
