@@ -42,12 +42,35 @@ FloatingPointDerivativeTests.test("${Self}.+") {
   expectEqual(20, differential(at: ${Self}(4), ${Self}(5), of: +)(${Self}(10), ${Self}(10)))
 }
 
-FloatingPointDerivativeTests.test("${Self}.-") {
+FloatingPointDerivativeTests.test("${Self}.-(_:_:)") {
   expectEqual((1, -1), gradient(at: ${Self}(4), ${Self}(5), of: -))
   expectEqual((10, -10), pullback(at: ${Self}(4), ${Self}(5), of: -)(${Self}(10)))
 
   expectEqual(0, derivative(at: ${Self}(4), ${Self}(5), of: -))
   expectEqual(-5, differential(at: ${Self}(4), ${Self}(5), of: -)(${Self}(5), ${Self}(10)))
+}
+
+FloatingPointDerivativeTests.test("${Self}.-(_:)") {
+  expectEqual(-1, gradient(at: ${Self}(5), of: { -$0 }))
+  expectEqual(-1, derivative(at: ${Self}(5), of: { -$0 }))
+
+  expectEqual(-1, gradient(at: ${Self}(-5), of: { -$0 }))
+  expectEqual(-1, derivative(at: ${Self}(-5), of: { -$0 }))
+}
+
+FloatingPointDerivativeTests.test("${Self}.negate") {
+  @differentiable(reverse)
+  func negate(_ x: ${Self}) -> ${Self} {
+    var output = x
+    output.negate()
+    return output
+  }
+
+  expectEqual(-1, gradient(at: ${Self}(5), of: { negate($0) }))
+  expectEqual(-1, derivative(at: ${Self}(5), of: { negate($0) }))
+
+  expectEqual(-1, gradient(at: ${Self}(-5), of: { negate($0) }))
+  expectEqual(-1, derivative(at: ${Self}(-5), of: { negate($0) }))
 }
 
 FloatingPointDerivativeTests.test("${Self}.*") {
@@ -75,19 +98,23 @@ FloatingPointDerivativeTests.test("${Self}./") {
 }
 
 FloatingPointDerivativeTests.test("${Self}.squareRoot") {
+%  for differential_op in ['gradient', 'derivative']:
+  expectEqual(0.5, ${differential_op}(at: 1, of: { $0.squareRoot() }))
+  expectEqual(0.25, ${differential_op}(at: 4, of: { $0.squareRoot() }))
+%  end # for derivative_op in ['gradient', 'derivative']:
+}
+
+FloatingPointDerivativeTests.test("${Self}.formSquareRoot") {
   @differentiable(reverse)
-  func altSquareRoot(_ x: ${Self}) -> ${Self} {
+  func formSquareRoot(_ x: ${Self}) -> ${Self} {
     var output = x
     output.formSquareRoot()
     return output
   }
 
 %  for differential_op in ['gradient', 'derivative']:
-  expectEqual(0.5, ${differential_op}(at: 1, of: { $0.squareRoot() }))
-  expectEqual(0.5, ${differential_op}(at: 1, of: { altSquareRoot($0) }))
-
-  expectEqual(0.25, ${differential_op}(at: 4, of: { $0.squareRoot() }))  
-  expectEqual(0.25, ${differential_op}(at: 4, of: { altSquareRoot($0) }))
+  expectEqual(0.5, ${differential_op}(at: 1, of: { formSquareRoot($0) }))
+  expectEqual(0.25, ${differential_op}(at: 4, of: { formSquareRoot($0) }))
 %  end # for derivative_op in ['gradient', 'derivative']:
 }
 
