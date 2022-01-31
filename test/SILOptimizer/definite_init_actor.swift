@@ -302,7 +302,10 @@ actor Ahmad {
   var x: Int = 0
   
   // CHECK-LABEL: sil hidden @$s4test5AhmadCACyYacfc : $@convention(method) @async (@owned Ahmad) -> @owned Ahmad {
+  // CHECK:         bb0{{.*}}:
+  // CHECK-NEXT:      [[GENERIC:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK-NEXT:      hop_to_executor [[GENERIC]]
   // CHECK:           store {{%[0-9]+}} to {{%[0-9]+}} : $*Int
   // CHECK: } // end sil function '$s4test5AhmadCACyYacfc'
-  nonisolated init() async {} // no hop should appear here because of explicit nonisolated marking.
+  nonisolated init() async {}
 }

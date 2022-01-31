@@ -1,6 +1,11 @@
 // RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
 // REQUIRES: concurrency
 
+// CHECK-LABEL: sil hidden [ossa] @$s4test16unspecifiedAsyncyyYaF : $@convention(thin) @async () -> ()
+// CHECK:         bb0:
+// CHECK-NEXT:      [[GENERIC:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+// CHECK-NEXT:      hop_to_executor [[GENERIC]]
+// CHECK:       } // end sil function '$s4test16unspecifiedAsyncyyYaF'
 func unspecifiedAsync() async {}
 
 actor MyActor {
@@ -104,7 +109,7 @@ actor MyActor {
   //        ** third hop is right after calling an arbitrary async function
   // CHECK:         [[FUNC:%[0-9]+]] = function_ref @$s4test16unspecifiedAsyncyyYaF : $@convention(thin) @async () -> ()
   // CHECK:         = apply [[FUNC]]() : $@convention(thin) @async () -> ()
-  // CHECK-NEXT:    hop_to_executor %9 : $MainActor
+  // CHECK-NEXT:    hop_to_executor {{%[0-9]+}} : $MainActor
   // CHECK:       } // end sil function '$s4test7MyActorC10delegatingACSb_tYacfC'
   @MainActor
   convenience init(delegating c: Bool) async {
