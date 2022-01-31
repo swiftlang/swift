@@ -3998,10 +3998,9 @@ bool swift::checkSendableConformance(
 
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  auto behavior = SendableCheckContext(conformanceDC)
+  auto behavior = SendableCheckContext(conformanceDC, check)
       .defaultDiagnosticBehavior();
   if (conformanceDC->getParentSourceFile() &&
-      nominal->getParentSourceFile() &&
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
                               nominal->getDescriptiveKind(),
