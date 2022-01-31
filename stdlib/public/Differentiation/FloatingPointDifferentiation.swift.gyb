@@ -38,7 +38,6 @@ def Availability(bits):
 
 ${Availability(bits)}
 extension ${Self}: Differentiable {
-  ${Availability(bits)}
   public typealias TangentVector = ${Self}
 }
 
@@ -48,7 +47,7 @@ extension ${Self}: Differentiable {
 
 /// Derivatives of standard unary operators.
 ${Availability(bits)}
-extension ${Self} {
+extension ${Self} { // TODO: extract these to a ['vjp', 'jvp'] gyb loop
   @inlinable
   @derivative(of: -)
   static func _vjpNegate(
@@ -66,24 +65,43 @@ extension ${Self} {
   }
 
   @inlinable
-  @derivative(of: negate)
+  @derivative(of: negate) // TODO: add test for this
   mutating func _vjpNegateAssign() -> (value: Void, pullback: (inout Self) -> Void) {
     negate()
     return ((), { v in v.negate() })
   }
 
   @inlinable
-  @derivative(of: negate)
+  @derivative(of: negate) // TODO: add test for this
   mutating func _jvpNegateAssign() -> (value: Void, differential: (inout Self) -> Void) {
     negate()
     return ((), { dx in dx.negate() })
+  }
+
+  @inlinable
+  @derivative(of: formSquareRoot) // TODO: add test for this
+  mutating func _vjpFormSquareRoot() -> (
+    value: Void, pullback: (inout Self) -> Void
+  ) {
+    formSquareRoot()
+    let value = self
+    return ((), { v in v /= 2 * value })
+  }
+
+  @inlinable
+  @derivative(of: formSquareRoot) // TODO: add test for this
+  mutating func _jvpFormSquareRoot() -> (
+    value: Void, differential: (inout Self) -> Void
+  ) {
+    formSquareRoot()
+    let value = self
+    return ((), { dx in dx /= 2 * value })
   }
 }
 
 /// Derivatives of standard binary operators.
 ${Availability(bits)}
 extension ${Self} {
-  ${Availability(bits)}
   @inlinable
   @derivative(of: +)
   static func _vjpAdd(
@@ -93,7 +111,6 @@ extension ${Self} {
     return (lhs + rhs, { v in (v, v) })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: +)
   static func _jvpAdd(
@@ -103,7 +120,6 @@ extension ${Self} {
     return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: +=)
   static func _vjpAddAssign(
@@ -114,7 +130,6 @@ extension ${Self} {
     return ((), { v in v })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: +=)
   static func _jvpAddAssign(
@@ -125,7 +140,6 @@ extension ${Self} {
     return ((), { $0 += $1 })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: -)
   static func _vjpSubtract(
@@ -135,7 +149,6 @@ extension ${Self} {
     return (lhs - rhs, { v in (v, -v) })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: -)
   static func _jvpSubtract(
@@ -145,7 +158,6 @@ extension ${Self} {
     return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: -=)
   static func _vjpSubtractAssign(
@@ -156,7 +168,6 @@ extension ${Self} {
     return ((), { v in -v })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: -=)
   static func _jvpSubtractAssign(
@@ -167,7 +178,6 @@ extension ${Self} {
     return ((), { $0 -= $1 })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: *)
   static func _vjpMultiply(
@@ -177,7 +187,6 @@ extension ${Self} {
     return (lhs * rhs, { v in (rhs * v, lhs * v) })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: *)
   static func _jvpMultiply(
@@ -187,7 +196,6 @@ extension ${Self} {
     return (lhs * rhs, { (dlhs, drhs) in lhs * drhs + rhs * dlhs })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: *=)
   static func _vjpMultiplyAssign(
@@ -203,7 +211,6 @@ extension ${Self} {
     })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: *=)
   static func _jvpMultiplyAssign(
@@ -215,7 +222,6 @@ extension ${Self} {
     return ((), { $0 = $0 * rhs + oldLhs * $1 })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: /)
   static func _vjpDivide(
@@ -225,7 +231,6 @@ extension ${Self} {
     return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: /)
   static func _jvpDivide(
@@ -235,7 +240,6 @@ extension ${Self} {
     return (lhs / rhs, { (dlhs, drhs) in dlhs / rhs - lhs / (rhs * rhs) * drhs })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: /=)
   static func _vjpDivideAssign(
@@ -251,7 +255,6 @@ extension ${Self} {
     })
   }
 
-  ${Availability(bits)}
   @inlinable
   @derivative(of: /=)
   static func _jvpDivideAssign(
@@ -261,6 +264,32 @@ extension ${Self} {
     let oldLhs = lhs
     lhs /= rhs
     return ((), { $0 = ($0 * rhs - oldLhs * $1) / (rhs * rhs)  })
+  }
+}
+
+/// Derivatives of tertiary operators
+${Availability(bits)}
+extension ${Self} {
+  @inlinable
+  @derivative(of: addProduct) // TODO: add test for this
+  mutating func _vjpAddProduct(
+    _ lhs: Self, 
+    _ rhs: Self
+  ) -> (value: Void, pullback: (inout Self) -> (Self, Self)) {
+    addProduct(lhs, rhs)
+    return ((), { v in (v * rhs, v * lhs) })
+  }
+
+  @inlinable
+  @derivative(of: addProduct) // TODO: add test for this
+  mutating func _jvpAddProduct(
+    _ lhs: Self, 
+    _ rhs: Self
+  ) -> (value: Void, differential: (inout Self, Self, Self) -> Void) {
+    addProduct(lhs, rhs)
+    return ((), { (dSelf, dlhs, drhs) in 
+      dSelf = dlhs * rhs + drhs * lhs + dSelf 
+    })
   }
 }
 
@@ -275,7 +304,7 @@ where
   Self == Self.TangentVector
 {
   @inlinable
-  @derivative(of: addingProduct)
+  @derivative(of: addingProduct) // TODO: change test for this (it passed with incorrect pullback)
   func _vjpAddingProduct(
     _ lhs: Self, 
     _ rhs: Self
@@ -284,7 +313,7 @@ where
   }
 
   @inlinable
-  @derivative(of: addingProduct)
+  @derivative(of: addingProduct) // TODO: add test for this
   func _jvpAddingProduct(
     _ lhs: Self, 
     _ rhs: Self
@@ -293,31 +322,7 @@ where
       dlhs * rhs + drhs * lhs + dSelf 
     })
   }
-/*
-  @usableFromInline
-  @derivative(of: negate)
-  mutating func _vjpAddProduct(
-    _ lhs: Self, 
-    _ rhs: Self
-  ) -> (value: Void, pullback: (inout Self) -> (Void, Self, Self)) {
-fatalError()
-  //  addProduct(lhs, rhs)
-  //  return ((), { v in (v * rhs, v * lhs) })
-  }
 
-  @inlinable
-  @derivative(of: Self.addProduct) // try static?
-  func _jvpAddProduct(
-    _ lhs: Self, 
-    _ rhs: Self
-  ) -> (value: Void, differential: (Self, Self, Self) -> Self) {
-  fatalError()
-  //  addProduct(lhs, rhs)
-  //  return ((), { (dSelf, dlhs, drhs) in 
-  //    dSelf = dlhs * rhs + drhs * lhs + dSelf 
-  //  })
-  }
-*/
   @inlinable
   @derivative(of: squareRoot)
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
@@ -326,20 +331,16 @@ fatalError()
   }
 
   @inlinable
-  @derivative(of: squareRoot)
+  @derivative(of: squareRoot) // TODO: add test for this
   func _jvpSquareRoot() -> (value: Self, differential: (Self) -> Self) {
     let value = squareRoot()
     return (value, { dx in dx / (2 * value) })
   }
-/*
-  @inlinable
-  @derivative(of: formSquareRoot)
-  mutating func 
-*/
+
   @inlinable
   @derivative(of: minimum)
-  static func _vjpMinimum(
-    _ x: Self, 
+  static func _vjpMinimum( // TODO: differentiate minimumMagnitude using gyb loop
+    _ x: Self,
     _ y: Self
   ) -> ( // TODO: try using `Self` instead of `TangentVector` here
     value: Self, pullback: (Self) -> (Self, Self)
@@ -349,8 +350,8 @@ fatalError()
   }
 
   @inlinable
-  @derivative(of: minimum)
-  static func _jvpMinimum(
+  @derivative(of: minimum) // TODO: add test for this
+  static func _jvpMinimum( // TODO: differentiate minimumMagnitude using gyb loop
     _ x: Self, 
     _ y: Self
   ) -> (
@@ -362,7 +363,7 @@ fatalError()
 
   @inlinable
   @derivative(of: maximum)
-  static func _vjpMaximum(
+  static func _vjpMaximum( // TODO: differentiate maximumMagnitude using gyb loop
     _ x: Self, 
     _ y: Self
   ) -> (
@@ -373,8 +374,8 @@ fatalError()
   }
 
   @inlinable
-  @derivative(of: maximum)
-  static func _jvpMaximum(
+  @derivative(of: maximum) // TODO: add test for this
+  static func _jvpMaximum( // TODO: differentiate maximumMagnitude using gyb loop
     _ x: Self, 
     _ y: Self
   ) -> (
