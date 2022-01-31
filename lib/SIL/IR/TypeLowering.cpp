@@ -1686,6 +1686,15 @@ namespace {
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
     }
+    
+    TypeLowering *handleInfinite(CanType type,
+                                 RecursiveProperties properties) {
+      // Infinite types cannot actually be instantiated, so treat them as
+      // opaque for code generation purposes.
+      properties.setAddressOnly();
+      properties.setInfinite();
+      return handleAddressOnly(type, properties);
+    }
 
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     TypeLowering * \
@@ -1779,6 +1788,12 @@ namespace {
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
+      // Bail out if the struct layout relies on itself.
+      TypeConverter::LowerAggregateTypeRAII loweringStruct(TC, structType);
+      if (loweringStruct.IsInfinite) {
+        return handleInfinite(structType, properties);
+      }
+
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
@@ -1820,6 +1835,12 @@ namespace {
       RecursiveProperties properties;
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      // Bail out if the enum layout relies on itself.
+      TypeConverter::LowerAggregateTypeRAII loweringEnum(TC, enumType);
+      if (loweringEnum.IsInfinite) {
+        return handleInfinite(enumType, properties);
+      }
 
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
