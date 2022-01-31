@@ -36,6 +36,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunction.h"
@@ -79,6 +80,19 @@ struct ArgumentDecoderInfo {
 
   CanSILFunctionType getMethodType() const { return MethodType; }
 
+  CanGenericSignature getGenericSignature() const {
+    return MethodType->getInvocationGenericSignature();
+  }
+
+  GenericSignature::RequiredProtocols getProtocolRequirements() const {
+    auto signature = getGenericSignature();
+    auto genericParams = signature.getGenericParams();
+
+    // func decodeNextArgument<Arg : <SerializationRequirement>() throws -> Arg
+    assert(genericParams.size() == 1);
+    return signature->getRequiredProtocols(genericParams.front());
+  }
+
   /// Form a callee to a decode method - `decodeNextArgument`.
   Callee getCallee() const;
 };
@@ -114,6 +128,10 @@ private:
   void decodeArgument(unsigned argumentIdx, const ArgumentDecoderInfo &decoder,
                       llvm::Value *argumentType, const SILParameterInfo &param,
                       Explosion &arguments);
+
+  void lookupWitnessTables(llvm::Value *value,
+                           GenericSignature::RequiredProtocols protocols,
+                           Explosion &witnessTables);
 
   /// Load witness table addresses (if any) from the given buffer
   /// into the given argument explosion.
@@ -329,6 +347,10 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
   // substitution Argument -> <argument metadata>
   decodeArgs.add(argumentType);
 
+  // Lookup witness tables for the requirement on the argument type.
+  lookupWitnessTables(argumentType, decoder.getProtocolRequirements(),
+                      decodeArgs);
+
   Address calleeErrorSlot;
   llvm::Value *decodeError = nullptr;
 
@@ -423,6 +445,37 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
                                                  arguments);
     break;
   }
+  }
+}
+
+void DistributedAccessor::lookupWitnessTables(
+    llvm::Value *value, GenericSignature::RequiredProtocols protocols,
+    Explosion &witnessTables) {
+  auto conformsToProtocol = IGM.getConformsToProtocolFn();
+
+  for (auto *protocol : protocols) {
+    auto *protocolDescriptor = IGM.getAddrOfProtocolDescriptor(protocol);
+    auto *witnessTable =
+        IGF.Builder.CreateCall(conformsToProtocol, {value, protocolDescriptor});
+
+    auto failBB = IGF.createBasicBlock("missing-witness");
+    auto contBB = IGF.createBasicBlock("");
+
+    auto isNull = IGF.Builder.CreateICmpEQ(
+        witnessTable, llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+    IGF.Builder.CreateCondBr(isNull, failBB, contBB);
+
+    // This operation shouldn't fail because runtime should have checked that
+    // a particular argument type conforms to `SerializationRequirement`
+    // of the distributed actor the decoder is used for. If it does fail
+    // then accessor should trap.
+    {
+      IGF.Builder.emitBlock(failBB);
+      IGF.emitTrap("missing witness table", /*EmitUnreachable=*/true);
+    }
+
+    IGF.Builder.emitBlock(contBB);
+    witnessTables.add(witnessTable);
   }
 }
 
