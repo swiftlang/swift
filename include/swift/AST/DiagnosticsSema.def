@@ -1925,6 +1925,11 @@ NOTE(invalid_nominal_extension_rewrite,none,
 // Protocols
 ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
+
+// FIXME: SwiftUI source compatibility hack; see usage for details.
+WARNING(type_does_not_conform_swiftui_warning,none,
+        "type %0 does not conform to protocol %1", (Type, Type))
+
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))
 
@@ -1953,11 +1958,11 @@ NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
 REMARK(add_predates_concurrency_import,none,
-     "add '@_predatesConcurrency' to %select{suppress|treat}0 "
+     "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
 REMARK(remove_predates_concurrency_import,none,
-     "'@_predatesConcurrency' attribute on module %0 is unused", (Identifier))
+     "'@preconcurrency' attribute on module %0 is unused", (Identifier))
 WARNING(public_decl_needs_sendable,none,
         "public %0 %1 does not specify whether it is 'Sendable' or not",
         (DescriptiveDeclKind, DeclName))
@@ -2300,6 +2305,10 @@ NOTE(protocol_witness_type_conflict,none,
 NOTE(protocol_witness_missing_requirement,none,
      "candidate would match if %0 %select{conformed to|subclassed|"
      "was the same type as}2 %1", (Type, Type, unsigned))
+NOTE(protocol_type_witness_missing_requirement,none,
+     "candidate would match if the conformance required that %0 "
+     "%select{conformed to|subclassed|was the same type as}2 %1",
+     (Type, Type, unsigned))
 
 NOTE(protocol_witness_optionality_conflict,none,
      "candidate %select{type has|result type has|parameter type has|"
@@ -2764,6 +2773,8 @@ ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
   "inheritance from non-protocol type %0", (Type))
+ERROR(inheritance_from_parametrized_protocol,none,
+  "cannot inherit from parametrized protocol type %0", (Type))
 ERROR(superclass_not_first,none,
   "superclass %0 must appear first in the inheritance clause", (Type))
 ERROR(superclass_not_open,none,
@@ -2781,6 +2792,8 @@ ERROR(inheritance_from_class_with_missing_vtable_entries,none,
       "cannot inherit from class %0 because it has overridable members that "
       "could not be loaded",
       (Identifier))
+NOTE(inheritance_from_class_with_missing_vtable_entry, none,
+     "could not deserialize %0", (DeclName))
 ERROR(inheritance_from_class_with_missing_vtable_entries_versioned,none,
       "cannot inherit from class %0 (compiled with Swift %1) because it has "
       "overridable members that could not be loaded in Swift %2",
@@ -3703,6 +3716,12 @@ ERROR(not_a_generic_definition,none,
       "cannot specialize a non-generic definition", ())
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
+ERROR(parametrized_protocol_not_supported,none,
+      "protocol type with generic argument can only be used as a generic constraint", ())
+ERROR(protocol_does_not_have_primary_assoc_type,none,
+      "cannot specialize protocol type %0", (Type))
+ERROR(protocol_cannot_have_multiple_generic_arguments,none,
+      "protocol type %0 can only be specialized with exactly one argument", (Type))
 ERROR(cannot_specialize_self,none,
       "cannot specialize 'Self'", ())
 NOTE(specialize_explicit_type_instead,none,
@@ -4441,6 +4460,12 @@ ERROR(distributed_actor_protocol_illegal_inheritance,none,
       (DeclName))
 ERROR(broken_distributed_actor_requirement,none,
       "DistributedActor protocol is broken: unexpected requirement", ())
+ERROR(distributed_actor_system_conformance_missing_adhoc_requirement,none,
+      "%0 %1 is missing witness for protocol requirement %2"
+      "", (DescriptiveDeclKind, DeclName, DeclName))
+NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
+      "protocol %0 requires function %1 with signature:\n%2",
+     (DeclName, DeclName, StringRef))
 
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
@@ -4746,7 +4771,9 @@ ERROR(global_actor_non_unsafe_init,none,
       "global actor attribute %0 argument can only be '(unsafe)'", (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
-      
+ERROR(global_actor_top_level_var,none,
+      "top-level code variables cannot have a global actor", ())
+
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
       (DescriptiveDeclKind, DeclName, StringRef, StringRef))
@@ -5313,6 +5340,17 @@ ERROR(nonobjc_not_allowed,none,
 #undef OBJC_DIAG_SELECT_2
 #undef OBJC_DIAG_SELECT
 #undef OBJC_ATTR_SELECT
+
+//------------------------------------------------------------------------------
+// MARK: @exclusivity
+//------------------------------------------------------------------------------
+ERROR(exclusivity_on_wrong_decl,none,
+      "@exclusivity can only be used on class properties, static properties and global variables",
+      ())
+
+ERROR(exclusivity_on_computed_property,none,
+      "@exclusivity can only be used on stored properties",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: @_borrowed

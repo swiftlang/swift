@@ -78,28 +78,6 @@ TypeChecker::gatherGenericParamBindingsText(
   return result.str().str();
 }
 
-// An alias to avoid repeating the `SmallVector`'s size parameter.
-using CollectedOpaqueReprs = SmallVector<OpaqueReturnTypeRepr *, 2>;
-
-/// Walk `repr` recursively, collecting any `OpaqueReturnTypeRepr`s.
-static CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *repr) {
-  class Walker : public ASTWalker {
-    CollectedOpaqueReprs &Reprs;
-
-  public:
-    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
-
-    bool walkToTypeReprPre(TypeRepr *repr) override {
-      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
-        Reprs.push_back(opaqueRepr);
-      return true;
-    }
-  };
-
-  CollectedOpaqueReprs reprs;
-  repr->walk(Walker(reprs));
-  return reprs;
-}
 
 //
 // Generic functions
@@ -206,7 +184,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
   } else {
-    opaqueReprs = collectOpaqueReturnTypeReprs(repr);
+    opaqueReprs = repr->collectOpaqueReturnTypeReprs();
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> requirements;
     for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
@@ -250,25 +228,17 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
 
       // Error out if the constraint type isn't a class or existential type.
       if (!constraintType->getClassOrBoundGenericClass() &&
-          !constraintType->isExistentialType()) {
+          !constraintType->is<ProtocolType>() &&
+          !constraintType->is<ProtocolCompositionType>() &&
+          !constraintType->is<ParametrizedProtocolType>()) {
         ctx.Diags.diagnose(currentRepr->getLoc(),
                            diag::opaque_type_invalid_constraint);
         return nullptr;
       }
 
-      if (constraintType->hasArchetype())
-        constraintType = constraintType->mapTypeOutOfContext();
-
-      if (constraintType->getClassOrBoundGenericClass()) {
-        requirements.push_back(
-            Requirement(RequirementKind::Superclass, paramType,
-                        constraintType));
-      } else {
-        // In this case, the constraint type is an existential
-        requirements.push_back(
-            Requirement(RequirementKind::Conformance, paramType,
-                        constraintType));
-      }
+      assert(!constraintType->hasArchetype());
+      requirements.emplace_back(RequirementKind::Conformance, paramType,
+                                constraintType);
     }
 
     interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
@@ -558,6 +528,21 @@ static Type formExtensionInterfaceType(
   // Find the nominal type declaration and its parent type.
   if (type->is<ProtocolCompositionType>())
     type = type->getCanonicalType();
+
+  // A parametrized protocol type is not a nominal. Unwrap it to get
+  // the underlying nominal, and record a same-type requirement for
+  // the primary associated type.
+  if (auto *paramProtoTy = type->getAs<ParametrizedProtocolType>()) {
+    auto *protoTy = paramProtoTy->getBaseType();
+    type = protoTy;
+
+    auto *depMemTy = DependentMemberType::get(
+        protoTy->getDecl()->getSelfInterfaceType(),
+        paramProtoTy->getAssocType());
+    sameTypeReqs.emplace_back(
+      RequirementKind::SameType, depMemTy,
+      paramProtoTy->getArgumentType());
+  }
 
   Type parentType = type->getNominalParent();
   GenericTypeDecl *genericDecl = type->getAnyGeneric();

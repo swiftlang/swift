@@ -271,7 +271,12 @@ GlobalActorAttributeRequest::evaluate(
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     // Subscripts and properties are fine...
     if (auto var = dyn_cast<VarDecl>(storage)) {
-      if (var->getDeclContext()->isLocalContext()) {
+      if (var->isTopLevelGlobal() &&
+          var->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel) {
+        var->diagnose(diag::global_actor_top_level_var)
+            .highlight(globalActorAttr->getRangeWithAt());
+        return None;
+      } else if (var->getDeclContext()->isLocalContext()) {
         var->diagnose(diag::global_actor_on_local_variable, var->getName())
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
@@ -717,15 +722,15 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
       isExplicitSendableConformance() ||
       hasExplicitSendableConformance(nominal);
 
-  // Determine whether this nominal type is visible via a @_predatesConcurrency
+  // Determine whether this nominal type is visible via a @preconcurrency
   // import.
   auto import = findImportFor(nominal, fromDC);
 
   // When the type is explicitly non-Sendable...
   if (isExplicitlyNonSendable) {
-    // @_predatesConcurrency imports downgrade the diagnostic to a warning.
-    if (import && import->options.contains(ImportFlags::PredatesConcurrency)) {
-      // FIXME: Note that this @_predatesConcurrency import was "used".
+    // @preconcurrency imports downgrade the diagnostic to a warning.
+    if (import && import->options.contains(ImportFlags::Preconcurrency)) {
+      // FIXME: Note that this @preconcurrency import was "used".
       return DiagnosticBehavior::Warning;
     }
 
@@ -734,10 +739,10 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 
   // When the type is implicitly non-Sendable...
 
-  // @_predatesConcurrency suppresses the diagnostic in Swift 5.x, and
+  // @preconcurrency suppresses the diagnostic in Swift 5.x, and
   // downgrades it to a warning in Swift 6 and later.
-  if (import && import->options.contains(ImportFlags::PredatesConcurrency)) {
-    // FIXME: Note that this @_predatesConcurrency import was "used".
+  if (import && import->options.contains(ImportFlags::Preconcurrency)) {
+    // FIXME: Note that this @preconcurrency import was "used".
     return nominalModule->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
         ? DiagnosticBehavior::Warning
         : DiagnosticBehavior::Ignore;
@@ -797,29 +802,29 @@ static bool diagnoseSingleNonSendableType(
         nominal->getName());
 
     // If we found the import that makes this nominal type visible, remark
-    // that it can be @_predatesConcurrency import.
+    // that it can be @preconcurrency import.
     // Only emit this remark once per source file, because it can happen a
     // lot.
-    if (import && !import->options.contains(ImportFlags::PredatesConcurrency) &&
+    if (import && !import->options.contains(ImportFlags::Preconcurrency) &&
         import->importLoc.isValid() && sourceFile &&
-        !sourceFile->hasImportUsedPredatesConcurrency(*import)) {
+        !sourceFile->hasImportUsedPreconcurrency(*import)) {
       SourceLoc importLoc = import->importLoc;
       ctx.Diags.diagnose(
           importLoc, diag::add_predates_concurrency_import,
           ctx.LangOpts.isSwiftVersionAtLeast(6),
           nominal->getParentModule()->getName())
-        .fixItInsert(importLoc, "@_predatesConcurrency ");
+        .fixItInsert(importLoc, "@preconcurrency ");
 
-      sourceFile->setImportUsedPredatesConcurrency(*import);
+      sourceFile->setImportUsedPreconcurrency(*import);
     }
   }
 
   // If we found an import that makes this nominal type visible, and that
-  // was a @_predatesConcurrency import, note that we have made use of the
+  // was a @preconcurrency import, note that we have made use of the
   // attribute.
-  if (import && import->options.contains(ImportFlags::PredatesConcurrency) &&
+  if (import && import->options.contains(ImportFlags::Preconcurrency) &&
       sourceFile) {
-    sourceFile->setImportUsedPredatesConcurrency(*import);
+    sourceFile->setImportUsedPreconcurrency(*import);
   }
 
   return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
@@ -1728,6 +1733,12 @@ namespace {
           }
         }
 
+        // Look through defers.
+        // FIXME: should this be covered automatically by the logic below?
+        if (auto func = dyn_cast<FuncDecl>(dc))
+          if (func->isDeferBody())
+            continue;
+
         if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
           // @Sendable functions are nonisolated.
           if (func->isSendable())
@@ -1779,12 +1790,26 @@ namespace {
       return nullptr;
     }
 
+    static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
+      auto fn = dyn_cast<FuncDecl>(dc);
+      if (!fn) return nullptr;
+      if (fn->isDeferBody())
+        return findAnnotatableFunction(fn->getDeclContext());
+      return fn;
+    }
+
     /// Note when the enclosing context could be put on a global actor.
     void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
       // If we are in a synchronous function on the global actor,
       // suggest annotating with the global actor itself.
-      if (auto fn = dyn_cast<FuncDecl>(dc)) {
-        if (!isa<AccessorDecl>(fn) && !fn->isAsyncContext()) {
+      if (auto fn = findAnnotatableFunction(dc)) {
+        // Suppress this for accesssors because you can't change the
+        // actor isolation of an individual accessor.  Arguably we could
+        // add this to the entire storage declaration, though.
+        // Suppress this for async functions out of caution; but don't
+        // suppress it if we looked through a defer.
+        if (!isa<AccessorDecl>(fn) &&
+            (!fn->isAsyncContext() || fn != dc)) {
           switch (getActorIsolation(fn)) {
           case ActorIsolation::ActorInstance:
           case ActorIsolation::DistributedActorInstance:
@@ -2967,7 +2992,7 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
     }
 
     // If the declaration predates concurrency, it has unsafe actor isolation.
-    if (decl->predatesConcurrency())
+    if (decl->preconcurrency())
       isUnsafe = true;
 
     return ActorIsolation::forGlobalActor(
@@ -3463,6 +3488,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If this is a local function, inherit the actor isolation from its
   // context if it global or was captured.
   if (auto func = dyn_cast<FuncDecl>(value)) {
+    // If this is a defer body, inherit unconditionally; we don't
+    // care if the enclosing function captures the isolated parameter.
+    if (func->isDeferBody()) {
+      auto enclosingIsolation =
+                        getActorIsolationOfContext(func->getDeclContext());
+      return inferredIsolation(enclosingIsolation);
+    }
+
     if (func->isLocalCapture() && !func->isSendable()) {
       switch (auto enclosingIsolation =
                   getActorIsolationOfContext(func->getDeclContext())) {
@@ -3505,6 +3538,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
+    ASTContext &ctx = var->getASTContext();
+    if (var->isTopLevelGlobal() &&
+        ctx.LangOpts.EnableExperimentalAsyncTopLevel) {
+      if (Type mainActor = ctx.getMainActorType())
+        return inferredIsolation(
+            ActorIsolation::forGlobalActor(mainActor,
+                                           /*unsafe=*/var->preconcurrency()));
+    }
     if (auto isolation = getActorIsolationFromWrappedProperty(var))
       return inferredIsolation(isolation);
   }
@@ -3957,10 +3998,9 @@ bool swift::checkSendableConformance(
 
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  auto behavior = SendableCheckContext(conformanceDC)
+  auto behavior = SendableCheckContext(conformanceDC, check)
       .defaultDiagnosticBehavior();
   if (conformanceDC->getParentSourceFile() &&
-      nominal->getParentSourceFile() &&
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
                               nominal->getDescriptiveKind(),
@@ -4217,7 +4257,7 @@ static bool hasKnownUnsafeSendableFunctionParams(AbstractFunctionDecl *func) {
 Type swift::adjustVarTypeForConcurrency(
     Type type, VarDecl *var, DeclContext *dc,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType) {
-  if (!var->predatesConcurrency())
+  if (!var->preconcurrency())
     return type;
 
   if (contextRequiresStrictConcurrencyChecking(dc, getType))
@@ -4238,7 +4278,7 @@ Type swift::adjustVarTypeForConcurrency(
 }
 
 /// Adjust a function type for @_unsafeSendable, @_unsafeMainActor, and
-/// @_predatesConcurrency.
+/// @preconcurrency.
 static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     AnyFunctionType *fnType, ValueDecl *decl,
     bool inConcurrencyContext, unsigned numApplies, bool isMainDispatchQueue) {
@@ -4264,7 +4304,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   assert(typeParams.size() == paramDecls->size());
   bool knownUnsafeParams = func && hasKnownUnsafeSendableFunctionParams(func);
   bool stripConcurrency =
-      decl->predatesConcurrency() && !inConcurrencyContext;
+      decl->preconcurrency() && !inConcurrencyContext;
   for (unsigned index : indices(typeParams)) {
     auto param = typeParams[index];
 

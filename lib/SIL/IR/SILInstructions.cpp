@@ -1045,6 +1045,15 @@ StringLiteralInst::StringLiteralInst(SILDebugLocation Loc, StringRef Text,
   SILNode::Bits.StringLiteralInst.TheEncoding = unsigned(encoding);
   SILNode::Bits.StringLiteralInst.Length = Text.size();
   memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
+
+  // It is undefined behavior to feed ill-formed UTF-8 into `Swift.String`;
+  // however, the compiler creates string literals in many places, so there's a
+  // risk of a mistake. StringLiteralInsts can be optimized into
+  // IntegerLiteralInsts before reaching IRGen, so this constructor is the best
+  // chokepoint to validate *all* string literals that may eventually end up in
+  // a binary.
+  assert((encoding == Encoding::Bytes || unicode::isWellFormedUTF8(Text))
+            && "Created StringLiteralInst with ill-formed UTF-8");
 }
 
 StringLiteralInst *StringLiteralInst::create(SILDebugLocation Loc,
@@ -1361,6 +1370,17 @@ unsigned swift::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
   llvm_unreachable("The field decl for a struct_extract, struct_element_addr, "
                    "or ref_element_addr must be an accessible stored "
                    "property of the operand type");
+}
+
+unsigned swift::getNumFieldsInNominal(NominalTypeDecl *decl) {
+  unsigned count = 0;
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
+         superDecl = superDecl->getSuperclassDecl()) {
+      count += superDecl->getStoredProperties().size();
+    }
+  }
+  return count + decl->getStoredProperties().size();
 }
 
 unsigned swift::getCaseIndex(EnumElementDecl *enumElement) {

@@ -491,6 +491,9 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
 
 namespace namelookup {
 
+void extractDirectlyReferencedNominalTypes(
+    Type type, SmallVectorImpl<NominalTypeDecl *> &decls);
+
 /// Once name lookup has gathered a set of results, perform any necessary
 /// steps to prune the result set before returning it to the caller.
 void pruneLookupResultSet(const DeclContext *dc, NLOptions options,

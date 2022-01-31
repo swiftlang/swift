@@ -1263,12 +1263,13 @@ public:
                                                      operand, poisonRefs));
   }
 
-  MoveValueInst *createMoveValue(SILLocation loc, SILValue operand) {
+  MoveValueInst *createMoveValue(SILLocation loc, SILValue operand,
+                                 bool isLexical = false) {
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitMoveValueOperation");
-    return insert(new (getModule())
-                  MoveValueInst(getSILDebugLocation(loc), operand));
+    return insert(new (getModule()) MoveValueInst(getSILDebugLocation(loc),
+                                                  operand, isLexical));
   }
 
   MarkUnresolvedMoveAddrInst *createMarkUnresolvedMoveAddr(SILLocation loc,
@@ -1276,6 +1277,13 @@ public:
                                                            SILValue takeAddr) {
     return insert(new (getModule()) MarkUnresolvedMoveAddrInst(
         getSILDebugLocation(loc), srcAddr, takeAddr));
+  }
+
+  MarkMustCheckInst *
+  createMarkMustCheckInst(SILLocation loc, SILValue src,
+                          MarkMustCheckInst::CheckKind kind) {
+    return insert(new (getModule())
+                      MarkMustCheckInst(getSILDebugLocation(loc), src, kind));
   }
 
   UnconditionalCheckedCastInst *

@@ -51,16 +51,18 @@ class Rule final {
   /// An 'explicit' rule is a generic requirement written by the user.
   unsigned Explicit : 1;
 
-  /// A 'simplified' rule was eliminated by simplifyRewriteSystem() if one of two
-  /// things happen:
-  /// - The rule's left hand side can be reduced via some other rule, in which
-  ///   case completion will have filled in the missing edge if necessary.
-  /// - The rule's right hand side can be reduced, in which case the reduced
-  ///   rule is added when simplifying the rewrite system.
-  ///
-  /// Simplified rules do not participate in term rewriting, because other rules
-  /// can be used to derive an equivalent rewrite path.
-  unsigned Simplified : 1;
+  /// An 'LHS simplified' rule's left hand side was reduced via another rule.
+  /// Set by simplifyLeftHandSides().
+  unsigned LHSSimplified : 1;
+
+  /// An 'RHS simplified' rule's right hand side can be reduced via another rule.
+  /// Set by simplifyRightHandSides().
+  unsigned RHSSimplified : 1;
+
+  /// A 'substitution simplified' rule's left hand side contains substitutions
+  /// which can be reduced via another rule.
+  /// Set by simplifyLeftHandSideSubstitutions().
+  unsigned SubstitutionSimplified : 1;
 
   /// A 'redundant' rule was eliminated by homotopy reduction. Redundant rules
   /// still participate in term rewriting, but they are not part of the minimal
@@ -83,7 +85,9 @@ public:
       : LHS(lhs), RHS(rhs) {
     Permanent = false;
     Explicit = false;
-    Simplified = false;
+    LHSSimplified = false;
+    RHSSimplified = false;
+    SubstitutionSimplified = false;
     Redundant = false;
     Conflicting = false;
   }
@@ -110,8 +114,16 @@ public:
     return Explicit;
   }
 
-  bool isSimplified() const {
-    return Simplified;
+  bool isLHSSimplified() const {
+    return LHSSimplified;
+  }
+
+  bool isRHSSimplified() const {
+    return RHSSimplified;
+  }
+
+  bool isSubstitutionSimplified() const {
+    return SubstitutionSimplified;
   }
 
   bool isRedundant() const {
@@ -127,9 +139,19 @@ public:
             RHS.containsUnresolvedSymbols());
   }
 
-  void markSimplified() {
-    assert(!Simplified);
-    Simplified = true;
+  void markLHSSimplified() {
+    assert(!LHSSimplified);
+    LHSSimplified = true;
+  }
+
+  void markRHSSimplified() {
+    assert(!RHSSimplified);
+    RHSSimplified = true;
+  }
+
+  void markSubstitutionSimplified() {
+    assert(!SubstitutionSimplified);
+    SubstitutionSimplified = true;
   }
 
   void markPermanent() {
@@ -203,6 +225,17 @@ class RewriteSystem final {
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
 
+  /// The set of protocols known to this rewrite system. The boolean associated
+  /// with each key is true if the protocol is part of the 'Protos' set above,
+  /// otherwies it is false.
+  ///
+  /// See RuleBuilder::ProtocolMap for a more complete explanation. For the most
+  /// part, this is only used while building the rewrite system, but conditional
+  /// requirement inference forces us to be able to add new protocols to the
+  /// rewrite system after the fact, so this little bit of RuleBuilder state
+  /// outlives the initialization phase.
+  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
+
   DebugOptions Debug;
 
   /// Whether we've initialized the rewrite system with a call to initialize().
@@ -233,6 +266,10 @@ public:
   /// Return the rewrite context used for allocating memory.
   RewriteContext &getRewriteContext() const { return Context; }
 
+  llvm::DenseMap<const ProtocolDecl *, bool> &getProtocolMap() {
+    return ProtocolMap;
+  }
+
   DebugOptions getDebugOptions() const { return Debug; }
 
   void initialize(bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
@@ -241,6 +278,10 @@ public:
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
     return Protos;
+  }
+
+  bool isKnownProtocol(const ProtocolDecl *proto) const {
+    return ProtocolMap.find(proto) != ProtocolMap.end();
   }
 
   unsigned getRuleID(const Rule &rule) const {
@@ -286,7 +327,9 @@ public:
 
   void simplifyLeftHandSides();
 
-  void simplifyRightHandSidesAndSubstitutions();
+  void simplifyRightHandSides();
+
+  void simplifyLeftHandSideSubstitutions();
 
   enum ValidityPolicy {
     AllowInvalidRequirements,
@@ -296,12 +339,20 @@ public:
   void verifyRewriteRules(ValidityPolicy policy) const;
 
 private:
+  struct CriticalPair {
+    MutableTerm LHS;
+    MutableTerm RHS;
+    RewritePath Path;
+
+    CriticalPair(MutableTerm lhs, MutableTerm rhs, RewritePath path)
+      : LHS(lhs), RHS(rhs), Path(path) {}
+  };
+
   bool
   computeCriticalPair(
       ArrayRef<Symbol>::const_iterator from,
       const Rule &lhs, const Rule &rhs,
-      std::vector<std::pair<MutableTerm, MutableTerm>> &pairs,
-      std::vector<RewritePath> &paths,
+      std::vector<CriticalPair> &pairs,
       std::vector<RewriteLoop> &loops) const;
 
   /// Constructed from a rule of the form X.[P2:T] => X.[P1:T] by
@@ -383,8 +434,6 @@ private:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
-  bool isInMinimizationDomain(ArrayRef<const ProtocolDecl *> protos) const;
-
   void recordRewriteLoop(MutableTerm basepoint,
                          RewritePath path);
 
@@ -403,6 +452,8 @@ private:
       llvm::DenseSet<unsigned> &redundantConformances);
 
 public:
+  bool isInMinimizationDomain(ArrayRef<const ProtocolDecl *> protos) const;
+
   ArrayRef<RewriteLoop> getLoops() const {
     return Loops;
   }

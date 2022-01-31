@@ -313,9 +313,17 @@ namespace swift {
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;
 
+    /// Enable experimental support for opaque parameter types, e.g.
+    /// `func f(collection: some Collection)`.
+    bool EnableExperimentalOpaqueParameters = false;
+
     /// Enable support for explicit existential types via the \c any
     /// keyword.
     bool EnableExplicitExistentialTypes = true;
+
+    /// Enable support for protocol types parametrized by primary
+    /// associated type.
+    bool EnableParametrizedProtocolTypes = false;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
@@ -484,7 +492,7 @@ namespace swift {
         ASTVerifierOverrideKind::NoOverride;
 
     /// Enables merged associated type support, which might go away.
-    bool RequirementMachineMergedAssociatedTypes = true;
+    bool RequirementMachineMergedAssociatedTypes = false;
 
     /// Enables dumping rewrite systems from the requirement machine.
     bool DumpRequirementMachine = false;
@@ -501,7 +509,7 @@ namespace swift {
 
     /// Maximum term length for requirement machine Knuth-Bendix completion
     /// algorithm.
-    unsigned RequirementMachineDepthLimit = 10;
+    unsigned RequirementMachineDepthLimit = 12;
 
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.

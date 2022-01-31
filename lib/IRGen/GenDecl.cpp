@@ -4152,21 +4152,31 @@ void IRGenModule::emitAccessibleFunctions() {
         llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
         mangledRecordName);
 
+    ConstantInitBuilder builder(*this);
+    ConstantStructBuilder fields =
+        builder.beginStruct(AccessibleFunctionRecordTy);
+
     std::string mangledFunctionName =
         LinkEntity::forSILFunction(func).mangleAsString();
     llvm::Constant *name = getAddrOfGlobalString(
         mangledFunctionName, /*willBeRelativelyAddressed*/ true);
-    llvm::Constant *relativeName = emitDirectRelativeReference(name, var, {});
+    fields.addRelativeAddress(name);
+
+    llvm::Constant *genericEnvironment = nullptr;
 
     GenericSignature signature;
     if (auto *env = func->getGenericEnvironment()) {
       signature = env->getGenericSignature();
+      genericEnvironment =
+          getAddrOfGenericEnvironment(signature.getCanonicalSignature());
     }
+
+    fields.addRelativeAddressOrNull(genericEnvironment);
 
     llvm::Constant *type = getTypeRef(func->getLoweredFunctionType(), signature,
                                       MangledTypeRefRole::Metadata)
                                .first;
-    llvm::Constant *relativeType = emitDirectRelativeReference(type, var, {1});
+    fields.addRelativeAddress(type);
 
     llvm::Constant *funcAddr = nullptr;
     if (func->isDistributed()) {
@@ -4178,20 +4188,13 @@ void IRGenModule::emitAccessibleFunctions() {
       funcAddr = getAddrOfSILFunction(func, NotForDefinition);
     }
 
-    llvm::Constant *relativeFuncAddr =
-        emitDirectRelativeReference(funcAddr, var, {2});
+    fields.addRelativeAddress(funcAddr);
 
-    AccessibleFunctionFlags flagsVal;
-    flagsVal.setDistributed(func->isDistributed());
+    AccessibleFunctionFlags flags;
+    flags.setDistributed(func->isDistributed());
+    fields.addInt32(flags.getOpaqueValue());
 
-    llvm::Constant *flags =
-        llvm::ConstantInt::get(Int32Ty, flagsVal.getOpaqueValue());
-
-    llvm::Constant *recordFields[] = {relativeName, relativeType,
-                                      relativeFuncAddr, flags};
-    auto record =
-        llvm::ConstantStruct::get(AccessibleFunctionRecordTy, recordFields);
-    var->setInitializer(record);
+    fields.finishAndSetAsInitializer(var);
     var->setSection(sectionName);
     var->setAlignment(llvm::MaybeAlign(4));
     disableAddressSanitizer(*this, var);

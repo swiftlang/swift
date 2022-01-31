@@ -43,6 +43,17 @@ void checkDistributedActorProperties(const ClassDecl *decl);
 /// The local and resolve distributed actor constructors have special rules to check.
 void checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor);
 
+/// Type-check additional ad-hoc protocol requirements.
+/// Ad-hoc requirements are protocol requirements currently not expressible
+/// in the Swift type-system.
+bool checkDistributedActorSystemAdHocProtocolRequirements(
+    ASTContext &Context,
+    ProtocolDecl *Proto,
+    NormalProtocolConformance *Conformance,
+    Type Adoptee,
+    bool diagnose);
+
+/// Typecheck a distributed method declaration
 bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
 
 /// Determine the distributed actor transport type for the given actor.
@@ -59,6 +70,5 @@ void diagnoseDistributedFunctionInNonDistributedActorProtocol(
 void addCodableFixIt(const NominalTypeDecl *nominal, InFlightDiagnostic &diag);
 
 }
-
 
 #endif /* SWIFT_SEMA_TYPECHECKDISTRIBUTED_H */

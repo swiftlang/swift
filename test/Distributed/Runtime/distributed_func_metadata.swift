@@ -40,8 +40,8 @@ struct ActorAddress: Sendable, Hashable, Codable {
 
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
-  typealias InvocationDecoder = FakeInvocation
-  typealias InvocationEncoder = FakeInvocation
+  typealias InvocationDecoder = FakeInvocationDecoder
+  typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
@@ -67,12 +67,40 @@ struct FakeActorSystem: DistributedActorSystem {
     print("assignID id:\(id)")
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+    Err: Error,
+//          Act.ID == ActorID,
+    Res: SerializationRequirement {
+    fatalError("Not implemented")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Err: Error
+//          Act.ID == ActorID
+  {
+    fatalError("Not implemented")
   }
 }
 
-struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+// === Sending / encoding -------------------------------------------------
+struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
@@ -80,20 +108,16 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
+}
 
-  // === Receiving / decoding -------------------------------------------------
+// === Receiving / decoding -------------------------------------------------
+class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
 
   func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-  ) throws { /* ... */ }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
   func decodeReturnType() throws -> Any.Type? { nil }
   func decodeErrorType() throws -> Any.Type? { nil }
-
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
-  }
 }
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
@@ -118,10 +142,10 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
   static func test_returnType() {
     print("~~ \(#function)")
     // CHECK: _getReturnTypeInfo: empty() = ()
-    print("_getReturnTypeInfo: empty() = \(String(reflecting: _getReturnTypeInfo(mangledMethodName: empty)!))")
+    print("_getReturnTypeInfo: empty() = \(String(reflecting: _getReturnTypeInfo(mangledMethodName: empty, genericEnv: nil, genericArguments: nil)!))")
 
     // CHECK: _getReturnTypeInfo: one(s:) = Swift.Int
-    print("_getReturnTypeInfo: one(s:) = \(String(reflecting: _getReturnTypeInfo(mangledMethodName: one)!))")
+    print("_getReturnTypeInfo: one(s:) = \(String(reflecting: _getReturnTypeInfo(mangledMethodName: one, genericEnv: nil, genericArguments: nil)!))")
   }
 
   static func test_paramTypes() {
@@ -158,7 +182,7 @@ func _withParameterTypeInfo(
 ) {
   let nameUTF8 = Array(name.utf8)
 
-  return try  nameUTF8.withUnsafeBufferPointer { nameUTF8  in
+  return nameUTF8.withUnsafeBufferPointer { nameUTF8  in
     // 1) demangle to get the expected parameter count of the func
     let paramCount = __getParameterCount(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
 
@@ -168,7 +192,7 @@ func _withParameterTypeInfo(
     }
 
     // prepare buffer for the parameter types to be decoded into:
-    var infoBuffer = UnsafeMutableRawBufferPointer
+    let infoBuffer = UnsafeMutableRawBufferPointer
         .allocate(byteCount: MemoryLayout<Any.Type>.size * Int(paramCount),
                   alignment: MemoryLayout<Any.Type>.alignment) // TODO: is this right always?
     defer {
@@ -178,6 +202,8 @@ func _withParameterTypeInfo(
     // 2) demangle and write all parameter types into the prepared buffer
     let decodedNum = __getParameterTypeInfo(
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
+        /*genericEnvironment=*/nil,
+        /*genericArguments=*/nil,
         infoBuffer.baseAddress!._rawValue, Int(paramCount))
 
     // if we failed demangling the types, return an empty array

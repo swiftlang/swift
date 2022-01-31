@@ -6523,6 +6523,8 @@ unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
 
 unsigned getCaseIndex(EnumElementDecl *enumElement);
 
+unsigned getNumFieldsInNominal(NominalTypeDecl *decl);
+
 /// Get the property for a struct or class by its unique index, or nullptr if
 /// the index does not match a property declared in this struct or class or
 /// one its superclasses.
@@ -7457,13 +7459,17 @@ class MoveValueInst
   /// set to false, we shouldn't emit such a diagnostic. This is a short term
   /// addition until we get MoveOnly wrapper types into the SIL type system.
   bool allowDiagnostics = false;
+  bool lexical = false;
 
-  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+  MoveValueInst(SILDebugLocation DebugLoc, SILValue operand, bool isLexical)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
+        lexical(isLexical) {}
 
 public:
   bool getAllowDiagnostics() const { return allowDiagnostics; }
   void setAllowsDiagnostics(bool newValue) { allowDiagnostics = newValue; }
+
+  bool isLexical() const { return lexical; };
 };
 
 /// Equivalent to a copy_addr to [init] except that it is used for diagnostics
@@ -7493,6 +7499,38 @@ public:
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
+
+/// This is a marker instruction that has no effect that is consumed by a
+/// diagnostic based semantic checker. Example: no implicit copy. Only legal in
+/// Raw SIL so that we can guarantee canonical SIL has had all SSA based
+/// checking by the checkers that rely upon this instruction.
+class MarkMustCheckInst
+    : public UnaryInstructionBase<SILInstructionKind::MarkMustCheckInst,
+                                  SingleValueInstruction>,
+      public OwnershipForwardingMixin {
+  friend class SILBuilder;
+
+public:
+  enum class CheckKind : unsigned {
+    Invalid = 0,
+    NoImplicitCopy,
+  };
+
+private:
+  CheckKind kind;
+
+  MarkMustCheckInst(SILDebugLocation DebugLoc, SILValue operand,
+                    CheckKind checkKind)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
+        OwnershipForwardingMixin(SILInstructionKind::MarkMustCheckInst,
+                                 operand->getOwnershipKind()),
+        kind(checkKind) {}
+
+public:
+  CheckKind getCheckKind() const { return kind; }
+
+  bool isNoImplicitCopy() const { return kind == CheckKind::NoImplicitCopy; }
 };
 
 /// Given an object reference, return true iff it is non-nil and refers
@@ -9677,7 +9715,8 @@ inline bool OwnershipForwardingMixin::isa(SILInstructionKind kind) {
          OwnershipForwardingTermInst::classof(kind) ||
          OwnershipForwardingConversionInst::classof(kind) ||
          OwnershipForwardingSelectEnumInstBase::classof(kind) ||
-         OwnershipForwardingMultipleValueInstruction::classof(kind);
+         OwnershipForwardingMultipleValueInstruction::classof(kind) ||
+         kind == SILInstructionKind::MarkMustCheckInst;
 }
 
 inline OwnershipForwardingMixin *
@@ -9698,6 +9737,8 @@ OwnershipForwardingMixin::get(SILInstruction *inst) {
     return result;
   if (auto *result =
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(inst))
+    return result;
+  if (auto *result = dyn_cast<MarkMustCheckInst>(inst))
     return result;
   return nullptr;
 }

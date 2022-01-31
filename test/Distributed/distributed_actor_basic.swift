@@ -23,19 +23,3 @@ distributed actor Second {
     try! await first.one(second: self)
   }
 }
-
-// ==== ------------------------------------------------------------------------
-
-extension First {
-  @_dynamicReplacement (for :_remote_one(second:))
-  nonisolated func _impl_one(second: Second) async throws {
-    fatalError()
-  }
-}
-
-extension Second {
-  @_dynamicReplacement (for :_remote_two(first:second:))
-  nonisolated func _impl_two(first: First, second: Second) async throws {
-    fatalError()
-  }
-}

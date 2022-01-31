@@ -147,12 +147,16 @@ void Rule::dump(llvm::raw_ostream &out) const {
     out << " [permanent]";
   if (Explicit)
     out << " [explicit]";
-  if (Simplified)
-    out << " [simplified]";
+  if (LHSSimplified)
+    out << " [lhs↓]";
+  if (RHSSimplified)
+    out << " [rhs↓]";
+  if (SubstitutionSimplified)
+    out << " [subst↓]";
   if (Redundant)
     out << " [redundant]";
   if (Conflicting)
-    out << "[conflicting]";
+    out << " [conflicting]";
 }
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
@@ -472,7 +476,7 @@ void RewriteSystem::simplifyLeftHandSides() {
 
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
-    if (rule.isSimplified())
+    if (rule.isLHSSimplified())
       continue;
 
     // First, see if the left hand side of this rule can be reduced using
@@ -487,7 +491,8 @@ void RewriteSystem::simplifyLeftHandSides() {
           continue;
 
         // Ignore other deleted rules.
-        if (getRule(*otherRuleID).isSimplified())
+        const auto &otherRule = getRule(*otherRuleID);
+        if (otherRule.isLHSSimplified())
           continue;
 
         if (Debug.contains(DebugFlags::Completion)) {
@@ -497,7 +502,7 @@ void RewriteSystem::simplifyLeftHandSides() {
                        << "\n";
         }
 
-        rule.markSimplified();
+        rule.markLHSSimplified();
         break;
       }
     }
@@ -509,12 +514,12 @@ void RewriteSystem::simplifyLeftHandSides() {
 ///
 /// Must be run after the completion procedure, since the deletion of
 /// rules is only valid to perform if the rewrite system is confluent.
-void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
+void RewriteSystem::simplifyRightHandSides() {
   assert(Complete);
 
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
-    if (rule.isSimplified())
+    if (rule.isRHSSimplified())
       continue;
 
     // Now, try to reduce the right hand side.
@@ -526,7 +531,7 @@ void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
     auto lhs = rule.getLHS();
 
     // We're adding a new rule, so the old rule won't apply anymore.
-    rule.markSimplified();
+    rule.markRHSSimplified();
 
     unsigned newRuleID = Rules.size();
 
@@ -554,16 +559,19 @@ void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
       llvm::dbgs() << "$ Right hand side simplification recorded a loop at ";
       llvm::dbgs() << lhs << ": ";
       loop.dump(llvm::dbgs(), MutableTerm(lhs), *this);
+      llvm::dbgs() << "\n";
     }
 
     recordRewriteLoop(MutableTerm(lhs), loop);
   }
+}
 
-  // Finally try to simplify substitutions in superclass, concrete type and
-  // concrete conformance symbols.
+/// Simplify substitutions in superclass, concrete type and concrete
+/// conformance symbols.
+void RewriteSystem::simplifyLeftHandSideSubstitutions() {
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
-    if (rule.isSimplified())
+    if (rule.isSubstitutionSimplified())
       continue;
 
     auto lhs = rule.getLHS();
@@ -583,7 +591,7 @@ void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
 
     // We're either going to add a new rule or record an identity, so
     // mark the old rule as simplified.
-    rule.markSimplified();
+    rule.markSubstitutionSimplified();
 
     MutableTerm newLHS(lhs.begin(), lhs.end() - 1);
     newLHS.add(symbol);
@@ -607,6 +615,7 @@ void RewriteSystem::simplifyRightHandSidesAndSubstitutions() {
 bool RewriteSystem::isInMinimizationDomain(
     ArrayRef<const ProtocolDecl *> protos) const {
   assert(protos.size() <= 1);
+  assert(Protos.empty() || !protos.empty());
 
   if (protos.empty() && Protos.empty())
     return true;
@@ -641,9 +650,6 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
   }
 
   for (const auto &rule : Rules) {
-    if (rule.isSimplified() || rule.isPermanent())
-      continue;
-
     const auto &lhs = rule.getLHS();
     const auto &rhs = rule.getRHS();
 
@@ -659,7 +665,12 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      if (index != 0 && index != lhs.size() - 1) {
+      // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
+      // which are immediately simplified away.
+      if (!rule.isLHSSimplified() &&
+          !rule.isRHSSimplified() &&
+          !rule.isSubstitutionSimplified() &&
+          index != 0 && index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
@@ -667,11 +678,18 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(rhs)) {
       auto symbol = rhs[index];
 
-      // This is only true if the input requirements were valid.
-      if (policy == DisallowInvalidRequirements) {
-        ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
-      } else {
-        // FIXME: Assert that we diagnosed an error
+      // Permanent rules contain name symbols at the end, like
+      // [P].T => [P:T].
+      if (!rule.isLHSSimplified() &&
+          !rule.isRHSSimplified() &&
+          !rule.isSubstitutionSimplified() &&
+          (!rule.isPermanent() || index == rhs.size() - 1)) {
+        // This is only true if the input requirements were valid.
+        if (policy == DisallowInvalidRequirements) {
+          ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
+        } else {
+          // FIXME: Assert that we diagnosed an error
+        }
       }
 
       ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
@@ -679,6 +697,14 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       if (index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
+      }
+
+      // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
+      // which are immediately simplified away.
+      if (!rule.isLHSSimplified() &&
+          !rule.isRHSSimplified() &&
+          !rule.isSubstitutionSimplified() &&
+          index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }

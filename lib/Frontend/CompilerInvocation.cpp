@@ -445,8 +445,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalNamedOpaqueTypes |=
       Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
+  Opts.EnableExperimentalOpaqueParameters |=
+      Args.hasArg(OPT_enable_experimental_opaque_parameters);
+
   Opts.EnableExplicitExistentialTypes |=
       Args.hasArg(OPT_enable_explicit_existential_types);
+
+  Opts.EnableParametrizedProtocolTypes |=
+      Args.hasArg(OPT_enable_parametrized_protocol_types);
 
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
@@ -1816,10 +1822,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                                           RenderedArgs, SDKPath,
                                           ResourceDir);
     }
-    // TODO: Should we support -fdebug-compilation-dir?
-    llvm::SmallString<256> cwd;
-    llvm::sys::fs::current_path(cwd);
-    Opts.DebugCompilationDir = std::string(cwd.str());
+
+    if (const Arg *A = Args.getLastArg(OPT_file_compilation_dir))
+      Opts.DebugCompilationDir = A->getValue();
+    else {
+      llvm::SmallString<256> cwd;
+      llvm::sys::fs::current_path(cwd);
+      Opts.DebugCompilationDir = std::string(cwd.str());
+    }
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {

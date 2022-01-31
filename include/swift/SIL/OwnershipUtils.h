@@ -182,6 +182,11 @@ public:
     return use->getOwnershipConstraint();
   }
 
+  bool isDirectlyForwarding() const {
+    auto &mixin = *OwnershipForwardingMixin::get(use->getUser());
+    return mixin.isDirectlyForwarding();
+  }
+
   ValueOwnershipKind getForwardingOwnershipKind() const;
   void setForwardingOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
@@ -1203,7 +1208,7 @@ void findTransitiveReborrowBaseValuePairs(
 /// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
 /// its reborrows.
 void visitTransitiveEndBorrows(
-    BorrowedValue beginBorrow,
+    SILValue value,
     function_ref<void(EndBorrowInst *)> visitEndBorrow);
 
 /// Whether the specified lexical begin_borrow instruction is nested.

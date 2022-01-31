@@ -100,7 +100,7 @@ extension Task {
   /// depending on the executor's scheduling details.
   ///
   /// If the task throws an error, this property propagates that error.
-  /// Tasks that respond to cancellation by throwing `Task.CancellationError`
+  /// Tasks that respond to cancellation by throwing `CancellationError`
   /// have that error propagated here upon cancellation.
   ///
   /// - Returns: The task's result.
@@ -289,12 +289,26 @@ extension Task where Success == Never, Failure == Never {
   public static var currentPriority: TaskPriority {
     withUnsafeCurrentTask { task in
       // If we are running on behalf of a task, use that task's priority.
-      if let task = task {
-        return task.priority
+      if let unsafeTask = task {
+         return TaskPriority(rawValue: _taskCurrentPriority(unsafeTask._task))
       }
 
       // Otherwise, query the system.
       return TaskPriority(rawValue: UInt8(_getCurrentThreadPriority()))
+    }
+  }
+
+  /// The current task's base priority.
+  ///
+  /// If you access this property outside of any task, this returns nil
+  @available(SwiftStdlib 5.7, *)
+  public static var basePriority: TaskPriority? {
+    withUnsafeCurrentTask { task in
+      // If we are running on behalf of a task, use that task's priority.
+      if let unsafeTask = task {
+         return TaskPriority(rawValue: _taskBasePriority(unsafeTask._task))
+      }
+      return nil
     }
   }
 }
@@ -752,8 +766,7 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `TaskPriority`
   /// - SeeAlso: `Task.currentPriority`
   public var priority: TaskPriority {
-    getJobFlags(_task).priority ?? TaskPriority(
-        rawValue: UInt8(_getCurrentThreadPriority()))
+    TaskPriority(rawValue: _taskCurrentPriority(_task))
   }
 
   /// Cancel the current task.
@@ -849,6 +862,12 @@ func _taskCancel(_ task: Builtin.NativeObject)
 @_silgen_name("swift_task_isCancelled")
 @usableFromInline
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
+
+@_silgen_name("swift_task_currentPriority")
+internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8
+
+@_silgen_name("swift_task_basePriority")
+internal func _taskBasePriority(_ task: Builtin.NativeObject) -> UInt8
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_createNullaryContinuationJob")

@@ -854,8 +854,10 @@ void swift::findGuaranteedReferenceRoots(SILValue value,
   while (auto value = worklist.pop()) {
     if (auto *arg = dyn_cast<SILPhiArgument>(value)) {
       if (auto *terminator = arg->getSingleTerminator()) {
-        worklist.insert(terminator->getOperand(arg->getIndex()));
-        continue;
+        if (terminator->isTransformationTerminator()) {
+          worklist.insert(terminator->getOperand(0));
+          continue;
+        }
       }
     } else if (auto *inst = value->getDefiningInstruction()) {
       if (auto *result =

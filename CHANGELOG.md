@@ -3,7 +3,7 @@ CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
-## Swift Next
+## Swift 5.7
 
 * [SE-0328][]:
 
@@ -11,13 +11,136 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   within a result type, including having multiple opaque types in the same
   result. For example:
 
-  ```
+  ```swift
   func getSomeDictionary() -> [some Hashable: some Codable] {
     return [ 1: "One", 2: "Two" ]
   }
   ```
 Swift 5.6
 ---------
+
+* Actor isolation checking now understands that `defer` bodies share the isolation of their enclosing function.
+
+  ```swift
+  // Works on global actors
+  @MainActor
+  func runAnimation(controller: MyViewController) async {
+    controller.hasActiveAnimation = true
+    defer { controller.hasActiveAnimation = false }
+
+    // do the animation here...
+  }
+
+  // Works on actor instances
+  actor OperationCounter {
+    var activeOperationCount = 0
+
+    func operate() async {
+      activeOperationCount += 1
+      defer { activeOperationCount -= 1 }
+
+      // do work here...
+    }
+  }
+  ```
+
+* [SE-0335][]:
+
+  Swift now allows existential types to be explicitly written with the `any`
+  keyword, creating a syntactic distinction between existential types and
+  protocol conformance constraints. For example:
+
+  ```swift
+  protocol P {}
+
+  func generic<T>(value: T) where T: P {
+    ...
+  }
+
+  func existential(value: any P) {
+     ...
+  }
+  ```
+
+* [SE-0337][]:
+
+  Swift now provides an incremental migration path to data race safety, allowing
+  APIs to adopt concurrency without breaking their clients that themselves have
+  not adopted concurrency. An existing declaration can introduce
+  concurrency-related annotations (such as making its closure parameters
+  `@Sendable`) and use the `@preconcurrency` attribute to maintain its behavior
+  for clients who have not themselves adopted concurrency:
+
+  ```swift
+  // module A
+  @preconcurrency func runOnSeparateTask(_ workItem: @Sendable () -> Void)
+
+  // module B
+  import A
+
+  class MyCounter {
+    var value = 0
+  }
+
+  func doesNotUseConcurrency(counter: MyCounter) {
+    runOnSeparateTask {
+      counter.value += 1 // no warning, because this code hasn't adopted concurrency
+    }
+  }
+
+  func usesConcurrency(counter: MyCounter) async {
+    runOnSeparateTask {
+      counter.value += 1 // warning: capture of non-Sendable type 'MyCounter'
+    }
+  }
+  ```
+
+  One can enable warnings about data race safety within a module with the
+  `-warn-concurrency` compiler option. When using a module that does not yet
+  provide `Sendable` annotations, one can suppress warnings for types from that
+  module by marking the import with `@preconcurrency`:
+
+  ```swift
+  /// module C
+  public struct Point {
+    public var x, y: Double
+  }
+
+  // module D
+  @preconcurrency import C
+
+  func centerView(at location: Point) {
+    Task {
+      await mainView.center(at: location) // no warning about non-Sendable 'Point' because the @preconcurrency import suppresses it
+    }
+  }
+  ```
+
+* [SE-0302][]:
+
+  Swift will now produce warnings to indicate potential data races when
+  non-`Sendable` types are passed across actor or task boundaries. For
+  example:
+
+  ```swift
+  class MyCounter {
+    var value = 0
+  }
+
+  func f() -> MyCounter {
+    let counter = MyCounter()
+    Task {
+      counter.value += 1  // warning: capture of non-Sendable type 'MyCounter'
+    }
+    return counter
+  }
+  ```
+
+* [SE-0331][]:
+
+  The conformance of the unsafe pointer types (e.g., `UnsafePointer`,
+  `UnsafeMutableBufferPointer`) to the `Sendable` protocols has been removed,
+  because pointers cannot safely be transferred across task or actor boundaries.
 
 * References to `Self` or so-called "`Self` requirements" in the type signatures
   of protocol members are now correctly detected in the parent of a nested type.
@@ -39,7 +162,7 @@ Swift 5.6
     // protocol type (use a generic constraint instead).
     _ = p.method
   }
-  ``` 
+  ```
 
 * [SE-0324][]:
 
@@ -65,6 +188,19 @@ Swift 5.6
       }
   }
   ```
+
+* [SE-0322][]:
+
+  The standard library now provides a new operation
+  `withUnsafeTemporaryAllocation` which provides an efficient temporarily
+  allocation within a limited scope, which will be optimized to use stack
+  allocation when possible.
+
+* [SE-0320][]:
+
+  Dictionaries with keys of any type conforming to the new protocol
+  `CodingKeyRepresentable` can now be encoded and decoded. Formerly, encoding
+  and decoding was limited to keys of type `String` or `Int`.
 
 * [SE-0315][]:
 
@@ -8766,15 +8902,21 @@ Swift 1.0
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
 [SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
 [SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
+[SE-0302]: <https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 [SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
 [SE-0315]: <https://github.com/apple/swift-evolution/blob/main/proposals/0315-placeholder-types.md>
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
+[SE-0320]: <https://github.com/apple/swift-evolution/blob/main/proposals/0320-codingkeyrepresentable.md>
+[SE-0322]: <https://github.com/apple/swift-evolution/blob/main/proposals/0322-temporary-buffers.md>
 [SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
 [SE-0328]: <https://github.com/apple/swift-evolution/blob/main/proposals/0328-structural-opaque-result-types.md>
+[SE-0331]: <https://github.com/apple/swift-evolution/blob/main/proposals/0331-remove-sendable-from-unsafepointer.md>
+[SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
+[SE-0335]: <https://github.com/apple/swift-evolution/blob/main/proposals/0335-existential-any.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

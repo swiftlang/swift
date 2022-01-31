@@ -492,12 +492,15 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
   SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16+1,
+  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16+1+1,
     : NumPadBits,
 
     Depth : 16,
     Index : 16,
-    TypeSequence : 1
+    TypeSequence : 1,
+
+    /// Whether this generic parameter represents an opaque type.
+    IsOpaqueType : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
@@ -898,7 +901,7 @@ public:
   void setHoisted(bool hoisted = true) { Bits.Decl.Hoisted = hoisted; }
 
   /// Whether this declaration predates the introduction of concurrency.
-  bool predatesConcurrency() const;
+  bool preconcurrency() const;
 
 public:
   bool escapedFromIfConfig() const {
@@ -2786,7 +2789,8 @@ public:
   /// Get the ordinal of the anonymous opaque parameter of this decl with type
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
   /// position e.g. `func f() -> some P`. Returns -1 if `repr` is not found.
-  unsigned getAnonymousOpaqueParamOrdinal(OpaqueReturnTypeRepr *repr) const;
+  Optional<unsigned> getAnonymousOpaqueParamOrdinal(
+      OpaqueReturnTypeRepr *repr) const;
 
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
@@ -2993,9 +2997,14 @@ public:
 /// \code
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
-class GenericTypeParamDecl : public AbstractTypeParamDecl {
-public:
-  static const unsigned InvalidDepth = 0xFFFF;
+class GenericTypeParamDecl final :
+    public AbstractTypeParamDecl,
+    private llvm::TrailingObjects<GenericTypeParamDecl, OpaqueReturnTypeRepr *>{
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<OpaqueReturnTypeRepr *>) const {
+    return isOpaqueType() ? 1 : 0;
+  }
 
   /// Construct a new generic type parameter.
   ///
@@ -3006,7 +3015,29 @@ public:
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       bool isTypeSequence, unsigned depth, unsigned index);
+                       bool isTypeSequence, unsigned depth, unsigned index,
+                       bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr);
+
+public:
+  /// Construct a new generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param nameLoc The location of the name.
+  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+                       bool isTypeSequence, unsigned depth, unsigned index)
+      : GenericTypeParamDecl(dc, name, nameLoc, isTypeSequence, depth, index,
+                             false, nullptr) { }
+
+  static const unsigned InvalidDepth = 0xFFFF;
+
+  static GenericTypeParamDecl *
+  create(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+         bool isTypeSequence, unsigned depth, unsigned index,
+         bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr);
 
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
@@ -3034,8 +3065,32 @@ public:
   /// \code
   /// func foo<@_typeSequence T>(_ : T...) { }
   /// struct Foo<@_typeSequence T> { }
-  /// \encode
+  /// \endcode
   bool isTypeSequence() const { return Bits.GenericTypeParamDecl.TypeSequence; }
+
+  /// Determine whether this generic parameter represents an opaque type.
+  ///
+  /// \code
+  /// // "some P" is representated by a generic type parameter.
+  /// func f() -> [some P] { ... }
+  /// \endcode
+  bool isOpaqueType() const {
+    return Bits.GenericTypeParamDecl.IsOpaqueType;
+  }
+
+  /// Retrieve the opaque return type representation described by this
+  /// generic parameter, or NULL if any of the following are true:
+  ///   - the generic parameter does not describe an opaque type
+  ///   - the opaque type was introduced via the "named opaque parameters"
+  ///     extension, meaning that it was specified explicitly
+  ///   - the enclosing declaration was deserialized, in which case it lost
+  ///     the source location information and has no type representation.
+  OpaqueReturnTypeRepr *getOpaqueTypeRepr() const {
+    if (!isOpaqueType())
+      return nullptr;
+
+    return *getTrailingObjects<OpaqueReturnTypeRepr *>();
+  }
 
   /// The index of this generic type parameter within its generic parameter
   /// list.
@@ -3364,13 +3419,14 @@ public:
                                           OptionSet<LookupDirectFlags> flags =
                                           OptionSet<LookupDirectFlags>());
 
-  /// Find the '_remote_<...>' counterpart function to a 'distributed func'.
-  ///
-  /// If the passed in function is not distributed this function returns null.
-  AbstractFunctionDecl* lookupDirectRemoteFunc(AbstractFunctionDecl *func);
+  /// Find the distributed actor system instance of this distributed actor.
+  VarDecl *getDistributedActorSystemProperty() const;
 
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
-  ValueDecl *getDistributedActorIDProperty() const;
+  VarDecl *getDistributedActorIDProperty() const;
+
+  /// Find the 'RemoteCallTarget.init(_mangledName:)' initializer function
+  ConstructorDecl* getDistributedRemoteCallTargetInitFunction() const;
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -4371,6 +4427,11 @@ public:
   /// saves loading the set of members in cases where there's no possibility of
   /// a protocol having nested types (ObjC protocols).
   ArrayRef<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
+
+  /// Returns the primary associated type, or nullptr if there isn't one. This is
+  /// the associated type that is parametrized with a same-type requirement in a
+  /// parametrized protocol type of the form SomeProtocol<SomeArgType>.
+  AssociatedTypeDecl *getPrimaryAssociatedType() const;
 
   /// Returns a protocol requirement with the given name, or nullptr if the
   /// name has multiple overloads, or no overloads at all.
@@ -6245,10 +6306,6 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
-  /// Get (or synthesize)  the associated remote function for this one.
-  /// For example, for `distributed func hi()` get `func _remote_hi()`.
-  AbstractFunctionDecl *getDistributedActorRemoteFuncDecl() const;
-
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
@@ -6387,6 +6444,11 @@ public:
     return getBodyKind() == BodyKind::SILSynthesize
     && getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
   }
+
+  /// Determines whether this function is a 'remoteCall' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedActorSystem' protocol.
+  bool isDistributedActorSystemRemoteCall(bool isVoidReturn) const;
 
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.

@@ -191,6 +191,8 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
     return cast<ProtocolType>(type)->requiresClass();
   case TypeKind::ProtocolComposition:
     return cast<ProtocolCompositionType>(type)->requiresClass();
+  case TypeKind::ParametrizedProtocol:
+    return cast<ParametrizedProtocolType>(type)->getBaseType()->requiresClass();
   case TypeKind::Existential:
     return isReferenceTypeImpl(cast<ExistentialType>(type).getConstraintType(),
                                sig, functionsCount);
@@ -293,6 +295,15 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   protocols = { members.data(), members.size() };
 }
 
+ExistentialLayout::ExistentialLayout(ParametrizedProtocolType *type) {
+  assert(type->isCanonical());
+
+  *this = ExistentialLayout(type->getBaseType());
+  sameTypeRequirements = {
+      reinterpret_cast<PrimaryAssociatedTypeRequirement *>(&type->AssocType),
+      1
+  };
+}
 
 ExistentialLayout TypeBase::getExistentialLayout() {
   return getCanonicalType().getExistentialLayout();
@@ -307,6 +318,9 @@ ExistentialLayout CanType::getExistentialLayout() {
 
   if (auto proto = dyn_cast<ProtocolType>(*this))
     return ExistentialLayout(proto);
+
+  if (auto param = dyn_cast<ParametrizedProtocolType>(*this))
+    return ExistentialLayout(param);
 
   auto comp = cast<ProtocolCompositionType>(*this);
   return ExistentialLayout(comp);
@@ -1497,6 +1511,14 @@ CanType TypeBase::computeCanonicalType() {
     Result = Composition.getPointer();
     break;
   }
+  case TypeKind::ParametrizedProtocol: {
+    auto *PPT = cast<ParametrizedProtocolType>(this);
+    auto Base = cast<ProtocolType>(PPT->getBaseType()->getCanonicalType());
+    auto Arg = PPT->getArgumentType()->getCanonicalType();
+    auto &C = Base->getASTContext();
+    Result = ParametrizedProtocolType::get(C, Base, Arg).getPointer();
+    break;
+  }
   case TypeKind::Existential: {
     auto *existential = cast<ExistentialType>(this);
     auto constraint = existential->getConstraintType()->getCanonicalType();
@@ -1557,6 +1579,49 @@ CanType TypeBase::computeCanonicalType() {
 
 CanType TypeBase::getCanonicalType(GenericSignature sig) {
   return sig.getCanonicalTypeInContext(this);
+}
+
+CanType TypeBase::getMinimalCanonicalType() const {
+  const auto MinimalTy = getCanonicalType().transform([](Type Ty) -> Type {
+    const CanType CanTy = CanType(Ty);
+
+    if (const auto ET = dyn_cast<ExistentialType>(CanTy)) {
+      const auto PCT =
+          dyn_cast<ProtocolCompositionType>(ET.getConstraintType());
+      if (!PCT) {
+        return CanTy;
+      }
+
+      const auto MinimalTy = PCT->getMinimalCanonicalType();
+      if (MinimalTy->getClassOrBoundGenericClass()) {
+        return MinimalTy;
+      }
+
+      return ExistentialType::get(MinimalTy);
+    }
+
+    if (const auto EM = dyn_cast<ExistentialMetatypeType>(CanTy)) {
+      const auto PCT = dyn_cast<ProtocolCompositionType>(EM.getInstanceType());
+      if (!PCT) {
+        return CanTy;
+      }
+
+      const auto MinimalTy = PCT->getMinimalCanonicalType();
+      if (MinimalTy->getClassOrBoundGenericClass()) {
+        return MetatypeType::get(MinimalTy);
+      }
+
+      return ExistentialMetatypeType::get(MinimalTy);
+    }
+
+    if (const auto Composition = dyn_cast<ProtocolCompositionType>(CanTy)) {
+      return Composition->getMinimalCanonicalType();
+    }
+
+    return CanTy;
+  });
+
+  return CanType(MinimalTy);
 }
 
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
@@ -3000,10 +3065,15 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
   auto ext1 = fn1->getExtInfo();
   auto ext2 = fn2->getExtInfo();
   if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
-    if (ext2.isThrowing()) {
+    // Removing 'throwing' is ABI-compatible for synchronous functions, but
+    // not for async ones.
+    if (ext2.isThrowing() &&
+        !(ext2.isAsync() &&
+          matchMode.contains(TypeMatchFlags::AllowABICompatible))) {
       ext1 = ext1.withThrows(true);
     }
   }
+
   // If specified, allow an escaping function parameter to override a
   // non-escaping function parameter when the parameter is optional.
   // Note that this is checking 'ext2' rather than 'ext1' because parameters
@@ -3333,6 +3403,7 @@ getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
 OpaqueSubstitutionKind
 ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
+  const auto *inContext = getContext();
   auto inModule = inContext ? inContext->getParentModule()
                             : opaque->getParentModule();
   return shouldPerformSubstitution(opaque, inModule, contextExpansion);
@@ -3376,12 +3447,11 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
   return OpaqueSubstitutionKind::SubstituteNonResilientModule;
 }
 
-static Type
-substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
-                                    ResilienceExpansion contextExpansion,
-                                    bool isWholeModuleContext) {
+static Type substOpaqueTypesWithUnderlyingTypesRec(
+    Type ty, const DeclContext *inContext, ResilienceExpansion contextExpansion,
+    bool isWholeModuleContext, SmallPtrSetImpl<OpaqueTypeDecl *> &decls) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
-                                                 isWholeModuleContext);
+                                                 isWholeModuleContext, decls);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -3441,6 +3511,13 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
   llvm_unreachable("invalid subsitution kind");
 }
 
+ReplaceOpaqueTypesWithUnderlyingTypes::ReplaceOpaqueTypesWithUnderlyingTypes(
+    const DeclContext *inContext, ResilienceExpansion contextExpansion,
+    bool isWholeModuleContext, llvm::SmallPtrSetImpl<OpaqueTypeDecl *> &seen)
+    : contextExpansion(contextExpansion),
+      inContextAndIsWholeModule(inContext, isWholeModuleContext),
+      seenDecls(&seen) {}
+
 Type ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(SubstitutableType *maybeOpaqueType) const {
   auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
@@ -3468,8 +3545,8 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
-  auto inContext = this->inContext;
-  auto isContextWholeModule = this->isContextWholeModule;
+  auto inContext = this->getContext();
+  auto isContextWholeModule = this->isWholeModule();
   if (inContext &&
       partialSubstTy.findIf(
           [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
@@ -3488,18 +3565,39 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
   // If the type changed, but still contains opaque types, recur.
   if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
-    return ::substOpaqueTypesWithUnderlyingTypes(
-        substTy, inContext, contextExpansion, isContextWholeModule);
+    if (auto *alreadySeen = this->seenDecls) {
+      // Detect substitution loops. If we find one, just bounce the original
+      // type back to the caller. This substitution will fail at runtime
+      // instead.
+      if (!alreadySeen->insert(opaqueRoot->getDecl()).second) {
+        return maybeOpaqueType;
+      }
+
+      auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
+          substTy, inContext, contextExpansion, isContextWholeModule,
+          *alreadySeen);
+      alreadySeen->erase(opaqueRoot->getDecl());
+      return res;
+    } else {
+      // We're the top of the stack for the recursion check. Allocate a set of
+      // opaque result type decls we've already seen for the rest of the check.
+      SmallPtrSet<OpaqueTypeDecl *, 8> seenDecls;
+      seenDecls.insert(opaqueRoot->getDecl());
+      return ::substOpaqueTypesWithUnderlyingTypesRec(
+          substTy, inContext, contextExpansion, isContextWholeModule,
+          seenDecls);
+    }
   }
 
   return substTy;
 }
 
-static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypes(
+static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
     ProtocolConformanceRef ref, Type origType, const DeclContext *inContext,
-    ResilienceExpansion contextExpansion, bool isWholeModuleContext) {
+    ResilienceExpansion contextExpansion, bool isWholeModuleContext,
+    SmallPtrSetImpl<OpaqueTypeDecl *> &decls) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
-                                                 isWholeModuleContext);
+                                                 isWholeModuleContext, decls);
   return ref.subst(origType, replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
@@ -3527,6 +3625,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
     // SIL type lowering may have already substituted away the opaque type, in
     // which case we'll end up "substituting" the same type.
     if (maybeOpaqueType->isEqual(replacementType)) {
+      const auto *inContext = getContext();
       assert(inContext && "Need context for already-substituted opaque types");
       return inContext->getParentModule()
                       ->lookupConformance(replacementType, protocol);
@@ -3556,8 +3655,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
-  auto inContext = this->inContext;
-  auto isContextWholeModule = this->isContextWholeModule;
+  auto inContext = this->getContext();
+  auto isContextWholeModule = this->isWholeModule();
   if (partialSubstTy.findIf(
           [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
@@ -3580,8 +3679,28 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return ::substOpaqueTypesWithUnderlyingTypes(
-        substRef, substTy, inContext, contextExpansion, isContextWholeModule);
+    if (auto *alreadySeen = this->seenDecls) {
+      // Detect substitution loops. If we find one, just bounce the original
+      // type back to the caller. This substitution will fail at runtime
+      // instead.
+      if (!alreadySeen->insert(opaqueRoot->getDecl()).second) {
+        return abstractRef;
+      }
+
+      auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
+          substRef, substTy, inContext, contextExpansion, isContextWholeModule,
+          *alreadySeen);
+      alreadySeen->erase(opaqueRoot->getDecl());
+      return res;
+    } else {
+      // We're the top of the stack for the recursion check. Allocate a set of
+      // opaque result type decls we've already seen for the rest of the check.
+      SmallPtrSet<OpaqueTypeDecl *, 8> seenDecls;
+      seenDecls.insert(opaqueRoot->getDecl());
+      return ::substOpaqueTypesWithUnderlyingTypesRec(
+          substRef, substTy, inContext, contextExpansion, isContextWholeModule,
+          seenDecls);
+    }
   }
   return substRef;
 }
@@ -3701,6 +3820,24 @@ void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(T.getPointer());
 }
 
+ParametrizedProtocolType::ParametrizedProtocolType(
+    const ASTContext *ctx,
+    ProtocolType *base, Type arg,
+    RecursiveTypeProperties properties)
+  : TypeBase(TypeKind::ParametrizedProtocol, /*Context=*/ctx, properties),
+    Base(base), AssocType(base->getDecl()->getPrimaryAssociatedType()),
+    Arg(arg) {
+  assert(AssocType != nullptr &&
+         "Protocol doesn't have a primary associated type");
+}
+
+void ParametrizedProtocolType::Profile(llvm::FoldingSetNodeID &ID,
+                                       ProtocolType *baseTy,
+                                       Type argTy) {
+  ID.AddPointer(baseTy);
+  ID.AddPointer(argTy.getPointer());
+}
+
 bool ProtocolType::requiresClass() {
   return getDecl()->requiresClass();
 }
@@ -3712,6 +3849,16 @@ bool ProtocolCompositionType::requiresClass() {
 Type ProtocolCompositionType::get(const ASTContext &C,
                                   ArrayRef<Type> Members,
                                   bool HasExplicitAnyObject) {
+  // Fast path for 'AnyObject' and 'Any'.
+  if (Members.empty()) {
+    return build(C, Members, HasExplicitAnyObject);
+  }
+
+  // If there's a single member and no layout constraint, return that type.
+  if (Members.size() == 1 && !HasExplicitAnyObject) {
+    return Members.front();
+  }
+
   for (Type t : Members) {
     if (!t->isCanonical())
       return build(C, Members, HasExplicitAnyObject);
@@ -3730,11 +3877,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   if (Superclass)
     HasExplicitAnyObject = false;
 
-  // If one protocol remains with no further constraints, its nominal
-  // type is the canonical type.
-  if (Protocols.size() == 1 && !Superclass && !HasExplicitAnyObject)
-    return Protocols.front()->getDeclaredInterfaceType();
-
   // Form the set of canonical protocol types from the protocol
   // declarations, and use that to build the canonical composition type.
   SmallVector<Type, 4> CanTypes;
@@ -3744,9 +3886,63 @@ Type ProtocolCompositionType::get(const ASTContext &C,
       Protocols, std::back_inserter(CanTypes),
       [](ProtocolDecl *Proto) { return Proto->getDeclaredInterfaceType(); });
 
-  // TODO: Canonicalize away HasExplicitAnyObject if it is implied
-  // by one of our member protocols.
+  // If one member remains and no layout constraint, return that type.
+  if (CanTypes.size() == 1 && !HasExplicitAnyObject)
+    return CanTypes.front();
+
   return build(C, CanTypes, HasExplicitAnyObject);
+}
+
+CanType ProtocolCompositionType::getMinimalCanonicalType() const {
+  const CanType CanTy = getCanonicalType();
+
+  // If the canonical type is not a composition, it's minimal.
+  const auto Composition = dyn_cast<ProtocolCompositionType>(CanTy);
+  if (!Composition) {
+    return CanTy;
+  }
+
+  // Nothing to minimize.
+  if (Composition->getMembers().empty()) {
+    return CanTy;
+  }
+
+  // The only cases we're missing out on proper minimization is when a
+  // composition has an explicit superclass or AnyObject constraint.
+  if (!Composition->hasExplicitAnyObject() &&
+      !Composition->getMembers().front()->getClassOrBoundGenericClass()) {
+    // Already minimal.
+    return CanTy;
+  }
+
+  auto &Ctx = CanTy->getASTContext();
+
+  // Use generic signature minimization: the requirements of the signature will
+  // represent the minimal composition.
+  const auto Sig = Ctx.getOpenedArchetypeSignature(CanTy);
+  const auto &Reqs = Sig.getRequirements();
+  if (Reqs.size() == 1) {
+    return Reqs.front().getSecondType()->getCanonicalType();
+  }
+
+  llvm::SmallVector<Type, 2> MinimalMembers;
+  bool MinimalHasExplicitAnyObject = false;
+  for (const auto &Req : Reqs) {
+    switch (Req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+      MinimalMembers.push_back(Req.getSecondType());
+      break;
+    case RequirementKind::Layout:
+      MinimalHasExplicitAnyObject = true;
+      break;
+    case RequirementKind::SameType:
+      llvm_unreachable("");
+    }
+  }
+
+  // The resulting composition is necessarily canonical.
+  return CanType(build(Ctx, MinimalMembers, MinimalHasExplicitAnyObject));
 }
 
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
@@ -4683,6 +4879,8 @@ case TypeKind::Id:
       changed |= fieldTy != transformed;
       newFields.push_back(SILField(transformed, f.isMutable()));
     }
+    if (!changed)
+      return *this;
     boxTy = SILBoxType::get(Ptr->getASTContext(),
                             SILLayout::get(Ptr->getASTContext(),
                                            l->getGenericSignature(), newFields),
@@ -5370,6 +5568,36 @@ case TypeKind::Id:
                                         substMembers,
                                         pc->hasExplicitAnyObject());
   }
+
+  case TypeKind::ParametrizedProtocol: {
+    auto *ppt = cast<ParametrizedProtocolType>(base);
+    Type base = ppt->getBaseType();
+    Type arg = ppt->getArgumentType();
+
+    bool anyChanged = false;
+
+    auto substBase = base.transformRec(fn);
+    if (!substBase)
+      return Type();
+
+    if (substBase.getPointer() != base.getPointer())
+      anyChanged = true;
+
+    auto substArg = arg.transformRec(fn);
+    if (!substArg)
+      return Type();
+
+    if (substArg.getPointer() != arg.getPointer())
+      anyChanged = true;
+
+    if (!anyChanged)
+      return *this;
+
+    return ParametrizedProtocolType::get(
+        Ptr->getASTContext(),
+        substBase->castTo<ProtocolType>(),
+        substArg);
+  }
   }
   
   llvm_unreachable("Unhandled type in transformation");
@@ -5527,6 +5755,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     if (auto superclass = layout.getSuperclass())
       return superclass->getReferenceCounting();
     return ReferenceCounting::Unknown;
+  }
+
+  case TypeKind::ParametrizedProtocol: {
+    return cast<ParametrizedProtocolType>(this)
+      ->getBaseType()
+      ->getReferenceCounting();
   }
 
   case TypeKind::Existential:

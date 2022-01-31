@@ -1504,10 +1504,10 @@ void swift::findTransitiveReborrowBaseValuePairs(
 }
 
 void swift::visitTransitiveEndBorrows(
-    BorrowedValue beginBorrow,
+    SILValue value,
     function_ref<void(EndBorrowInst *)> visitEndBorrow) {
   GraphNodeWorklist<SILValue, 4> worklist;
-  worklist.insert(beginBorrow.value);
+  worklist.insert(value);
 
   while (!worklist.empty()) {
     auto val = worklist.pop();

@@ -26,6 +26,11 @@ namespace swift {
   class ProtocolType;
   class ProtocolCompositionType;
 
+struct PrimaryAssociatedTypeRequirement {
+  AssociatedTypeDecl *AssocType;
+  Type Argument;
+};
+
 struct ExistentialLayout {
   enum Kind { Class, Error, Opaque };
 
@@ -37,6 +42,7 @@ struct ExistentialLayout {
 
   ExistentialLayout(ProtocolType *type);
   ExistentialLayout(ProtocolCompositionType *type);
+  ExistentialLayout(ParametrizedProtocolType *type);
 
   /// The explicit superclass constraint, if any.
   Type explicitSuperclass;
@@ -108,6 +114,10 @@ private:
 
   /// Zero or more protocol constraints from a ProtocolCompositionType
   ArrayRef<Type> protocols;
+
+  /// Zero or more primary associated type requirements from a
+  /// ParametrizedProtocolType
+  ArrayRef<PrimaryAssociatedTypeRequirement> sameTypeRequirements;
 };
 
 }

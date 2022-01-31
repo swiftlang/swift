@@ -54,40 +54,60 @@ struct FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocationEncoder() -> InvocationDecoder {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+    Err: Error,
+//          Act.ID == ActorID,
+    Res: SerializationRequirement {
+    fatalError("Not implemented")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Err: Error
+//          Act.ID == ActorID
+  {
+    fatalError("Not implemented")
   }
 }
 
-struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
-  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
-  mutating func doneRecording() throws {}
+  func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  func doneRecording() throws {}
 
   // === Receiving / decoding -------------------------------------------------
 
   func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-  ) throws { /* ... */ }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
   func decodeReturnType() throws -> Any.Type? { nil }
   func decodeErrorType() throws -> Any.Type? { nil }
-
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
-  }
 }
 
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test() async throws {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   let local = Capybara(system: system)
   // await local.eat() // SHOULD ERROR

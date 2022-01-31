@@ -1047,9 +1047,9 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
       auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
       if (!name.empty()) {
-        auto paramDecl = createDecl<GenericTypeParamDecl>(
+        auto paramDecl = GenericTypeParamDecl::create(
             getAssociatedModule(), name, SourceLoc(), paramTy->isTypeSequence(),
-            paramTy->getDepth(), paramTy->getIndex());
+            paramTy->getDepth(), paramTy->getIndex(), false, nullptr);
         paramTy = paramDecl->getDeclaredInterfaceType()
                    ->castTo<GenericTypeParamType>();
       }
@@ -2680,16 +2680,18 @@ public:
     bool isTypeSequence;
     unsigned depth;
     unsigned index;
+    bool isOpaqueType;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, isTypeSequence, depth, index);
+        scratch, nameID, isImplicit, isTypeSequence, depth, index,
+        isOpaqueType);
 
     // Always create GenericTypeParamDecls in the associated file; the real
     // context will reparent them.
     auto *DC = MF.getFile();
-    auto genericParam = MF.createDecl<GenericTypeParamDecl>(
+    auto genericParam = GenericTypeParamDecl::create(
         DC, MF.getIdentifier(nameID), SourceLoc(), isTypeSequence, depth,
-        index);
+        index, isOpaqueType, /*opaqueTypeRepr=*/nullptr);
     declOrOffset = genericParam;
 
     if (isImplicit)
@@ -4416,11 +4418,25 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Exclusivity_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::ExclusivityDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) ExclusivityAttr((ExclusivityAttr::Mode)kind);
+        break;
+      }
+
       case decls_block::Effects_DECL_ATTR: {
         unsigned kind;
-        serialization::decls_block::EffectsDeclAttrLayout::readRecord(scratch,
-                                                                      kind);
-        Attr = new (ctx) EffectsAttr((EffectsKind)kind);
+        IdentifierID customStringID;
+        serialization::decls_block::EffectsDeclAttrLayout::
+          readRecord(scratch, kind, customStringID);
+        if (customStringID) {
+          assert((EffectsKind)kind == EffectsKind::Custom);
+          Attr = new (ctx) EffectsAttr(MF.getIdentifier(customStringID).str());
+        } else {
+          Attr = new (ctx) EffectsAttr((EffectsKind)kind);
+        }
         break;
       }
       case decls_block::OriginallyDefinedIn_DECL_ATTR: {
@@ -5604,6 +5620,26 @@ public:
     return ProtocolCompositionType::get(ctx, protocols, hasExplicitAnyObject);
   }
 
+  Expected<Type> deserializeParametrizedProtocolType(ArrayRef<uint64_t> scratch,
+                                                     StringRef blobData) {
+
+    uint64_t baseTyID, argTyID;
+
+    decls_block::ParametrizedProtocolTypeLayout::readRecord(scratch,
+                                                            baseTyID, argTyID);
+
+    auto baseTy = MF.getTypeChecked(baseTyID);
+    if (!baseTy)
+      return baseTy.takeError();
+
+    auto argTy = MF.getTypeChecked(argTyID);
+    if (!argTy)
+      return argTy.takeError();
+
+    return ParametrizedProtocolType::get(
+        ctx, (*baseTy)->castTo<ProtocolType>(), *argTy);
+  }
+
   Expected<Type> deserializeExistentialType(ArrayRef<uint64_t> scratch,
                                             StringRef blobData) {
     TypeID constraintID;
@@ -6364,13 +6400,6 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
     assert(!Err && "unable to read default witness table");
     (void)Err;
   }
-}
-
-void ModuleFile::diagnoseMissingNamedMember(const IterableDeclContext *IDC,
-                                            DeclName name) {
-  // TODO: Implement diagnostics for failed member lookups from module files.
-  llvm_unreachable(
-      "Missing member diangosis is not implemented for module files.");
 }
 
 static llvm::Error consumeErrorIfXRefNonLoadedModule(llvm::Error &&error) {

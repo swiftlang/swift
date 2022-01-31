@@ -76,7 +76,7 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RuleBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, System.getProtocolMap());
   builder.addRequirements(sig.getRequirements());
 
   // Add the initial set of rewrite rules to the rewrite system.
@@ -115,7 +115,7 @@ RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
     llvm::dbgs() << " {\n";
   }
 
-  RuleBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, System.getProtocolMap());
   builder.addProtocols(protos);
 
   // Add the initial set of rewrite rules to the rewrite system.
@@ -157,7 +157,7 @@ void RequirementMachine::initWithAbstractRequirements(
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RuleBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, System.getProtocolMap());
   builder.addRequirements(requirements);
 
   // Add the initial set of rewrite rules to the rewrite system.
@@ -200,7 +200,7 @@ RequirementMachine::initWithWrittenRequirements(
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RuleBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, System.getProtocolMap());
   builder.addRequirements(requirements);
 
   // Add the initial set of rewrite rules to the rewrite system.
@@ -288,9 +288,10 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   if (Sig)
     out << Sig;
   else if (!Params.empty()) {
-    out << "fresh signature ";
+    out << "fresh signature <";
     for (auto paramTy : Params)
       out << " " << Type(paramTy);
+    out << " >";
   } else {
     auto protos = System.getProtocols();
     assert(!protos.empty());

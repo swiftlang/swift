@@ -526,7 +526,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr,
-      subclassScope, hasCReferences, effect, numSpecAttrs,
+      subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, isDistributed;
   ArrayRef<uint64_t> SemanticsIDs;
@@ -534,7 +534,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr,
-      subclassScope, hasCReferences, effect, numSpecAttrs,
+      subclassScope, hasCReferences, effect, numAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, isDistributed, funcTyID, replacedFunctionID,
       genericSigID, clangNodeOwnerID, SemanticsIDs);
@@ -700,8 +700,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   }
 
   // Read and instantiate the specialize attributes.
-  bool shouldAddAtttributes = fn->getSpecializeAttrs().empty();
-  while (numSpecAttrs--) {
+  bool shouldAddSpecAtttrs = fn->getSpecializeAttrs().empty();
+  bool shouldAddEffectAttrs = !fn->hasArgumentEffects();
+  for (unsigned attrIdx = 0; attrIdx < numAttrs; ++attrIdx) {
     llvm::Expected<llvm::BitstreamEntry> maybeNext =
         SILCursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeNext)
@@ -714,6 +715,20 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     if (!maybeKind)
       return maybeKind.takeError();
     unsigned kind = maybeKind.get();
+    
+    if (kind == SIL_ARG_EFFECTS_ATTR) {
+      IdentifierID effectID;
+      unsigned isDerived;
+      SILArgEffectsAttrLayout::readRecord(scratch, effectID, isDerived);
+      if (shouldAddEffectAttrs) {
+        StringRef effectStr = MF->getIdentifierText(effectID);
+        auto error = fn->parseEffects(effectStr, /*fromSIL*/ true, isDerived, {});
+        (void)error;
+        assert(!error.first && "effects deserialization error");
+      }
+      continue;
+    }
+
     assert(kind == SIL_SPECIALIZE_ATTR && "Missing specialization attribute");
 
     unsigned exported;
@@ -752,7 +767,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     auto specializedSig = MF->getGenericSignature(specializedSigID);
     // Only add the specialize attributes once.
-    if (shouldAddAtttributes) {
+    if (shouldAddSpecAtttrs) {
       // Read the substitution list and construct a SILSpecializeAttr.
       fn->addSpecializeAttr(SILSpecializeAttr::create(
           SILMod, specializedSig, exported != 0, specializationKind, target,
@@ -1984,12 +1999,25 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   case SILInstructionKind::MoveValueInst: {
     auto Ty = MF->getType(TyID);
-    auto AllowsDiagnostics = bool(Attr);
+    bool AllowsDiagnostics = Attr & 0x1;
+    bool IsLexical = (Attr >> 1) & 0x1;
     auto *MVI = Builder.createMoveValue(
         Loc,
-        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        IsLexical);
     MVI->setAllowsDiagnostics(AllowsDiagnostics);
     ResultInst = MVI;
+    break;
+  }
+
+  case SILInstructionKind::MarkMustCheckInst: {
+    using CheckKind = MarkMustCheckInst::CheckKind;
+    auto Ty = MF->getType(TyID);
+    auto CKind = CheckKind(Attr);
+    ResultInst = Builder.createMarkMustCheckInst(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        CKind);
     break;
   }
 

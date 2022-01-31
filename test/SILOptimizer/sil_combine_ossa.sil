@@ -4218,6 +4218,27 @@ bb0(%0 : @guaranteed $B):
   return %2 : $B
 }
 
+// Check that a mark_dependence on an enum on a lexical value doesn't result in
+// RAUWing the enum with the lexical value and extending the latter's lifetime.
+//
+// CHECK-LABEL: sil [ossa] @mark_dependence_base1_lexical1 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*Builtin.Int64, [[INSTANCE:%[^,]+]] : @owned $B):
+// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK:         [[OPTIONAL:%[^,]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[LIFETIME]]
+// CHECK:         [[DEPENDENT_ADDR:%[^,]+]] = mark_dependence [[ADDR]]
+// CHECK:         [[VALUE:%[^,]+]] = load [trivial] [[DEPENDENT_ADDR]]
+// CHECK:         return [[VALUE]]
+// CHECK-LABEL: } // end sil function 'mark_dependence_base1_lexical1'
+sil [ossa] @mark_dependence_base1_lexical1 : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
+bb0(%addr : $*Builtin.Int64, %instance : @owned $B):
+  %lifetime = move_value [lexical] %instance : $B
+  %optional = enum $FakeOptional<B>, #FakeOptional.some!enumelt, %lifetime : $B
+  %dependent_addr = mark_dependence %addr : $*Builtin.Int64 on %optional : $FakeOptional<B>
+  %value = load [trivial] %dependent_addr : $*Builtin.Int64
+  destroy_value %optional : $FakeOptional<B>
+  return %value : $Builtin.Int64
+}
+
 protocol _NSArrayCore {}
 
 // CHECK-LABEL: sil [ossa] @mark_dependence_base2 :

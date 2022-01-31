@@ -574,7 +574,8 @@ public:
           value = SILValue(SGF.B.createBeginBorrow(PrologueLoc, value,
                                                    /*isLexical*/ true));
           value = SGF.B.createCopyValue(PrologueLoc, value);
-          value = SGF.B.createMoveValue(PrologueLoc, value);
+          value = SGF.B.createMarkMustCheckInst(
+              PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
         } else {
           value = SILValue(
               SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true));
@@ -1798,14 +1799,16 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   }
 
   if (getASTContext().LangOpts.EnableExperimentalMoveOnly) {
-    if (auto *mvi = dyn_cast<MoveValueInst>(Val.getDefiningInstruction())) {
-      if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
-        if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
-          if (bbi->isLexical()) {
-            B.emitDestroyValueOperation(silLoc, mvi);
-            B.createEndBorrow(silLoc, bbi);
-            B.emitDestroyValueOperation(silLoc, bbi->getOperand());
-            return;
+    if (auto *mvi = dyn_cast<MarkMustCheckInst>(Val.getDefiningInstruction())) {
+      if (mvi->isNoImplicitCopy()) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
+          if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {
+            if (bbi->isLexical()) {
+              B.emitDestroyValueOperation(silLoc, mvi);
+              B.createEndBorrow(silLoc, bbi);
+              B.emitDestroyValueOperation(silLoc, bbi->getOperand());
+              return;
+            }
           }
         }
       }

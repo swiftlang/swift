@@ -386,9 +386,13 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
 
     const auto &otherRule = getRule(found->second);
 
-    // Prefer to delete "less canonical" rules.
-    if (rule.compare(otherRule, Context) > 0)
+    // If the new rule is conflicting, don't compare the rules at all
+    // and prefer to delete the new rule. Otherwise, prefer to delete
+    // the less canonical of the two rules.
+    if (rule.isConflicting() ||
+        rule.compare(otherRule, Context) > 0) {
       found = pair;
+    }
   }
 
   if (!found)
@@ -477,18 +481,20 @@ void RewriteSystem::minimizeRewriteSystem() {
   propagateExplicitBits();
 
   // First pass:
-  // - Eliminate all simplified non-conformance rules.
+  // - Eliminate all LHS-simplified non-conformance rules.
+  // - Eliminate all RHS-simplified and substitution-simplified rules.
   // - Eliminate all rules with unresolved symbols.
   performHomotopyReduction([&](unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
-    if (rule.isSimplified() &&
+    if (rule.isLHSSimplified() &&
         !rule.isAnyConformanceRule())
       return true;
 
-    // Other rules involving unresolved name symbols are derived from an
-    // associated type introduction rule together with a conformance rule.
-    // They are eliminated in the first pass.
+    if (rule.isRHSSimplified() ||
+        rule.isSubstitutionSimplified())
+      return true;
+
     if (rule.getLHS().containsUnresolvedSymbols())
       return true;
 
@@ -688,11 +694,11 @@ void RewriteSystem::verifyMinimizedRules(
       continue;
     }
 
-    // Simplified rules should be redundant, unless they're protocol conformance
-    // rules, which unfortunately might no be redundant, because we try to keep
-    // them in the original protocol definition for compatibility with the
-    // GenericSignatureBuilder's minimization algorithm.
-    if (rule.isSimplified() &&
+    // LHS-simplified rules should be redundant, unless they're protocol
+    // conformance rules, which unfortunately might no be redundant, because
+    // we try to keep them in the original protocol definition for
+    // compatibility with the GenericSignatureBuilder's minimization algorithm.
+    if (rule.isLHSSimplified() &&
         !rule.isRedundant() &&
         !rule.isProtocolConformanceRule()) {
       llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
@@ -700,8 +706,19 @@ void RewriteSystem::verifyMinimizedRules(
       abort();
     }
 
+    // RHS-simplified and substitution-simplified rules should be redundant.
+    if ((rule.isRHSSimplified() ||
+         rule.isSubstitutionSimplified()) &&
+        !rule.isRedundant()) {
+      llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+
     if (rule.isRedundant() &&
         rule.isAnyConformanceRule() &&
+        !rule.isRHSSimplified() &&
+        !rule.isSubstitutionSimplified() &&
         !rule.containsUnresolvedSymbols() &&
         !redundantConformances.count(ruleID)) {
       llvm::errs() << "Minimal conformance is redundant: " << rule << "\n\n";

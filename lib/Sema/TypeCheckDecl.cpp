@@ -694,6 +694,17 @@ ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
+AssociatedTypeDecl *
+PrimaryAssociatedTypeRequest::evaluate(Evaluator &evaluator,
+                                       ProtocolDecl *decl) const {
+  for (auto *assocType : decl->getAssociatedTypeMembers()) {
+    if (assocType->getAttrs().hasAttribute<PrimaryAssociatedTypeAttr>())
+      return assocType;
+  }
+
+  return nullptr;
+}
+
 bool
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<ClassDecl>(decl))
@@ -1083,6 +1094,14 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   if (!rawTy) {
     return std::make_tuple<>();
   }
+  
+  // Avoid computing raw values for enum cases in swiftinterface files since raw
+  // values are intentionally omitted from them (unless the enum is @objc).
+  // Without bailing here, incorrect raw values can be automatically generated
+  // and incorrect diagnostics may be omitted for some decls.
+  SourceFile *Parent = ED->getDeclContext()->getParentSourceFile();
+  if (Parent && Parent->Kind == SourceFileKind::Interface && !ED->isObjC())
+    return std::make_tuple<>();
 
   if (!computeAutomaticEnumValueKind(ED)) {
     return std::make_tuple<>();
@@ -2603,11 +2622,6 @@ static ArrayRef<Decl *> evaluateMembersRequest(
         (void) var->getPropertyWrapperInitializerInfo();
       }
     }
-
-    // For a distributed function, add the remote function.
-    if (auto *func = dyn_cast<FuncDecl>(member)) {
-      (void) func->getDistributedActorRemoteFuncDecl();
-    }
   }
 
   SortedDeclList synthesizedMembers;
@@ -2773,7 +2787,8 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   }
 
   // Cannot extend function types, tuple types, etc.
-  if (!extendedType->getAnyNominal()) {
+  if (!extendedType->getAnyNominal() &&
+      !extendedType->is<ParametrizedProtocolType>()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
     return error();

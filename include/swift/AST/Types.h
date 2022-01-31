@@ -499,6 +499,11 @@ public:
   /// associated types, or type parameters that have been made concrete.
   CanType getCanonicalType(GenericSignature sig);
 
+  /// Canonical protocol composition types are minimized only to a certain
+  /// degree to preserve ABI compatibility. This routine enables performing
+  /// slower, but stricter minimization at need (e.g. redeclaration checking).
+  CanType getMinimalCanonicalType() const;
+
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
   TypeBase *reconstituteSugar(bool Recursive);
@@ -5175,7 +5180,12 @@ public:
   /// given set of members.
   static Type get(const ASTContext &C, ArrayRef<Type> Members,
                   bool HasExplicitAnyObject);
-  
+
+  /// Canonical protocol composition types are minimized only to a certain
+  /// degree to preserve ABI compatibility. This routine enables performing
+  /// slower, but stricter minimization at need (e.g. redeclaration checking).
+  CanType getMinimalCanonicalType() const;
+
   /// Retrieve the set of members composed to create this type.
   ///
   /// For non-canonical types, this can contain classes, protocols and
@@ -5232,6 +5242,70 @@ private:
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
+
+/// ParametrizedProtocolType - A type that constrains the primary associated
+/// type of a protocol to an argument type.
+///
+/// Written like a bound generic type, eg Sequence<Int>.
+///
+/// For now, these are only supported in generic requirement-like contexts:
+/// - Inheritance clauses of protocols, generic parameters, associated types
+/// - Conformance requirements in where clauses
+/// - Extensions
+///
+/// Assuming that the primary associated type of Sequence is Element, the
+/// desugaring is that T : Sequence<Int> is equivalent to
+///
+/// \code
+/// T : Sequence where T.Element == Int.
+/// \endcode
+class ParametrizedProtocolType final : public TypeBase,
+    public llvm::FoldingSetNode {
+  friend struct ExistentialLayout;
+
+  ProtocolType *Base;
+  AssociatedTypeDecl *AssocType;
+  Type Arg;
+
+public:
+  /// Retrieve an instance of a protocol composition type with the
+  /// given set of members.
+  static Type get(const ASTContext &C, ProtocolType *base,
+                  Type arg);
+
+  ProtocolType *getBaseType() const {
+    return Base;
+  }
+
+  AssociatedTypeDecl *getAssocType() const {
+    return AssocType;
+  }
+
+  Type getArgumentType() const {
+    return Arg;
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, Base, Arg);
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ProtocolType *base,
+                      Type arg);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ParametrizedProtocol;
+  }
+  
+private:
+  ParametrizedProtocolType(const ASTContext *ctx,
+                           ProtocolType *base, Type arg,
+                           RecursiveTypeProperties properties);
+};
+BEGIN_CAN_TYPE_WRAPPER(ParametrizedProtocolType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getArgumentType)
+END_CAN_TYPE_WRAPPER(ParametrizedProtocolType, Type)
 
 /// An existential type, spelled with \c any .
 ///
@@ -5598,15 +5672,21 @@ enum class OpaqueSubstitutionKind {
 /// archetypes with underlying types visible at a given resilience expansion
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
-public:
-  const DeclContext *inContext;
   ResilienceExpansion contextExpansion;
-  bool isContextWholeModule;
+  llvm::PointerIntPair<const DeclContext *, 1, bool> inContextAndIsWholeModule;
+  llvm::SmallPtrSetImpl<OpaqueTypeDecl *> *seenDecls;
+
+public:
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
                                         ResilienceExpansion contextExpansion,
                                         bool isWholeModuleContext)
-      : inContext(inContext), contextExpansion(contextExpansion),
-        isContextWholeModule(isWholeModuleContext) {}
+      : contextExpansion(contextExpansion),
+        inContextAndIsWholeModule(inContext, isWholeModuleContext),
+        seenDecls(nullptr) {}
+
+  ReplaceOpaqueTypesWithUnderlyingTypes(
+      const DeclContext *inContext, ResilienceExpansion contextExpansion,
+      bool isWholeModuleContext, llvm::SmallPtrSetImpl<OpaqueTypeDecl *> &seen);
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -5622,6 +5702,13 @@ public:
   static OpaqueSubstitutionKind
   shouldPerformSubstitution(OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
                             ResilienceExpansion contextExpansion);
+
+private:
+  const DeclContext *getContext() const {
+    return inContextAndIsWholeModule.getPointer();
+  }
+
+  bool isWholeModule() const { return inContextAndIsWholeModule.getInt(); }
 };
 
 /// An archetype that represents the dynamic type of an opened existential.

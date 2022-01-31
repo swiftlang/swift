@@ -13,6 +13,7 @@
 #include "SILParserFunctionBuilder.h"
 #include "SILParserState.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -949,6 +950,12 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
   }
 }
 
+struct ArgEffectLoc {
+  SourceLoc start;
+  SourceLoc end;
+  bool isDerived;
+};
+
 static bool parseDeclSILOptional(bool *isTransparent,
                                  IsSerialized_t *isSerialized,
                                  bool *isCanonical,
@@ -970,8 +977,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  ValueDecl **ClangDecl,
-                                 EffectsKind *MRK, SILParser &SP,
-                                 SILModule &M) {
+                                 EffectsKind *MRK,
+                             llvm::SmallVectorImpl<ArgEffectLoc> *argEffectLocs,
+                                 SILParser &SP, SILModule &M) {
   while (SP.P.consumeIf(tok::l_square)) {
     if (isLet && SP.P.Tok.is(tok::kw_let)) {
       *isLet = true;
@@ -1176,8 +1184,21 @@ static bool parseDeclSILOptional(bool *isTransparent,
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
-    }
-    else {
+    } else if (argEffectLocs && (SP.P.Tok.getText() == "escapes" ||
+                                 SP.P.Tok.getText() == "defined_escapes")) {
+      bool isDerived = SP.P.Tok.getText() == "escapes";
+      SP.P.consumeToken();
+      do {
+        SourceLoc effectsStart = SP.P.Tok.getLoc();
+        while (SP.P.Tok.isNot(tok::r_square, tok::comma, tok::eof)) {
+          SP.P.consumeToken();
+        }
+        SourceLoc effectsEnd = SP.P.Tok.getLoc();
+        argEffectLocs->push_back({effectsStart, effectsEnd, isDerived});
+      } while (SP.P.consumeIf(tok::comma));
+      SP.P.consumeToken();
+      continue;
+    } else {
       SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
       return true;
     }
@@ -3275,22 +3296,57 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   case SILInstructionKind::MoveValueInst: {
     bool allowsDiagnostics = false;
+    bool isLexical = false;
+
     StringRef AttrName;
-    if (parseSILOptional(AttrName, *this)) {
-      if (!AttrName.equals("allows_diagnostics")) {
-        auto diag = diag::sil_movevalue_invalid_optional_attribute;
-        P.diagnose(InstLoc.getSourceLoc(), diag, AttrName);
+    SourceLoc AttrLoc;
+    while (parseSILOptional(AttrName, AttrLoc, *this)) {
+      if (AttrName == "allows_diagnostics")
+        allowsDiagnostics = true;
+      else if (AttrName == "lexical")
+        isLexical = true;
+      else {
+        P.diagnose(InstLoc.getSourceLoc(),
+                   diag::sil_invalid_attribute_for_instruction, AttrName,
+                   "move_value");
         return true;
       }
-      allowsDiagnostics = true;
     }
 
     if (parseTypedValueRef(Val, B))
       return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    auto *MVI = B.createMoveValue(InstLoc, Val);
+    auto *MVI = B.createMoveValue(InstLoc, Val, isLexical);
     MVI->setAllowsDiagnostics(allowsDiagnostics);
+    ResultVal = MVI;
+    break;
+  }
+
+  case SILInstructionKind::MarkMustCheckInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    StringRef AttrName;
+    if (!parseSILOptional(AttrName, *this)) {
+      auto diag = diag::sil_markmustcheck_requires_attribute;
+      P.diagnose(InstLoc.getSourceLoc(), diag);
+      return true;
+    }
+
+    using CheckKind = MarkMustCheckInst::CheckKind;
+    CheckKind CKind = llvm::StringSwitch<CheckKind>(AttrName)
+                          .Case("no_implicit_copy", CheckKind::NoImplicitCopy)
+                          .Default(CheckKind::Invalid);
+
+    if (CKind == CheckKind::Invalid) {
+      auto diag = diag::sil_markmustcheck_invalid_attribute;
+      P.diagnose(InstLoc.getSourceLoc(), diag, AttrName);
+      return true;
+    }
+    auto *MVI = B.createMarkMustCheckInst(InstLoc, Val, CKind);
     ResultVal = MVI;
     break;
   }
@@ -6284,6 +6340,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
+  llvm::SmallVector<ArgEffectLoc, 8> argEffectLocs;
   SILFunction *DynamicallyReplacedFunction = nullptr;
   Identifier objCReplacementFor;
   if (parseSILLinkage(FnLinkage, P) ||
@@ -6294,7 +6351,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &inlineStrategy, &optimizationMode, &perfConstr, nullptr,
           &isWeakImported, &availability,
           &isWithoutActuallyEscapingThunk, &Semantics,
-          &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
+          &SpecAttrs, &ClangDecl, &MRK, &argEffectLocs, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_function_name) ||
@@ -6339,6 +6396,21 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setOptimizationMode(optimizationMode);
     FunctionState.F->setPerfConstraints(perfConstr);
     FunctionState.F->setEffectsKind(MRK);
+
+    for (ArgEffectLoc aeLoc : argEffectLocs) {
+      StringRef effectsStr = P.SourceMgr.extractText(
+                        CharSourceRange(P.SourceMgr, aeLoc.start, aeLoc.end));
+      auto error = FunctionState.F->parseEffects(effectsStr, /*fromSIL*/true,
+                                                 /*isDerived*/ aeLoc.isDerived,
+                                                 {});
+      if (error.first) {
+        SourceLoc loc = aeLoc.start;
+        if (loc.isValid())
+          loc = loc.getAdvancedLoc(error.second);
+        P.diagnose(loc, diag::error_in_effects_attribute, StringRef(error.first));
+        return true;
+      }
+    }
     if (ClangDecl)
       FunctionState.F->setClangNodeOwner(ClangDecl);
     for (auto &Attr : Semantics) {
@@ -6505,7 +6577,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr,
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -6555,7 +6627,8 @@ bool SILParserState::parseSILProperty(Parser &P) {
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           SP, M))
     return true;
   
   ValueDecl *VD;
@@ -6625,7 +6698,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           VTableState, M))
+                           nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -7142,7 +7215,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           WitnessState, M))
+                           nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.

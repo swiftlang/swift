@@ -2182,6 +2182,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
+  case TypeKind::ParametrizedProtocol:
+    return convertParametrizedProtocolType(cast<ParametrizedProtocolType>(ty));
   case TypeKind::Existential:
     return convertExistentialType(cast<ExistentialType>(ty));
   case TypeKind::GenericTypeParam:

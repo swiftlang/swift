@@ -123,3 +123,8 @@ unsigned swift::unicode::extractFirstUnicodeScalar(StringRef S) {
   (void)Result;
   return Scalar;
 }
+
+bool swift::unicode::isWellFormedUTF8(StringRef S) {
+  const llvm::UTF8 *begin = S.bytes_begin();
+  return llvm::isLegalUTF8String(&begin, S.bytes_end());
+}

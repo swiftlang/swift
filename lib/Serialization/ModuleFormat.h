@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 660; // remove nested archetypes
+const uint16_t SWIFTMODULE_VERSION_MINOR = 666; // mark_must_check initial
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1105,6 +1105,12 @@ namespace decls_block {
     BCArray<TypeIDField> // protocols
   >;
 
+  using ParametrizedProtocolTypeLayout = BCRecordLayout<
+    PARAMETRIZED_PROTOCOL_TYPE,
+    TypeIDField,         // base
+    TypeIDWithBitField   // argument
+  >;
+
   using BoundGenericTypeLayout = BCRecordLayout<
     BOUND_GENERIC_TYPE,
     DeclIDField, // generic decl
@@ -1217,7 +1223,8 @@ namespace decls_block {
     BCFixed<1>,        // implicit flag
     BCFixed<1>,        // type sequence?
     BCVBR<4>,          // depth
-    BCVBR<4>           // index
+    BCVBR<4>,          // index
+    BCFixed<1>         // opaque type?
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<
@@ -1837,7 +1844,8 @@ namespace decls_block {
 
   using EffectsDeclAttrLayout = BCRecordLayout<
     Effects_DECL_ATTR,
-    BCFixed<2>  // modref value
+    BCFixed<3>,   // EffectKind
+    DeclIDField   // Custom effect string or 0.
   >;
 
   using ForeignErrorConventionLayout = BCRecordLayout<
@@ -1921,6 +1929,11 @@ namespace decls_block {
   using OptimizeDeclAttrLayout = BCRecordLayout<
     Optimize_DECL_ATTR,
     BCFixed<2>  // optimize value
+  >;
+
+  using ExclusivityDeclAttrLayout = BCRecordLayout<
+    Optimize_DECL_ATTR,
+    BCFixed<2>  // exclusivity mode
   >;
 
   using AvailableDeclAttrLayout = BCRecordLayout<

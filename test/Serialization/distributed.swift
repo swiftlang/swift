@@ -17,9 +17,3 @@ func testDoSomethingDistributed(system: FakeActorSystem) {
   let _: DA = DA(system: system)
 }
 
-extension DA {
-  @_dynamicReplacement(for:_remote_doSomethingDistributed(param:))
-  func _impl_doSomethingDistributed(param: String) async throws -> Int {
-    return 2222
-  }
-}

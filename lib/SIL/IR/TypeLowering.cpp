@@ -579,6 +579,11 @@ namespace {
                                        IsTypeExpansionSensitive_t isSensitive) {
       return visitExistentialType(type, origType, isSensitive);
     }
+    RetTy visitParametrizedProtocolType(CanParametrizedProtocolType type,
+                                        AbstractionPattern origType,
+                                        IsTypeExpansionSensitive_t isSensitive) {
+      return visitExistentialType(type, origType, isSensitive);
+    }
 
     // Enums depend on their enumerators.
     RetTy visitEnumType(CanEnumType type, AbstractionPattern origType,
@@ -3406,6 +3411,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
         ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
+
+  // Asynchronous functions require a thunk if they differ in whether they
+  // have an error result.
+  if (fnTy1->hasErrorResult() != fnTy2->hasErrorResult() &&
+      (fnTy1->isAsync() || fnTy2->isAsync()))
+    return ABIDifference::NeedsThunk;
 
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {
     auto param1 = fnTy1->getParameters()[i], param2 = fnTy2->getParameters()[i];

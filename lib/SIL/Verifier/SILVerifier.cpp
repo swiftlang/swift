@@ -1641,7 +1641,6 @@ public:
 
     // Check that the arguments and result match.
     SILFunctionConventions substConv(substTy, F.getModule());
-    //require(site.getArguments().size() == substTy->getNumSILArguments(),
     require(site.getNumArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = site.getNumArguments(); i < size; ++i) {
@@ -5383,6 +5382,12 @@ public:
             "Result and operand must have the same type, today.");
   }
 
+  void checkMarkMustCheckInst(MarkMustCheckInst *i) {
+    require(i->getModule().getStage() == SILStage::Raw,
+            "Only valid in Raw SIL! Should have been eliminated by /some/ "
+            "diagnostic pass");
+  }
+
   void verifyEpilogBlocks(SILFunction *F) {
     bool FoundReturnBlock = false;
     bool FoundThrowBlock = false;
@@ -5609,6 +5614,7 @@ public:
             const auto &foundState = insertResult.first->second;
             require(state.Stack == foundState.Stack || isUnreachable(),
                     "inconsistent stack heights entering basic block");
+
             require(state.ActiveOps == foundState.ActiveOps || isUnreachable(),
                     "inconsistent active-operations sets entering basic block");
             require(state.CFG == foundState.CFG,

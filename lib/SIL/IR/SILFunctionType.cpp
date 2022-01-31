@@ -394,11 +394,23 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
   if (origTypeOfAbstraction) {
     (void) origTypeOfAbstraction.findIf([&](Type t) -> bool {
       if (auto *at = t->getAs<ArchetypeType>()) {
-        types.insert(at->getInterfaceType()->getCanonicalType());
-        for (auto *proto : at->getConformsTo()) {
-          reqs.push_back(Requirement(RequirementKind::Conformance,
-                                     at->getInterfaceType(),
-                                     proto->getDeclaredInterfaceType()));
+        auto interfaceTy = at->getInterfaceType();
+        auto genericParams = sig.getGenericParams();
+
+        // The GSB used to drop requirements which reference non-existent
+        // generic parameters, whereas the RequirementMachine asserts now.
+        // Filter thes requirements out explicitly to preserve the old
+        // behavior.
+        if (std::find_if(genericParams.begin(), genericParams.end(),
+                         [interfaceTy](CanGenericTypeParamType t) -> bool {
+                           return t->isEqual(interfaceTy->getRootGenericParam());
+                         }) != genericParams.end()) {
+          types.insert(interfaceTy->getCanonicalType());
+          for (auto *proto : at->getConformsTo()) {
+            reqs.push_back(Requirement(RequirementKind::Conformance,
+                                       interfaceTy,
+                                       proto->getDeclaredInterfaceType()));
+          }
         }
       }
       return false;
@@ -4390,8 +4402,9 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
   if (getRepresentation() != other->getRepresentation())
     return ABICompatibilityCheckResult::DifferentFunctionRepresentations;
 
-  // `() async -> ()` is not compatible with `() async -> @error Error`.
-  if (!hasErrorResult() && other->hasErrorResult() && isAsync()) {
+  // `() async -> ()` is not compatible with `() async -> @error Error` and
+  // vice versa.
+  if (hasErrorResult() != other->hasErrorResult() && isAsync()) {
     return ABICompatibilityCheckResult::DifferentErrorResultConventions;
   }
 

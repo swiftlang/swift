@@ -1896,6 +1896,20 @@ public:
   void visitMoveValueInst(MoveValueInst *I) {
     if (I->getAllowDiagnostics())
       *this << "[allows_diagnostics] ";
+    if (I->isLexical())
+      *this << "[lexical] ";
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMarkMustCheckInst(MarkMustCheckInst *I) {
+    using CheckKind = MarkMustCheckInst::CheckKind;
+    switch (I->getCheckKind()) {
+    case CheckKind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case CheckKind::NoImplicitCopy:
+      *this << "[no_implicit_copy] ";
+      break;
+    }
     *this << getIDAndType(I->getOperand());
   }
 
@@ -2943,6 +2957,36 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[readwrite] ";
   else if (getEffectsKind() == EffectsKind::ReleaseNone)
     OS << "[releasenone] ";
+
+  llvm::SmallVector<int, 8> definedEscapesIndices;
+  llvm::SmallVector<int, 8> escapesIndices;
+  visitArgEffects([&](int effectIdx, bool isDerived, ArgEffectKind kind) {
+    if (kind == ArgEffectKind::Escape) {
+      if (isDerived) {
+        escapesIndices.push_back(effectIdx);
+      } else {
+        definedEscapesIndices.push_back(effectIdx);
+      }
+    }
+  });
+  if (!definedEscapesIndices.empty()) {
+    OS << "[defined_escapes ";
+    for (int effectIdx : definedEscapesIndices) {
+      if (effectIdx > 0)
+        OS << ", ";
+      writeEffect(OS, effectIdx);
+    }
+    OS << "] ";
+  }
+  if (!escapesIndices.empty()) {
+    OS << "[escapes ";
+    for (int effectIdx : escapesIndices) {
+      if (effectIdx > 0)
+        OS << ", ";
+      writeEffect(OS, effectIdx);
+    }
+    OS << "] ";
+  }
 
   if (auto *replacedFun = getDynamicallyReplacedFunction()) {
     OS << "[dynamic_replacement_for \"";

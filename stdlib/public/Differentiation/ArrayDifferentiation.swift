@@ -16,8 +16,7 @@ import Swift
 // Protocol conformances
 //===----------------------------------------------------------------------===//
 
-// TODO(TF-938): Add `Element: Differentiable` requirement.
-extension Array {
+extension Array where Element: Differentiable {
   /// The view of an array as the differentiable product manifold of `Element`
   /// multiplied with itself `count` times.
   @frozen

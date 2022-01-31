@@ -1240,13 +1240,6 @@ void PassContext_fixStackNesting(BridgedPassContext passContext,
   }
 }
 
-SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context) {
-  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
-  ASTContext &ctxt = pm->getModule()->getASTContext();
-  return AvailabilityContext::forDeploymentTarget(ctxt).isContainedIn(
-    ctxt.getSwift51Availability());
-}
-
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context) {
   SwiftPassInvocation *invocation = castToPassInvocation(context);
   SILPassManager *pm = invocation->getPassManager();

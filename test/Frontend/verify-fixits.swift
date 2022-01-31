@@ -18,6 +18,42 @@ func test0Fixits() {
   // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}}
 
+  // CHECK: [[@LINE+1]]:80: error: invalid column number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{x-1=a}}
+
+  // CHECK: [[@LINE+1]]:82: error: invalid column number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-x=a}}
+
+  // CHECK: [[@LINE+1]]:82: error: invalid column number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:x-1=a}}
+
+  // CHECK: [[@LINE+1]]:80: error: invalid line number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{x:1-1=a}}
+
+  // CHECK: [[@LINE+1]]:84: error: invalid column number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1:x=a}}
+
+  // CHECK: [[@LINE+1]]:82: error: invalid line number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-x:1=a}}
+
+  // CHECK: [[@LINE+1]]:82: error: invalid column number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:x-1:x=a}}
+
+  // CHECK: [[@LINE+1]]:80: error: invalid line number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{x:1-1:x=a}}
+
+  // CHECK: [[@LINE+1]]:82: error: invalid column number in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:x-x:1=a}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1-1:1=a}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1:1=a}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1-1=a}}
+
   // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=a}} {{2-2=b}}
 
@@ -57,6 +93,15 @@ func test1Fixits() {
 
   // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{15-18=aa}} {{none}}
+
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{98:15-98:18=aa}}
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{100:15-18=aa}}
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-102:18=aa}}
+  // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{61:15-18=aa}}
 }
 
 func test2Fixits() {

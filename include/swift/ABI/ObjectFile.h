@@ -28,6 +28,9 @@ class SwiftObjectFileFormat {
 public:
   virtual ~SwiftObjectFileFormat() {}
   virtual llvm::StringRef getSectionName(ReflectionSectionKind section) = 0;
+  virtual llvm::Optional<llvm::StringRef> getSegmentName() {
+    return {};
+  }
 };
 
 /// Responsible for providing the Mach-O reflection section identifiers.
@@ -49,6 +52,9 @@ public:
       return "__swift5_reflstr";
     }
     llvm_unreachable("Section type not found.");
+  }
+  llvm::Optional<llvm::StringRef> getSegmentName() override {
+    return {"__TEXT"};
   }
 };
 

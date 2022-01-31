@@ -1466,6 +1466,7 @@ namespace  {
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
+    UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(NoLocks)
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(Inlinable)
@@ -1505,7 +1506,7 @@ namespace  {
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
-    UNINTERESTING_ATTR(PredatesConcurrency)
+    UNINTERESTING_ATTR(Preconcurrency)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
@@ -1563,6 +1564,9 @@ namespace  {
 
     UNINTERESTING_ATTR(TypeSequence)
     UNINTERESTING_ATTR(CompileTimeConst)
+
+    UNINTERESTING_ATTR(PrimaryAssociatedType)
+
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

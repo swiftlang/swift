@@ -404,11 +404,6 @@ public:
   std::unordered_set<ImportDiagnostic, ImportDiagnosticHasher>
       CollectedDiagnostics;
 
-  // ClangNodes for which all import diagnostics have been both collected and
-  // emitted.
-  std::unordered_set<ImportDiagnosticTarget, ImportDiagnosticTargetHasher>
-      DiagnosedValues;
-
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
@@ -1455,9 +1450,6 @@ public:
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
-  virtual void diagnoseMissingNamedMember(const IterableDeclContext *IDC,
-                                          DeclName name) override;
-
 private:
   void
   loadAllMembersOfObjcContainer(Decl *D,
@@ -1600,8 +1592,14 @@ public:
   void lookupAllObjCMembers(SwiftLookupTable &table,
                             VisibleDeclConsumer &consumer);
 
-  /// Emit any import diagnostics associated with the given name.
-  void diagnoseValue(SwiftLookupTable &table, DeclName name);
+  /// Emits diagnostics for any declarations named name
+  /// whose direct declaration context is a TU.
+  void diagnoseTopLevelValue(const DeclName &name);
+
+  /// Emit diagnostics for declarations named name that are members
+  /// of the provided container.
+  void diagnoseMemberValue(const DeclName &name,
+                           const clang::DeclContext *container);
 
   /// Emit any import diagnostics associated with the given Clang node.
   void diagnoseTargetDirectly(ImportDiagnosticTarget target);

@@ -33,6 +33,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("completion", DebugFlags::Completion)
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
+      .Case("conditional-requirements", DebugFlags::ConditionalRequirements)
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
       .Case("minimal-conformances", DebugFlags::MinimalConformances)
       .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)

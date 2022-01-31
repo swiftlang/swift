@@ -727,18 +727,6 @@ bool SILDeclRef::isAlwaysInline() const {
   return false;
 }
 
-bool SILDeclRef::hasEffectsAttribute() const {
-  if (!hasDecl())
-    return false;
-  return getDecl()->getAttrs().hasAttribute<EffectsAttr>();
-}
-
-EffectsKind SILDeclRef::getEffectsAttribute() const {
-  assert(hasEffectsAttribute());
-  EffectsAttr *MA = getDecl()->getAttrs().getAttribute<EffectsAttr>();
-  return MA->getKind();
-}
-
 bool SILDeclRef::isAnyThunk() const {
   return isForeignToNativeThunk() ||
     isNativeToForeignThunk() ||

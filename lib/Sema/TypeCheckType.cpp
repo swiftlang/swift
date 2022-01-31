@@ -624,6 +624,44 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
 
+  if (ctx.LangOpts.EnableParametrizedProtocolTypes) {
+    if (auto *protoType = type->getAs<ProtocolType>()) {
+      // Build ParametrizedProtocolType if the protocol has a primary associated
+      // type and we're in a supported context (for now just generic requirements,
+      // inheritance clause, extension binding).
+      if (!resolution.getOptions().isParametrizedProtocolSupported()) {
+        diags.diagnose(loc, diag::parametrized_protocol_not_supported);
+        return ErrorType::get(ctx);
+      }
+
+      auto *protoDecl = protoType->getDecl();
+      if (protoDecl->getPrimaryAssociatedType() == nullptr) {
+        diags.diagnose(loc, diag::protocol_does_not_have_primary_assoc_type,
+                       protoType);
+
+        return ErrorType::get(ctx);
+      }
+
+      auto genericArgs = generic->getGenericArgs();
+
+      if (genericArgs.size() != 1) {
+        diags.diagnose(loc, diag::protocol_cannot_have_multiple_generic_arguments,
+                       protoType);
+
+        return ErrorType::get(ctx);
+      }
+
+      auto genericResolution =
+        resolution.withOptions(adjustOptionsForGenericArgs(options));
+
+      Type argTy = genericResolution.resolveType(genericArgs[0], silParams);
+      if (!argTy || argTy->hasError())
+        return ErrorType::get(ctx);
+
+      return ParametrizedProtocolType::get(ctx, protoType, argTy);
+    }
+  }
+
   // We must either have an unbound generic type, or a generic type alias.
   if (!type->is<UnboundGenericType>()) {
      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
@@ -2070,10 +2108,22 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     // evaluation of an `OpaqueResultTypeRequest`.
     auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
     auto *DC = getDeclContext();
-    if (isa<OpaqueTypeDecl>(DC)) {
-      auto opaqueDecl = cast<OpaqueTypeDecl>(DC);
-      unsigned ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr);
-      return getIdentityOpaqueTypeArchetypeType(opaqueDecl, ordinal);
+    if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
+      if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(opaqueRepr))
+        return getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal);
+    }
+
+    // Check whether any of the generic parameters in the context represents
+    // this opaque type. If so, return that generic parameter.
+    if (auto declDC = DC->getAsDecl()) {
+      if (auto genericContext = declDC->getAsGenericContext()) {
+        if (auto genericParams = genericContext->getGenericParams()) {
+          for (auto genericParam : *genericParams) {
+            if (genericParam->getOpaqueTypeRepr() == opaqueRepr)
+              return genericParam->getDeclaredInterfaceType();
+          }
+        }
+      }
     }
 
     // We are not inside an `OpaqueTypeDecl`, so diagnose an error.
@@ -3634,6 +3684,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
   case TypeResolverContext::GenericRequirement:
+  case TypeResolverContext::ExistentialConstraint:
   case TypeResolverContext::SameTypeRequirement:
   case TypeResolverContext::ProtocolMetatypeBase:
   case TypeResolverContext::MetatypeBase:
@@ -3849,9 +3900,13 @@ NeverNullType
 TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
                                      TypeResolutionOptions options) {
   auto constraintType = resolveType(repr->getConstraint(),
-      options.withContext(TypeResolverContext::GenericRequirement));
+      options.withContext(TypeResolverContext::ExistentialConstraint));
   if (constraintType->is<ExistentialMetatypeType>())
     return constraintType;
+
+  // If we already failed, don't diagnose again.
+  if (constraintType->hasError())
+    return ErrorType::get(getASTContext());
 
   auto anyStart = repr->getAnyLoc();
   auto anyEnd = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, anyStart);
