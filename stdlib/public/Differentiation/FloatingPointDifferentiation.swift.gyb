@@ -47,56 +47,36 @@ extension ${Self}: Differentiable {
 
 /// Derivatives of standard unary operators.
 ${Availability(bits)}
-extension ${Self} { // TODO: extract these to a ['vjp', 'jvp'] gyb loop
+extension ${Self} {
+%for derivative_kind in ['vjp', 'jvp']:
+%  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
   @inlinable
   @derivative(of: -)
-  static func _vjpNegate(
+  static func _${derivative_kind}Negate(
     _ x: ${Self}
-  ) -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
+  ) -> (value: ${Self}, ${linear_map_kind}: (${Self}) -> ${Self}) {
     return (-x, { v in -v })
   }
 
   @inlinable
-  @derivative(of: -)
-  static func _jvpNegate(
-    _ x: ${Self}
-  ) -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
-    return (-x, { dx in -dx })
-  }
-
-  @inlinable
   @derivative(of: negate) // TODO: add test for this
-  mutating func _vjpNegateAssign() -> (value: Void, pullback: (inout Self) -> Void) {
-    negate()
-    return ((), { v in v.negate() })
-  }
-
-  @inlinable
-  @derivative(of: negate) // TODO: add test for this
-  mutating func _jvpNegateAssign() -> (value: Void, differential: (inout Self) -> Void) {
+  mutating func _${derivative_kind}NegateAssign() -> (
+    value: Void, ${linear_map_kind}: (inout Self) -> Void
+  ) {
     negate()
     return ((), { dx in dx.negate() })
   }
 
   @inlinable
   @derivative(of: formSquareRoot) // TODO: add test for this
-  mutating func _vjpFormSquareRoot() -> (
-    value: Void, pullback: (inout Self) -> Void
+  mutating func _${derivative_kind}FormSquareRoot() -> (
+    value: Void, ${linear_map_kind}: (inout Self) -> Void
   ) {
     formSquareRoot()
     let value = self
     return ((), { v in v /= 2 * value })
   }
-
-  @inlinable
-  @derivative(of: formSquareRoot) // TODO: add test for this
-  mutating func _jvpFormSquareRoot() -> (
-    value: Void, differential: (inout Self) -> Void
-  ) {
-    formSquareRoot()
-    let value = self
-    return ((), { dx in dx /= 2 * value })
-  }
+%end # for derivative_kind in ['jvp', 'vjp']:
 }
 
 /// Derivatives of standard binary operators.
@@ -337,51 +317,54 @@ where
     return (value, { dx in dx / (2 * value) })
   }
 
+%for suffix in ['', 'Magnitude']:
+%  op = 'abs' if suffix == 'Magnitude' else ''
   @inlinable
-  @derivative(of: minimum)
-  static func _vjpMinimum( // TODO: differentiate minimumMagnitude using gyb loop
+  @derivative(of: minimum${suffix})
+  static func _vjpMinimum${suffix}(
     _ x: Self,
     _ y: Self
   ) -> ( // TODO: try using `Self` instead of `TangentVector` here
     value: Self, pullback: (Self) -> (Self, Self)
   ) {
-    if x <= y || y.isNaN { return (x, { v in (v, .zero) }) }
-    return (y, { v in (.zero, v) })
+    if ${op}(x) <= ${op}(y) || y.isNaN { return (${op}(x), { v in (v, .zero) }) }
+    return (${op}(y), { v in (.zero, v) })
   }
 
   @inlinable
-  @derivative(of: minimum) // TODO: add test for this
-  static func _jvpMinimum( // TODO: differentiate minimumMagnitude using gyb loop
+  @derivative(of: minimum${suffix}) // TODO: add test for this
+  static func _jvpMinimum${suffix}(
     _ x: Self, 
     _ y: Self
   ) -> (
     value: Self, differential: (Self, Self) -> (Self)
   ) {
-    if x <= y || y.isNaN { return (x, { (dx, _) in dx }) }
-    return (y, { (_, dy) in dy })
+    if ${op}(x) <= ${op}(y) || y.isNaN { return (${op}(x), { (dx, _) in dx }) }
+    return (${op}(y), { (_, dy) in dy })
   }
 
   @inlinable
-  @derivative(of: maximum)
-  static func _vjpMaximum( // TODO: differentiate maximumMagnitude using gyb loop
+  @derivative(of: maximum${suffix})
+  static func _vjpMaximum${suffix}(
     _ x: Self, 
     _ y: Self
   ) -> (
     value: Self, pullback: (Self) -> (Self, Self)
   ) {
-    if x > y || y.isNaN { return (x, { v in (v, .zero) }) }
-    return (y, { v in (.zero, v) })
+    if ${op}(x) > ${op}(y) || y.isNaN { return (${op}(x), { v in (v, .zero) }) }
+    return (${op}(y), { v in (.zero, v) })
   }
 
   @inlinable
-  @derivative(of: maximum) // TODO: add test for this
-  static func _jvpMaximum( // TODO: differentiate maximumMagnitude using gyb loop
+  @derivative(of: maximum${suffix}) // TODO: add test for this
+  static func _jvpMaximum${suffix}(
     _ x: Self, 
     _ y: Self
   ) -> (
     value: Self, differential: (Self, Self) -> (Self)
   ) {
-    if x > y || y.isNaN { return (x, { (dx, _) in dx }) }
-    return (y, { (_, dy) in dy })
+    if ${op}(x) > ${op}(y) || y.isNaN { return (${op}(x), { (dx, _) in dx }) }
+    return (${op}(y), { (_, dy) in dy })
   }
+%end # for suffix in ['', 'Magnitude']:
 }
