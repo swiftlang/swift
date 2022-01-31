@@ -3855,6 +3855,11 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   }
 }
 
+void KeyPathPatternComponent::print(SILPrintContext &ctxt) const {
+  SILPrinter printer(ctxt);
+  printer.printKeyPathPatternComponent(*this);
+}
+
 //===----------------------------------------------------------------------===//
 // SILPrintContext members
 //===----------------------------------------------------------------------===//

@@ -78,6 +78,7 @@ class StringLiteralExpr;
 class ValueDecl;
 class VarDecl;
 class FunctionRefBaseInst;
+class SILPrintContext;
 
 template <typename ImplClass> class SILClonerWithScopes;
 
@@ -3489,7 +3490,9 @@ public:
     
   void incrementRefCounts() const;
   void decrementRefCounts() const;
-  
+
+  void print(SILPrintContext &ctxt) const;
+
   void Profile(llvm::FoldingSetNodeID &ID);
 };
 
