@@ -33,12 +33,12 @@ public:
   }
   /// Predicate to identify if the named section can contain reflection data.
   virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) {
-    return getSectionName(fieldmd) == sectionName ||
-           getSectionName(assocty) == sectionName ||
-           getSectionName(builtin) == sectionName ||
-           getSectionName(capture) == sectionName ||
-           getSectionName(typeref) == sectionName ||
-           getSectionName(reflstr) == sectionName;
+    return sectionName == getSectionName(fieldmd) ||
+           sectionName == getSectionName(assocty) ||
+           sectionName == getSectionName(builtin) ||
+           sectionName == getSectionName(capture) ||
+           sectionName == getSectionName(typeref) ||
+           sectionName == getSectionName(reflstr);
   }
 };
 
@@ -67,6 +67,9 @@ public:
   }
 
   bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    // For Mach-O, the caller must call this function twice, once with just the
+    // section name (ex `__swift5_fieldmd`), and again with the segment
+    // qualified section name (ex `__DATA,__const`).
     return sectionName.startswith("__swift5_") ||
            sectionName == "__DATA_CONST,__const" ||
            sectionName == "__DATA,__const";
