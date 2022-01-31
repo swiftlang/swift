@@ -45,8 +45,8 @@ struct ActorAddress: Sendable, Hashable, Codable {
 //final class FakeActorSystem: DistributedActorSystem {
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
-  typealias InvocationDecoder = FakeInvocation
-  typealias InvocationEncoder = FakeInvocation
+  typealias InvocationDecoder = FakeInvocationDecoder
+  typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
 
   init() {}
@@ -105,16 +105,17 @@ struct FakeActorSystem: DistributedActorSystem {
 
 }
 
-struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
+
+struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
 
-  var types: [Any.Type] = []
+  var substitutions: [Any.Type] = []
   var arguments: [Any] = []
   var returnType: Any.Type? = nil
   var errorType: Any.Type? = nil
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
-    types.append(type)
+    substitutions.append(type)
   }
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {
     arguments.append(argument)
@@ -127,17 +128,45 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
   }
   mutating func doneRecording() throws {}
 
-  // === Receiving / decoding -------------------------------------------------
+  // For testing only
+  func makeDecoder() -> FakeInvocationDecoder {
+    return .init(
+      args: arguments,
+      substitutions: substitutions,
+      returnType: returnType,
+      errorType: errorType
+    )
+  }
+}
 
+
+class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
+
+  var arguments: [Any] = []
+  var substitutions: [Any.Type] = []
+  var returnType: Any.Type? = nil
+  var errorType: Any.Type? = nil
+
+  init(
+    args: [Any],
+    substitutions: [Any.Type] = [],
+    returnType: Any.Type? = nil,
+    errorType: Any.Type? = nil
+  ) {
+    self.arguments = args
+    self.substitutions = substitutions
+    self.returnType = returnType
+    self.errorType = errorType
+  }
+
+  // === Receiving / decoding -------------------------------------------------
   func decodeGenericSubstitutions() throws -> [Any.Type] {
-    []
+    return substitutions
   }
 
   var argumentIndex: Int = 0
-  mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument>
-  ) throws {
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument {
     guard argumentIndex < arguments.count else {
       fatalError("Attempted to decode more arguments than stored! Index: \(argumentIndex), args: \(arguments)")
     }
@@ -148,16 +177,18 @@ struct FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvo
     }
 
     print("  > decode argument: \(argument)")
-    pointer.pointee = argument
     argumentIndex += 1
+    return argument
   }
 
-  func decodeErrorType() throws -> Any.Type? {
-    self.errorType
+  public func decodeErrorType() throws -> Any.Type? {
+    print("  > decode return type: \(errorType.map { String(describing: $0) }  ?? "nil")")
+    return self.errorType
   }
 
-  func decodeReturnType() throws -> Any.Type? {
-    self.returnType
+  public func decodeReturnType() throws -> Any.Type? {
+    print("  > decode return type: \(returnType.map { String(describing: $0) }  ?? "nil")")
+    return self.returnType
   }
 }
 

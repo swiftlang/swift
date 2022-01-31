@@ -133,7 +133,7 @@ class FakeDistributedInvocation: DistributedTargetInvocationEncoder, Distributed
   func decodeGenericSubstitutions() throws -> [Any.Type] {
     []
   }
-  func decodeNextArgument<Argument>() throws -> Argument {
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument {
     fatalError()
   }
   func decodeReturnType() throws -> Any.Type? {

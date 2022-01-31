@@ -311,7 +311,7 @@ public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
     return genericSubs
   }
 
-  public func decodeNextArgument<Argument>() throws -> Argument {
+  public func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument {
     guard argumentIndex < arguments.count else {
       fatalError("Attempted to decode more arguments than stored! Index: \(argumentIndex), args: \(arguments)")
     }
