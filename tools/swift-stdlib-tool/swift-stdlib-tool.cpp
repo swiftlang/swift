@@ -953,7 +953,21 @@ std::vector<uint8_t> query_code_signature(std::string file) {
 }
 
 template <typename F>
-void enumerateDirectory(std::string directory, F &&func) {
+void listDirectoryContents(std::string directory, F &&func) {
+  DIR *dir = opendir(directory.c_str());
+  if (dir == NULL) {
+    return;
+  }
+
+  struct dirent *entry;
+  while ((entry = readdir(dir))) {
+    func(directory + "/" + entry->d_name);
+  }
+  closedir(dir);
+}
+
+template <typename F>
+void recursivelyListFiles(std::string directory, F &&func) {
   DIR *dir = opendir(directory.c_str());
   if (dir == NULL) {
     return;
@@ -975,7 +989,7 @@ void enumerateDirectory(std::string directory, F &&func) {
   }
   closedir(dir);
   for (const auto &path : subpaths) {
-    enumerateDirectory(path, func);
+    recursivelyListFiles(path, func);
   }
 }
 
@@ -1085,7 +1099,7 @@ int main(int argc, const char *argv[]) {
     std::string root_path =
         parentPath(parentPath(self_executable)) + "/" + "lib";
 
-    enumerateDirectory(root_path, [&](std::string entry) {
+    listDirectoryContents(root_path, [&](std::string entry) {
       if (filename(entry).compare(0, strlen("swift-"), "swift-") == 0) {
         src_dirs.push_back(entry + "/" + platform);
       }
@@ -1119,7 +1133,7 @@ int main(int argc, const char *argv[]) {
 
   // Collect executables from the --scan-folder locations.
   for (const auto &embedDir : embedDirs) {
-    enumerateDirectory(embedDir, [&](std::string entry) {
+    recursivelyListFiles(embedDir, [&](std::string entry) {
       if (0 == access(entry.c_str(), X_OK)) {
         executables.push_back(entry);
       } else {
