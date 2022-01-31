@@ -64,6 +64,20 @@ extension ${Self} {
   ) -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
     return (-x, { dx in -dx })
   }
+
+  @inlinable
+  @derivative(of: negate)
+  mutating func _vjpNegateAssign() -> (value: Void, pullback: (inout Self) -> Void) {
+    negate()
+    return ((), { v in v.negate() })
+  }
+
+  @inlinable
+  @derivative(of: negate)
+  mutating func _jvpNegateAssign() -> (value: Void, differential: (inout Self) -> Void) {
+    negate()
+    return ((), { dx in dx.negate() })
+  }
 }
 
 /// Derivatives of standard binary operators.
@@ -279,7 +293,31 @@ where
       dlhs * rhs + drhs * lhs + dSelf 
     })
   }
+/*
+  @usableFromInline
+  @derivative(of: negate)
+  mutating func _vjpAddProduct(
+    _ lhs: Self, 
+    _ rhs: Self
+  ) -> (value: Void, pullback: (inout Self) -> (Void, Self, Self)) {
+fatalError()
+  //  addProduct(lhs, rhs)
+  //  return ((), { v in (v * rhs, v * lhs) })
+  }
 
+  @inlinable
+  @derivative(of: Self.addProduct) // try static?
+  func _jvpAddProduct(
+    _ lhs: Self, 
+    _ rhs: Self
+  ) -> (value: Void, differential: (Self, Self, Self) -> Self) {
+  fatalError()
+  //  addProduct(lhs, rhs)
+  //  return ((), { (dSelf, dlhs, drhs) in 
+  //    dSelf = dlhs * rhs + drhs * lhs + dSelf 
+  //  })
+  }
+*/
   @inlinable
   @derivative(of: squareRoot)
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
@@ -293,14 +331,18 @@ where
     let value = squareRoot()
     return (value, { dx in dx / (2 * value) })
   }
-
+/*
+  @inlinable
+  @derivative(of: formSquareRoot)
+  mutating func 
+*/
   @inlinable
   @derivative(of: minimum)
   static func _vjpMinimum(
     _ x: Self, 
     _ y: Self
   ) -> ( // TODO: try using `Self` instead of `TangentVector` here
-    value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
+    value: Self, pullback: (Self) -> (Self, Self)
   ) {
     if x <= y || y.isNaN { return (x, { v in (v, .zero) }) }
     return (y, { v in (.zero, v) })
@@ -312,7 +354,7 @@ where
     _ x: Self, 
     _ y: Self
   ) -> (
-    value: Self, differential: (TangentVector, TangentVector) -> (TangentVector)
+    value: Self, differential: (Self, Self) -> (Self)
   ) {
     if x <= y || y.isNaN { return (x, { (dx, _) in dx }) }
     return (y, { (_, dy) in dy })
@@ -324,7 +366,7 @@ where
     _ x: Self, 
     _ y: Self
   ) -> (
-    value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
+    value: Self, pullback: (Self) -> (Self, Self)
   ) {
     if x > y || y.isNaN { return (x, { v in (v, .zero) }) }
     return (y, { v in (.zero, v) })
@@ -336,7 +378,7 @@ where
     _ x: Self, 
     _ y: Self
   ) -> (
-    value: Self, differential: (TangentVector, TangentVector) -> (TangentVector)
+    value: Self, differential: (Self, Self) -> (Self)
   ) {
     if x > y || y.isNaN { return (x, { (dx, _) in dx }) }
     return (y, { (_, dy) in dy })
