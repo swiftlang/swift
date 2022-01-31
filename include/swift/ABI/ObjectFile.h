@@ -32,14 +32,7 @@ public:
     return {};
   }
   /// Predicate to identify if the named section can contain reflection data.
-  virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) {
-    return sectionName == getSectionName(fieldmd) ||
-           sectionName == getSectionName(assocty) ||
-           sectionName == getSectionName(builtin) ||
-           sectionName == getSectionName(capture) ||
-           sectionName == getSectionName(typeref) ||
-           sectionName == getSectionName(reflstr);
-  }
+  virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) = 0;
 };
 
 /// Responsible for providing the Mach-O reflection section identifiers.
@@ -96,6 +89,10 @@ public:
     }
     llvm_unreachable("Section type not found.");
   }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith("swift5_");
+  }
 };
 
 /// Responsible for providing the COFF reflection section identifiers
@@ -117,6 +114,10 @@ public:
       return ".sw5rfst";
     }
     llvm_unreachable("Section  not found.");
+  }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith(".sw5");
   }
 };
 } // namespace swift
