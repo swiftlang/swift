@@ -289,14 +289,6 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
       when = _dispatch_clock_and_value_to_time(DISPATCH_CLOCK_MONOTONIC, q);
       break;
     }
-    case swift_clock_id_realtime: {
-      const struct timespec ts = {
-        .tv_sec = static_cast<long>(sec),
-        .tv_nsec = static_cast<long>(nsec)
-      };
-      when = dispatch_walltime(&ts, 0);
-      break;
-    }
     case swift_clock_id_suspending: {
       uint64_t q = sec * NSEC_PER_SEC + nsec;
       when = _dispatch_clock_and_value_to_time(DISPATCH_CLOCK_UPTIME, q);
