@@ -44,7 +44,7 @@ where
 {
   // NOTE(TF-1094): serialized `@derivative` for `.swiftinterface` compilation.
   @inlinable
-  @derivative(of: subscript(_:).get)
+  @derivative(of: subscript(_:))
   internal func _vjpSubscript(_ index: Int)
     -> (value: Scalar, pullback: (Scalar.TangentVector) -> TangentVector)
   {
@@ -56,7 +56,7 @@ where
   }
 
   @inlinable
-  @derivative(of: subscript(_:).get)
+  @derivative(of: subscript(_:))
   internal func _jvpSubscript(index: Int)
     -> (value: Scalar, differential: (TangentVector) -> Scalar.TangentVector)
   {
