@@ -141,3 +141,22 @@ void PostDominanceInfo::verify() const {
     abort();
   }
 }
+
+void
+swift::computeDominanceFrontier(SILBasicBlock *root,
+                                DominanceInfo *domTree,
+                                SmallVectorImpl<SILBasicBlock *> &frontier) {
+  auto *function = root->getParent();
+  assert(function->hasOwnership());
+  assert(frontier.empty());
+
+  DominanceOrder domOrder(root, domTree);
+  while (SILBasicBlock *block = domOrder.getNext()) {
+    DominanceInfoNode *domNode = domTree->getNode(block);
+    if (domNode->isLeaf()) {
+      frontier.push_back(block);
+      continue;
+    }
+    domOrder.pushChildren(block);
+  }
+}
