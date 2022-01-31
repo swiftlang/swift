@@ -285,7 +285,6 @@ extension DistributedActorSystem {
       let returnType = try invocationDecoder.decodeReturnType() ?? returnTypeFromTypeInfo
       // let errorType = try invocation.decodeErrorType() // TODO: decide how to use?
 
-      var decoderAny = invocationDecoder as Any
       // Execute the target!
       try await _executeDistributedTarget(
         on: actor,
@@ -419,12 +418,7 @@ public protocol DistributedTargetInvocationDecoder : AnyObject {
 //  /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
 //  /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
 //  /// performs the actual distributed (local) instance method invocation.
-//  mutating func decodeNextArgument<Argument: SerializationRequirement>(
-//      into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-//  ) throws
-
-  // FIXME(distributed): remove this since it must have the ': SerializationRequirement'
-  func decodeNextArgument<Argument>() throws -> Argument
+//  mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
 
   func decodeErrorType() throws -> Any.Type?
 
