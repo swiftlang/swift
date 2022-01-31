@@ -1139,6 +1139,7 @@ Some kinds need arguments, which precede ``Tf``.
   CONST-PROP ::= 'i' NATURAL_ZERO            // 64-bit-integer
   CONST-PROP ::= 'd' NATURAL_ZERO            // float-as-64-bit-integer
   CONST-PROP ::= 's' ENCODING                // string literal. Consumes one identifier argument.
+  CONST-PROP ::= 'k'                         // keypath. Consumes one identifier - the SHA1 of the keypath and two types (root and value).
 
   ENCODING ::= 'b'                           // utf8
   ENCODING ::= 'w'                           // utf16

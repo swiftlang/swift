@@ -424,3 +424,5 @@ $s17distributed_thunk2DAC1fyyFTE ---> distributed thunk for distributed_thunk.DA
 $s16distributed_test1XC7computeyS2iFTF ---> distributed accessor for distributed_test.X.compute(Swift.Int) -> Swift.Int
 $s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed accessor for distributed thunk for distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String
 $s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> ()
+$s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> ()
+
