@@ -346,8 +346,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   using llvm::SMLoc;
   
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
-  CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
-  StringRef InputFile = SM.extractText(EntireRange);
+  StringRef InputFile = SM.getEntireTextForBuffer(BufferID);
   StringRef BufferName = SM.getIdentifierForBuffer(BufferID);
 
   // Queue up all of the diagnostics, allowing us to sort them and emit them in
