@@ -1,5 +1,9 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -parse-stdlib -emit-sil
 
+// For now since this is experimental disable on windows.
+//
+// UNSUPPORTED: OS=windows-msvc
+
 import Swift
 
 public class Klass {
