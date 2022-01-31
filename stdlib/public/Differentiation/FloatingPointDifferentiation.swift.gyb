@@ -327,8 +327,8 @@ where
   ) -> ( // TODO: try using `Self` instead of `TangentVector` here
     value: Self, pullback: (Self) -> (Self, Self)
   ) {
-    if ${op}(x) <= ${op}(y) || y.isNaN { return (${op}(x), { v in (v, .zero) }) }
-    return (${op}(y), { v in (.zero, v) })
+    if ${op}(x) <= ${op}(y) || y.isNaN { return (x, { v in (v, .zero) }) }
+    return (y, { v in (.zero, v) })
   }
 
   @inlinable
@@ -339,8 +339,8 @@ where
   ) -> (
     value: Self, differential: (Self, Self) -> (Self)
   ) {
-    if ${op}(x) <= ${op}(y) || y.isNaN { return (${op}(x), { (dx, _) in dx }) }
-    return (${op}(y), { (_, dy) in dy })
+    if ${op}(x) <= ${op}(y) || y.isNaN { return (x, { (dx, _) in dx }) }
+    return (y, { (_, dy) in dy })
   }
 
   @inlinable
@@ -351,8 +351,8 @@ where
   ) -> (
     value: Self, pullback: (Self) -> (Self, Self)
   ) {
-    if ${op}(x) > ${op}(y) || y.isNaN { return (${op}(x), { v in (v, .zero) }) }
-    return (${op}(y), { v in (.zero, v) })
+    if ${op}(x) > ${op}(y) || y.isNaN { return (x, { v in (v, .zero) }) }
+    return (y, { v in (.zero, v) })
   }
 
   @inlinable
@@ -363,8 +363,8 @@ where
   ) -> (
     value: Self, differential: (Self, Self) -> (Self)
   ) {
-    if ${op}(x) > ${op}(y) || y.isNaN { return (${op}(x), { (dx, _) in dx }) }
-    return (${op}(y), { (_, dy) in dy })
+    if ${op}(x) > ${op}(y) || y.isNaN { return (x, { (dx, _) in dx }) }
+    return (y, { (_, dy) in dy })
   }
 %end # for suffix in ['', 'Magnitude']:
 }

@@ -99,6 +99,30 @@ FloatingPointDerivativeTests.test("${Self}.maximum") {
   expectEqual((0.0, 1.0), gradient(at: .nan, ${Self}(1), of: { ${Self}.maximum($0, $1) }))
 }
 
+FloatingPointDerivativeTests.test("${Self}.minimumMagnitude") {
+%  for s1 in ['+', '-']:
+%    for s2 in ['+', '-']:
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(${s1}1), ${Self}(${s2}2), of: { ${Self}.minimumMagnitude($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(${s1}1), ${Self}(${s2}1), of: { ${Self}.minimumMagnitude($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: ${Self}(${s1}2), ${Self}(${s2}1), of: { ${Self}.minimumMagnitude($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(${s1}1), ${s2}.nan, of: { ${Self}.minimumMagnitude($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: ${s1}.nan, ${Self}(${s2}1), of: { ${Self}.minimumMagnitude($0, $1) }))
+%    end # for s2 in ['+', '-']:
+%  end # for s1 in ['+', '-']:
+}
+
+FloatingPointDerivativeTests.test("${Self}.maximumMagnitude") {
+%  for s1 in ['+', '-']:
+%    for s2 in ['+', '-']:
+  expectEqual((0.0, 1.0), gradient(at: ${Self}(${s1}1), ${Self}(${s2}2), of: { ${Self}.maximumMagnitude($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: ${Self}(${s1}1), ${Self}(${s2}1), of: { ${Self}.maximumMagnitude($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(${s1}2), ${Self}(${s2}1), of: { ${Self}.maximumMagnitude($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(${s1}1), ${s2}.nan, of: { ${Self}.maximumMagnitude($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: ${s1}.nan, ${Self}(${s2}1), of: { ${Self}.maximumMagnitude($0, $1) }))
+%    end # for s2 in ['+', '-']:
+%  end # for s1 in ['+', '-']:
+}
+
 %if Self == 'Float80':
 #endif
 %end
