@@ -69,32 +69,44 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
 namespace {
 
 struct ArgumentDecoderInfo {
+  /// The instance of the decoder this information belongs to.
   llvm::Value *Decoder;
 
+  /// The type of `decodeNextArgument` method.
   CanSILFunctionType MethodType;
+
+  /// The pointer to `decodeNextArgument` method which
+  /// could be used to form a call to it.
   FunctionPointer MethodPtr;
+
+  /// Protocol requirements associated with the generic
+  /// parameter `Argument` of this decode method.
+  GenericSignature::RequiredProtocols ProtocolRequirements;
 
   ArgumentDecoderInfo(llvm::Value *decoder, CanSILFunctionType decodeMethodTy,
                       FunctionPointer decodePtr)
-      : Decoder(decoder), MethodType(decodeMethodTy), MethodPtr(decodePtr) {}
+      : Decoder(decoder), MethodType(decodeMethodTy), MethodPtr(decodePtr),
+        ProtocolRequirements(findProtocolRequirements(decodeMethodTy)) {}
 
   CanSILFunctionType getMethodType() const { return MethodType; }
 
-  CanGenericSignature getGenericSignature() const {
-    return MethodType->getInvocationGenericSignature();
-  }
-
-  GenericSignature::RequiredProtocols getProtocolRequirements() const {
-    auto signature = getGenericSignature();
-    auto genericParams = signature.getGenericParams();
-
-    // func decodeNextArgument<Arg : <SerializationRequirement>() throws -> Arg
-    assert(genericParams.size() == 1);
-    return signature->getRequiredProtocols(genericParams.front());
+  ArrayRef<ProtocolDecl *> getProtocolRequirements() const {
+    return ProtocolRequirements;
   }
 
   /// Form a callee to a decode method - `decodeNextArgument`.
   Callee getCallee() const;
+
+private:
+  static GenericSignature::RequiredProtocols
+  findProtocolRequirements(CanSILFunctionType decodeMethodTy) {
+    auto signature = decodeMethodTy->getInvocationGenericSignature();
+    auto genericParams = signature.getGenericParams();
+
+    // func decodeNextArgument<Arg : #SerializationRequirement#>() throws -> Arg
+    assert(genericParams.size() == 1);
+    return signature->getRequiredProtocols(genericParams.front());
+  }
 };
 
 class DistributedAccessor {
@@ -130,7 +142,7 @@ private:
                       Explosion &arguments);
 
   void lookupWitnessTables(llvm::Value *value,
-                           GenericSignature::RequiredProtocols protocols,
+                           ArrayRef<ProtocolDecl *> protocols,
                            Explosion &witnessTables);
 
   /// Load witness table addresses (if any) from the given buffer
@@ -449,7 +461,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
 }
 
 void DistributedAccessor::lookupWitnessTables(
-    llvm::Value *value, GenericSignature::RequiredProtocols protocols,
+    llvm::Value *value, ArrayRef<ProtocolDecl *> protocols,
     Explosion &witnessTables) {
   auto conformsToProtocol = IGM.getConformsToProtocolFn();
 
