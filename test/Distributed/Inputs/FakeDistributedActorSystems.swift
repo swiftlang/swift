@@ -158,7 +158,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
           Act.ID == ActorID,
           Err: Error,
           Res: SerializationRequirement {
-    print("  >> remoteCall: on:\(actor)), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType)), returning:\(String(reflecting: returnType))")
+    print("  >> remoteCall: on:\(actor), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType)), returning:\(String(reflecting: returnType))")
     guard let targetActor = activeActors[actor.id] else {
       fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor")
     }
@@ -205,7 +205,7 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
     where Act: DistributedActor,
           Act.ID == ActorID,
           Err: Error {
-    print("  >> remoteCallVoid: on:\(actor)), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType))")
+    print("  >> remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType))")
     guard let targetActor = activeActors[actor.id] else {
       fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor")
     }
@@ -253,7 +253,7 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
   var errorType: Any.Type? = nil
 
   public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {
-    print(" > encode generic sub: \(type)")
+    print(" > encode generic sub: \(String(reflecting: type))")
     genericSubs.append(type)
   }
 
@@ -262,11 +262,11 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
     arguments.append(argument)
   }
   public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {
-    print(" > encode error type: \(type)")
+    print(" > encode error type: \(String(reflecting: type))")
     self.errorType = type
   }
   public mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {
-    print(" > encode return type: \(type)")
+    print(" > encode return type: \(String(reflecting: type))")
     self.returnType = type
   }
   public mutating func doneRecording() throws {

@@ -29,9 +29,15 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 distributed actor Greeter {
-  distributed func echo(name: String) -> String {
-    return "Echo: \(name)"
+  distributed func generic<V: Codable>(_ value: V) -> String {
+    return "\(value)"
   }
+
+  distributed func generic2<A: Codable, B: Codable>(
+      strict: Double, _ value: A, _ bs: [B]) -> String {
+    return "\(value) \(bs)"
+  }
+
 }
 
 func test() async throws {
@@ -40,12 +46,30 @@ func test() async throws {
   let local = Greeter(system: system)
   let ref = try Greeter.resolve(id: local.id, using: system)
 
-  let reply = try await ref.echo(name: "Caplin")
-  // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC4echo4nameS2S_tFTE"), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  let r1 = try await ref.generic("Caplin")
+  // CHECK: > encode generic sub: Swift.String
+  // CHECK: > encode argument: Caplin
+  // CHECK: > encode return type: Swift.String
+  // CHECK: > done recording
+  // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC7genericySSxSeRzSERzlFTE"), invocation:FakeInvocationEncoder(genericSubs: [Swift.String], arguments: ["Caplin"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  print("reply: \(r1)")
+  // CHECK: reply: Caplin
 
-  // CHECK: << remoteCall return: Echo: Caplin
-  print("reply: \(reply)")
-  // CHECK: reply: Echo: Caplin
+  let r2 = try await ref.generic2(
+      strict: 2.0,
+      "Caplin",
+      [1, 2, 3]
+  )
+  // CHECK: > encode generic sub: Swift.String
+  // CHECK: > encode generic sub: Swift.Int
+  // CHECK: > encode argument: 2.0
+  // CHECK: > encode argument: Caplin
+  // CHECK: > encode argument: [1, 2, 3]
+  // CHECK: > encode return type: Swift.String
+  // CHECK: > done recording
+  // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC8generic26strict__SSSd_xSayq_GtSeRzSERzSeR_SER_r0_lFTE"), invocation:FakeInvocationEncoder(genericSubs: [Swift.String, Swift.Int], arguments: [2.0, "Caplin", [1, 2, 3]], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+  print("reply: \(r2)")
+  // CHECK: reply: Caplin
 }
 
 @main struct Main {

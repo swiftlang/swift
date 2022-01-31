@@ -44,7 +44,7 @@ func test() async throws {
 
   do {
     try await ref.maybeThrows()
-    // CHECK: >> remoteCallVoid: on:main.Greeter), target:RemoteCallTarget(_mangledName: "$s4main7GreeterC11maybeThrowsyyKFTE"), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: nil, errorType: Optional(Swift.Error.Protocol)), throwing:Swift.Error.Protocol
+    // CHECK: >> remoteCallVoid: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC11maybeThrowsyyKFTE"), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: nil, errorType: Optional(Swift.Error.Protocol)), throwing:Swift.Error.Protocol
 
     print("did not throw")
     // CHECK-NOT: did not throw
