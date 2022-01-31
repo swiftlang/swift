@@ -2833,6 +2833,13 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Inline constructor for subject.
   auto subject = ([&]() -> ConsumableManagedValue {
+    // If we have a move only value, ensure plus one and convert it. Switches
+    // always consume move only values.
+    if (subjectMV.getType().isMoveOnly()) {
+      subjectMV = B.createOwnedMoveOnlyToCopyableValue(
+          S, subjectMV.ensurePlusOne(*this, S));
+    }
+
     // If we have a plus one value...
     if (subjectMV.isPlusOne(*this)) {
       // And we have an address that is loadable, perform a load [take].
