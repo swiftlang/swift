@@ -147,6 +147,7 @@ actor A10: AsyncThrowingProtocolWithNotSendable {
 }
 
 // rdar://86653457 - Crash due to missing Sendable conformances.
+// expected-warning@+1{{non-final class 'Klass' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
 class Klass<Output: Sendable>: Sendable {}
 final class SubKlass: Klass<[S]> {}
 public struct S {}
