@@ -29,9 +29,15 @@ struct S3_P1: P1 {
   nonisolated func onMainActor() { }
 }
 
+struct S4_P1_quietly: P1 {
+  @SomeGlobalActor func onMainActor() { }
+}
+
+@SomeGlobalActor
 struct S4_P1: P1 {
   @SomeGlobalActor func onMainActor() { } // expected-warning{{instance method 'onMainActor()' isolated to global actor 'SomeGlobalActor' can not satisfy corresponding requirement from protocol 'P1' isolated to global actor 'MainActor'}}
 }
+
 
 @MainActor(unsafe)
 protocol P2 {
