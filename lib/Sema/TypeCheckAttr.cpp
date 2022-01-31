@@ -3562,7 +3562,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    if (!VD->hasStorage())
+    if (!VD->hasStorageOrWrapsStorage())
       return None;
 
     // Do not permit potential availability of script-mode global variables;

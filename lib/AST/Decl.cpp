@@ -6446,6 +6446,20 @@ VarDecl *VarDecl::getPropertyWrapperWrappedValueVar() const {
   return getPropertyWrapperAuxiliaryVariables().localWrappedValueVar;
 }
 
+bool VarDecl::hasStorageOrWrapsStorage() const {
+  if (hasStorage())
+    return true;
+  
+  if (getAttrs().hasAttribute<LazyAttr>())
+    return true;
+  
+  auto *backing = getPropertyWrapperBackingProperty();
+  if (backing && backing->hasStorage())
+    return true;
+  
+  return false;
+}
+
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
   if (getDeclContext()->isTypeContext() || isImplicit())
     return;
