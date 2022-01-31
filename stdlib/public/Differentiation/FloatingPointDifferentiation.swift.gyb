@@ -50,8 +50,15 @@ ${Availability(bits)}
 extension ${Self} {
 %for derivative_kind in ['vjp', 'jvp']:
 %  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
+  // TODO: Add derivative of `init<Source>()` where Source: FloatingPoint
+  // TODO: Add derivative of `init(signOf:magnitudeOf:)`
+  // TODO: Add derivative of `sign`
+  // TODO: Add derivative of `magnitude`
+  // TODO: Add derivative of `round()`
+  // TODO: Add derivative of `rounded()`
+
   @inlinable
-  @derivative(of: -) // TODO: add test for JVP for of this
+  @derivative(of: -)
   static func _${derivative_kind}Negate(
     _ x: ${Self}
   ) -> (value: ${Self}, ${linear_map_kind}: (${Self}) -> ${Self}) {
@@ -59,7 +66,7 @@ extension ${Self} {
   }
 
   @inlinable
-  @derivative(of: negate) // TODO: add test for this
+  @derivative(of: negate)
   mutating func _${derivative_kind}NegateAssign() -> (
     value: Void, ${linear_map_kind}: (inout Self) -> Void
   ) {
@@ -82,6 +89,11 @@ extension ${Self} {
 /// Derivatives of standard binary operators.
 ${Availability(bits)}
 extension ${Self} {
+  // TODO: Add derivative of `formRemainder(dividingBy:)`
+  // TODO: Add derivative of `formTruncatingRemainder(dividingBy:)`
+  // TODO: Add derivative of `remainder(dividingBy:)`
+  // TODO: Add derivative of `truncatingRemainder(dividingBy:)`
+
   @inlinable
   @derivative(of: +)
   static func _vjpAdd(
