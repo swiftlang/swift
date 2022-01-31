@@ -51,7 +51,7 @@ extension ${Self} {
 %for derivative_kind in ['vjp', 'jvp']:
 %  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
   @inlinable
-  @derivative(of: -)
+  @derivative(of: -) // TODO: add test for JVP for of this
   static func _${derivative_kind}Negate(
     _ x: ${Self}
   ) -> (value: ${Self}, ${linear_map_kind}: (${Self}) -> ${Self}) {
@@ -313,54 +313,40 @@ where
   }
 %end # for derivative_kind in ['jvp', 'vjp']:
 
-%for suffix in ['', 'Magnitude']:
-%  op = 'abs' if suffix == 'Magnitude' else ''
+%for compare_op in ['minimum', 'maximum']:
+%  compare_symbol = '<=' if compare_op == 'minimum' else '>'
+%  compare_camel = 'Minimum' if compare_op == 'minimum' else 'Maximum' # to ensure camel case
+%  for suffix in ['', 'Magnitude']:
+%    magnitude_op = 'abs' if suffix == 'Magnitude' else ''
   @inlinable
-  @derivative(of: minimum${suffix})
-  static func _vjpMinimum${suffix}(
+  @derivative(of: ${compare_op}${suffix})
+  static func _vjp${compare_camel}${suffix}(
     _ x: Self,
     _ y: Self
   ) -> ( // TODO: try using `Self` instead of `TangentVector` here
     value: Self, pullback: (Self) -> (Self, Self)
   ) {
-    if ${op}(x) <= ${op}(y) || y.isNaN { return (x, { v in (v, .zero) }) }
-    return (y, { v in (.zero, v) })
+    if ${magnitude_op}(x) ${compare_symbol} ${magnitude_op}(y) || y.isNaN { 
+      return (x, { v in (v, .zero) }) 
+    } else {
+      return (y, { v in (.zero, v) })
+    }
   }
 
   @inlinable
-  @derivative(of: minimum${suffix}) // TODO: add test for this
-  static func _jvpMinimum${suffix}(
+  @derivative(of: ${compare_op}${suffix})
+  static func _jvp${compare_camel}${suffix}(
     _ x: Self, 
     _ y: Self
   ) -> (
     value: Self, differential: (Self, Self) -> (Self)
   ) {
-    if ${op}(x) <= ${op}(y) || y.isNaN { return (x, { (dx, _) in dx }) }
-    return (y, { (_, dy) in dy })
+    if ${magnitude_op}(x) ${compare_symbol} ${magnitude_op}(y) || y.isNaN { 
+      return (x, { (dx, _) in dx }) 
+    } else {
+      return (y, { (_, dy) in dy })
+    }
   }
-
-  @inlinable
-  @derivative(of: maximum${suffix})
-  static func _vjpMaximum${suffix}(
-    _ x: Self, 
-    _ y: Self
-  ) -> (
-    value: Self, pullback: (Self) -> (Self, Self)
-  ) {
-    if ${op}(x) > ${op}(y) || y.isNaN { return (x, { v in (v, .zero) }) }
-    return (y, { v in (.zero, v) })
-  }
-
-  @inlinable
-  @derivative(of: maximum${suffix}) // TODO: add test for this
-  static func _jvpMaximum${suffix}(
-    _ x: Self, 
-    _ y: Self
-  ) -> (
-    value: Self, differential: (Self, Self) -> (Self)
-  ) {
-    if ${op}(x) > ${op}(y) || y.isNaN { return (x, { (dx, _) in dx }) }
-    return (y, { (_, dy) in dy })
-  }
-%end # for suffix in ['', 'Magnitude']:
+%  end # for suffix in ['', 'Magnitude']:
+%end # for compare_op in ['minimum', 'maximum']:
 }
