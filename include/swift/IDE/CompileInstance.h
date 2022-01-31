@@ -36,6 +36,7 @@ class CompileInstance {
 
   struct Options {
     unsigned MaxASTReuseCount = 100;
+    unsigned DependencyCheckIntervalSecond = 5;
   } Opts;
 
   std::mutex mtx;
@@ -43,7 +44,11 @@ class CompileInstance {
   std::unique_ptr<CompilerInstance> CI;
   llvm::hash_code CachedArgHash;
   std::atomic<bool> CachedCIInvalidated;
+  llvm::sys::TimePoint<> DependencyCheckedTimestamp;
+  llvm::StringMap<llvm::hash_code> InMemoryDependencyHash;
   unsigned CachedReuseCount;
+
+  bool shouldCheckDependencies() const;
 
   /// Perform cached sema. Returns \c true if the CI is not reusable.
   bool performCachedSemaIfPossible(DiagnosticConsumer *DiagC);
@@ -54,8 +59,8 @@ class CompileInstance {
                  DiagnosticConsumer *DiagC);
 
   /// Perform Parse and Sema, potentially CI from previous compilation is
-  /// reused.
-  void performSema(llvm::ArrayRef<const char *> Args,
+  /// reused. Returns \c true if there was any error.
+  bool performSema(llvm::ArrayRef<const char *> Args,
                    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
                    DiagnosticConsumer *DiagC,
                    std::shared_ptr<std::atomic<bool>> CancellationFlag);
