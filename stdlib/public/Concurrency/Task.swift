@@ -100,7 +100,7 @@ extension Task {
   /// depending on the executor's scheduling details.
   ///
   /// If the task throws an error, this property propagates that error.
-  /// Tasks that respond to cancellation by throwing `Task.CancellationError`
+  /// Tasks that respond to cancellation by throwing `CancellationError`
   /// have that error propagated here upon cancellation.
   ///
   /// - Returns: The task's result.
