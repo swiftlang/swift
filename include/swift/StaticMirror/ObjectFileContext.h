@@ -138,10 +138,10 @@ T unwrap(llvm::Expected<T> value) {
   exit(EXIT_FAILURE);
 }
 
-ReflectionContextHolder makeReflectionContextForObjectFiles(
+std::unique_ptr<ReflectionContextHolder> makeReflectionContextForObjectFiles(
     const std::vector<const llvm::object::ObjectFile *> &objectFiles);
 
-ReflectionContextHolder makeReflectionContextForMetadataReader(
+std::unique_ptr<ReflectionContextHolder> makeReflectionContextForMetadataReader(
     std::shared_ptr<ObjectMemoryReader> reader);
 
 } // end namespace static_mirror

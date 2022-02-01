@@ -495,7 +495,7 @@ ObjectMemoryReader::resolvePointer(reflection::RemoteAddress Addr,
 }
 
 template <typename Runtime>
-ReflectionContextHolder makeReflectionContextForMetadataReader(
+std::unique_ptr<ReflectionContextHolder> makeReflectionContextForMetadataReader(
     std::shared_ptr<ObjectMemoryReader> reader, uint8_t pointerSize) {
   using ReflectionContext = reflection::ReflectionContext<Runtime>;
   auto context = new ReflectionContext(reader);
@@ -503,12 +503,15 @@ ReflectionContextHolder makeReflectionContextForMetadataReader(
   for (unsigned i = 0, e = reader->getImages().size(); i < e; ++i) {
     context->addImage(reader->getImageStartAddress(i));
   }
-  return {ReflectionContextOwner(
-              context, [](void *x) { delete (ReflectionContext *)x; }),
-          builder, *reader, pointerSize};
+
+  ReflectionContextHolder *holder = new ReflectionContextHolder{
+      ReflectionContextOwner(context,
+                             [](void *x) { delete (ReflectionContext *)x; }),
+      builder, *reader, pointerSize};
+  return std::unique_ptr<ReflectionContextHolder>(holder);
 }
 
-ReflectionContextHolder makeReflectionContextForObjectFiles(
+std::unique_ptr<ReflectionContextHolder> makeReflectionContextForObjectFiles(
     const std::vector<const ObjectFile *> &objectFiles) {
   auto Reader = std::make_shared<ObjectMemoryReader>(objectFiles);
 
