@@ -655,10 +655,6 @@ bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
     return false;
   }
 
-  if (D->isImplicit()) {
-    return false;
-  }
-
   if (!isa<ValueDecl>(D)) {
     return false;
   }
