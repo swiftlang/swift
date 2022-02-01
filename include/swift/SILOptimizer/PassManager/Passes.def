@@ -436,6 +436,8 @@ PASS(MoveKillsCopyableAddressesChecker, "sil-move-kills-copyable-addresses-check
 PASS(MoveFunctionCanonicalization, "sil-move-function-canon",
      "Pass that canonicalizes certain parts of the IR before we perform move "
      "function checking.")
+PASS(DebugInfoCanonicalizer, "sil-onone-debuginfo-canonicalizer",
+     "Canonicalize debug info at -Onone by propagating debug info into coroutine funclets")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
