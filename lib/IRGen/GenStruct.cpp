@@ -1285,7 +1285,13 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
   // All resilient structs have the same opaque lowering, since they are
   // indistinguishable as values --- except that we have to track
   // ABI-accessibility.
-  if (IGM.isResilient(D, ResilienceExpansion::Maximal)) {
+  //
+  // Treat infinitely-sized types as resilient as well, since they can never
+  // be concretized.
+  if (IGM.isResilient(D, ResilienceExpansion::Maximal)
+      || IGM.getSILTypes().getTypeLowering(SILType::getPrimitiveAddressType(type),
+                                            TypeExpansionContext::minimal())
+            .getRecursiveProperties().isInfinite()) {
     auto structAccessible =
       IsABIAccessible_t(IGM.getSILModule().isTypeMetadataAccessible(type));
     return &getResilientStructTypeInfo(structAccessible);
