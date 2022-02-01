@@ -540,13 +540,8 @@ namespace {
 
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
 
-template<unsigned PointerSize>
-using ExternalTypeContextDescriptor
-#if SWIFT_OBJC_INTEROP
-= TargetTypeContextDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
-#else
-= TargetTypeContextDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
-#endif
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalTypeContextDescriptor = TargetTypeContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -2115,13 +2110,8 @@ using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
 template<typename Runtime> struct TargetProtocolDescriptor;
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
 
-template<unsigned PointerSize>
-using ExternalProtocolDescriptor
-#if SWIFT_OBJC_INTEROP
-= TargetProtocolDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
-#else
-= TargetProtocolDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
-#endif
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalProtocolDescriptor = TargetProtocolDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 /// A witness table for a protocol.
 ///
@@ -2866,21 +2856,11 @@ using TargetProtocolConformanceRecord =
 
 using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
 
-template<unsigned PointerSize>
-using ExternalProtocolConformanceDescriptor
-#if SWIFT_OBJC_INTEROP
-= TargetProtocolConformanceDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
-#else
-= TargetProtocolConformanceDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
-#endif
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalProtocolConformanceDescriptor = TargetProtocolConformanceDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
-template<unsigned PointerSize>
-using ExternalProtocolConformanceRecord
-#if SWIFT_OBJC_INTEROP
-= TargetProtocolConformanceRecord<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
-#else
-= TargetProtocolConformanceRecord<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
-#endif
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalProtocolConformanceRecord = TargetProtocolConformanceRecord<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 template<typename Runtime>
 struct TargetGenericContext;
@@ -2936,13 +2916,8 @@ private:
 };
 
 using ContextDescriptor = TargetContextDescriptor<InProcess>;
-template<unsigned PointerSize>
-using ExternalContextDescriptor
-#if SWIFT_OBJC_INTEROP
-= TargetContextDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
-#else
-= TargetContextDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
-#endif
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalContextDescriptor = TargetContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 inline bool isCImportedModuleName(llvm::StringRef name) {
   // This does not include MANGLING_MODULE_CLANG_IMPORTER because that's
@@ -2974,13 +2949,8 @@ struct TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
 
 using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
 
-template<unsigned PointerSize>
-using ExternalModuleContextDescriptor
-#if SWIFT_OBJC_INTEROP
-= TargetModuleContextDescriptor<External<WithObjCInterop<RuntimeTarget<PointerSize>>>>;
-#else
-= TargetModuleContextDescriptor<External<NoObjCInterop<RuntimeTarget<PointerSize>>>>;
-#endif
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalModuleContextDescriptor = TargetModuleContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 template<typename Runtime>
 inline bool TargetContextDescriptor<Runtime>::isCImportedContext() const {

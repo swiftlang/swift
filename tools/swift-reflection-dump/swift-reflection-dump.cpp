@@ -117,10 +117,20 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
     // Dump everything
     switch (context.PointerSize) {
     case 4:
-      builder.dumpAllSections<4>(stream);
+      // FIXME: This could/should be configurable.
+#if SWIFT_OBJC_INTEROP
+      builder.dumpAllSections<WithObjCInterop, 4>(stream);
+#else
+      builder.dumpAllSections<NoObjCInterop, 4>(stream);
+#endif
       break;
-     case 8:
-      builder.dumpAllSections<8>(stream);
+    case 8:
+      // FIXME: This could/should be configurable.
+#if SWIFT_OBJC_INTEROP
+      builder.dumpAllSections<WithObjCInterop, 8>(stream);
+#else
+      builder.dumpAllSections<NoObjCInterop, 8>(stream);
+#endif
       break;
     default:
       fputs("unsupported word size in object file\n", stderr);
