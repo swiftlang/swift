@@ -144,7 +144,7 @@ EXPECTED_DEFAULTS = {
     'enable_asan': False,
     'enable_experimental_differentiable_programming': True,
     'enable_experimental_concurrency': True,
-    'enable_experimental_distributed': True,
+    'enable_experimental_distributed': False,
     'enable_experimental_string_processing': True,
     'enable_lsan': False,
     'enable_sanitize_coverage': False,
