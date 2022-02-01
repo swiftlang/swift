@@ -816,6 +816,12 @@ public:
       for (auto Id : PredIDs)
         *this << ' ' << Id;
     }
+
+    // If the basic block has a name available, print it as well
+    auto debugName = BB->getDebugName();
+    if (debugName.hasValue()) {
+      *this << " /// " << debugName.getValue();
+    }
     *this << '\n';
 
     const auto &SM = BB->getModule().getASTContext().SourceMgr;

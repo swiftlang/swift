@@ -163,6 +163,8 @@ public:
       llvm::ilist<SILDifferentiabilityWitness>;
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
+  using BasicBlockNameMapType =
+      llvm::DenseMap<const SILBasicBlock *, llvm::StringRef>;
 
   enum class LinkingMode : uint8_t {
     /// Link functions with non-public linkage. Used by the mandatory pipeline.
@@ -360,6 +362,10 @@ private:
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
 
+#if NDEBUG
+  BasicBlockNameMapType basicBlockNames;
+#endif
+
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options);
 
@@ -446,6 +452,23 @@ public:
   /// Set a flag indicating that this module is serialized already.
   void setSerialized() { serialized = true; }
   bool isSerialized() const { return serialized; }
+
+  void setBasicBlockName(const SILBasicBlock *block, StringRef name) {
+    #if NDEBUG
+    basicBlockNames[block] = name;
+    #endif
+  }
+  Optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
+    #if NDEBUG
+    auto Known = basicBlockNames.find(block);
+    if (Known == basicBlockNames.end())
+      return None;
+
+    return Known->second;
+    #else
+    return None;
+    #endif
+  }
 
   /// Serialize a SIL module using the configured SerializeSILAction.
   void serialize();
