@@ -18,5 +18,21 @@
 // CHECK-DAG:    bool SWIFT_ENABLE_MANGLED_NAME_VERIFICATION [default: false] - Enable verification that metadata can roundtrip through a mangled name each time metadata is instantiated.
 // CHECK-DAG:    bool SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE [default: false] - Scribble on runtime allocations such as metadata allocations.
 
-print("Hello, world")
 // CHECK: Hello, world
+
+// We have to write this to stderr to avoid being dependent on the order of
+// stdout vs stderr (the data can come in any order).
+#if canImport(Darwin)
+import Darwin.C
+#elseif canImport(Glibc)
+import Glibc
+#elseif os(WASI)
+import WASILibc
+#elseif os(Windows)
+import CRT
+#else
+#error("Unsupported platform")
+#endif
+
+fputs("\nHello, world\n", stderr)
+
