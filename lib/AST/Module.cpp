@@ -963,6 +963,14 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
 #ifndef NDEBUG
   llvm::DenseSet<Decl *> visited;
   for (auto *D : Results) {
+    // decls synthesized from implicit clang decls may appear multiple times;
+    // e.g. if multiple modules with underlying clang modules are re-exported.
+    // including duplicates of these is harmless, so skip them when counting
+    // this assertion
+    if (const auto *CD = D->getClangDecl()) {
+      if (CD->isImplicit()) continue;
+    }
+
     auto inserted = visited.insert(D).second;
     assert(inserted && "there should be no duplicate decls");
   }
