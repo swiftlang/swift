@@ -54,7 +54,7 @@ class TSanLibDispatch(product.Product):
         clangxx = join_path(toolchain_path, 'bin', 'clang++')
 
         config_cmd = [
-            'cmake',
+            self.toolchain.cmake,
             '-GNinja',
             '-DCMAKE_PREFIX_PATH=%s' % toolchain_path,
             '-DCMAKE_C_COMPILER=%s' % clang,
