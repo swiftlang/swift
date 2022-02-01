@@ -31,6 +31,8 @@ public:
   virtual llvm::Optional<llvm::StringRef> getSegmentName() {
     return {};
   }
+  /// Predicate to identify if the named section can contain reflection data.
+  virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) = 0;
 };
 
 /// Responsible for providing the Mach-O reflection section identifiers.
@@ -56,6 +58,15 @@ public:
   llvm::Optional<llvm::StringRef> getSegmentName() override {
     return {"__TEXT"};
   }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    // For Mach-O, the caller must call this function twice, once with just the
+    // section name (ex `__swift5_fieldmd`), and again with the segment
+    // qualified section name (ex `__DATA,__const`).
+    return sectionName.startswith("__swift5_") ||
+           sectionName == "__DATA_CONST,__const" ||
+           sectionName == "__DATA,__const";
+  }
 };
 
 /// Responsible for providing the ELF reflection section identifiers.
@@ -78,6 +89,10 @@ public:
     }
     llvm_unreachable("Section type not found.");
   }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith("swift5_");
+  }
 };
 
 /// Responsible for providing the COFF reflection section identifiers
@@ -99,6 +114,10 @@ public:
       return ".sw5rfst";
     }
     llvm_unreachable("Section  not found.");
+  }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith(".sw5");
   }
 };
 } // namespace swift
