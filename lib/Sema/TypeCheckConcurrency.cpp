@@ -2228,7 +2228,8 @@ namespace {
               apply->getLoc(), diag::actor_isolated_call_decl,
               *unsatisfiedIsolation,
               calleeDecl->getDescriptiveKind(), calleeDecl->getName(),
-              getContextIsolation());
+              getContextIsolation())
+            .warnUntilSwiftVersion(6);
           calleeDecl->diagnose(
               diag::actor_isolated_sync_func, calleeDecl->getDescriptiveKind(),
               calleeDecl->getName());
@@ -3144,7 +3145,7 @@ static Optional<ActorIsolation> getIsolationFromWrappers(
 
   if (!nominal->getParentSourceFile())
     return None;
-  
+
   Optional<ActorIsolation> foundIsolation;
   for (auto member : nominal->getMembers()) {
     auto var = dyn_cast<VarDecl>(member);
