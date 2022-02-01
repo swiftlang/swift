@@ -70,11 +70,11 @@ private:
       // The serialization code doesn't allow us to cross-reference
       // typealias declarations directly.  We could fix that, but it's
       // easier to just avoid doing so and fall into the external-path code.
-      if (!isa<TypeAliasDecl>(swiftDecl)) {
+      if (swiftDecl.hasValue() && !isa<TypeAliasDecl>(swiftDecl.getValue())) {
         // Only accept this declaration if it round-trips.
-        if (auto swiftClangDecl = swiftDecl->getClangDecl())
+        if (auto swiftClangDecl = swiftDecl.getValue()->getClangDecl())
           if (isSameDecl(decl, swiftClangDecl))
-            return swiftDecl;
+            return swiftDecl.getValue();
       }
     }
 

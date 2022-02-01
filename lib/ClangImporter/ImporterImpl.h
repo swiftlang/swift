@@ -404,11 +404,6 @@ public:
   std::unordered_set<ImportDiagnostic, ImportDiagnosticHasher>
       CollectedDiagnostics;
 
-  // ClangNodes for which all import diagnostics have been both collected and
-  // emitted.
-  std::unordered_set<ImportDiagnosticTarget, ImportDiagnosticTargetHasher>
-      DiagnosedValues;
-
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
@@ -913,6 +908,7 @@ public:
   /// Import the given Clang source range into Swift.
   SourceRange importSourceRange(clang::SourceRange loc);
 
+  // TODO: Make this return an Optional<ValueDecl *> ?
   /// Import the given Clang preprocessor macro as a Swift value decl.
   ///
   /// \p macroNode must be a MacroInfo or a ModuleMacro.
@@ -946,16 +942,17 @@ public:
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
-  Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version,
-                         bool UseCanonicalDecl = true);
+  Optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl,
+                                    Version version,
+                                    bool UseCanonicalDecl = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
 
-  Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
-                               Version version,
-                               bool SuperfluousTypedefsAreTransparent,
-                               bool UseCanonicalDecl);
+  Optional<Decl *>
+  importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl, Version version,
+                         bool SuperfluousTypedefsAreTransparent,
+                         bool UseCanonicalDecl);
 
   /// Same as \c importDeclReal, but for use inside importer
   /// implementation.
@@ -963,8 +960,8 @@ public:
   /// Unlike \c importDeclReal, this function for convenience transparently
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
-  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version,
-                   bool UseCanonicalDecl = true) {
+  Optional<Decl *> importDecl(const clang::NamedDecl *ClangDecl,
+                              Version version, bool UseCanonicalDecl = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/true,
                                   /*UseCanonicalDecl*/ UseCanonicalDecl);
@@ -976,8 +973,9 @@ public:
   ///
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
-  Decl *importDeclReal(const clang::NamedDecl *ClangDecl, Version version,
-                       bool useCanonicalDecl = true) {
+  Optional<Decl *> importDeclReal(const clang::NamedDecl *ClangDecl,
+                                  Version version,
+                                  bool useCanonicalDecl = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/false,
                                   /*UseCanonicalDecl*/ useCanonicalDecl);
@@ -1030,11 +1028,11 @@ private:
   ///
   /// \param writtenName The name that should be used for the declaration
   ///        in cycle diagnostics.
-  Decl *importDeclForDeclContext(const clang::Decl *ImportingDecl,
-                                 StringRef writtenName,
-                                 const clang::NamedDecl *ClangDecl,
-                                 Version version,
-                                 bool UseCanonicalDecl = true);
+  Optional<Decl *> importDeclForDeclContext(const clang::Decl *ImportingDecl,
+                                            StringRef writtenName,
+                                            const clang::NamedDecl *ClangDecl,
+                                            Version version,
+                                            bool UseCanonicalDecl = true);
 
 public:
   /// Import the declaration context of a given Clang declaration into
@@ -1455,9 +1453,6 @@ public:
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
-  virtual void diagnoseMissingNamedMember(const IterableDeclContext *IDC,
-                                          DeclName name) override;
-
 private:
   void
   loadAllMembersOfObjcContainer(Decl *D,
@@ -1600,8 +1595,14 @@ public:
   void lookupAllObjCMembers(SwiftLookupTable &table,
                             VisibleDeclConsumer &consumer);
 
-  /// Emit any import diagnostics associated with the given name.
-  void diagnoseValue(SwiftLookupTable &table, DeclName name);
+  /// Emits diagnostics for any declarations named name
+  /// whose direct declaration context is a TU.
+  void diagnoseTopLevelValue(const DeclName &name);
+
+  /// Emit diagnostics for declarations named name that are members
+  /// of the provided container.
+  void diagnoseMemberValue(const DeclName &name,
+                           const clang::DeclContext *container);
 
   /// Emit any import diagnostics associated with the given Clang node.
   void diagnoseTargetDirectly(ImportDiagnosticTarget target);

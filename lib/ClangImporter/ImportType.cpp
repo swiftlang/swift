@@ -708,18 +708,21 @@ namespace {
       GenericSignature genericSig;
       if (auto *category =
             dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
-        auto ext = cast_or_null<ExtensionDecl>(
-            Impl.importDecl(category, Impl.CurrentVersion));
-        if (!ext)
+        const Optional<Decl *> ext = Impl.importDecl(category, Impl.CurrentVersion);
+        if (!ext.hasValue())
           return ImportResult();
-        genericSig = ext->getGenericSignature();
+
+        auto extValue = cast_or_null<ExtensionDecl>(ext.getValue());
+        if (!extValue)
+          return ImportResult();
+        genericSig = extValue->getGenericSignature();
       } else if (auto *interface =
           dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
-        auto cls = castIgnoringCompatibilityAlias<ClassDecl>(
-            Impl.importDecl(interface, Impl.CurrentVersion));
-        if (!cls)
+        const Optional<Decl *> clsOpt = Impl.importDecl(interface, Impl.CurrentVersion);
+        auto clsValue = castIgnoringCompatibilityAlias<ClassDecl>(clsOpt.getValue());
+        if (!clsValue)
           return ImportResult();
-        genericSig = cls->getGenericSignature();
+        genericSig = clsValue->getGenericSignature();
       }
       unsigned index = objcTypeParamDecl->getIndex();
       // Pull the generic param decl out of the imported class.
@@ -758,13 +761,16 @@ namespace {
       }
 
       // Import the underlying declaration.
-      auto decl = dyn_cast_or_null<TypeDecl>(
-          Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
+      const Optional<Decl *> declOpt =
+        Impl.importDecl(type->getDecl(), Impl.CurrentVersion);
+      if (!declOpt) return Visit(type->desugar());
+
+      auto declValue = dyn_cast_or_null<TypeDecl>(declOpt.getValue());
 
       // If that fails, fall back on importing the underlying type.
-      if (!decl) return Visit(type->desugar());
+      if (!declValue) return Visit(type->desugar());
 
-      Type mappedType = decl->getDeclaredInterfaceType();
+      Type mappedType = declValue->getDeclaredInterfaceType();
 
       if (getSwiftNewtypeAttr(type->getDecl(), Impl.CurrentVersion)) {
         auto underlying = Visit(type->getDecl()->getUnderlyingType());
@@ -800,7 +806,7 @@ namespace {
         case MappedTypeNameKind::DefineAndUse:
           break;
         case MappedTypeNameKind::DefineOnly:
-          if (auto typealias = dyn_cast<TypeAliasDecl>(decl))
+          if (auto typealias = dyn_cast<TypeAliasDecl>(declValue))
             mappedType = typealias->getDeclaredInterfaceType()
               ->getDesugaredType();
           break;
@@ -870,7 +876,7 @@ namespace {
 #endif
 
       // If the imported typealias is unavailable, return the underlying type.
-      if (decl->getAttrs().isUnavailable(Impl.SwiftContext))
+      if (declValue->getAttrs().isUnavailable(Impl.SwiftContext))
         return underlyingResult;
 
       return { mappedType, underlyingResult.Hint };
@@ -914,12 +920,13 @@ namespace {
     }
 
     ImportResult VisitRecordType(const clang::RecordType *type) {
-      auto decl = dyn_cast_or_null<TypeDecl>(
-          Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
-      if (!decl)
+      const Optional<Decl *> declOpt =
+        Impl.importDecl(type->getDecl(), Impl.CurrentVersion);
+      if (!declOpt)
         return nullptr;
 
-      return decl->getDeclaredInterfaceType();
+      auto decl = dyn_cast_or_null<TypeDecl>(declOpt.getValue());
+      return decl ? decl->getDeclaredInterfaceType() : nullptr;
     }
 
     ImportResult VisitEnumType(const clang::EnumType *type) {
@@ -946,12 +953,13 @@ namespace {
       case EnumKind::FrozenEnum:
       case EnumKind::Unknown:
       case EnumKind::Options: {
-        auto decl = dyn_cast_or_null<TypeDecl>(
-            Impl.importDecl(clangDecl, Impl.CurrentVersion));
-        if (!decl)
+        const Optional<Decl *> declOpt =
+          Impl.importDecl(clangDecl, Impl.CurrentVersion);
+        if (!declOpt)
           return nullptr;
 
-        return decl->getDeclaredInterfaceType();
+        auto decl = dyn_cast_or_null<TypeDecl>(declOpt.getValue());
+        return decl ? decl->getDeclaredInterfaceType() : nullptr;
       }
       }
 
@@ -1007,7 +1015,8 @@ namespace {
       // qualified),
       if (auto objcClass = type->getInterfaceDecl()) {
         auto imported = castIgnoringCompatibilityAlias<ClassDecl>(
-            Impl.importDecl(objcClass, Impl.CurrentVersion));
+            Impl.importDecl(objcClass,
+                            Impl.CurrentVersion).getValueOr(nullptr));
         if (!imported && !objcClass->hasDefinition())
           Impl.addImportDiagnostic(
               type, Diagnostic(diag::incomplete_interface, objcClass));
@@ -1197,12 +1206,17 @@ namespace {
 
         for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
              cp != cpEnd; ++cp) {
-          auto proto = castIgnoringCompatibilityAlias<ProtocolDecl>(
-            Impl.importDecl(*cp, Impl.CurrentVersion));
+          const Optional<Decl *> proto =
+              Impl.importDecl(*cp, Impl.CurrentVersion);
           if (!proto)
             return Type();
 
-          members.push_back(proto->getDeclaredInterfaceType());
+          auto protoValue =
+              castIgnoringCompatibilityAlias<ProtocolDecl>(proto.getValue());
+          if (!protoValue)
+            return Type();
+
+          members.push_back(protoValue->getDeclaredInterfaceType());
         }
 
         importedType = ExistentialType::get(
@@ -2840,8 +2854,11 @@ Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
   }
 
   for (auto decl : lookupResult) {
-    if (auto swiftDecl =
-            importDecl(decl->getUnderlyingDecl(), CurrentVersion)) {
+    Optional<Decl *> swiftDeclOpt =
+        importDecl(decl->getUnderlyingDecl(), CurrentVersion);
+    if (!swiftDeclOpt.hasValue())
+      continue;
+    if (auto swiftDecl = swiftDeclOpt.getValue()) {
       return swiftDecl;
     }
   }
@@ -2917,8 +2934,8 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   for (auto decl : lookupResult) {
     if (auto swiftDecl =
             impl.importDecl(decl->getUnderlyingDecl(), impl.CurrentVersion)) {
-      if (auto protoDecl =
-              dynCastIgnoringCompatibilityAlias<ProtocolDecl>(swiftDecl)) {
+      if (auto protoDecl = dynCastIgnoringCompatibilityAlias<ProtocolDecl>(
+              swiftDecl.getValue())) {
         return protoDecl->getDeclaredInterfaceType();
       }
     }

@@ -156,15 +156,18 @@ void ClangImporter::Implementation::lookupValueDWARF(
     auto *namedDecl = dyn_cast<clang::NamedDecl>(clangDecl);
     if (!namedDecl)
       continue;
-    auto *swiftDecl = cast_or_null<ValueDecl>(
-        importDeclReal(namedDecl->getMostRecentDecl(), CurrentVersion));
+    const Optional<Decl *> swiftDecl =
+        importDeclReal(namedDecl->getMostRecentDecl(), CurrentVersion);
     if (!swiftDecl)
       continue;
+    auto *swiftDeclValue = cast_or_null<ValueDecl>(swiftDecl.getValue());
+    if (!swiftDeclValue)
+      continue;
 
-    if (swiftDecl->getName().matchesRef(name) &&
-        swiftDecl->getDeclContext()->isModuleScopeContext()) {
-      forceLoadAllMembers(dyn_cast<IterableDeclContext>(swiftDecl));
-      results.push_back(swiftDecl);
+    if (swiftDeclValue->getName().matchesRef(name) &&
+        swiftDeclValue->getDeclContext()->isModuleScopeContext()) {
+      forceLoadAllMembers(dyn_cast<IterableDeclContext>(swiftDeclValue));
+      results.push_back(swiftDeclValue);
     }
   }
 }
@@ -185,10 +188,13 @@ void ClangImporter::Implementation::lookupTypeDeclDWARF(
       continue;
     }
     auto *namedDecl = cast<clang::NamedDecl>(clangDecl);
-    Decl *importedDecl = cast_or_null<ValueDecl>(
-        importDeclReal(namedDecl->getMostRecentDecl(), CurrentVersion));
+    const Optional<Decl *> importedDecl =
+        importDeclReal(namedDecl->getMostRecentDecl(), CurrentVersion);
+    if (!importedDecl)
+      continue;
 
-    if (auto *importedType = dyn_cast_or_null<TypeDecl>(importedDecl)) {
+    Decl *importedDeclValue = cast_or_null<ValueDecl>(importedDecl.getValue());
+    if (auto *importedType = dyn_cast_or_null<TypeDecl>(importedDeclValue)) {
       forceLoadAllMembers(dyn_cast<IterableDeclContext>(importedType));
       receiver(importedType);
     }

@@ -2871,8 +2871,8 @@ void ClangImporter::lookupBridgingHeaderDecls(
   for (auto *ClangD : Impl.BridgeHeaderTopLevelDecls) {
     if (filter(ClangD)) {
       if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
-        if (Decl *imported = Impl.importDeclReal(ND, Impl.CurrentVersion))
-          receiver(imported);
+        if (auto imported = Impl.importDeclReal(ND, Impl.CurrentVersion))
+          receiver(imported.getValue());
       }
     }
   }
@@ -2937,8 +2937,8 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
         continue;
       if (filter(ClangD)) {
         if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
-          if (Decl *imported = Impl.importDeclReal(ND, Impl.CurrentVersion))
-            receiver(imported);
+          if (auto imported = Impl.importDeclReal(ND, Impl.CurrentVersion))
+            receiver(imported.getValue());
         }
       }
     }
@@ -3035,13 +3035,18 @@ void ClangImporter::lookupTypeDecl(
             !isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
           continue;
         }
-        Decl *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
+        const Optional<Decl *> imported =
+          Impl.importDecl(clangDecl, Impl.CurrentVersion);
+        if (!imported.hasValue())
+          continue;
 
         // Namespaces are imported as extensions for enums.
-        if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
-          imported = ext->getExtendedNominal();
+        Decl *importedExtendedNominal = imported.getValue();
+        if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported.getValue())) {
+          importedExtendedNominal = ext->getExtendedNominal();
         }
-        if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
+        if (auto *importedType =
+            dyn_cast_or_null<TypeDecl>(importedExtendedNominal)) {
           foundViaClang = true;
           receiver(importedType);
         }
@@ -3147,10 +3152,15 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
 
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
-      if (auto extension = cast_or_null<ExtensionDecl>(
-              owner.importDecl(category, owner.CurrentVersion,
-                               /*UseCanonical*/false))) {
-        results.push_back(extension);
+      const Optional<Decl *> extension =
+        owner.importDecl(category,
+                         owner.CurrentVersion, /*UseCanonical*/false);
+      if (!extension.hasValue())
+        continue;
+
+      if (auto extensionValue =
+          cast_or_null<ExtensionDecl>(extension.getValue())) {
+        results.push_back(extensionValue);
       }
     }
 
@@ -3170,32 +3180,34 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      Decl *importedDecl = owner.importDecl(decl, owner.CurrentVersion);
+      const Optional<Decl *> importedDecl =
+        owner.importDecl(decl, owner.CurrentVersion);
       if (!importedDecl) continue;
 
       // Find the enclosing extension, if there is one.
-      ExtensionDecl *ext = findEnclosingExtension(importedDecl);
+      ExtensionDecl *ext = findEnclosingExtension(importedDecl.getValue());
       if (ext && knownExtensions.insert(ext).second)
         results.push_back(ext);
 
       // If this is a compatibility typealias, the canonical type declaration
       // may exist in another extension.
-      auto alias = dyn_cast<TypeAliasDecl>(importedDecl);
+      auto alias = dyn_cast<TypeAliasDecl>(importedDecl.getValue());
       if (!alias || !alias->isCompatibilityAlias()) continue;
 
       auto aliasedTy = alias->getUnderlyingType();
       ext = nullptr;
-      importedDecl = nullptr;
 
       // Note: We can't use getAnyGeneric() here because `aliasedTy`
       // might be typealias.
+      Decl *aliasTypeDecl = nullptr;
       if (auto Ty = dyn_cast<TypeAliasType>(aliasedTy.getPointer()))
-        importedDecl = Ty->getDecl();
+        aliasTypeDecl = Ty->getDecl();
       else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
-        importedDecl = Ty->getDecl();
-      if (!importedDecl) continue;
+        aliasTypeDecl = Ty->getDecl();
+      else
+        continue;
 
-      ext = findEnclosingExtension(importedDecl);
+      ext = findEnclosingExtension(aliasTypeDecl);
       if (ext && knownExtensions.insert(ext).second)
         results.push_back(ext);
     }
@@ -3275,7 +3287,7 @@ void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
   if (auto lookupTable = owner.findLookupTable(clangModule)) {
     // Search it.
     owner.lookupValue(*lookupTable, name, *consumer);
-    if (getASTContext().LangOpts.EnableExperimentalClangImporterDiagnostics) {
+        if (getASTContext().LangOpts.EnableExperimentalClangImporterDiagnostics) {
       if (results.empty()) {
         owner.diagnoseValue(*lookupTable, name);
       }
@@ -3359,23 +3371,26 @@ ClangModuleUnit::lookupNestedType(Identifier name,
       if (!newName.getDeclName().isSimpleName(name))
         return true;
 
-      auto decl = dyn_cast_or_null<TypeDecl>(
-          owner.importDeclReal(clangTypeDecl, nameVersion));
-      if (!decl)
+      const Optional<Decl *> decl =
+        owner.importDeclReal(clangTypeDecl, nameVersion);
+      if (!decl.hasValue())
+        return false;
+      auto declValue = dyn_cast_or_null<TypeDecl>(decl.getValue());
+      if (!declValue)
         return false;
 
       if (!originalDecl)
-        originalDecl = decl;
-      else if (originalDecl == decl)
+        originalDecl = declValue;
+      else if (originalDecl == declValue)
         return true;
 
-      auto *importedContext = decl->getDeclContext()->getSelfNominalTypeDecl();
+      auto *importedContext = declValue->getDeclContext()->getSelfNominalTypeDecl();
       if (importedContext != baseType)
         return true;
 
-      assert(decl->getName() == name &&
+      assert(declValue->getName() == name &&
              "importFullName behaved differently from importDecl");
-      results.push_back(decl);
+      results.push_back(declValue);
       anyMatching = true;
       return true;
     });
@@ -3458,8 +3473,9 @@ void ClangImporter::loadObjCMethods(
       (void)Impl.importDecl(objcMethod->findPropertyDecl(true),
                             Impl.CurrentVersion);
 
-    method = dyn_cast_or_null<AbstractFunctionDecl>(
-        Impl.importDecl(objcMethod, Impl.CurrentVersion));
+    if (const Optional<Decl *> methodOpt =
+        Impl.importDecl(objcMethod, Impl.CurrentVersion))
+      method = dyn_cast_or_null<AbstractFunctionDecl>(methodOpt.getValue());
   }
 
   // If we didn't find anything, we're done.
@@ -3541,14 +3557,15 @@ void ClangModuleUnit::lookupObjCMethods(
     if (objcMethod->isPropertyAccessor())
       (void)owner.importDecl(objcMethod->findPropertyDecl(true),
                              owner.CurrentVersion);
-    Decl *imported = owner.importDecl(objcMethod, owner.CurrentVersion);
+    Optional<Decl *> imported =
+      owner.importDecl(objcMethod, owner.CurrentVersion);
     if (!imported) continue;
 
-    if (auto func = dyn_cast<AbstractFunctionDecl>(imported))
+    if (auto func = dyn_cast<AbstractFunctionDecl>(imported.getValue()))
       results.push_back(func);
 
     // If there is an alternate declaration, also look at it.
-    for (auto alternate : owner.getAlternateDecls(imported)) {
+    for (auto alternate : owner.getAlternateDecls(imported.getValue())) {
       if (auto func = dyn_cast<AbstractFunctionDecl>(alternate))
         results.push_back(func);
     }
@@ -3630,7 +3647,8 @@ std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
 }
 
-Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
+Optional<Decl *>
+ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
   return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
 }
 
@@ -4005,8 +4023,11 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
   if (name.isOperator()) {
     for (auto entry : table.lookupMemberOperators(name.getBaseName())) {
       if (isVisibleClangEntry(entry)) {
-        if (auto decl = dyn_cast_or_null<ValueDecl>(
-                importDeclReal(entry->getMostRecentDecl(), CurrentVersion))) {
+        const Optional<Decl *> declOpt =
+                importDeclReal(entry->getMostRecentDecl(), CurrentVersion);
+        if (!declOpt.hasValue())
+          continue;
+        if (auto decl = dyn_cast_or_null<ValueDecl>(declOpt.getValue())) {
           consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
           declFound = true;
         }
@@ -4022,14 +4043,14 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
     // If it's a Clang declaration, try to import it.
     if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
       bool isNamespace = isa<clang::NamespaceDecl>(clangDecl);
-      Decl *realDecl =
+      auto realDecl =
           importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion,
                          /*useCanonicalDecl*/ !isNamespace);
 
-      if (!realDecl)
+      if (!realDecl.hasValue() || !realDecl.getValue() ||
+          !isa<ValueDecl>(realDecl.getValue()))
         continue;
-      decl = cast<ValueDecl>(realDecl);
-      if (!decl) continue;
+      decl = cast<ValueDecl>(realDecl.getValue());
     } else if (!name.isSpecial()) {
       // Try to import a macro.
       if (auto modMacro = entry.dyn_cast<clang::ModuleMacro *>())
@@ -4096,9 +4117,12 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
           return;
 
         // Then try to import the decl under the alternate name.
+        const Optional<Decl *> alternateNamedDeclOpt =
+          importDeclReal(recentClangDecl, nameVersion);
+        if (!alternateNamedDeclOpt.hasValue())
+          return;
         auto alternateNamedDecl =
-            cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
-                                                   nameVersion));
+          cast_or_null<ValueDecl>(alternateNamedDeclOpt.getValue());
         if (!alternateNamedDecl || alternateNamedDecl == decl)
           return;
         assert(alternateNamedDecl->getName().matchesRef(name) &&
@@ -4144,8 +4168,10 @@ void ClangImporter::Implementation::lookupObjCMembers(
                         [&](ImportedName importedName,
                             ImportNameVersion nameVersion) -> bool {
       // Import the declaration.
-      auto decl =
-          cast_or_null<ValueDecl>(importDeclReal(clangDecl, nameVersion));
+      const Optional<Decl *> declOpt = importDeclReal(clangDecl, nameVersion);
+      if (!declOpt.hasValue())
+        return false;
+      auto decl = cast_or_null<ValueDecl>(declOpt.getValue());
       if (!decl)
         return false;
 
@@ -4716,8 +4742,10 @@ ClangImporter::instantiateCXXClassTemplate(
   assert(isa<clang::RecordType>(CanonType) &&
           "type of non-dependent specialization is not a RecordType");
 
-  return dyn_cast_or_null<StructDecl>(
-      Impl.importDecl(ctsd, Impl.CurrentVersion));
+  Optional<Decl *> structDecl = Impl.importDecl(ctsd, Impl.CurrentVersion);
+  if (!structDecl.hasValue())
+    return nullptr;
+  return dyn_cast_or_null<StructDecl>(structDecl.getValue());
 }
 
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
