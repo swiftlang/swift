@@ -1321,6 +1321,7 @@ public:
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType,
+    ArgumentList *argList,
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
@@ -1340,8 +1341,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   ParameterListInfo paramInfo(params, callee, appliedSelf);
 
-  // Dig out the argument information.
-  auto *argList = cs.getArgumentList(loc);
+  // Make sure that argument list is available.
   assert(argList);
 
   // Apply labels to arguments.
@@ -10634,11 +10634,14 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                               ? ConstraintKind::OperatorArgumentConversion
                               : ConstraintKind::ArgumentConversion);
 
+    auto *argumentsLoc = getConstraintLocator(
+        outerLocator.withPathElement(ConstraintLocator::ApplyArgument));
+
+    auto *argumentList = getArgumentList(argumentsLoc);
     // The argument type must be convertible to the input type.
     auto matchCallResult = ::matchCallArguments(
-        *this, func2, func1->getParams(), func2->getParams(), subKind,
-        outerLocator.withPathElement(ConstraintLocator::ApplyArgument),
-        trailingClosureMatching);
+        *this, func2, argumentList, func1->getParams(), func2->getParams(),
+        subKind, argumentsLoc, trailingClosureMatching);
 
     switch (matchCallResult) {
     case SolutionKind::Error:

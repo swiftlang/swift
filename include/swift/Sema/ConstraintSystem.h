@@ -5467,6 +5467,7 @@ matchCallArguments(
 ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,
                    FunctionType *contextualType,
+                   ArgumentList *argumentList,
                    ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
                    ConstraintKind subKind,
