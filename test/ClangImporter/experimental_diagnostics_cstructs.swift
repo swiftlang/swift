@@ -7,10 +7,10 @@ s.c = 5
 // CHECK:      experimental_diagnostics_cstructs.swift:{{[0-9]+}}:3: error: value of type 'PartialImport' has no member 'c'
 // CHECK-NEXT: s.c = 5
 // CHECK-NEXT: ~ ^
-// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: note: field 'c' not imported
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: error: field 'c' not imported
 // CHECK-NEXT:   int _Complex c;
 // CHECK-NEXT:   ^
-// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: note: built-in type 'Complex' not supported
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: error: built-in type 'Complex' not supported
 // CHECK-NEXT:   int _Complex c;
 // CHECK-NEXT:   ^
 
@@ -18,10 +18,10 @@ partialImport.c = 5
 // CHECK:      experimental_diagnostics_cstructs.swift:{{[0-9]+}}:15: error: value of type 'PartialImport' has no member 'c'
 // CHECK-NEXT: partialImport.c = 5
 // CHECK-NEXT: ~~~~~~~~~~~~~ ^
-// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: note: field 'c' not imported
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: error: field 'c' not imported
 // CHECK-NEXT:   int _Complex c;
 // CHECK-NEXT:   ^
-// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: note: built-in type 'Complex' not supported
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: error: built-in type 'Complex' not supported
 // CHECK-NEXT:   int _Complex c;
 // CHECK-NEXT:   ^
 
@@ -32,9 +32,9 @@ newPartialImport.d = 5
 // CHECK:      experimental_diagnostics_cstructs.swift:{{[0-9]+}}:18: error: value of type 'PartialImport' has no member 'd'
 // CHECK-NEXT: newPartialImport.d = 5
 // CHECK-NEXT: ~~~~~~~~~~~~~~~~ ^
-// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: note: field 'd' not imported
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: error: field 'd' not imported
 // CHECK-NEXT:   int _Complex d;
 // CHECK-NEXT:   ^
-// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: note: built-in type 'Complex' not supported
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: error: built-in type 'Complex' not supported
 // CHECK-NEXT:   int _Complex d;
 // CHECK-NEXT:   ^

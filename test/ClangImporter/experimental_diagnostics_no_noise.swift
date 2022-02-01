@@ -16,16 +16,16 @@ _ = bar.methodReturningForwardDeclaredInterface()
 // CHECK:      experimental_diagnostics_no_noise.swift:{{[0-9]+}}:{{[0-9]+}}: error: value of type 'Bar' has no member 'methodReturningForwardDeclaredInterface'
 // CHECK-NEXT: _ = bar.methodReturningForwardDeclaredInterface()
 // CHECK-NEXT:     ~~~ ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// CHECK-NEXT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: note: method 'methodReturningForwardDeclaredInterface' not imported
+// CHECK-NEXT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: error: method 'methodReturningForwardDeclaredInterface' not imported
 // CHECK-NEXT: - (ForwardDeclaredInterface *) methodReturningForwardDeclaredInterface;
 // CHECK-NEXT: ^
-// CHECK-NEXT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: note: return type not imported
+// CHECK-NEXT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: error: return type not imported
 // CHECK-NEXT: - (ForwardDeclaredInterface *) methodReturningForwardDeclaredInterface;
 // CHECK-NEXT: ^
-// CHECK-NEXT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ForwardDeclaredInterface' is incomplete
+// CHECK-NEXT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: error: interface 'ForwardDeclaredInterface' is incomplete
 // CHECK-NEXT: - (ForwardDeclaredInterface *) methodReturningForwardDeclaredInterface;
 // CHECK-NEXT: ^
-// CHECK-NEXT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ForwardDeclaredInterface' forward declared here
+// CHECK-NEXT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: error: interface 'ForwardDeclaredInterface' forward declared here
 // CHECK-NEXT: @class ForwardDeclaredInterface;
 // CHECK-NEXT: ^
 
@@ -36,13 +36,13 @@ unsupported_parameter_type(1,2)
 // CHECK:      experimental_diagnostics_no_noise.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'unsupported_parameter_type' in scope
 // CHECK-NEXT: unsupported_parameter_type(1,2)
 // CHECK-NEXT: ^~~~~~~~~~~~~~~~~~~~~~~~~~
-// CHECK-NEXT: cfuncs.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'unsupported_parameter_type' not imported
+// CHECK-NEXT: cfuncs.h:{{[0-9]+}}:{{[0-9]+}}: error: function 'unsupported_parameter_type' not imported
 // CHECK-NEXT:      int unsupported_parameter_type(int param1, _Complex int param2);
 // CHECK-NEXT: {{^}}^
-// CHECK-NEXT: cfuncs.h:{{[0-9]+}}:{{[0-9]+}}: note: parameter 'param2' not imported
+// CHECK-NEXT: cfuncs.h:{{[0-9]+}}:{{[0-9]+}}: error: parameter 'param2' not imported
 // CHECK-NEXT:      int unsupported_parameter_type(int param1, _Complex int param2);
 // CHECK-NEXT: {{^}}                                           ^
-// CHECK-NEXT: cfuncs.h:{{[0-9]+}}:{{[0-9]+}}: note: built-in type 'Complex' not supported
+// CHECK-NEXT: cfuncs.h:{{[0-9]+}}:{{[0-9]+}}: error: built-in type 'Complex' not supported
 // CHECK-NEXT:      int unsupported_parameter_type(int param1, _Complex int param2);
 // CHECK-NEXT: {{^}}                                           ^
 
@@ -54,10 +54,10 @@ s.c = 5
 // CHECK:      experimental_diagnostics_no_noise.swift:{{[0-9]+}}:{{[0-9]+}}: error: value of type 'PartialImport' has no member 'c'
 // CHECK-NEXT: s.c = 5
 // CHECK-NEXT: ~ ^
-// CHECK-NEXT: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: note: field 'c' not imported
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: error: field 'c' not imported
 // CHECK-NEXT:   int _Complex c;
 // CHECK-NEXT:   ^
-// CHECK-NEXT: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: note: built-in type 'Complex' not supported
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: error: built-in type 'Complex' not supported
 // CHECK-NEXT:   int _Complex c;
 // CHECK-NEXT:   ^
 // CHECK-NEXT: ctypes.PartialImport:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'a'?

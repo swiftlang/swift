@@ -11,13 +11,13 @@ commonName()
 // CHECK:      experimental_diagnostics_lookup_accuracy.swift:10:1: error: cannot find 'commonName' in scope
 // CHECK-NEXT: commonName()
 // CHECK-NEXT: ^~~~~~~~~~
-// CHECK-NEXT: CommonName.h:5:1: note: function 'commonName' not imported
+// CHECK-NEXT: CommonName.h:5:1: error: function 'commonName' not imported
 // CHECK-NEXT:      _Complex int commonName();
 // CHECK-NEXT: {{^}}^
-// CHECK-NEXT: CommonName.h:5:1: note: return type not imported
+// CHECK-NEXT: CommonName.h:5:1: error: return type not imported
 // CHECK-NEXT:      _Complex int commonName();
 // CHECK-NEXT: {{^}}^
-// CHECK-NEXT: CommonName.h:5:1: note: built-in type 'Complex' not supported
+// CHECK-NEXT: CommonName.h:5:1: error: built-in type 'Complex' not supported
 // CHECK-NEXT:      _Complex int commonName();
 // CHECK-NEXT: {{^}}^
 
@@ -27,9 +27,9 @@ s.commonName = 5
 // CHECK:      experimental_diagnostics_lookup_accuracy.swift:26:3: error: value of type 'MyStruct' has no member 'commonName'
 // CHECK-NEXT: s.commonName = 5
 // CHECK-NEXT: ~ ^
-// CHECK-NEXT: CommonName.h:2:3: note: field 'commonName' not imported
+// CHECK-NEXT: CommonName.h:2:3: error: field 'commonName' not imported
 // CHECK-NEXT:   int _Complex commonName;
 // CHECK-NEXT:   ^
-// CHECK-NEXT: CommonName.h:2:3: note: built-in type 'Complex' not supported
+// CHECK-NEXT: CommonName.h:2:3: error: built-in type 'Complex' not supported
 // CHECK-NEXT:   int _Complex commonName;
 // CHECK-NEXT:   ^
