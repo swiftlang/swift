@@ -4742,16 +4742,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 /// \returns true on error, false on success.
 static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
                                     DerivativeAttr *attr) {
-  if (D->isInvalid()) {
-    return true;
-  }
-  
   // Note: Implementation must be idempotent because it may be called multiple
   // times for the same attribute.
   auto &diags = Ctx.Diags;
   // `@derivative` attribute requires experimental differentiable programming
   // to be enabled.
   if (checkIfDifferentiableProgrammingEnabled(Ctx, attr, D->getDeclContext()))
+    return true;
+  if (D->isInvalid())
     return true;
   auto *derivative = cast<FuncDecl>(D);
   auto originalName = attr->getOriginalFunctionName();
