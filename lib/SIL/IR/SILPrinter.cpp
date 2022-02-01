@@ -791,6 +791,12 @@ public:
     // the block header.
     printBlockArgumentUses(BB);
 
+    // If the basic block has a name available, print it as well
+    auto debugName = BB->getDebugName();
+    if (debugName.hasValue()) {
+      *this << "// " << debugName.getValue() << '\n';
+    }
+
     // Then print the name of our block, the arguments, and the block colon.
     *this << Ctx.getID(BB);
     printBlockArguments(BB);

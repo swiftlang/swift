@@ -67,6 +67,14 @@ int SILBasicBlock::getDebugID() const {
   llvm_unreachable("block not in function's block list");
 }
 
+void SILBasicBlock::setDebugName(llvm::StringRef name) {
+  getModule().setBasicBlockName(this, name);
+}
+
+Optional<llvm::StringRef> SILBasicBlock::getDebugName() const {
+  return getModule().getBasicBlockName(this);
+}
+
 SILModule &SILBasicBlock::getModule() const {
   return getParent()->getModule();
 }
