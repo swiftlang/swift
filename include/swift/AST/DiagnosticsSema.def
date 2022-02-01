@@ -1512,6 +1512,18 @@ NOTE(attr_objc_implementation_fixit_remove_category_name,none,
      "remove arguments to implement the main '@interface' for this class",
      ())
 
+ERROR(member_of_objc_implementation_not_objc_or_final,none,
+      "%0 %1 does not match any %0 declared in the headers for %2; did you use "
+      "the %0's Swift name?",
+      (DescriptiveDeclKind, ValueDecl *, ValueDecl *))
+NOTE(fixit_add_objc_for_objc_implementation,none,
+     "add '@objc' to define an Objective-C-compatible %0 not declared in "
+     "the header",
+     (DescriptiveDeclKind))
+NOTE(fixit_add_final_for_objc_implementation,none,
+     "add 'final' to define a Swift %0 that cannot be overridden",
+     (DescriptiveDeclKind))
+
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
 ERROR(cdecl_empty_name,none,

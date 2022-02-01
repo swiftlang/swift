@@ -1213,6 +1213,29 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
   }
 }
 
+/// Check that, if this declaration is a member of an `@_objcImplementation`
+/// extension, it is either `final` or `@objc` (which may have been inferred by
+/// checking whether it shadows an imported declaration).
+static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
+  auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+  if (!ED || !ED->isObjCImplementation()) return;
+
+  if (VD->isSemanticallyFinal() || VD->isObjC()) return;
+
+  auto &diags = VD->getASTContext().Diags;
+  diags.diagnose(VD, diag::member_of_objc_implementation_not_objc_or_final,
+                 VD->getDescriptiveKind(), VD, ED->getExtendedNominal());
+
+  if (canBeRepresentedInObjC(VD))
+    diags.diagnose(VD, diag::fixit_add_objc_for_objc_implementation,
+                   VD->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+
+  diags.diagnose(VD, diag::fixit_add_final_for_objc_implementation,
+                 VD->getDescriptiveKind())
+      .fixItInsert(VD->getAttributeInsertionLoc(true), "final ");
+}
+
 /// Build a default initializer string for the given pattern.
 ///
 /// This string is suitable for display in diagnostics.
@@ -1835,6 +1858,10 @@ public:
       // Check whether the member is @objc or dynamic.
       (void) VD->isObjC();
       (void) VD->isDynamic();
+
+      // If this is in an `@_objcImplementation` extension, check whether it's
+      // valid there.
+      checkObjCImplementationMemberAvoidsVTable(VD);
 
       // Check for actor isolation of top-level and local declarations.
       // Declarations inside types are handled in checkConformancesInContext()

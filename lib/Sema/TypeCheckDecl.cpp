@@ -987,6 +987,12 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl())
     return true;
 
+  // @objc declarations in @_objcImplementation extensions are implicitly
+  // dynamic.
+  if (auto ED = dyn_cast_or_null<ExtensionDecl>(dc->getAsDecl()))
+    if (ED->isObjCImplementation())
+      return true;
+
   // If any of the declarations overridden by this declaration are dynamic
   // or were imported from Objective-C, this declaration is dynamic.
   // Don't do this if the declaration is not exposed to Objective-C; that's
