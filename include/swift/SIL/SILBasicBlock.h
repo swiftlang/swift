@@ -107,6 +107,9 @@ public:
   ///          debug output.
   int getDebugID() const;
 
+  void setDebugName(llvm::StringRef name);
+  Optional<llvm::StringRef> getDebugName() const;
+
   SILFunction *getParent() { return Parent; }
   const SILFunction *getParent() const { return Parent; }
 
