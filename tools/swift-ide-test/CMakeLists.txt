@@ -3,6 +3,7 @@ add_swift_host_tool(swift-ide-test
   ModuleAPIDiff.cpp
   XMLValidator.cpp
   SWIFT_COMPONENT tools
+  THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
 )
 target_link_libraries(swift-ide-test
                       PRIVATE
@@ -20,8 +21,6 @@ if(LLVM_ENABLE_LIBXML2)
     include_directories(SYSTEM "/usr/local/include")
   endif()
 endif()
-
-target_thinlto_ld64_add_flto_codegen_only(swift-ide-test)
 
 # Create a symlink for swift-api-dump.py in the bin directory
 swift_create_post_build_symlink(swift-ide-test
