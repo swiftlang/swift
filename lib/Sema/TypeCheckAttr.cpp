@@ -4749,11 +4749,24 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   // to be enabled.
   if (checkIfDifferentiableProgrammingEnabled(Ctx, attr, D->getDeclContext()))
     return true;
+
   auto *derivative = cast<FuncDecl>(D);
   auto originalName = attr->getOriginalFunctionName();
 
   auto *derivativeInterfaceType =
-      derivative->getInterfaceType()->castTo<AnyFunctionType>();
+      derivative->getInterfaceType()->getAs<AnyFunctionType>();
+  if (!derivativeInterfaceType) {
+    // Crashes if the instance is not an ErrorType.
+    if (derivative->getInterfaceType()->is<ErrorType>()) {
+      diags.diagnose(attr->getLocation(),
+                     diag::derivative_attr_unknown_error);
+      return true;
+    } else {
+      // This should never happen, but leaving a runtime diagnostic incase it
+      // does because little is known about this failure.
+      llvm::report_fatal_error("Unknown failure in typeCheckDerivativeAttr.");
+    }
+  }
 
   // Perform preliminary `@derivative` declaration checks.
   // The result type should be a two-element tuple.
