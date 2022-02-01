@@ -104,7 +104,6 @@ function(_add_target_variant_c_compile_link_flags)
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
     list(APPEND result
-      "-arch" "${CFLAGS_ARCH}"
       "-F${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
@@ -1202,6 +1201,10 @@ function(add_swift_target_library_single target name)
   endif()
 
   list(APPEND library_search_directories "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift")
+
+  # Override -arch on macOS. This is crucial for Apple Silicon, where CMake forces
+  # the *host* architecture to appear as the argument to -arch otherwise.
+  set_property(TARGET ${target} PROPERTY OSX_ARCHITECTURES "${SWIFTLIB_SINGLE_ARCHITECTURE}")
 
   # Add variant-specific flags.
   set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
