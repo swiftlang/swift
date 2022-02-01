@@ -10549,17 +10549,20 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   };
 
   // Local function to form an unsolved result.
-  auto formUnsolved = [&] {
+  auto formUnsolved = [&](bool activate = false) {
     if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::createApplicableFunction(
+      auto *application = Constraint::createApplicableFunction(
           *this, type1, type2, trailingClosureMatching,
-          getConstraintLocator(locator)));
+          getConstraintLocator(locator));
+
+      addUnsolvedConstraint(application);
+      if (activate)
+        activateConstraint(application);
+
       return SolutionKind::Solved;
     }
     
     return SolutionKind::Unsolved;
-
   };
 
   // If right-hand side is a type variable, the constraint is unsolved.
@@ -10694,6 +10697,26 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     auto instance2 = getFixedTypeRecursive(meta2->getInstanceType(), true);
     if (instance2->isTypeVariableOrMember())
       return formUnsolved();
+
+    auto *argumentsLoc = getConstraintLocator(
+        outerLocator.withPathElement(ConstraintLocator::ApplyArgument));
+
+    auto *argumentList = getArgumentList(argumentsLoc);
+    assert(argumentList);
+
+    // Cannot simplify construction of callable types during constraint
+    // generation when trailing closures are present because such calls
+    // have special trailing closure matching semantics. It's unclear
+    // whether trailing arguments belong to `.init` or implicit
+    // `.callAsFunction` in this case.
+    //
+    // Note that the constraint has to be activate so that solver attempts
+    // once constraint generation is done.
+    if (getPhase() == ConstraintSystemPhase::ConstraintGeneration &&
+        argumentList->hasAnyTrailingClosures() &&
+        instance2->isCallableNominalType(DC)) {
+      return formUnsolved(/*activate=*/true);
+    }
 
     // Construct the instance from the input arguments.
     auto simplified = simplifyConstructionConstraint(instance2, func1, subflags,
