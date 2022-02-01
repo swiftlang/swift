@@ -109,6 +109,11 @@ bool SILType::isTrivial(const SILFunction &F) const {
 }
 
 bool SILType::isEmpty(const SILFunction &F) const {
+  // Infinite types are never empty.
+  if (F.getTypeLowering(*this).getRecursiveProperties().isInfinite()) {
+    return false;
+  }
+  
   if (auto tupleTy = getAs<TupleType>()) {
     // A tuple is empty if it either has no elements or if all elements are
     // empty.
