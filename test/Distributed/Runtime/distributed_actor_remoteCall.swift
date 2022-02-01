@@ -7,6 +7,8 @@
 
 // rdar://87568630 - segmentation fault on 32-bit WatchOS simulator
 // UNSUPPORTED: OS=watchos && CPU=i386
+// rdar://88340451 - segmentation fault on arm64_32 WatchOS simulator
+// UNSUPPORTED: OS=watchos && CPU=arm64_32
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
