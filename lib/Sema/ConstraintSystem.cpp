@@ -6111,55 +6111,5 @@ ASTNode constraints::findAsyncNode(ClosureExpr *closure) {
   auto *body = closure->getBody();
   if (!body)
     return ASTNode();
-
-  // A walker that looks for 'async' and 'await' expressions
-  // that aren't nested within closures or nested declarations.
-  class FindInnerAsync : public ASTWalker {
-    ASTNode AsyncNode;
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // If we've found an 'await', record it and terminate the traversal.
-      if (isa<AwaitExpr>(expr)) {
-        AsyncNode = expr;
-        return {false, nullptr};
-      }
-
-      // Do not recurse into other closures.
-      if (isa<ClosureExpr>(expr))
-        return {false, expr};
-
-      return {true, expr};
-    }
-
-    bool walkToDeclPre(Decl *decl) override {
-      // Do not walk into function or type declarations.
-      if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-        if (patternBinding->isAsyncLet())
-          AsyncNode = patternBinding;
-
-        return true;
-      }
-
-      return false;
-    }
-
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
-        if (forEach->getAwaitLoc().isValid()) {
-          AsyncNode = forEach;
-          return {false, nullptr};
-        }
-      }
-
-      return {true, stmt};
-    }
-
-  public:
-    ASTNode getAsyncNode() { return AsyncNode; }
-  };
-
-  FindInnerAsync asyncFinder;
-  body->walk(asyncFinder);
-
-  return asyncFinder.getAsyncNode();
+  return body->findAsyncNode();
 }

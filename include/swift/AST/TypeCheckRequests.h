@@ -3283,6 +3283,21 @@ public:
   bool isCached() const { return true; }
 };
 
+class GetSourceFileAsyncNode
+    : public SimpleRequest<GetSourceFileAsyncNode, ASTNode(const SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ASTNode evaluate(Evaluator &evaluator, const SourceFile *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
