@@ -164,7 +164,7 @@ public:
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
   using BasicBlockNameMapType =
-      llvm::DenseMap<const SILBasicBlock *, llvm::StringRef>;
+      llvm::DenseMap<const SILBasicBlock *, std::string>;
 
   enum class LinkingMode : uint8_t {
     /// Link functions with non-public linkage. Used by the mandatory pipeline.
@@ -455,7 +455,7 @@ public:
 
   void setBasicBlockName(const SILBasicBlock *block, StringRef name) {
     #if NDEBUG
-    basicBlockNames[block] = name;
+    basicBlockNames[block] = name.str();
     #endif
   }
   Optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
@@ -464,7 +464,7 @@ public:
     if (Known == basicBlockNames.end())
       return None;
 
-    return Known->second;
+    return StringRef(Known->second);
     #else
     return None;
     #endif
