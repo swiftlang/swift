@@ -10,6 +10,7 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
     SWIFT_COMPONENT no_component
     HAS_SWIFT_MODULES
     BOOTSTRAPPING 0
+    THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
   )
   target_link_libraries(swift-frontend-bootstrapping0
                         PRIVATE
@@ -21,8 +22,6 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping0/${CMAKE_CFG_INTDIR}/bin")
 
-  target_thinlto_ld64_add_flto_codegen_only(swift-frontend-bootstrapping0)
-
   # Bootstrapping - level 1
 
   add_swift_host_tool(swift-frontend-bootstrapping1
@@ -30,6 +29,7 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
     SWIFT_COMPONENT no_component
     HAS_SWIFT_MODULES
     BOOTSTRAPPING 1
+    THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
   )
   target_link_libraries(swift-frontend-bootstrapping1
                         PRIVATE
@@ -40,8 +40,6 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping1/${CMAKE_CFG_INTDIR}/bin")
-
-  target_thinlto_ld64_add_flto_codegen_only(swift-frontend-bootstrapping1)
 endif()
 
 add_swift_host_tool(swift-frontend
