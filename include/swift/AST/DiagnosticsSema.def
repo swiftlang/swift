@@ -3313,8 +3313,6 @@ NOTE(protocol_witness_missing_differentiable_attr_invalid_context,none,
      "to %3", (StringRef, DeclName, Type, Type))
 
 // @derivative
-ERROR(derivative_attr_unknown_error,none,
-      "encountered unknown error while parsing @derivative(of:) attribute", ())
 ERROR(derivative_attr_expected_result_tuple,none,
       "'@derivative(of:)' attribute requires function to return a two-element "
       "tuple; first element must have label 'value:' and second element must "
