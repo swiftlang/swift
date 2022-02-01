@@ -3966,7 +3966,8 @@ public:
       return false;
 
     // Arbitrary protocol constraints are okay for 'any' types.
-    if (isa<ExistentialTypeRepr>(T))
+    if (Ctx.LangOpts.EnableExperimentalUniversalExistentials &&
+        isa<ExistentialTypeRepr>(T))
       return false;
 
     visit(T);
@@ -3991,16 +3992,23 @@ public:
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {
-    if (T->isInvalid() || !Ctx.LangOpts.EnableExplicitExistentialTypes)
+    if (T->isInvalid())
       return;
 
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
       if (proto->existentialRequiresAny()) {
-        Ctx.Diags.diagnose(comp->getNameLoc(),
-                           diag::existential_requires_any,
-                           proto->getName())
-            .limitBehavior(DiagnosticBehavior::Warning);
+        if (!Ctx.LangOpts.EnableExperimentalUniversalExistentials) {
+          Ctx.Diags.diagnose(comp->getNameLoc(),
+                             diag::unsupported_existential_type,
+                             proto->getName());
+          T->setInvalid();
+        } else if (Ctx.LangOpts.EnableExplicitExistentialTypes) {
+          Ctx.Diags.diagnose(comp->getNameLoc(),
+                             diag::existential_requires_any,
+                             proto->getName())
+              .limitBehavior(DiagnosticBehavior::Warning);
+        }
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
@@ -4014,10 +4022,17 @@ public:
             if (!protoDecl->existentialRequiresAny())
               continue;
 
-            Ctx.Diags.diagnose(comp->getNameLoc(),
-                               diag::existential_requires_any,
-                               protoDecl->getName())
-                .limitBehavior(DiagnosticBehavior::Warning);
+            if (!Ctx.LangOpts.EnableExperimentalUniversalExistentials) {
+              Ctx.Diags.diagnose(comp->getNameLoc(),
+                                 diag::unsupported_existential_type,
+                                 protoDecl->getName());
+              T->setInvalid();
+            } else if (Ctx.LangOpts.EnableExplicitExistentialTypes) {
+              Ctx.Diags.diagnose(comp->getNameLoc(),
+                                 diag::existential_requires_any,
+                                 protoDecl->getName())
+                  .limitBehavior(DiagnosticBehavior::Warning);
+            }
           }
         }
         return false;

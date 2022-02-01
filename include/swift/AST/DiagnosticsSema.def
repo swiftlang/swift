@@ -4647,6 +4647,9 @@ ERROR(unchecked_not_inheritance_clause,none,
 ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
+ERROR(unsupported_existential_type,none,
+      "protocol %0 can only be used as a generic constraint because it has "
+      "Self or associated type requirements", (Identifier))
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))

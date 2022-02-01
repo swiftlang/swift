@@ -3,7 +3,7 @@
 protocol HasSelfRequirements {
   func foo(_ x: Self)
 
-  func returnsOwnProtocol() -> any HasSelfRequirements
+  func returnsOwnProtocol() -> HasSelfRequirements // expected-error {{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 protocol Bar {
   init()
@@ -35,10 +35,10 @@ func useCompoAsWhereRequirement<T>(_ x: T) where T: HasSelfRequirements & Bar {}
 func useCompoAliasAsWhereRequirement<T>(_ x: T) where T: Compo {}
 func useNestedCompoAliasAsWhereRequirement<T>(_ x: T) where T: CompoAssocType.Compo {}
 
-func useAsType(_: any HasSelfRequirements,
-               _: any HasSelfRequirements & Bar,
-               _: any Compo,
-               _: any CompoAssocType.Compo) { }
+func useAsType(_: any HasSelfRequirements, // expected-error {{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}}
+               _: any HasSelfRequirements & Bar, // expected-error {{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}}
+               _: any Compo, // expected-error {{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}}
+               _: any CompoAssocType.Compo) { } // expected-error {{protocol 'HasSelfRequirements' can only be used as a generic constraint because it has Self or associated type requirements}}
 
 struct TypeRequirement<T: HasSelfRequirements> {}
 struct CompoTypeRequirement<T: HasSelfRequirements & Bar> {}
@@ -66,7 +66,7 @@ do {
 
   func checkIt(_ js: Any) throws {
     switch js {
-    case let dbl as any HasAssoc:
+    case let dbl as any HasAssoc: // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
       throw MyError.bad(dbl)
 
     default:
@@ -75,8 +75,8 @@ do {
   }
 }
 
-func testHasAssoc(_ x: Any, _: any HasAssoc) {
-  if let p = x as? any HasAssoc {
+func testHasAssoc(_ x: Any, _: any HasAssoc) { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+  if let p = x as? any HasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
     p.foo()
   }
 
@@ -84,16 +84,16 @@ func testHasAssoc(_ x: Any, _: any HasAssoc) {
     typealias Assoc = Int
     func foo() {}
 
-    func method() -> any HasAssoc {}
+    func method() -> any HasAssoc {} // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
   }
 }
 
-var b: any HasAssoc
+var b: any HasAssoc // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
 
 protocol P {}
 typealias MoreHasAssoc = HasAssoc & P
 func testHasMoreAssoc(_ x: Any) {
-  if let p = x as? any MoreHasAssoc {
+  if let p = x as? any MoreHasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
     p.foo()
   }
 }
@@ -102,36 +102,36 @@ typealias X = Struct1<any Pub & Bar>
 _ = Struct1<any Pub & Bar>.self
 
 typealias AliasWhere<T> = T
-where T: HasAssoc, T.Assoc == any HasAssoc
+where T: HasAssoc, T.Assoc == any HasAssoc // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
 
 struct StructWhere<T>
 where T: HasAssoc,
-      T.Assoc == any HasAssoc {}
+      T.Assoc == any HasAssoc {} // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
 
-protocol ProtocolWhere where T == any HasAssoc {
+protocol ProtocolWhere where T == any HasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
   associatedtype T
 
   associatedtype U: HasAssoc
-    where U.Assoc == any HasAssoc
+    where U.Assoc == any HasAssoc // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 
-extension HasAssoc where Assoc == any HasAssoc {}
+extension HasAssoc where Assoc == any HasAssoc {} // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
 
 func FunctionWhere<T>(_: T)
 where T : HasAssoc,
-      T.Assoc == any HasAssoc {}
+      T.Assoc == HasAssoc {} // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
 
 struct SubscriptWhere {
   subscript<T>(_: T) -> Int
   where T : HasAssoc,
-        T.Assoc == any HasAssoc {
+        T.Assoc == HasAssoc { // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
     get {}
     set {}
   }
 }
 
 struct OuterGeneric<T> {
-  func contextuallyGenericMethod() where T == any HasAssoc {}
+  func contextuallyGenericMethod() where T == HasAssoc {} // expected-error {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 
 func testInvalidAny() {
