@@ -362,9 +362,11 @@ extension _${U}Int128: FixedWidthInteger {
     return (quotient_, remainder_)
   }
 
+/* disabled since it causes a compile failure in LLDB
   internal static prefix func ~(x: Self) -> Self {
     Self(high: ~x.high, low: ~x.low)
   }
+*/
 
   internal static func &= (_ lhs: inout Self, _ rhs: Self) {
     lhs.low &= rhs.low
