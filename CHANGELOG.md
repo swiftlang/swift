@@ -5,6 +5,29 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* The compiler now correctly emits warnings for more kinds of expressions where a protocol conformance is used and may be unavailable at runtime. Previously, member reference expressions and type erasing expressions that used potentially unavailable conformances were not diagnosed, leading to potential crashes at runtime.
+
+  ```swift
+  struct Pancake {}
+  protocol Food {}
+
+  extension Food {
+    var isGlutenFree: Bool { false }
+  }
+
+  @available(macOS 12.0, *)
+  extension Pancake: Food {}
+
+  @available(macOS 11.0, *)
+  func eatPancake(_ pancake: Pancake) {
+    if (pancake.isGlutenFree) { // warning: conformance of 'Pancake' to 'Food' is only available in macOS 12.0 or newer
+      eatFood(pancake) // warning: conformance of 'Pancake' to 'Food' is only available in macOS 12.0 or newer
+    }
+  }
+
+  func eatFood(_ food: Food) {}
+  ```
+
 * [SE-0328][]:
 
   Opaque types (expressed with 'some') can now be used in structural positions
