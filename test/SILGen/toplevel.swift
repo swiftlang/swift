@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s | %FileCheck %s --check-prefixes='CHECK,SYNC-CHECK'
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-experimental-async-top-level %s | %FileCheck %s --check-prefixes='CHECK,ASYNC-CHECK'
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-experimental-async-top-level %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -11,13 +11,7 @@ func trap() -> Never {
 // CHECK-LABEL: sil [ossa] @main
 // CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
-// async setup call to @async_Main (this is in @main)
-// ASYNC-CHECK: [[ASYNC_MAIN:%[0-9]+]] = function_ref @async_Main : $@convention(thin) @async () -> ()
-// ASYNC-CHECK: [[THUNK:%[0-9]+]] = function_ref @$sIetH_yts5Error_pIegHrzo_TR
-
-// Actual body of async top-level
-// ASYNC-CHECK-LABEL: sil hidden [ossa] @async_Main
-// ASYNC-CHECK: bb0:
+// CHECK-NOT: @async_Main
 
 
 // -- initialize x
@@ -127,11 +121,7 @@ defer {
 
 
 // CHECK: [[RET:%[0-9]+]] = struct $Int32
-// SYNC-CHECK: return [[RET]]
-
-// ASYNC-CHECK: [[EXITFUNC:%[0-9]+]] = function_ref @exit
-// ASYNC-CHECK: apply [[EXITFUNC]]([[RET]]) : $@convention(c) (Int32) -> Never
-// ASYNC-CHECK: unreachable
+// CHECK: return [[RET]]
 
 // CHECK-LABEL: sil hidden [ossa] @$s8toplevel7print_xyyF
 

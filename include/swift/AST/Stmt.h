@@ -161,7 +161,7 @@ public:
 
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
-  
+
   SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
   bool empty() const { return getNumElements() == 0; }
@@ -182,7 +182,9 @@ public:
   ArrayRef<ASTNode> getElements() const {
     return {getTrailingObjects<ASTNode>(), Bits.BraceStmt.NumElements};
   }
-  
+
+  ASTNode findAsyncNode();
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
 

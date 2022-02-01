@@ -271,8 +271,7 @@ GlobalActorAttributeRequest::evaluate(
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     // Subscripts and properties are fine...
     if (auto var = dyn_cast<VarDecl>(storage)) {
-      if (var->isTopLevelGlobal() &&
-          var->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel) {
+      if (var->isTopLevelGlobal() && var->getDeclContext()->isAsyncContext()) {
         var->diagnose(diag::global_actor_top_level_var)
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
@@ -3538,10 +3537,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
-    ASTContext &ctx = var->getASTContext();
-    if (var->isTopLevelGlobal() &&
-        ctx.LangOpts.EnableExperimentalAsyncTopLevel) {
-      if (Type mainActor = ctx.getMainActorType())
+    if (var->isTopLevelGlobal() && var->getDeclContext()->isAsyncContext()) {
+      if (Type mainActor = var->getASTContext().getMainActorType())
         return inferredIsolation(
             ActorIsolation::forGlobalActor(mainActor,
                                            /*unsafe=*/var->preconcurrency()));
