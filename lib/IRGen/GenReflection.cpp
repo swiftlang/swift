@@ -1068,39 +1068,39 @@ public:
 
     const TypeInfo &TI = strategy.getTypeInfo();
     if (auto fixedTI = dyn_cast<FixedTypeInfo>(&TI)) {
-      addTypeRef(type, CanGenericSignature());
-
       // Get the spare bits mask for the enum payloads.
-      // The enum machinery currently exposes this broken
-      // into two parts; reassemble them to get what the runtime
-      // expects.
-      // TODO: Is there a better way to do this?
-      // Should we instead iterate over the payloads
-      // and build up a spare bit mask that way?
       SpareBitVector spareBits;
-      fixedTI->applyFixedSpareBitsMask(IGM, spareBits);
-      spareBits |= strategy.getTagBitsForPayloads();
+      for (auto enumCase : strategy.getElementsWithPayload()) {
+        cast<FixedTypeInfo>(enumCase.ti)->applyFixedSpareBitsMask(IGM, spareBits);
+      }
 
+      // Pad or truncate the bit mask to a multiple of 32 bits
       llvm::APInt bits = spareBits.asAPInt();
       auto bitCount = bits.getActiveBits();
-      auto usesSpareBitMask = bitCount > 0;
+      auto usesPayloadSpareBits = bitCount > 0;
       auto byteCount = (bitCount + 7) / 8;
-      auto payloadSize = ti->getFixedSize().getValue();
-      if (byteCount > payloadSize) {
-        byteCount = payloadSize;
-        bitCount = byteCount / 8;
-      }
       auto wordCount = (byteCount + 3) / 4;
       bits = bits.zextOrTrunc(wordCount * 32);
 
-      uint32_t flags = usesSpareBitMask ? 1 : 0;
-      B.addInt32(flags);
-      B.addInt32(bitCount);
+      addTypeRef(type, CanGenericSignature());
+
+      // MPE record contents are a multiple of 32-bits
+      uint32_t contentSizeInWords =
+        1 /* Size + flags */
+        + 1 /* SpareBits byte count */
+        + wordCount;
+      uint32_t flags = usesPayloadSpareBits ? 1 : 0;
+
+      B.addInt32((contentSizeInWords << 16) | flags);
+      B.addInt32(byteCount);
+      // TODO: Endianness??
       for (unsigned i = 0; i < wordCount; ++i) {
         uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
         B.addInt32(nextWord);
         bits.lshrInPlace(32);
       }
+    } else {
+      assert(false && "TI was not 'FixedTypeInfo'??");
     }
   }
 

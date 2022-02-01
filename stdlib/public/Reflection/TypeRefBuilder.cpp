@@ -528,8 +528,7 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
 void TypeRefBuilder::dumpMultiPayloadEnumSection(std::ostream &stream) {
   for (const auto &sections : ReflectionInfos) {
     for (const auto descriptor : sections.MultiPayloadEnum) {
-//      auto info = getXXXXX(descriptor);
-//      info.dump(stream);
+      descriptor->dump(stream);
     }
   }
 }

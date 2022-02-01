@@ -2023,28 +2023,22 @@ public:
         // have detailed layout information from the compiler.
         auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumInfo(TR);
         if (MPEDescriptor) {
-          if (MPEDescriptor->usesSpareBits()) {
-            auto BitfieldBitCount = MPEDescriptor->BitfieldBitCount;
-            auto MaskBytes = std::min(PayloadSize, (BitfieldBitCount + 7) / 8);
-            auto SpareBitMask = MPEDescriptor->BitfieldBits;
-            BitMask spareBitsMask(PayloadSize, SpareBitMask, MaskBytes);
-
-            BitMask t(PayloadSize);
-            auto tValid = populateSpareBitsMask(Cases, t);
-            assert(tValid);
+          if (MPEDescriptor->usesPayloadSpareBits()) {
+            auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
+            auto SpareBitMask = MPEDescriptor->getPayloadSpareBits();
+            BitMask spareBitsMask(PayloadSize, SpareBitMask, PayloadSpareBitMaskByteCount);
 
             if (!spareBitsMask.isZero()) {
-              // TEMPORARY: compare our computed spare bit mask to the
-              // one we got from the compiler (to verify that the compiler
-              // is putting the right data in)
-              if (t != spareBitsMask) {
-                std::cerr << "Mismatched bit masks: "
-                          << t.str()
-                          << " != "
-                          << spareBitsMask.str()
-                          << std::endl;
-                assert(t == spareBitsMask);
-              }
+#if !defined(NDEBUG) || 1
+              // DEBUGGING: compare the locally-computed spare bit mask to the
+              // one we got from the compiler.  If they're different, then
+              // either the compiler is emitting the wrong thing or the
+              // local runtime computation isn't quite right.
+              BitMask locallyComputedSpareBitsMask(PayloadSize);
+              auto locallyComputedSpareBitsMaskIsValid = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask);
+              assert(locallyComputedSpareBitsMaskIsValid);
+              assert(locallyComputedSpareBitsMask == spareBitsMask);
+#endif
 
               // Use compiler-provided spare bit information
               return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(

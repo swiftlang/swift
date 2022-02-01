@@ -203,7 +203,7 @@ public:
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
-    return MPER->getSize();
+    return MPER->getSizeInBytes();
   }
 };
 using MultiPayloadEnumSection = ReflectionSection<MultiPayloadEnumDescriptorIterator>;
@@ -1302,6 +1302,10 @@ public:
     stream << "CONFORMANCES:\n";
     stream << "=============\n";
     dumpConformanceSection<ObjCInteropKind, PointerSize>(stream);
+    stream << "\n";
+    stream << "MULTI-PAYLOAD ENUM DESCRIPTORS:\n";
+    stream << "====================\n";
+    dumpMultiPayloadEnumSection(stream);
     stream << "\n";
   }
 };

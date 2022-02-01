@@ -377,16 +377,84 @@ public:
 class MultiPayloadEnumDescriptor {
 public:
   const RelativeDirectPointer<const char> TypeName;
-  uint32_t Flags;
-  uint32_t BitfieldBitCount; // Size of bitfield in bits
-  uint8_t  BitfieldBits[]; // Variably-sized bitmask field; always a multiple of 4 bytes
 
-  bool usesSpareBits() const {
-    return Flags & 1;
+private:
+  // This descriptor contains a series of 32-bit words
+  uint32_t contents[];
+
+  // Properties are stored in `contents` at particular indexes:
+
+  // uint32_t SizeFlags;
+  // Upper 16 bits are the size of the contents (in 32-bit words):
+  //  (This allows us to expand this structure in the future;
+  //  new fields should have accessors that test whether the
+  //  size is large enough and return "non-existent" if the
+  //  descriptor isn't large enough to have that field.)
+  // Lower 16 bits are flag bits
+
+  int getSizeFlagsIndex() const { return 0; }
+
+  // uint32_t PayloadSpareBitMaskByteCount;
+  // Number of bytes in "payload spare bits"
+
+  int getPayloadSpareBitMaskByteCountIndex() const {
+    return getSizeFlagsIndex() + 1;
   }
 
-  size_t getSize() const {
-    return sizeof(*this) + ((BitfieldBitCount + 31) / 32) * 4;
+  // uint8_t  *PayloadSpareBits;
+  // Variably-sized bitmask field (padded to a multiple of 4 bytes)
+
+  int getPayloadSpareBitsIndex() const {
+    return getPayloadSpareBitMaskByteCountIndex() + 1;
+  }
+
+  // uint32_t foo;
+  // TODO: Some future field
+  // int getFooIndex() const {
+  //   return getPayloadSpareBitsIndex()
+  //   + getPayloadSpareBitMaskByteCount() / 4;
+  // }
+
+  // uint32_t getFoo() const {
+  //   if (getFooIndex() < getContentsSizeInWords()) {
+  //       return contents[getFooIndex()];
+  //   } else {
+  //       return 0; // Field isn't present
+  //   }
+  // }
+
+public:
+  //
+  // Data derived from the above...
+  //
+
+  uint32_t getContentsSizeInWords() const {
+    return contents[getSizeFlagsIndex()] >> 16;
+  }
+
+  uint32_t getFlags() const {
+    return contents[getSizeFlagsIndex()] & 0xffff;
+  }
+
+  size_t getSizeInBytes() const {
+    size_t sizeInBytes = sizeof(TypeName) + getContentsSizeInWords() * 4;
+    return sizeInBytes;
+  }
+
+  bool usesPayloadSpareBits() const {
+    return getFlags() & 1;
+  }
+
+  uint32_t getPayloadSpareBitMaskByteCount() const {
+    return contents[getPayloadSpareBitMaskByteCountIndex()];
+  }
+
+  const uint8_t *getPayloadSpareBits() const {
+    return reinterpret_cast<const uint8_t *>(&contents[getPayloadSpareBitsIndex()]);
+  }
+
+  void dump(std::ostream &stream) const {
+    // TODO
   }
 };
 
