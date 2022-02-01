@@ -224,21 +224,6 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool PassChangedSIL) {
   return PassChangedSIL && (SILPrintAll || !functionSelectionEmpty());
 }
 
-static bool isDisabled(SILTransform *T, SILFunction *F = nullptr) {
-  if (!SILDisablePassOnlyFun.empty() && F &&
-      SILDisablePassOnlyFun.end() == std::find(SILDisablePassOnlyFun.begin(),
-                                               SILDisablePassOnlyFun.end(),
-                                               F->getName()))
-    return false;
-
-  for (const std::string &NamePattern : SILDisablePass) {
-    if (T->getTag().contains(NamePattern) || T->getID().contains(NamePattern)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
   if (functionSelectionEmpty()) {
     Mod->dump();
@@ -399,6 +384,35 @@ bool SILPassManager::isMandatoryFunctionPass(SILFunctionTransform *sft) {
          sft->getPassKind() ==
              PassKind::NonTransparentFunctionOwnershipModelEliminator ||
          sft->getPassKind() == PassKind::OwnershipModelEliminator;
+}
+
+static bool isDisabled(SILTransform *T, SILFunction *F = nullptr) {
+  if (SILDisablePass.empty())
+    return false;
+
+  if (SILPassManager::isPassDisabled(T->getTag()) ||
+      SILPassManager::isPassDisabled(T->getID())) {
+    if (F && !SILPassManager::disablePassesForFunction(F))
+      return false;
+    return true;
+  }
+  return false;
+}
+
+bool SILPassManager::isPassDisabled(StringRef passName) {
+  for (const std::string &namePattern : SILDisablePass) {
+    if (passName.contains(namePattern))
+      return true;
+  }
+  return false;
+}
+
+bool SILPassManager::disablePassesForFunction(SILFunction *function) {
+  if (SILDisablePassOnlyFun.empty())
+    return true;
+
+  return std::find(SILDisablePassOnlyFun.begin(), SILDisablePassOnlyFun.end(),
+                   function->getName()) != SILDisablePassOnlyFun.end();
 }
 
 void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
