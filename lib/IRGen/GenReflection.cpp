@@ -37,6 +37,7 @@
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "GenValueWitness.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
@@ -1012,40 +1013,6 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
   builder.emit();
 }
 
-static CanType getFormalTypeInContext(CanType abstractType, DeclContext *dc) {
-  // Map the parent of any non-generic nominal type.
-  if (auto nominalType = dyn_cast<NominalType>(abstractType)) {
-    // If it doesn't have a parent, or the parent doesn't need remapping,
-    // do nothing.
-    auto abstractParentType = nominalType.getParent();
-    if (!abstractParentType) return abstractType;
-    auto parentType = getFormalTypeInContext(abstractParentType, dc);
-    if (abstractParentType == parentType) return abstractType;
-
-    // Otherwise, rebuild the type.
-    return CanType(NominalType::get(nominalType->getDecl(), parentType,
-                                    nominalType->getDecl()->getASTContext()));
-
-  // Map unbound types into their defining context.
-  } else if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
-    return dc->mapTypeIntoContext(ugt->getDecl()->getDeclaredInterfaceType())
-        ->getCanonicalType();
-
-  // Everything else stays the same.
-  } else {
-    return abstractType;
-  }
-}
-
-/// Given an abstract type --- a type possibly expressed in terms of
-/// unbound generic types --- return the formal type within the type's
-/// primary defining context.
-static CanType getFormalTypeInContext(CanType abstractType) {
-  if (auto nominal = abstractType.getAnyNominal())
-    return getFormalTypeInContext(abstractType, nominal);
-  return abstractType;
-}
-
 class MultiPayloadEnumDescriptorBuilder : public ReflectionMetadataBuilder {
   CanType type;
   const FixedTypeInfo *ti;
@@ -1060,7 +1027,7 @@ public:
   }
 
   void layout() override {
-    auto &strategy = getEnumImplStrategy(IGM, getFormalTypeInContext(type));
+    auto &strategy = getEnumImplStrategy(IGM, getFormalTypeInPrimaryContext(type));
     bool isMPE = strategy.getElementsWithPayload().size() > 1;
     assert(isMPE && "Cannot emit Multi-Payload Enum data for an enum that doesn't have multiple payloads");
 
