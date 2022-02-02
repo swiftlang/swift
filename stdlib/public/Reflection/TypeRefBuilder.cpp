@@ -535,7 +535,27 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
 void TypeRefBuilder::dumpMultiPayloadEnumSection(std::ostream &stream) {
   for (const auto &sections : ReflectionInfos) {
     for (const auto descriptor : sections.MultiPayloadEnum) {
-      descriptor->dump(stream);
+      auto typeNode =
+          demangleTypeRef(readTypeRef(descriptor, descriptor->TypeName));
+      auto typeName = nodeToString(typeNode);
+      clearNodeFactory();
+
+      stream << "\n- " << typeName << ":\n";
+      stream << "  Flags: ";
+      if (descriptor->usesPayloadSpareBits()) {
+        stream << " usesPayloadSpareBits";
+      }
+      stream << "\n";
+      auto maskBytes = descriptor->getPayloadSpareBitMaskByteCount();
+      if (maskBytes > 0) {
+        stream << "  Spare bit mask: 0x";
+        const uint8_t *p = descriptor->getPayloadSpareBits();
+        for (unsigned i = 0; i < maskBytes; i++) {
+          stream << std::hex << std::setw(2) << std::setfill('0') << p[i];
+        }
+        stream << "\n";
+      }
+      stream << "\n";
     }
   }
 }

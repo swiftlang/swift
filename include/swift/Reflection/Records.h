@@ -452,10 +452,6 @@ public:
   const uint8_t *getPayloadSpareBits() const {
     return reinterpret_cast<const uint8_t *>(&contents[getPayloadSpareBitsIndex()]);
   }
-
-  void dump(std::ostream &stream) const {
-    // TODO
-  }
 };
 
 class CaptureTypeRecord {
