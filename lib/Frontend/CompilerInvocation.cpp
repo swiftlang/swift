@@ -454,6 +454,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableParameterizedProtocolTypes |=
       Args.hasArg(OPT_enable_parameterized_protocol_types);
 
+  Opts.EnableOpenedExistentialTypes |=
+      Args.hasArg(OPT_enable_experimental_opened_existential_types);
+
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
 
