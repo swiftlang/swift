@@ -91,7 +91,10 @@ typedef struct swift_reflection_mapping_info {
   swift_reflection_section_mapping_t capture;
   swift_reflection_section_mapping_t type_references;
   swift_reflection_section_mapping_t reflection_strings;
-  swift_reflection_section_mapping_t multipayload_enums; // TODO: Is this okay?
+// The following cannot be added to this struct without breaking ABI.
+// As a result, swift_reflection_addReflectionMappingInfo
+// will never be complete.  Use swift_reflection_addImage instead.
+//  swift_reflection_section_mapping_t multipayload_enums;
 } swift_reflection_mapping_info_t;
 
 /// The layout kind of a Swift type.

@@ -790,8 +790,6 @@ public:
   void dumpBuiltinTypeSection(std::ostream &stream);
   void dumpCaptureSection(std::ostream &stream);
   void dumpMultiPayloadEnumSection(std::ostream &stream);
-  void dumpAllSections(std::ostream &stream);
-};
 
   ///
   /// Extraction of protocol conformances

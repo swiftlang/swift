@@ -735,7 +735,7 @@ public:
         {Pairs[0].first, Pairs[0].second}, {Pairs[1].first, Pairs[1].second},
         {Pairs[2].first, Pairs[2].second}, {Pairs[3].first, Pairs[3].second},
         {Pairs[4].first, Pairs[4].second}, {Pairs[5].first, Pairs[5].second},
-        {Pairs[6].first, Pairs[6].second}};
+        {Pairs[6].first, Pairs[6].second}, {Pairs[7].first, Pairs[7].second}};
     this->addReflectionInfo(Info);
     return true;
   }

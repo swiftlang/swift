@@ -266,8 +266,8 @@ void swift_reflection_addReflectionMappingInfo(
       reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
       reflectionSectionFromLocalAndRemote<const void *>(Info.reflection_strings),
       ReflectionSection<const void *>(nullptr, 0),
-      reflectionSectionFromLocalAndRemote<MultiPayloadEnumDescriptorIterator>(
-        Info.multipayload_enums)};
+      MultiPayloadEnumSection(0, 0)
+  };
 
   Context->addReflectionInfo(ContextInfo);
 }
