@@ -451,6 +451,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExplicitExistentialTypes |=
       Args.hasArg(OPT_enable_explicit_existential_types);
 
+  Opts.EnableOpenedExistentialTypes |=
+      Args.hasArg(OPT_enable_experimental_opened_existential_types);
+
   Opts.EnableParametrizedProtocolTypes |=
       Args.hasArg(OPT_enable_parametrized_protocol_types);
 

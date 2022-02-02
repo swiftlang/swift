@@ -321,6 +321,10 @@ namespace swift {
     /// keyword.
     bool EnableExplicitExistentialTypes = true;
 
+    /// Enable support for implicitly opening existential argument types
+    /// in calls to generic functions.
+    bool EnableOpenedExistentialTypes = false;
+
     /// Enable support for protocol types parametrized by primary
     /// associated type.
     bool EnableParametrizedProtocolTypes = false;
