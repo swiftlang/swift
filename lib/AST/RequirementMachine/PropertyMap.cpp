@@ -330,6 +330,12 @@ void PropertyMap::clear() {
 std::pair<CompletionResult, unsigned>
 PropertyMap::buildPropertyMap(unsigned maxIterations,
                               unsigned maxDepth) {
+  if (System.getDebugOptions().contains(DebugFlags::PropertyMap)) {
+    llvm::dbgs() << "-------------------------\n";
+    llvm::dbgs() << "- Building property map -\n";
+    llvm::dbgs() << "-------------------------\n";
+  }
+
   clear();
 
   struct Property {

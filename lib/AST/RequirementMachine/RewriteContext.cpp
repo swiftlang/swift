@@ -31,6 +31,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("add", DebugFlags::Add)
       .Case("merge", DebugFlags::Merge)
       .Case("completion", DebugFlags::Completion)
+      .Case("property-map", DebugFlags::PropertyMap)
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
       .Case("conditional-requirements", DebugFlags::ConditionalRequirements)
