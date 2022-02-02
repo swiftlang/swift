@@ -731,6 +731,12 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
     out << "- " << relation.first << " =>> " << relation.second << "\n";
   }
   out << "}\n";
+  out << "Type differences: {\n";
+  for (const auto &difference : Differences) {
+    difference.dump(out);
+    out << "\n";
+  }
+  out << "}\n";
   out << "Rewrite loops: {\n";
   for (const auto &loop : Loops) {
     if (loop.isDeleted())

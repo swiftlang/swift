@@ -21,6 +21,7 @@
 #include "Symbol.h"
 #include "Term.h"
 #include "Trie.h"
+#include "TypeDifference.h"
 
 namespace llvm {
   class raw_ostream;
@@ -389,6 +390,9 @@ public:
   using Relation = std::pair<Term, Term>;
 
 private:
+  /// The map's values are indices into the vector. The map is used for
+  /// uniquing, then the index is returned and lookups are performed into
+  /// the vector.
   llvm::DenseMap<Relation, unsigned> RelationMap;
   std::vector<Relation> Relations;
 
@@ -410,6 +414,24 @@ public:
   unsigned recordSameTypeWitnessRelation(
       Symbol concreteConformanceSymbol,
       Symbol associatedTypeSymbol);
+
+private:
+  /// The map's values are indices into the vector. The map is used for
+  /// uniquing, then the index is returned and lookups are performed into
+  /// the vector.
+  llvm::DenseMap<std::pair<Symbol, Symbol>, unsigned> DifferenceMap;
+  std::vector<TypeDifference> Differences;
+
+  unsigned recordTypeDifference(Symbol lhs, Symbol rhs,
+                                const TypeDifference &difference);
+
+public:
+  bool
+  computeTypeDifference(Symbol lhs, Symbol rhs,
+                        Optional<unsigned> &lhsDifferenceID,
+                        Optional<unsigned> &rhsDifferenceID);
+
+  const TypeDifference &getTypeDifference(unsigned index) const;
 
 private:
   //////////////////////////////////////////////////////////////////////////////
