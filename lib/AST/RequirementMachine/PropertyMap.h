@@ -245,6 +245,11 @@ private:
 
   void addProperty(Term key, Symbol property, unsigned ruleID);
 
+  void addConformanceProperty(Term key, Symbol property, unsigned ruleID);
+  void addLayoutProperty(Term key, Symbol property, unsigned ruleID);
+  void addSuperclassProperty(Term key, Symbol property, unsigned ruleID);
+  void addConcreteTypeProperty(Term key, Symbol property, unsigned ruleID);
+
   void checkConcreteTypeRequirements();
 
   void concretizeNestedTypesFromConcreteParents();
