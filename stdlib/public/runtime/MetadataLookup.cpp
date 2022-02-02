@@ -1461,6 +1461,9 @@ public:
 #define BUILTIN_TYPE(Symbol, _) \
     if (mangledName.equals(#Symbol)) \
       return &METADATA_SYM(Symbol).base;
+#if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
+#endif
 #include "swift/Runtime/BuiltinTypes.def"
     return BuiltType();
   }
