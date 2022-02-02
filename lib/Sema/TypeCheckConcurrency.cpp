@@ -719,7 +719,6 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   // Determine whether the type was explicitly non-Sendable.
   auto nominalModule = nominal->getParentModule();
   bool isExplicitlyNonSendable = nominalModule->isConcurrencyChecked() ||
-      isExplicitSendableConformance() ||
       hasExplicitSendableConformance(nominal);
 
   // Determine whether this nominal type is visible via a @preconcurrency
@@ -728,7 +727,7 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 
   // When the type is explicitly non-Sendable...
   if (isExplicitlyNonSendable) {
-    // @preconcurrency imports downgrade the diagnostic to a warning.
+    // @preconcurrency imports downgrade the diagnostic to a warning in Swift 6,
     if (import && import->options.contains(ImportFlags::Preconcurrency)) {
       // FIXME: Note that this @preconcurrency import was "used".
       return DiagnosticBehavior::Warning;
@@ -748,7 +747,17 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
         : DiagnosticBehavior::Ignore;
   }
 
-  return defaultDiagnosticBehavior();
+  auto defaultBehavior = defaultDiagnosticBehavior();
+
+  // If we are checking an implicit Sendable conformance, don't suppress
+  // diagnostics for declarations in the same module. We want them so make
+  // enclosing inferred types non-Sendable.
+  if (defaultBehavior == DiagnosticBehavior::Ignore &&
+      nominal->getParentSourceFile() &&
+      conformanceCheck && *conformanceCheck == SendableCheck::Implicit)
+    return DiagnosticBehavior::Warning;
+
+  return defaultBehavior;
 }
 
 /// Produce a diagnostic for a single instance of a non-Sendable type where
@@ -3890,8 +3899,10 @@ static bool checkSendableInstanceStorage(
     bool operator()(VarDecl *property, Type propertyType) {
       // Classes with mutable properties are not Sendable.
       if (property->supportsMutation() && isa<ClassDecl>(nominal)) {
-        if (check == SendableCheck::Implicit)
+        if (check == SendableCheck::Implicit) {
+          invalid = true;
           return true;
+        }
 
         auto behavior = SendableCheckContext(
             dc, check).defaultDiagnosticBehavior();
@@ -3910,6 +3921,10 @@ static bool checkSendableInstanceStorage(
           propertyType, SendableCheckContext(dc, check), property->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
             if (check == SendableCheck::Implicit) {
+              // If we are to ignore this diagnose, just continue.
+              if (behavior == DiagnosticBehavior::Ignore)
+                return false;
+
               invalid = true;
               return true;
             }
@@ -3937,6 +3952,10 @@ static bool checkSendableInstanceStorage(
           elementType, SendableCheckContext(dc, check), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
             if (check == SendableCheck::Implicit) {
+              // If we are to ignore this diagnose, just continue.
+              if (behavior == DiagnosticBehavior::Ignore)
+                return false;
+
               invalid = true;
               return true;
             }
