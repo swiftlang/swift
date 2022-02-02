@@ -20,11 +20,8 @@ distributed actor D2 {
 }
 
 distributed actor D3 {
-  // expected-error@-1{{protocol 'DistributedActor' is broken; cannot derive conformance for type 'D3'}}
-  // expected-error@-2{{protocol 'DistributedActor' is broken; cannot derive conformance for type 'D3'}} // FIXME(distributed): duplicate errors
-  // expected-error@-3{{type 'D3' does not conform to protocol 'Identifiable'}}
-  // expected-error@-4{{type 'D3' does not conform to protocol 'DistributedActor'}}
-  // expected-error@-5{{type 'D3' does not conform to protocol 'DistributedActor'}}
+  // expected-error@-1{{type 'D3' does not conform to protocol 'Identifiable'}}
+  // expected-error@-2{{type 'D3' does not conform to protocol 'DistributedActor'}}
 
   var id: Int { 0 }
   // expected-error@-1{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
@@ -36,11 +33,8 @@ struct OtherActorIdentity: Sendable, Hashable, Codable {}
 
 distributed actor D4 {
   // expected-error@-1{{actor 'D4' has no initializers}}
-  // expected-error@-2{{type 'D4' does not conform to protocol 'DistributedActor'}} // FIXME(distributed): duplicated errors
-  // expected-error@-3{{type 'D4' does not conform to protocol 'DistributedActor'}}
-  // expected-error@-4{{protocol 'DistributedActor' is broken; cannot derive conformance for type 'D4'}} // FIXME(distributed): duplicated errors
-  // expected-error@-5{{protocol 'DistributedActor' is broken; cannot derive conformance for type 'D4'}}
-  // expected-error@-6{{type 'D4' does not conform to protocol 'Identifiable'}}
+  // expected-error@-2{{type 'D4' does not conform to protocol 'DistributedActor'}}
+  // expected-error@-3{{type 'D4' does not conform to protocol 'Identifiable'}}
   let actorSystem: String
   // expected-error@-1{{invalid redeclaration of synthesized property 'actorSystem'}}
   // expected-error@-2{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
