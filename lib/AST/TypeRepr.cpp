@@ -102,6 +102,16 @@ bool TypeRepr::hasOpaque() {
     findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
 }
 
+TypeRepr *TypeRepr::getWithoutParens() const {
+  auto *repr = const_cast<TypeRepr *>(this);
+  while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(repr)) {
+    if (!tupleRepr->isParenType())
+      break;
+    repr = tupleRepr->getElementType(0);
+  }
+  return repr;
+}
+
 CollectedOpaqueReprs TypeRepr::collectOpaqueReturnTypeReprs() {
   class Walker : public ASTWalker {
     CollectedOpaqueReprs &Reprs;
