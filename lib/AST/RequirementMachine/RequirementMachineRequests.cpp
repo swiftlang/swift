@@ -126,7 +126,7 @@ RequirementMachine::buildRequirementsFromRules(
         // For compatibility with the old GenericSignatureBuilder, drop requirements
         // containing ErrorTypes.
         auto superclassType = Map.getTypeFromSubstitutionSchema(
-                                prop->getSuperclass(),
+                                prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 genericParams, MutableTerm());
         if (superclassType->hasError())

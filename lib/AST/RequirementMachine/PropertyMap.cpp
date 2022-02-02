@@ -154,7 +154,7 @@ Type PropertyBag::getSuperclassBound(
     const MutableTerm &lookupTerm,
     const PropertyMap &map) const {
   MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
-  return map.getTypeFromSubstitutionSchema(Superclass->getSuperclass(),
+  return map.getTypeFromSubstitutionSchema(Superclass->getConcreteType(),
                                            Superclass->getSubstitutions(),
                                            genericParams, prefix);
 }

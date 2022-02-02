@@ -312,8 +312,8 @@ static std::pair<Symbol, bool> unifySuperclasses(
     llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
   }
 
-  auto lhsType = lhs.getSuperclass();
-  auto rhsType = rhs.getSuperclass();
+  auto lhsType = lhs.getConcreteType();
+  auto rhsType = rhs.getConcreteType();
 
   auto *lhsClass = lhsType.getClassOrBoundGenericClass();
   assert(lhsClass != nullptr);
@@ -425,7 +425,7 @@ void PropertyMap::addProperty(
       // A rule (T.[superclass: C] => T) induces a rule (T.[layout: L] => T),
       // where L is either AnyObject or _NativeObject.
       auto superclass =
-          property.getSuperclass()->getClassOrBoundGenericClass();
+          property.getConcreteType()->getClassOrBoundGenericClass();
       auto layout =
           LayoutConstraint::getLayoutConstraint(
             superclass->getLayoutConstraintKind(),
@@ -579,7 +579,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents() {
           props->getKey(),
           RequirementKind::Superclass,
           *props->SuperclassRule,
-          props->Superclass->getSuperclass(),
+          props->Superclass->getConcreteType(),
           props->Superclass->getSubstitutions(),
           props->ConformsToRules,
           props->ConformsTo,
