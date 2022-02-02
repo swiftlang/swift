@@ -1220,6 +1220,10 @@ public:
   /// constructions) to the argument lists for the call to that locator.
   llvm::MapVector<ConstraintLocator *, ArgumentList *> argumentLists;
 
+  /// The set of implicitly generated `.callAsFunction` root expressions.
+  llvm::DenseMap<ConstraintLocator *, UnresolvedDotExpr *>
+      ImplicitCallAsFunctionRoots;
+
   /// Record a new argument matching choice for given locator that maps a
   /// single argument to a single parameter.
   void recordSingleArgMatchingChoice(ConstraintLocator *locator);
@@ -2468,6 +2472,12 @@ public:
   /// types.
   llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
 
+  /// A cache of implicitly generated dot-member expressions used as roots
+  /// for some `.callAsFunction` calls. The key here is "base" locator for
+  /// the `.callAsFunction` member reference.
+  llvm::SmallMapVector<ConstraintLocator *, UnresolvedDotExpr *, 2>
+      ImplicitCallAsFunctionRoots;
+
 private:
   /// Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
@@ -2950,6 +2960,9 @@ public:
 
     /// The length of \c ArgumentLists.
     unsigned numArgumentLists;
+
+    /// The length of \c ImplicitCallAsFunctionRoots.
+    unsigned numImplicitCallAsFunctionRoots;
 
     /// The previous score.
     Score PreviousScore;

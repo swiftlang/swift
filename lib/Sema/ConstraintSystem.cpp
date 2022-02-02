@@ -3239,7 +3239,8 @@ size_t Solution::getTotalMemory() const {
          ConstraintRestrictions.getMemorySize() +
          llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
-         (DefaultedConstraints.size() * sizeof(void *));
+         (DefaultedConstraints.size() * sizeof(void *)) +
+         ImplicitCallAsFunctionRoots.getMemorySize();
 }
 
 DeclContext *Solution::getDC() const { return constraintSystem->DC; }
