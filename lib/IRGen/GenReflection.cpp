@@ -1555,12 +1555,13 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
     }
 
     // If this is a fixed-size multi-payload enum, we have to emit a descriptor
-    // with the size and alignment of the type, because the reflection library
-    // cannot derive this information at runtime.
+    // with the size and alignment of the type and another with the spare bit
+    // mask data, because the reflection library cannot consistently derive this
+    // information at runtime.
     if (strategy.getElementsWithPayload().size() > 1 &&
         !strategy.needsPayloadSizeInMetadata()) {
       needsOpaqueDescriptor = true;
-      needsMPEDescriptor = true; // or should this be strategy.isReflectable();
+      needsMPEDescriptor = true;
     }
   }
 
