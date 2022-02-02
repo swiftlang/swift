@@ -4151,7 +4151,12 @@ void PrintAST::visitLoadExpr(LoadExpr *expr) {
 }
 
 void PrintAST::visitTypeExpr(TypeExpr *expr) {
-  printType(expr->getType());
+  if (auto metaType = expr->getType()->castTo<AnyMetatypeType>()) {
+    // Don't print `.Type` for an expr.
+    printType(metaType->getInstanceType());
+  } else {
+    printType(expr->getType());
+  }
 }
 
 void PrintAST::visitArrayExpr(ArrayExpr *expr) {
@@ -4233,6 +4238,8 @@ void PrintAST::visitBinaryExpr(BinaryExpr *expr) {
   visit(expr->getLHS());
   Printer << " ";
   if (auto operatorRef = expr->getFn()->getMemberOperatorRef()) {
+    Printer << operatorRef->getDecl()->getBaseName();
+  } else if (auto *operatorRef = dyn_cast<DeclRefExpr>(expr->getFn())) {
     Printer << operatorRef->getDecl()->getBaseName();
   }
   Printer << " ";
