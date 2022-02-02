@@ -29,7 +29,7 @@ struct S3_P1: P1 {
   nonisolated func onMainActor() { }
 }
 
-struct S4_P1_quitely: P1 {
+struct S4_P1_quietly: P1 {
   @SomeGlobalActor func onMainActor() { }
 }
 
