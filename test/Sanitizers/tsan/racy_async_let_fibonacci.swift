@@ -15,6 +15,7 @@
 // UNSUPPORTED: OS=watchos
 
 // rdar://86825277
+// SR-15805
 // UNSUPPORTED: CPU=arm64 || CPU=arm64e
 
 func fib(_ n: Int) -> Int {
