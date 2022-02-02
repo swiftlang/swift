@@ -1322,6 +1322,7 @@ ManglingError Remangler::mangleFunctionSignatureSpecialization(Node *node,
           break;
         }
         case FunctionSigSpecializationParamKind::ClosureProp:
+        case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
           RETURN_IF_ERROR(mangleIdentifier(Param->getChild(1), depth + 1));
           for (unsigned i = 2, e = Param->getNumChildren(); i != e; ++i) {
             RETURN_IF_ERROR(mangleType(Param->getChild(i), depth + 1));
@@ -1399,6 +1400,9 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
       }
       break;
     }
+    case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      Buffer << "pk";
+      break;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Buffer << 'c';
       break;
