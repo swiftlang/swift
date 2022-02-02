@@ -4749,8 +4749,6 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   // to be enabled.
   if (checkIfDifferentiableProgrammingEnabled(Ctx, attr, D->getDeclContext()))
     return true;
-  if (D->isInvalid())
-    return true;
   auto *derivative = cast<FuncDecl>(D);
   auto originalName = attr->getOriginalFunctionName();
 
