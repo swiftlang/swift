@@ -370,6 +370,10 @@ public:
 
   unsigned InternalizeAtLink : 1;
 
+  /// Whether to avoid emitting zerofill globals as preallocated type metadata
+  /// and prototol conformance caches.
+  unsigned NoPreallocatedInstantiationCaches : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -433,6 +437,7 @@ public:
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false),
+        NoPreallocatedInstantiationCaches(false),
         CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
