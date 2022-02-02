@@ -223,55 +223,6 @@ namespace {
   };
 }
 
-/// When a type parameter has two concrete types, we have to unify the
-/// type constructor arguments.
-///
-/// For example, suppose that we have two concrete same-type requirements:
-///
-///   T == Foo<X.Y, Z, String>
-///   T == Foo<Int, A.B, W>
-///
-/// These lower to the following two rules:
-///
-///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}] => T
-///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}] => T
-///
-/// The two concrete type symbols will be added to the property bag of 'T',
-/// and we will eventually end up in this method, where we will generate three
-/// induced rules:
-///
-///   X.Y.[concrete: Int] => X.Y
-///   A.B => Z
-///   W.[concrete: String] => W
-///
-/// Returns the left hand side on success (it could also return the right hand
-/// side; since we unified the type constructor arguments, it doesn't matter).
-///
-/// Returns true if a conflict was detected.
-static bool unifyConcreteTypes(
-    Symbol lhs, Symbol rhs, RewriteSystem &system,
-    bool debug) {
-  auto lhsType = lhs.getConcreteType();
-  auto rhsType = rhs.getConcreteType();
-
-  if (debug) {
-    llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
-  }
-
-  ConcreteTypeMatcher matcher(lhs.getSubstitutions(),
-                              rhs.getSubstitutions(),
-                              system, debug);
-  if (!matcher.match(lhsType, rhsType)) {
-    // FIXME: Diagnose the conflict
-    if (debug) {
-      llvm::dbgs() << "%% Concrete type conflict\n";
-    }
-    return true;
-  }
-
-  return false;
-}
-
 /// When a type parameter has two superclasses, we have to both unify the
 /// type constructor arguments, and record the most derived superclass.
 ///
@@ -440,9 +391,33 @@ void PropertyMap::addSuperclassProperty(
   }
 }
 
+/// When a type parameter has two concrete types, we have to unify the
+/// type constructor arguments.
+///
+/// For example, suppose that we have two concrete same-type requirements:
+///
+///   T == Foo<X.Y, Z, String>
+///   T == Foo<Int, A.B, W>
+///
+/// These lower to the following two rules:
+///
+///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}] => T
+///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}] => T
+///
+/// The two concrete type symbols will be added to the property bag of 'T',
+/// and we will eventually end up in this method, where we will generate three
+/// induced rules:
+///
+///   X.Y.[concrete: Int] => X.Y
+///   A.B => Z
+///   W.[concrete: String] => W
 void PropertyMap::addConcreteTypeProperty(
     Term key, Symbol property, unsigned ruleID) {
   auto *props = getOrCreateProperties(key);
+
+  const auto &rule = System.getRule(ruleID);
+  assert(rule.getRHS() == key);
+
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   if (!props->ConcreteType) {
@@ -452,10 +427,196 @@ void PropertyMap::addConcreteTypeProperty(
   }
 
   assert(props->ConcreteTypeRule.hasValue());
-  bool conflict = unifyConcreteTypes(*props->ConcreteType, property,
-                                     System, debug);
+
+  if (debug) {
+    llvm::dbgs() << "% Unifying " << *props->ConcreteType;
+    llvm::dbgs() << " with " << property << "\n";
+  }
+
+  Optional<unsigned> lhsDifferenceID;
+  Optional<unsigned> rhsDifferenceID;
+
+  bool conflict = System.computeTypeDifference(*props->ConcreteType, property,
+                                               lhsDifferenceID,
+                                               rhsDifferenceID);
+
   if (conflict) {
+    // FIXME: Diagnose the conflict
+    if (debug) {
+      llvm::dbgs() << "%% Concrete type conflict\n";
+    }
     recordConflict(key, *props->ConcreteTypeRule, ruleID, System);
+    return;
+  }
+
+  // Record induced rules from the given type difference.
+  auto processTypeDifference = [&](const TypeDifference &difference) {
+    if (debug) {
+      difference.dump(llvm::dbgs());
+    }
+
+    for (const auto &pair : difference.SameTypes) {
+      // Both sides are type parameters; add a same-type requirement.
+      MutableTerm lhsTerm(difference.LHS.getSubstitutions()[pair.first]);
+      MutableTerm rhsTerm(difference.RHS.getSubstitutions()[pair.second]);
+
+      if (debug) {
+        llvm::dbgs() << "%% Induced rule " << lhsTerm
+                     << " == " << rhsTerm << "\n";
+      }
+
+      // FIXME: Need a rewrite path here.
+      System.addRule(lhsTerm, rhsTerm);
+    }
+
+    for (const auto &pair : difference.ConcreteTypes) {
+      // A type parameter is equated with a concrete type; add a concrete
+      // type requirement.
+      MutableTerm rhsTerm(difference.LHS.getSubstitutions()[pair.first]);
+      MutableTerm lhsTerm(rhsTerm);
+      lhsTerm.add(pair.second);
+
+      if (debug) {
+        llvm::dbgs() << "%% Induced rule " << lhsTerm
+                     << " == " << rhsTerm << "\n";
+      }
+
+      // FIXME: Need a rewrite path here.
+      System.addRule(lhsTerm, rhsTerm);
+    }
+  };
+
+  // Handle the case where (LHS ∧ RHS) is distinct from both LHS and RHS:
+  // - First, record a new rule.
+  // - Next, process the LHS -> (LHS ∧ RHS) difference.
+  // - Finally, process the RHS -> (LHS ∧ RHS) difference.
+  if (lhsDifferenceID && rhsDifferenceID) {
+    const auto &lhsDifference = System.getTypeDifference(*lhsDifferenceID);
+    const auto &rhsDifference = System.getTypeDifference(*rhsDifferenceID);
+
+    auto newProperty = lhsDifference.RHS;
+    assert(newProperty == rhsDifference.RHS);
+
+    MutableTerm rhsTerm(key);
+    MutableTerm lhsTerm(key);
+    lhsTerm.add(newProperty);
+
+    if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID)) {
+      assert(lhsDifference.RHS == rhsDifference.RHS);
+
+      if (debug) {
+        llvm::dbgs() << "%% Induced rule " << lhsTerm
+                     << " == " << rhsTerm << "\n";
+      }
+
+      System.addRule(lhsTerm, rhsTerm);
+    }
+
+    // Recover the (LHS ∧ RHS) rule.
+    RewritePath path;
+    bool simplified = System.simplify(lhsTerm, &path);
+    assert(simplified);
+    (void) simplified;
+
+    assert(path.size() == 1);
+    assert(path.begin()->Kind == RewriteStep::Rule);
+
+    unsigned newRuleID = path.begin()->getRuleID();
+
+    // Process LHS -> (LHS ∧ RHS).
+    if (checkRulePairOnce(*props->ConcreteTypeRule, newRuleID))
+      processTypeDifference(lhsDifference);
+
+    // Process RHS -> (LHS ∧ RHS).
+    if (checkRulePairOnce(ruleID, newRuleID))
+      processTypeDifference(rhsDifference);
+
+    // The new property is more specific, so update ConcreteType and
+    // ConcreteTypeRule.
+    props->ConcreteType = newProperty;
+    props->ConcreteTypeRule = ruleID;
+
+    return;
+  }
+
+  // Handle the case where RHS == (LHS ∧ RHS) by processing LHS -> (LHS ∧ RHS).
+  if (lhsDifferenceID) {
+    assert(!rhsDifferenceID);
+
+    const auto &lhsDifference = System.getTypeDifference(*lhsDifferenceID);
+    assert(*props->ConcreteType == lhsDifference.LHS);
+    assert(property == lhsDifference.RHS);
+
+    if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID))
+      processTypeDifference(lhsDifference);
+
+    // The new property is more specific, so update ConcreteType and
+    // ConcreteTypeRule.
+    props->ConcreteType = property;
+    props->ConcreteTypeRule = ruleID;
+
+    return;
+  }
+
+  // Handle the case where LHS == (LHS ∧ RHS) by processing LHS -> (LHS ∧ RHS).
+  if (rhsDifferenceID) {
+    assert(!lhsDifferenceID);
+
+    const auto &rhsDifference = System.getTypeDifference(*rhsDifferenceID);
+    assert(property == rhsDifference.LHS);
+    assert(*props->ConcreteType == rhsDifference.RHS);
+
+    if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID))
+      processTypeDifference(rhsDifference);
+
+    // The new property is less specific, so ConcreteType and ConcreteTypeRule
+    // remain unchanged.
+    return;
+  }
+
+  assert(property == *props->ConcreteType);
+
+  if (*props->ConcreteTypeRule != ruleID) {
+    // If the rules are different but the concrete types are identical, then
+    // the key is some term U.V, the existing rule is a rule of the form:
+    //
+    //    V.[concrete: G<...> with <X, Y>]
+    //
+    // and the new rule is a rule of the form:
+    //
+    //    U.V.[concrete: G<...> with <U.X, U.Y>]
+    //
+    // Record a loop relating the two rules via a concrete type adjustment.
+    // Since the new rule appears without context, it becomes redundant.
+    if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID)) {
+      const auto &otherRule = System.getRule(*props->ConcreteTypeRule);
+      assert(otherRule.getRHS().size() < key.size());
+
+      unsigned adjustment = (key.size() - otherRule.getRHS().size());
+
+      // Build a loop that rewrites U.V back into itself via the two rules,
+      // with a concrete type adjustment in the middle.
+      RewritePath path;
+
+      // Add a rewrite step U.(V => V.[concrete: G<...> with <X, Y>]).
+      path.add(RewriteStep::forRewriteRule(/*startOffset=*/adjustment,
+                                           /*endOffset=*/0,
+                                           *props->ConcreteTypeRule,
+                                           /*inverse=*/true));
+
+      // Add a concrete type adjustment.
+      path.add(RewriteStep::forAdjustment(/*startOffset=*/adjustment,
+                                          /*endOffset=*/0,
+                                          /*inverse=*/false));
+
+      // Add a rewrite step (U.V.[concrete: G<...> with <U.X, U.Y>] => U.V).
+      path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
+                                           /*endOffset=*/0,
+                                           ruleID,
+                                           /*inverse=*/false));
+
+      System.recordRewriteLoop(MutableTerm(key), path);
+    }
   }
 }
 
