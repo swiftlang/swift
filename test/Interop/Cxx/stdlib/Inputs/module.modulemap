@@ -1,3 +1,7 @@
 module StdVector {
   header "std-vector.h"
 }
+
+module StdUnorderedSet {
+  header "std-unordered-set.h"
+}
