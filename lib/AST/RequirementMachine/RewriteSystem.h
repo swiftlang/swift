@@ -456,9 +456,6 @@ private:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
-  void recordRewriteLoop(MutableTerm basepoint,
-                         RewritePath path);
-
   void propagateExplicitBits();
 
   Optional<unsigned>
@@ -474,6 +471,9 @@ private:
       llvm::DenseSet<unsigned> &redundantConformances);
 
 public:
+  void recordRewriteLoop(MutableTerm basepoint,
+                         RewritePath path);
+
   bool isInMinimizationDomain(ArrayRef<const ProtocolDecl *> protos) const;
 
   ArrayRef<RewriteLoop> getLoops() const {
