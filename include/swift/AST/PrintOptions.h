@@ -479,6 +479,10 @@ struct PrintOptions {
   /// Whether to print inheritance lists for types.
   bool PrintInherited = true;
 
+  /// Whether to print a space before the `:` of an inheritance list in a type
+  /// decl.
+  bool PrintSpaceBeforeInheritance = true;
+
   /// Whether to print feature checks for compatibility with older Swift
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;

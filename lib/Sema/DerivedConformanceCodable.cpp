@@ -1669,7 +1669,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           auto *nestedContainerDecl = createKeyedContainer(
               C, funcDC, C.getKeyedDecodingContainerDecl(),
               caseCodingKeys->getDeclaredInterfaceType(),
-              VarDecl::Introducer::Var, C.Id_nestedContainer);
+              VarDecl::Introducer::Let, C.Id_nestedContainer);
 
           auto *nestedContainerCall = createNestedContainerKeyedByForKeyCall(
               C, funcDC, containerExpr, caseCodingKeys, codingKeyCase);
