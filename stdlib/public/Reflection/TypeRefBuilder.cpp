@@ -324,8 +324,15 @@ TypeRefBuilder::getMultiPayloadEnumInfo(const TypeRef *TR) {
   for (auto Info : ReflectionInfos) {
     for (auto MultiPayloadEnumDescriptor : Info.MultiPayloadEnum) {
 
-      // XXX Reject MPE descriptors that don't make sense
-      //  if (condition) { continue; }
+      // Assert that descriptor size is sane...
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() >= 2);
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() < 256);
+      // BitMask must fit within the advertised size...
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords()
+             >= 2 + MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() / 4);
+      // Must have a non-empty spare bits mask iff spare bits are used...
+      assert(MultiPayloadEnumDescriptor->usesPayloadSpareBits()
+             == (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() != 0));
 
       auto CandidateMangledName =
         readTypeRef(MultiPayloadEnumDescriptor, MultiPayloadEnumDescriptor->TypeName);
