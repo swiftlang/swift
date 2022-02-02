@@ -18,7 +18,6 @@
 #if SWIFT_ENABLE_REFLECTION
 
 #include "swift/Reflection/TypeRefBuilder.h"
-
 #include "swift/Demangling/Demangle.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Reflection/TypeLowering.h"
@@ -29,6 +28,7 @@
 
 using namespace swift;
 using namespace reflection;
+using ReadBytesResult = swift::remote::MemoryReader::ReadBytesResult;
 
 TypeRefBuilder::BuiltType
 TypeRefBuilder::decodeMangledType(Node *node, bool forRequirement) {
@@ -494,25 +494,6 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
       info.dump(stream);
     }
   }
-}
-
-void TypeRefBuilder::dumpAllSections(std::ostream &stream) {
-  stream << "FIELDS:\n";
-  stream << "=======\n";
-  dumpFieldSection(stream);
-  stream << "\n";
-  stream << "ASSOCIATED TYPES:\n";
-  stream << "=================\n";
-  dumpAssociatedTypeSection(stream);
-  stream << "\n";
-  stream << "BUILTIN TYPES:\n";
-  stream << "==============\n";
-  dumpBuiltinTypeSection(stream);
-  stream << "\n";
-  stream << "CAPTURE DESCRIPTORS:\n";
-  stream << "====================\n";
-  dumpCaptureSection(stream);
-  stream << "\n";
 }
 
 #endif
