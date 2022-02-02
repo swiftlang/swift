@@ -4556,8 +4556,7 @@ void PrintAST::visitBraceStmt(BraceStmt *stmt) {
 void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
   if (!stmt->hasResult()) {
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(Current)) {
-      if (FD->hasBody()) {
-        auto *Body = FD->getBody();
+      if (auto *Body = FD->getBody()) {
         if (Body->getLastElement().dyn_cast<Stmt *>() == stmt) {
           // Don't print empty return.
           return;
