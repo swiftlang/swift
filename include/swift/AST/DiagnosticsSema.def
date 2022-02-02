@@ -1607,6 +1607,11 @@ ERROR(originally_definedin_need_available,none,
 ERROR(originally_definedin_must_not_before_available_version,none,
       "symbols are moved to the current module before they were available in the OSs", (StringRef))
 
+WARNING(originally_defined_in_on_non_public,
+       none, "@%0 does not have any effect on "
+       "%select{private|fileprivate|internal|%error|%error}1 declarations",
+       (StringRef, AccessLevel))
+
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
