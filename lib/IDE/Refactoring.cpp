@@ -3354,7 +3354,8 @@ public:
   AddEquatableContext() : DC(nullptr), Adopter(), ProtocolsLocations(),
   Protocols(), StoredProperties(), Range(nullptr, nullptr) {};
 
-  static AddEquatableContext getDeclarationContextFromInfo(ResolvedCursorInfo Info);
+  static AddEquatableContext
+  getDeclarationContextFromInfo(const ResolvedCursorInfo &Info);
 
   std::string getInsertionTextForProtocol();
 
@@ -3468,7 +3469,7 @@ getProtocolRequirements() {
 }
 
 AddEquatableContext AddEquatableContext::
-getDeclarationContextFromInfo(ResolvedCursorInfo Info) {
+getDeclarationContextFromInfo(const ResolvedCursorInfo &Info) {
   if (Info.isInvalid()) {
     return AddEquatableContext();
   }
