@@ -110,7 +110,7 @@ static_assert(alignof(HeapObject) == alignof(void*),
               "HeapObject must be pointer-aligned");
 
 } // end namespace swift
-#endif // __cplusplus
+#endif // __swift__
 
 /// Global bit masks
 
