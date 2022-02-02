@@ -461,6 +461,15 @@ public:
     ReplacedFunction->incrementRefCount();
   }
 
+  SILFunction *getDistributedRecordArgumentFunction() const {
+    return ReplacedFunction;
+  }
+  void setDistributedRecordArgumentFunction(SILFunction *f) {
+    if (f == nullptr)
+      return;
+    f->incrementRefCount();
+  }
+
   /// This function should only be called when SILFunctions are bulk deleted.
   void dropDynamicallyReplacedFunction() {
     if (!ReplacedFunction)

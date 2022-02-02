@@ -62,6 +62,10 @@ Type getDistributedActorSystemType(NominalTypeDecl *actor);
 /// Determine the distributed actor identity type for the given actor.
 Type getDistributedActorIDType(NominalTypeDecl *actor);
 
+/// Determine the serialization requirement for the given actor, actor system
+/// or other type that has the SerializationRequirement associated type.
+Type getDistributedSerializationRequirementType(NominalTypeDecl *nominal);
+
 /// Diagnose a distributed func declaration in a not-distributed actor protocol.
 void diagnoseDistributedFunctionInNonDistributedActorProtocol(
   const ProtocolDecl *proto, InFlightDiagnostic &diag);

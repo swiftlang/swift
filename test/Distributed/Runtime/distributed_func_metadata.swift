@@ -1,4 +1,3 @@
-// XXX: %target-swift-frontend -module-name SomeModuleName -primary-file %s -emit-sil -parse-as-library -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --enable-var-scope --dump-input=always
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
