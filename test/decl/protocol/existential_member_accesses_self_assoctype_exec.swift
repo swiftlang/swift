@@ -107,4 +107,30 @@ Tests.test("Covariant 'Self' erasure") {
   expectEqual(true, S() is P)
 }
 
+protocol MyIntCollection:
+  BidirectionalCollection where Element == Int,
+                                SubSequence == ArraySlice<Element>,
+                                Index == Int {}
+extension Array: MyIntCollection where Element == Int {}
+
+Tests.test("Known associated types") {
+  let erasedIntArr: MyIntCollection = [5, 8, 1, 9, 3, 8]
+
+  expectEqual(6, erasedIntArr.count)
+  expectEqual(5, erasedIntArr[Int.zero])
+  expectEqual(8, erasedIntArr.last.unsafelyUnwrapped)
+  expectEqual([5, 8, 1, 9, 3], erasedIntArr.dropLast())
+  expectEqual([8, 3, 9, 1, 8, 5], erasedIntArr.reversed())
+  expectEqual(9, erasedIntArr.max().unsafelyUnwrapped)
+  expectEqual([1, 3, 5, 8, 8, 9], erasedIntArr.sorted())
+  expectEqual(false, erasedIntArr.contains(Int.zero))
+  expectEqual([5, 8],
+    erasedIntArr[
+      erasedIntArr.startIndex...erasedIntArr.firstIndex(
+        of: erasedIntArr.last.unsafelyUnwrapped
+      ).unsafelyUnwrapped
+    ]
+  )
+}
+
 runAllTests()

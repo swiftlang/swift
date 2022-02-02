@@ -3126,10 +3126,11 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto archetypeVisitor = [&](CanType t) {
     if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
       if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
+        const auto root = cast<OpenedArchetypeType>(CanType(opened->getRoot()));
         assert((openedExistential == CanArchetypeType() ||
-                openedExistential == opened) &&
+                openedExistential == root) &&
                "one too many open existentials");
-        openedExistential = opened;
+        openedExistential = root;
       } else {
         hasArchetypes = true;
       }
@@ -3158,6 +3159,16 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto substTypeHelper = [&](SubstitutableType *type) -> Type {
     if (CanType(type) == openedExistential)
       return newArchetype;
+
+    // If a nested archetype is rooted on our opened existential, fail:
+    // Type::subst attempts to substitute the parent of a nested archetype
+    // only if it fails to find a replacement for the nested one.
+    if (auto *opened = dyn_cast<OpenedArchetypeType>(type)) {
+      if (openedExistential->isEqual(opened->getRoot())) {
+        return nullptr;
+      }
+    }
+
     return Type(type).subst(contextSubs);
   };
   auto substConformanceHelper =
