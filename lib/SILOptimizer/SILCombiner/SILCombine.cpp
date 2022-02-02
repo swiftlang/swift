@@ -491,16 +491,22 @@ void SILCombine_registerInstructionPass(BridgedStringRef name,
 SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   static BridgedInstructionPassRunFn runFunction = nullptr;                \
   static bool runFunctionSet = false;                                      \
+  static bool passDisabled = false;                                        \
   if (!runFunctionSet) {                                                   \
     runFunction = swiftInstPasses[TAG];                                    \
     if (!runFunction && passesRegistered) {                                \
       llvm::errs() << "Swift pass " << TAG << " is not registered\n";      \
       abort();                                                             \
     }                                                                      \
+    passDisabled = SILPassManager::isPassDisabled(TAG);                    \
     runFunctionSet = true;                                                 \
   }                                                                        \
   if (!runFunction) {                                                      \
     LEGACY_RUN;                                                            \
+  }                                                                        \
+  if (passDisabled &&                                                      \
+      SILPassManager::disablePassesForFunction(inst->getFunction())) {     \
+    return nullptr;                                                        \
   }                                                                        \
   runSwiftInstructionPass(inst, runFunction);                              \
   return nullptr;                                                          \

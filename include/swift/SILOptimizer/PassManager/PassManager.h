@@ -352,6 +352,9 @@ public:
 
   void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 
+  static bool isPassDisabled(StringRef passName);
+  static bool disablePassesForFunction(SILFunction *function);
+
 private:
   void execute();
 
