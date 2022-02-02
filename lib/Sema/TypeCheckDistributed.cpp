@@ -110,6 +110,30 @@ bool IsDistributedActorRequest::evaluate(
 
 // ==== ------------------------------------------------------------------------
 
+static bool checkAdHocRequirementAccessControl(
+    NominalTypeDecl *decl,
+    ProtocolDecl *proto,
+    AbstractFunctionDecl *func) {
+  if (!func)
+    return false;
+
+  // === check access control
+  // if type is public, the remoteCall must be too
+  if (decl->getEffectiveAccess() >= AccessLevel::Public &&
+      func->getEffectiveAccess() != AccessLevel::Public) {
+    func->diagnose(diag::witness_not_accessible_type,
+                   diag::RequirementKind::Func,
+                   func->getName(),
+                   /*isSetter=*/false,
+                   /*requiredAccess=*/AccessLevel::Public,
+                   AccessLevel::Public,
+                   proto->getName());
+        return true;
+  }
+
+  return false;
+}
+
 bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
     ASTContext &C,
     ProtocolDecl *Proto,
@@ -117,11 +141,14 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
     Type Adoptee,
     bool diagnose) {
   auto decl = Adoptee->getAnyNominal();
+  auto anyMissingAdHocRequirements = false;
 
   // ==== ----------------------------------------------------------------------
   // Check the ad-hoc requirements of 'DistributedActorSystem":
   // - remoteCall
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
+    auto systemProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
+
     auto remoteCallDecl =
         C.getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/false);
     if (!remoteCallDecl && diagnose) {
@@ -142,8 +169,10 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           "        Act.ID == ActorID,\n"
           "        Err: Error,\n"
           "        Res: SerializationRequirement\n");
-      return true;
+      anyMissingAdHocRequirements = true;
     }
+    if (checkAdHocRequirementAccessControl(decl, systemProto, remoteCallDecl))
+      anyMissingAdHocRequirements = true;
 
     auto remoteCallVoidDecl =
         C.getRemoteCallOnDistributedActorSystem(decl, /*isVoidReturn=*/true);
@@ -163,17 +192,18 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           "  where Act: DistributedActor,\n"
           "        Act.ID == ActorID,\n"
           "        Err: Error\n");
-      return true;
+      anyMissingAdHocRequirements = true;
     }
+    if (checkAdHocRequirementAccessControl(decl, systemProto, remoteCallVoidDecl))
+      anyMissingAdHocRequirements = true;
 
-    return false;
+    return anyMissingAdHocRequirements;
   }
 
   // ==== ----------------------------------------------------------------------
   // Check the ad-hoc requirements of 'DistributedTargetInvocation'
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder)) {
     // FIXME(distributed): implement finding this the requirements here
-    auto anyMissingAdHocRequirements = false;
 
     if (!C.getRecordArgumentOnDistributedInvocationEncoder(decl)) {
       decl->diagnose(

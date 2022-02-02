@@ -169,9 +169,8 @@ struct FakeActorSystem: DistributedActorSystem {
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-//          Act.ID == ActorID,
-          Err: Error
-  {
+          Act.ID == ActorID,
+          Err: Error {
     fatalError("not implemented: \(#function)")
   }
 }

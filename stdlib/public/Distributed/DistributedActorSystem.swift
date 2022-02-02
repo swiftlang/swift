@@ -131,6 +131,26 @@ public protocol DistributedActorSystem: Sendable {
 //            Err: Error,
 //            Res: SerializationRequirement
 
+  /// Invoked by the Swift runtime when making a remote call.
+  ///
+  /// The `arguments` are the arguments container that was previously created
+  /// by `makeInvocationEncoder` and has been populated with all arguments.
+  ///
+  /// This method should perform the actual remote function call, and await for its response.
+  ///
+  /// ## Errors
+  /// This method is allowed to throw because of underlying transport or serialization errors,
+  /// as well as by re-throwing the error received from the remote callee (if able to).
+//  func remoteCallVoid<Act, Err>(
+//      on actor: Act,
+//      target: RemoteCallTarget,
+//      invocation: inout InvocationEncoder,
+//      throwing: Err.Type
+//  ) async throws -> Res
+//      where Act: DistributedActor,
+//            Act.ID == ActorID,
+//            Err: Error
+
 }
 
 // ==== ----------------------------------------------------------------------------------------------------------------

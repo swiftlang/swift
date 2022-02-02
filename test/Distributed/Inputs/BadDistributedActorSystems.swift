@@ -34,9 +34,9 @@ public struct ActorAddress: Hashable, Sendable, Codable {
   }
 }
 
-// ==== Noop Transport ---------------------------------------------------------
+// ==== Fake Systems -----------------------------------------------------------
 
-public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
+public struct MissingRemoteCallVoidActorSystem: DistributedActorSystem {
   public typealias ActorID = ActorAddress
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias InvocationEncoder = FakeInvocationEncoder
@@ -48,7 +48,7 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
   let someValue3: String = ""
   let someValue4: String = ""
 
-  public init() {
+  init() {
     print("Initialized new FakeActorSystem")
   }
 
@@ -90,21 +90,17 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
     throw ExecuteDistributedTargetError(message: "Not implemented.")
   }
 
-  public func remoteCallVoid<Act, Err>(
-    on actor: Act,
-    target: RemoteCallTarget,
-    invocation invocationEncoder: inout InvocationEncoder,
-    throwing: Err.Type
-  ) async throws
-    where Act: DistributedActor,
-          Act.ID == ActorID,
-          Err: Error {
-    throw ExecuteDistributedTargetError(message: "Not implemented.")
-  }
-
-  public nonisolated var description: Swift.String {
-    "\(Self.self)()"
-  }
+//  func remoteCallVoid<Act, Err>(
+//    on actor: Act,
+//    target: RemoteCallTarget,
+//    invocation invocationEncoder: inout InvocationEncoder,
+//    throwing: Err.Type
+//  ) async throws
+//    where Act: DistributedActor,
+//          Act.ID == ActorID,
+//          Err: Error {
+//    throw ExecuteDistributedTargetError(message: "Not implemented.")
+//  }
 }
 
 // ==== Fake Roundtrip Transport -----------------------------------------------
@@ -331,12 +327,12 @@ public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
   }
 
   public func decodeErrorType() throws -> Any.Type? {
-    print("  > decode return type: \(errorType.map { String(reflecting: $0) }  ?? "nil")")
+    print("  > decode return type: \(errorType.map { String(describing: $0) }  ?? "nil")")
     return self.errorType
   }
 
   public func decodeReturnType() throws -> Any.Type? {
-    print("  > decode return type: \(returnType.map { String(reflecting: $0) }  ?? "nil")")
+    print("  > decode return type: \(returnType.map { String(describing: $0) }  ?? "nil")")
     return self.returnType
   }
 }
@@ -368,7 +364,3 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
 
 @_silgen_name("swift_distributed_actor_is_remote")
 func __isRemoteActor(_ actor: AnyObject) -> Bool
-
-func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
-}
