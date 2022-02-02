@@ -1326,6 +1326,38 @@ FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
   return nullptr;
 }
 
+FuncDecl *
+ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
+    NominalTypeDecl *nominal) const {
+  for (auto result : nominal->lookupDirect(Id_recordGenericSubstitution)) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+    if (fd->getParameters()->size() != 1)
+      continue;
+    if (fd->hasAsync())
+      continue;
+    if (!fd->hasThrows())
+      continue;
+    // TODO(distributed): more checks
+
+    auto genericParamList = fd->getGenericParams();
+
+    // A single generic parameter.
+    if (genericParamList->size() != 1)
+      continue;
+
+    // No requirements on the generic parameter
+    if (fd->getGenericRequirements().size() != 0)
+      continue;
+
+    if (fd->getResultInterfaceType()->isVoid())
+      return fd;
+  }
+
+  return nullptr;
+}
+
 FuncDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
   for (auto result : nominal->lookupDirect(Id_recordArgument)) {

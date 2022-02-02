@@ -679,6 +679,15 @@ public:
   FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
       NominalTypeDecl *actorOrSystem) const;
 
+  // Retrieve the declaration of
+  // DistributedInvocationEncoder.recordGenericSubstitution(_:).
+  //
+  // \param nominal optionally provide a 'NominalTypeDecl' from which the
+  // function decl shall be extracted. This is useful to avoid witness calls
+  // through the protocol which is looked up when nominal is null.
+  FuncDecl *getRecordGenericSubstitutionOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
+
   // Retrieve the declaration of DistributedInvocationEncoder.recordArgument(_:).
   //
   // \param nominal optionally provide a 'NominalTypeDecl' from which the
@@ -1341,6 +1350,12 @@ public:
   /// Retrieve the name of to be used for the entry point, either main or an
   /// alternative specified via the -entry-point-function-name frontend flag.
   std::string getEntryPointFunctionName() const;
+
+  /// Find the type of SerializationRequirement on the passed nominal.
+  ///
+  /// This type exists as a typealias/associatedtype on all distributed actors,
+  /// actor systems, and related serialization types.
+  Type getDistributedSerializationRequirementType(NominalTypeDecl *);
 
   /// Find the concrete invocation decoder associated with the given actor.
   NominalTypeDecl *

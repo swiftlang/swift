@@ -1608,7 +1608,7 @@ public:
                        SubstitutionMap subMap);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
-  
+
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,

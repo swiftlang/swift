@@ -432,6 +432,12 @@ Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   return getAssociatedTypeOfDistributedSystem(actor, ctx.Id_ActorID);
 }
 
+Type ASTContext::getDistributedSerializationRequirementType(
+    NominalTypeDecl *nominal) {
+  return getAssociatedTypeOfDistributedSystem(nominal,
+                                              Id_SerializationRequirement);
+}
+
 NominalTypeDecl *
 ASTContext::getDistributedActorInvocationDecoder(NominalTypeDecl *actor) {
   if (!actor->isDistributedActor())
@@ -473,8 +479,7 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
                                            DeclNameRef(ctx.Id_decodeNextArgument));
 
   // typealias SerializationRequirement = any ...
-  auto serializerType = getAssociatedTypeOfDistributedSystem(
-                            actor, ctx.Id_SerializationRequirement)
+  auto serializerType = ctx.getDistributedSerializationRequirementType(actor)
                             ->castTo<ExistentialType>()
                             ->getConstraintType()
                             ->getDesugaredType();
