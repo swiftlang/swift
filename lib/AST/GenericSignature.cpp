@@ -542,6 +542,37 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
   return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
+Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
+  assert(type->isTypeParameter());
+
+  llvm::SmallVector<Type, 2> types;
+  if (Type superclass = getSuperclassBound(type)) {
+    // If the class contains a type parameter, try looking for a non-dependent
+    // superclass.
+    while (superclass && superclass->hasTypeParameter()) {
+      superclass = superclass->getSuperclass();
+    }
+
+    if (superclass)
+      types.push_back(superclass);
+  }
+  for (const auto &elt : getRequiredProtocols(type)) {
+    types.push_back(elt->getDeclaredInterfaceType());
+  }
+
+  const auto layout = getLayoutConstraint(type);
+  const auto boundsTy = ProtocolCompositionType::get(
+      getASTContext(), types,
+      /*HasExplicitAnyObject=*/layout &&
+          layout->getKind() == LayoutConstraintKind::Class);
+
+  if (boundsTy->isExistentialType()) {
+    return ExistentialType::get(boundsTy);
+  }
+
+  return boundsTy;
+}
+
 void GenericSignature::Profile(llvm::FoldingSetNodeID &id) const {
   return GenericSignature::Profile(id, getPointer()->getGenericParams(),
                                      getPointer()->getRequirements());

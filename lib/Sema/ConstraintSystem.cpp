@@ -1727,6 +1727,103 @@ static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
   return true;
 }
 
+/// Type-erase occurrences of covariant 'Self'-rooted type parameters to their
+/// most specific non-dependent bounds throughout the given type, using
+/// \p baseTy as the existential base object type.
+///
+/// \note If a 'Self'-rooted type parameter is bound to a concrete type, this
+/// routine will recurse into the concrete type.
+static Type typeEraseCovariantExistentialSelfReferences(Type refTy,
+                                                        Type baseTy) {
+  assert(baseTy->isExistentialType());
+  if (!refTy->hasTypeParameter()) {
+    return refTy;
+  }
+
+  const auto existentialSig =
+      baseTy->getASTContext().getOpenedArchetypeSignature(baseTy);
+
+  unsigned metatypeDepth = 0;
+
+  std::function<Type(Type, TypePosition)> transformFn;
+  transformFn = [&](Type type, TypePosition initialPos) -> Type {
+    return type.transformWithPosition(
+        initialPos, [&](TypeBase *t, TypePosition currPos) -> Optional<Type> {
+      if (!t->hasTypeParameter()) {
+        return Type(t);
+      }
+
+      if (t->is<MetatypeType>()) {
+        const auto instanceTy = t->getMetatypeInstanceType();
+        ++metatypeDepth;
+        const auto erasedTy = transformFn(instanceTy, currPos);
+        --metatypeDepth;
+
+        if (instanceTy.getPointer() == erasedTy.getPointer()) {
+          return Type(t);
+        }
+
+        return Type(ExistentialMetatypeType::get(erasedTy));
+      }
+
+      if (!t->isTypeParameter()) {
+        // Recurse.
+        return None;
+      }
+
+      if (t->getRootGenericParam()->getDepth() > 0) {
+        return Type(t);
+      }
+
+      // If the type parameter is beyond the domain of the existential generic
+      // signature, ignore it.
+      if (!existentialSig->isValidTypeInContext(t)) {
+        return Type(t);
+      }
+
+      // If the type parameter is bound to a concrete type, recurse into it.
+      if (const auto concreteTy = existentialSig->getConcreteType(t)) {
+        const auto erasedTy = transformFn(concreteTy, currPos);
+        if (erasedTy.getPointer() == concreteTy.getPointer()) {
+          // Don't return the concrete type if we haven't type-erased anything
+          // inside it, or else we might inadvertently transform a normal
+          // metatype into an existential one.
+          return Type(t);
+        }
+
+        return erasedTy;
+      }
+
+      switch (currPos) {
+      case TypePosition::Covariant:
+        break;
+
+      case TypePosition::Contravariant:
+      case TypePosition::Invariant:
+        return Type(t);
+      }
+
+      Type erasedTy;
+
+      // The upper bounds of 'Self' is the existential base type.
+      if (t->is<GenericTypeParamType>()) {
+        erasedTy = baseTy;
+      } else {
+        erasedTy = existentialSig->getNonDependentUpperBounds(t);
+      }
+
+      if (metatypeDepth) {
+        if (const auto existential = erasedTy->getAs<ExistentialType>())
+          return existential->getConstraintType();
+      }
+
+      return erasedTy;
+    });
+  };
+
+  return transformFn(refTy, TypePosition::Covariant);
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
@@ -1989,27 +2086,44 @@ ConstraintSystem::getTypeOfMemberReference(
     type = type->replaceSelfParameterType(baseObjTy);
   }
 
-  // When accessing protocol members with an existential base, replace
-  // the 'Self' type parameter with the existential type, since formally
-  // the access will operate on existentials and not type parameters.
-  if (!isDynamicResult &&
-      baseObjTy->isExistentialType() &&
-      outerDC->getSelfProtocolDecl()) {
-    auto selfTy = replacements[
-      cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
-                                 ->getCanonicalType())];
-    type = type.transform([&](Type t) -> Type {
-      if (t->is<TypeVariableType>())
-        if (t->isEqual(selfTy))
-          return baseObjTy;
-      if (auto *metatypeTy = t->getAs<MetatypeType>())
-        if (metatypeTy->getInstanceType()->isEqual(selfTy)) {
-          auto constraint = baseObjTy;
-          if (auto existential = baseObjTy->getAs<ExistentialType>())
-            constraint = existential->getConstraintType();
-          return ExistentialMetatypeType::get(constraint);
-        }
-      return t;
+  // Superficially, protocol members with an existential base are accessed
+  // directly on the existential, and not an opened archetype, and we may have
+  // to adjust the type of the reference (e.g. covariant 'Self' type-erasure) to
+  // support certain accesses.
+  if (!isStaticMemberRefOnProtocol && !isDynamicResult &&
+      baseObjTy->isExistentialType() && outerDC->getSelfProtocolDecl() &&
+      // If there are no type variables, there were no references to 'Self'.
+      type->hasTypeVariable()) {
+    const auto selfGP = cast<GenericTypeParamType>(
+        outerDC->getSelfInterfaceType()->getCanonicalType());
+
+    // First, temporarily reconstitute the 'Self' generic parameter.
+    type = type.transformRec([&](TypeBase *t) -> Optional<Type> {
+      // Don't recurse into children unless we have to.
+      if (!type->hasTypeVariable())
+        return Type(t);
+
+      if (isa<TypeVariableType>(t) && t->isEqual(replacements.lookup(selfGP)))
+        return selfGP;
+
+      // Recurse.
+      return None;
+    });
+
+    // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
+    type = typeEraseCovariantExistentialSelfReferences(type, baseObjTy);
+
+    // Finally, swap the 'Self'-corresponding type variable back in.
+    type = type.transformRec([&](TypeBase *t) -> Optional<Type> {
+      // Don't recurse into children unless we have to.
+      if (!type->hasTypeParameter())
+        return Type(t);
+
+      if (isa<GenericTypeParamType>(t) && t->isEqual(selfGP))
+        return Type(replacements.lookup(selfGP));
+
+      // Recurse.
+      return None;
     });
   }
 
@@ -5787,6 +5901,117 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
     return;
 
   ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+}
+
+/// A protocol member accessed with an existential value might have generic
+/// constraints that require the ability to spell an opened archetype in order
+/// to be satisfied. Such are
+/// - superclass requirements, when the object is a non-'Self'-rooted type
+///   parameter, and the subject is dependent on 'Self', e.g. U : G<Self.A>
+/// - same-type requirements, when one side is dependent on 'Self', and the
+///   other is a non-'Self'-rooted type parameter, e.g. U.Element == Self.
+///
+/// Because opened archetypes are not part of the surface language, these
+/// constraints render the member inaccessible.
+static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
+    Type baseTy, const ValueDecl *member) {
+  const auto sig =
+      member->getInnermostDeclContext()->getGenericSignatureOfContext();
+
+  // Fast path: the member is generic only over 'Self'.
+  if (sig.getGenericParams().size() == 1) {
+    return false;
+  }
+
+  class IsDependentOnSelfInBaseTypeContextWalker : public TypeWalker {
+    CanGenericSignature Sig;
+
+  public:
+    explicit IsDependentOnSelfInBaseTypeContextWalker(CanGenericSignature Sig)
+        : Sig(Sig) {}
+
+    Action walkToTypePre(Type ty) override {
+      if (!ty->isTypeParameter()) {
+        return Action::Continue;
+      }
+
+      if (ty->getRootGenericParam()->getDepth() > 0) {
+        return Action::SkipChildren;
+      }
+
+      if (!Sig->isValidTypeInContext(ty)) {
+        return Action::SkipChildren;
+      }
+
+      const auto concreteTy = Sig->getConcreteType(ty);
+      if (concreteTy && !concreteTy->hasTypeParameter()) {
+        return Action::SkipChildren;
+      }
+
+      return Action::Stop;
+    }
+  } isDependentOnSelfWalker(
+      member->getASTContext().getOpenedArchetypeSignature(baseTy));
+
+  for (const auto &req : sig.getRequirements()) {
+    switch (req.getKind()) {
+    case RequirementKind::Superclass: {
+      if (req.getFirstType()->getRootGenericParam()->getDepth() > 0 &&
+          req.getSecondType().walk(isDependentOnSelfWalker)) {
+        return true;
+      }
+
+      break;
+    }
+    case RequirementKind::SameType: {
+      const auto isNonSelfRootedTypeParam = [](Type ty) {
+        return ty->isTypeParameter() &&
+               ty->getRootGenericParam()->getDepth() > 0;
+      };
+
+      if ((isNonSelfRootedTypeParam(req.getFirstType()) &&
+           req.getSecondType().walk(isDependentOnSelfWalker)) ||
+          (isNonSelfRootedTypeParam(req.getSecondType()) &&
+           req.getFirstType().walk(isDependentOnSelfWalker))) {
+        return true;
+      }
+
+      break;
+    }
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+      break;
+    }
+  }
+
+  return false;
+}
+
+bool ConstraintSystem::isMemberAvailableOnExistential(
+    Type baseTy, const ValueDecl *member) const {
+  assert(member->getDeclContext()->getSelfProtocolDecl());
+
+  // If the type of the member references 'Self' or a 'Self'-rooted associated
+  // type in non-covariant position, we cannot reference the member.
+  const auto info = member->findExistentialSelfReferences(
+      baseTy, /*treatNonResultCovariantSelfAsInvariant=*/false);
+  if (info.selfRef > TypePosition::Covariant ||
+      info.assocTypeRef > TypePosition::Covariant) {
+    return false;
+  }
+
+  // FIXME: Appropriately diagnose assignments instead.
+  if (auto *const storageDecl = dyn_cast<AbstractStorageDecl>(member)) {
+    if (info.hasCovariantSelfResult && storageDecl->supportsMutation())
+      return false;
+  }
+
+  if (doesMemberHaveUnfulfillableConstraintsWithExistentialBase(baseTy,
+                                                                member)) {
+    return false;
+  }
+
+  return true;
 }
 
 SourceLoc constraints::getLoc(ASTNode anchor) {

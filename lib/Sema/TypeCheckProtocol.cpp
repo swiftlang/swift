@@ -1026,8 +1026,9 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
         // defining a non-final class conforming to 'Collection' which uses
         // the default witness for 'Collection.Iterator', which is defined
         // as 'IndexingIterator<Self>'.
-        const auto selfRefInfo = proto->findProtocolSelfReferences(
-            req, /*treatNonResultCovariantSelfAsInvariant=*/true);
+        const auto selfRefInfo = req->findExistentialSelfReferences(
+            proto->getDeclaredInterfaceType(),
+            /*treatNonResultCovariantSelfAsInvariant=*/true);
         if (!selfRefInfo.assocTypeRef) {
           covariantSelf = classDecl;
         }
@@ -4055,10 +4056,11 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
 
   // Check whether this requirement uses Self in a way that might
   // prevent conformance from succeeding.
-  const auto selfRefInfo = Proto->findProtocolSelfReferences(
-      requirement, /*treatNonResultCovariantSelfAsInvariant=*/true);
+  const auto selfRefInfo = requirement->findExistentialSelfReferences(
+      Proto->getDeclaredInterfaceType(),
+      /*treatNonResultCovariantSelfAsInvariant=*/true);
 
-  if (selfRefInfo.selfRef == SelfReferencePosition::Invariant) {
+  if (selfRefInfo.selfRef == TypePosition::Invariant) {
     // References to Self in a position where subclasses cannot do
     // the right thing. Complain if the adoptee is a non-final
     // class.
