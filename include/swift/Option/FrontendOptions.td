@@ -579,6 +579,10 @@ def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allow removal of runtime metadata records (public types, protocol conformances) based on whether they're used or unused">;
 
+def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocated-instantiation-caches">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Avoid preallocating metadata instantiation caches in globals">;
+
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
