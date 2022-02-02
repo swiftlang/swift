@@ -1050,6 +1050,7 @@ namespace {
               if (memberTypes.empty())
                 hasExplicitAnyObject = true;
 
+              // Generic arguments are always imported as existential types.
               Type importedTypeArg = ExistentialType::get(
                   ProtocolCompositionType::get(
                       Impl.SwiftContext, memberTypes,
@@ -1182,9 +1183,6 @@ namespace {
             }
           }
 
-          if (bridgedType->isConstraintType())
-            bridgedType = ExistentialType::get(bridgedType);
-
           return { importedType,
                    ImportHint(ImportHint::ObjCBridged, bridgedType) };
         }
@@ -1205,9 +1203,9 @@ namespace {
           members.push_back(proto->getDeclaredInterfaceType());
         }
 
-        importedType = ExistentialType::get(
+        importedType =
             ProtocolCompositionType::get(Impl.SwiftContext, members,
-                                         /*HasExplicitAnyObject=*/false));
+                                         /*HasExplicitAnyObject=*/false);
       }
 
       // Class or Class<P> maps to an existential metatype.
@@ -1271,6 +1269,32 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::Enum:
   case ImportTypeKind::RecordField:
     return false;
+  case ImportTypeKind::AuditedVariable:
+  case ImportTypeKind::AuditedResult:
+  case ImportTypeKind::Parameter:
+  case ImportTypeKind::CompletionHandlerResultParameter:
+  case ImportTypeKind::CFRetainedOutParameter:
+  case ImportTypeKind::CFUnretainedOutParameter:
+  case ImportTypeKind::Property:
+  case ImportTypeKind::PropertyWithReferenceSemantics:
+    return true;
+  }
+
+  llvm_unreachable("Invalid ImportTypeKind.");
+}
+
+/// True if the type can be an existential type in this context.
+static bool isExistentialContext(ImportTypeKind importKind) {
+  switch (importKind) {
+  case ImportTypeKind::Abstract:
+  case ImportTypeKind::Typedef:
+    return false;
+  case ImportTypeKind::Value:
+  case ImportTypeKind::ObjCCollectionElement:
+  case ImportTypeKind::Variable:
+  case ImportTypeKind::Result:
+  case ImportTypeKind::Enum:
+  case ImportTypeKind::RecordField:
   case ImportTypeKind::AuditedVariable:
   case ImportTypeKind::AuditedResult:
   case ImportTypeKind::Parameter:
@@ -1549,6 +1573,11 @@ static ImportedType adjustTypeForConcreteImport(
   }
 
   assert(importedType);
+
+  if (importedType->isConstraintType() &&
+      isExistentialContext(importKind)) {
+    importedType = ExistentialType::get(importedType);
+  }
 
   if (importKind == ImportTypeKind::RecordField &&
       importedType->isAnyClassReferenceType() &&

@@ -2796,16 +2796,6 @@ namespace {
                                       SourceLoc(), Name,
                                       Loc,
                                       /*genericparams*/nullptr, DC);
-
-      // Unwrap an explicit ExistentialType around the underlying type so that
-      // the typealias can be used in a generic constraint context.
-      //
-      // FIXME: We might want to push this down further into importType(), and
-      // once ExistentialType becomes mandatory in the future we want to wrap
-      // references to imported typealiases in Sema's resolveType() as well.
-      if (auto *existentialType = SwiftType->getAs<ExistentialType>())
-        SwiftType = existentialType->getConstraintType();
-
       Result->setUnderlyingType(SwiftType);
       
       // Make Objective-C's 'id' unavailable.
