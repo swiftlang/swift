@@ -718,7 +718,6 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   // Determine whether the type was explicitly non-Sendable.
   auto nominalModule = nominal->getParentModule();
   bool isExplicitlyNonSendable = nominalModule->isConcurrencyChecked() ||
-      isExplicitSendableConformance() ||
       hasExplicitSendableConformance(nominal);
 
   // Determine whether this nominal type is visible via a @preconcurrency
@@ -726,10 +725,13 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   auto import = findImportFor(nominal, fromDC);
 
   // When the type is explicitly non-Sendable...
+  auto sourceFile = fromDC->getParentSourceFile();
   if (isExplicitlyNonSendable) {
-    // @preconcurrency imports downgrade the diagnostic to a warning.
+    // @preconcurrency imports downgrade the diagnostic to a warning in Swift 6,
     if (import && import->options.contains(ImportFlags::Preconcurrency)) {
-      // FIXME: Note that this @preconcurrency import was "used".
+      if (sourceFile)
+        sourceFile->setImportUsedPreconcurrency(*import);
+
       return DiagnosticBehavior::Warning;
     }
 
@@ -741,13 +743,25 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   // @preconcurrency suppresses the diagnostic in Swift 5.x, and
   // downgrades it to a warning in Swift 6 and later.
   if (import && import->options.contains(ImportFlags::Preconcurrency)) {
-    // FIXME: Note that this @preconcurrency import was "used".
+    if (sourceFile)
+      sourceFile->setImportUsedPreconcurrency(*import);
+
     return nominalModule->getASTContext().LangOpts.isSwiftVersionAtLeast(6)
         ? DiagnosticBehavior::Warning
         : DiagnosticBehavior::Ignore;
   }
 
-  return defaultDiagnosticBehavior();
+  auto defaultBehavior = defaultDiagnosticBehavior();
+
+  // If we are checking an implicit Sendable conformance, don't suppress
+  // diagnostics for declarations in the same module. We want them so make
+  // enclosing inferred types non-Sendable.
+  if (defaultBehavior == DiagnosticBehavior::Ignore &&
+      nominal->getParentSourceFile() &&
+      conformanceCheck && *conformanceCheck == SendableCheck::Implicit)
+    return DiagnosticBehavior::Warning;
+
+  return defaultBehavior;
 }
 
 /// Produce a diagnostic for a single instance of a non-Sendable type where
@@ -768,14 +782,6 @@ static bool diagnoseSingleNonSendableType(
   }
 
   bool wasSuppressed = diagnose(type, behavior);
-
-  // If this type was imported from another module, try to find the
-  // corresponding import.
-  Optional<AttributedImport<swift::ImportedModule>> import;
-  SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
-  if (nominal && nominal->getParentModule() != module) {
-    import = findImportFor(nominal, fromContext.fromDC);
-  }
 
   if (behavior == DiagnosticBehavior::Ignore || wasSuppressed) {
     // Don't emit any other diagnostics.
@@ -800,6 +806,14 @@ static bool diagnoseSingleNonSendableType(
         diag::non_sendable_nominal, nominal->getDescriptiveKind(),
         nominal->getName());
 
+    // This type was imported from another module; try to find the
+    // corresponding import.
+    Optional<AttributedImport<swift::ImportedModule>> import;
+    SourceFile *sourceFile = fromContext.fromDC->getParentSourceFile();
+    if (sourceFile) {
+      import = findImportFor(nominal, fromContext.fromDC);
+    }
+
     // If we found the import that makes this nominal type visible, remark
     // that it can be @preconcurrency import.
     // Only emit this remark once per source file, because it can happen a
@@ -816,14 +830,6 @@ static bool diagnoseSingleNonSendableType(
 
       sourceFile->setImportUsedPreconcurrency(*import);
     }
-  }
-
-  // If we found an import that makes this nominal type visible, and that
-  // was a @preconcurrency import, note that we have made use of the
-  // attribute.
-  if (import && import->options.contains(ImportFlags::Preconcurrency) &&
-      sourceFile) {
-    sourceFile->setImportUsedPreconcurrency(*import);
   }
 
   return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
@@ -3887,8 +3893,10 @@ static bool checkSendableInstanceStorage(
     bool operator()(VarDecl *property, Type propertyType) {
       // Classes with mutable properties are not Sendable.
       if (property->supportsMutation() && isa<ClassDecl>(nominal)) {
-        if (check == SendableCheck::Implicit)
+        if (check == SendableCheck::Implicit) {
+          invalid = true;
           return true;
+        }
 
         auto behavior = SendableCheckContext(
             dc, check).defaultDiagnosticBehavior();
@@ -3907,6 +3915,10 @@ static bool checkSendableInstanceStorage(
           propertyType, SendableCheckContext(dc, check), property->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
             if (check == SendableCheck::Implicit) {
+              // If we are to ignore this diagnose, just continue.
+              if (behavior == DiagnosticBehavior::Ignore)
+                return false;
+
               invalid = true;
               return true;
             }
@@ -3934,6 +3946,10 @@ static bool checkSendableInstanceStorage(
           elementType, SendableCheckContext(dc, check), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
             if (check == SendableCheck::Implicit) {
+              // If we are to ignore this diagnose, just continue.
+              if (behavior == DiagnosticBehavior::Ignore)
+                return false;
+
               invalid = true;
               return true;
             }
