@@ -1978,8 +1978,11 @@ namespace {
                 Description.requiresSpecialization);
       // Instantiation function
       B.addRelativeAddressOrNull(Description.instantiationFn);
+
       // Private data
-      {
+      if (IGM.IRGen.Opts.NoPreallocatedInstantiationCaches) {
+        B.addInt32(0);
+      } else {
         auto privateDataTy =
           llvm::ArrayType::get(IGM.Int8PtrTy,
                                swift::NumGenericMetadataPrivateDataWords);

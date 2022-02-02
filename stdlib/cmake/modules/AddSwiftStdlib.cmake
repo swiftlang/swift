@@ -364,6 +364,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS")
   endif()
 
+  if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+    list(APPEND result "-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES")
+  endif()
+
   if(SWIFT_STDLIB_HAS_TYPE_PRINTING)
     list(APPEND result "-DSWIFT_STDLIB_HAS_TYPE_PRINTING")
   endif()

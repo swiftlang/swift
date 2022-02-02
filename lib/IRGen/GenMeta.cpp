@@ -1267,7 +1267,7 @@ namespace {
     }
 
     void addMetadataInstantiationCache() {
-      if (!HasMetadata) {
+      if (!HasMetadata || IGM.getOptions().NoPreallocatedInstantiationCaches) {
         B.addInt32(0);
         return;
       }
@@ -2569,6 +2569,8 @@ namespace {
 
     /// Emit the instantiation cache variable for the template.
     void emitInstantiationCache() {
+      if (IGM.IRGen.Opts.NoPreallocatedInstantiationCaches) return;
+      
       auto cache = cast<llvm::GlobalVariable>(
         IGM.getAddrOfTypeMetadataInstantiationCache(Target, ForDefinition));
       auto init =
