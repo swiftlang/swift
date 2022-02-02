@@ -3149,8 +3149,9 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
           ProtocolConformanceState::Incomplete, /*isUnchecked=*/false);
       ConformanceChecker checker(getASTContext(), &conformance,
                                  missingWitnesses);
-      checker.resolveValueWitnesses();
+      // Type witnesses must be resolved first.
       checker.resolveTypeWitnesses();
+      checker.resolveValueWitnesses();
     }
 
     for (auto decl : missingWitnesses) {
