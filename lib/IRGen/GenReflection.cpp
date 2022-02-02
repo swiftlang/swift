@@ -1012,8 +1012,6 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
   builder.emit();
 }
 
- // TODO: This is copied from GenEnum.cpp; should we refactor to eliminate
- // the duplication?
 static CanType getFormalTypeInContext(CanType abstractType, DeclContext *dc) {
   // Map the parent of any non-generic nominal type.
   if (auto nominalType = dyn_cast<NominalType>(abstractType)) {
@@ -1067,40 +1065,40 @@ public:
     assert(isMPE && "Cannot emit Multi-Payload Enum data for an enum that doesn't have multiple payloads");
 
     const TypeInfo &TI = strategy.getTypeInfo();
-    if (auto fixedTI = dyn_cast<FixedTypeInfo>(&TI)) {
-      // Get the spare bits mask for the enum payloads.
-      SpareBitVector spareBits;
-      for (auto enumCase : strategy.getElementsWithPayload()) {
-        cast<FixedTypeInfo>(enumCase.ti)->applyFixedSpareBitsMask(IGM, spareBits);
-      }
+    auto fixedTI = dyn_cast<FixedTypeInfo>(&TI);
+    assert(fixedTI != nullptr
+           && "MPE reflection records can only be emitted for fixed-layout enums");
 
-      // Pad or truncate the bit mask to a multiple of 32 bits
-      llvm::APInt bits = spareBits.asAPInt();
-      auto bitCount = bits.getActiveBits();
-      auto usesPayloadSpareBits = bitCount > 0;
-      auto byteCount = (bitCount + 7) / 8;
-      auto wordCount = (byteCount + 3) / 4;
-      bits = bits.zextOrTrunc(wordCount * 32);
+    // Get the spare bits mask for the enum payloads.
+    SpareBitVector spareBits;
+    for (auto enumCase : strategy.getElementsWithPayload()) {
+      cast<FixedTypeInfo>(enumCase.ti)->applyFixedSpareBitsMask(IGM, spareBits);
+    }
 
-      addTypeRef(type, CanGenericSignature());
+    // Pad or truncate the bit mask to a multiple of 32 bits
+    llvm::APInt bits = spareBits.asAPInt();
+    auto bitCount = bits.getActiveBits();
+    auto usesPayloadSpareBits = bitCount > 0;
+    auto byteCount = (bitCount + 7) / 8;
+    auto wordCount = (byteCount + 3) / 4;
+    bits = bits.zextOrTrunc(wordCount * 32);
 
-      // MPE record contents are a multiple of 32-bits
-      uint32_t contentSizeInWords =
-        1 /* Size + flags */
-        + 1 /* SpareBits byte count */
-        + wordCount;
-      uint32_t flags = usesPayloadSpareBits ? 1 : 0;
+    addTypeRef(type, CanGenericSignature());
 
-      B.addInt32((contentSizeInWords << 16) | flags);
-      B.addInt32(byteCount);
-      // TODO: Endianness??
-      for (unsigned i = 0; i < wordCount; ++i) {
-        uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
-        B.addInt32(nextWord);
-        bits.lshrInPlace(32);
-      }
-    } else {
-      assert(false && "TI was not 'FixedTypeInfo'??");
+    // MPE record contents are a multiple of 32-bits
+    uint32_t contentSizeInWords =
+      1 /* Size + flags */
+      + 1 /* SpareBits byte count */
+      + wordCount;
+    uint32_t flags = usesPayloadSpareBits ? 1 : 0;
+
+    B.addInt32((contentSizeInWords << 16) | flags);
+    B.addInt32(byteCount);
+    // TODO: Endianness??
+    for (unsigned i = 0; i < wordCount; ++i) {
+      uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
+      B.addInt32(nextWord);
+      bits.lshrInPlace(32);
     }
   }
 
@@ -1562,7 +1560,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
     if (strategy.getElementsWithPayload().size() > 1 &&
         !strategy.needsPayloadSizeInMetadata()) {
       needsOpaqueDescriptor = true;
-      needsMPEDescriptor = true;
+      needsMPEDescriptor = true; // or should this be strategy.isReflectable();
     }
   }
 
