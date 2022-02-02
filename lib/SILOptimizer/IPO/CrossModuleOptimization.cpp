@@ -511,6 +511,10 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Public)
     return;
 
+  // We must not modify decls which are defined in other modules.
+  if (M.getSwiftModule() != decl->getDeclContext()->getParentModule())
+    return;
+
   if (decl->getFormalAccess() < AccessLevel::Public &&
       !decl->isUsableFromInline()) {
     // Mark the nominal type as "usableFromInline".
