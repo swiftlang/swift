@@ -1302,7 +1302,7 @@ public:
     dumpConformanceSection<ObjCInteropKind, PointerSize>(stream);
     stream << "\n";
     stream << "MULTI-PAYLOAD ENUM DESCRIPTORS:\n";
-    stream << "====================\n";
+    stream << "===============================\n";
     dumpMultiPayloadEnumSection(stream);
     stream << "\n";
   }

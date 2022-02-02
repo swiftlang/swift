@@ -660,12 +660,13 @@ public:
   }
   // Construct a bitmask of the appropriate number of bytes
   // initialized with bits from the specified buffer
-  BitMask(unsigned sizeInBytes, const uint8_t *initialValue, unsigned initialValueBytes)
+  BitMask(unsigned sizeInBytes, const uint8_t *initialValue, unsigned initialValueBytes, unsigned offset)
     : size(sizeInBytes)
   {
     assert(sizeInBytes < std::numeric_limits<uint32_t>::max());
+    assert(initialValueBytes + offset <= sizeInBytes);
     mask = (uint8_t *)calloc(1, size);
-    memcpy(mask, initialValue, initialValueBytes);
+    memcpy(mask + offset, initialValue, initialValueBytes);
   }
   // Move constructor moves ownership and zeros the src
   BitMask(BitMask&& src) noexcept: size(src.size), mask(std::move(src.mask)) {
@@ -2004,6 +2005,9 @@ public:
     } else {
       // MultiPayloadEnumImplStrategy
 
+      // Uncomment the following line to dump the MPE section every time we come through here...
+      //TC.getBuilder().dumpMultiPayloadEnumSection(std::cerr); // DEBUG helper
+
       // Check if this is a dynamic or static multi-payload enum
 
       // If we have a fixed descriptor for this type, it is a fixed-size
@@ -2020,22 +2024,25 @@ public:
         auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
 
         // If there's a multi-payload enum descriptor, then we
-        // have detailed layout information from the compiler.
+        // have layout information from the compiler.
         auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumInfo(TR);
         if (MPEDescriptor) {
           if (MPEDescriptor->usesPayloadSpareBits()) {
             auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
+            auto PayloadSpareBitMaskByteOffset = MPEDescriptor->getPayloadSpareBitMaskByteOffset();
             auto SpareBitMask = MPEDescriptor->getPayloadSpareBits();
-            BitMask spareBitsMask(PayloadSize, SpareBitMask, PayloadSpareBitMaskByteCount);
+            BitMask spareBitsMask(PayloadSize, SpareBitMask,
+                                  PayloadSpareBitMaskByteCount, PayloadSpareBitMaskByteOffset);
 
             if (!spareBitsMask.isZero()) {
-#if !defined(NDEBUG) || 1
+#if !defined(NDEBUG) && 0
               // DEBUGGING: compare the locally-computed spare bit mask to the
               // one we got from the compiler.  If they're different, then
               // either the compiler is emitting the wrong thing or the
               // local runtime computation isn't quite right.
               BitMask locallyComputedSpareBitsMask(PayloadSize);
-              auto locallyComputedSpareBitsMaskIsValid = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask);
+              auto locallyComputedSpareBitsMaskIsValid
+                = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask);
               assert(locallyComputedSpareBitsMaskIsValid);
               assert(locallyComputedSpareBitsMask == spareBitsMask);
 #endif

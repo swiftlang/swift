@@ -394,18 +394,29 @@ private:
 
   int getSizeFlagsIndex() const { return 0; }
 
-  // uint32_t PayloadSpareBitMaskByteCount;
-  // Number of bytes in "payload spare bits"
+  // uint32_t PayloadSpareBitMaskByteOffsetCount;
+  // Number of bytes in "payload spare bits", and
+  // offset of them within the payload area
+  // Only present if `usePayloadSpareBits()`
 
   int getPayloadSpareBitMaskByteCountIndex() const {
-    return getSizeFlagsIndex() + 1;
+    if (usesPayloadSpareBits()) {
+      return getSizeFlagsIndex() + 1;
+    } else {
+      return getSizeFlagsIndex();
+    }
   }
 
   // uint8_t  *PayloadSpareBits;
   // Variably-sized bitmask field (padded to a multiple of 4 bytes)
+  // Only present if `usePayloadSpareBits()`
 
   int getPayloadSpareBitsIndex() const {
-    return getPayloadSpareBitMaskByteCountIndex() + 1;
+    if (usesPayloadSpareBits()) {
+      return getPayloadSpareBitMaskByteCountIndex() + 1;
+    } else {
+      return getPayloadSpareBitMaskByteCountIndex();
+    }
   }
 
   // uint32_t foo;
@@ -432,25 +443,41 @@ public:
     return contents[getSizeFlagsIndex()] >> 16;
   }
 
-  uint32_t getFlags() const {
-    return contents[getSizeFlagsIndex()] & 0xffff;
-  }
-
   size_t getSizeInBytes() const {
     size_t sizeInBytes = sizeof(TypeName) + getContentsSizeInWords() * 4;
     return sizeInBytes;
+  }
+
+  uint32_t getFlags() const {
+    return contents[getSizeFlagsIndex()] & 0xffff;
   }
 
   bool usesPayloadSpareBits() const {
     return getFlags() & 1;
   }
 
+  uint32_t getPayloadSpareBitMaskByteOffset() const {
+    if (usesPayloadSpareBits()) {
+      return contents[getPayloadSpareBitMaskByteCountIndex()] >> 16;
+    } else {
+      return 0;
+    }
+  }
+
   uint32_t getPayloadSpareBitMaskByteCount() const {
-    return contents[getPayloadSpareBitMaskByteCountIndex()];
+    if (usesPayloadSpareBits()) {
+      return contents[getPayloadSpareBitMaskByteCountIndex()] & 0xffff;
+    } else {
+      return 0;
+    }
   }
 
   const uint8_t *getPayloadSpareBits() const {
-    return reinterpret_cast<const uint8_t *>(&contents[getPayloadSpareBitsIndex()]);
+    if (usesPayloadSpareBits()) {
+      return reinterpret_cast<const uint8_t *>(&contents[getPayloadSpareBitsIndex()]);
+    } else {
+      return nullptr;
+    }
   }
 };
 

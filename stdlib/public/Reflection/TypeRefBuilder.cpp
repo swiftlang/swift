@@ -325,14 +325,19 @@ TypeRefBuilder::getMultiPayloadEnumInfo(const TypeRef *TR) {
     for (auto MultiPayloadEnumDescriptor : Info.MultiPayloadEnum) {
 
       // Assert that descriptor size is sane...
-      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() >= 2);
-      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() < 256);
-      // BitMask must fit within the advertised size...
-      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords()
-             >= 2 + MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() / 4);
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() >= 1);
+      // We're limited to 64k of spare bits mask...
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() < 16384);
+      assert(MultiPayloadEnumDescriptor->getSizeInBytes() ==
+             4 + MultiPayloadEnumDescriptor->getContentsSizeInWords() * 4);
       // Must have a non-empty spare bits mask iff spare bits are used...
       assert(MultiPayloadEnumDescriptor->usesPayloadSpareBits()
              == (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() != 0));
+      // BitMask must fit within the advertised size...
+      if (MultiPayloadEnumDescriptor->usesPayloadSpareBits()) {
+        assert(MultiPayloadEnumDescriptor->getContentsSizeInWords()
+               >= 2 + (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() + 3) / 4);
+      }
 
       auto CandidateMangledName =
         readTypeRef(MultiPayloadEnumDescriptor, MultiPayloadEnumDescriptor->TypeName);
@@ -541,19 +546,25 @@ void TypeRefBuilder::dumpMultiPayloadEnumSection(std::ostream &stream) {
       clearNodeFactory();
 
       stream << "\n- " << typeName << ":\n";
-      stream << "  Flags: ";
+      stream << "  Descriptor Size: " << descriptor->getSizeInBytes() << "\n";
+      stream << "  Flags: " << std::hex << descriptor->getFlags() << std::dec;
       if (descriptor->usesPayloadSpareBits()) {
         stream << " usesPayloadSpareBits";
       }
       stream << "\n";
       auto maskBytes = descriptor->getPayloadSpareBitMaskByteCount();
+      auto maskOffset = descriptor->getPayloadSpareBitMaskByteOffset();
       if (maskBytes > 0) {
-        stream << "  Spare bit mask: 0x";
+        if (maskOffset > 0) {
+          stream << "  Spare bit mask: (offset " << maskOffset << " bytes) 0x";
+        } else {
+          stream << "  Spare bit mask: 0x";
+        }
         const uint8_t *p = descriptor->getPayloadSpareBits();
         for (unsigned i = 0; i < maskBytes; i++) {
           stream << std::hex << std::setw(2) << std::setfill('0') << p[i];
         }
-        stream << "\n";
+        stream << std::dec << "\n";
       }
       stream << "\n";
     }

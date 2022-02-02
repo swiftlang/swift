@@ -1075,30 +1075,45 @@ public:
       cast<FixedTypeInfo>(enumCase.ti)->applyFixedSpareBitsMask(IGM, spareBits);
     }
 
-    // Pad or truncate the bit mask to a multiple of 32 bits
+    // Trim leading/trailing zero bytes, then pad to a multiple of 32 bits
     llvm::APInt bits = spareBits.asAPInt();
-    auto bitCount = bits.getActiveBits();
+    uint32_t byteOffset = bits.countTrailingZeros() / 8;
+    bits.lshrInPlace(byteOffset * 8); // Trim zero bytes from bottom end
+
+    auto bitCount = bits.getActiveBits(); // Ignore high-order zero bits
     auto usesPayloadSpareBits = bitCount > 0;
-    auto byteCount = (bitCount + 7) / 8;
+    uint32_t byteCount = (bitCount + 7) / 8;
     auto wordCount = (byteCount + 3) / 4;
     bits = bits.zextOrTrunc(wordCount * 32);
+
+    // Never write an MPE descriptor bigger than 16k
+    // The runtime will fall back on its own internal
+    // spare bits calculation for this (very rare) case.
+    if (byteCount > 16384) {
+      return;
+    }
 
     addTypeRef(type, CanGenericSignature());
 
     // MPE record contents are a multiple of 32-bits
-    uint32_t contentSizeInWords =
-      1 /* Size + flags */
-      + 1 /* SpareBits byte count */
-      + wordCount;
+    uint32_t contentSizeInWords = 1; /* Size + flags is mandatory */
+    if (wordCount > 0) {
+      contentSizeInWords +=
+        1 /* SpareBits byte count */
+        + wordCount;
+    }
     uint32_t flags = usesPayloadSpareBits ? 1 : 0;
 
     B.addInt32((contentSizeInWords << 16) | flags);
-    B.addInt32(byteCount);
-    // TODO: Endianness??
-    for (unsigned i = 0; i < wordCount; ++i) {
-      uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
-      B.addInt32(nextWord);
-      bits.lshrInPlace(32);
+
+    if (byteCount > 0) {
+      B.addInt32((byteOffset << 16) | byteCount);
+      // TODO: Endianness??
+      for (unsigned i = 0; i < wordCount; ++i) {
+        uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
+        B.addInt32(nextWord);
+        bits.lshrInPlace(32);
+      }
     }
   }
 
