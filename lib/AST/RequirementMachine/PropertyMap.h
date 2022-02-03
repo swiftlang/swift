@@ -286,6 +286,11 @@ private:
     RequirementKind requirementKind,
     Symbol concreteConformanceSymbol) const;
 
+  Optional<unsigned> concretelySimplifySubstitutions(Symbol symbol,
+                                                     RewritePath *path) const;
+
+  void concretelySimplifyLeftHandSideSubstitutions() const;
+
   void verify() const;
 };
 
