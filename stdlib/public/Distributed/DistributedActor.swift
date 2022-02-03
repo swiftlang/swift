@@ -20,7 +20,7 @@ import _Concurrency
 ///
 /// FIXME(distributed): We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
 @_marker
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public protocol AnyActor: Sendable, AnyObject {
 }
 
@@ -34,7 +34,7 @@ public protocol AnyActor: Sendable, AnyObject {
 ///
 /// The 'DistributedActor' protocol provides the core functionality of any
 /// distributed actor.
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedActor:
     AnyActor,
     Identifiable,
@@ -84,7 +84,7 @@ public protocol DistributedActor:
 
 // ==== Hashable conformance ---------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 extension DistributedActor {
   nonisolated public func hash(into hasher: inout Hasher) {
     self.id.hash(into: &hasher)
@@ -98,11 +98,11 @@ extension DistributedActor {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
-  @available(SwiftStdlib 5.6, *)
+  @available(SwiftStdlib 5.7, *)
   public static let actorSystemKey = CodingUserInfoKey(rawValue: "$distributed_actor_system")!
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 extension DistributedActor {
   nonisolated public init(from decoder: Decoder) throws {
     guard let system = decoder.userInfo[.actorSystemKey] as? ActorSystem else {
@@ -123,7 +123,7 @@ extension DistributedActor {
 
 // ==== Local actor special handling -------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 extension DistributedActor {
 
   /// Executes the passed 'body' only when the distributed actor is local instance.
