@@ -367,9 +367,9 @@ GenericSignature autodiff::getDifferentiabilityWitnessGenericSignature(
 }
 
 TangentSpace TangentSpace::getTuple(TupleType *tupleTy) {
-  if (tupleTy->getElements().size() == 0) {
-    llvm::report_fatal_error("Attempted to get tangent space of empty tuple.");
-  }
+  assert(!tupleTy->isVoid() &&
+         "Attempted to get tangent space of 'Void', which cannot be "
+         "differentiated.");
   return {Kind::Tuple, tupleTy};
 }
 
