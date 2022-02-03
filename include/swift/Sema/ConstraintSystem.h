@@ -3488,6 +3488,11 @@ public:
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
 
+  /// Record implicitly generated `callAsFunction` with root at the
+  /// given expression, located at \c locator.
+  void recordCallAsFunction(UnresolvedDotExpr *root, ArgumentList *arguments,
+                            ConstraintLocator *locator);
+
   /// Walk a closure AST to determine its effects.
   ///
   /// \returns a function's extended info describing the effects, as

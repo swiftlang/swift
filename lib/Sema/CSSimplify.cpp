@@ -10495,6 +10495,32 @@ bool ConstraintSystem::simplifyAppliedOverloads(
                                       numOptionalUnwraps, locator);
 }
 
+/// Create an implicit dot-member reference expression to be used
+/// as a root for injected `.callAsFunction` call.
+static UnresolvedDotExpr *
+createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
+                                    ArgumentList *arguments,
+                                    ConstraintLocator *calleeLocator) {
+  auto &ctx = cs.getASTContext();
+  auto *baseExpr = castToExpr(calleeLocator->getAnchor());
+
+  SmallVector<Identifier, 2> closureLabelsScratch;
+  // Create implicit `.callAsFunction` expression to use as an anchor
+  // for new argument list that only has trailing closures in it.
+  auto *implicitRef = UnresolvedDotExpr::createImplicit(
+      ctx, baseExpr, {ctx.Id_callAsFunction},
+      arguments->getArgumentLabels(closureLabelsScratch));
+
+  {
+    // Record a type of the new reference in the constraint system.
+    cs.setType(implicitRef, refType);
+    // Record new `.callAsFunction` in the constraint system.
+    cs.recordCallAsFunction(implicitRef, arguments, calleeLocator);
+  }
+
+  return implicitRef;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
     Type type1, Type type2,
@@ -10654,7 +10680,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       auto resultTy = func2->getResult();
 
       // If this is a call that constructs a callable type with
-      // a trailing closure(s), closure(s) might not belong to
+      // trailing closure(s), closure(s) might not belong to
       // the constructor but rather to implicit `callAsFunction`,
       // there is no way to determine that without trying.
       if (resultTy->isCallableNominalType(DC) &&
@@ -10720,28 +10746,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
             /*RParen=*/SourceLoc(),
             /*firstTrailingClosureIndex=*/0);
 
-        // The base expression for `.callAsFunction`.
-        auto *baseExpr = castToExpr(argumentsLoc->getAnchor());
-
-        SmallVector<Identifier, 2> closureLabelsScratch;
-        // Create implicit `.callAsFunction` expression to use as an anchor
-        // for new argument list that only has trailing closures in it.
-        auto *implicitCall = UnresolvedDotExpr::createImplicit(
-            ctx, baseExpr, {ctx.Id_callAsFunction},
-            implicitCallArgumentList->getArgumentLabels(closureLabelsScratch));
-
-        {
-
-          // Record new root in the constraint system.
-          ImplicitCallAsFunctionRoots.insert({calleeLoc, implicitCall});
-
-          setType(implicitCall, callAsFunctionResultTy);
-
-          associateArgumentList(
-              getConstraintLocator(implicitCall,
-                                   ConstraintLocator::ApplyArgument),
-              implicitCallArgumentList);
-        }
+        auto *implicitRef = createImplicitRootForCallAsFunction(
+            *this, callAsFunctionResultTy, implicitCallArgumentList, calleeLoc);
 
         auto callAsFunctionArguments =
             FunctionType::get(trailingClosureTypes, callAsFunctionResultTy,
@@ -10753,7 +10759,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
         addUnsolvedConstraint(Constraint::create(
             *this, ConstraintKind::ApplicableFunction, callAsFunctionArguments,
             callableType,
-            getConstraintLocator(implicitCall,
+            getConstraintLocator(implicitRef,
                                  ConstraintLocator::ApplyFunction)));
         break;
       }
@@ -12003,6 +12009,15 @@ void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
   argumentMatchingChoices.insert({locator, result});
+}
+
+void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,
+                                            ArgumentList *arguments,
+                                            ConstraintLocator *locator) {
+  ImplicitCallAsFunctionRoots.insert({locator, root});
+
+  associateArgumentList(
+      getConstraintLocator(root, ConstraintLocator::ApplyArgument), arguments);
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
