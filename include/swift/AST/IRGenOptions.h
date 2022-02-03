@@ -87,6 +87,13 @@ enum class SwiftAsyncFramePointerKind : unsigned {
    Never,  // Don't emit Swift async extended frame info.
 };
 
+enum class ReflectionMetadataMode : unsigned {
+  None,         ///< Don't emit reflection metadata at all.
+  DebuggerOnly, ///< Emit reflection metadata for the debugger, don't link them
+                ///  into runtime metadata and don't force them to stay alive.
+  Runtime,      ///< Make reflection metadata fully available.
+};
+
 using clang::PointerAuthSchema;
 
 struct PointerAuthOptions : clang::PointerAuthOptions {
@@ -295,7 +302,7 @@ public:
   unsigned ValueNames : 1;
 
   /// Emit nominal type field metadata.
-  unsigned EnableReflectionMetadata : 1;
+  ReflectionMetadataMode ReflectionMetadata : 2;
 
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
@@ -423,7 +430,7 @@ public:
         LLVMLTOKind(IRGenLLVMLTOKind::None),
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false),
-        ValueNames(false), EnableReflectionMetadata(true),
+        ValueNames(false), ReflectionMetadata(ReflectionMetadataMode::Runtime),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
