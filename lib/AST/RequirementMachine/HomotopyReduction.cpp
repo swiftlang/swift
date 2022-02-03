@@ -94,7 +94,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
       break;
     }
 
-    case RewriteStep::AdjustConcreteType:
+    case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
@@ -213,7 +213,7 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
       sawRule = true;
       continue;
     }
-    case RewriteStep::AdjustConcreteType:
+    case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
@@ -279,7 +279,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
         break;
       }
 
-      auto adjustStep = [&](RewriteStep newStep) {
+      auto recontextualizeStep = [&](RewriteStep newStep) {
         bool inverse = newStep.Inverse ^ step.Inverse;
 
         if (newStep.Kind == RewriteStep::Decompose && inverse) {
@@ -302,15 +302,15 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
       if (step.Inverse) {
         for (auto newStep : llvm::reverse(path))
-          adjustStep(newStep);
+          recontextualizeStep(newStep);
       } else {
         for (auto newStep : path)
-          adjustStep(newStep);
+          recontextualizeStep(newStep);
       }
 
       break;
     }
-    case RewriteStep::AdjustConcreteType:
+    case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:

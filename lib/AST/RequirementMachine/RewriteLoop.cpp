@@ -85,8 +85,8 @@ void RewriteStep::dump(llvm::raw_ostream &out,
 
     break;
   }
-  case AdjustConcreteType: {
-    auto pair = evaluator.applyAdjustment(*this, system);
+  case PrefixSubstitutions: {
+    auto pair = evaluator.applyPrefixSubstitutions(*this, system);
 
     out << "(σ";
     out << (Inverse ? " - " : " + ");
@@ -260,11 +260,11 @@ RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
 }
 
 std::pair<MutableTerm, MutableTerm>
-RewritePathEvaluator::applyAdjustment(const RewriteStep &step,
-                                      const RewriteSystem &system) {
+RewritePathEvaluator::applyPrefixSubstitutions(const RewriteStep &step,
+                                               const RewriteSystem &system) {
   auto &term = getCurrentTerm();
 
-  assert(step.Kind == RewriteStep::AdjustConcreteType);
+  assert(step.Kind == RewriteStep::PrefixSubstitutions);
 
   auto &ctx = system.getRewriteContext();
   MutableTerm prefix(term.begin() + step.StartOffset,
@@ -451,8 +451,8 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
     (void) applyRewriteRule(step, system);
     break;
 
-  case RewriteStep::AdjustConcreteType:
-    (void) applyAdjustment(step, system);
+  case RewriteStep::PrefixSubstitutions:
+    (void) applyPrefixSubstitutions(step, system);
     break;
 
   case RewriteStep::Shift:

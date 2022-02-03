@@ -134,7 +134,7 @@ void RewriteLoop::findProtocolConformanceRules(
         break;
       }
 
-      case RewriteStep::AdjustConcreteType:
+      case RewriteStep::PrefixSubstitutions:
       case RewriteStep::Shift:
       case RewriteStep::Decompose:
       case RewriteStep::Relation:

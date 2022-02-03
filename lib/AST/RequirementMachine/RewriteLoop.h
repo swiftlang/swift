@@ -62,7 +62,7 @@ struct RewriteStep {
     /// If inverted: strip the prefix from each substitution.
     ///
     /// The StartOffset field encodes the length of the prefix.
-    AdjustConcreteType,
+    PrefixSubstitutions,
 
     ///
     /// *** Rewrite step kinds introduced by simplifySubstitutions() ***
@@ -130,10 +130,13 @@ struct RewriteStep {
 
   /// If Kind is Rule, the index of the rule in the rewrite system.
   ///
-  /// If Kind is AdjustConcreteType, the length of the prefix to add or remove
+  /// If Kind is PrefixSubstitutions, the length of the prefix to add or remove
   /// at the beginning of each concrete substitution.
   ///
-  /// If Kind is Concrete, the number of substitutions to push or pop.
+  /// If Kind is Decompose, the number of substitutions to push or pop.
+  ///
+  /// If Kind is Relation, the relation index returned from
+  /// RewriteSystem::recordRelation().
   unsigned Arg : 16;
 
   RewriteStep(StepKind kind, unsigned startOffset, unsigned endOffset,
@@ -154,10 +157,10 @@ struct RewriteStep {
     return RewriteStep(Rule, startOffset, endOffset, ruleID, inverse);
   }
 
-  static RewriteStep forAdjustment(unsigned offset, unsigned endOffset,
-                                   bool inverse) {
-    return RewriteStep(AdjustConcreteType, /*startOffset=*/0, endOffset,
-                       /*arg=*/offset, inverse);
+  static RewriteStep forPrefixSubstitutions(unsigned length, unsigned endOffset,
+                                            bool inverse) {
+    return RewriteStep(PrefixSubstitutions, /*startOffset=*/0, endOffset,
+                       /*arg=*/length, inverse);
   }
 
   static RewriteStep forShift(bool inverse) {
@@ -355,8 +358,8 @@ struct RewritePathEvaluator {
                                       const RewriteSystem &system);
 
   std::pair<MutableTerm, MutableTerm>
-  applyAdjustment(const RewriteStep &step,
-                  const RewriteSystem &system);
+  applyPrefixSubstitutions(const RewriteStep &step,
+                           const RewriteSystem &system);
 
   void applyShift(const RewriteStep &step,
                   const RewriteSystem &system);

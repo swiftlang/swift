@@ -452,15 +452,15 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                                          getRuleID(lhs),
                                          /*inverse=*/true));
 
-    // (2) Next, if the right hand side rule ends with a concrete type symbol,
-    // perform the concrete type adjustment:
+    // (2) Next, if the right hand side rule ends with a superclass or concrete
+    // type symbol, remove the prefix 'T' from each substitution in the symbol.
     //
     //     (σ - T)
     if (xv.back().hasSubstitutions() &&
         !xv.back().getSubstitutions().empty() &&
         t.size() > 0) {
-      path.add(RewriteStep::forAdjustment(t.size(), /*endOffset=*/0,
-                                          /*inverse=*/true));
+      path.add(RewriteStep::forPrefixSubstitutions(t.size(), /*endOffset=*/0,
+                                                   /*inverse=*/true));
 
       xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
           t, Context);

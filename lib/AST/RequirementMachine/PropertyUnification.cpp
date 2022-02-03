@@ -586,28 +586,30 @@ void PropertyMap::addConcreteTypeProperty(
     //
     //    U.V.[concrete: G<...> with <U.X, U.Y>]
     //
-    // Record a loop relating the two rules via a concrete type adjustment.
+    // Record a loop relating the two rules via a rewrite step to prefix 'U' to
+    // the symbol's substitutions.
+    //
     // Since the new rule appears without context, it becomes redundant.
     if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID)) {
       const auto &otherRule = System.getRule(*props->ConcreteTypeRule);
       assert(otherRule.getRHS().size() < key.size());
 
-      unsigned adjustment = (key.size() - otherRule.getRHS().size());
+      unsigned prefixLength = (key.size() - otherRule.getRHS().size());
 
       // Build a loop that rewrites U.V back into itself via the two rules,
-      // with a concrete type adjustment in the middle.
+      // with a prefix substitutions step in the middle.
       RewritePath path;
 
       // Add a rewrite step U.(V => V.[concrete: G<...> with <X, Y>]).
-      path.add(RewriteStep::forRewriteRule(/*startOffset=*/adjustment,
+      path.add(RewriteStep::forRewriteRule(/*startOffset=*/prefixLength,
                                            /*endOffset=*/0,
                                            *props->ConcreteTypeRule,
                                            /*inverse=*/true));
 
-      // Add a concrete type adjustment.
-      path.add(RewriteStep::forAdjustment(/*startOffset=*/adjustment,
-                                          /*endOffset=*/0,
-                                          /*inverse=*/false));
+      // Add a rewrite step to prefix 'U' to the substitutions.
+      path.add(RewriteStep::forPrefixSubstitutions(/*length=*/prefixLength,
+                                                   /*endOffset=*/0,
+                                                   /*inverse=*/false));
 
       // Add a rewrite step (U.V.[concrete: G<...> with <U.X, U.Y>] => U.V).
       path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
