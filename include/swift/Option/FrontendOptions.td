@@ -525,6 +525,10 @@ def enable_parametrized_protocol_types :
   Flag<["-"], "enable-parametrized-protocol-types">,
   HelpText<"Enable experimental support for primary associated types and parametrized protocols">;
 
+def enable_experimental_generics_features :
+  Flag<["-"], "enable-experimental-generics-features">,
+  HelpText<"Enable support for various experimental generics features">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
