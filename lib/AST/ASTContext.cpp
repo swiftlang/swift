@@ -4313,6 +4313,8 @@ Type ExistentialType::get(Type constraint) {
   if (constraint->is<ExistentialMetatypeType>())
     return constraint;
 
+  assert(constraint->isConstraintType());
+
   auto properties = constraint->getRecursiveProperties();
   auto arena = getArena(properties);
 
