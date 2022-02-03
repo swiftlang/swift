@@ -2698,9 +2698,9 @@ public:
         TheDecl(decl), isMutating(isMutating) {}
   ParameterConvention
   getIndirectSelfParameter(const AbstractionPattern &type) const override {
-    llvm_unreachable(
-        "cxx functions do not have a Swift self parameter; "
-        "foreign self parameter is handled in getIndirectParameter");
+    if (isMutating)
+      return ParameterConvention::Indirect_Inout;
+    return ParameterConvention::Indirect_In_Guaranteed;
   }
 
   ParameterConvention
@@ -2708,9 +2708,7 @@ public:
                        const TypeLowering &substTL) const override {
     // `self` is the last parameter.
     if (index == TheDecl->getNumParams()) {
-      if (isMutating)
-        return ParameterConvention::Indirect_Inout;
-      return ParameterConvention::Indirect_In_Guaranteed;
+      return getIndirectSelfParameter(type);
     }
     return super::getIndirectParameter(index, type, substTL);
   }
