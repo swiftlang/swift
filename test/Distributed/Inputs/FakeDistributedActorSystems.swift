@@ -327,12 +327,12 @@ public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
   }
 
   public func decodeErrorType() throws -> Any.Type? {
-    print("  > decode return type: \(errorType.map { String(describing: $0) }  ?? "nil")")
+    print("  > decode return type: \(errorType.map { String(reflecting: $0) }  ?? "nil")")
     return self.errorType
   }
 
   public func decodeReturnType() throws -> Any.Type? {
-    print("  > decode return type: \(returnType.map { String(describing: $0) }  ?? "nil")")
+    print("  > decode return type: \(returnType.map { String(reflecting: $0) }  ?? "nil")")
     return self.returnType
   }
 }

@@ -1016,7 +1016,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           SmallVector<Type, 1> subTypes;
           SmallVector<ProtocolConformanceRef, 2> subConformances;
 
-          //          subTypes.push_back(paramTy.getASTType());
           subTypes.push_back(paramTy);
 
           subs = SubstitutionMap::get(recordArgumentGenericSig, subTypes,
@@ -1535,15 +1534,13 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     }
     {
       // FIXME(distributed): manual since I could not figure out how to NOT destroy_addr in the error path, where the memory is not initialized, so the destroy would fail SIL verification
-//      emitThrowWithCleanupBasicBlock(*this, loc, thunk, remoteCallErrorBB, errorBB,
-//                                     /*endAccesses*/{invocationEncoderAccess},
-//                                     /*endLifetimes*/{remoteCallSystemSelf});
+      //      emitThrowWithCleanupBasicBlock(*this, loc, thunk, remoteCallErrorBB, errorBB,
+      //                                     /*endAccesses*/{invocationEncoderAccess},
+      //                                     /*endLifetimes*/{remoteCallSystemSelf});
       B.emitBlock(remoteCallErrorBB);
       SILValue error = remoteCallErrorBB->createPhiArgument(
           fnConv.getSILErrorType(getTypeExpansionContext()),
           OwnershipKind::Owned);
-
-      //      auto result = remoteCallReturnValue.getValue();
 
       // TODO(distributed): make those into cleanups
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
