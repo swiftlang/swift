@@ -74,7 +74,7 @@ cd $SWIFT_PATH
 # FIXME: Wasmer doesn't support linux-aarch64, consider using a different WASI-compatible runtime.
 if [ "$(uname -m)" != "aarch64" ]; then
   if [ ! -e ~/.wasmer/bin/wasmer ]; then
-    curl https://get.wasmer.io -sSfL | sh
+    curl https://get.wasmer.io -sSfL | sh -s "2.1.1"
   fi
 fi
 
