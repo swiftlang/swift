@@ -24,6 +24,7 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
+#include <iomanip>
 #include <iostream>
 #include <ostream>
 #include <unordered_map>
@@ -132,6 +133,17 @@ public:
                   << ", size of next record: "
                   << NextSize
                   << std::endl;
+        const uint8_t *p = reinterpret_cast<const uint8_t *>(Cur.getLocalBuffer());
+        std::cerr << "Previous bytes: ";
+        for (unsigned i = -8; i < 0; i++) {
+          std::cerr << std::hex << std::setw(2) << p[i] << " ";
+        }
+        std::cerr << std::endl;
+        std::cerr << "Next bytes: ";
+        for (unsigned i = 0; i < Size && i < 8; i++) {
+          std::cerr << std::hex << std::setw(2) << p[i] << " ";
+        }
+        std::cerr << std::endl;
         abort();
       }
     }
