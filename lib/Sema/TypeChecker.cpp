@@ -619,13 +619,17 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                            dc, stage);
     }) != params.end();
     bool alreadyDiagnosedOneParam = false;
+    bool hasInoutDiffParameter = false;
     for (unsigned i = 0, end = fnTy->getNumParams(); i != end; ++i) {
       auto param = params[i];
       if (param.isNoDerivative())
         continue;
       auto paramType = param.getPlainType();
-      if (TypeChecker::isDifferentiable(paramType, isLinear, dc, stage))
+      if (TypeChecker::isDifferentiable(paramType, isLinear, dc, stage)) {
+        if (param.isInOut())
+          hasInoutDiffParameter = true;
         continue;
+      }
       auto diagLoc =
           repr ? (*repr)->getArgsTypeRepr()->getElement(i).Type->getLoc() : loc;
       auto paramTypeString = paramType->getString();
@@ -654,7 +658,8 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
     // Check the result
     bool differentiable = isDifferentiable(result,
                                            /*tangentVectorEqualsSelf*/ isLinear,
-                                           dc, stage);
+                                           dc, stage) ^ hasInoutDiffParameter;
+    // TODO: make the error cleaner
     if (!differentiable) {
       auto diagLoc = repr ? (*repr)->getResultTypeRepr()->getLoc() : loc;
       auto resultStr = fnTy->getResult()->getString();
