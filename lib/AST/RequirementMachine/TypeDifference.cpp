@@ -31,9 +31,7 @@ void TypeDifference::dump(llvm::raw_ostream &out) const {
 
   for (const auto &pair : SameTypes) {
     out << "- " << LHS.getSubstitutions()[pair.first] << " (#";
-    out << pair.first << ") -> ";
-    out << RHS.getSubstitutions()[pair.second] << " (#";
-    out << pair.second << ")\n";
+    out << pair.first << ") -> " << pair.second << "\n";
   }
 
   for (const auto &pair : ConcreteTypes) {
@@ -62,15 +60,11 @@ void TypeDifference::verify(RewriteContext &ctx) const {
            "Missing substitutions with non-equal symbols");
 
     llvm::DenseSet<unsigned> lhsVisited;
-    llvm::DenseSet<unsigned> rhsVisited;
 
     for (const auto &pair : SameTypes) {
       auto first = LHS.getSubstitutions()[pair.first];
-      auto second = RHS.getSubstitutions()[pair.second];
-      VERIFY(first.compare(second, ctx) > 0, "Order violation");
-
+      VERIFY(first.compare(pair.second, ctx) > 0, "Order violation");
       VERIFY(lhsVisited.insert(pair.first).second, "Duplicate substitutions");
-      VERIFY(rhsVisited.insert(pair.second).second, "Duplicate substitutions");
     }
 
     for (const auto &pair : ConcreteTypes) {
@@ -93,14 +87,14 @@ namespace {
     
   public:
     /// Mismatches where both sides are type parameters and the left hand
-    /// side orders before the right hand side. The integers index the
-    /// LHSSubstitutions and RHSSubstitutions arrays, respectively.
-    SmallVector<std::pair<unsigned, unsigned>, 1> SameTypesOnLHS;
+    /// side orders before the right hand side. The integer is an index
+    /// into the LHSSubstitutions array.
+    SmallVector<std::pair<unsigned, Term>, 1> SameTypesOnLHS;
 
     /// Mismatches where both sides are type parameters and the left hand
-    /// side orders after the right hand side. The integers index the
-    /// RHSSubstitutions and LHSSubstitutions arrays, respectively.
-    SmallVector<std::pair<unsigned, unsigned>, 1> SameTypesOnRHS;
+    /// side orders after the right hand side. The integer is an index
+    /// into the RHSSubstitutions array.
+    SmallVector<std::pair<unsigned, Term>, 1> SameTypesOnRHS;
 
     /// Mismatches where the left hand side is concrete and the right hand
     /// side is a type parameter. The integer is an index into the
@@ -139,9 +133,9 @@ namespace {
 
         int compare = lhsTerm.compare(rhsTerm, Context);
         if (compare < 0) {
-          SameTypesOnLHS.emplace_back(rhsIndex, lhsIndex);
+          SameTypesOnLHS.emplace_back(rhsIndex, lhsTerm);
         } else if (compare > 0) {
-          SameTypesOnRHS.emplace_back(lhsIndex, rhsIndex);
+          SameTypesOnRHS.emplace_back(lhsIndex, rhsTerm);
         } else {
           assert(lhsTerm == rhsTerm);
         }
@@ -196,20 +190,16 @@ namespace {
 
       for (const auto &pair : SameTypesOnLHS) {
         auto first = RHSSubstitutions[pair.first];
-        auto second = LHSSubstitutions[pair.second];
-        VERIFY(first.compare(second, Context) > 0, "Order violation");
+        VERIFY(first.compare(pair.second, Context) > 0, "Order violation");
 
         VERIFY(rhsVisited.insert(pair.first).second, "Duplicate substitution");
-        VERIFY(lhsVisited.insert(pair.second).second, "Duplicate substitution");
       }
 
       for (const auto &pair : SameTypesOnRHS) {
         auto first = LHSSubstitutions[pair.first];
-        auto second = RHSSubstitutions[pair.second];
-        VERIFY(first.compare(second, Context) > 0, "Order violation");
+        VERIFY(first.compare(pair.second, Context) > 0, "Order violation");
 
         VERIFY(lhsVisited.insert(pair.first).second, "Duplicate substitution");
-        VERIFY(rhsVisited.insert(pair.second).second, "Duplicate substitution");
       }
 
       for (const auto &pair : ConcreteTypesOnLHS) {
@@ -232,17 +222,13 @@ namespace {
       out << "Abstract differences with LHS < RHS:\n";
       for (const auto &pair : SameTypesOnLHS) {
         out << "- " << RHSSubstitutions[pair.first] << " (#";
-        out << pair.first << ") -> ";
-        out << LHSSubstitutions[pair.second] << " (#";
-        out << pair.second << ")\n";
+        out << pair.first << ") -> " << pair.second << "\n";
       }
 
       out << "Abstract differences with RHS < LHS:\n";
       for (const auto &pair : SameTypesOnRHS) {
         out << "- " << LHSSubstitutions[pair.first] << " (#";
-        out << pair.first << ") -> ";
-        out << RHSSubstitutions[pair.second] << " (#";
-        out << pair.second << ")\n";
+        out << pair.first << ") -> " << pair.second << "\n";
       }
 
       out << "Concrete differences with LHS < RHS:\n";
@@ -266,16 +252,14 @@ namespace {
 }
 
 static TypeDifference
-computeMeet(Symbol symbol, Symbol otherSymbol,
-            const llvm::SmallVector<std::pair<unsigned, unsigned>, 1> &sameTypes,
-            const llvm::SmallVector<std::pair<unsigned, Symbol>, 1> &concreteTypes,
-            RewriteContext &ctx) {
-  assert(symbol.getKind() == otherSymbol.getKind());
-
+buildTypeDifference(
+    Symbol symbol,
+    const llvm::SmallVector<std::pair<unsigned, Term>, 1> &sameTypes,
+    const llvm::SmallVector<std::pair<unsigned, Symbol>, 1> &concreteTypes,
+    RewriteContext &ctx) {
   auto &astCtx = ctx.getASTContext();
 
   SmallVector<Term, 2> resultSubstitutions;
-  SmallVector<std::pair<unsigned, unsigned>, 1> remappedSameTypes;
 
   auto nextSubstitution = [&](Term t) -> Type {
     unsigned index = resultSubstitutions.size();
@@ -286,18 +270,14 @@ computeMeet(Symbol symbol, Symbol otherSymbol,
 
   auto type = symbol.getConcreteType();
   auto substitutions = symbol.getSubstitutions();
-  auto otherSubstitutions = otherSymbol.getSubstitutions();
 
   Type resultType = type.transformRec([&](Type t) -> Optional<Type> {
     if (t->is<GenericTypeParamType>()) {
       unsigned index = RewriteContext::getGenericParamIndex(t);
 
       for (const auto &pair : sameTypes) {
-        if (pair.first == index) {
-          remappedSameTypes.emplace_back(pair.first,
-                                         resultSubstitutions.size());
-          return nextSubstitution(otherSubstitutions[pair.second]);
-        }
+        if (pair.first == index)
+          return nextSubstitution(pair.second);
       }
 
       for (const auto &pair : concreteTypes) {
@@ -334,7 +314,6 @@ computeMeet(Symbol symbol, Symbol otherSymbol,
       return Symbol::forConcreteType(CanType(resultType),
                                      resultSubstitutions, ctx);
     case Symbol::Kind::ConcreteConformance:
-      assert(symbol.getProtocol() == otherSymbol.getProtocol());
       return Symbol::forConcreteConformance(CanType(resultType),
                                             resultSubstitutions,
                                             symbol.getProtocol(),
@@ -343,10 +322,10 @@ computeMeet(Symbol symbol, Symbol otherSymbol,
       break;
     }
 
-    llvm::report_fatal_error("Bad symbol kind");
+    llvm_unreachable("Bad symbol kind");
   }();
 
-  return {symbol, resultSymbol, remappedSameTypes, concreteTypes};
+  return {symbol, resultSymbol, sameTypes, concreteTypes};
 }
 
 unsigned
@@ -425,16 +404,16 @@ RewriteSystem::computeTypeDifference(Symbol lhs, Symbol rhs,
 
   matcher.verify();
 
-  auto lhsMeetRhs = computeMeet(lhs, rhs,
-                                matcher.SameTypesOnRHS,
-                                matcher.ConcreteTypesOnRHS,
-                                Context);
+  auto lhsMeetRhs = buildTypeDifference(lhs,
+                                        matcher.SameTypesOnRHS,
+                                        matcher.ConcreteTypesOnRHS,
+                                        Context);
   lhsMeetRhs.verify(Context);
 
-  auto rhsMeetLhs = computeMeet(rhs, lhs,
-                                matcher.SameTypesOnLHS,
-                                matcher.ConcreteTypesOnLHS,
-                                Context);
+  auto rhsMeetLhs = buildTypeDifference(rhs,
+                                        matcher.SameTypesOnLHS,
+                                        matcher.ConcreteTypesOnLHS,
+                                        Context);
   rhsMeetLhs.verify(Context);
 
   bool isConflict = (matcher.ConcreteConflicts.size() > 0);
@@ -458,10 +437,10 @@ RewriteSystem::computeTypeDifference(Symbol lhs, Symbol rhs,
     // The meet operation should be idempotent.
     {
       // (LHS ∧ (LHS ∧ RHS)) == (LHS ∧ RHS)
-      auto lhsMeetLhsMeetRhs = computeMeet(lhs, lhsMeetRhs.RHS,
-                                           lhsMeetRhs.SameTypes,
-                                           lhsMeetRhs.ConcreteTypes,
-                                           Context);
+      auto lhsMeetLhsMeetRhs = buildTypeDifference(lhs,
+                                                   lhsMeetRhs.SameTypes,
+                                                   lhsMeetRhs.ConcreteTypes,
+                                                   Context);
 
       lhsMeetLhsMeetRhs.verify(Context);
 
@@ -481,10 +460,10 @@ RewriteSystem::computeTypeDifference(Symbol lhs, Symbol rhs,
 
     {
       // (RHS ∧ (RHS ∧ LHS)) == (RHS ∧ LHS)
-      auto rhsMeetRhsMeetRhs = computeMeet(rhs, rhsMeetLhs.RHS,
-                                           rhsMeetLhs.SameTypes,
-                                           rhsMeetLhs.ConcreteTypes,
-                                           Context);
+      auto rhsMeetRhsMeetRhs = buildTypeDifference(rhs,
+                                                   rhsMeetLhs.SameTypes,
+                                                   rhsMeetLhs.ConcreteTypes,
+                                                   Context);
 
       rhsMeetRhsMeetRhs.verify(Context);
 

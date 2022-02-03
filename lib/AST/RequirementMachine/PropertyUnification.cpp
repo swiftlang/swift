@@ -458,7 +458,7 @@ void PropertyMap::addConcreteTypeProperty(
     for (const auto &pair : difference.SameTypes) {
       // Both sides are type parameters; add a same-type requirement.
       MutableTerm lhsTerm(difference.LHS.getSubstitutions()[pair.first]);
-      MutableTerm rhsTerm(difference.RHS.getSubstitutions()[pair.second]);
+      MutableTerm rhsTerm(pair.second);
 
       if (debug) {
         llvm::dbgs() << "%% Induced rule " << lhsTerm

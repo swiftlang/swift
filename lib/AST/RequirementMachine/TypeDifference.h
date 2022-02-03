@@ -15,6 +15,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Symbol.h"
+#include "Term.h"
 
 #ifndef TYPE_DIFFERENCE_H_
 #define TYPE_DIFFERENCE_H_
@@ -30,7 +31,6 @@ namespace swift {
 namespace rewriting {
 
 class RewriteContext;
-class Term;
 
 /// Describes transformations that turn LHS into RHS. There are two kinds of
 /// transformations:
@@ -43,14 +43,14 @@ struct TypeDifference {
 
   /// A pair (N1, N2) where N1 is an index into LHS.getSubstitutions() and
   /// N2 is an index into RHS.getSubstitutions().
-  SmallVector<std::pair<unsigned, unsigned>, 1> SameTypes;
+  SmallVector<std::pair<unsigned, Term>, 1> SameTypes;
 
   /// A pair (N1, C2) where N1 is an index into LHS.getSubstitutions() and
   /// C2 is a concrete type symbol.
   SmallVector<std::pair<unsigned, Symbol>, 1> ConcreteTypes;
 
   TypeDifference(Symbol lhs, Symbol rhs,
-                 SmallVector<std::pair<unsigned, unsigned>, 1> sameTypes,
+                 SmallVector<std::pair<unsigned, Term>, 1> sameTypes,
                  SmallVector<std::pair<unsigned, Symbol>, 1> concreteTypes)
     : LHS(lhs), RHS(rhs), SameTypes(sameTypes), ConcreteTypes(concreteTypes) {}
 
