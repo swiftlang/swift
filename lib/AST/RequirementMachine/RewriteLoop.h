@@ -353,9 +353,6 @@ struct RewritePathEvaluator {
   applyRelation(const RewriteStep &step,
                 const RewriteSystem &system);
 
-  void applyConcreteConformance(const RewriteStep &step,
-                                const RewriteSystem &system);
-
   void dump(llvm::raw_ostream &out) const;
 };
 
