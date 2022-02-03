@@ -26,8 +26,10 @@ class raw_ostream;
 namespace swift {
 class DeclContext;
 class ModuleDecl;
+class VarDecl;
 class NominalTypeDecl;
 class SubstitutionMap;
+class AbstractFunctionDecl;
 
 /// Determine whether the given types are (canonically) equal, declared here
 /// to avoid having to include Types.h.
@@ -35,6 +37,11 @@ bool areTypesEqual(Type type1, Type type2);
 
 /// Determine whether the given type is suitable as a concurrent value type.
 bool isSendableType(ModuleDecl *module, Type type);
+
+/// Determines if the 'let' can be read from anywhere within the given module,
+/// regardless of the isolation or async-ness of the context in which
+/// the var is read.
+bool isLetAccessibleAnywhere(const ModuleDecl *fromModule, VarDecl *let);
 
 /// Describes the actor isolation of a given declaration, which determines
 /// the actors with which it can interact.
@@ -168,6 +175,9 @@ ActorIsolation getActorIsolation(ValueDecl *value);
 
 /// Determine how the given declaration context is isolated.
 ActorIsolation getActorIsolationOfContext(DeclContext *dc);
+
+/// Determines whether this function's body uses flow-sensitive isolation.
+bool usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn);
 
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 

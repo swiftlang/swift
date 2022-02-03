@@ -197,7 +197,7 @@ distributed actor DijonMustard {
 
   func f() {} // expected-note {{distributed actor-isolated instance method 'f()' declared here}}
 
-  nonisolated convenience init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+  nonisolated convenience init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
     self.init(system: conv2)
   }
 }
