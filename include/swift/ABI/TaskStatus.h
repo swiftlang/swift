@@ -176,7 +176,9 @@ public:
   TaskGroupTaskStatusRecord(AsyncTask *child)
       : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
         FirstChild(child),
-        LastChild(child) {}
+        LastChild(child) {
+    assert(!LastChild || !LastChild->childFragment()->getNextChild());
+  }
 
   TaskGroup *getGroup() { return reinterpret_cast<TaskGroup *>(this); }
 
