@@ -18,7 +18,6 @@ let _: @differentiable(reverse) (Float) throws -> Float
 
 struct NonDiffType { var x: Int }
 
-// FIXME: Properly type-check parameters and the result's differentiability
 // expected-error @+1 {{parameter type 'NonDiffType' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 let _: @differentiable(reverse) (NonDiffType) -> Float
 
@@ -40,6 +39,12 @@ let _: @differentiable(reverse) (Float) -> NonDiffType
 let _: @differentiable(_linear) (Float) -> NonDiffType
 
 let _: @differentiable(_linear) (Float) -> Float
+
+// expected-error @+1 {{'@differentiable' function type cannot have both an 'inout' parameter and a differentiable result}}
+let _: @differentiable(reverse) (inout Float) -> Float
+
+// expected-error @+1 {{'@differentiable' function type cannot have both an 'inout' parameter and a differentiable result}}
+let _: @differentiable(_linear) (inout Float) -> Float
 
 // expected-error @+1 {{result type '@differentiable(reverse) (U) -> Float' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 func test1<T: Differentiable, U: Differentiable>(_: @differentiable(reverse) (T) -> @differentiable(reverse) (U) -> Float) {}
