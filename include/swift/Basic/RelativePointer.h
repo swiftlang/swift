@@ -454,6 +454,17 @@ public:
     return reinterpret_cast<PointerTy>(absolute);
   }
 
+  /// Apply the offset to a parameter, instead of `this`.
+  PointerTy getRelative(void *base) const & {
+    // Check for null.
+    if (Nullable && RelativeOffset == 0)
+      return nullptr;
+
+    // The value is addressed relative to `base`.
+    uintptr_t absolute = detail::applyRelativeOffset(base, RelativeOffset);
+    return reinterpret_cast<PointerTy>(absolute);
+  }
+
   /// A zero relative offset encodes a null reference.
   bool isNull() const & {
     return RelativeOffset == 0;
@@ -486,6 +497,10 @@ public:
 
   const typename super::ValueTy *operator->() const & {
     return this->get();
+  }
+
+  const typename super::ValueTy* getRelative(void *base) const & {
+    return this->super::getRelative(base);
   }
 
   using super::isNull;

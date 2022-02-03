@@ -1228,8 +1228,13 @@ bool DeclContext::isAsyncContext() const {
   case DeclContextKind::GenericTypeDecl:
     return false;
   case DeclContextKind::FileUnit:
+    if (const SourceFile *sf = dyn_cast<SourceFile>(this))
+      return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
+             sf->isAsyncTopLevelSourceFile();
+    return false;
   case DeclContextKind::TopLevelCodeDecl:
-    return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel;
+    return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
+           getParent()->isAsyncContext();
   case DeclContextKind::AbstractClosureExpr:
     return cast<AbstractClosureExpr>(this)->isBodyAsync();
   case DeclContextKind::AbstractFunctionDecl: {

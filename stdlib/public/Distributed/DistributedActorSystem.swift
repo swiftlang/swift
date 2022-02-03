@@ -154,7 +154,7 @@ extension DistributedActorSystem {
   public func executeDistributedTarget<Act, ResultHandler>(
     on actor: Act,
     mangledTargetName: String,
-    invocationDecoder: inout InvocationDecoder,
+    invocationDecoder: InvocationDecoder,
     handler: ResultHandler
   ) async throws where Act: DistributedActor,
                        // Act.ID == ActorID, // FIXME(distributed): can we bring this back?
@@ -281,48 +281,15 @@ extension DistributedActorSystem {
       _openExistential(returnTypeFromTypeInfo, do: destroyReturnTypeBuffer)
     }
 
-    // Prepare the buffer to decode the argument values into
-    let hargs = HeterogeneousBuffer.allocate(forTypes: argumentTypes)
-    defer {
-      hargs.deinitialize()
-      hargs.deallocate()
-    }
-
     do {
-      // Decode the invocation and pack arguments into the h-buffer
-
-      // TODO(distributed): decode the generics info
-      // TODO(distributed): move this into the IRGen synthesized funcs, so we don't need hargs at all and can specialize the decodeNextArgument calls
-      do {
-        var argumentIdx = 0
-        for unsafeRawArgPointer in hargs {
-          guard argumentIdx < paramCount else {
-            throw ExecuteDistributedTargetError(
-              message: "Unexpected attempt to decode more parameters than expected: \(argumentIdx + 1)")
-          }
-          let argumentType = argumentTypes[argumentIdx]
-          argumentIdx += 1
-
-          // FIXME(distributed): func doDecode<Arg: SerializationRequirement>(_: Arg.Type) throws {
-          // FIXME:     but how would we call this...?
-          // FIXME:     > type 'Arg' constrained to non-protocol, non-class type 'Self.Invocation.SerializationRequirement'
-          func doDecodeArgument<Arg>(_: Arg.Type) throws {
-            let unsafeArgPointer = unsafeRawArgPointer
-              .bindMemory(to: Arg.self, capacity: 1)
-            try invocationDecoder.decodeNextArgument(Arg.self, into: unsafeArgPointer)
-          }
-          try _openExistential(argumentType, do: doDecodeArgument)
-        }
-      }
-
       let returnType = try invocationDecoder.decodeReturnType() ?? returnTypeFromTypeInfo
-      // let errorType = try invocation.decodeErrorType() // TODO: decide how to use?
+      // let errorType = try invocation.decodeErrorType() // TODO(distributed): decide how to use?
 
       // Execute the target!
       try await _executeDistributedTarget(
         on: actor,
         mangledTargetName, UInt(mangledTargetName.count),
-        argumentBuffer: hargs.buffer._rawValue, // TODO(distributed): pass the invocationDecoder instead, so we can decode inside IRGen directly into the argument explosion
+        argumentDecoder: invocationDecoder,
         argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
         resultBuffer: resultBuffer._rawValue,
         substitutions: UnsafeRawPointer(substitutionsBuffer),
@@ -345,7 +312,7 @@ extension DistributedActorSystem {
 func _executeDistributedTarget(
   on actor: AnyObject, // DistributedActor
   _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
-  argumentBuffer: Builtin.RawPointer, // HeterogeneousBuffer of arguments
+  argumentDecoder: AnyObject, // concrete type for `InvocationDecoder`
   argumentTypes: Builtin.RawPointer,
   resultBuffer: Builtin.RawPointer,
   substitutions: UnsafeRawPointer?,
@@ -433,7 +400,7 @@ public protocol DistributedTargetInvocationEncoder {
 
 /// Decoder that must be provided to `executeDistributedTarget` and is used
 /// by the Swift runtime to decode arguments of the invocation.
-public protocol DistributedTargetInvocationDecoder {
+public protocol DistributedTargetInvocationDecoder : AnyObject {
   associatedtype SerializationRequirement
 
   func decodeGenericSubstitutions() throws -> [Any.Type]
@@ -451,28 +418,11 @@ public protocol DistributedTargetInvocationDecoder {
 //  /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
 //  /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
 //  /// performs the actual distributed (local) instance method invocation.
-//  mutating func decodeNextArgument<Argument: SerializationRequirement>(
-//      into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-//  ) throws
-
-  // FIXME(distributed): remove this since it must have the ': SerializationRequirement'
-  mutating func decodeNextArgument<Argument>(
-    _ argumentType: Argument.Type,
-    into pointer: UnsafeMutablePointer<Argument> // pointer to our hbuffer
-  ) throws
+//  mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
 
   func decodeErrorType() throws -> Any.Type?
 
   func decodeReturnType() throws -> Any.Type?
-}
-
-///
-/// It will be called exactly `N` times where `N` is the known number of arguments
-/// to the target invocation.
-@available(SwiftStdlib 5.6, *)
-public protocol DistributedTargetInvocationArgumentDecoder {
-
-
 }
 
 @available(SwiftStdlib 5.6, *)

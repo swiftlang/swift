@@ -2834,15 +2834,9 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     ValueOwnership ownership = ValueOwnership::Default;
 
-    auto *nestedRepr = eltTypeRepr;
-
     // Look through parens here; other than parens, specifiers
     // must appear at the top level of a parameter type.
-    while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
-      if (!tupleRepr->isParenType())
-        break;
-      nestedRepr = tupleRepr->getElementType(0);
-    }
+    auto *nestedRepr = eltTypeRepr->getWithoutParens();
 
     bool isolated = false;
     bool compileTimeConst = false;

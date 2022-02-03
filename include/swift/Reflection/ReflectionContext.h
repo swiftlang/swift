@@ -219,8 +219,9 @@ public:
       for (unsigned I = 0; I < NumSect; ++I) {
         auto S = reinterpret_cast<typename T::Section *>(
             SectionsBuf + (I * sizeof(typename T::Section)));
-        if (strncmp(S->sectname, Name.data(), strlen(Name.data())) != 0)
+        if (strncmp(S->sectname, Name.data(), sizeof(S->sectname)) != 0)
           continue;
+
         auto RemoteSecStart = S->addr + Slide;
         auto LocalSectBuf =
             this->getReader().readBytes(RemoteAddress(RemoteSecStart), S->size);
@@ -247,13 +248,16 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref));
     auto ReflStrMdSec = findMachOSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
+    auto ConformMdSec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
         BuiltinTySec.first == nullptr &&
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
-        ReflStrMdSec.first == nullptr)
+        ReflStrMdSec.first == nullptr &&
+        ConformMdSec.first == nullptr)
       return false;
 
     ReflectionInfo info = {
@@ -262,7 +266,8 @@ public:
         {BuiltinTySec.first, BuiltinTySec.second},
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second}};
+        {ReflStrMdSec.first, ReflStrMdSec.second},
+        {ConformMdSec.first, ConformMdSec.second}};
 
     this->addReflectionInfo(info);
 
@@ -365,13 +370,16 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref));
     auto ReflStrMdSec = findCOFFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
+    auto ConformMdSec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
         BuiltinTySec.first == nullptr &&
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
-        ReflStrMdSec.first == nullptr)
+        ReflStrMdSec.first == nullptr &&
+        ConformMdSec.first == nullptr)
       return false;
 
     ReflectionInfo Info = {
@@ -380,7 +388,8 @@ public:
         {BuiltinTySec.first, BuiltinTySec.second},
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second}};
+        {ReflStrMdSec.first, ReflStrMdSec.second},
+        {ConformMdSec.first, ConformMdSec.second}};
     this->addReflectionInfo(Info);
     return true;
   }
@@ -544,6 +553,8 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref));
     auto ReflStrMdSec = findELFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
+    auto ConformMdSec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
 
     if (Error)
       return false;
@@ -555,7 +566,8 @@ public:
         BuiltinTySec.first == nullptr &&
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
-        ReflStrMdSec.first == nullptr)
+        ReflStrMdSec.first == nullptr &&
+        ConformMdSec.first == nullptr)
       return false;
 
     ReflectionInfo info = {
@@ -564,7 +576,8 @@ public:
         {BuiltinTySec.first, BuiltinTySec.second},
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second}};
+        {ReflStrMdSec.first, ReflStrMdSec.second},
+        {ConformMdSec.first, ConformMdSec.second}};
 
     this->addReflectionInfo(info);
     return true;
@@ -665,7 +678,9 @@ public:
     auto Sections = {
         ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
         ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
-        ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr};
+        ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr,
+        ReflectionSectionKind::conform
+    };
 
     llvm::SmallVector<std::pair<RemoteRef<void>, uint64_t>, 6> Pairs;
     for (auto Section : Sections) {
@@ -687,7 +702,8 @@ public:
     ReflectionInfo Info = {
         {Pairs[0].first, Pairs[0].second}, {Pairs[1].first, Pairs[1].second},
         {Pairs[2].first, Pairs[2].second}, {Pairs[3].first, Pairs[3].second},
-        {Pairs[4].first, Pairs[4].second}, {Pairs[5].first, Pairs[5].second}};
+        {Pairs[4].first, Pairs[4].second}, {Pairs[5].first, Pairs[5].second},
+        {Pairs[6].first, Pairs[6].second}};
     this->addReflectionInfo(Info);
     return true;
   }

@@ -1091,6 +1091,43 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Obtain the invocation decoder associated with the given distributed actor.
+class GetDistributedActorInvocationDecoderRequest :
+  public SimpleRequest<GetDistributedActorInvocationDecoderRequest,
+                       NominalTypeDecl *(NominalTypeDecl *),
+                       RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Obtain the method that could be used to decode argument values passed
+/// to a particular actor invocation type.
+class GetDistributedActorArgumentDecodingMethodRequest :
+  public SimpleRequest<GetDistributedActorArgumentDecodingMethodRequest,
+                       FuncDecl *(NominalTypeDecl *),
+                       RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///
@@ -3241,6 +3278,21 @@ private:
 
   FunctionType::ExtInfo evaluate(
       Evaluator &evaluator, ClosureExpr *closure) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class GetSourceFileAsyncNode
+    : public SimpleRequest<GetSourceFileAsyncNode, ASTNode(const SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ASTNode evaluate(Evaluator &evaluator, const SourceFile *) const;
 
 public:
   bool isCached() const { return true; }

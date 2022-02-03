@@ -44,7 +44,7 @@ void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
 ///    on: AnyObject,
 ///    _ targetName: UnsafePointer<UInt8>,
 ///    _ targetNameLength: UInt,
-///    argumentBuffer: Builtin.RawPointer,
+///    argumentDecoder: AnyObject,
 ///    argumentTypes: UnsafeBufferPointer<Any.Type>,
 ///    resultBuffer: Builtin.RawPointer,
 ///    substitutions: UnsafeRawPointer?,
@@ -54,7 +54,7 @@ void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
 using TargetExecutorSignature =
     AsyncSignature<void(/*on=*/DefaultActor *,
                         /*targetName=*/const char *, /*targetNameSize=*/size_t,
-                        /*argumentBuffer=*/void *,
+                        /*argumentDecoder=*/HeapObject *,
                         /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
                         /*substitutions=*/void *,
@@ -70,7 +70,7 @@ TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 
 /// Accessor takes:
 ///   - an async context
-///   - an argument buffer as a raw pointer
+///   - an argument decoder as an instance of type conforming to `InvocationDecoder`
 ///   - a list of all argument types (with substitutions applied)
 ///   - a result buffer as a raw pointer
 ///   - a list of substitutions
@@ -78,7 +78,7 @@ TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 ///   - a number of witness tables in the buffer
 ///   - a reference to an actor to execute method on.
 using DistributedAccessorSignature =
-    AsyncSignature<void(/*argumentBuffer=*/void *,
+    AsyncSignature<void(/*argumentDecoder=*/HeapObject *,
                         /*argumentTypes=*/const Metadata *const *,
                         /*resultBuffer=*/void *,
                         /*substitutions=*/void *,
@@ -110,7 +110,7 @@ void ::swift_distributed_execute_target(
     SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     DefaultActor *actor,
     const char *targetNameStart, size_t targetNameLength,
-    void *argumentBuffer,
+    HeapObject *argumentDecoder,
     const Metadata *const *argumentTypes,
     void *resultBuffer,
     void *substitutions,
@@ -150,7 +150,7 @@ void ::swift_distributed_execute_target(
       swift_distributed_execute_target_resume);
 
   accessorEntry(calleeContext,
-                argumentBuffer, argumentTypes,
+                argumentDecoder, argumentTypes,
                 resultBuffer,
                 substitutions,
                 witnessTables,

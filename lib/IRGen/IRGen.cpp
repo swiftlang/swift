@@ -27,6 +27,7 @@
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
+#include "swift/Basic/MD5Stream.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
@@ -69,7 +70,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
-#include "llvm/Support/MD5.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Target/TargetMachine.h"
@@ -377,30 +377,6 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     }
   }
 }
-
-namespace {
-/// An output stream which calculates the MD5 hash of the streamed data.
-class MD5Stream : public llvm::raw_ostream {
-private:
-
-  uint64_t Pos = 0;
-  llvm::MD5 Hash;
-
-  void write_impl(const char *Ptr, size_t Size) override {
-    Hash.update(ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(Ptr), Size));
-    Pos += Size;
-  }
-
-  uint64_t current_pos() const override { return Pos; }
-
-public:
-
-  void final(MD5::MD5Result &Result) {
-    flush();
-    Hash.final(Result);
-  }
-};
-} // end anonymous namespace
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
 /// and options which influence the compilation.

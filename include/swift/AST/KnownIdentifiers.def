@@ -289,7 +289,10 @@ IDENTIFIER(system)
 IDENTIFIER(target)
 IDENTIFIER(throwing)
 IDENTIFIER(using)
+IDENTIFIER(InvocationDecoder)
 IDENTIFIER(whenLocal)
+IDENTIFIER(decodeNextArgument)
+IDENTIFIER(SerializationRequirement)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

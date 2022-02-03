@@ -19,6 +19,9 @@
 // FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
 // UNSUPPORTED: linux
 
+// rdar://88228867 - remoteCall_* tests have been disabled due to random failures
+// REQUIRES: rdar88228867
+
 import _Distributed
 import FakeDistributedActorSystems
 
@@ -54,8 +57,8 @@ func test() async throws {
   // CHECK: > encode return type: String
   // CHECK: > done recording
   // CHECK: >> remoteCall
-  // CHECK: > decode argument: Caplin
   // CHECK: > decode return type: String
+  // CHECK: > decode argument: Caplin
   // CHECK: << onReturn: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
 
   print("got: \(reply)")

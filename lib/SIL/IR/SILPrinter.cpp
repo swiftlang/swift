@@ -791,6 +791,12 @@ public:
     // the block header.
     printBlockArgumentUses(BB);
 
+    // If the basic block has a name available, print it as well
+    auto debugName = BB->getDebugName();
+    if (debugName.hasValue()) {
+      *this << "// " << debugName.getValue() << '\n';
+    }
+
     // Then print the name of our block, the arguments, and the block colon.
     *this << Ctx.getID(BB);
     printBlockArguments(BB);
@@ -1898,6 +1904,18 @@ public:
       *this << "[allows_diagnostics] ";
     if (I->isLexical())
       *this << "[lexical] ";
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMarkMustCheckInst(MarkMustCheckInst *I) {
+    using CheckKind = MarkMustCheckInst::CheckKind;
+    switch (I->getCheckKind()) {
+    case CheckKind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case CheckKind::NoImplicitCopy:
+      *this << "[no_implicit_copy] ";
+      break;
+    }
     *this << getIDAndType(I->getOperand());
   }
 
@@ -3841,6 +3859,11 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
                },
                [&] { OS << ", "; });
   }
+}
+
+void KeyPathPatternComponent::print(SILPrintContext &ctxt) const {
+  SILPrinter printer(ctxt);
+  printer.printKeyPathPatternComponent(*this);
 }
 
 //===----------------------------------------------------------------------===//

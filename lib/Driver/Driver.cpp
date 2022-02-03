@@ -812,7 +812,8 @@ static bool computeIncremental(const llvm::opt::InputArgList *ArgList,
 
   if (ShowIncrementalBuildDecisions) {
     llvm::outs() << "Incremental compilation has been disabled, because it "
-                 << ReasonToDisable;
+                 << ReasonToDisable
+                 << "\n";
   }
   return false;
 }

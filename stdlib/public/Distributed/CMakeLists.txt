@@ -19,7 +19,6 @@ add_swift_target_library(swift_Distributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   DistributedActor.swift
   DistributedActorSystem.swift
   DistributedMetadata.swift
-  HeterogeneousBuffer.swift
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc

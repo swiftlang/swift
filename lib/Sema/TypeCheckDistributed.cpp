@@ -378,22 +378,8 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
   (void)decl->getDistributedActorIDProperty();
 }
 
-Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
-  assert(actor->isDistributedActor());
-  auto &ctx = actor->getASTContext();
-
-  auto protocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-  if (!protocol)
-    return ErrorType::get(ctx);
-
-  // Dig out the actor system type.
-  auto module = actor->getParentModule();
-  Type selfType = actor->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, protocol);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_ActorSystem);
-}
-
-Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
+static Type getAssociatedTypeOfDistributedSystem(NominalTypeDecl *actor,
+                                                 Identifier member) {
   assert(actor->isDistributedActor());
   auto &ctx = actor->getASTContext();
 
@@ -410,9 +396,9 @@ Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   if (!actorSystemProtocol)
     return ErrorType::get(ctx);
 
-  AssociatedTypeDecl *idAssocTypeDecl =
-      actorSystemProtocol->getAssociatedType(ctx.Id_ActorID);
-  if (!idAssocTypeDecl)
+  AssociatedTypeDecl *assocTypeDecl =
+      actorSystemProtocol->getAssociatedType(member);
+  if (!assocTypeDecl)
     return ErrorType::get(ctx);
 
   auto module = actor->getParentModule();
@@ -420,10 +406,141 @@ Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   auto conformance = module->lookupConformance(selfType, actorProtocol);
   Type dependentType = actorProtocol->getSelfInterfaceType();
   dependentType = DependentMemberType::get(dependentType, actorSystemDecl);
-  dependentType = DependentMemberType::get(dependentType, idAssocTypeDecl);
-  auto t = dependentType.subst(
-      SubstitutionMap::getProtocolSubstitutions(
-        actorProtocol, selfType, conformance));
+  dependentType = DependentMemberType::get(dependentType, assocTypeDecl);
 
-  return t;
+  return dependentType.subst(SubstitutionMap::getProtocolSubstitutions(
+      actorProtocol, selfType, conformance));
+}
+
+Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
+  assert(actor->isDistributedActor());
+  auto &ctx = actor->getASTContext();
+
+  auto protocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+  if (!protocol)
+    return ErrorType::get(ctx);
+
+  // Dig out the actor system type.
+  auto module = actor->getParentModule();
+  Type selfType = actor->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, protocol);
+  return conformance.getTypeWitnessByName(selfType, ctx.Id_ActorSystem);
+}
+
+Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
+  auto &ctx = actor->getASTContext();
+  return getAssociatedTypeOfDistributedSystem(actor, ctx.Id_ActorID);
+}
+
+Type ASTContext::getDistributedSerializationRequirementType(
+    NominalTypeDecl *nominal) {
+  return getAssociatedTypeOfDistributedSystem(nominal,
+                                              Id_SerializationRequirement);
+}
+
+NominalTypeDecl *
+ASTContext::getDistributedActorInvocationDecoder(NominalTypeDecl *actor) {
+  if (!actor->isDistributedActor())
+    return nullptr;
+
+  return evaluateOrDefault(
+      evaluator, GetDistributedActorInvocationDecoderRequest{actor}, nullptr);
+}
+
+NominalTypeDecl *
+GetDistributedActorInvocationDecoderRequest::evaluate(Evaluator &evaluator,
+                                                      NominalTypeDecl *actor) const {
+  auto &ctx = actor->getASTContext();
+  auto decoderTy =
+      getAssociatedTypeOfDistributedSystem(actor, ctx.Id_InvocationDecoder);
+  return decoderTy->hasError() ? nullptr : decoderTy->getAnyNominal();
+}
+
+FuncDecl *ASTContext::getDistributedActorArgumentDecodingMethod(NominalTypeDecl *actor) {
+  if (!actor->isDistributedActor())
+    return nullptr;
+
+  return evaluateOrDefault(
+    evaluator, GetDistributedActorArgumentDecodingMethodRequest{actor}, nullptr);
+}
+
+
+FuncDecl *
+GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
+                                                           NominalTypeDecl *actor) const {
+  auto &ctx = actor->getASTContext();
+
+  auto *decoder = ctx.getDistributedActorInvocationDecoder(actor);
+  assert(decoder);
+
+  auto decoderTy = decoder->getInterfaceType()->getMetatypeInstanceType();
+
+  auto members = TypeChecker::lookupMember(actor->getDeclContext(), decoderTy,
+                                           DeclNameRef(ctx.Id_decodeNextArgument));
+
+  // typealias SerializationRequirement = any ...
+  auto serializerType = ctx.getDistributedSerializationRequirementType(actor)
+                            ->castTo<ExistentialType>()
+                            ->getConstraintType()
+                            ->getDesugaredType();
+
+  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
+  if (auto composition = serializerType->getAs<ProtocolCompositionType>()) {
+    for (auto member : composition->getMembers()) {
+      if (auto *protocol = member->getAs<ProtocolType>())
+        serializationReqs.insert(protocol->getDecl());
+    }
+  } else {
+    auto protocol = serializerType->castTo<ProtocolType>()->getDecl();
+    serializationReqs.insert(protocol);
+  }
+
+  SmallVector<FuncDecl *, 2> candidates;
+  // Looking for `decodeNextArgument<Arg: <SerializationReq>>() throws -> Arg`
+  for (auto &member : members) {
+    auto *FD = dyn_cast<FuncDecl>(member.getValueDecl());
+    if (!FD || FD->hasAsync() || !FD->hasThrows())
+      continue;
+
+    auto *params = FD->getParameters();
+    // No arguemnts.
+    if (params->size() != 0)
+      continue;
+
+    auto genericParamList = FD->getGenericParams();
+    // A single generic parameter.
+    if (genericParamList->size() != 1)
+      continue;
+
+    auto paramTy = genericParamList->getParams()[0]
+                       ->getInterfaceType()
+                       ->getMetatypeInstanceType();
+
+    // `decodeNextArgument` should return its generic parameter value
+    if (!FD->getResultInterfaceType()->isEqual(paramTy))
+      continue;
+
+    // Let's find out how many serialization requirements does this method cover
+    // e.g. `Codable` is two requirements - `Encodable` and `Decodable`.
+    unsigned numSerializationReqsCovered = llvm::count_if(
+        FD->getGenericRequirements(), [&](const Requirement &requirement) {
+          if (!(requirement.getFirstType()->isEqual(paramTy) &&
+                requirement.getKind() == RequirementKind::Conformance))
+            return 0;
+
+          return serializationReqs.count(requirement.getProtocolDecl()) ? 1 : 0;
+        });
+
+    // If the current method covers all of the serialization requirements,
+    // it's a match. Note that it might also have other requirements, but
+    // we let that go as long as there are no two candidates that differ
+    // only in generic requirements.
+    if (numSerializationReqsCovered == serializationReqs.size())
+      candidates.push_back(FD);
+  }
+
+  // Type-checker should reject any definition of invocation decoder
+  // that doesn't have a correct version of `decodeNextArgument` declared.
+  assert(candidates.size() == 1);
+  return candidates.front();
 }

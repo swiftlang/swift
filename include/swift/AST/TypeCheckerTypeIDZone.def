@@ -112,6 +112,12 @@ SWIFT_REQUEST(TypeChecker, GetDistributedActorIDPropertyRequest, VarDecl *(Nomin
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorSystemPropertyRequest, VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedActorInvocationDecoderRequest,
+              NominalTypeDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedActorArgumentDecodingMethodRequest,
+              FuncDecl *(NominalTypeDecl *),
+              Cache, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GlobalActorInstanceRequest,
               VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
@@ -371,4 +377,7 @@ SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetSourceFileAsyncNode,
+              AwaitExpr *(const SourceFile *),
               Cached, NoLocationInfo)

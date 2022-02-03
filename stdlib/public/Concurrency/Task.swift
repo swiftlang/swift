@@ -100,7 +100,7 @@ extension Task {
   /// depending on the executor's scheduling details.
   ///
   /// If the task throws an error, this property propagates that error.
-  /// Tasks that respond to cancellation by throwing `Task.CancellationError`
+  /// Tasks that respond to cancellation by throwing `CancellationError`
   /// have that error propagated here upon cancellation.
   ///
   /// - Returns: The task's result.
@@ -301,7 +301,7 @@ extension Task where Success == Never, Failure == Never {
   /// The current task's base priority.
   ///
   /// If you access this property outside of any task, this returns nil
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 5.7, *)
   public static var basePriority: TaskPriority? {
     withUnsafeCurrentTask { task in
       // If we are running on behalf of a task, use that task's priority.

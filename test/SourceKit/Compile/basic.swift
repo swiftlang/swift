@@ -4,6 +4,7 @@
 
 // RUN: %sourcekitd-test \
 // RUN:     -shell -- echo "# start" == \
+// RUN:     -shell -- cp %t/t1.1.swift %t/t1.swift == \
 // RUN:     -req=compile -name c1 -- -c %t/t1.swift -module-name TestModule -o %t/out/test.o == \
 // RUN:     -shell -- cp %t/t1.2.swift %t/t1.swift == \
 // RUN:     -shell -- echo "# modified" == \
@@ -44,7 +45,7 @@
 // CHECK-NEXT: {
 // CHECK-NEXT: }
 
-//--- t1.swift
+//--- t1.1.swift
 public func test1() {
   struct English {}
   print("This is just a test")

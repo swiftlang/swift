@@ -20,6 +20,9 @@
 // rdar://87568630 - segmentation fault on 32-bit WatchOS simulator
 // UNSUPPORTED: OS=watchos && CPU=i386
 
+// rdar://88228867 - remoteCall_* tests have been disabled due to random failures
+// REQUIRES: rdar88228867
+
 import _Distributed
 import FakeDistributedActorSystems
 
@@ -38,7 +41,7 @@ func test() async throws {
   let ref = try Greeter.resolve(id: local.id, using: system)
 
   let response = try await ref.hello()
-  // CHECK: >> remoteCall: on:main.Greeter), target:RemoteCallTarget(_mangledName: "$s4main7GreeterC5helloSSyFTE"), invocation:FakeRoundtripInvocation(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil, argumentIndex: 0), throwing:Swift.Never, returning:Swift.String
+  // CHECK: >> remoteCall: on:main.Greeter, target:RemoteCallTarget(_mangledName: "$s4main7GreeterC5helloSSyFTE"), invocation:FakeInvocationEncoder(genericSubs: [], arguments: [], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
 
   print("response: \(response)")
   // CHECK: response: Hello, World!

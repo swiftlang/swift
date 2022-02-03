@@ -5,6 +5,29 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* The compiler now correctly emits warnings for more kinds of expressions where a protocol conformance is used and may be unavailable at runtime. Previously, member reference expressions and type erasing expressions that used potentially unavailable conformances were not diagnosed, leading to potential crashes at runtime.
+
+  ```swift
+  struct Pancake {}
+  protocol Food {}
+
+  extension Food {
+    var isGlutenFree: Bool { false }
+  }
+
+  @available(macOS 12.0, *)
+  extension Pancake: Food {}
+
+  @available(macOS 11.0, *)
+  func eatPancake(_ pancake: Pancake) {
+    if (pancake.isGlutenFree) { // warning: conformance of 'Pancake' to 'Food' is only available in macOS 12.0 or newer
+      eatFood(pancake) // warning: conformance of 'Pancake' to 'Food' is only available in macOS 12.0 or newer
+    }
+  }
+
+  func eatFood(_ food: Food) {}
+  ```
+
 * [SE-0328][]:
 
   Opaque types (expressed with 'some') can now be used in structural positions
@@ -18,6 +41,27 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   ```
 Swift 5.6
 ---------
+
+* [SE-0327][]:
+
+In Swift 5 mode, a warning is now emitted if the default-value expression of an
+instance-member property requires global-actor isolation. For example:
+
+```swift
+@MainActor
+func partyGenerator() -> [PartyMember] { fatalError("todo") }
+
+class Party {
+  @MainActor var members: [PartyMember] = partyGenerator()
+  //                                      ^~~~~~~~~~~~~~~~
+  // warning: expression requiring global actor 'MainActor' cannot
+  //          appear in default-value expression of property 'members'
+}
+```
+
+Previously, the isolation granted by the type checker matched the isolation of
+the property itself, but at runtime that is not guaranteed. In Swift 6, 
+such default-value expressions will become an error if they require isolation.
 
 * Actor isolation checking now understands that `defer` bodies share the isolation of their enclosing function.
 
@@ -8913,6 +8957,7 @@ Swift 1.0
 [SE-0322]: <https://github.com/apple/swift-evolution/blob/main/proposals/0322-temporary-buffers.md>
 [SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 [SE-0323]: <https://github.com/apple/swift-evolution/blob/main/proposals/0323-async-main-semantics.md>
+[SE-0327]: <https://github.com/apple/swift-evolution/blob/main/proposals/0327-actor-initializers.md>
 [SE-0328]: <https://github.com/apple/swift-evolution/blob/main/proposals/0328-structural-opaque-result-types.md>
 [SE-0331]: <https://github.com/apple/swift-evolution/blob/main/proposals/0331-remove-sendable-from-unsafepointer.md>
 [SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>

@@ -3413,6 +3413,22 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
   // Attrs are in the reverse order of the source order. We need to visit them
   // in source order to diagnose the later attribute.
   for (auto *Attr: Attrs) {
+    static StringRef AttrName = "_originallyDefinedIn";
+
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      // This attribute does not make sense on private declarations since
+      // clients can't use them.
+      auto access =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true);
+      if (!access.isPublic()) {
+        diagnoseAndRemoveAttr(Attr,
+                              diag::originally_defined_in_on_non_public,
+                              AttrName, VD->getFormalAccess());
+        continue;
+      }
+    }
+    
     if (!Attr->isActivePlatform(Ctx))
       continue;
     auto AtLoc = Attr->AtLoc;
@@ -3425,7 +3441,6 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
                platformString(Platform));
       return;
     }
-    static StringRef AttrName = "_originallyDefinedIn";
     if (!D->getDeclContext()->isModuleScopeContext()) {
       diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
       return;

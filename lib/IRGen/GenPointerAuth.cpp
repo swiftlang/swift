@@ -442,6 +442,10 @@ static void hashStringForType(IRGenModule &IGM, CanType Ty, raw_ostream &Out,
       hashStringForType(IGM, UnwrappedTy->getCanonicalType(), Out, genericEnv);
       Out << ">";
     }
+  } else if (auto ETy = dyn_cast<ExistentialType>(Ty)) {
+    // Look through existential types
+    hashStringForType(IGM, ETy->getConstraintType()->getCanonicalType(),
+                      Out, genericEnv);
   } else if (auto GTy = dyn_cast<AnyGenericType>(Ty)) {
     // For generic and non-generic value types, use the mangled declaration
     // name, and ignore all generic arguments.

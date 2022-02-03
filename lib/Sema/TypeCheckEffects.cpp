@@ -1492,9 +1492,7 @@ public:
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
     // Top-level code implicitly handles errors.
     return Context(/*handlesErrors=*/true,
-                   /*handlesAsync=*/
-                   D->getASTContext().LangOpts.EnableExperimentalAsyncTopLevel,
-                   None);
+                   /*handlesAsync=*/D->isAsyncContext(), None);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {

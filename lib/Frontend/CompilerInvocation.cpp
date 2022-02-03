@@ -2182,6 +2182,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.InternalizeAtLink = true;
   }
 
+  if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
+    Opts.NoPreallocatedInstantiationCaches = true;
+  }
+
   // Default to disabling swift async extended frame info on anything but
   // darwin. Other platforms are unlikely to have support for extended frame
   // pointer information.

@@ -333,7 +333,7 @@ private:
   /// Retrieve generic signature where this parameter originates from.
   GenericSignature getSignature(ConstraintLocator *locator);
 
-  void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
+  void maybeEmitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
 
   /// If this is a failure in conditional requirement, retrieve
   /// conformance information.

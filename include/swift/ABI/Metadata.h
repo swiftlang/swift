@@ -540,6 +540,9 @@ namespace {
 
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
 
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalTypeContextDescriptor = TargetTypeContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
+
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
@@ -2106,7 +2109,10 @@ using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
 
 template<typename Runtime> struct TargetProtocolDescriptor;
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
-  
+
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalProtocolDescriptor = TargetProtocolDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
+
 /// A witness table for a protocol.
 ///
 /// With the exception of the initial protocol conformance descriptor,
@@ -2722,6 +2728,16 @@ public:
     return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
+  constexpr inline auto
+  getTypeRefDescriptorOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, TypeRef);
+  }
+
+  constexpr inline auto
+  getProtocolDescriptorOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Protocol);
+  }
+
   TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor *
   _getTypeDescriptorLocation() const {
     if (getTypeKind() != TypeReferenceKind::IndirectTypeDescriptor)
@@ -2840,6 +2856,12 @@ using TargetProtocolConformanceRecord =
 
 using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
 
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalProtocolConformanceDescriptor = TargetProtocolConformanceDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
+
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalProtocolConformanceRecord = TargetProtocolConformanceRecord<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
+
 template<typename Runtime>
 struct TargetGenericContext;
 
@@ -2876,6 +2898,11 @@ struct TargetContextDescriptor {
               : 0;
   }
 
+  constexpr inline auto
+  getParentOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Parent);
+  }
+
 #ifndef NDEBUG
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use in the debugger");
@@ -2889,6 +2916,8 @@ private:
 };
 
 using ContextDescriptor = TargetContextDescriptor<InProcess>;
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalContextDescriptor = TargetContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 inline bool isCImportedModuleName(llvm::StringRef name) {
   // This does not include MANGLING_MODULE_CLANG_IMPORTER because that's
@@ -2908,12 +2937,20 @@ struct TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
     return isCImportedModuleName(Name.get());
   }
 
+  constexpr inline auto
+  getNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Name);
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Module;
   }
 };
 
 using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
+
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalModuleContextDescriptor = TargetModuleContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 template<typename Runtime>
 inline bool TargetContextDescriptor<Runtime>::isCImportedContext() const {
@@ -3413,6 +3450,11 @@ public:
     return {this->template getTrailingObjects<
                              TargetProtocolRequirement<Runtime>>(),
             NumRequirements};
+  }
+
+  constexpr inline auto
+  getNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Name);
   }
 
   /// Retrieve the requirement base descriptor address.
@@ -4078,6 +4120,11 @@ public:
   /// Return the offset of the start of generic arguments in the nominal
   /// type's metadata. The returned value is measured in sizeof(StoredPointer).
   int32_t getGenericArgumentOffset() const;
+
+  constexpr inline auto
+  getNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Name);
+  }
 
   /// Return the start of the generic arguments array in the nominal
   /// type's metadata. The returned value is measured in sizeof(StoredPointer).

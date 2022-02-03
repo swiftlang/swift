@@ -818,6 +818,7 @@ public:
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
   SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlock(llvm::StringRef debugName);
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
@@ -1607,7 +1608,7 @@ public:
                        SubstitutionMap subMap);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
-  
+
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,

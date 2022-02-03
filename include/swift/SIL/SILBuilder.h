@@ -1279,6 +1279,13 @@ public:
         getSILDebugLocation(loc), srcAddr, takeAddr));
   }
 
+  MarkMustCheckInst *
+  createMarkMustCheckInst(SILLocation loc, SILValue src,
+                          MarkMustCheckInst::CheckKind kind) {
+    return insert(new (getModule())
+                      MarkMustCheckInst(getSILDebugLocation(loc), src, kind));
+  }
+
   UnconditionalCheckedCastInst *
   createUnconditionalCheckedCast(SILLocation Loc, SILValue op,
                                  SILType destLoweredTy,

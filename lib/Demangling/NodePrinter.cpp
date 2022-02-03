@@ -1054,6 +1054,17 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << "'";
       Printer << "]";
       break;
+    case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      Printer << "[";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << " : ";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << "<";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ",";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ">]";
+      break;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "[";
       print(Node->getChild(Idx++), depth + 1);
@@ -1610,6 +1621,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     case FunctionSigSpecializationParamKind::ConstantPropString:
       Printer << "Constant Propagated String";
+      return nullptr;
+    case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      Printer << "Constant Propagated KeyPath";
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";

@@ -327,6 +327,7 @@ FORWARDING_OWNERSHIP(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP(InitExistentialRef)
 FORWARDING_OWNERSHIP(DifferentiableFunction)
 FORWARDING_OWNERSHIP(LinearFunction)
+FORWARDING_OWNERSHIP(MarkMustCheck)
 #undef FORWARDING_OWNERSHIP
 
 // Arbitrary value casts are forwarding instructions that are also allowed to

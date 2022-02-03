@@ -582,6 +582,9 @@ public:
 
   ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
 
+  /// Returns true if the source file contains concurrency in the top-level
+  bool isAsyncTopLevelSourceFile() const;
+
 private:
 
   /// If not \c None, the underlying vector contains the parsed tokens of this
