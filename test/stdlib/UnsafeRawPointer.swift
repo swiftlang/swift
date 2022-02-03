@@ -17,7 +17,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
   Missile.missilesLaunched = 0
   do {
     let sizeInBytes = 3 * MemoryLayout<Missile>.stride
-    var p1 = UnsafeMutableRawPointer.allocate(
+    let p1 = UnsafeMutableRawPointer.allocate(
       byteCount: sizeInBytes, alignment: MemoryLayout<Missile>.alignment)
     defer {
       p1.deallocate()
@@ -28,7 +28,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
     expectEqual(2, ptrM[1].number)
     expectEqual(2, ptrM[2].number)
 
-    var p2 = UnsafeMutableRawPointer.allocate(
+    let p2 = UnsafeMutableRawPointer.allocate(
       byteCount: sizeInBytes, alignment: MemoryLayout<Missile>.alignment)
     defer {
       p2.deallocate()
@@ -56,25 +56,25 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
 
 UnsafeMutableRawPointerExtraTestSuite.test("bindMemory") {
   let sizeInBytes = 3 * MemoryLayout<Int>.stride
-  var p1 = UnsafeMutableRawPointer.allocate(
+  let p1 = UnsafeMutableRawPointer.allocate(
     byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment)
   defer {
     p1.deallocate()
   }
   let ptrI = p1.bindMemory(to: Int.self, capacity: 3)
   let bufI = UnsafeMutableBufferPointer(start: ptrI, count: 3)
-  bufI.initialize(from: 1...3)
+  _ = bufI.initialize(from: 1...3)
   let ptrU = p1.bindMemory(to: UInt.self, capacity: 3)
   expectEqual(1, ptrU[0])
   expectEqual(2, ptrU[1])
   expectEqual(3, ptrU[2])
   let ptrU2 = p1.assumingMemoryBound(to: UInt.self)
-  expectEqual(1, ptrU[0])
+  expectEqual(1, ptrU2[0])
 }
 
 UnsafeMutableRawPointerExtraTestSuite.test("load/store") {
   let sizeInBytes = 3 * MemoryLayout<Int>.stride
-  var p1 = UnsafeMutableRawPointer.allocate(
+  let p1 = UnsafeMutableRawPointer.allocate(
     byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment)
   defer {
     p1.deallocate()
@@ -96,7 +96,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load/store") {
 
 UnsafeMutableRawPointerExtraTestSuite.test("copyMemory") {
   let sizeInBytes = 4 * MemoryLayout<Int>.stride
-  var rawPtr = UnsafeMutableRawPointer.allocate(
+  let rawPtr = UnsafeMutableRawPointer.allocate(
     byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment)
   defer {
     rawPtr.deallocate()
