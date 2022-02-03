@@ -656,11 +656,12 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
     }
 
     // Check the result
-    bool differentiable = isDifferentiable(result,
-                                           /*tangentVectorEqualsSelf*/ isLinear,
-                                           dc, stage) ^ hasInoutDiffParameter;
+    bool resultIsDifferentiable =
+        isDifferentiable(result,
+                         /*tangentVectorEqualsSelf*/ isLinear,
+                         dc, stage);
     // TODO: make the error cleaner
-    if (!differentiable) {
+    if (resultIsDifferentiable == hasInoutDiffParameter) {
       auto diagLoc = repr ? (*repr)->getResultTypeRepr()->getLoc() : loc;
       auto resultStr = fnTy->getResult()->getString();
       auto diag = ctx.Diags.diagnose(
