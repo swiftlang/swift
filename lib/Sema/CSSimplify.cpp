@@ -10720,17 +10720,28 @@ ConstraintSystem::simplifyApplicableFnConstraint(
             /*RParen=*/SourceLoc(),
             /*firstTrailingClosureIndex=*/0);
 
+        // The base expression for `.callAsFunction`.
+        auto *baseExpr = castToExpr(argumentsLoc->getAnchor());
+
         SmallVector<Identifier, 2> closureLabelsScratch;
         // Create implicit `.callAsFunction` expression to use as an anchor
         // for new argument list that only has trailing closures in it.
         auto *implicitCall = UnresolvedDotExpr::createImplicit(
-            ctx, getAsExpr(argumentsLoc->getAnchor()), {ctx.Id_callAsFunction},
+            ctx, baseExpr, {ctx.Id_callAsFunction},
             implicitCallArgumentList->getArgumentLabels(closureLabelsScratch));
 
-        associateArgumentList(
-            getConstraintLocator(implicitCall,
-                                 ConstraintLocator::ApplyArgument),
-            implicitCallArgumentList);
+        {
+
+          // Record new root in the constraint system.
+          ImplicitCallAsFunctionRoots.insert({calleeLoc, implicitCall});
+
+          setType(implicitCall, callAsFunctionResultTy);
+
+          associateArgumentList(
+              getConstraintLocator(implicitCall,
+                                   ConstraintLocator::ApplyArgument),
+              implicitCallArgumentList);
+        }
 
         auto callAsFunctionArguments =
             FunctionType::get(trailingClosureTypes, callAsFunctionResultTy,
