@@ -10674,9 +10674,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     switch (matchCallResult) {
     case SolutionKind::Error: {
-      if (shouldAttemptFixes())
-        return SolutionKind::Error;
-
       auto resultTy = func2->getResult();
 
       // If this is a call that constructs a callable type with
