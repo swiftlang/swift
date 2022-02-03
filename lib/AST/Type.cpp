@@ -507,6 +507,20 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
         return Type(ExistentialMetatypeType::get(erasedTy));
       }
 
+      // Opaque types whose substitutions involve this type parameter are
+      // erased to their upper bound.
+      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(ty)) {
+        for (auto replacementType :
+                 opaque->getSubstitutions().getReplacementTypes()) {
+          if (replacementType->hasOpenedExistentialWithRoot(root)) {
+            Type interfaceType = opaque->getInterfaceType();
+            auto genericSig =
+                opaque->getDecl()->getOpaqueInterfaceGenericSignature();
+            return genericSig->getNonDependentUpperBounds(interfaceType);
+          }
+        }
+      }
+
       auto *const archetype = dyn_cast<OpenedArchetypeType>(ty);
       if (!archetype) {
         // Recurse.

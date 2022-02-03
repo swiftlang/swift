@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-opened-existential-types -enable-parameterized-protocol-types -enable-experimental-opaque-parameters
+// RUN: %target-typecheck-verify-swift -enable-experimental-opened-existential-types -enable-parametrized-protocol-types -enable-experimental-opaque-parameters
 
 protocol Q { }
 
@@ -59,4 +59,21 @@ func testMultipleOpened(a: any P, b: any P & Q) {
 
   let r2 = a.combineThePs(b)
   let _: Int = r2  // expected-error{{cannot convert value of type '(Q, Q)?' to specified type 'Int'}}  
+}
+
+// --- With primary associated types and opaque parameter types
+protocol CollectionOf: Collection {
+  @_primaryAssociatedType associatedtype Element
+}
+
+extension Array: CollectionOf { }
+extension Set: CollectionOf { }
+
+func reverseIt<T>(_ c: some CollectionOf<T>) -> some CollectionOf<T> {
+  return c.reversed()
+}
+
+func useReverseIt(_ c: any CollectionOf) {
+  let c = reverseIt(c)
+  let _: Int = c // expected-error{{cannot convert value of type 'CollectionOf' to specified type 'Int'}}
 }
