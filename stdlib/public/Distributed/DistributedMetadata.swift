@@ -15,7 +15,7 @@ import Swift
 /// Get the parameter count from a mangled method name.
 ///
 /// - Returns: May return a negative number to signal a decoding error.
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public // SPI _Distributed
 func _getParameterCount(mangledMethodName name: String) -> Int32 {
   let nameUTF8 = Array(name.utf8)
@@ -25,7 +25,7 @@ func _getParameterCount(mangledMethodName name: String) -> Int32 {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_func_getParameterCount")
 public // SPI _Distributed
 func __getParameterCount(
@@ -38,7 +38,7 @@ func __getParameterCount(
 ///
 /// - Returns: the actual number of types written,
 ///            or negative value to signify an error
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public // SPI _Distributed
 func _getParameterTypeInfo(
   mangledMethodName name: String,
@@ -56,7 +56,7 @@ func _getParameterTypeInfo(
 
 /// - Returns: the actual number of types written,
 ///             or a negative value to signal decoding error.
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_func_getParameterTypeInfo")
 public // SPI _Distributed
 func __getParameterTypeInfo(
@@ -66,7 +66,7 @@ func __getParameterTypeInfo(
     _ types: Builtin.RawPointer, _ typesLength: Int
 ) -> Int32
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public // SPI _Distributed
 func _getReturnTypeInfo(
   mangledMethodName name: String,
@@ -80,7 +80,7 @@ func _getReturnTypeInfo(
   }
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_func_getReturnTypeInfo")
 public // SPI _Distributed
 func __getReturnTypeInfo(
@@ -93,7 +93,7 @@ func __getReturnTypeInfo(
 
 /// Retrieve a generic environment descriptor associated with
 /// the given distributed target
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_getGenericEnvironment")
 public // SPI _Distributed
 func _getGenericEnvironmentOfDistributedTarget(
@@ -101,7 +101,7 @@ func _getGenericEnvironmentOfDistributedTarget(
     _ targetNameLength: UInt
 ) -> UnsafeRawPointer?
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_getWitnessTables")
 public // SPI _Distributed
 func _getWitnessTablesFor(

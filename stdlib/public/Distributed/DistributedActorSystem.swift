@@ -12,7 +12,7 @@
 import Swift
 import _Concurrency
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedActorSystem: Sendable {
   /// The identity used by actors that communicate via this transport
   associatedtype ActorID: Sendable & Hashable & Codable // TODO: make Codable conditional here
@@ -135,7 +135,7 @@ public protocol DistributedActorSystem: Sendable {
 
 // ==== ----------------------------------------------------------------------------------------------------------------
 // MARK: Execute Distributed Methods
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 extension DistributedActorSystem {
 
   /// Prepare and execute a call to the distributed function identified by the passed arguments,
@@ -307,7 +307,7 @@ extension DistributedActorSystem {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_execute_target")
 func _executeDistributedTarget(
   on actor: AnyObject, // DistributedActor
@@ -323,7 +323,7 @@ func _executeDistributedTarget(
 // ==== ----------------------------------------------------------------------------------------------------------------
 // MARK: Support types
 /// A distributed 'target' can be a `distributed func` or `distributed` computed property.
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public struct RemoteCallTarget {
   let _mangledName: String // TODO: StaticString would be better here; no arc, codesize of cleanups
 
@@ -425,7 +425,7 @@ public protocol DistributedTargetInvocationDecoder : AnyObject {
   func decodeReturnType() throws -> Any.Type?
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationResultHandler {
   associatedtype SerializationRequirement
 
@@ -439,10 +439,10 @@ public protocol DistributedTargetInvocationResultHandler {
 /******************************************************************************/
 
 /// Error protocol to which errors thrown by any `DistributedActorSystem` should conform.
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public protocol DistributedActorSystemError: Error {}
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public struct ExecuteDistributedTargetError: DistributedActorSystemError {
   let message: String
 
@@ -451,7 +451,7 @@ public struct ExecuteDistributedTargetError: DistributedActorSystemError {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public struct DistributedActorCodingError: DistributedActorSystemError {
   public let message: String
 
