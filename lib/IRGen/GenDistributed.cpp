@@ -277,7 +277,10 @@ DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
           IGM, AccessorType, AccessorType, SubstitutionMap(),
           /*suppress generics*/ true,
           FunctionPointer::Kind(
-              FunctionPointer::BasicKind::AsyncFunctionPointer))) {}
+              FunctionPointer::BasicKind::AsyncFunctionPointer))) {
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
+}
 
 void DistributedAccessor::decodeArguments(llvm::Value *decoder,
                                           llvm::Value *argumentTypes,
