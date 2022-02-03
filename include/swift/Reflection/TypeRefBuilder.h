@@ -24,6 +24,7 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
+#include <iostream>
 #include <ostream>
 #include <unordered_map>
 #include <vector>
