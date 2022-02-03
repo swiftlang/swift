@@ -483,7 +483,7 @@ void DistributedAccessor::lookupWitnessTables(
     // then accessor should trap.
     {
       IGF.Builder.emitBlock(failBB);
-      IGF.emitTrap("missing witness table", /*EmitUnreachable=*/true);
+      IGF.emitTrap("", /*EmitUnreachable=*/true);
     }
 
     IGF.Builder.emitBlock(contBB);
