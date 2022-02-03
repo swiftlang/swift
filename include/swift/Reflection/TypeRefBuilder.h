@@ -86,6 +86,7 @@ public:
 template<typename Self, typename Descriptor>
 class ReflectionSectionIteratorBase
   : public std::iterator<std::forward_iterator_tag, Descriptor> {
+  uint64_t OriginalSize;
 protected:
   Self &asImpl() {
     return *static_cast<Self *>(this);
@@ -95,7 +96,7 @@ public:
   uint64_t Size;
     
   ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size)
-    : Cur(Cur), Size(Size) {
+    : Cur(Cur), Size(Size), OriginalSize(Size) {
     if (Size != 0) {
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
@@ -130,6 +131,7 @@ public:
         fputs("reflection section too small!\n", stderr);
         std::cerr << "Remaining section size: "
                   << Size
+                  << "(of " << OriginalSize << ")"
                   << ", size of next record: "
                   << NextSize
                   << std::endl;
