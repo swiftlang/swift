@@ -582,9 +582,23 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   }
 
   // Don't record effectively internal declarations if specified
-  if (Walker.Options.MinimumAccessLevel > AccessLevel::Internal &&
-      D->hasUnderscoredNaming()) {
-    return true;
+  if (D->hasUnderscoredNaming()) {
+    AccessLevel symLevel = AccessLevel::Public;
+    if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+      symLevel = VD->getFormalAccess();
+    }
+
+    // Underscored symbols should be treated as `internal`, unless they're already
+    // marked that way - in that case, treat them as `private`
+    AccessLevel effectiveLevel;
+    if (symLevel > AccessLevel::Internal) {
+      effectiveLevel = AccessLevel::Internal;
+    } else {
+      effectiveLevel = AccessLevel::Private;
+    }
+
+    if (Walker.Options.MinimumAccessLevel > effectiveLevel)
+      return true;
   }
 
   // Don't include declarations with the @_spi attribute unless the

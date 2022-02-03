@@ -145,10 +145,19 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   if (!C.getLoadedModule(C.Id_Distributed))
     return nullptr;
 
+  auto module = C.getStdlibModule();
+  auto DistSystemProtocol =
+      C.getProtocol(KnownProtocolKind::DistributedActorSystem);
 
-  if (auto system = actor->lookupDirect(C.Id_actorSystem).begin()) {
-    // TODO(distributed): may need to check conformance here?
-    return dyn_cast<VarDecl>(*system);
+  for (auto system : actor->lookupDirect(C.Id_actorSystem)) {
+    if (auto var = dyn_cast<VarDecl>(system)) {
+      auto conformance = module->conformsToProtocol(var->getInterfaceType(),
+                                                    DistSystemProtocol);
+      if (conformance.isInvalid())
+        continue;
+
+      return var;
+    }
   }
 
   return nullptr;

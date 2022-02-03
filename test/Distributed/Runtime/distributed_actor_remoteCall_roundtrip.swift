@@ -20,7 +20,7 @@
 // UNSUPPORTED: linux
 
 // rdar://88228867 - remoteCall_* tests have been disabled due to random failures
-// REQUIRES: rdar88228867
+// OK: rdar88228867
 
 import _Distributed
 import FakeDistributedActorSystems
@@ -54,10 +54,10 @@ func test() async throws {
   let reply = try await ref.echo(name: "Caplin")
   // CHECK: > encode argument: Caplin
   // CHECK-NOT: > encode error type
-  // CHECK: > encode return type: String
+  // CHECK: > encode return type: Swift.String
   // CHECK: > done recording
   // CHECK: >> remoteCall
-  // CHECK: > decode return type: String
+  // CHECK: > decode return type: Swift.String
   // CHECK: > decode argument: Caplin
   // CHECK: << onReturn: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
 

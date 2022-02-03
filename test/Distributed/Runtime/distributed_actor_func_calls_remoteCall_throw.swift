@@ -21,7 +21,7 @@
 // UNSUPPORTED: OS=watchos && CPU=i386
 
 // rdar://88228867 - remoteCall_* tests have been disabled due to random failures
-// REQUIRES: rdar88228867
+// OK: rdar88228867
 
 import _Distributed
 import FakeDistributedActorSystems
