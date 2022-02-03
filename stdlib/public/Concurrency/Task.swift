@@ -698,7 +698,7 @@ extension Task where Success == Never, Failure == Never {
 ///
 /// If necessary to store a `Task` object itself, it is possible to create
 /// an un-structured task and store it, however it is not possible to retrieve
-/// the "current" task object itself. Instead, interactions with the "current"
+/// the "current" task as an object. Instead, interactions with the "current"
 /// task are performed with the `currentPriority` and similar APIs which safely
 /// query the current task, without exposing its actual identity.
 ///
