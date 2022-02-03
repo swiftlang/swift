@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-universal-existentials
 
 // Bad containers and ranges
 struct BadContainer1 {

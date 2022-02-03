@@ -317,6 +317,10 @@ namespace swift {
     /// keyword.
     bool EnableExplicitExistentialTypes = true;
 
+    /// Enable experimental support for universal existential types
+    /// as proposed in SE-0309.
+    bool EnableExperimentalUniversalExistentials = false;
+
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-universal-existentials
 
 //===----------------------------------------------------------------------===//
 // Use of protocols with Self or associated type requirements

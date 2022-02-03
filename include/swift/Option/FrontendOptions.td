@@ -486,6 +486,10 @@ def enable_explicit_existential_types :
   Flag<["-"], "enable-explicit-existential-types">,
   HelpText<"Enable experimental support for explicit existential types">;
 
+def enable_experimental_universal_existentials :
+  Flag<["-"], "enable-experimental-universal-existentials">,
+  HelpText<"Enable experimental support for universal existential types">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;

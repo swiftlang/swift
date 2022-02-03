@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -enable-experimental-universal-existentials
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
