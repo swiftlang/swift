@@ -229,4 +229,24 @@ UnsafeMutableRawPointerExtraTestSuite.test("moveInitialize:from:") {
   check(Check.RightOverlap)
 }
 
+UnsafeMutableRawPointerExtraTestSuite.test("withMemoryRebound") {
+  // test withMemoryRebound behaviour, post SE-0333.
+  let allocated = UnsafeMutableRawPointer.allocate(byteCount: 32,  alignment: 8)
+  defer { allocated.deallocate() }
+  allocated.withMemoryRebound(to: Int.self, capacity: 4) {
+    // Make sure the closure argument is a `UnsafeMutablePointer<Int>`
+    let ptrT: UnsafeMutablePointer<Int> = $0
+    // and that the pointee type is `Int`.
+    expectType(Int.self, &ptrT.pointee)
+  }
+  let nonmutable = UnsafeRawPointer(allocated)
+  nonmutable.withMemoryRebound(to: UInt.self, capacity: 4) {
+    // Make sure the closure argument is a `UnsafePointer<UInt>`
+    let ptrT: UnsafePointer<UInt> = $0
+    // and that the element type is `Int`.
+    let mutablePtrT = UnsafeMutablePointer(mutating: ptrT)
+    expectType(UInt.self, &mutablePtrT.pointee)
+  }
+}
+
 runAllTests()

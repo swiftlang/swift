@@ -1081,6 +1081,22 @@ Unsafe${'Mutable' if mutable else ''}BufferPointerTestSuite.test("withMemoryRebo
   }
 }
 
+% RawName = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
+Unsafe${'Mutable' if mutable else ''}RawBufferPointerTestSuite.test("withMemoryRebound") {
+  // test withMemoryRebound behaviour, post SE-0333.
+  let allocated = UnsafeMutableRawBufferPointer.allocate(byteCount: 32,  alignment: 8)
+  defer { allocated.deallocate() }
+  let ptrR = ${'allocated' if mutable else RawName + '(allocated)'}
+  ptrR.withMemoryRebound(to: Int.self) {
+    // Make sure the closure argument is a ${TypedName}
+    let ptrT: ${TypedName}<Int> = $0
+    expectEqual(ptrT.count, 32/MemoryLayout<Int>.stride)
+    // and that the element type is `Int`.
+    let mutablePtrT = ${'ptrT' if mutable else 'UnsafeMutableBufferPointer(mutating: ptrT)'}
+    expectType(Int.self, &mutablePtrT[0])
+  }
+}
+
 % end # mutable
 
 runAllTests()
