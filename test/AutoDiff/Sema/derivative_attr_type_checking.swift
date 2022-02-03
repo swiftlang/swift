@@ -79,6 +79,16 @@ func vjpOriginalFunctionNotFound(_ x: Float) -> (value: Float, pullback: (Float)
   fatalError()
 }
 
+struct Q { }
+
+@derivative(of: remainder(_:_:)) // expected-error {{cannot find 'remainder' in scope}}
+// expected-error @+1 {{generic parameter 'T' is not used in function signature}}
+func _vjpRemainder<T: FloatingPoint>(_ x: Q, _ y: Q) -> (
+  value: Q, pullback: (Q) -> (Q, Q)
+) {
+  fatalError()
+}
+
 // Test `@derivative` attribute where `value:` result does not conform to `Differentiable`.
 // Invalid original function should be diagnosed first.
 // expected-error @+1 {{cannot find 'nonexistentFunction' in scope}}
