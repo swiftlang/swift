@@ -110,12 +110,12 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
   }
 
   auto context = makeReflectionContextForObjectFiles(ObjectFiles);
-  auto &builder = context.Builder;
+  auto &builder = context->Builder;
 
   switch (Action) {
   case ActionType::DumpReflectionSections:
     // Dump everything
-    switch (context.PointerSize) {
+    switch (context->PointerSize) {
     case 4:
       // FIXME: This could/should be configurable.
 #if SWIFT_OBJC_INTEROP
