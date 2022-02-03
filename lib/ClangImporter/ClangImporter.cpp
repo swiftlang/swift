@@ -3121,7 +3121,7 @@ static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
   }
 }
 
-void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive) const {
   if (clangModule)
     getImportDecls(const_cast<ClangModuleUnit *>(this), clangModule, results);
   getTopLevelDecls(results);

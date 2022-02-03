@@ -145,7 +145,7 @@ namespace swift {
   /// \c ModuleDecl::getDisplayDecls() would only return if previous
   /// work happened to have synthesized them.
   void
-  getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results);
+  getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results, bool Recursive = false);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.
