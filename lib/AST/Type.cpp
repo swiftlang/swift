@@ -3362,6 +3362,13 @@ Type ArchetypeType::getExistentialType() const {
   auto constraint = ProtocolCompositionType::get(
      ctx, constraintTypes, requiresClass());
 
+  // If the archetype is only constrained to a class type,
+  // return the class type directly.
+  if (!constraint->isConstraintType()) {
+    assert(constraint->getClassOrBoundGenericClass());
+    return constraint;
+  }
+
   return ExistentialType::get(constraint);
 }
 
