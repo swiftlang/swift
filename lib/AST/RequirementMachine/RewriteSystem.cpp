@@ -263,6 +263,7 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
                                           RewritePath *path) const {
   assert(symbol.hasSubstitutions());
 
+  // Fast path if the type is fully concrete.
   auto substitutions = symbol.getSubstitutions();
   if (substitutions.empty())
     return false;
@@ -272,10 +273,12 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
   unsigned oldSize = (path ? path->size() : 0);
 
   if (path) {
-    // The term is on the A stack. Push all substitutions onto the A stack.
-    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/false));
+    // The term is at the top of the primary stack. Push all substitutions onto
+    // the primary stack.
+    path->add(RewriteStep::forDecompose(substitutions.size(),
+                                        /*inverse=*/false));
 
-    // Move all substitutions but the first one to the B stack.
+    // Move all substitutions but the first one to the secondary stack.
     for (unsigned i = 1; i < substitutions.size(); ++i)
       path->add(RewriteStep::forShift(/*inverse=*/false));
   }
@@ -287,12 +290,12 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
   bool first = true;
   bool anyChanged = false;
   for (auto substitution : substitutions) {
-    // Move the next substitution from the B stack to the A stack.
+    // Move the next substitution from the secondary stack to the primary stack.
     if (!first && path)
       path->add(RewriteStep::forShift(/*inverse=*/true));
     first = false;
 
-    // The current substitution is at the top of the A stack; simplify it.
+    // The current substitution is at the top of the primary stack; simplify it.
     MutableTerm mutTerm(substitution);
     anyChanged |= simplify(mutTerm, path);
 
@@ -300,10 +303,12 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
     newSubstitutions.push_back(Term::get(mutTerm, Context));
   }
 
-  // All simplified substitutions are now on the A stack. Collect them to
+  // All simplified substitutions are now on the primary stack. Collect them to
   // produce the new term.
-  if (path)
-    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/true));
+  if (path) {
+    path->add(RewriteStep::forDecompose(substitutions.size(),
+                                        /*inverse=*/true));
+  }
 
   // If nothing changed, we don't have to rebuild the symbol.
   if (!anyChanged) {
@@ -566,7 +571,7 @@ void RewriteSystem::simplifyRightHandSides() {
   }
 }
 
-/// Simplify substitutions in superclass, concrete type and concrete
+/// Simplify substitution terms in superclass, concrete type and concrete
 /// conformance symbols.
 void RewriteSystem::simplifyLeftHandSideSubstitutions() {
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {

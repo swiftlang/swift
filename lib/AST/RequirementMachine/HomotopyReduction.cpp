@@ -21,7 +21,7 @@
 //
 // Redundant rules that are not part of the minimal set are redundant are
 // detected by analyzing the set of rewrite loops computed by the completion
-// procedure.
+// procedure. See RewriteLoop.cpp for a discussion of rewrite loops.
 //
 // If a rewrite rule appears exactly once in a loop and without context, the
 // loop witnesses a redundancy; the rewrite rule is equivalent to traveling

@@ -237,6 +237,9 @@ PropertyMap::~PropertyMap() {
 
 /// Look for a property bag corresponding to a suffix of the given range.
 ///
+/// The symbol range must correspond to a term that has already been
+/// simplified.
+///
 /// Returns nullptr if no information is known about this key.
 PropertyBag *
 PropertyMap::lookUpProperties(std::reverse_iterator<const Symbol *> begin,
@@ -248,6 +251,8 @@ PropertyMap::lookUpProperties(std::reverse_iterator<const Symbol *> begin,
 }
 
 /// Look for a property bag corresponding to a suffix of the given key.
+///
+/// The term must have already been simplified.
 ///
 /// Returns nullptr if no information is known about this key.
 PropertyBag *

@@ -9,6 +9,52 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// This file defines data types used for representing redundancies among
+// rewrite rules. The information encoded in these types is ultimately used
+// for generic signature minimization.
+//
+// A RewriteStep is a single primitive transformation; the canonical example is
+// the application of a rewrite rule, possibly to a subterm.
+//
+// A RewritePath is a composition of RewriteSteps describing the transformation
+// of a term into another term. One place where a RewritePath originates is
+// RewriteSystem::simplify(); that method takes an optional RewritePath argument
+// to which the series of RewriteSteps performed during simplification are
+// appended. If the term was already canonical, the resulting path is empty,
+// otherwise it will consist of at least one RewriteStep.
+//
+// Simplification always applies rules by replacing a subterm equal to the LHS
+// with the RHS where LHS > RHS, so the RewriteSteps constructed there always
+// make the term shorter. However, more generally, RewriteSteps  can also
+// express the inverse rewrite, where RHS is replaced with LHS, making the term
+// longer.
+//
+// Inverted RewriteSteps are constructed in the Knuth-Bendix completion
+// algorithm. A simple example is where two rules (U.V => X) and (V.W => Y)
+// overlap on the term U.V.W. Then the induced rule (X.W => U.Y) (assuming that
+// X.W > U.Y) can be described by a RewritePath which begins at X.W, applies
+// the inverted rule (X => U.V) to the subterm X to obtain U.V.W, then applies
+// the rule (V.W => Y) to the subterm V.W to obtain U.Y.
+//
+// A RewriteLoop is a path that begins and ends at the same term. A RewriteLoop
+// describes a _redundancy_. For example, when completion adds a new rule to
+// resolve an overlap, it constructs a RewritePath describing this new rule in
+// terms of existing rules; by adding an additional rewrite step corresponding
+// to the new rule, we get a loop that begins and ends at the same point, or in
+// other words, a RewriteLoop.
+//
+// In the above example, we have a RewritePath from X.W to U.Y via the two
+// existing rewrite rules with the overlap term U.V.W in the middle. If we then
+// add a third rewrite step for the new rule inverted, (U.Y => X.W), we get a
+// loop that begins and ends at X.W. This loop encodes that the new rule
+// (X.W => U.Y) is redundant because it can be expresed in terms of other rules.
+//
+// The homotopy reduction algorithm in HomotopyReduction.cpp uses rewrite loops
+// to find a minimal set of rewrite rules, which are then used to construct a
+// minimal generic signature.
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/AST/Type.h"
 #include "llvm/Support/raw_ostream.h"
