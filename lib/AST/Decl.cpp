@@ -1985,6 +1985,45 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
   return false;
 }
 
+/// Returns true iff a defer's storage access kind should always
+/// match the access kind of its immediately enclosing function.
+///
+/// In Swift 5 and earlier, this was not true, meaning that property observers,
+/// etc, would be invoked in initializers or deinitializers if a property access
+/// happens within a defer, but not when outside the defer.
+static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
+  assert(defer->isDeferBody());
+
+  // In Swift 6+, then yes.
+  if (defer->getASTContext().isSwiftVersionAtLeast(6))
+    return true;
+
+  // If the defer is part of a function that is a member of an actor or
+  // concurrency-aware type, then yes.
+  if (auto *deferContext = defer->getParent()) {
+    if (auto *funcContext = deferContext->getParent()) {
+      if (auto *type = funcContext->getSelfNominalTypeDecl()) {
+        if (type->isAnyActor())
+          return true;
+
+        switch (getActorIsolation(type)) {
+          case swift::ActorIsolation::Unspecified:
+          case swift::ActorIsolation::GlobalActorUnsafe:
+            break;
+
+          case swift::ActorIsolation::ActorInstance:
+          case swift::ActorIsolation::DistributedActorInstance:
+          case swift::ActorIsolation::Independent:
+          case swift::ActorIsolation::GlobalActor:
+            return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 static bool isDirectToStorageAccess(const DeclContext *UseDC,
                                     const VarDecl *var, bool isAccessOnSelf) {
   if (!var->hasStorage())
@@ -1993,6 +2032,11 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
   auto *AFD = dyn_cast<AbstractFunctionDecl>(UseDC);
   if (AFD == nullptr)
     return false;
+
+  // Check if this is a function representing a defer.
+  if (auto *func = dyn_cast<FuncDecl>(AFD))
+    if (func->isDeferBody() && deferMatchesEnclosingAccess(func))
+      return isDirectToStorageAccess(func->getParent(), var, isAccessOnSelf);
 
   // The property reference is for immediate class, not a derived class.
   if (AFD->getParent()->getSelfNominalTypeDecl() !=
