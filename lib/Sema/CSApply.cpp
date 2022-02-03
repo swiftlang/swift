@@ -7709,7 +7709,38 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   apply->setFn(declRef);
 
   // Tail-recur to actually call the constructor.
-  return finishApply(apply, openedType, locator, ctorLocator);
+  auto *ctorCall = finishApply(apply, openedType, locator, ctorLocator);
+
+  // Check whether this is a situation like `T(...) { ... }` where `T` is
+  // a callable type and trailing closure(s) are associated with implicit
+  // `.callAsFunction` instead of constructor.
+  {
+    auto callAsFunction =
+        solution.ImplicitCallAsFunctionRoots.find(ctorLocator);
+    if (callAsFunction != solution.ImplicitCallAsFunctionRoots.end()) {
+      auto *dotExpr = callAsFunction->second;
+      auto resultTy = solution.getResolvedType(dotExpr);
+
+      auto *implicitCall = CallExpr::createImplicit(
+          cs.getASTContext(), ctorCall,
+          solution.getArgumentList(cs.getConstraintLocator(
+              dotExpr, ConstraintLocator::ApplyArgument)));
+
+      implicitCall->setType(resultTy);
+      cs.cacheType(implicitCall);
+
+      auto *memberCalleeLoc =
+          cs.getConstraintLocator(dotExpr,
+                                  {ConstraintLocator::ApplyFunction,
+                                   ConstraintLocator::ImplicitCallAsFunction},
+                                  /*summaryFlags=*/0);
+
+      return finishApply(implicitCall, resultTy, cs.getConstraintLocator(dotExpr),
+                         memberCalleeLoc);
+    }
+  }
+
+  return ctorCall;
 }
 
 /// Determine whether this closure should be treated as Sendable.
