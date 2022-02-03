@@ -562,8 +562,8 @@ static Type formExtensionInterfaceType(
   auto nominal = dyn_cast<NominalTypeDecl>(genericDecl);
   auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
   if (!nominal) {
-    Type underlyingType = typealias->getUnderlyingType();
-    nominal = underlyingType->getNominalOrBoundGenericNominal();
+    type = typealias->getUnderlyingType();
+    nominal = type->getNominalOrBoundGenericNominal();
   }
 
   // Form the result.
