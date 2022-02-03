@@ -75,6 +75,16 @@ func SR15053<T : Numeric>(_ a: T, _ b: T) -> T {
   // expected-error@-1 {{binary operator '/' cannot be applied to operands of type 'T' and 'Int'}}
 }
 
+infix operator %%
+
+func %% (_ lhs: Int, _ rhs: Int) -> Int {
+  lhs / rhs
+}
+
+func %% (_ lhs: Float, _ rhs: Float) -> Float {
+  lhs / rhs
+}
+
 func SR15053<T : Numeric>(_ a: T, _ b: T) {
-  (a + b) / 2 // expected-error {{cannot convert value of type 'T' to expected argument type 'Int'}}
+  (a + b) %% 2 // expected-error {{cannot convert value of type 'T' to expected argument type 'Int'}}
 }
