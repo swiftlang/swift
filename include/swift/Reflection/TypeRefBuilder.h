@@ -94,14 +94,16 @@ protected:
 public:
   RemoteRef<void> Cur;
   uint64_t Size;
+  std::string Name;
     
-  ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size)
-    : Cur(Cur), Size(Size), OriginalSize(Size) {
+  ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size, std::string Name)
+    : OriginalSize(Size), Cur(Cur), Size(Size), Name(Name) {
     if (Size != 0) {
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
         fputs("reflection section too small!\n", stderr);
+        std::cerr << "Section Type: " << Name << std::endl;
         std::cerr << "Section size: "
                   << Size
                   << ", size of first record: "
@@ -129,6 +131,7 @@ public:
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
         fputs("reflection section too small!\n", stderr);
+        std::cerr << "Section Type: " << Name << std::endl;
         std::cerr << "Remaining section size: "
                   << Size
                   << "(of " << OriginalSize << ")"
@@ -137,7 +140,8 @@ public:
                   << std::endl;
         const uint8_t *p = reinterpret_cast<const uint8_t *>(Cur.getLocalBuffer());
         std::cerr << "Previous bytes: ";
-        for (unsigned i = -8; i < 0; i++) {
+        int position = (int)(OriginalSize - Size);
+        for (int i = std::max(-8, -position); i < 0; i++) {
           std::cerr << std::hex << std::setw(2) << p[i] << " ";
         }
         std::cerr << std::endl;
@@ -168,7 +172,7 @@ class FieldDescriptorIterator
 {
 public:
   FieldDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "FieldDescriptor")
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
@@ -183,7 +187,7 @@ class AssociatedTypeIterator
 {
 public:
   AssociatedTypeIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "AssociatedType")
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<AssociatedTypeDescriptor> ATR){
@@ -198,7 +202,7 @@ class BuiltinTypeDescriptorIterator
                                          BuiltinTypeDescriptor> {
 public:
   BuiltinTypeDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "BuiltinTypeDescriptor")
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR){
@@ -212,7 +216,7 @@ class CaptureDescriptorIterator
                                          CaptureDescriptor> {
 public:
   CaptureDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "CaptureDescriptor")
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR){
@@ -228,7 +232,7 @@ class MultiPayloadEnumDescriptorIterator
                                          MultiPayloadEnumDescriptor> {
 public:
   MultiPayloadEnumDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "MultiPayloadEnum")
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
