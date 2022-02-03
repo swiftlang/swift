@@ -172,6 +172,14 @@ public:
   /// `OpaqueReturnTypeRepr`s.
   CollectedOpaqueReprs collectOpaqueReturnTypeReprs();
 
+  /// Retrieve the type repr without any parentheses around it.
+  ///
+  /// The use of this function must be restricted to contexts where
+  /// user-written types are provided, and a syntactic analysis is appropriate.
+  /// Most use cases should analyze the resolved \c Type instead and use
+  /// \c Type::getCanonicalType() or \c Type::getWithoutParens().
+  TypeRepr *getWithoutParens() const;
+
   //*** Allocation Routines ************************************************/
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
