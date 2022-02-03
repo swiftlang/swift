@@ -641,6 +641,7 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
       if (hasValidDifferentiabilityParam)
         diagnostic.fixItInsert(diagLoc, "@noDerivative ");
     }
+    
     // Reject the case where all parameters have '@noDerivative'.
     if (!alreadyDiagnosedOneParam && !hasValidDifferentiabilityParam) {
       auto diagLoc = repr ? (*repr)->getArgsTypeRepr()->getLoc() : loc;
@@ -655,20 +656,33 @@ bool TypeChecker::diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
       }
     }
 
-    // Check the result
+    // Check the result.
     bool resultIsDifferentiable =
-        isDifferentiable(result,
-                         /*tangentVectorEqualsSelf*/ isLinear,
-                         dc, stage);
-    // TODO: make the error cleaner
-    if (resultIsDifferentiable == hasInoutDiffParameter) {
+        isDifferentiable(result, /*tangentVectorEqualsSelf*/ isLinear, dc,
+        stage);
+    
+    // Reject the case where there are multiple semantic results.
+    if (resultIsDifferentiable && hasInoutDiffParameter) {
+      auto diagLoc = repr ? (*repr)->getArgsTypeRepr()->getLoc() : loc;
+      auto diag = ctx.Diags.diagnose(
+          diagLoc,
+          diag::differentiable_function_type_multiple_semantic_results);
+      hadAnyError = true;
+      
+      if (repr) {
+        diag.highlight((*repr)->getSourceRange());
+      }
+    }
+    
+    // Reject the case where there are no semantic results.
+    if (!resultIsDifferentiable && !hasInoutDiffParameter) {
       auto diagLoc = repr ? (*repr)->getResultTypeRepr()->getLoc() : loc;
       auto resultStr = fnTy->getResult()->getString();
       auto diag = ctx.Diags.diagnose(
           diagLoc, diag::differentiable_function_type_invalid_result, resultStr,
           isLinear);
       hadAnyError = true;
-
+      
       if (repr) {
           diag.highlight((*repr)->getResultTypeRepr()->getSourceRange());
       }

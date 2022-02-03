@@ -5040,6 +5040,9 @@ ERROR(differentiable_function_type_invalid_result,none,
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
       "function type is '@differentiable%select{|(_linear)}1'",
       (StringRef, bool))
+ERROR(differentiable_function_type_multiple_semantic_results,none,
+      "'@differentiable' function type cannot have both an 'inout' parameter "
+      "and a differentiable result", ())
 ERROR(differentiable_function_type_no_differentiability_parameters, 
       none,
       "'@differentiable' function type requires at least one differentiability "
