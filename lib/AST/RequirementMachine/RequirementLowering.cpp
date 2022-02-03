@@ -212,9 +212,7 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
                                    SmallVectorImpl<StructuralRequirement> &result) {
   SmallVector<Requirement, 2> reqs;
 
-  if (constraintType->is<ProtocolType>() ||
-      constraintType->is<ProtocolCompositionType>() ||
-      constraintType->is<ParameterizedProtocolType>()) {
+  if (constraintType->isConstraintType()) {
     // Handle conformance requirements.
     desugarConformanceRequirement(subjectType, constraintType, reqs);
   } else if (constraintType->getClassOrBoundGenericClass()) {

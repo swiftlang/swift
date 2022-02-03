@@ -6365,7 +6365,8 @@ inline bool TypeBase::isConstraintType() const {
 
 inline bool CanType::isConstraintTypeImpl(CanType type) {
   return (isa<ProtocolType>(type) ||
-          isa<ProtocolCompositionType>(type));
+          isa<ProtocolCompositionType>(type) ||
+          isa<ParameterizedProtocolType>(type));
 }
 
 inline bool TypeBase::isExistentialType() {

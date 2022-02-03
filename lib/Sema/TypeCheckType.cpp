@@ -3856,7 +3856,10 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       continue;
     }
 
-    if (ty->isConstraintType()) {
+    // FIXME: Support compositions involving parameterized protocol types,
+    // like Collection<String> & Sendable, etc.
+    if (ty->isConstraintType() &&
+        !ty->is<ParameterizedProtocolType>()) {
       auto layout = ty->getExistentialLayout();
       if (auto superclass = layout.explicitSuperclass)
         if (checkSuperclass(tyR->getStartLoc(), superclass))
