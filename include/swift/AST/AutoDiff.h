@@ -364,9 +364,7 @@ public:
   static TangentSpace getTangentVector(Type tangentVectorType) {
     return {Kind::TangentVector, tangentVectorType};
   }
-  static TangentSpace getTuple(TupleType *tupleTy) {
-    return {Kind::Tuple, tupleTy};
-  }
+  static TangentSpace getTuple(TupleType *tupleTy);
 
   bool isTangentVector() const { return kind == Kind::TangentVector; }
   bool isTuple() const { return kind == Kind::Tuple; }
