@@ -18,6 +18,9 @@
 // CHECK-DAG:    bool SWIFT_ENABLE_MANGLED_NAME_VERIFICATION [default: false] - Enable verification that metadata can roundtrip through a mangled name each time metadata is instantiated.
 // CHECK-DAG:    bool SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE [default: false] - Scribble on runtime allocations such as metadata allocations.
 
+// We need to do this because the DAG checks require a non-DAG check as an
+// anchor:
+
 // CHECK: Hello, world
 
 // We have to write this to stderr to avoid being dependent on the order of
