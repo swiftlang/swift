@@ -1099,4 +1099,20 @@ Unsafe${'Mutable' if mutable else ''}RawBufferPointerTestSuite.test("withMemoryR
 
 % end # mutable
 
+UnsafeRawBufferPointerTestSuite.test("assumingMemoryBound") {
+  let array = (0..<4).map({ $0 })
+  array.withUnsafeBytes({
+    let b: UnsafeBufferPointer = $0.assumingMemoryBound(to: Int.self)
+    expectEqual(b.count, array.count)
+    expectEqual(b[3], array[3])
+  })
+  var mutableArray = array
+  mutableArray.withUnsafeMutableBytes({
+    let b: UnsafeMutableBufferPointer = $0.assumingMemoryBound(to: Int.self)
+    expectEqual(b.count, array.count)
+    for i in b.indices { b[i] += 1 }
+  })
+  expectEqual(mutableArray[3], array[3]+1)
+}
+
 runAllTests()
