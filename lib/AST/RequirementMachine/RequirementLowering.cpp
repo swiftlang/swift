@@ -133,7 +133,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
     return;
   }
 
-  if (auto *paramType = constraintType->getAs<ParametrizedProtocolType>()) {
+  if (auto *paramType = constraintType->getAs<ParameterizedProtocolType>()) {
     auto *protoDecl = paramType->getBaseType()->getDecl();
 
     desugarConformanceRequirement(subjectType, paramType->getBaseType(),
@@ -214,7 +214,7 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
 
   if (constraintType->is<ProtocolType>() ||
       constraintType->is<ProtocolCompositionType>() ||
-      constraintType->is<ParametrizedProtocolType>()) {
+      constraintType->is<ParameterizedProtocolType>()) {
     // Handle conformance requirements.
     desugarConformanceRequirement(subjectType, constraintType, reqs);
   } else if (constraintType->getClassOrBoundGenericClass()) {

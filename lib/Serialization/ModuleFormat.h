@@ -1105,8 +1105,8 @@ namespace decls_block {
     BCArray<TypeIDField> // protocols
   >;
 
-  using ParametrizedProtocolTypeLayout = BCRecordLayout<
-    PARAMETRIZED_PROTOCOL_TYPE,
+  using ParameterizedProtocolTypeLayout = BCRecordLayout<
+    PARAMETERIZED_PROTOCOL_TYPE,
     TypeIDField,         // base
     TypeIDWithBitField   // argument
   >;

@@ -1477,7 +1477,7 @@ private:
 
     case TypeKind::Existential:
     case TypeKind::ProtocolComposition:
-    case TypeKind::ParametrizedProtocol: {
+    case TypeKind::ParameterizedProtocol: {
       auto *Decl = DbgTy.getDecl();
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);

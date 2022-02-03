@@ -405,7 +405,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
-    llvm::FoldingSet<ParametrizedProtocolType> ParametrizedProtocolTypes;
+    llvm::FoldingSet<ParameterizedProtocolType> ParameterizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
     llvm::DenseMap<std::pair<OpaqueTypeDecl *, SubstitutionMap>,
                    GenericEnvironment *> OpaqueArchetypeEnvironments;
@@ -3404,9 +3404,9 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
   return compTy;
 }
 
-Type ParametrizedProtocolType::get(const ASTContext &C,
-                                   ProtocolType *baseTy,
-                                   Type argTy) {
+Type ParameterizedProtocolType::get(const ASTContext &C,
+                                    ProtocolType *baseTy,
+                                    Type argTy) {
   bool isCanonical = baseTy->isCanonical();
   RecursiveTypeProperties properties = baseTy->getRecursiveProperties();
   properties |= argTy->getRecursiveProperties();
@@ -3416,16 +3416,16 @@ Type ParametrizedProtocolType::get(const ASTContext &C,
 
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
-  ParametrizedProtocolType::Profile(ID, baseTy, argTy);
+  ParameterizedProtocolType::Profile(ID, baseTy, argTy);
 
   if (auto paramTy
-      = C.getImpl().getArena(arena).ParametrizedProtocolTypes
+      = C.getImpl().getArena(arena).ParameterizedProtocolTypes
           .FindNodeOrInsertPos(ID, InsertPos))
     return paramTy;
 
-  auto paramTy = new (C, arena) ParametrizedProtocolType(
+  auto paramTy = new (C, arena) ParameterizedProtocolType(
         isCanonical ? &C : nullptr, baseTy, argTy, properties);
-  C.getImpl().getArena(arena).ParametrizedProtocolTypes.InsertNode(
+  C.getImpl().getArena(arena).ParameterizedProtocolTypes.InsertNode(
       paramTy, InsertPos);
   return paramTy;
 }

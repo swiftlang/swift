@@ -321,9 +321,9 @@ namespace swift {
     /// keyword.
     bool EnableExplicitExistentialTypes = true;
 
-    /// Enable support for protocol types parametrized by primary
+    /// Enable support for protocol types parameterized by primary
     /// associated type.
-    bool EnableParametrizedProtocolTypes = false;
+    bool EnableParameterizedProtocolTypes = false;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;

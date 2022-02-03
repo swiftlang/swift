@@ -5243,7 +5243,7 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
-/// ParametrizedProtocolType - A type that constrains the primary associated
+/// ParameterizedProtocolType - A type that constrains the primary associated
 /// type of a protocol to an argument type.
 ///
 /// Written like a bound generic type, eg Sequence<Int>.
@@ -5259,7 +5259,7 @@ END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 /// \code
 /// T : Sequence where T.Element == Int.
 /// \endcode
-class ParametrizedProtocolType final : public TypeBase,
+class ParameterizedProtocolType final : public TypeBase,
     public llvm::FoldingSetNode {
   friend struct ExistentialLayout;
 
@@ -5294,18 +5294,18 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::ParametrizedProtocol;
+    return T->getKind() == TypeKind::ParameterizedProtocol;
   }
   
 private:
-  ParametrizedProtocolType(const ASTContext *ctx,
-                           ProtocolType *base, Type arg,
-                           RecursiveTypeProperties properties);
+  ParameterizedProtocolType(const ASTContext *ctx,
+                            ProtocolType *base, Type arg,
+                            RecursiveTypeProperties properties);
 };
-BEGIN_CAN_TYPE_WRAPPER(ParametrizedProtocolType, Type)
+BEGIN_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getArgumentType)
-END_CAN_TYPE_WRAPPER(ParametrizedProtocolType, Type)
+END_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
 
 /// An existential type, spelled with \c any .
 ///

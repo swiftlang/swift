@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify -enable-parametrized-protocol-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify -enable-parameterized-protocol-types -disable-availability-checking
 
-// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -enable-parametrized-protocol-types -requirement-machine-inferred-signatures=verify -disable-availability-checking 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify -enable-parameterized-protocol-types -requirement-machine-inferred-signatures=verify -disable-availability-checking 2>&1 | %FileCheck %s
 
 
 protocol Sequence {
@@ -19,38 +19,38 @@ struct ConcreteEquatableSequence<Element : Equatable> : EquatableSequence {}
 
 /// Parametrized protocol in protocol inheritance clause
 
-// CHECK-LABEL: parametrized_protocol.(file).IntSequence@
+// CHECK-LABEL: parameterized_protocol.(file).IntSequence@
 // CHECK: Requirement signature: <Self where Self : Sequence, Self.[Sequence]Element == Int>
 protocol IntSequence : Sequence<Int> {}
 
 
-/// Concrete types cannot inherit from a parametrized protocol
+/// Concrete types cannot inherit from a parameterized protocol
 
 struct SillyStruct : Sequence<Int> {}
-// expected-error@-1 {{cannot inherit from parametrized protocol type 'Sequence<Int>'}}
+// expected-error@-1 {{cannot inherit from protocol type with generic argument 'Sequence<Int>'}}
 // expected-error@-2 {{type 'SillyStruct' does not conform to protocol 'Sequence'}}
 
 
 /// Parametrized protocol in generic parameter inheritance clause
 
-// CHECK-LABEL: parametrized_protocol.(file).IntSequenceWrapper@
+// CHECK-LABEL: parameterized_protocol.(file).IntSequenceWrapper@
 // CHECK: Generic signature: <S where S : Sequence, S.[Sequence]Element == Int>
 struct IntSequenceWrapper<S : Sequence<Int>> {}
 
-// CHECK-LABEL: parametrized_protocol.(file).SequenceWrapper@
+// CHECK-LABEL: parameterized_protocol.(file).SequenceWrapper@
 // CHECK: Generic signature: <S, E where S : Sequence, E == S.[Sequence]Element>
 struct SequenceWrapper<S : Sequence<E>, E> {}
 
 
 /// Parametrized protocol in associated type inheritance clause
 
-// CHECK-LABEL: parametrized_protocol.(file).IntSequenceWrapperProtocol@
+// CHECK-LABEL: parameterized_protocol.(file).IntSequenceWrapperProtocol@
 // CHECK: Requirement signature: <Self where Self.[IntSequenceWrapperProtocol]S : Sequence, Self.[IntSequenceWrapperProtocol]S.[Sequence]Element == Int>
 protocol IntSequenceWrapperProtocol {
   associatedtype S : Sequence<Int>
 }
 
-// CHECK-LABEL: parametrized_protocol.(file).SequenceWrapperProtocol@
+// CHECK-LABEL: parameterized_protocol.(file).SequenceWrapperProtocol@
 // CHECK: Requirement signature: <Self where Self.[SequenceWrapperProtocol]E == Self.[SequenceWrapperProtocol]S.[Sequence]Element, Self.[SequenceWrapperProtocol]S : Sequence>
 protocol SequenceWrapperProtocol {
   associatedtype S : Sequence<E>
@@ -60,24 +60,24 @@ protocol SequenceWrapperProtocol {
 
 /// Parametrized protocol in where clause of concrete type
 
-// CHECK-LABEL: parametrized_protocol.(file).IntSequenceWrapper2@
+// CHECK-LABEL: parameterized_protocol.(file).IntSequenceWrapper2@
 // CHECK: Generic signature: <S where S : Sequence, S.[Sequence]Element == Int>
 struct IntSequenceWrapper2<S> where S : Sequence<Int> {}
 
-// CHECK-LABEL: parametrized_protocol.(file).SequenceWrapper2@
+// CHECK-LABEL: parameterized_protocol.(file).SequenceWrapper2@
 // CHECK: Generic signature: <S, E where S : Sequence, E == S.[Sequence]Element>
 struct SequenceWrapper2<S, E> where S : Sequence<E> {}
 
 
 /// Parametrized protocol in where clause of associated type
 
-// CHECK-LABEL: parametrized_protocol.(file).IntSequenceWrapperProtocol2@
+// CHECK-LABEL: parameterized_protocol.(file).IntSequenceWrapperProtocol2@
 // CHECK: Requirement signature: <Self where Self.[IntSequenceWrapperProtocol2]S : Sequence, Self.[IntSequenceWrapperProtocol2]S.[Sequence]Element == Int>
 protocol IntSequenceWrapperProtocol2 {
   associatedtype S where S : Sequence<Int>
 }
 
-// CHECK-LABEL: parametrized_protocol.(file).SequenceWrapperProtocol2@
+// CHECK-LABEL: parameterized_protocol.(file).SequenceWrapperProtocol2@
 // CHECK: Requirement signature: <Self where Self.[SequenceWrapperProtocol2]E == Self.[SequenceWrapperProtocol2]S.[Sequence]Element, Self.[SequenceWrapperProtocol2]S : Sequence>
 protocol SequenceWrapperProtocol2 {
   associatedtype S where S : Sequence<E>
@@ -111,19 +111,19 @@ struct OpaqueTypes<E> {
 }
 
 
-/// Extensions of parametrized protocol type
+/// Extensions of parameterized protocol type
 
 // CHECK-LABEL: ExtensionDecl line={{[0-9]+}} base=Sequence<Int>
 // CHECK: Generic signature: <Self where Self : Sequence, Self.[Sequence]Element == Int>
 extension Sequence<Int> {
 
-  // CHECK-LABEL: parametrized_protocol.(file).Sequence extension.doSomethingGeneric@
+  // CHECK-LABEL: parameterized_protocol.(file).Sequence extension.doSomethingGeneric@
   // CHECK: Generic signature: <Self, E where Self : Sequence, Self.[Sequence]Element == Int>
   func doSomethingGeneric<E>(_: E) {}
 }
 
 
-/// Cannot use parametrized protocol as the type of a value
+/// Cannot use parameterized protocol as the type of a value
 
 func takesSequenceOfInt1(_: Sequence<Int>) {}
 // expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}

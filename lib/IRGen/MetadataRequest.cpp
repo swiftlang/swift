@@ -1741,8 +1741,8 @@ namespace {
     }
 
     MetadataResponse
-    visitParametrizedProtocolType(CanParametrizedProtocolType type,
-                                  DynamicMetadataRequest request) {
+    visitParameterizedProtocolType(CanParameterizedProtocolType type,
+                                   DynamicMetadataRequest request) {
       return emitExistentialTypeMetadata(type, request);
     }
 
