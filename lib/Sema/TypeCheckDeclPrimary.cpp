@@ -1664,6 +1664,30 @@ ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   return {};
 }
 
+static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
+                                            const Pattern *P,
+                                            Expr *init) {
+  // Make sure we have a user-written type annotation.
+  auto *TP = dyn_cast<TypedPattern>(P);
+  if (!TP || !TP->getTypeRepr()) {
+    return;
+  }
+
+  auto *repr = TP->getTypeRepr()->getWithoutParens();
+  if (auto *PTR = dyn_cast<PlaceholderTypeRepr>(repr)) {
+    Ctx.Diags.diagnose(P->getLoc(),
+                       diag::placeholder_type_not_allowed_in_pattern)
+        .highlight(P->getSourceRange());
+    if (init && !init->getType()->hasError()) {
+      auto initTy = init->getType()->mapTypeOutOfContext();
+      Ctx.Diags
+          .diagnose(PTR->getLoc(),
+                    diag::replace_placeholder_with_inferred_type, initTy)
+          .fixItReplace(PTR->getSourceRange(), initTy.getString());
+    }
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2077,6 +2101,11 @@ public:
         diagnoseUnownedImmediateDeallocation(Ctx, PBD->getPattern(i),
                                              PBD->getEqualLoc(i),
                                              init);
+
+        // Written placeholder types are banned in the signatures of pattern
+        // bindings. If there's a valid initializer, try to offer its type
+        // as a replacement.
+        diagnoseWrittenPlaceholderTypes(Ctx, PBD->getPattern(i), init);
 
         // If we entered an initializer context, contextualize any
         // auto-closures we might have created.

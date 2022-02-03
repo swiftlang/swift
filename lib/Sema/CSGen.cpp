@@ -1364,7 +1364,7 @@ namespace {
         return Type();
       }
       // Diagnose top-level usages of placeholder types.
-      if (isa<TopLevelCodeDecl>(CS.DC) && isa<PlaceholderTypeRepr>(repr)) {
+      if (isa<PlaceholderTypeRepr>(repr->getWithoutParens())) {
         CS.getASTContext().Diags.diagnose(repr->getLoc(),
                                           diag::placeholder_type_not_allowed);
       }
