@@ -3,30 +3,24 @@ RUN: %remote-run -n --remote-dir /xyz-REMOTE -o FIRST_OPT -o SECOND_OPT --output
 CHECK: /usr/bin/ssh -n
 CHECK-DAG: -p 12345
 CHECK-DAG: -o FIRST_OPT -o SECOND_OPT
-CHECK-SAME: some_user@some_host -- '/usr/bin/env' '/bin/rm' '-rf' '{{.+}}-REMOTE/output'
+CHECK-SAME: some_user@some_host -- '/usr/bin/env'
+CHECK-SAME: '/bin/rm' '-rf' '{{.+}}-REMOTE/output'
 
 CHECK-NEXT: /usr/bin/ssh -n
 CHECK-DAG: -p 12345
 CHECK-DAG: -o FIRST_OPT -o SECOND_OPT
-CHECK-SAME: some_user@some_host -- '/usr/bin/env' '/bin/mkdir' '-p' '{{.+}}-REMOTE/output/nested'
-
-CHECK-NEXT: /usr/bin/sftp
-CHECK-DAG: -P 12345
-CHECK-DAG: -o FIRST_OPT -o SECOND_OPT
-CHECK-SAME: some_user@some_host
-CHECK-DAG: -put '{{.+}}/nested/output' '/xyz-REMOTE/output/nested/output'
-CHECK-DAG: -put '{{.+}}/nested/input' '/xyz-REMOTE/output/nested/input'
+CHECK-SAME: some_user@some_host -- '/usr/bin/env'
+CHECK-SAME: '/bin/mkdir' '-p' '{{.+}}-REMOTE/output/nested'
 
 CHECK: /usr/bin/ssh -n
 CHECK-DAG: -p 12345
 CHECK-DAG: -o FIRST_OPT -o SECOND_OPT
-CHECK-SAME: some_user@some_host -- '/usr/bin/env' 'cp'
+CHECK-SAME: some_user@some_host -- '/usr/bin/env'
+CHECK-SAME: 'cp'
 
-CHECK-NEXT: {{^}}/bin/mkdir -p {{.+}}/nested
+CHECK-NEXT: {{^}}/bin/mkdir -p {{.+}}
 
-CHECK-NEXT: /usr/bin/sftp
-CHECK-DAG: -P 12345
-CHECK-DAG: -o FIRST_OPT -o SECOND_OPT
+CHECK-NEXT: /usr/bin/rsync
+CHECK-DAG: '-p' '12345'
+CHECK-DAG: '-o' 'FIRST_OPT' '-o' 'SECOND_OPT'
 CHECK-SAME: some_user@some_host
-CHECK-DAG: -get '/xyz-REMOTE/output/nested/output' '{{.+}}/nested/output'
-CHECK-DAG: -get '/xyz-REMOTE/output/nested/input' '{{.+}}/nested/input'
