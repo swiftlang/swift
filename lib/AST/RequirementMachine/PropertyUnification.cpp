@@ -518,6 +518,9 @@ void PropertyMap::addConcreteTypeProperty(
     assert(simplified);
     (void) simplified;
 
+    // FIXME: This is unsound! While 'key' was canonical at the time we
+    // started property map construction, we might have added other rules
+    // since then that made it non-canonical.
     assert(path.size() == 1);
     assert(path.begin()->Kind == RewriteStep::Rule);
 
