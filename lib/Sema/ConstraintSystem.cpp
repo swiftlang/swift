@@ -2714,6 +2714,7 @@ void ConstraintSystem::bindOverloadType(
     if (!argList) {
       argList = ArgumentList::createImplicit(
           ctx, {Argument(SourceLoc(), ctx.Id_dynamicMember, /*expr*/ nullptr)},
+          /*firstTrailingClosureIndex=*/None,
           AllocationArena::ConstraintSolver);
     }
 

@@ -10736,12 +10736,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
         if (matchCallResult != SolutionKind::Solved)
           return SolutionKind::Error;
 
-        // Note that `createImplicit` cannot be used here because it
-        // doesn't allow us to specify trailing closure index.
-        auto *implicitCallArgumentList = ArgumentList::createParsed(
-            ctx, /*LParen=*/SourceLoc(), trailingClosures,
-            /*RParen=*/SourceLoc(),
-            /*firstTrailingClosureIndex=*/0);
+        auto *implicitCallArgumentList =
+            ArgumentList::createImplicit(ctx, trailingClosures,
+                                         /*firstTrailingClosureIndex=*/0);
 
         auto *implicitRef = createImplicitRootForCallAsFunction(
             *this, callAsFunctionResultTy, implicitCallArgumentList, calleeLoc);
@@ -11720,6 +11717,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (!ArgumentLists.count(memberLoc)) {
       auto *argList = ArgumentList::createImplicit(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
+          /*firstTrailingClosureIndex=*/None,
           AllocationArena::ConstraintSolver);
       ArgumentLists.insert({memberLoc, argList});
     }
