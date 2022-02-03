@@ -57,6 +57,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Range.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include "RewriteSystem.h"
@@ -123,6 +124,16 @@ void RewriteStep::dump(llvm::raw_ostream &out,
       out << result.suffix;
     }
 
+    break;
+  }
+  case DecomposeConcrete: {
+    evaluator.applyDecomposeConcrete(*this, system);
+
+    out << (Inverse ? "ComposeConcrete(" : "DecomposeConcrete(");
+
+    const auto &difference = system.getTypeDifference(Arg);
+
+    out << difference.LHS << " : " << difference.RHS << ")";
     break;
   }
   }
@@ -444,6 +455,93 @@ RewritePathEvaluator::applyRelation(const RewriteStep &step,
   return {lhs, rhs, prefix, suffix};
 }
 
+void RewritePathEvaluator::applyDecomposeConcrete(const RewriteStep &step,
+                                                  const RewriteSystem &system) {
+  assert(step.Kind == RewriteStep::DecomposeConcrete);
+
+  const auto &difference = system.getTypeDifference(step.Arg);
+  auto bug = [&](StringRef msg) {
+    llvm::errs() << msg << "\n";
+    llvm::errs() << "- StartOffset: " << step.StartOffset << "\n";
+    llvm::errs() << "- EndOffset: " << step.EndOffset << "\n";
+    llvm::errs() << "- DifferenceID: " << step.Arg << "\n";
+    llvm::errs() << "\nType difference:\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << "\nEvaluator state:\n";
+    dump(llvm::errs());
+    abort();
+  };
+
+  auto substitutions = difference.LHS.getSubstitutions();
+
+  auto getReplacementSubstitution = [&](unsigned n) -> MutableTerm {
+    for (const auto &pair : difference.SameTypes) {
+      if (pair.first == n) {
+        // Given a transformation Xn -> Xn', return the term Xn'.
+        return MutableTerm(pair.second);
+      }
+    }
+
+    for (const auto &pair : difference.ConcreteTypes) {
+      if (pair.first == n) {
+        // Given a transformation Xn -> [concrete: D], return the
+        // return Xn.[concrete: D].
+        MutableTerm result(substitutions[n]);
+        result.add(pair.second);
+        return result;
+      }
+    }
+
+    // Otherwise return the original substitution Xn.
+    return MutableTerm(substitutions[n]);
+  };
+
+  if (!step.Inverse) {
+    auto &term = getCurrentTerm();
+
+    auto concreteSymbol = *(term.end() - step.EndOffset - 1);
+    if (concreteSymbol != difference.RHS)
+      bug("Concrete symbol not equal to expected RHS");
+
+    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset - 1);
+    newTerm.add(difference.LHS);
+    newTerm.append(term.end() - step.EndOffset, term.end());
+    term = newTerm;
+
+    for (unsigned n : indices(substitutions))
+      Primary.push_back(getReplacementSubstitution(n));
+
+  } else {
+    unsigned numSubstitutions = substitutions.size();
+
+    if (Primary.size() < numSubstitutions + 1)
+      bug("Not enough terms on the stack");
+
+    for (unsigned n : indices(substitutions)) {
+      const auto &otherSubstitution = *(Primary.end() - numSubstitutions + n);
+      auto expectedSubstitution = getReplacementSubstitution(n);
+      if (otherSubstitution != expectedSubstitution) {
+        llvm::errs() << "Got: " << otherSubstitution << "\n";
+        llvm::errs() << "Expected: " << expectedSubstitution << "\n";
+        bug("Unexpected substitution term on the stack");
+      }
+    }
+
+    Primary.resize(Primary.size() - numSubstitutions);
+
+    auto &term = getCurrentTerm();
+
+    auto concreteSymbol = *(term.end() - step.EndOffset - 1);
+    if (concreteSymbol != difference.LHS)
+      bug("Concrete symbol not equal to expected LHS");
+
+    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset - 1);
+    newTerm.add(difference.RHS);
+    newTerm.append(term.end() - step.EndOffset, term.end());
+    term = newTerm;
+  }
+}
+
 void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
@@ -465,6 +563,10 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
 
   case RewriteStep::Relation:
     applyRelation(step, system);
+    break;
+
+  case RewriteStep::DecomposeConcrete:
+    applyDecomposeConcrete(step, system);
     break;
   }
 }

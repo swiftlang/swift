@@ -110,7 +110,48 @@ struct RewriteStep {
     ///
     /// The Arg field stores the result of calling
     /// RewriteSystem::recordRelation().
-    Relation
+    Relation,
+
+    /// A generalization of `Decompose` that can replace structural components
+    /// of the type with concrete types, using a TypeDifference that has been
+    /// computed previously.
+    ///
+    /// The Arg field is a TypeDifference ID, returned from
+    /// RewriteSystem::registerTypeDifference().
+    ///
+    /// Say the TypeDifference LHS is [concrete: C<...> with <X1, X2...>], and
+    /// say the TypeDifference RHS is [concrete: C'<...> with <X', X2', ...>].
+    ///
+    /// Note that the LHS and RHS may have a different number of substitutions.
+    ///
+    /// If not inverted: the top of the primary stack must be a term ending
+    /// with the RHS of the TypeDifference:
+    ///
+    ///    T.[concrete: C'<...> with <X1', X2'...>]
+    ///
+    /// First, the symbol at the end of the term is replaced by the LHS of the
+    /// TypeDifference:
+    ///
+    ///    T.[concrete: C<...> with <X1, X2...>]
+    ///
+    /// Then, each substitution of the LHS is pushed on the primary stack, with
+    /// the transforms of the TypeDifference applied:
+    ///
+    /// - If (n, f(Xn)) appears in TypeDifference::SameTypes, then we push
+    ///   f(Xn).
+    /// - If (n, [concrete: D]) appears in TypeDifference::ConcreteTypes, then
+    ///   we push Xn.[concrete: D].
+    /// - Otherwise, we push Xn.
+    ///
+    /// This gives you something like:
+    ///
+    ///    T.[concrete: C<...> with <X1, X2, X3...>] X1 f(X2) X3.[concrete: D]
+    ///
+    /// If inverted: the above is performed in reverse, leaving behind the
+    /// term ending with the TypeDifference RHS at the top of the primary stack:
+    ///
+    ///    T.[concrete: C'<...> with <X1', X2'...>]
+    DecomposeConcrete
   };
 
   /// The rewrite step kind.
@@ -177,6 +218,11 @@ struct RewriteStep {
                                  bool inverse) {
     return RewriteStep(Relation, startOffset, /*endOffset=*/0,
                        /*arg=*/relationID, inverse);
+  }
+
+  static RewriteStep forDecomposeConcrete(unsigned differenceID, bool inverse) {
+    return RewriteStep(DecomposeConcrete, /*startOffset=*/0, /*endOffset=*/0,
+                       /*arg=*/differenceID, inverse);
   }
 
   bool isInContext() const {
@@ -370,6 +416,9 @@ struct RewritePathEvaluator {
   AppliedRewriteStep
   applyRelation(const RewriteStep &step,
                 const RewriteSystem &system);
+
+  void applyDecomposeConcrete(const RewriteStep &step,
+                              const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
 };

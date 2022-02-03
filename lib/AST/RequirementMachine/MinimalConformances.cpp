@@ -138,6 +138,7 @@ void RewriteLoop::findProtocolConformanceRules(
       case RewriteStep::Shift:
       case RewriteStep::Decompose:
       case RewriteStep::Relation:
+      case RewriteStep::DecomposeConcrete:
         break;
       }
     }

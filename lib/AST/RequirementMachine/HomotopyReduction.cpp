@@ -98,6 +98,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
       break;
     }
 
@@ -217,6 +218,7 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
       break;
     }
 
@@ -265,24 +267,31 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
   SmallVector<RewriteStep, 4> newSteps;
 
-  // Keep track of Decompose/Compose pairs. Any rewrite steps in
-  // between do not need to be re-contextualized, since they
-  // operate on new terms that were pushed on the stack by the
-  // Compose operation.
-  unsigned decomposeCount = 0;
-
   for (const auto &step : Steps) {
     switch (step.Kind) {
     case RewriteStep::Rule: {
+      // All other rewrite rules remain unchanged.
       if (step.getRuleID() != ruleID) {
         newSteps.push_back(step);
         break;
       }
 
+      // Ok, we found a rewrite step referencing the redundant rule.
+      // Replace this step with the provided path. If this rewrite step has
+      // context, the path's own steps must be re-contextualized.
+
+      // Keep track of Decompose/DecomposeConcrete pairs. Any rewrite steps
+      // in between do not need to be re-contextualized, since they operate
+      // on new terms that were pushed on the stack by the Decompose or
+      // DecomposeConcrete operation.
+      unsigned decomposeCount = 0;
+
       auto recontextualizeStep = [&](RewriteStep newStep) {
         bool inverse = newStep.Inverse ^ step.Inverse;
 
-        if (newStep.Kind == RewriteStep::Decompose && inverse) {
+        if ((newStep.Kind == RewriteStep::Decompose ||
+             newStep.Kind == RewriteStep::DecomposeConcrete) &&
+            inverse) {
           assert(decomposeCount > 0);
           --decomposeCount;
         }
@@ -295,11 +304,14 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
         newStep.Inverse = inverse;
         newSteps.push_back(newStep);
 
-        if (newStep.Kind == RewriteStep::Decompose && !inverse) {
+        if ((newStep.Kind == RewriteStep::Decompose ||
+             newStep.Kind == RewriteStep::DecomposeConcrete) &&
+            !inverse) {
           ++decomposeCount;
         }
       };
 
+      // If this rewrite step is inverted, invert the entire path.
       if (step.Inverse) {
         for (auto newStep : llvm::reverse(path))
           recontextualizeStep(newStep);
@@ -308,12 +320,16 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
           recontextualizeStep(newStep);
       }
 
+      // Decompose and DecomposeConcrete steps should come in balanced pairs.
+      assert(decomposeCount == 0);
+
       break;
     }
     case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
       newSteps.push_back(step);
       break;
     }
