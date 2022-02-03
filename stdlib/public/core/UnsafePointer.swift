@@ -303,6 +303,8 @@ public struct UnsafePointer<Pointee>: _Pointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
+  // This custom silgen name is chosen to not interfere with the old ABI
+  @_silgen_name("_swift_se0333_UnsafePointer_withMemoryRebound")
   public func withMemoryRebound<T, Result>(
     to type: T.Type, capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws -> Result
@@ -315,6 +317,21 @@ public struct UnsafePointer<Pointee>: _Pointer {
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
+    return try body(.init(_rawValue))
+  }
+
+  // This unavailable implementation uses the expected mangled name
+  // of `withMemoryRebound`, and provides an entry point for any
+  // binary compiled against the stlib binary for Swift 5.6 and older.
+  @available(*, unavailable)
+  @_silgen_name("$sSP17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_SPyqd__GKXEtKr0_lF")
+  public func _legacy_se0333_withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
+    _ body: (UnsafePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer {
+      Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
+    }
     return try body(.init(_rawValue))
   }
 
@@ -970,6 +987,8 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   @_alwaysEmitIntoClient
+  // This custom silgen name is chosen to not interfere with the old ABI
+  @_silgen_name("$_swift_se0333_UnsafeMutablePointer_withMemoryRebound")
   public func withMemoryRebound<T, Result>(
     to type: T.Type, capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
@@ -982,6 +1001,21 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
+    return try body(.init(_rawValue))
+  }
+
+  // This unavailable implementation uses the expected mangled name
+  // of `withMemoryRebound`, and provides an entry point for any
+  // binary compiled against the stlib binary for Swift 5.6 and older.
+  @available(*, unavailable)
+  @_silgen_name("$sSp17withMemoryRebound2to8capacity_qd_0_qd__m_Siqd_0_Spyqd__GKXEtKr0_lF")
+  public func _legacy_se0333_withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
+    _ body: (UnsafeMutablePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer {
+      Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
+    }
     return try body(.init(_rawValue))
   }
 
