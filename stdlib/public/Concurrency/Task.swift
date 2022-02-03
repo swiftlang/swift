@@ -695,9 +695,12 @@ extension Task where Success == Never, Failure == Never {
 /// Storing an unsafe reference doesn't affect the task's actual life cycle,
 /// and the behavior of accessing an unsafe task reference
 /// outside of the `withUnsafeCurrentTask(body:)` method's closure isn't defined.
-/// Instead, use the `task` property of `UnsafeCurrentTask`
-/// to access an instance of `Task` that you can store long-term
-/// and interact with outside of the closure body.
+///
+/// If necessary to store a `Task` object itself, it is possible to create
+/// an un-structured task and store it, however it is not possible to retrieve
+/// the "current" task object itself. Instead, interactions with the "current"
+/// task are performed with the `currentPriority` and similar APIs which safely
+/// query the current task, without exposing its actual identity.
 ///
 /// - Parameters:
 ///   - body: A closure that takes an `UnsafeCurrentTask` parameter.
