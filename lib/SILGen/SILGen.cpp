@@ -1980,8 +1980,11 @@ public:
         // emitAsyncMainThreadStart will create argc and argv.
         // Just set the main actor as the expected executor; we should
         // already be running on it.
+        SILValue executor = sgm.TopLevelSGF->emitMainExecutor(prologueLoc);
         sgm.TopLevelSGF->ExpectedExecutor =
-          sgm.TopLevelSGF->emitMainExecutor(prologueLoc);
+            sgm.TopLevelSGF->B.createOptionalSome(
+                prologueLoc, executor,
+                SILType::getOptionalType(executor->getType()));
       } else {
         // Create the argc and argv arguments.
         auto entry = sgm.TopLevelSGF->B.getInsertionBB();
