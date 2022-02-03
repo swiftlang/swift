@@ -503,6 +503,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalStringProcessing |=
       Args.hasArg(OPT_enable_experimental_string_processing);
 
+  Opts.EnableExperimentalBoundGenericExtensions |=
+    Args.hasArg(OPT_enable_experimental_bound_generic_extensions);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   Opts.CheckAPIAvailabilityOnly |=
