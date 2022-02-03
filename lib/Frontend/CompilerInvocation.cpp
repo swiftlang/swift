@@ -2043,8 +2043,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   if (Args.hasArg(OPT_disable_reflection_metadata)) {
-    Opts.EnableReflectionMetadata = false;
+    Opts.ReflectionMetadata = ReflectionMetadataMode::None;
     Opts.EnableReflectionNames = false;
+  }
+
+  if (Args.hasArg(OPT_reflection_metadata_for_debugger_only)) {
+    Opts.ReflectionMetadata = ReflectionMetadataMode::DebuggerOnly;
+    Opts.EnableReflectionNames = true;
   }
 
   if (Args.hasArg(OPT_enable_anonymous_context_mangled_names))
