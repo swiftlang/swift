@@ -143,9 +143,11 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    // NOTE: Unchecked math because unsafe pointers are not required to
-    // behave sensibly if you misuse their indices. We validate in
-    // debug mode.
+    // NOTE: Wrapping math because we allow unsafe buffer pointers not to verify
+    // index preconditions in release builds. Our (optimistic) assumption is
+    // that the caller is already ensuring that indices are valid, so we can
+    // elide the usual checks to help the optimizer generate better code.
+    // However, we still check for overflow in debug mode.
     let result = i.addingReportingOverflow(1)
     _debugPrecondition(!result.overflow)
     return result.partialValue
@@ -158,9 +160,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    // NOTE: Unchecked math because unsafe pointers are not required to
-    // behave sensibly if you misuse their indices. We validate in
-    // debug mode.
+    // See note on wrapping arithmetic in `index(after:)` above.
     let result = i.addingReportingOverflow(1)
     _debugPrecondition(!result.overflow)
     i = result.partialValue
@@ -173,9 +173,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    // NOTE: Unchecked math because unsafe pointers are not required to
-    // behave sensibly if you misuse their indices. We validate in
-    // debug mode.
+    // See note on wrapping arithmetic in `index(after:)` above.
     let result = i.subtractingReportingOverflow(1)
     _debugPrecondition(!result.overflow)
     return result.partialValue
@@ -188,9 +186,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    // NOTE: Unchecked math because unsafe pointers are not required to
-    // behave sensibly if you misuse their indices. We validate in
-    // debug mode.
+    // See note on wrapping arithmetic in `index(after:)` above.
     let result = i.subtractingReportingOverflow(1)
     _debugPrecondition(!result.overflow)
     i = result.partialValue
@@ -203,9 +199,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    // NOTE: Unchecked math because unsafe pointers are not required to
-    // behave sensibly if you misuse their indices. We validate in
-    // debug mode.
+    // See note on wrapping arithmetic in `index(after:)` above.
     let result = i.addingReportingOverflow(n)
     _debugPrecondition(!result.overflow)
     return result.partialValue
@@ -218,9 +212,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    // NOTE: Unchecked math because unsafe pointers are not required to
-    // behave sensibly if you misuse their indices. We validate in
-    // debug mode.
+    // See note on wrapping arithmetic in `index(after:)` above.
     let maxOffset = limit.subtractingReportingOverflow(i)
     _debugPrecondition(!maxOffset.overflow)
     let l = maxOffset.partialValue
