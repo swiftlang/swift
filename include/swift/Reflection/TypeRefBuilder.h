@@ -94,9 +94,18 @@ public:
     
   ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size)
     : Cur(Cur), Size(Size) {
-    if (Size != 0 && Self::getCurrentRecordSize(this->operator*()) > Size) {
-      fputs("reflection section too small!\n", stderr);
-      abort();
+    if (Size != 0) {
+      auto NextRecord = this->operator*();
+      auto NextSize = Self::getCurrentRecordSize(NextRecord);
+      if (NextSize > Size) {
+        fputs("reflection section too small!\n", stderr);
+        std::cerr << "Section size: "
+                  << Size
+                  << ", size of first record: "
+                  << NextSize
+                  << std::endl;
+        abort();
+      }
     }
   }
 
@@ -117,6 +126,11 @@ public:
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
         fputs("reflection section too small!\n", stderr);
+        std::cerr << "Remaining section size: "
+                  << Size
+                  << ", size of next record: "
+                  << NextSize
+                  << std::endl;
         abort();
       }
     }
