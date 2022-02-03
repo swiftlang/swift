@@ -1054,4 +1054,33 @@ UnsafeMutableBufferPointerTestSuite.test("nonmutating-swapAt-withARC") {
 
 % end # SelfName
 
+% for mutable in [True, False]:
+% TypedName = 'UnsafeMutableBufferPointer' if mutable else 'UnsafeBufferPointer'
+Unsafe${'Mutable' if mutable else ''}BufferPointerTestSuite.test("withMemoryRebound") {
+  // test withMemoryRebound behaviour, post SE-0333.
+  let mutableBufferI = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+  defer { mutableBufferI.deallocate() }
+  let ptrI = ${'mutableBufferI' if mutable else TypedName + '(mutableBufferI)'}
+  // test rebinding to a wider type with the same alignment
+  ptrI.withMemoryRebound(to: (Int, Int).self) {
+    // Make sure the closure argument is a ${TypedName}
+    let ptrT: ${TypedName}<(Int, Int)> = $0
+    expectEqual(ptrT.count, 2)
+    // and that the element type is (Int, Int).
+    let mutablePtrT = ${'ptrT' if mutable else 'UnsafeMutableBufferPointer(mutating: ptrT)'}
+    expectType((Int, Int).self, &mutablePtrT[0])
+    // test rebinding to a narrower type
+    ptrT.withMemoryRebound(to: UInt.self) {
+      // Make sure the closure argument is a ${TypedName}
+      let ptrU: ${TypedName}<UInt> = $0
+      expectEqual(ptrU.count, 4)
+      // and that the element type is UInt.
+      let mutablePtrU = ${'ptrU' if mutable else 'UnsafeMutableBufferPointer(mutating: ptrU)'}
+      expectType(UInt.self, &mutablePtrU[0])
+    }
+  }
+}
+
+% end # mutable
+
 runAllTests()
