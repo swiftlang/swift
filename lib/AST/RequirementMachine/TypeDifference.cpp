@@ -251,8 +251,8 @@ namespace {
   };
 }
 
-static TypeDifference
-buildTypeDifference(
+TypeDifference
+swift::rewriting::buildTypeDifference(
     Symbol symbol,
     const llvm::SmallVector<std::pair<unsigned, Term>, 1> &sameTypes,
     const llvm::SmallVector<std::pair<unsigned, Symbol>, 1> &concreteTypes,

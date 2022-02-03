@@ -58,6 +58,13 @@ struct TypeDifference {
   void verify(RewriteContext &ctx) const;
 };
 
+TypeDifference
+buildTypeDifference(
+    Symbol symbol,
+    const llvm::SmallVector<std::pair<unsigned, Term>, 1> &sameTypes,
+    const llvm::SmallVector<std::pair<unsigned, Symbol>, 1> &concreteTypes,
+    RewriteContext &ctx);
+
 } // end namespace rewriting
 
 } // end namespace swift

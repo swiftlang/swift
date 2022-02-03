@@ -422,10 +422,10 @@ private:
   llvm::DenseMap<std::pair<Symbol, Symbol>, unsigned> DifferenceMap;
   std::vector<TypeDifference> Differences;
 
+public:
   unsigned recordTypeDifference(Symbol lhs, Symbol rhs,
                                 const TypeDifference &difference);
 
-public:
   bool
   computeTypeDifference(Symbol lhs, Symbol rhs,
                         Optional<unsigned> &lhsDifferenceID,
