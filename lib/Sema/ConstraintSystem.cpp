@@ -1777,6 +1777,19 @@ static Type typeEraseCovariantExistentialSelfReferences(Type refTy,
 
   unsigned metatypeDepth = 0;
 
+  /// Check whether the given type has a reference to the generic parameter
+  /// that we are erasing.
+  auto hasErasedGenericParameter = [&](Type type) {
+    if (!type->hasTypeParameter())
+      return false;
+
+    return type.findIf([&](Type type) {
+      if (auto gp = type->getAs<GenericTypeParamType>())
+        return gp->getDepth() == 0;
+      return false;
+    });
+  };
+
   std::function<Type(Type, TypePosition)> transformFn;
   transformFn = [&](Type type, TypePosition initialPos) -> Type {
     return type.transformWithPosition(
@@ -1796,6 +1809,20 @@ static Type typeEraseCovariantExistentialSelfReferences(Type refTy,
         }
 
         return Type(ExistentialMetatypeType::get(erasedTy));
+      }
+
+      // Opaque types whose substitutions involve this type parameter are
+      // erased to their upper bound.
+      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(type.getPointer())) {
+        for (auto replacementType :
+                 opaque->getSubstitutions().getReplacementTypes()) {
+          if (hasErasedGenericParameter(replacementType)) {
+            Type interfaceType = opaque->getInterfaceType();
+            auto genericSig =
+                opaque->getDecl()->getOpaqueInterfaceGenericSignature();
+            return genericSig->getNonDependentUpperBounds(interfaceType);
+          }
+        }
       }
 
       if (!t->isTypeParameter()) {
