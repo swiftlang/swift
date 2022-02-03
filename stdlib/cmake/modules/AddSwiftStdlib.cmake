@@ -833,6 +833,11 @@ function(add_swift_target_library_single target name)
       -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
 
+  # Define availability macros.
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}") 
+  endforeach()
+
   # Don't install the Swift module content for back-deployment libraries.
   if (SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY)
     set(install_in_component "never_install")
@@ -1712,11 +1717,6 @@ function(add_swift_target_library name)
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
 
-  # Define availability macros.
-  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}") 
-  endforeach()
-  
   # In the standard library and overlays, warn about implicit overrides
   # as a reminder to consider when inherited protocols need different
   # behavior for their requirements.
