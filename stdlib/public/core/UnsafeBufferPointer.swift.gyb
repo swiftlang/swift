@@ -749,19 +749,7 @@ extension Unsafe${Mutable}BufferPointer {
     to type: T.Type,
     _ body: (${Self}<T>) throws -> Result
   ) rethrows -> Result {
-    if let base = _position {
-      _debugPrecondition(MemoryLayout<Element>.stride == MemoryLayout<T>.stride)
-      Builtin.bindMemory(base._rawValue, count._builtinWordValue, T.self)
-      defer {
-        Builtin.bindMemory(base._rawValue, count._builtinWordValue, Element.self)
-      }
-
-      return try body(${Self}<T>(
-        start: Unsafe${Mutable}Pointer<T>(base._rawValue), count: count))
-    }
-    else {
-      return try body(${Self}<T>(start: nil, count: 0))
-    }
+    return try withMemoryRebound(to: T.self, body)
   }
 
   /// A pointer to the first element of the buffer.

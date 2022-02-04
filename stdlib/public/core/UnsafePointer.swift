@@ -333,11 +333,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
     capacity count: Int,
     _ body: (UnsafePointer<T>) throws -> Result
   ) rethrows -> Result {
-    Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
-    defer {
-      Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
-    }
-    return try body(.init(_rawValue))
+    return try withMemoryRebound(to: T.self, capacity: count, body)
   }
 
   /// Accesses the pointee at the specified offset from this pointer.
@@ -1022,11 +1018,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     capacity count: Int,
     _ body: (UnsafeMutablePointer<T>) throws -> Result
   ) rethrows -> Result {
-    Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
-    defer {
-      Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
-    }
-    return try body(.init(_rawValue))
+    return try withMemoryRebound(to: T.self, capacity: count, body)
   }
 
   /// Accesses the pointee at the specified offset from this pointer.
