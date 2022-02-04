@@ -744,8 +744,10 @@ extension Unsafe${Mutable}BufferPointer {
 % else:
   @_silgen_name("$sSR17withMemoryRebound2to_qd_0_qd__m_qd_0_SRyqd__GKXEtKr0_lF")
 % end
-  public func _legacy_se0333_withMemoryRebound<T, Result>(
-    to type: T.Type, _ body: (${Self}<T>) throws -> Result
+  @usableFromInline
+  internal func _legacy_se0333_withMemoryRebound<T, Result>(
+    to type: T.Type,
+    _ body: (${Self}<T>) throws -> Result
   ) rethrows -> Result {
     if let base = _position {
       _debugPrecondition(MemoryLayout<Element>.stride == MemoryLayout<T>.stride)
