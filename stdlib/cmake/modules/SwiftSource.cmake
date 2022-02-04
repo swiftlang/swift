@@ -457,6 +457,11 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
+  # The standard library and overlays are built with -requirement-machine-protocol-signatures=verify.
+  if(SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-requirement-machine-protocol-signatures=verify")
+  endif()
+
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
   if(SWIFTFILE_IS_STDLIB AND SWIFT_STDLIB_STABLE_ABI)
     list(APPEND swift_flags "-enable-library-evolution")
