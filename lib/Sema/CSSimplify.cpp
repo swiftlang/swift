@@ -10696,16 +10696,10 @@ ConstraintSystem::simplifyApplicableFnConstraint(
         auto &ctx = getASTContext();
         auto numTrailing = argumentList->getNumTrailingClosures();
 
-        SmallVector<Argument, 4> newArguments;
-        SmallVector<Argument, 4> trailingClosures;
-
-        for (unsigned i = 0, n = argumentList->size(); i != n; ++i) {
-          if (argumentList->isTrailingClosureIndex(i)) {
-            trailingClosures.push_back(argumentList->get(i));
-          } else {
-            newArguments.push_back(argumentList->get(i));
-          }
-        }
+        SmallVector<Argument, 4> newArguments(
+            argumentList->getNonTrailingArgs());
+        SmallVector<Argument, 4> trailingClosures(
+            argumentList->getTrailingClosures());
 
         // Original argument list with all the trailing closures removed.
         auto *newArgumentList = ArgumentList::createParsed(
