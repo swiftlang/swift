@@ -582,7 +582,12 @@ namespace {
 
     /// Add a pointer to the given type as the next parameter.
     void addPointerParameter(llvm::Type *storageType) {
-      ParamIRTypes.push_back(storageType->getPointerTo());
+      if (isa<llvm::FunctionType>(storageType)) {
+        // read the program data space from the target data layout
+        ParamIRTypes.push_back(storageType->getPointerTo(IGM.DataLayout.getProgramAddressSpace()));
+      } else {
+        ParamIRTypes.push_back(storageType->getPointerTo());
+      }
     }
 
     void addCoroutineContextParameter();
@@ -3452,11 +3457,11 @@ llvm::CallBase *CallEmission::emitCallSite() {
     auto origCallee = call->getCalledOperand();
     llvm::Value *opaqueCallee = origCallee;
     opaqueCallee =
-      IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);
+      IGF.Builder.CreatePointerBitCastOrAddrSpaceCast(opaqueCallee, IGF.IGM.Int8PtrTy);
     opaqueCallee = IGF.Builder.CreateIntrinsicCall(
         llvm::Intrinsic::coro_prepare_retcon, {opaqueCallee});
     opaqueCallee =
-      IGF.Builder.CreateBitCast(opaqueCallee, origCallee->getType());
+      IGF.Builder.CreatePointerBitCastOrAddrSpaceCast(opaqueCallee, origCallee->getType());
     call->setCalledFunction(fn.getFunctionType(), opaqueCallee);
 
     // Reset the insert point to after the call.
@@ -4667,11 +4672,11 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
                          llvm::Intrinsic::ID idIntrinsic, Size bufferSize,
                          Alignment bufferAlignment) {
   auto prototype =
-    IGF.IGM.getOpaquePtr(IGF.IGM.getAddrOfContinuationPrototype(fnType));
+    IGF.IGM.getOpaquePtrToFn(IGF.IGM.getAddrOfContinuationPrototype(fnType));
 
   // Use malloc and free as our allocator.
-  auto allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
-  auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getFreeFn());
+  auto allocFn = IGF.IGM.getOpaquePtrToFn(IGF.IGM.getMallocFn());
+  auto deallocFn = IGF.IGM.getOpaquePtrToFn(IGF.IGM.getFreeFn());
 
   // Call the right 'llvm.coro.id.retcon' variant.
   llvm::Value *buffer = emission.getCoroutineBuffer();
@@ -5265,7 +5270,7 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   // Use the pointer/pointer and pointer/int casts if we can.
   if (toTy->isPointerTy()) {
     if (fromTy->isPointerTy())
-      return Builder.CreateBitCast(value, toTy);
+      return Builder.CreatePointerBitCastOrAddrSpaceCast(value, toTy);
     if (fromTy == IGM.IntPtrTy)
       return Builder.CreateIntToPtr(value, toTy);
   } else if (fromTy->isPointerTy()) {
@@ -5816,7 +5821,7 @@ Signature irgen::emitCastOfFunctionPointer(IRGenFunction &IGF,
                             : IGF.IGM.getSignature(fnType);
 
   // Emit the cast.
-  fnPtr = IGF.Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo());
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo(IGF.IGM.DataLayout.getProgramAddressSpace()));
 
   // Return the information.
   return sig;
@@ -5949,7 +5954,7 @@ FunctionPointer FunctionPointer::forExplosionValue(IRGenFunction &IGF,
                                                    llvm::Value *fnPtr,
                                                    CanSILFunctionType fnType) {
   // Bitcast out of an opaque pointer type.
-  assert(fnPtr->getType() == IGF.IGM.Int8PtrTy);
+  assert(fnPtr->getType() == IGF.IGM.Int8ProgramSpacePtrTy);
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, fnType);
   auto authInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, fnType);
 
@@ -5968,7 +5973,7 @@ FunctionPointer::getExplosionValue(IRGenFunction &IGF,
   }
 
   // Bitcast to an opaque pointer type.
-  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8ProgramSpacePtrTy);
 
   return fnPtr;
 }
