@@ -861,6 +861,8 @@ public:
   void print(raw_ostream &OS) const;
   void print(raw_ostream &OS, const PrintOptions &Opts) const;
 
+  void printInherited(ASTPrinter &Printer, const PrintOptions &Options) const;
+
   /// Pretty-print the given declaration.
   ///
   /// \param Printer ASTPrinter object.
