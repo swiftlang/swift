@@ -77,3 +77,22 @@ func useReverseIt(_ c: any CollectionOf) {
   let c = reverseIt(c)
   let _: Int = c // expected-error{{cannot convert value of type 'CollectionOf' to specified type 'Int'}}
 }
+
+/// --- Opening existentials when returning opaque types.
+extension P {
+  func getQ() -> some Q {
+    let a: A? = nil
+    return a!
+  }
+
+  func getCollectionOf() -> some CollectionOf<A> {
+    return [] as [A]
+  }
+}
+
+func testReturningOpaqueTypes(p: any P) {
+  let q = p.getQ()
+  let _: Int = q  // expected-error{{cannot convert value of type 'Q' to specified type 'Int'}}
+
+  p.getCollectionOf() // expected-error{{member 'getCollectionOf' cannot be used on value of protocol type 'P'; use a generic constraint instead}}
+}
