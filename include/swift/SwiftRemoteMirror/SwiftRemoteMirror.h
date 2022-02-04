@@ -151,6 +151,11 @@ swift_reflection_metadataNominalTypeDescriptor(SwiftReflectionContextRef Context
 																							 swift_reflection_ptr_t Metadata);
 
 
+SWIFT_REMOTE_MIRROR_LINKAGE
+int
+swift_reflection_metadataIsActor(SwiftReflectionContextRef ContextRef,
+                                 swift_reflection_ptr_t Metadata);
+
 /// Returns an opaque type reference for a class or closure context
 /// instance pointer, or NULL if one can't be constructed.
 ///
@@ -434,6 +439,21 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 swift_async_task_slab_allocations_return_t
 swift_reflection_asyncTaskSlabAllocations(SwiftReflectionContextRef ContextRef,
                                           swift_reflection_ptr_t SlabPtr);
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_async_task_info_t
+swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
+                               swift_reflection_ptr_t AsyncTaskPtr);
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_actor_info_t
+swift_reflection_actorInfo(SwiftReflectionContextRef ContextRef,
+                           swift_reflection_ptr_t ActorPtr);
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_reflection_ptr_t
+swift_reflection_nextJob(SwiftReflectionContextRef ContextRef,
+                         swift_reflection_ptr_t JobPtr);
 
 #ifdef __cplusplus
 } // extern "C"
