@@ -496,28 +496,6 @@ void RewritePathEvaluator::applyDecomposeConcrete(const RewriteStep &step,
 
   auto substitutions = difference.LHS.getSubstitutions();
 
-  auto getReplacementSubstitution = [&](unsigned n) -> MutableTerm {
-    for (const auto &pair : difference.SameTypes) {
-      if (pair.first == n) {
-        // Given a transformation Xn -> Xn', return the term Xn'.
-        return MutableTerm(pair.second);
-      }
-    }
-
-    for (const auto &pair : difference.ConcreteTypes) {
-      if (pair.first == n) {
-        // Given a transformation Xn -> [concrete: D], return the
-        // return Xn.[concrete: D].
-        MutableTerm result(substitutions[n]);
-        result.add(pair.second);
-        return result;
-      }
-    }
-
-    // Otherwise return the original substitution Xn.
-    return MutableTerm(substitutions[n]);
-  };
-
   if (!step.Inverse) {
     auto &term = getCurrentTerm();
 
@@ -531,7 +509,7 @@ void RewritePathEvaluator::applyDecomposeConcrete(const RewriteStep &step,
     term = newTerm;
 
     for (unsigned n : indices(substitutions))
-      Primary.push_back(getReplacementSubstitution(n));
+      Primary.push_back(difference.getReplacementSubstitution(n));
 
   } else {
     unsigned numSubstitutions = substitutions.size();
@@ -541,7 +519,7 @@ void RewritePathEvaluator::applyDecomposeConcrete(const RewriteStep &step,
 
     for (unsigned n : indices(substitutions)) {
       const auto &otherSubstitution = *(Primary.end() - numSubstitutions + n);
-      auto expectedSubstitution = getReplacementSubstitution(n);
+      auto expectedSubstitution = difference.getReplacementSubstitution(n);
       if (otherSubstitution != expectedSubstitution) {
         llvm::errs() << "Got: " << otherSubstitution << "\n";
         llvm::errs() << "Expected: " << expectedSubstitution << "\n";

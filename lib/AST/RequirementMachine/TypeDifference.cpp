@@ -25,6 +25,28 @@
 using namespace swift;
 using namespace rewriting;
 
+MutableTerm TypeDifference::getReplacementSubstitution(unsigned index) const {
+  for (const auto &pair : SameTypes) {
+    if (pair.first == index) {
+      // Given a transformation Xn -> Xn', return the term Xn'.
+      return MutableTerm(pair.second);
+    }
+  }
+
+  for (const auto &pair : ConcreteTypes) {
+    if (pair.first == index) {
+      // Given a transformation Xn -> [concrete: D], return the
+      // return Xn.[concrete: D].
+      MutableTerm result(LHS.getSubstitutions()[index]);
+      result.add(pair.second);
+      return result;
+    }
+  }
+
+  // Otherwise return the original substitution Xn.
+  return MutableTerm(LHS.getSubstitutions()[index]);
+}
+
 void TypeDifference::dump(llvm::raw_ostream &out) const {
   llvm::errs() << "Base term: " << BaseTerm << "\n";
   llvm::errs() << "LHS: " << LHS << "\n";
