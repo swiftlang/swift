@@ -5770,9 +5770,6 @@ public:
 
   /// Retrieve the ID number of this opened existential.
   UUID getOpenedExistentialID() const;
-  
-  /// Retrieve the opened existential type
-  Type getOpenedExistentialType() const;
 
   /// Return the archetype that represents the root generic parameter of its
   /// interface type.
@@ -6412,8 +6409,7 @@ inline bool TypeBase::isOpenedExistentialWithError() {
 
   CanType T = getCanonicalType();
   if (auto archetype = dyn_cast<OpenedArchetypeType>(T)) {
-    auto openedExistentialType = archetype->getOpenedExistentialType();
-    return openedExistentialType->isExistentialWithError();
+    return archetype->getExistentialType()->isExistentialWithError();
   }
   return false;
 }

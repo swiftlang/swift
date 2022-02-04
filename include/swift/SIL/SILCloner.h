@@ -249,7 +249,9 @@ public:
   }
 
   void remapOpenedType(CanOpenedArchetypeType archetypeTy) {
-    auto existentialTy = archetypeTy->getOpenedExistentialType()->getCanonicalType();
+    assert(archetypeTy->isRoot());
+
+    auto existentialTy = archetypeTy->getExistentialType()->getCanonicalType();
     auto replacementTy = OpenedArchetypeType::get(
         getOpASTType(existentialTy),
         archetypeTy->getInterfaceType());

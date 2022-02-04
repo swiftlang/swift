@@ -943,13 +943,10 @@ public:
         // so we can't use it for TypeTransformContext.
         // To work around this, replace the OpenedArchetypeType with the type of
         // the protocol itself.
-        CurrentType = CurrentType.transform([](Type T) -> Type {
-          if (auto *Opened = T->getAs<OpenedArchetypeType>()) {
-            return Opened->getOpenedExistentialType();
-          } else {
-            return T;
-          }
-        });
+        if (auto *Opened = CurrentType->getAs<OpenedArchetypeType>()) {
+          assert(Opened->isRoot());
+          CurrentType = Opened->getExistentialType();
+        }
         CurrentType = CurrentType->mapTypeOutOfContext();
       }
       setCurrentType(CurrentType);
@@ -5979,7 +5976,7 @@ public:
 
     if (Options.PrintForSIL)
       Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
-    visit(T->getOpenedExistentialType());
+    visit(T->getExistentialType());
   }
 
   void printArchetypeCommon(ArchetypeType *T,

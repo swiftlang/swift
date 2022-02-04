@@ -66,10 +66,10 @@ Type Solution::getFixedType(TypeVariableType *typeVar) const {
 /// members via dynamic lookup.
 static bool isOpenedAnyObject(Type type) {
   auto archetype = type->getAs<OpenedArchetypeType>();
-  if (!archetype)
+  if (!archetype || !archetype->isRoot())
     return false;
 
-  return archetype->getOpenedExistentialType()->isAnyObject();
+  return archetype->getExistentialType()->isAnyObject();
 }
 
 SubstitutionMap
@@ -7518,7 +7518,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
             ->getExistentialInstanceType();
         }
         assert(openedInstanceTy->castTo<OpenedArchetypeType>()
-                   ->getOpenedExistentialType()
+                   ->getExistentialType()
                    ->isEqual(existentialInstanceTy));
 
         auto opaqueValue =
