@@ -2462,7 +2462,8 @@ struct TargetGenericWitnessTable {
   using PrivateDataType = void *[swift::NumGenericMetadataPrivateDataWords];
 
   /// Private data for the instantiator.  Out-of-line so that the rest
-  /// of this structure can be constant.
+  /// of this structure can be constant. Might be null when building with
+  /// -disable-preallocated-instantiation-caches.
   RelativeDirectPointer<PrivateDataType> PrivateData;
 
   uint16_t getWitnessTablePrivateSizeInWords() const {
@@ -3536,7 +3537,8 @@ using OpaqueTypeDescriptor = TargetOpaqueTypeDescriptor<InProcess>;
 template <typename Runtime>
 struct TargetGenericMetadataInstantiationCache {
   /// Data that the runtime can use for its own purposes.  It is guaranteed
-  /// to be zero-filled by the compiler.
+  /// to be zero-filled by the compiler. Might be null when building with
+  /// -disable-preallocated-instantiation-caches.
   TargetPointer<Runtime, void>
   PrivateData[swift::NumGenericMetadataPrivateDataWords];
 };
