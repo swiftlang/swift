@@ -3914,10 +3914,29 @@ findExistentialSelfReferences(CanGenericSignature existentialSig, Type type,
     return info;
   }
 
-  // Opaque result types of protocol extension members contain an invariant
-  // reference to 'Self'.
-  if (type->is<OpaqueTypeArchetypeType>())
-    return SelfReferenceInfo::forSelfRef(TypePosition::Invariant);
+  // If the signature of an opaque result type has a same-type constraint
+  // that refereces Self, it's invariant.
+  if (auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
+    auto info = SelfReferenceInfo();
+    auto opaqueSig = opaque->getDecl()->getOpaqueInterfaceGenericSignature();
+    for (const auto &req : opaqueSig.getRequirements()) {
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+      case RequirementKind::Layout:
+      case RequirementKind::Superclass:
+        continue;
+
+      case RequirementKind::SameType:
+        info |= findExistentialSelfReferences(
+            existentialSig, req.getFirstType(), TypePosition::Invariant);
+        info |= findExistentialSelfReferences(
+            existentialSig, req.getSecondType(), TypePosition::Invariant);
+        break;
+      }
+    }
+
+    return info;
+  }
 
   // Protocol compositions preserve variance.
   if (auto *existential = type->getAs<ExistentialType>())

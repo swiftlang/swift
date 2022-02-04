@@ -343,7 +343,7 @@ do {
 
     arg.invariantSelf1(0) // expected-error {{member 'invariantSelf1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     if #available(macOS 10.15, *) {
-      arg.invariantSelf1_1() // expected-error {{member 'invariantSelf1_1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+      _ = arg.invariantSelf1_1()
     }
     arg.invariantSelf2(0) // expected-error {{member 'invariantSelf2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelf3(0) // expected-error {{member 'invariantSelf3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
@@ -392,7 +392,7 @@ do {
 
     arg.invariantSelfProp1 // expected-error {{member 'invariantSelfProp1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     if #available(macOS 10.15, *) {
-      arg.invariantSelfProp1_1 // expected-error {{member 'invariantSelfProp1_1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+      _ = arg.invariantSelfProp1_1
     }
     arg.invariantSelfProp2 // expected-error {{member 'invariantSelfProp2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.invariantSelfProp3 // expected-error {{member 'invariantSelfProp3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}

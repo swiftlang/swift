@@ -1813,7 +1813,7 @@ static Type typeEraseCovariantExistentialSelfReferences(Type refTy,
 
       // Opaque types whose substitutions involve this type parameter are
       // erased to their upper bound.
-      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(type.getPointer())) {
+      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t)) {
         for (auto replacementType :
                  opaque->getSubstitutions().getReplacementTypes()) {
           if (hasErasedGenericParameter(replacementType)) {
