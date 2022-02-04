@@ -8,6 +8,7 @@
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[GET_MAIN:%.*]] = function_ref @swift_task_getMainExecutor
 // CHECK-NEXT: [[MAIN:%.*]] = apply [[GET_MAIN]]()
+// CHECK-NEXT: [[MAIN_OPTIONAL:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[MAIN]]
 
 actor MyActorImpl {}
 
@@ -67,7 +68,7 @@ await printFromMyActor(value: a)
 // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
 // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
 // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
-// CHECK: hop_to_executor [[MAIN]]
+// CHECK: hop_to_executor [[MAIN_OPTIONAL]]
 // CHECK: end_borrow [[ACTORREF]]
 
 if a < 10 {
@@ -121,6 +122,6 @@ if a < 10 {
     // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
     // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
     // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
-    // CHECK: hop_to_executor [[MAIN]]
+    // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
     // CHECK: end_borrow [[ACTORREF]]
 }
