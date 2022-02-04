@@ -142,12 +142,12 @@ public:
         std::cerr << "Previous bytes: ";
         int position = (int)(OriginalSize - Size);
         for (int i = std::max(-8, -position); i < 0; i++) {
-          std::cerr << std::hex << std::setw(2) << p[i] << " ";
+          std::cerr << std::hex << std::setw(2) << (int)p[i] << " ";
         }
         std::cerr << std::endl;
         std::cerr << "Next bytes: ";
         for (unsigned i = 0; i < Size && i < 8; i++) {
-          std::cerr << std::hex << std::setw(2) << p[i] << " ";
+          std::cerr << std::hex << std::setw(2) << (int)p[i] << " ";
         }
         std::cerr << std::endl;
         abort();
