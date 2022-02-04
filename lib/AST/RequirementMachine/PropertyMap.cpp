@@ -323,18 +323,11 @@ void PropertyMap::clear() {
 /// Build the property map from all rules of the form T.[p] => T, where
 /// [p] is a property symbol.
 ///
-/// Returns a pair consisting of a status and number of iterations executed.
-///
-/// The status is CompletionResult::MaxIterations if we exceed \p maxIterations
-/// iterations.
-///
-/// The status is CompletionResult::MaxDepth if we produce a rewrite rule whose
-/// left hand side has a length exceeding \p maxDepth.
-///
-/// Otherwise, the status is CompletionResult::Success.
-std::pair<CompletionResult, unsigned>
-PropertyMap::buildPropertyMap(unsigned maxIterations,
-                              unsigned maxDepth) {
+/// Also performs property unification, nested type concretization and
+/// concrete simplification. These phases can add new rules; if new rules
+/// were added, the the caller must run another round of Knuth-Bendix
+/// completion, and rebuild the property map again.
+void PropertyMap::buildPropertyMap() {
   if (System.getDebugOptions().contains(DebugFlags::PropertyMap)) {
     llvm::dbgs() << "-------------------------\n";
     llvm::dbgs() << "- Building property map -\n";
@@ -382,10 +375,6 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
     properties[length].push_back({rhs, *property, ruleID});
   }
 
-  // Merging multiple superclass or concrete type rules can induce new rules
-  // to unify concrete type constructor arguments.
-  unsigned ruleCount = System.getRules().size();
-
   for (const auto &bucket : properties) {
     for (auto property : bucket) {
       addProperty(property.key, property.symbol,
@@ -405,20 +394,8 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
   // concrete types.
   concretelySimplifyLeftHandSideSubstitutions();
 
-  unsigned addedNewRules = System.getRules().size() - ruleCount;
-  for (unsigned i = ruleCount, e = System.getRules().size(); i < e; ++i) {
-    const auto &newRule = System.getRule(i);
-    if (newRule.getDepth() > maxDepth)
-      return std::make_pair(CompletionResult::MaxDepth, addedNewRules);
-  }
-
   // Check invariants of the constructed property map.
   verify();
-
-  if (System.getRules().size() > maxIterations)
-    return std::make_pair(CompletionResult::MaxIterations, addedNewRules);
-
-  return std::make_pair(CompletionResult::Success, addedNewRules);
 }
 
 /// Similar to RewriteSystem::simplifySubstitutions(), but also replaces type

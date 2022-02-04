@@ -510,13 +510,13 @@ namespace swift {
     /// Enables fine-grained debug output from the requirement machine.
     std::string DebugRequirementMachine;
 
-    /// Maximum iteration count for requirement machine Knuth-Bendix completion
+    /// Maximum rule count for requirement machine Knuth-Bendix completion
     /// algorithm.
-    unsigned RequirementMachineStepLimit = 4000;
+    unsigned RequirementMachineMaxRuleCount = 4000;
 
     /// Maximum term length for requirement machine Knuth-Bendix completion
     /// algorithm.
-    unsigned RequirementMachineDepthLimit = 12;
+    unsigned RequirementMachineMaxRuleLength = 12;
 
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.

@@ -486,28 +486,25 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
   return true;
 }
 
-/// Computes the confluent completion using the Knuth-Bendix algorithm.
+/// Computes the confluent completion using the Knuth-Bendix algorithm and
+/// returns a status code.
 ///
-/// Returns a pair consisting of a status and number of iterations executed.
+/// The status is CompletionResult::MaxRuleCount if we add more than
+/// \p maxRuleCount rules.
 ///
-/// The status is CompletionResult::MaxIterations if we exceed \p maxIterations
-/// iterations.
-///
-/// The status is CompletionResult::MaxDepth if we produce a rewrite rule whose
-/// left hand side has a length exceeding \p maxDepth.
+/// The status is CompletionResult::MaxRuleLength if we produce a rewrite rule
+/// whose left hand side has a length exceeding \p maxRuleLength.
 ///
 /// Otherwise, the status is CompletionResult::Success.
-std::pair<CompletionResult, unsigned>
-RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
-                                          unsigned maxDepth) {
+CompletionResult
+RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
+                                          unsigned maxRuleLength) {
   assert(Initialized);
   assert(!Minimized);
 
   // Complete might already be set, if we're re-running completion after
   // adding new rules in the property map's concrete type unification procedure.
   Complete = 1;
-
-  unsigned steps = 0;
 
   bool again = false;
 
@@ -605,18 +602,16 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     again = false;
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
-      if (Rules.size() > maxIterations)
-        return std::make_pair(CompletionResult::MaxIterations, steps);
+      if (Rules.size() > maxRuleCount)
+        return CompletionResult::MaxRuleCount;
 
       if (!addRule(pair.LHS, pair.RHS, &pair.Path))
         continue;
 
       // Check if the new rule is too long.
-      if (Rules.back().getDepth() > maxDepth)
-        return std::make_pair(CompletionResult::MaxDepth, steps);
+      if (Rules.back().getDepth() > maxRuleLength)
+        return CompletionResult::MaxRuleLength;
 
-      // Only count a 'step' once we add a new rule.
-      ++steps;
       again = true;
     }
 
@@ -640,5 +635,5 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
   assert(MergedAssociatedTypes.empty() &&
          "Should have processed all merge candidates");
 
-  return std::make_pair(CompletionResult::Success, steps);
+  return CompletionResult::Success;
 }

@@ -343,13 +343,13 @@ def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print out requirement machine statistics at the end of the compilation job">;
 
-def requirement_machine_step_limit : Separate<["-"], "requirement-machine-step-limit">,
+def requirement_machine_max_rule_count : Joined<["-"], "requirement-machine-max-rule-count=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the maximum steps before we give up on confluent completion">;
+  HelpText<"Set the maximum number of rules before giving up">;
 
-def requirement_machine_depth_limit : Separate<["-"], "requirement-machine-depth-limit">,
+def requirement_machine_max_rule_length : Joined<["-"], "requirement-machine-max-rule-length=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the maximum depth before we give up on confluent completion">;
+  HelpText<"Set the maximum rule length before giving up">;
 
 def disable_requirement_machine_merged_associated_types : Flag<["-"], "disable-requirement-machine-merged-associated-types">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,

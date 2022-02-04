@@ -206,9 +206,7 @@ public:
                                 std::reverse_iterator<const Symbol *> end) const;
   PropertyBag *lookUpProperties(const MutableTerm &key) const;
 
-  std::pair<CompletionResult, unsigned>
-  buildPropertyMap(unsigned maxIterations,
-                   unsigned maxDepth);
+  void buildPropertyMap();
 
   void dump(llvm::raw_ostream &out) const;
 

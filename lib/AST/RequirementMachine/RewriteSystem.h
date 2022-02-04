@@ -192,18 +192,17 @@ public:
   }
 };
 
-/// Result type for RewriteSystem::computeConfluentCompletion() and
-/// PropertyMap::buildPropertyMap().
+/// Result type for RequirementMachine::computeCompletion().
 enum class CompletionResult {
-  /// Confluent completion was computed successfully.
+  /// Completion was successful.
   Success,
 
-  /// Maximum number of iterations reached.
-  MaxIterations,
+  /// Maximum number of rules exceeded.
+  MaxRuleCount,
 
-  /// Completion produced a rewrite rule whose left hand side has a length
-  /// exceeding the limit.
-  MaxDepth
+  /// Maximum rule length exceeded.
+  MaxRuleLength,
+
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -322,9 +321,8 @@ public:
   /// Pairs of rules which have already been checked for overlap.
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
-  std::pair<CompletionResult, unsigned>
-  computeConfluentCompletion(unsigned maxIterations,
-                             unsigned maxDepth);
+  CompletionResult computeConfluentCompletion(unsigned maxRuleCount,
+                                              unsigned maxRuleLength);
 
   void simplifyLeftHandSides();
 

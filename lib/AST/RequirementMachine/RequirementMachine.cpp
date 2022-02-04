@@ -25,8 +25,8 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
     : Context(ctx), System(ctx), Map(System) {
   auto &langOpts = ctx.getASTContext().LangOpts;
   Dump = langOpts.DumpRequirementMachine;
-  RequirementMachineStepLimit = langOpts.RequirementMachineStepLimit;
-  RequirementMachineDepthLimit = langOpts.RequirementMachineDepthLimit;
+  MaxRuleCount = langOpts.RequirementMachineMaxRuleCount;
+  MaxRuleLength = langOpts.RequirementMachineMaxRuleLength;
   Stats = ctx.getASTContext().Stats;
 
   if (Stats)
@@ -41,13 +41,13 @@ static void checkCompletionResult(const RequirementMachine &machine,
   case CompletionResult::Success:
     break;
 
-  case CompletionResult::MaxIterations:
-    llvm::errs() << "Rewrite system exceeds maximum completion step count\n";
+  case CompletionResult::MaxRuleCount:
+    llvm::errs() << "Rewrite system exceeded maximum rule count\n";
     machine.dump(llvm::errs());
     abort();
 
-  case CompletionResult::MaxDepth:
-    llvm::errs() << "Rewrite system exceeds maximum completion depth\n";
+  case CompletionResult::MaxRuleLength:
+    llvm::errs() << "Rewrite system exceeded rule length limit\n";
     machine.dump(llvm::errs());
     abort();
   }
@@ -224,43 +224,56 @@ RequirementMachine::initWithWrittenRequirements(
 CompletionResult
 RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
   while (true) {
-    // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
-    auto result = System.computeConfluentCompletion(
-        RequirementMachineStepLimit,
-        RequirementMachineDepthLimit);
+    {
+      unsigned ruleCount = System.getRules().size();
 
-    if (Stats) {
-      Stats->getFrontendCounters()
-          .NumRequirementMachineCompletionSteps += result.second;
+      // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
+      auto result = System.computeConfluentCompletion(MaxRuleCount, MaxRuleLength);
+
+      unsigned rulesAdded = (System.getRules().size() - ruleCount);
+
+      if (Stats) {
+        Stats->getFrontendCounters()
+            .NumRequirementMachineCompletionSteps += rulesAdded;
+      }
+
+      // Check for failure.
+      if (result != CompletionResult::Success)
+        return result;
+
+      // Check invariants.
+      System.verifyRewriteRules(policy);
     }
 
-    // Check for failure.
-    if (result.first != CompletionResult::Success)
-      return result.first;
+    {
+      unsigned ruleCount = System.getRules().size();
 
-    // Check invariants.
-    System.verifyRewriteRules(policy);
+      // Build the property map, which also performs concrete term
+      // unification; if this added any new rules, run the completion
+      // procedure again.
+      Map.buildPropertyMap();
 
-    // Build the property map, which also performs concrete term
-    // unification; if this added any new rules, run the completion
-    // procedure again.
-    result = Map.buildPropertyMap(
-        RequirementMachineStepLimit,
-        RequirementMachineDepthLimit);
+      unsigned rulesAdded = (System.getRules().size() - ruleCount);
 
-    if (Stats) {
-      Stats->getFrontendCounters()
-        .NumRequirementMachineUnifiedConcreteTerms += result.second;
+      if (Stats) {
+        Stats->getFrontendCounters()
+          .NumRequirementMachineUnifiedConcreteTerms += rulesAdded;
+      }
+
+      // Check new rules added by the property map against configured limits.
+      for (unsigned i = 0; i < rulesAdded; ++i) {
+        const auto &newRule = System.getRule(ruleCount + i);
+        if (newRule.getDepth() > MaxRuleLength)
+          return CompletionResult::MaxRuleLength;
+      }
+
+      if (System.getRules().size() > MaxRuleCount)
+        return CompletionResult::MaxRuleCount;
+
+      // If buildPropertyMap() didn't add any new rules, we are done.
+      if (rulesAdded == 0)
+        break;
     }
-
-    // Check for failure.
-    if (result.first != CompletionResult::Success)
-      return result.first;
-
-    // If buildPropertyMap() added new rules, we run another round of
-    // Knuth-Bendix, and build the property map again.
-    if (result.second == 0)
-      break;
   }
 
   if (Dump) {

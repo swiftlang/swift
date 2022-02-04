@@ -266,7 +266,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       ctx.Diags.diagnose(otherProto->getLoc(),
                          diag::requirement_machine_completion_failed,
                          /*protocol=*/1,
-                         status == CompletionResult::MaxIterations ? 0 : 1);
+                         unsigned(status));
 
       if (otherProto != proto) {
         ctx.evaluator.cacheOutput(
@@ -504,7 +504,7 @@ InferredGenericSignatureRequestRQM::evaluate(
     ctx.Diags.diagnose(loc,
                        diag::requirement_machine_completion_failed,
                        /*protocol=*/0,
-                       status == CompletionResult::MaxIterations ? 0 : 1);
+                       unsigned(status));
 
     auto result = GenericSignature::get(genericParams, {});
     return GenericSignatureWithError(result, /*hadError=*/true);

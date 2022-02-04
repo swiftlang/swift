@@ -61,8 +61,10 @@ class RequirementMachine final {
 
   bool Dump = false;
   bool Complete = false;
-  unsigned RequirementMachineStepLimit;
-  unsigned RequirementMachineDepthLimit;
+
+  /// Parameters to prevent runaway completion and property map construction.
+  unsigned MaxRuleCount;
+  unsigned MaxRuleLength;
 
   UnifiedStatsReporter *Stats;
 
