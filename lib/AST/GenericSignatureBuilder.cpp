@@ -8388,7 +8388,7 @@ AbstractGenericSignatureRequest::evaluate(
     auto gsbResult = buildViaGSB();
 
     if (!rqmResult.getPointer() && !gsbResult.getPointer())
-      return gsbResult;
+      return rqmResult;
 
     if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
       llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
@@ -8398,7 +8398,7 @@ AbstractGenericSignatureRequest::evaluate(
       abort();
     }
 
-    return gsbResult;
+    return rqmResult;
   }
   }
 }
@@ -8558,7 +8558,7 @@ InferredGenericSignatureRequest::evaluate(
     auto gsbResult = buildViaGSB();
 
     if (!rqmResult.getPointer() && !gsbResult.getPointer())
-      return gsbResult;
+      return rqmResult;
 
     if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
       llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
@@ -8568,7 +8568,7 @@ InferredGenericSignatureRequest::evaluate(
       abort();
     }
 
-    return gsbResult;
+    return rqmResult;
   }
   }
 }
@@ -8672,7 +8672,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
       abort();
     }
 
-    return gsbResult;
+    return rqmResult;
   }
   }
 }
