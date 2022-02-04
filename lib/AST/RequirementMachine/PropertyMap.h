@@ -243,6 +243,11 @@ private:
 
   void addProperty(Term key, Symbol property, unsigned ruleID);
 
+  void processTypeDifference(const TypeDifference &difference,
+                             unsigned differenceID,
+                             unsigned lhsRuleID,
+                             unsigned rhsRuleID);
+
   void addConformanceProperty(Term key, Symbol property, unsigned ruleID);
   void addLayoutProperty(Term key, Symbol property, unsigned ruleID);
   void addSuperclassProperty(Term key, Symbol property, unsigned ruleID);

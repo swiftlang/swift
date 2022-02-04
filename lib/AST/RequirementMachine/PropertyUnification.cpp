@@ -391,6 +391,48 @@ void PropertyMap::addSuperclassProperty(
   }
 }
 
+/// Record induced rules from the given type difference.
+void PropertyMap::processTypeDifference(const TypeDifference &difference,
+                                        unsigned differenceID,
+                                        unsigned lhsRuleID,
+                                        unsigned rhsRuleID) {
+  bool debug = Debug.contains(DebugFlags::ConcreteUnification);
+
+  if (debug) {
+    difference.dump(llvm::dbgs());
+  }
+
+  for (const auto &pair : difference.SameTypes) {
+    // Both sides are type parameters; add a same-type requirement.
+    MutableTerm lhsTerm(difference.LHS.getSubstitutions()[pair.first]);
+    MutableTerm rhsTerm(pair.second);
+
+    if (debug) {
+      llvm::dbgs() << "%% Induced rule " << lhsTerm
+                   << " == " << rhsTerm << "\n";
+    }
+
+    // FIXME: Need a rewrite path here.
+    System.addRule(lhsTerm, rhsTerm);
+  }
+
+  for (const auto &pair : difference.ConcreteTypes) {
+    // A type parameter is equated with a concrete type; add a concrete
+    // type requirement.
+    MutableTerm rhsTerm(difference.LHS.getSubstitutions()[pair.first]);
+    MutableTerm lhsTerm(rhsTerm);
+    lhsTerm.add(pair.second);
+
+    if (debug) {
+      llvm::dbgs() << "%% Induced rule " << lhsTerm
+                   << " == " << rhsTerm << "\n";
+    }
+
+    // FIXME: Need a rewrite path here.
+    System.addRule(lhsTerm, rhsTerm);
+  }
+}
+
 /// When a type parameter has two concrete types, we have to unify the
 /// type constructor arguments.
 ///
@@ -450,43 +492,6 @@ void PropertyMap::addConcreteTypeProperty(
     return;
   }
 
-  // Record induced rules from the given type difference.
-  auto processTypeDifference = [&](const TypeDifference &difference) {
-    if (debug) {
-      difference.dump(llvm::dbgs());
-    }
-
-    for (const auto &pair : difference.SameTypes) {
-      // Both sides are type parameters; add a same-type requirement.
-      MutableTerm lhsTerm(difference.LHS.getSubstitutions()[pair.first]);
-      MutableTerm rhsTerm(pair.second);
-
-      if (debug) {
-        llvm::dbgs() << "%% Induced rule " << lhsTerm
-                     << " == " << rhsTerm << "\n";
-      }
-
-      // FIXME: Need a rewrite path here.
-      System.addRule(lhsTerm, rhsTerm);
-    }
-
-    for (const auto &pair : difference.ConcreteTypes) {
-      // A type parameter is equated with a concrete type; add a concrete
-      // type requirement.
-      MutableTerm rhsTerm(difference.LHS.getSubstitutions()[pair.first]);
-      MutableTerm lhsTerm(rhsTerm);
-      lhsTerm.add(pair.second);
-
-      if (debug) {
-        llvm::dbgs() << "%% Induced rule " << lhsTerm
-                     << " == " << rhsTerm << "\n";
-      }
-
-      // FIXME: Need a rewrite path here.
-      System.addRule(lhsTerm, rhsTerm);
-    }
-  };
-
   // Handle the case where (LHS ∧ RHS) is distinct from both LHS and RHS:
   // - First, record a new rule.
   // - Next, process the LHS -> (LHS ∧ RHS) difference.
@@ -510,6 +515,8 @@ void PropertyMap::addConcreteTypeProperty(
                      << " == " << rhsTerm << "\n";
       }
 
+      // This rule does not need a rewrite path because it will be related
+      // to the existing rule in concretelySimplifyLeftHandSideSubstitutions().
       System.addRule(lhsTerm, rhsTerm);
     }
 
@@ -529,11 +536,13 @@ void PropertyMap::addConcreteTypeProperty(
 
     // Process LHS -> (LHS ∧ RHS).
     if (checkRulePairOnce(*props->ConcreteTypeRule, newRuleID))
-      processTypeDifference(lhsDifference);
+      processTypeDifference(lhsDifference, *lhsDifferenceID,
+                            *props->ConcreteTypeRule, newRuleID);
 
     // Process RHS -> (LHS ∧ RHS).
     if (checkRulePairOnce(ruleID, newRuleID))
-      processTypeDifference(rhsDifference);
+      processTypeDifference(rhsDifference, *rhsDifferenceID,
+                            ruleID, newRuleID);
 
     // The new property is more specific, so update ConcreteType and
     // ConcreteTypeRule.
@@ -552,7 +561,8 @@ void PropertyMap::addConcreteTypeProperty(
     assert(property == lhsDifference.RHS);
 
     if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID))
-      processTypeDifference(lhsDifference);
+      processTypeDifference(lhsDifference, *lhsDifferenceID,
+                            *props->ConcreteTypeRule, ruleID);
 
     // The new property is more specific, so update ConcreteType and
     // ConcreteTypeRule.
@@ -571,7 +581,8 @@ void PropertyMap::addConcreteTypeProperty(
     assert(*props->ConcreteType == rhsDifference.RHS);
 
     if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID))
-      processTypeDifference(rhsDifference);
+      processTypeDifference(rhsDifference, *rhsDifferenceID,
+                            ruleID, *props->ConcreteTypeRule);
 
     // The new property is less specific, so ConcreteType and ConcreteTypeRule
     // remain unchanged.
