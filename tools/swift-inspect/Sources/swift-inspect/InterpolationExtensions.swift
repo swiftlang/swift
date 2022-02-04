@@ -13,7 +13,7 @@
 import SwiftRemoteMirror
 
 extension DefaultStringInterpolation {
-  mutating func appendInterpolation(hex: swift_reflection_ptr_t) {
+  mutating func appendInterpolation<T>(hex: T) where T: BinaryInteger {
     appendInterpolation("0x")
     appendInterpolation(String(hex, radix: 16))
   }

@@ -169,6 +169,7 @@ struct SwiftInspect: ParsableCommand {
       DumpGenericMetadata.self,
       DumpCacheNodes.self,
       DumpArrays.self,
+      DumpConcurrency.self,
     ])
 }
 
@@ -260,7 +261,7 @@ struct DumpCacheNodes: ParsableCommand {
 
 struct DumpArrays: ParsableCommand {
   static let configuration = CommandConfiguration(
-    abstract: "Print the target's metadata cache nodes.")
+    abstract: "Print information about array objects in the target.")
 
   @OptionGroup()
   var options: UniversalOptions
@@ -268,6 +269,20 @@ struct DumpArrays: ParsableCommand {
   func run() throws {
     try withReflectionContext(nameOrPid: options.nameOrPid) {
       try dumpArrays(context: $0, inspector: $1)
+    }
+  }
+}
+
+struct DumpConcurrency: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Print information about the target's concurrency runtime.")
+
+  @OptionGroup()
+  var options: UniversalOptions
+
+  func run() throws {
+    try withReflectionContext(nameOrPid: options.nameOrPid) {
+      try dumpConcurrency(context: $0, inspector: $1)
     }
   }
 }
