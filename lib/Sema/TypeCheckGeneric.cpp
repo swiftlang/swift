@@ -506,7 +506,6 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
       // Produce an error that this generic parameter cannot be bound.
       paramDecl->diagnose(diag::unreferenced_generic_parameter,
                           paramDecl->getNameStr());
-      decl->setInvalid();
     }
   }
 }
@@ -562,8 +561,8 @@ static Type formExtensionInterfaceType(
   auto nominal = dyn_cast<NominalTypeDecl>(genericDecl);
   auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
   if (!nominal) {
-    Type underlyingType = typealias->getUnderlyingType();
-    nominal = underlyingType->getNominalOrBoundGenericNominal();
+    type = typealias->getUnderlyingType();
+    nominal = type->getNominalOrBoundGenericNominal();
   }
 
   // Form the result.

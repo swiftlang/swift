@@ -315,6 +315,45 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   return;
 }
 
+// FIXME: the callers of ctorHopsInjectedByDefiniteInit is not correct (rdar://87485045)
+// we must still set the SGF.ExpectedExecutor field to say that we must
+// hop to the executor after every apply in the constructor. This seems to
+// happen for the main actor isolated async inits, but not for the plain ones,
+// where 'self' is not going to directly be the instance. We have to extend the
+// ExecutorBreadcrumb class to detect whether it needs to do a load or not
+// in it's emit method.
+//
+// So, the big problem right now is that for a delegating async actor init,
+// after calling an async function, no hop-back is being emitted.
+
+/// Returns true if the given async constructor will have its
+/// required actor hops injected later by definite initialization.
+static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
+                                           ActorIsolation const& isolation) {
+  // must be async, but we can assume that.
+  assert(ctor->hasAsync());
+
+  auto *dc = ctor->getDeclContext();
+  auto selfClassDecl = dc->getSelfClassDecl();
+
+  // must be an actor
+  if (!selfClassDecl || !selfClassDecl->isAnyActor())
+    return false;
+
+  // must be instance isolated
+  switch (isolation) {
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
+      return true;
+
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent:
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      return false;
+  }
+}
+
 void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
 
@@ -360,9 +399,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Make sure we've hopped to the right global actor, if any.
   if (ctor->hasAsync()) {
-    SILLocation prologueLoc(selfDecl);
-    prologueLoc.markAsPrologue();
-    emitConstructorPrologActorHop(prologueLoc, getActorIsolation(ctor));
+    auto isolation = getActorIsolation(ctor);
+    // if it's not injected by definite init, we do it in the prologue now.
+    if (!ctorHopsInjectedByDefiniteInit(ctor, isolation)) {
+      SILLocation prologueLoc(selfDecl);
+      prologueLoc.markAsPrologue();
+      emitConstructorPrologActorHop(prologueLoc, isolation);
+    }
   }
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -754,10 +797,14 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     selfClassDecl->isDistributedActor() && !isDelegating;
 
   // Make sure we've hopped to the right global actor, if any.
-  if (ctor->hasAsync() && !selfClassDecl->isActor()) {
-    SILLocation prologueLoc(selfDecl);
-    prologueLoc.markAsPrologue();
-    emitConstructorPrologActorHop(prologueLoc, getActorIsolation(ctor));
+  if (ctor->hasAsync()) {
+    auto isolation = getActorIsolation(ctor);
+    // if it's not injected by definite init, we do it in the prologue now.
+    if (!ctorHopsInjectedByDefiniteInit(ctor, isolation)) {
+      SILLocation prologueLoc(selfDecl);
+      prologueLoc.markAsPrologue();
+      emitConstructorPrologActorHop(prologueLoc, isolation);
+    }
   }
 
   if (!NeedsBoxForSelf) {

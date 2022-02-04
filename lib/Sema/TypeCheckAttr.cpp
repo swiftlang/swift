@@ -5643,17 +5643,13 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     }
   }
   
-  // `nonisolated` on most actor initializers is invalid or redundant.
+  // `nonisolated` on non-async actor initializers is invalid
+  // the reasoning is that there is a "little bit" of isolation,
+  // as afforded by flow-isolation.
   if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
       if (nominal->isAnyActor()) {
-        if (ctor->isConvenienceInit()) {
-          // all convenience inits are `nonisolated` by default
-          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_convenience_init)
-            .warnUntilSwiftVersion(6);
-          return;
-          
-        } else if (!ctor->hasAsync()) {
+        if (!ctor->hasAsync()) {
           // the isolation for a synchronous init cannot be `nonisolated`.
           diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
             .warnUntilSwiftVersion(6);

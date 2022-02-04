@@ -18,12 +18,24 @@
 #include "swift/DriverTool/DriverTool.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
+#include "swift/StaticMirror/BinaryScanningTool.h"
+#include "swift/StaticMirror/BinaryScanImpl.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "swift/Option/Options.h"
 
 using namespace swift::dependencies;
+using namespace swift::static_mirror;
 
 DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t)
+
+inline BinaryScanningTool *unwrap_static_mirror(swiftscan_static_mirror_t P) {
+  return reinterpret_cast<BinaryScanningTool *>(P);
+}
+inline swiftscan_static_mirror_t
+wrap_static_mirror(const BinaryScanningTool *P) {
+  return reinterpret_cast<swiftscan_static_mirror_t>(
+      const_cast<BinaryScanningTool *>(P));
+}
 
 //=== Private Cleanup Functions -------------------------------------------===//
 
@@ -533,6 +545,86 @@ swiftscan_compiler_supported_features_query() {
   allFeatures.emplace_back("emit-abi-descriptor");
   return create_set(allFeatures);
 }
+
+//=== Static Mirror Scan Functions ---------------------------------------===//
+swiftscan_static_mirror_t
+swiftscan_static_mirror_create(int num_binaries, const char **binary_paths,
+                               const char *arch) {
+  INITIALIZE_LLVM();
+  std::vector<std::string> inputBinaryPaths;
+  for (unsigned SI = 0, SE = num_binaries; SI < SE; ++SI)
+    inputBinaryPaths.push_back(binary_paths[SI]);
+
+  return wrap_static_mirror(new BinaryScanningTool(inputBinaryPaths, arch));
+}
+
+void swiftscan_static_mirror_dispose(
+    swiftscan_static_mirror_t c_static_mirror) {
+  delete unwrap_static_mirror(c_static_mirror);
+}
+
+swiftscan_static_mirror_conformances_set_t *
+swiftscan_static_mirror_conformances_set_create(
+    swiftscan_static_mirror_t static_mirror, int num_protocols,
+    const char **protocol_names) {
+  std::vector<std::string> protocols;
+  for (unsigned SI = 0, SE = num_protocols; SI < SE; ++SI)
+    protocols.push_back(protocol_names[SI]);
+  BinaryScanningTool *scanTool = unwrap_static_mirror(static_mirror);
+  auto scanResult = scanTool->collectConformances(protocols);
+
+  // Bridge to the C interface
+  swiftscan_static_mirror_conformances_set_t *conformanceSet =
+        new swiftscan_static_mirror_conformances_set_t;
+  conformanceSet->count = scanResult.Conformances.size();
+  conformanceSet->conformances =
+      new swiftscan_static_mirror_conformance_info_t[conformanceSet->count];
+
+  size_t idx = 0;
+  for (auto &conformance : scanResult.Conformances) {
+    swiftscan_conformance_info_s *conformanceInfo = new swiftscan_conformance_info_s;
+    conformanceSet->conformances[idx] = conformanceInfo;
+    conformanceInfo->type_name = create_clone(conformance.TypeName.c_str());
+    conformanceInfo->mangled_type_name = create_clone(conformance.MangledTypeName.c_str());
+    conformanceInfo->protocol_name = create_clone(conformance.ProtocolName.c_str());
+    idx += 1;
+  }
+  return conformanceSet;
+}
+
+swiftscan_string_ref_t
+swiftscan_static_mirror_conformance_info_get_type_name(swiftscan_static_mirror_conformance_info_t info) {
+  return info->type_name;
+}
+
+swiftscan_string_ref_t
+swiftscan_static_mirror_conformance_info_get_protocol_name(swiftscan_static_mirror_conformance_info_t info) {
+  return info->protocol_name;
+}
+
+swiftscan_string_ref_t
+swiftscan_static_mirror_conformance_info_get_mangled_type_name(swiftscan_static_mirror_conformance_info_t info) {
+  return info->mangled_type_name;
+}
+
+void swiftscan_static_mirror_conformance_info_dispose(
+    swiftscan_static_mirror_conformance_info_t info) {
+  swiftscan_conformance_info_s *info_impl = info;
+  swiftscan_string_dispose(info_impl->type_name);
+  swiftscan_string_dispose(info_impl->mangled_type_name);
+  swiftscan_string_dispose(info_impl->protocol_name);
+}
+
+void swiftscan_static_mirror_conformances_set_dispose(
+    swiftscan_static_mirror_conformances_set_t *set) {
+  for (size_t i = 0; i < set->count; ++i) {
+    swiftscan_static_mirror_conformance_info_dispose(set->conformances[i]);
+  }
+  delete[] set->conformances;
+  delete set;
+}
+
+//=== Experimental Compiler Invocation Functions ------------------------===//
 
 int invoke_swift_compiler(int argc, const char **argv) {
   return swift::mainEntry(argc, argv);

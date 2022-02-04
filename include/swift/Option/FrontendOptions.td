@@ -309,6 +309,10 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
+
+def enable_experimental_bound_generic_extensions :
+  Flag<["-"], "enable-experimental-bound-generic-extensions">,
+  HelpText<"Enable experimental support for extensions of bound generic types">;
 }
 
 // HIDDEN FLAGS
@@ -454,6 +458,9 @@ def enable_anonymous_context_mangled_names :
 
 def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
   HelpText<"Disable emission of reflection metadata for nominal types">;
+
+def reflection_metadata_for_debugger_only : Flag<["-"], "reflection-metadata-for-debugger-only">,
+  HelpText<"Emit reflection metadata for debugger only, don't make them available at runtime">;
 
 def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"

@@ -239,9 +239,14 @@ struct FieldTypeInfo {
 
 /// Info about a protocol conformance read out from an Image
 struct ProtocolConformanceInfo {
-  std::string typeName;
-  std::string protocolName;
-  std::string mangledTypeName;
+  std::string TypeName;
+  std::string ProtocolName;
+  std::string MangledTypeName;
+};
+
+struct ConformanceCollectionResult {
+  std::vector<ProtocolConformanceInfo> Conformances;
+  std::vector<std::string> Errors;
 };
 
 /// An implementation of MetadataReader's BuilderType concept for
@@ -1171,7 +1176,9 @@ private:
 public:
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
-  void dumpConformanceSection(std::ostream &stream) {
+  ConformanceCollectionResult collectAllConformances() {
+    ConformanceCollectionResult result;
+
     // The Fields section has gathered info on types that includes their mangled
     // names. Use that to build a dictionary from a type's demangled name to its
     // mangeled name
@@ -1203,25 +1210,34 @@ public:
         auto optionalConformanceInfo =
             conformanceReader.readConformanceDescriptor(conformanceAddr,
                                                         typeNameToManglingMap);
-        if (!optionalConformanceInfo.hasValue()) {
-          stream << "Error reading conformance descriptor: "
-                 << conformanceReader.Error << "\n";
-          continue;
-        }
-        auto conformanceInfo = optionalConformanceInfo.getValue();
-        auto typeConformancesKey = conformanceInfo.mangledTypeName + " (" +
-                                   conformanceInfo.typeName + ")";
-        if (typeConformances.count(typeConformancesKey) != 0) {
-          typeConformances[typeConformancesKey].push_back(
-              conformanceInfo.protocolName);
-        } else {
-          typeConformances.emplace(
-              typeConformancesKey,
-              std::vector<std::string>{conformanceInfo.protocolName});
-        }
+        if (!optionalConformanceInfo.hasValue())
+          result.Errors.push_back(conformanceReader.Error);
+        else
+          result.Conformances.push_back(optionalConformanceInfo.getValue());
       }
     }
+    return result;
+  }
 
+  template <template <typename Runtime> class ObjCInteropKind,
+            unsigned PointerSize>
+  void dumpConformanceSection(std::ostream &stream) {
+    auto conformanceCollectionResult = collectAllConformances<ObjCInteropKind, PointerSize>();
+
+    // Collect all conformances and aggregate them per-conforming-type.
+    std::unordered_map<std::string, std::vector<std::string>> typeConformances;
+    for (auto &conformanceInfo : conformanceCollectionResult.Conformances) {
+      auto typeConformancesKey = conformanceInfo.MangledTypeName + " (" +
+                                 conformanceInfo.TypeName + ")";
+      if (typeConformances.count(typeConformancesKey) != 0) {
+        typeConformances[typeConformancesKey].push_back(
+            conformanceInfo.ProtocolName);
+      } else {
+        typeConformances.emplace(
+            typeConformancesKey,
+            std::vector<std::string>{conformanceInfo.ProtocolName});
+      }
+    }
     for (auto &pair : typeConformances) {
       stream << pair.first << " : ";
       bool first = true;
@@ -1233,6 +1249,12 @@ public:
         stream << protocol;
       }
       stream << "\n";
+    }
+
+    // Report encountered errors
+    for (auto &error : conformanceCollectionResult.Errors) {
+      stream << "Error reading conformance descriptor: "
+             << error << "\n";
     }
   }
 

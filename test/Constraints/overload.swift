@@ -187,12 +187,12 @@ R_28051973().f(r28051973) // expected-error {{cannot use mutating member on immu
 // Fix for CSDiag vs CSSolver disagreement on what constitutes a
 // valid overload.
 
-func overloadedMethod(n: Int) {} // expected-note {{'overloadedMethod(n:)' declared here}}
-func overloadedMethod<T>() {}
+func overloadedMethod(n: Int) {}
+func overloadedMethod<T>() {} // expected-note {{in call to function 'overloadedMethod()'}}
 // expected-error@-1 {{generic parameter 'T' is not used in function signature}}
 
 overloadedMethod()
-// expected-error@-1 {{missing argument for parameter 'n' in call}}
+// expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
 // Ensure we select the overload of '??' returning T? rather than T.
 func SR3817(_ d: [String : Any], _ s: String, _ t: String) -> Any {
