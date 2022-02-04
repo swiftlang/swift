@@ -43,6 +43,15 @@ bool PropertyMap::checkRulePairOnce(unsigned firstRuleID,
 /// Given a key T, a rule (V.[p1] => V) where T == U.V, and a property [p2]
 /// where [p1] < [p2], record a rule (T.[p2] => T) that is induced by
 /// the original rule (V.[p1] => V).
+///
+/// This is used to define rewrite loops for relating pairs of rules where
+/// one implies another:
+///
+/// - a more specific layout constraint implies a general layout constraint5
+/// - a superclass bound implies a layout constraint
+/// - a concrete type that is a class implies a superclass bound
+/// - a concrete type that is a class implies a layout constraint
+///
 static void recordRelation(Term key,
                            unsigned lhsRuleID,
                            Symbol rhsProperty,
@@ -391,7 +400,122 @@ void PropertyMap::addSuperclassProperty(
   }
 }
 
-/// Record induced rules from the given type difference.
+/// Build a rewrite path for a rule induced by concrete type unification.
+///
+/// Consider two concrete type rules (T.[LHS] => T) and (T.[RHS] => T), a
+/// TypeDifference describing the transformation from LHS to RHS, and the
+/// index of a substitution Xn from [C] which is transformed into its
+/// replacement f(Xn).
+///
+/// The rewrite path should allow us to eliminate the induced rule
+/// (f(Xn) => Xn), so the induced rule will appear without context, and
+/// the concrete type rules (T.[LHS] => T) and (T.[RHS] => T) will appear
+/// in context.
+///
+/// There are two cases:
+///
+/// a) The substitution Xn remains a type parameter in [RHS], but becomes
+///    a canonical term Xn', so f(Xn) = Xn'.
+///
+///    In the first case, the induced rule (Xn => Xn'), described by a
+///    rewrite path as follows:
+///
+///    Xn
+///    Xn' T.[RHS] // RightConcreteProjection(n) pushes T.[RHS]
+///    Xn' T       // Application of (T.[RHS] => T) in context
+///    Xn' T.[LHS] // Application of (T => T.[LHS]) in context
+///    Xn'         // LeftConcreteProjection(n) pops T.[LHS]
+///
+///    Now when this path is composed with a rewrite step for the inverted
+///    induced rule (Xn' => Xn), we get a rewrite loop at Xn in which the
+///    new rule appears in empty context.
+///
+/// b) The substitution Xn becomes a concrete type [D] in [C'], so
+///    f(Xn) = Xn.[D].
+///
+///    In the second case, the induced rule is (Xn.[D] => Xn), described
+///    by a rewrite path (going in the other direction) as follows:
+///
+///    Xn
+///    Xn.[D] T.[RHS] // RightConcreteProjection(n) pushes T.[RHS]
+///    Xn.[D] T       // Application of (T.[RHS] => T) in context
+///    Xn.[D] T.[LHS] // Application of (T => T.[LHS]) in context
+///    Xn.[D]         // LeftConcreteProjection(n) pops T.[LHS]
+///
+///    Now when this path is composed with a rewrite step for the induced
+///    rule (Xn.[D] => Xn), we get a rewrite loop at Xn in which the
+///    new rule appears in empty context.
+///
+/// There is a minor complication; the concrete type rules T.[LHS] and
+/// T.[RHS] might actually be T.[LHS] and V.[RHS] where V is a suffix of
+/// T, so T = U.V for some |U| > 0, (or vice versa). In this case we need
+/// an additional step in the middle to prefix the concrete substitutions
+/// of [LHS] (or [LHS]) with U.
+static void buildRewritePathForInducedRule(unsigned differenceID,
+                                           unsigned lhsRuleID,
+                                           unsigned rhsRuleID,
+                                           unsigned substitutionIndex,
+                                           const RewriteSystem &system,
+                                           RewritePath &path) {
+  unsigned lhsLength = system.getRule(lhsRuleID).getRHS().size();
+  unsigned rhsLength = system.getRule(rhsRuleID).getRHS().size();
+
+  unsigned lhsPrefix = 0, rhsPrefix = 0;
+  if (lhsLength < rhsLength)
+    lhsPrefix = rhsLength - lhsLength;
+  if (rhsLength < lhsLength)
+    rhsPrefix = lhsLength - rhsLength;
+
+  assert(lhsPrefix == 0 || rhsPrefix == 0);
+
+  // Replace f(Xn) with Xn and push T.[RHS] on the stack.
+  path.add(RewriteStep::forRightConcreteProjection(
+      differenceID, substitutionIndex, /*inverse=*/false));
+
+  // If the rule was actually (V.[RHS] => V) with T == U.V for some
+  // |U| > 0, strip U from the prefix of each substitution of [RHS].
+  if (rhsPrefix > 0) {
+    path.add(RewriteStep::forPrefixSubstitutions(/*prefix=*/rhsPrefix,
+                                                 /*endOffset=*/0,
+                                                 /*inverse=*/true));
+  }
+
+  // Apply the rule (V.[RHS] => V).
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/rhsPrefix, /*endOffset=*/0,
+      /*ruleID=*/rhsRuleID, /*inverse=*/false));
+
+  // Apply the inverted rule (V' => V'.[LHS]).
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/lhsPrefix, /*endOffset=*/0,
+      /*ruleID=*/lhsRuleID, /*inverse=*/true));
+
+  // If the rule was actually (V.[LHS] => V) with T == U.V for some
+  // |U| > 0, prefix each substitution of [LHS] with U.
+  if (lhsPrefix > 0) {
+    path.add(RewriteStep::forPrefixSubstitutions(/*prefix=*/lhsPrefix,
+                                                 /*endOffset=*/0,
+                                                 /*inverse=*/false));
+  }
+
+  // Pop T.[LHS] from the stack, leaving behind Xn.
+  path.add(RewriteStep::forLeftConcreteProjection(
+           differenceID, substitutionIndex, /*inverse=*/true));
+}
+
+/// Given two concrete type rules (T.[LHS] => T) and (T.[RHS] => T) and
+/// TypeDifference describing the transformation from LHS to RHS,
+/// record rules for transforming each substitution of LHS into a
+/// more canonical type parameter or concrete type from RHS.
+///
+/// This also records rewrite paths relating induced rules to the original
+/// concrete type rules, since the concrete type rules imply the induced
+/// rules and make them redundant.
+///
+/// The implication going in the other direction -- where one of the
+/// two concrete type rules together with the induced rules implies the
+/// other concrete type rule -- is recorded in
+/// concretelySimplifyLeftHandSideSubstitutions().
 void PropertyMap::processTypeDifference(const TypeDifference &difference,
                                         unsigned differenceID,
                                         unsigned lhsRuleID,
@@ -402,34 +526,22 @@ void PropertyMap::processTypeDifference(const TypeDifference &difference,
     difference.dump(llvm::dbgs());
   }
 
-  for (const auto &pair : difference.SameTypes) {
-    // Both sides are type parameters; add a same-type requirement.
-    auto lhsTerm = difference.getOriginalSubstitution(pair.first);
-    MutableTerm rhsTerm(pair.second);
+  for (unsigned index : indices(difference.LHS.getSubstitutions())) {
+    auto lhsTerm = difference.getReplacementSubstitution(index);
+    auto rhsTerm = difference.getOriginalSubstitution(index);
+
+    RewritePath path;
+    buildRewritePathForInducedRule(differenceID, lhsRuleID, rhsRuleID,
+                                   index, System, path);
 
     if (debug) {
       llvm::dbgs() << "%% Induced rule " << lhsTerm
-                   << " == " << rhsTerm << "\n";
+                   << " => " << rhsTerm << " with path ";
+      path.dump(llvm::dbgs(), lhsTerm, System);
+      llvm::dbgs() << "\n";
     }
 
-    // FIXME: Need a rewrite path here.
-    System.addRule(lhsTerm, rhsTerm);
-  }
-
-  for (const auto &pair : difference.ConcreteTypes) {
-    // A type parameter is equated with a concrete type; add a concrete
-    // type requirement.
-    auto rhsTerm = difference.getOriginalSubstitution(pair.first);
-    MutableTerm lhsTerm(rhsTerm);
-    lhsTerm.add(pair.second);
-
-    if (debug) {
-      llvm::dbgs() << "%% Induced rule " << lhsTerm
-                   << " == " << rhsTerm << "\n";
-    }
-
-    // FIXME: Need a rewrite path here.
-    System.addRule(lhsTerm, rhsTerm);
+    System.addRule(lhsTerm, rhsTerm, &path);
   }
 }
 
@@ -676,6 +788,11 @@ void PropertyMap::addProperty(
   llvm_unreachable("Bad symbol kind");
 }
 
+/// Post-pass to handle unification and conflict checking between pairs of
+/// rules of different kinds:
+///
+/// - concrete vs superclass
+/// - concrete vs layout
 void PropertyMap::checkConcreteTypeRequirements() {
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
