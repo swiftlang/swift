@@ -25,6 +25,10 @@
 using namespace swift;
 using namespace rewriting;
 
+MutableTerm TypeDifference::getOriginalSubstitution(unsigned index) const {
+  return MutableTerm(LHS.getSubstitutions()[index]);
+}
+
 MutableTerm TypeDifference::getReplacementSubstitution(unsigned index) const {
   for (const auto &pair : SameTypes) {
     if (pair.first == index) {
@@ -37,14 +41,14 @@ MutableTerm TypeDifference::getReplacementSubstitution(unsigned index) const {
     if (pair.first == index) {
       // Given a transformation Xn -> [concrete: D], return the
       // return Xn.[concrete: D].
-      MutableTerm result(LHS.getSubstitutions()[index]);
+      auto result = getOriginalSubstitution(index);
       result.add(pair.second);
       return result;
     }
   }
 
   // Otherwise return the original substitution Xn.
-  return MutableTerm(LHS.getSubstitutions()[index]);
+  return getOriginalSubstitution(index);
 }
 
 void TypeDifference::dump(llvm::raw_ostream &out) const {
@@ -53,12 +57,12 @@ void TypeDifference::dump(llvm::raw_ostream &out) const {
   llvm::errs() << "RHS: " << RHS << "\n";
 
   for (const auto &pair : SameTypes) {
-    out << "- " << LHS.getSubstitutions()[pair.first] << " (#";
+    out << "- " << getOriginalSubstitution(pair.first) << " (#";
     out << pair.first << ") -> " << pair.second << "\n";
   }
 
   for (const auto &pair : ConcreteTypes) {
-    out << "- " << LHS.getSubstitutions()[pair.first] << " (#";
+    out << "- " << getOriginalSubstitution(pair.first) << " (#";
     out << pair.first << ") -> " << pair.second << "\n";
   }
 }

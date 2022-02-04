@@ -404,7 +404,7 @@ void PropertyMap::processTypeDifference(const TypeDifference &difference,
 
   for (const auto &pair : difference.SameTypes) {
     // Both sides are type parameters; add a same-type requirement.
-    MutableTerm lhsTerm(difference.LHS.getSubstitutions()[pair.first]);
+    auto lhsTerm = difference.getOriginalSubstitution(pair.first);
     MutableTerm rhsTerm(pair.second);
 
     if (debug) {
@@ -419,7 +419,7 @@ void PropertyMap::processTypeDifference(const TypeDifference &difference,
   for (const auto &pair : difference.ConcreteTypes) {
     // A type parameter is equated with a concrete type; add a concrete
     // type requirement.
-    MutableTerm rhsTerm(difference.LHS.getSubstitutions()[pair.first]);
+    auto rhsTerm = difference.getOriginalSubstitution(pair.first);
     MutableTerm lhsTerm(rhsTerm);
     lhsTerm.add(pair.second);
 

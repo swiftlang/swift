@@ -58,6 +58,7 @@ struct TypeDifference {
     : BaseTerm(baseTerm), LHS(lhs), RHS(rhs),
       SameTypes(sameTypes), ConcreteTypes(concreteTypes) {}
 
+  MutableTerm getOriginalSubstitution(unsigned index) const;
   MutableTerm getReplacementSubstitution(unsigned index) const;
 
   void dump(llvm::raw_ostream &out) const;
