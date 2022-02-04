@@ -526,6 +526,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
+  if(SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES)
+    list(APPEND swift_flags "-Xfrontend -disable-preallocated-instantiation-caches")
+  endif()
+
   list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
