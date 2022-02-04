@@ -5428,7 +5428,7 @@ public:
 
     if (!Options.excludeAttrKind(TAK_Sendable) &&
         info.isSendable()) {
-      Printer << "@Sendable ";
+      Printer.printSimpleAttr("@Sendable") << " ";
     }
 
     SmallString<64> buf;

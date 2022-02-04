@@ -2796,6 +2796,15 @@ namespace {
                                       SourceLoc(), Name,
                                       Loc,
                                       /*genericparams*/nullptr, DC);
+
+      // If the typedef is marked with @Sendable and not @_nonSendable, make
+      // any function type in it Sendable.
+      auto sendability = Result->getAttrs().getEffectiveSendableAttr();
+      if (isa_and_nonnull<SendableAttr>(sendability))
+        SwiftType = applyToFunctionType(SwiftType, [](ASTExtInfo info) {
+          return info.withConcurrent();
+        });
+
       Result->setUnderlyingType(SwiftType);
       
       // Make Objective-C's 'id' unavailable.

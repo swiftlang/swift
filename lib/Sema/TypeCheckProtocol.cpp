@@ -140,15 +140,31 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
                   Type witnessType, bool witnessTypeIsIUO,
                   VarianceKind variance) {
   // If the witness type is noescape but the requirement type is not,
-  // adjust the witness type to be escaping. This permits a limited form of
-  // covariance.
-  bool reqNoescapeToEscaping = false;
-  (void)adjustInferredAssociatedType(reqtType, reqNoescapeToEscaping);
-  bool witnessNoescapeToEscaping = false;
-  Type adjustedWitnessType =
-    adjustInferredAssociatedType(witnessType, witnessNoescapeToEscaping);
-  if (witnessNoescapeToEscaping && !reqNoescapeToEscaping)
-    witnessType = adjustedWitnessType;
+  // adjust the witness type to be escaping; likewisse for sendability. This
+  // permits a limited form of covariance.
+  auto applyAdjustment = [&](TypeAdjustment adjustment) {
+    // Sometimes the witness has a function type, but the requirement has
+    // something else (a dependent type we need to infer, in the most relevant
+    // case). In that situation, should we behave as though the requirement type
+    // *did* need the adjustment, or as though it *did not*?
+    //
+    // For noescape, we want to behave as though it was necessary because any
+    // function type not in a parameter is, more or less, implicitly @escaping.
+    // For Sendable, we want to behave as though it was not necessary because
+    // function types that aren't in a parameter can be Sendable or not.
+    // FIXME: Should we check for a Sendable bound on the requirement type?
+    bool inRequirement = (adjustment != TypeAdjustment::NoescapeToEscaping);
+    (void)adjustInferredAssociatedType(adjustment, reqtType, inRequirement);
+
+    bool inWitness = false;
+    Type adjustedWitnessType =
+      adjustInferredAssociatedType(adjustment, witnessType, inWitness);
+    if (inWitness && !inRequirement)
+      witnessType = adjustedWitnessType;
+  };
+
+  applyAdjustment(TypeAdjustment::NoescapeToEscaping);
+  applyAdjustment(TypeAdjustment::NonsendableToSendable);
 
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
