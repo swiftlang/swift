@@ -84,6 +84,7 @@ bool CheckerLivenessInfo::compute() {
   while (SILValue value = defUseWorklist.pop()) {
     LLVM_DEBUG(llvm::dbgs() << "New Value: " << value);
     SWIFT_DEFER { LLVM_DEBUG(llvm::dbgs() << "Finished Value: " << value); };
+
     for (Operand *use : value->getUses()) {
       auto *user = use->getUser();
       LLVM_DEBUG(llvm::dbgs() << "    User: " << *user);
@@ -190,7 +191,6 @@ namespace {
 struct MoveKillsCopyableValuesChecker {
   SILFunction *fn;
   CheckerLivenessInfo livenessInfo;
-  SmallSetVector<MoveValueInst *, 1> movesWithinLivenessBoundary;
 
   MoveKillsCopyableValuesChecker(SILFunction *fn) : fn(fn) {}
   bool check();
@@ -377,7 +377,6 @@ bool MoveKillsCopyableValuesChecker::check() {
 
     // Then look at all of our found consuming uses. See if any of these are
     // _move that are within the boundary.
-    SWIFT_DEFER { movesWithinLivenessBoundary.clear(); };
     for (auto *use : livenessInfo.consumingUse) {
       if (auto *mvi = dyn_cast<MoveValueInst>(use->getUser())) {
         // Only emit diagnostics if our move value allows us to.
@@ -392,17 +391,11 @@ bool MoveKillsCopyableValuesChecker::check() {
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
         if (livenessInfo.liveness.isWithinBoundary(mvi)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
-          movesWithinLivenessBoundary.insert(mvi);
+          emitDiagnosticForMove(lexicalValue, varName, mvi);
         } else {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: No!\n");
         }
       }
-    }
-
-    // Ok, we found all of our moves that violate the boundary condition, lets
-    // emit diagnostics for each of them.
-    for (auto *mvi : movesWithinLivenessBoundary) {
-      emitDiagnosticForMove(lexicalValue, varName, mvi);
     }
   }
 
