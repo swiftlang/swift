@@ -863,6 +863,7 @@ public:
                                               Decl *attachingTo);
   void printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                                                 Decl *attachingTo);
+  void printInherited(const Decl *decl);
 
   void printGenericSignature(GenericSignature genericSig,
                              unsigned flags);
@@ -891,7 +892,6 @@ private:
                     bool openBracket = true, bool closeBracket = true);
   void printGenericDeclGenericParams(GenericContext *decl);
   void printDeclGenericRequirements(GenericContext *decl);
-  void printInherited(const Decl *decl);
   void printBodyIfNecessary(const AbstractFunctionDecl *decl);
 
   void printEnumElement(EnumElementDecl *elt);
@@ -2416,7 +2416,10 @@ void PrintAST::printInherited(const Decl *decl) {
   if (TypesToPrint.empty())
     return;
 
-  Printer << " : ";
+  if (Options.PrintSpaceBeforeInheritance) {
+    Printer << " ";
+  }
+  Printer << ": ";
 
   interleave(TypesToPrint, [&](InheritedEntry inherited) {
     if (inherited.isUnchecked)
@@ -4195,7 +4198,12 @@ void PrintAST::visitLoadExpr(LoadExpr *expr) {
 }
 
 void PrintAST::visitTypeExpr(TypeExpr *expr) {
-  printType(expr->getType());
+  if (auto metaType = expr->getType()->castTo<AnyMetatypeType>()) {
+    // Don't print `.Type` for an expr.
+    printType(metaType->getInstanceType());
+  } else {
+    printType(expr->getType());
+  }
 }
 
 void PrintAST::visitArrayExpr(ArrayExpr *expr) {
@@ -4277,6 +4285,8 @@ void PrintAST::visitBinaryExpr(BinaryExpr *expr) {
   visit(expr->getLHS());
   Printer << " ";
   if (auto operatorRef = expr->getFn()->getMemberOperatorRef()) {
+    Printer << operatorRef->getDecl()->getBaseName();
+  } else if (auto *operatorRef = dyn_cast<DeclRefExpr>(expr->getFn())) {
     Printer << operatorRef->getDecl()->getBaseName();
   }
   Printer << " ";
@@ -4588,6 +4598,16 @@ void PrintAST::visitBraceStmt(BraceStmt *stmt) {
 }
 
 void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
+  if (!stmt->hasResult()) {
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(Current)) {
+      if (auto *Body = FD->getBody()) {
+        if (Body->getLastElement().dyn_cast<Stmt *>() == stmt) {
+          // Don't print empty return.
+          return;
+        }
+      }
+    }
+  }
   Printer << tok::kw_return;
   if (stmt->hasResult()) {
     Printer << " ";
@@ -4775,6 +4795,11 @@ void Decl::print(raw_ostream &OS, const PrintOptions &Opts) const {
 bool Decl::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
   PrintAST printer(Printer, Opts);
   return printer.visit(const_cast<Decl *>(this));
+}
+
+void Decl::printInherited(ASTPrinter &Printer, const PrintOptions &Opts) const {
+  PrintAST printer(Printer, Opts);
+  printer.printInherited(this);
 }
 
 bool Decl::shouldPrintInContext(const PrintOptions &PO) const {

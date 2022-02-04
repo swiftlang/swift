@@ -3354,7 +3354,8 @@ public:
   AddEquatableContext() : DC(nullptr), Adopter(), ProtocolsLocations(),
   Protocols(), StoredProperties(), Range(nullptr, nullptr) {};
 
-  static AddEquatableContext getDeclarationContextFromInfo(ResolvedCursorInfo Info);
+  static AddEquatableContext
+  getDeclarationContextFromInfo(const ResolvedCursorInfo &Info);
 
   std::string getInsertionTextForProtocol();
 
@@ -3468,7 +3469,7 @@ getProtocolRequirements() {
 }
 
 AddEquatableContext AddEquatableContext::
-getDeclarationContextFromInfo(ResolvedCursorInfo Info) {
+getDeclarationContextFromInfo(const ResolvedCursorInfo &Info) {
   if (Info.isInvalid()) {
     return AddEquatableContext();
   }
@@ -3523,6 +3524,177 @@ performChange() {
                            Context.getInsertionTextForProtocol());
   EditConsumer.insertAfter(SM, Context.getInsertStartLoc(),
                            Context.getInsertionTextForFunction(SM));
+  return false;
+}
+
+class AddCodableContext {
+
+  /// Declaration context
+  DeclContext *DC;
+
+  /// Start location of declaration context brace
+  SourceLoc StartLoc;
+
+  /// Array of all conformed protocols
+  SmallVector<swift::ProtocolDecl *, 2> Protocols;
+
+  /// Range of internal members in declaration
+  DeclRange Range;
+
+  bool conformsToCodableProtocol() {
+    for (ProtocolDecl *Protocol : Protocols) {
+      if (Protocol->getKnownProtocolKind() == KnownProtocolKind::Encodable ||
+          Protocol->getKnownProtocolKind() == KnownProtocolKind::Decodable) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+public:
+  AddCodableContext(NominalTypeDecl *Decl)
+      : DC(Decl), StartLoc(Decl->getBraces().Start),
+        Protocols(Decl->getAllProtocols()), Range(Decl->getMembers()){};
+
+  AddCodableContext(ExtensionDecl *Decl)
+      : DC(Decl), StartLoc(Decl->getBraces().Start),
+        Protocols(Decl->getExtendedNominal()->getAllProtocols()),
+        Range(Decl->getMembers()){};
+
+  AddCodableContext() : DC(nullptr), Protocols(), Range(nullptr, nullptr){};
+
+  static AddCodableContext
+  getDeclarationContextFromInfo(const ResolvedCursorInfo &Info);
+
+  void printInsertionText(const ResolvedCursorInfo &CursorInfo,
+                          SourceManager &SM, llvm::raw_ostream &OS);
+
+  bool isValid() { return StartLoc.isValid() && conformsToCodableProtocol(); }
+
+  SourceLoc getInsertStartLoc();
+};
+
+SourceLoc AddCodableContext::getInsertStartLoc() {
+  SourceLoc MaxLoc = StartLoc;
+  for (auto Mem : Range) {
+    if (Mem->getEndLoc().getOpaquePointerValue() >
+        MaxLoc.getOpaquePointerValue()) {
+      MaxLoc = Mem->getEndLoc();
+    }
+  }
+  return MaxLoc;
+}
+
+/// Walks an AST and prints the synthesized Codable implementation.
+class SynthesizedCodablePrinter : public ASTWalker {
+private:
+  ASTPrinter &Printer;
+
+public:
+  SynthesizedCodablePrinter(ASTPrinter &Printer) : Printer(Printer) {}
+
+  bool walkToDeclPre(Decl *D) override {
+    auto *VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      return false;
+
+    if (!VD->isSynthesized()) {
+      return true;
+    }
+    SmallString<32> Scratch;
+    auto name = VD->getName().getString(Scratch);
+    // Print all synthesized enums,
+    // since Codable can synthesize multiple enums (for associated values).
+    auto shouldPrint =
+        isa<EnumDecl>(VD) || name == "init(from:)" || name == "encode(to:)";
+    if (!shouldPrint) {
+      // Some other synthesized decl that we don't want to print.
+      return false;
+    }
+
+    Printer.printNewline();
+
+    if (auto enumDecl = dyn_cast<EnumDecl>(D)) {
+      // Manually print enum here, since we don't want to print synthesized
+      // functions.
+      Printer << "enum " << enumDecl->getNameStr();
+      PrintOptions Options;
+      Options.PrintSpaceBeforeInheritance = false;
+      enumDecl->printInherited(Printer, Options);
+      Printer << " {";
+      for (Decl *EC : enumDecl->getAllElements()) {
+        Printer.printNewline();
+        Printer << "  ";
+        EC->print(Printer, Options);
+      }
+      Printer.printNewline();
+      Printer << "}";
+      return false;
+    }
+
+    PrintOptions Options;
+    Options.SynthesizeSugarOnTypes = true;
+    Options.FunctionDefinitions = true;
+    Options.VarInitializers = true;
+    Options.PrintExprs = true;
+    Options.TypeDefinitions = true;
+    Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
+
+    Printer.printNewline();
+    D->print(Printer, Options);
+
+    return false;
+  }
+};
+
+void AddCodableContext::printInsertionText(const ResolvedCursorInfo &CursorInfo,
+                                           SourceManager &SM,
+                                           llvm::raw_ostream &OS) {
+  StringRef ExtraIndent;
+  StringRef CurrentIndent =
+      Lexer::getIndentationForLine(SM, getInsertStartLoc(), &ExtraIndent);
+  std::string Indent;
+  if (getInsertStartLoc() == StartLoc) {
+    Indent = (CurrentIndent + ExtraIndent).str();
+  } else {
+    Indent = CurrentIndent.str();
+  }
+
+  ExtraIndentStreamPrinter Printer(OS, Indent);
+  Printer.printNewline();
+  SynthesizedCodablePrinter Walker(Printer);
+  DC->getAsDecl()->walk(Walker);
+}
+
+AddCodableContext AddCodableContext::getDeclarationContextFromInfo(
+    const ResolvedCursorInfo &Info) {
+  if (Info.isInvalid()) {
+    return AddCodableContext();
+  }
+  if (!Info.IsRef) {
+    if (auto *NomDecl = dyn_cast<NominalTypeDecl>(Info.ValueD)) {
+      return AddCodableContext(NomDecl);
+    }
+  }
+  // TODO: support extensions
+  // (would need to get synthesized nodes from the main decl,
+  // and only if it's in the same file?)
+  return AddCodableContext();
+}
+
+bool RefactoringActionAddExplicitCodableImplementation::isApplicable(
+    const ResolvedCursorInfo &Tok, DiagnosticEngine &Diag) {
+  return AddCodableContext::getDeclarationContextFromInfo(Tok).isValid();
+}
+
+bool RefactoringActionAddExplicitCodableImplementation::performChange() {
+  auto Context = AddCodableContext::getDeclarationContextFromInfo(CursorInfo);
+
+  SmallString<64> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+  Context.printInsertionText(CursorInfo, SM, OS);
+
+  EditConsumer.insertAfter(SM, Context.getInsertStartLoc(), OS.str());
   return false;
 }
 
