@@ -32,12 +32,15 @@ namespace rewriting {
 
 class RewriteContext;
 
-/// Describes transformations that turn LHS into RHS. There are two kinds of
-/// transformations:
+/// Describes transformations that turn LHS into RHS, given that there are a
+/// pair of rules (BaseTerm.[LHS] => BaseTerm) and (BaseTerm.[RHS] => BaseTerm).
+///
+/// There are two kinds of transformations:
 ///
 /// - Replacing a type term T1 with another type term T2, where T2 < T1.
 /// - Replacing a type term T1 with a concrete type C2.
 struct TypeDifference {
+  Term BaseTerm;
   Symbol LHS;
   Symbol RHS;
 
@@ -49,10 +52,11 @@ struct TypeDifference {
   /// C2 is a concrete type symbol.
   SmallVector<std::pair<unsigned, Symbol>, 1> ConcreteTypes;
 
-  TypeDifference(Symbol lhs, Symbol rhs,
+  TypeDifference(Term baseTerm, Symbol lhs, Symbol rhs,
                  SmallVector<std::pair<unsigned, Term>, 1> sameTypes,
                  SmallVector<std::pair<unsigned, Symbol>, 1> concreteTypes)
-    : LHS(lhs), RHS(rhs), SameTypes(sameTypes), ConcreteTypes(concreteTypes) {}
+    : BaseTerm(baseTerm), LHS(lhs), RHS(rhs),
+      SameTypes(sameTypes), ConcreteTypes(concreteTypes) {}
 
   void dump(llvm::raw_ostream &out) const;
   void verify(RewriteContext &ctx) const;
@@ -60,7 +64,7 @@ struct TypeDifference {
 
 TypeDifference
 buildTypeDifference(
-    Symbol symbol,
+    Term baseTerm, Symbol symbol,
     const llvm::SmallVector<std::pair<unsigned, Term>, 1> &sameTypes,
     const llvm::SmallVector<std::pair<unsigned, Symbol>, 1> &concreteTypes,
     RewriteContext &ctx);

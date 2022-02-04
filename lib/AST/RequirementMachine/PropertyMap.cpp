@@ -407,7 +407,7 @@ void PropertyMap::buildPropertyMap() {
 /// Otherwise returns an index which can be passed to
 /// RewriteSystem::getTypeDifference().
 Optional<unsigned>
-PropertyMap::concretelySimplifySubstitutions(Symbol symbol,
+PropertyMap::concretelySimplifySubstitutions(Term baseTerm, Symbol symbol,
                                              RewritePath *path) const {
   assert(symbol.hasSubstitutions());
 
@@ -503,13 +503,12 @@ PropertyMap::concretelySimplifySubstitutions(Symbol symbol,
     return None;
   }
 
-  auto difference = buildTypeDifference(symbol, sameTypes, concreteTypes,
+  auto difference = buildTypeDifference(baseTerm, symbol,
+                                        sameTypes, concreteTypes,
                                         Context);
   assert(difference.LHS != difference.RHS);
 
-  unsigned differenceID = System.recordTypeDifference(difference.LHS,
-                                                      difference.RHS,
-                                                      difference);
+  unsigned differenceID = System.recordTypeDifference(difference);
 
   // All simplified substitutions are now on the primary stack. Collect them to
   // produce the new term.
@@ -529,13 +528,16 @@ void PropertyMap::concretelySimplifyLeftHandSideSubstitutions() const {
         rule.isSubstitutionSimplified())
       continue;
 
-    auto symbol = rule.getLHS().back();
-    if (!symbol.hasSubstitutions())
+    auto optSymbol = rule.isPropertyRule();
+    if (!optSymbol || !optSymbol->hasSubstitutions())
       continue;
+
+    auto symbol = *optSymbol;
 
     RewritePath path;
 
-    auto differenceID = concretelySimplifySubstitutions(symbol, &path);
+    auto differenceID = concretelySimplifySubstitutions(
+        rule.getRHS(), symbol, &path);
     if (!differenceID)
       continue;
 

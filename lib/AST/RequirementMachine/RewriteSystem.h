@@ -422,15 +422,14 @@ private:
   /// The map's values are indices into the vector. The map is used for
   /// uniquing, then the index is returned and lookups are performed into
   /// the vector.
-  llvm::DenseMap<std::pair<Symbol, Symbol>, unsigned> DifferenceMap;
+  llvm::DenseMap<std::tuple<Term, Symbol, Symbol>, unsigned> DifferenceMap;
   std::vector<TypeDifference> Differences;
 
 public:
-  unsigned recordTypeDifference(Symbol lhs, Symbol rhs,
-                                const TypeDifference &difference);
+  unsigned recordTypeDifference(const TypeDifference &difference);
 
   bool
-  computeTypeDifference(Symbol lhs, Symbol rhs,
+  computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
                         Optional<unsigned> &lhsDifferenceID,
                         Optional<unsigned> &rhsDifferenceID);
 

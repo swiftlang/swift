@@ -26,6 +26,7 @@ using namespace swift;
 using namespace rewriting;
 
 void TypeDifference::dump(llvm::raw_ostream &out) const {
+  llvm::errs() << "Base term: " << BaseTerm << "\n";
   llvm::errs() << "LHS: " << LHS << "\n";
   llvm::errs() << "RHS: " << RHS << "\n";
 
@@ -253,7 +254,7 @@ namespace {
 
 TypeDifference
 swift::rewriting::buildTypeDifference(
-    Symbol symbol,
+    Term baseTerm, Symbol symbol,
     const llvm::SmallVector<std::pair<unsigned, Term>, 1> &sameTypes,
     const llvm::SmallVector<std::pair<unsigned, Symbol>, 1> &concreteTypes,
     RewriteContext &ctx) {
@@ -325,17 +326,16 @@ swift::rewriting::buildTypeDifference(
     llvm_unreachable("Bad symbol kind");
   }();
 
-  return {symbol, resultSymbol, sameTypes, concreteTypes};
+  return {baseTerm, symbol, resultSymbol, sameTypes, concreteTypes};
 }
 
 unsigned
-RewriteSystem::recordTypeDifference(Symbol lhs, Symbol rhs,
-                                    const TypeDifference &difference) {
-  assert(lhs == difference.LHS);
-  assert(rhs == difference.RHS);
-  assert(lhs != rhs);
+RewriteSystem::recordTypeDifference(const TypeDifference &difference) {
+  assert(difference.LHS != difference.RHS);
 
-  auto key = std::make_pair(lhs, rhs);
+  auto key = std::make_tuple(difference.BaseTerm,
+                             difference.LHS,
+                             difference.RHS);
   auto found = DifferenceMap.find(key);
   if (found != DifferenceMap.end())
     return found->second;
@@ -380,7 +380,7 @@ const TypeDifference &RewriteSystem::getTypeDifference(unsigned index) const {
 /// See the comment at the top of TypeDifference in TypeDifference.h for a
 /// description of the actual transformations.
 bool
-RewriteSystem::computeTypeDifference(Symbol lhs, Symbol rhs,
+RewriteSystem::computeTypeDifference(Term baseTerm, Symbol lhs, Symbol rhs,
                                      Optional<unsigned> &lhsDifferenceID,
                                      Optional<unsigned> &rhsDifferenceID) {
   assert(lhs.getKind() == rhs.getKind());
@@ -404,13 +404,13 @@ RewriteSystem::computeTypeDifference(Symbol lhs, Symbol rhs,
 
   matcher.verify();
 
-  auto lhsMeetRhs = buildTypeDifference(lhs,
+  auto lhsMeetRhs = buildTypeDifference(baseTerm, lhs,
                                         matcher.SameTypesOnRHS,
                                         matcher.ConcreteTypesOnRHS,
                                         Context);
   lhsMeetRhs.verify(Context);
 
-  auto rhsMeetLhs = buildTypeDifference(rhs,
+  auto rhsMeetLhs = buildTypeDifference(baseTerm, rhs,
                                         matcher.SameTypesOnLHS,
                                         matcher.ConcreteTypesOnLHS,
                                         Context);
@@ -437,7 +437,7 @@ RewriteSystem::computeTypeDifference(Symbol lhs, Symbol rhs,
     // The meet operation should be idempotent.
     {
       // (LHS ∧ (LHS ∧ RHS)) == (LHS ∧ RHS)
-      auto lhsMeetLhsMeetRhs = buildTypeDifference(lhs,
+      auto lhsMeetLhsMeetRhs = buildTypeDifference(baseTerm, lhs,
                                                    lhsMeetRhs.SameTypes,
                                                    lhsMeetRhs.ConcreteTypes,
                                                    Context);
@@ -460,7 +460,7 @@ RewriteSystem::computeTypeDifference(Symbol lhs, Symbol rhs,
 
     {
       // (RHS ∧ (RHS ∧ LHS)) == (RHS ∧ LHS)
-      auto rhsMeetRhsMeetRhs = buildTypeDifference(rhs,
+      auto rhsMeetRhsMeetRhs = buildTypeDifference(baseTerm, rhs,
                                                    rhsMeetLhs.SameTypes,
                                                    rhsMeetLhs.ConcreteTypes,
                                                    Context);
@@ -484,10 +484,10 @@ RewriteSystem::computeTypeDifference(Symbol lhs, Symbol rhs,
 #endif
 
   if (lhs != lhsMeetRhs.RHS)
-    lhsDifferenceID = recordTypeDifference(lhs, lhsMeetRhs.RHS, lhsMeetRhs);
+    lhsDifferenceID = recordTypeDifference(lhsMeetRhs);
 
   if (rhs != rhsMeetLhs.RHS)
-    rhsDifferenceID = recordTypeDifference(rhs, rhsMeetLhs.RHS, rhsMeetLhs);
+    rhsDifferenceID = recordTypeDifference(rhsMeetLhs);
 
   return isConflict;
 }

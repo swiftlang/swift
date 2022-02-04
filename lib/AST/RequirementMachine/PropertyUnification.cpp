@@ -436,7 +436,8 @@ void PropertyMap::addConcreteTypeProperty(
   Optional<unsigned> lhsDifferenceID;
   Optional<unsigned> rhsDifferenceID;
 
-  bool conflict = System.computeTypeDifference(*props->ConcreteType, property,
+  bool conflict = System.computeTypeDifference(key,
+                                               *props->ConcreteType, property,
                                                lhsDifferenceID,
                                                rhsDifferenceID);
 
