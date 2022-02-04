@@ -606,10 +606,6 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
-def enable_experimental_cxx_interop :
-  Flag<["-"], "enable-experimental-cxx-interop">,
-  HelpText<"Allow importing C++ modules into Swift (experimental feature)">;
-
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
