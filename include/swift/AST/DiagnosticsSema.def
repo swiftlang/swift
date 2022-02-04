@@ -2561,6 +2561,8 @@ ERROR(requirement_machine_completion_failed,none,
       "cannot build rewrite system for %select{generic signature|protocol}0; "
       "%select{%error|rule count|rule length|concrete nesting}1 limit exceeded",
       (unsigned, unsigned))
+NOTE(requirement_machine_completion_rule,none,
+     "failed rewrite rule is %0", (StringRef))
 
 ERROR(associated_type_objc,none,
       "associated type %0 cannot be declared inside '@objc' protocol %1",

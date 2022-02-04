@@ -489,14 +489,19 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
 /// Computes the confluent completion using the Knuth-Bendix algorithm and
 /// returns a status code.
 ///
+/// The first element of the pair is a status.
+///
 /// The status is CompletionResult::MaxRuleCount if we add more than
 /// \p maxRuleCount rules.
 ///
 /// The status is CompletionResult::MaxRuleLength if we produce a rewrite rule
 /// whose left hand side has a length exceeding \p maxRuleLength.
 ///
-/// Otherwise, the status is CompletionResult::Success.
-CompletionResult
+/// In the above two cases, the second element of the pair is a rule ID.
+///
+/// Otherwise, the status is CompletionResult::Success and the second element
+/// is zero.
+std::pair<CompletionResult, unsigned>
 RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
                                           unsigned maxRuleLength) {
   assert(Initialized);
@@ -603,14 +608,14 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
       if (Rules.size() > maxRuleCount)
-        return CompletionResult::MaxRuleCount;
+        return std::make_pair(CompletionResult::MaxRuleCount, Rules.size() - 1);
 
       if (!addRule(pair.LHS, pair.RHS, &pair.Path))
         continue;
 
       // Check if the new rule is too long.
       if (Rules.back().getDepth() > maxRuleLength)
-        return CompletionResult::MaxRuleLength;
+        return std::make_pair(CompletionResult::MaxRuleLength, Rules.size() - 1);
 
       again = true;
     }
@@ -635,5 +640,5 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
   assert(MergedAssociatedTypes.empty() &&
          "Should have processed all merge candidates");
 
-  return CompletionResult::Success;
+  return std::make_pair(CompletionResult::Success, 0);
 }

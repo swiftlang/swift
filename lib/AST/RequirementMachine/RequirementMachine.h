@@ -88,17 +88,20 @@ class RequirementMachine final {
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
   void initWithGenericSignature(CanGenericSignature sig);
-  CompletionResult initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
+  std::pair<CompletionResult, unsigned>
+  initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
   void initWithAbstractRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements);
-  CompletionResult initWithWrittenRequirements(
+  std::pair<CompletionResult, unsigned>
+  initWithWrittenRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<StructuralRequirement> requirements);
 
   bool isComplete() const;
 
-  CompletionResult computeCompletion(RewriteSystem::ValidityPolicy policy);
+  std::pair<CompletionResult, unsigned>
+  computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
@@ -141,6 +144,8 @@ public:
   computeMinimalProtocolRequirements();
 
   std::vector<Requirement> computeMinimalGenericSignatureRequirements();
+
+  std::string getRuleAsStringForDiagnostics(unsigned ruleID) const;
 
   bool hadError() const;
 

@@ -325,8 +325,9 @@ public:
   /// Pairs of rules which have already been checked for overlap.
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
-  CompletionResult computeConfluentCompletion(unsigned maxRuleCount,
-                                              unsigned maxRuleLength);
+  std::pair<CompletionResult, unsigned>
+  computeConfluentCompletion(unsigned maxRuleCount,
+                             unsigned maxRuleLength);
 
   void simplifyLeftHandSides();
 

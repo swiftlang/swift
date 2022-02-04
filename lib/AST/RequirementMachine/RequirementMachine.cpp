@@ -92,7 +92,7 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
                     std::move(builder.RequirementRules));
 
   auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
-  checkCompletionResult(*this, result);
+  checkCompletionResult(*this, result.first);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
@@ -109,7 +109,7 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 /// Used by RequirementSignatureRequest.
 ///
 /// Returns failure if completion fails within the configured number of steps.
-CompletionResult
+std::pair<CompletionResult, unsigned>
 RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
@@ -173,7 +173,7 @@ void RequirementMachine::initWithAbstractRequirements(
                     std::move(builder.RequirementRules));
 
   auto result = computeCompletion(RewriteSystem::AllowInvalidRequirements);
-  checkCompletionResult(*this, result);
+  checkCompletionResult(*this, result.first);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
@@ -189,7 +189,7 @@ void RequirementMachine::initWithAbstractRequirements(
 /// Used by InferredGenericSignatureRequest.
 ///
 /// Returns failure if completion fails within the configured number of steps.
-CompletionResult
+std::pair<CompletionResult, unsigned>
 RequirementMachine::initWithWrittenRequirements(
     ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<StructuralRequirement> requirements) {
@@ -227,7 +227,11 @@ RequirementMachine::initWithWrittenRequirements(
 /// Attempt to obtain a confluent rewrite system by iterating the Knuth-Bendix
 /// completion procedure together with property map construction until fixed
 /// point.
-CompletionResult
+///
+/// Returns a pair where the first element is the status. If the status is not
+/// CompletionResult::Success, the second element of the pair is the rule ID
+/// which triggered failure.
+std::pair<CompletionResult, unsigned>
 RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
   while (true) {
     {
@@ -244,7 +248,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
       }
 
       // Check for failure.
-      if (result != CompletionResult::Success)
+      if (result.first != CompletionResult::Success)
         return result;
 
       // Check invariants.
@@ -269,14 +273,20 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
       // Check new rules added by the property map against configured limits.
       for (unsigned i = 0; i < rulesAdded; ++i) {
         const auto &newRule = System.getRule(ruleCount + i);
-        if (newRule.getDepth() > MaxRuleLength)
-          return CompletionResult::MaxRuleLength;
-        if (newRule.getNesting() > MaxConcreteNesting)
-          return CompletionResult::MaxConcreteNesting;
+        if (newRule.getDepth() > MaxRuleLength) {
+          return std::make_pair(CompletionResult::MaxRuleLength,
+                                ruleCount + i);
+        }
+        if (newRule.getNesting() > MaxConcreteNesting) {
+          return std::make_pair(CompletionResult::MaxConcreteNesting,
+                                ruleCount + i);
+        }
       }
 
-      if (System.getRules().size() > MaxRuleCount)
-        return CompletionResult::MaxRuleCount;
+      if (System.getRules().size() > MaxRuleCount) {
+        return std::make_pair(CompletionResult::MaxRuleCount,
+                              System.getRules().size() - 1);
+      }
 
       // If buildPropertyMap() didn't add any new rules, we are done.
       if (rulesAdded == 0)
@@ -291,7 +301,17 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
   assert(!Complete);
   Complete = true;
 
-  return CompletionResult::Success;
+  return std::make_pair(CompletionResult::Success, 0);
+}
+
+std::string RequirementMachine::getRuleAsStringForDiagnostics(
+    unsigned ruleID) const {
+  const auto &rule = System.getRule(ruleID);
+
+  std::string result;
+  llvm::raw_string_ostream out(result);
+  out << rule;
+  return out.str();
 }
 
 bool RequirementMachine::isComplete() const {
