@@ -339,8 +339,9 @@ public struct UnsafeRawPointer: _Pointer {
   /// to `Int64`, then accesses a property on the signed integer.
   ///
   ///     let pointer: UnsafeRawPointer = fetchValue()
-  ///     let isNegative = pointer.withMemoryRebound(to: Int64.self,
-  ///                                                capacity: 1) {
+  ///     let isNegative = pointer.withMemoryRebound(
+  ///         to: Int64.self, capacity: 1
+  ///     ) {
   ///         return $0.pointee < 0
   ///     }
   ///
@@ -780,7 +781,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///
   ///     let pointer: UnsafeMutableRawPointer = fetchValue()
   ///     pointer.withMemoryRebound(to: Int64.self, capacity: 1) {
-  ///         ptr.pointee.negate()
+  ///         $0.pointee.negate()
   ///     }
   ///
   /// After executing `body`, this method rebinds memory back to its original

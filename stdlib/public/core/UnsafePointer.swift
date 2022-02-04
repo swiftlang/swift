@@ -266,8 +266,9 @@ public struct UnsafePointer<Pointee>: _Pointer {
   /// pointer to `Int64`, then accesses a property on the signed integer.
   ///
   ///     let uint64Pointer: UnsafePointer<UInt64> = fetchValue()
-  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self,
-  ///                                                      capacity: 1) {
+  ///     let isNegative = uint64Pointer.withMemoryRebound(
+  ///         to: Int64.self, capacity: 1
+  ///     ) {
   ///         return $0.pointee < 0
   ///     }
   ///
@@ -308,7 +309,8 @@ public struct UnsafePointer<Pointee>: _Pointer {
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("_swift_se0333_UnsafePointer_withMemoryRebound")
   public func withMemoryRebound<T, Result>(
-    to type: T.Type, capacity count: Int,
+    to type: T.Type,
+    capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws -> Result
   ) rethrows -> Result {
     _debugPrecondition(
@@ -952,8 +954,8 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// pointer to `Int64`, then modifies the signed integer.
   ///
   ///     let uint64Pointer: UnsafeMutablePointer<UInt64> = fetchValue()
-  ///     uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) { ptr in
-  ///         ptr.pointee.negate()
+  ///     uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) {
+  ///         $0.pointee.negate()
   ///     }
   ///
   /// Because this pointer's memory is no longer bound to its `Pointee` type
@@ -993,7 +995,8 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   // This custom silgen name is chosen to not interfere with the old ABI
   @_silgen_name("$_swift_se0333_UnsafeMutablePointer_withMemoryRebound")
   public func withMemoryRebound<T, Result>(
-    to type: T.Type, capacity count: Int,
+    to type: T.Type,
+    capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
   ) rethrows -> Result {
     _debugPrecondition(
