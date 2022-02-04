@@ -2780,8 +2780,8 @@ ERROR(inheritance_from_non_protocol_or_class,none,
   "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,none,
   "inheritance from non-protocol type %0", (Type))
-ERROR(inheritance_from_parametrized_protocol,none,
-  "cannot inherit from parametrized protocol type %0", (Type))
+ERROR(inheritance_from_parameterized_protocol,none,
+  "cannot inherit from protocol type with generic argument %0", (Type))
 ERROR(superclass_not_first,none,
   "superclass %0 must appear first in the inheritance clause", (Type))
 ERROR(superclass_not_open,none,
@@ -3723,7 +3723,7 @@ ERROR(not_a_generic_definition,none,
       "cannot specialize a non-generic definition", ())
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
-ERROR(parametrized_protocol_not_supported,none,
+ERROR(parameterized_protocol_not_supported,none,
       "protocol type with generic argument can only be used as a generic constraint", ())
 ERROR(protocol_does_not_have_primary_assoc_type,none,
       "cannot specialize protocol type %0", (Type))

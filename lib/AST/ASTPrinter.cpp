@@ -5921,7 +5921,7 @@ public:
     }
   }
 
-  void visitParametrizedProtocolType(ParametrizedProtocolType *T) {
+  void visitParameterizedProtocolType(ParameterizedProtocolType *T) {
     visit(T->getBaseType());
     Printer << "<";
     visit(T->getArgumentType());

@@ -1266,7 +1266,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendExistentialLayout(layout, sig, forDecl);
     }
 
-    case TypeKind::ParametrizedProtocol: {
+    case TypeKind::ParameterizedProtocol: {
       llvm::errs() << "Not implemented\n";
       abort();
     }

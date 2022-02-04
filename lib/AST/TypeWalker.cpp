@@ -174,7 +174,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
-  bool visitParametrizedProtocolType(ParametrizedProtocolType *ty) {
+  bool visitParameterizedProtocolType(ParameterizedProtocolType *ty) {
     if (doIt(ty->getBaseType()))
       return true;
 

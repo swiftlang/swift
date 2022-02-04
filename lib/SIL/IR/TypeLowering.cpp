@@ -579,9 +579,9 @@ namespace {
                                        IsTypeExpansionSensitive_t isSensitive) {
       return visitExistentialType(type, origType, isSensitive);
     }
-    RetTy visitParametrizedProtocolType(CanParametrizedProtocolType type,
-                                        AbstractionPattern origType,
-                                        IsTypeExpansionSensitive_t isSensitive) {
+    RetTy visitParameterizedProtocolType(CanParameterizedProtocolType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
       return visitExistentialType(type, origType, isSensitive);
     }
 

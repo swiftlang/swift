@@ -339,8 +339,8 @@ public:
                                type1->getMembers(), type2->getMembers());
   }
 
-  bool visitParametrizedProtocolType(CanParametrizedProtocolType type1,
-                                     CanParametrizedProtocolType type2) {
+  bool visitParameterizedProtocolType(CanParameterizedProtocolType type1,
+                                      CanParameterizedProtocolType type2) {
     if (asImpl().visit(type1.getBaseType(), type2.getBaseType()))
       return true;
 

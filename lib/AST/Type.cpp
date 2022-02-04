@@ -191,8 +191,8 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
     return cast<ProtocolType>(type)->requiresClass();
   case TypeKind::ProtocolComposition:
     return cast<ProtocolCompositionType>(type)->requiresClass();
-  case TypeKind::ParametrizedProtocol:
-    return cast<ParametrizedProtocolType>(type)->getBaseType()->requiresClass();
+  case TypeKind::ParameterizedProtocol:
+    return cast<ParameterizedProtocolType>(type)->getBaseType()->requiresClass();
   case TypeKind::Existential:
     return isReferenceTypeImpl(cast<ExistentialType>(type).getConstraintType(),
                                sig, functionsCount);
@@ -295,7 +295,7 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   protocols = { members.data(), members.size() };
 }
 
-ExistentialLayout::ExistentialLayout(ParametrizedProtocolType *type) {
+ExistentialLayout::ExistentialLayout(ParameterizedProtocolType *type) {
   assert(type->isCanonical());
 
   *this = ExistentialLayout(type->getBaseType());
@@ -319,7 +319,7 @@ ExistentialLayout CanType::getExistentialLayout() {
   if (auto proto = dyn_cast<ProtocolType>(*this))
     return ExistentialLayout(proto);
 
-  if (auto param = dyn_cast<ParametrizedProtocolType>(*this))
+  if (auto param = dyn_cast<ParameterizedProtocolType>(*this))
     return ExistentialLayout(param);
 
   auto comp = cast<ProtocolCompositionType>(*this);
@@ -1553,12 +1553,12 @@ CanType TypeBase::computeCanonicalType() {
     Result = Composition.getPointer();
     break;
   }
-  case TypeKind::ParametrizedProtocol: {
-    auto *PPT = cast<ParametrizedProtocolType>(this);
+  case TypeKind::ParameterizedProtocol: {
+    auto *PPT = cast<ParameterizedProtocolType>(this);
     auto Base = cast<ProtocolType>(PPT->getBaseType()->getCanonicalType());
     auto Arg = PPT->getArgumentType()->getCanonicalType();
     auto &C = Base->getASTContext();
-    Result = ParametrizedProtocolType::get(C, Base, Arg).getPointer();
+    Result = ParameterizedProtocolType::get(C, Base, Arg).getPointer();
     break;
   }
   case TypeKind::Existential: {
@@ -3873,20 +3873,20 @@ void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(T.getPointer());
 }
 
-ParametrizedProtocolType::ParametrizedProtocolType(
+ParameterizedProtocolType::ParameterizedProtocolType(
     const ASTContext *ctx,
     ProtocolType *base, Type arg,
     RecursiveTypeProperties properties)
-  : TypeBase(TypeKind::ParametrizedProtocol, /*Context=*/ctx, properties),
+  : TypeBase(TypeKind::ParameterizedProtocol, /*Context=*/ctx, properties),
     Base(base), AssocType(base->getDecl()->getPrimaryAssociatedType()),
     Arg(arg) {
   assert(AssocType != nullptr &&
          "Protocol doesn't have a primary associated type");
 }
 
-void ParametrizedProtocolType::Profile(llvm::FoldingSetNodeID &ID,
-                                       ProtocolType *baseTy,
-                                       Type argTy) {
+void ParameterizedProtocolType::Profile(llvm::FoldingSetNodeID &ID,
+                                        ProtocolType *baseTy,
+                                        Type argTy) {
   ID.AddPointer(baseTy);
   ID.AddPointer(argTy.getPointer());
 }
@@ -5676,8 +5676,8 @@ case TypeKind::Id:
                                         pc->hasExplicitAnyObject());
   }
 
-  case TypeKind::ParametrizedProtocol: {
-    auto *ppt = cast<ParametrizedProtocolType>(base);
+  case TypeKind::ParameterizedProtocol: {
+    auto *ppt = cast<ParameterizedProtocolType>(base);
     Type base = ppt->getBaseType();
     Type arg = ppt->getArgumentType();
 
@@ -5700,7 +5700,7 @@ case TypeKind::Id:
     if (!anyChanged)
       return *this;
 
-    return ParametrizedProtocolType::get(
+    return ParameterizedProtocolType::get(
         Ptr->getASTContext(),
         substBase->castTo<ProtocolType>(),
         substArg);
@@ -5863,8 +5863,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return ReferenceCounting::Unknown;
   }
 
-  case TypeKind::ParametrizedProtocol: {
-    return cast<ParametrizedProtocolType>(this)
+  case TypeKind::ParameterizedProtocol: {
+    return cast<ParameterizedProtocolType>(this)
       ->getBaseType()
       ->getReferenceCounting();
   }
