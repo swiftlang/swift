@@ -90,7 +90,7 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs) {
   assert(lhs.getKind() == Symbol::Kind::AssociatedType);
   assert(rhs.getKind() == Symbol::Kind::AssociatedType);
   assert(lhs.getName() == rhs.getName());
-  assert(lhs.compare(rhs, *this) > 0);
+  assert(*lhs.compare(rhs, *this) > 0);
 
   auto protos = lhs.getProtocols();
   auto otherProtos = rhs.getProtocols();
@@ -320,8 +320,8 @@ void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
     // We must have mergedSymbol <= rhs < lhs, therefore mergedSymbol != lhs.
     assert(lhs.back() != mergedSymbol &&
            "Left hand side should not already end with merged symbol?");
-    assert(mergedSymbol.compare(rhs.back(), Context) <= 0);
-    assert(rhs.back().compare(lhs.back(), Context) < 0);
+    assert(*mergedSymbol.compare(rhs.back(), Context) <= 0);
+    assert(*rhs.back().compare(lhs.back(), Context) < 0);
 
     // If the merge didn't actually produce a new symbol, there is nothing else
     // to do.

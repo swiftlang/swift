@@ -435,7 +435,7 @@ void MinimalConformances::collectConformanceRules() {
               if (lhsRule.isExplicit() != rhsRule.isExplicit())
                 return !lhsRule.isExplicit();
 
-              return lhsRule.getLHS().compare(rhsRule.getLHS(), Context) > 0;
+              return *lhsRule.getLHS().compare(rhsRule.getLHS(), Context) > 0;
             });
 
   Context.ConformanceRulesHistogram.add(ConformanceRules.size());

@@ -63,7 +63,7 @@ void TypeDifference::verify(RewriteContext &ctx) const {
 
     for (const auto &pair : SameTypes) {
       auto first = LHS.getSubstitutions()[pair.first];
-      VERIFY(first.compare(pair.second, ctx) > 0, "Order violation");
+      VERIFY(*first.compare(pair.second, ctx) > 0, "Order violation");
       VERIFY(lhsVisited.insert(pair.first).second, "Duplicate substitutions");
     }
 
@@ -131,8 +131,8 @@ namespace {
         auto lhsTerm = LHSSubstitutions[lhsIndex];
         auto rhsTerm = RHSSubstitutions[rhsIndex];
 
-        int compare = lhsTerm.compare(rhsTerm, Context);
-        if (compare < 0) {
+        Optional<int> compare = lhsTerm.compare(rhsTerm, Context);
+        if (*compare < 0) {
           SameTypesOnLHS.emplace_back(rhsIndex, lhsTerm);
         } else if (compare > 0) {
           SameTypesOnRHS.emplace_back(lhsIndex, rhsTerm);
@@ -190,14 +190,14 @@ namespace {
 
       for (const auto &pair : SameTypesOnLHS) {
         auto first = RHSSubstitutions[pair.first];
-        VERIFY(first.compare(pair.second, Context) > 0, "Order violation");
+        VERIFY(*first.compare(pair.second, Context) > 0, "Order violation");
 
         VERIFY(rhsVisited.insert(pair.first).second, "Duplicate substitution");
       }
 
       for (const auto &pair : SameTypesOnRHS) {
         auto first = LHSSubstitutions[pair.first];
-        VERIFY(first.compare(pair.second, Context) > 0, "Order violation");
+        VERIFY(*first.compare(pair.second, Context) > 0, "Order violation");
 
         VERIFY(lhsVisited.insert(pair.first).second, "Duplicate substitution");
       }

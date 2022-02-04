@@ -167,9 +167,9 @@ unsigned Rule::getNesting() const {
 }
 
 /// Linear order on rules; compares LHS followed by RHS.
-int Rule::compare(const Rule &other, RewriteContext &ctx) const {
-  int compare = LHS.compare(other.LHS, ctx);
-  if (compare != 0)
+Optional<int> Rule::compare(const Rule &other, RewriteContext &ctx) const {
+  Optional<int> compare = LHS.compare(other.LHS, ctx);
+  if (!compare.hasValue() || *compare != 0)
     return compare;
 
   return RHS.compare(other.RHS, ctx);
@@ -415,8 +415,8 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // If the left hand side and right hand side are already equivalent, we're
   // done.
-  int result = lhs.compare(rhs, Context);
-  if (result == 0) {
+  Optional<int> result = lhs.compare(rhs, Context);
+  if (*result == 0) {
     // If this rule is a consequence of existing rules, add a homotopy
     // generator.
     if (path) {
@@ -436,12 +436,12 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // Orient the two terms so that the left hand side is greater than the
   // right hand side.
-  if (result < 0) {
+  if (*result < 0) {
     std::swap(lhs, rhs);
     loop.invert();
   }
 
-  assert(lhs.compare(rhs, Context) > 0);
+  assert(*lhs.compare(rhs, Context) > 0);
 
   if (Debug.contains(DebugFlags::Add)) {
     llvm::dbgs() << "## Simplified and oriented rule " << lhs << " => " << rhs << "\n\n";

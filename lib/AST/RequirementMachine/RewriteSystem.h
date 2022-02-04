@@ -183,7 +183,7 @@ public:
 
   unsigned getNesting() const;
 
-  int compare(const Rule &other, RewriteContext &ctx) const;
+  Optional<int> compare(const Rule &other, RewriteContext &ctx) const;
 
   void dump(llvm::raw_ostream &out) const;
 

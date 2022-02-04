@@ -128,9 +128,10 @@ bool Term::containsUnresolvedSymbols() const {
 ///
 /// This is used to implement Term::compare() and MutableTerm::compare()
 /// below.
-static int shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
-                           const Symbol *rhsBegin, const Symbol *rhsEnd,
-                           RewriteContext &ctx) {
+static Optional<int>
+shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
+                const Symbol *rhsBegin, const Symbol *rhsEnd,
+                RewriteContext &ctx) {
   unsigned lhsSize = (lhsEnd - lhsBegin);
   unsigned rhsSize = (rhsEnd - rhsBegin);
   if (lhsSize != rhsSize)
@@ -143,8 +144,8 @@ static int shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
     ++lhsBegin;
     ++rhsBegin;
 
-    int result = lhs.compare(rhs, ctx);
-    if (result != 0) {
+    Optional<int> result = lhs.compare(rhs, ctx);
+    if (!result.hasValue() || *result != 0) {
       assert(lhs != rhs);
       return result;
     }
@@ -155,13 +156,17 @@ static int shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
   return 0;
 }
 
-/// Shortlex order on terms.
-int Term::compare(Term other, RewriteContext &ctx) const {
+/// Shortlex order on terms. Returns None if the terms are identical except
+/// for an incomparable superclass or concrete type symbol at the end.
+Optional<int>
+Term::compare(Term other, RewriteContext &ctx) const {
   return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 
-/// Shortlex order on mutable terms.
-int MutableTerm::compare(const MutableTerm &other, RewriteContext &ctx) const {
+/// Shortlex order on mutable terms. Returns None if the terms are identical
+/// except for an incomparable superclass or concrete type symbol at the end.
+Optional<int>
+MutableTerm::compare(const MutableTerm &other, RewriteContext &ctx) const {
   return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 
