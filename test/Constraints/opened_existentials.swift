@@ -69,16 +69,19 @@ protocol CollectionOf: Collection {
 extension Array: CollectionOf { }
 extension Set: CollectionOf { }
 
+@available(SwiftStdlib 5.1, *)
 func reverseIt<T>(_ c: some CollectionOf<T>) -> some CollectionOf<T> {
   return c.reversed()
 }
 
+@available(SwiftStdlib 5.1, *)
 func useReverseIt(_ c: any CollectionOf) {
   let c = reverseIt(c)
   let _: Int = c // expected-error{{cannot convert value of type 'CollectionOf' to specified type 'Int'}}
 }
 
 /// --- Opening existentials when returning opaque types.
+@available(SwiftStdlib 5.1, *)
 extension P {
   func getQ() -> some Q {
     let a: A? = nil
@@ -90,6 +93,7 @@ extension P {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
 func testReturningOpaqueTypes(p: any P) {
   let q = p.getQ()
   let _: Int = q  // expected-error{{cannot convert value of type 'Q' to specified type 'Int'}}
