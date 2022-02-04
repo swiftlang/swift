@@ -461,9 +461,8 @@ private:
 
   void propagateExplicitBits();
 
-  Optional<unsigned>
-  findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
-                   RewritePath &replacementPath);
+  Optional<std::pair<unsigned, unsigned>>
+  findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
