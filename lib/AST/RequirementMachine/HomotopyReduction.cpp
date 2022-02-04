@@ -99,6 +99,8 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
     case RewriteStep::DecomposeConcrete:
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::RightConcreteProjection:
       break;
     }
 
@@ -219,6 +221,8 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
     case RewriteStep::DecomposeConcrete:
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::RightConcreteProjection:
       break;
     }
 
@@ -280,23 +284,19 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
       // Replace this step with the provided path. If this rewrite step has
       // context, the path's own steps must be re-contextualized.
 
-      // Keep track of Decompose/DecomposeConcrete pairs. Any rewrite steps
-      // in between do not need to be re-contextualized, since they operate
-      // on new terms that were pushed on the stack by the Decompose or
-      // DecomposeConcrete operation.
-      unsigned decomposeCount = 0;
+      // Keep track of rewrite step pairs which push and pop the stack. Any
+      // rewrite steps enclosed with a push/pop are not re-contextualized.
+      unsigned pushCount = 0;
 
       auto recontextualizeStep = [&](RewriteStep newStep) {
         bool inverse = newStep.Inverse ^ step.Inverse;
 
-        if ((newStep.Kind == RewriteStep::Decompose ||
-             newStep.Kind == RewriteStep::DecomposeConcrete) &&
-            inverse) {
-          assert(decomposeCount > 0);
-          --decomposeCount;
+        if (newStep.pushesTermsOnStack() && inverse) {
+          assert(pushCount > 0);
+          --pushCount;
         }
 
-        if (decomposeCount == 0) {
+        if (pushCount == 0) {
           newStep.StartOffset += step.StartOffset;
           newStep.EndOffset += step.EndOffset;
         }
@@ -304,10 +304,8 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
         newStep.Inverse = inverse;
         newSteps.push_back(newStep);
 
-        if ((newStep.Kind == RewriteStep::Decompose ||
-             newStep.Kind == RewriteStep::DecomposeConcrete) &&
-            !inverse) {
-          ++decomposeCount;
+        if (newStep.pushesTermsOnStack() && !inverse) {
+          ++pushCount;
         }
       };
 
@@ -320,8 +318,8 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
           recontextualizeStep(newStep);
       }
 
-      // Decompose and DecomposeConcrete steps should come in balanced pairs.
-      assert(decomposeCount == 0);
+      // Rewrite steps which push and pop the stack must come in balanced pairs.
+      assert(pushCount == 0);
 
       break;
     }
@@ -330,6 +328,8 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
     case RewriteStep::DecomposeConcrete:
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::RightConcreteProjection:
       newSteps.push_back(step);
       break;
     }

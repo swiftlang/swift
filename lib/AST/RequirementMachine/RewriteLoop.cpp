@@ -136,6 +136,28 @@ void RewriteStep::dump(llvm::raw_ostream &out,
     out << difference.LHS << " : " << difference.RHS << ")";
     break;
   }
+  case LeftConcreteProjection: {
+    evaluator.applyLeftConcreteProjection(*this, system);
+
+    out << "LeftConcrete" << (Inverse ? "In" : "Pro") << "jection(";
+
+    const auto &difference = system.getTypeDifference(
+        getTypeDifferenceID());
+
+    out << difference.LHS << " : " << difference.RHS << ")";
+    break;
+  }
+  case RightConcreteProjection: {
+    evaluator.applyRightConcreteProjection(*this, system);
+
+    out << "RightConcrete" << (Inverse ? "In" : "Pro") << "jection(";
+
+    const auto &difference = system.getTypeDifference(
+        getTypeDifferenceID());
+
+    out << difference.LHS << " : " << difference.RHS << ")";
+    break;
+  }
   }
 }
 
@@ -542,6 +564,139 @@ void RewritePathEvaluator::applyDecomposeConcrete(const RewriteStep &step,
   }
 }
 
+void
+RewritePathEvaluator::applyLeftConcreteProjection(const RewriteStep &step,
+                                                  const RewriteSystem &system) {
+  assert(step.Kind == RewriteStep::LeftConcreteProjection);
+
+  const auto &difference = system.getTypeDifference(step.getTypeDifferenceID());
+  unsigned index = step.getSubstitutionIndex();
+
+  MutableTerm leftProjection(difference.LHS.getSubstitutions()[index]);
+
+  MutableTerm leftBaseTerm(difference.BaseTerm);
+  leftBaseTerm.add(difference.LHS);
+
+  auto bug = [&](StringRef msg) {
+    llvm::errs() << msg << "\n";
+    llvm::errs() << "- StartOffset: " << step.StartOffset << "\n";
+    llvm::errs() << "- EndOffset: " << step.EndOffset << "\n";
+    llvm::errs() << "- SubstitutionIndex: " << index << "\n";
+    llvm::errs() << "- LeftProjection: " << leftProjection << "\n";
+    llvm::errs() << "- LeftBaseTerm: " << leftBaseTerm << "\n";
+    llvm::errs() << "- DifferenceID: " << step.getTypeDifferenceID() << "\n";
+    llvm::errs() << "\nType difference:\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << ":\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << "\nEvaluator state:\n";
+    dump(llvm::errs());
+    abort();
+  };
+
+  if (!step.Inverse) {
+    const auto &term = getCurrentTerm();
+
+    MutableTerm subTerm(term.begin() + step.StartOffset,
+                        term.end() - step.EndOffset);
+    if (subTerm != MutableTerm(leftProjection))
+      bug("Incorrect left projection term");
+
+    Primary.push_back(leftBaseTerm);
+  } else {
+    if (Primary.size() < 2)
+      bug("Too few elements on the primary stack");
+
+    if (Primary.back() != leftBaseTerm)
+      bug("Incorrect left base term");
+
+    Primary.pop_back();
+
+    const auto &term = getCurrentTerm();
+
+    MutableTerm subTerm(term.begin() + step.StartOffset,
+                        term.end() - step.EndOffset);
+    if (subTerm != leftProjection)
+      bug("Incorrect left projection term");
+  }
+}
+
+void
+RewritePathEvaluator::applyRightConcreteProjection(const RewriteStep &step,
+                                                   const RewriteSystem &system) {
+  assert(step.Kind == RewriteStep::RightConcreteProjection);
+
+  const auto &difference = system.getTypeDifference(step.getTypeDifferenceID());
+  unsigned index = step.getSubstitutionIndex();
+
+  MutableTerm leftProjection(difference.LHS.getSubstitutions()[index]);
+  auto rightProjection = difference.getReplacementSubstitution(index);
+
+  MutableTerm leftBaseTerm(difference.BaseTerm);
+  leftBaseTerm.add(difference.LHS);
+
+  MutableTerm rightBaseTerm(difference.BaseTerm);
+  rightBaseTerm.add(difference.RHS);
+
+  auto bug = [&](StringRef msg) {
+    llvm::errs() << msg << "\n";
+    llvm::errs() << "- StartOffset: " << step.StartOffset << "\n";
+    llvm::errs() << "- EndOffset: " << step.EndOffset << "\n";
+    llvm::errs() << "- SubstitutionIndex: " << index << "\n";
+    llvm::errs() << "- LeftProjection: " << leftProjection << "\n";
+    llvm::errs() << "- RightProjection: " << rightProjection << "\n";
+    llvm::errs() << "- LeftBaseTerm: " << leftBaseTerm << "\n";
+    llvm::errs() << "- RightBaseTerm: " << rightBaseTerm << "\n";
+    llvm::errs() << "- DifferenceID: " << step.getTypeDifferenceID() << "\n";
+    llvm::errs() << "\nType difference:\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << ":\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << "\nEvaluator state:\n";
+    dump(llvm::errs());
+    abort();
+  };
+
+  if (!step.Inverse) {
+    auto &term = getCurrentTerm();
+
+    MutableTerm subTerm(term.begin() + step.StartOffset,
+                        term.end() - step.EndOffset);
+
+    if (subTerm != rightProjection)
+      bug("Incorrect right projection term");
+
+    MutableTerm newTerm(term.begin(), term.begin() + step.StartOffset);
+    newTerm.append(leftProjection);
+    newTerm.append(term.end() - step.EndOffset, term.end());
+
+    term = newTerm;
+
+    Primary.push_back(rightBaseTerm);
+  } else {
+    if (Primary.size() < 2)
+      bug("Too few elements on the primary stack");
+
+    if (Primary.back() != rightBaseTerm)
+      bug("Incorrect right base term");
+
+    Primary.pop_back();
+
+    auto &term = getCurrentTerm();
+
+    MutableTerm subTerm(term.begin() + step.StartOffset,
+                        term.end() - step.EndOffset);
+    if (subTerm != leftProjection)
+      bug("Incorrect left projection term");
+
+    MutableTerm newTerm(term.begin(), term.begin() + step.StartOffset);
+    newTerm.append(rightProjection);
+    newTerm.append(term.end() - step.EndOffset, term.end());
+
+    term = newTerm;
+  }
+}
+
 void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
@@ -567,6 +722,14 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
 
   case RewriteStep::DecomposeConcrete:
     applyDecomposeConcrete(step, system);
+    break;
+
+  case RewriteStep::LeftConcreteProjection:
+    applyLeftConcreteProjection(step, system);
+    break;
+
+  case RewriteStep::RightConcreteProjection:
+    applyRightConcreteProjection(step, system);
     break;
   }
 }

@@ -139,6 +139,8 @@ void RewriteLoop::findProtocolConformanceRules(
       case RewriteStep::Decompose:
       case RewriteStep::Relation:
       case RewriteStep::DecomposeConcrete:
+      case RewriteStep::LeftConcreteProjection:
+      case RewriteStep::RightConcreteProjection:
         break;
       }
     }
