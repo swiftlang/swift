@@ -624,13 +624,13 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
 
-  if (ctx.LangOpts.EnableParametrizedProtocolTypes) {
+  if (ctx.LangOpts.EnableParameterizedProtocolTypes) {
     if (auto *protoType = type->getAs<ProtocolType>()) {
-      // Build ParametrizedProtocolType if the protocol has a primary associated
+      // Build ParameterizedProtocolType if the protocol has a primary associated
       // type and we're in a supported context (for now just generic requirements,
       // inheritance clause, extension binding).
-      if (!resolution.getOptions().isParametrizedProtocolSupported()) {
-        diags.diagnose(loc, diag::parametrized_protocol_not_supported);
+      if (!resolution.getOptions().isParameterizedProtocolSupported()) {
+        diags.diagnose(loc, diag::parameterized_protocol_not_supported);
         return ErrorType::get(ctx);
       }
 
@@ -658,7 +658,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       if (!argTy || argTy->hasError())
         return ErrorType::get(ctx);
 
-      return ParametrizedProtocolType::get(ctx, protoType, argTy);
+      return ParameterizedProtocolType::get(ctx, protoType, argTy);
     }
   }
 
@@ -3856,7 +3856,10 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       continue;
     }
 
-    if (ty->isConstraintType()) {
+    // FIXME: Support compositions involving parameterized protocol types,
+    // like Collection<String> & Sendable, etc.
+    if (ty->isConstraintType() &&
+        !ty->is<ParameterizedProtocolType>()) {
       auto layout = ty->getExistentialLayout();
       if (auto superclass = layout.explicitSuperclass)
         if (checkSuperclass(tyR->getStartLoc(), superclass))

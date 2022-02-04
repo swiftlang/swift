@@ -4723,12 +4723,12 @@ public:
   }
 
   void
-  visitParametrizedProtocolType(const ParametrizedProtocolType *type) {
+  visitParameterizedProtocolType(const ParameterizedProtocolType *type) {
     using namespace decls_block;
 
     unsigned abbrCode =
-        S.DeclTypeAbbrCodes[ParametrizedProtocolTypeLayout::Code];
-    ParametrizedProtocolTypeLayout::emitRecord(
+        S.DeclTypeAbbrCodes[ParameterizedProtocolTypeLayout::Code];
+    ParameterizedProtocolTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(type->getBaseType()),
         S.addTypeRef(type->getArgumentType()));

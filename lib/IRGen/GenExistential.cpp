@@ -1557,7 +1557,7 @@ TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
 }
 
 const TypeInfo *
-TypeConverter::convertParametrizedProtocolType(ParametrizedProtocolType *T) {
+TypeConverter::convertParameterizedProtocolType(ParameterizedProtocolType *T) {
   return createExistentialTypeInfo(IGM, CanType(T));
 }
 

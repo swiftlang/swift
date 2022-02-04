@@ -5620,13 +5620,13 @@ public:
     return ProtocolCompositionType::get(ctx, protocols, hasExplicitAnyObject);
   }
 
-  Expected<Type> deserializeParametrizedProtocolType(ArrayRef<uint64_t> scratch,
-                                                     StringRef blobData) {
+  Expected<Type> deserializeParameterizedProtocolType(ArrayRef<uint64_t> scratch,
+                                                      StringRef blobData) {
 
     uint64_t baseTyID, argTyID;
 
-    decls_block::ParametrizedProtocolTypeLayout::readRecord(scratch,
-                                                            baseTyID, argTyID);
+    decls_block::ParameterizedProtocolTypeLayout::readRecord(scratch,
+                                                             baseTyID, argTyID);
 
     auto baseTy = MF.getTypeChecked(baseTyID);
     if (!baseTy)
@@ -5636,7 +5636,7 @@ public:
     if (!argTy)
       return argTy.takeError();
 
-    return ParametrizedProtocolType::get(
+    return ParameterizedProtocolType::get(
         ctx, (*baseTy)->castTo<ProtocolType>(), *argTy);
   }
 

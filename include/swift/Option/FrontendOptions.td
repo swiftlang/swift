@@ -517,9 +517,9 @@ def enable_explicit_existential_types :
   Flag<["-"], "enable-explicit-existential-types">,
   HelpText<"Enable experimental support for explicit existential types">;
 
-def enable_parametrized_protocol_types :
-  Flag<["-"], "enable-parametrized-protocol-types">,
-  HelpText<"Enable experimental support for primary associated types and parametrized protocols">;
+def enable_parameterized_protocol_types :
+  Flag<["-"], "enable-parameterized-protocol-types">,
+  HelpText<"Enable experimental support for primary associated types and parameterized protocols">;
 
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
