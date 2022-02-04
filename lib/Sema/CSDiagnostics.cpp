@@ -3933,19 +3933,145 @@ bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {
 }
 
 bool InvalidMemberRefOnExistential::diagnoseAsError() {
-  auto anchor = getRawAnchor();
+  const auto Anchor = getRawAnchor();
 
-  DeclNameLoc nameLoc;
-  if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
-    nameLoc = UDE->getNameLoc();
-  } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
-    nameLoc = UME->getNameLoc();
+  DeclNameLoc NameLoc;
+  ParamDecl *PD = nullptr;
+  if (auto *UDE = getAsExpr<UnresolvedDotExpr>(Anchor)) {
+    NameLoc = UDE->getNameLoc();
+    if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+      PD = dyn_cast<ParamDecl>(DRE->getDecl());
+    }
+  } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(Anchor)) {
+    NameLoc = UME->getNameLoc();
+  } else if (auto *SE = getAsExpr<SubscriptExpr>(Anchor)) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(SE->getBase())) {
+      PD = dyn_cast<ParamDecl>(DRE->getDecl());
+    }
   }
 
-  emitDiagnostic(diag::could_not_use_member_on_existential, getBaseType(),
-                 getName())
-      .highlight(nameLoc.getSourceRange())
-      .highlight(getSourceRange());
+  auto Diag = emitDiagnostic(diag::could_not_use_member_on_existential,
+                             getBaseType(), getName());
+  Diag.highlight(NameLoc.getSourceRange());
+  Diag.highlight(getSourceRange());
+
+  // If the base expression is a reference to a function or subscript
+  // parameter, offer a fixit that replaces the existential parameter type with
+  // its generic equivalent, e.g. func foo(p: any P) → func foo<T: P>(p: T).
+  // FIXME: Add an option to use 'some' vs. an explicit generic parameter.
+
+  if (!PD || !PD->getDeclContext()->getAsDecl())
+    return true;
+
+  // Code inside a subscript is bound against a duplicate set of implicit
+  // accessor parameters, which don't have a TypeRepr; dig out the corresponding
+  // explicit subscript parameter.
+  if (auto *const AD =
+          dyn_cast<AccessorDecl>(PD->getDeclContext()->getAsDecl())) {
+    auto *const SD = dyn_cast<SubscriptDecl>(AD->getStorage());
+    if (!SD)
+      return true;
+
+    const auto AccessorParams = AD->getParameters()->getArray();
+    const unsigned idx =
+        llvm::find(AccessorParams, PD) - AccessorParams.begin();
+
+    switch (AD->getAccessorKind()) {
+    case AccessorKind::Set:
+    case AccessorKind::WillSet:
+    case AccessorKind::DidSet:
+      // Ignore references to the 'newValue' or 'oldValue' parameters.
+      if (AccessorParams.front() == PD) {
+        return true;
+      }
+
+      PD = SD->getIndices()->get(idx - 1);
+      break;
+
+    case AccessorKind::Get:
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+      PD = SD->getIndices()->get(idx);
+      break;
+    }
+  }
+
+  // Bail out in the absence of a TypeRepr.
+  if (!PD->getTypeRepr())
+    return true;
+
+  // Give up on 'inout' parameters. The intent is far more vague in this case,
+  // and applying the fix-it would invalidate mutations.
+  if (PD->isInOut())
+    return true;
+
+  constexpr StringRef GPNamePlaceholder = "<#generic parameter name#>";
+  SourceRange TyReplacementRange;
+  SourceRange RemoveAnyRange;
+  SourceLoc GPDeclLoc;
+  std::string GPDeclStr;
+  {
+    llvm::raw_string_ostream OS(GPDeclStr);
+    auto *const GC = PD->getDeclContext()->getAsDecl()->getAsGenericContext();
+    if (GC->getParsedGenericParams()) {
+      GPDeclLoc = GC->getParsedGenericParams()->getRAngleLoc();
+      OS << ", ";
+    } else {
+      GPDeclLoc =
+          isa<AbstractFunctionDecl>(GC)
+              ? cast<AbstractFunctionDecl>(GC)->getParameters()->getLParenLoc()
+              : cast<SubscriptDecl>(GC)->getIndices()->getLParenLoc();
+      OS << "<";
+    }
+    OS << GPNamePlaceholder << ": ";
+
+    auto *TR = PD->getTypeRepr()->getWithoutParens();
+    if (auto *STR = dyn_cast<SpecifierTypeRepr>(TR)) {
+      TR = STR->getBase()->getWithoutParens();
+    }
+    if (auto *ETR = dyn_cast<ExistentialTypeRepr>(TR)) {
+      TR = ETR->getConstraint();
+      RemoveAnyRange = SourceRange(ETR->getAnyLoc(), TR->getStartLoc());
+      TR = TR->getWithoutParens();
+    }
+    if (auto *MTR = dyn_cast<MetatypeTypeRepr>(TR)) {
+      TR = MTR->getBase();
+
+      // (P & Q).Type -> T.Type
+      // (P).Type -> (T).Type
+      // ((P & Q)).Type -> ((T)).Type
+      if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
+        assert(TTR->isParenType());
+        if (!isa<CompositionTypeRepr>(TTR->getElementType(0))) {
+          TR = TR->getWithoutParens();
+        }
+      }
+    }
+    TyReplacementRange = TR->getSourceRange();
+
+    // Strip any remaining parentheses and print the conformance constraint.
+    TR->getWithoutParens()->print(OS);
+
+    if (!GC->getParsedGenericParams()) {
+      OS << ">";
+    }
+  }
+
+  // First, replace the constraint type with the generic parameter type
+  // placeholder.
+  Diag.fixItReplace(TyReplacementRange, GPNamePlaceholder);
+
+  // Remove 'any' if needed, using a character-based removal to pick up
+  // whitespaces between it and its constraint repr.
+  if (RemoveAnyRange.isValid()) {
+    Diag.fixItRemoveChars(RemoveAnyRange.Start, RemoveAnyRange.End);
+  }
+
+  // Finally, insert the generic parameter declaration.
+  Diag.fixItInsert(GPDeclLoc, GPDeclStr);
+
   return true;
 }
 
