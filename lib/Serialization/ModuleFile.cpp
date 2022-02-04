@@ -973,9 +973,9 @@ ModuleFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl *> &results)
   }
 }
 
-void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
+void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results, bool recursive) {
   if (UnderlyingModule)
-    UnderlyingModule->getDisplayDecls(results);
+    UnderlyingModule->getDisplayDecls(results, recursive);
 
   PrettyStackTraceModuleFile stackEntry(*this);
   getImportDecls(results);
