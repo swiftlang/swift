@@ -49,8 +49,8 @@ template <typename Runtime> struct MetadataCacheNode {
 };
 
 template <typename Runtime> struct ConcurrentHashMap {
-  typename uint32_t ReaderCount;
-  typename uint32_t ElementCount;
+  uint32_t ReaderCount;
+  uint32_t ElementCount;
   typename Runtime::StoredPointer Elements;
   typename Runtime::StoredPointer Indices;
   // We'll ignore the remaining fields for now....
