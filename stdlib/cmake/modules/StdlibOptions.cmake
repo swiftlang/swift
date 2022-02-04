@@ -139,6 +139,10 @@ option(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
        "Build stdlib without a custom implementation of MetadataAllocator, relying on malloc+free instead."
        FALSE)
 
+option(SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES
+       "Build stdlib with -disable-preallocated-instantiation-caches"
+       FALSE)
+
 option(SWIFT_STDLIB_HAS_COMMANDLINE
        "Build stdlib with the CommandLine enum and support for argv/argc."
        TRUE)
