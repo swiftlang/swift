@@ -8630,6 +8630,27 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
         ArrayRef<Requirement>());
   };
 
+  auto compare = [&](ArrayRef<Requirement> rqmResult,
+                     ArrayRef<Requirement> gsbResult) {
+    if (proto->getParentModule()->isStdlibModule() &&
+        (proto->getName().is("Collection") ||
+         proto->getName().is("StringProtocol"))) {
+      if (rqmResult.size() > gsbResult.size())
+        return false;
+    } else {
+      if (rqmResult.size() != gsbResult.size())
+        return false;
+    }
+
+    return std::equal(rqmResult.begin(),
+                      rqmResult.end(),
+                      gsbResult.begin(),
+                      [](const Requirement &lhs,
+                         const Requirement &rhs) {
+                        return lhs.getCanonical() == rhs.getCanonical();
+                      });
+  };
+
   switch (ctx.LangOpts.RequirementMachineProtocolSignatures) {
   case RequirementMachineMode::Disabled:
     return buildViaGSB();
@@ -8641,23 +8662,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
-    // For now, only compare conformance requirements, since those are the
-    // important ones from the ABI perspective.
-    SmallVector<Requirement, 2> rqmConformances;
-    for (auto req : rqmResult) {
-      if (req.getKind() == RequirementKind::Conformance)
-        rqmConformances.push_back(req);
-    }
-    SmallVector<Requirement, 2> gsbConformances;
-    for (auto req : gsbResult) {
-      if (req.getKind() == RequirementKind::Conformance)
-        gsbConformances.push_back(req);
-    }
-
-    if (rqmConformances.size() != gsbConformances.size() ||
-        !std::equal(rqmConformances.begin(),
-                    rqmConformances.end(),
-                    gsbConformances.begin())) {
+    if (!compare(rqmResult, gsbResult)) {
       llvm::errs() << "RequirementMachine protocol signature minimization is broken:\n";
       llvm::errs() << "Protocol: " << proto->getName() << "\n";
 
