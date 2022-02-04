@@ -4500,9 +4500,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   }
 
   // Check whether we have a reasonable constraint type at all.
-  if (!constraintType->is<ProtocolType>() &&
-      !constraintType->is<ProtocolCompositionType>() &&
-      !constraintType->is<ParametrizedProtocolType>() &&
+  if (!constraintType->isConstraintType() &&
       !constraintType->getClassOrBoundGenericClass()) {
     if (source.getLoc().isValid() && !constraintType->hasError()) {
       Impl->HadAnyError = true;
@@ -4516,7 +4514,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
   }
 
   // Parametrized protocol requirements.
-  if (auto *paramProtoType = constraintType->getAs<ParametrizedProtocolType>()) {
+  if (auto *paramProtoType = constraintType->getAs<ParameterizedProtocolType>()) {
     bool anyErrors = false;
 
     auto *protoDecl = paramProtoType->getBaseType()->getDecl();

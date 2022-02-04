@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6 -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
+// REQUIRES: asserts
 
 @MainActor
 func mainActorFn() -> Int { return 0 } // expected-note 2 {{calls to global function 'mainActorFn()' from outside of its actor context are implicitly asynchronous}}

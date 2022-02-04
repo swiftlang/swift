@@ -44,7 +44,7 @@ struct LargeStruct : Codable {
   var d: Double
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public distributed actor MyActor {
   distributed func simple1(_: Int) {
   }
@@ -82,7 +82,7 @@ public distributed actor MyActor {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public distributed actor MyOtherActor {
   distributed func empty() {
   }

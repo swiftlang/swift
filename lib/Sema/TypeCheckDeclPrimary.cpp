@@ -249,9 +249,9 @@ static void checkInheritanceClause(
       inheritedTy = layout.explicitSuperclass;
     }
 
-    if (inheritedTy->is<ParametrizedProtocolType>()) {
+    if (inheritedTy->is<ParameterizedProtocolType>()) {
       if (!isa<ProtocolDecl>(decl)) {
-        decl->diagnose(diag::inheritance_from_parametrized_protocol,
+        decl->diagnose(diag::inheritance_from_parameterized_protocol,
                        inheritedTy);
       }
       continue;

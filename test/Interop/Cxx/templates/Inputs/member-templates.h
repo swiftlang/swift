@@ -28,6 +28,10 @@ template <class T> struct TemplateClassWithMemberTemplates {
 
   template <class U> void setValue(U val) { value = val; }
 
+  template<class U> TemplateClassWithMemberTemplates<U> toOtherSpec(const U& u) const {
+    return {u};
+  }
+
   TemplateClassWithMemberTemplates(T val) : value(val) {}
 };
 

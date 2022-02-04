@@ -276,8 +276,8 @@ public:
     }
   }
 
-  /// Whether parametrized protocol types are supported in this context.
-  bool isParametrizedProtocolSupported() const {
+  /// Whether parameterized protocol types are supported in this context.
+  bool isParameterizedProtocolSupported() const {
     switch (context) {
     case Context::Inherited:
     case Context::ExtensionBinding:

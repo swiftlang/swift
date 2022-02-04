@@ -5815,7 +5815,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::Existential:
     case TypeKind::ProtocolComposition:
-    case TypeKind::ParametrizedProtocol:
+    case TypeKind::ParameterizedProtocol:
       switch (kind) {
       case ConstraintKind::Equal:
       case ConstraintKind::Bind:
@@ -6453,7 +6453,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::SequenceArchetype:
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
-  case TypeKind::ParametrizedProtocol:
+  case TypeKind::ParameterizedProtocol:
   case TypeKind::Protocol:
   case TypeKind::Existential:
     // Break out to handle the actual construction below.

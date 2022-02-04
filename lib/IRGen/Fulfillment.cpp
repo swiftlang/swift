@@ -103,7 +103,7 @@ static bool isLeafTypeMetadata(CanType type) {
     return false;
 
   // Parametrized protocols have component types.
-  case TypeKind::ParametrizedProtocol:
+  case TypeKind::ParameterizedProtocol:
     return false;
 
   // Existential types have constraint types.

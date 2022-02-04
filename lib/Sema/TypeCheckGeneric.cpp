@@ -227,10 +227,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         return nullptr;
 
       // Error out if the constraint type isn't a class or existential type.
-      if (!constraintType->getClassOrBoundGenericClass() &&
-          !constraintType->is<ProtocolType>() &&
-          !constraintType->is<ProtocolCompositionType>() &&
-          !constraintType->is<ParametrizedProtocolType>()) {
+      if (!constraintType->isConstraintType() &&
+          !constraintType->getClassOrBoundGenericClass()) {
         ctx.Diags.diagnose(currentRepr->getLoc(),
                            diag::opaque_type_invalid_constraint);
         return nullptr;
@@ -528,10 +526,10 @@ static Type formExtensionInterfaceType(
   if (type->is<ProtocolCompositionType>())
     type = type->getCanonicalType();
 
-  // A parametrized protocol type is not a nominal. Unwrap it to get
+  // A parameterized protocol type is not a nominal. Unwrap it to get
   // the underlying nominal, and record a same-type requirement for
   // the primary associated type.
-  if (auto *paramProtoTy = type->getAs<ParametrizedProtocolType>()) {
+  if (auto *paramProtoTy = type->getAs<ParameterizedProtocolType>()) {
     auto *protoTy = paramProtoTy->getBaseType();
     type = protoTy;
 
