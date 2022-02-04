@@ -628,6 +628,9 @@ bool RewriteSystem::isInMinimizationDomain(
 
 void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
                                       RewritePath path) {
+  RewriteLoop loop(basepoint, path);
+  loop.verify(*this);
+
   if (!RecordLoops)
     return;
 
@@ -635,7 +638,7 @@ void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
   if (!isInMinimizationDomain(basepoint.getRootProtocols()))
     return;
 
-  Loops.emplace_back(basepoint, path);
+  Loops.push_back(loop);
 }
 
 void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {

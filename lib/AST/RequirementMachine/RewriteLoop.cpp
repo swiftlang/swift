@@ -109,6 +109,29 @@ void RewritePath::dump(llvm::raw_ostream &out,
   }
 }
 
+void RewriteLoop::verify(const RewriteSystem &system) const {
+#ifndef NDEBUG
+  RewritePathEvaluator evaluator(Basepoint);
+
+  for (const auto &step : Path) {
+    evaluator.apply(step, system);
+  }
+
+  if (evaluator.getCurrentTerm() != Basepoint) {
+    llvm::errs() << "Not a loop: ";
+    dump(llvm::errs(), system);
+    llvm::errs() << "\n";
+    abort();
+  }
+
+  if (evaluator.isInContext()) {
+    llvm::errs() << "Leftover terms on evaluator stack\n";
+    evaluator.dump(llvm::errs());
+    abort();
+  }
+#endif
+}
+
 void RewriteLoop::dump(llvm::raw_ostream &out,
                        const RewriteSystem &system) const {
   out << Basepoint << ": ";

@@ -286,6 +286,8 @@ public:
                           ProtocolConformanceRules, 2> &result,
       const RewriteSystem &system) const;
 
+  void verify(const RewriteSystem &system) const;
+
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
 };
 
