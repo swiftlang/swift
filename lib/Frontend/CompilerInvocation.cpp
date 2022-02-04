@@ -470,10 +470,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
     Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
 
-  Opts.EnableExperimentalClangImporterDiagnostics |=
-      Args.hasArg(OPT_enable_experimental_clang_importer_diagnostics);
+  Opts.DisableExperimentalClangImporterDiagnostics |=
+      Args.hasArg(OPT_disable_experimental_clang_importer_diagnostics);
 
   Opts.EnableExperimentalEagerClangModuleDiagnostics |=
+      !Args.hasArg(OPT_disable_experimental_clang_importer_diagnostics) &&
       Args.hasArg(OPT_enable_experimental_eager_clang_module_diagnostics);
 
   Opts.DisableImplicitConcurrencyModuleImport |=
