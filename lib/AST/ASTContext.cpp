@@ -4880,6 +4880,10 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
       addTrivial(Id_CGFloat, coreGraphics);
     }
 
+    if (auto coreFoundation = getLoadedModule(getIdentifier("CoreFoundation"))) {
+      addTrivial(Id_CGFloat, coreFoundation);
+    }
+
     // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
     // FIXME: Layering violation to use the ClangImporter's define.
     const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
@@ -4928,6 +4932,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   conditionallyAddTrivial(nominal, getIdentifier("ObjCBool"), Id_ObjectiveC);
   conditionallyAddTrivial(nominal, getSwiftId(KnownFoundationEntity::NSZone), Id_ObjectiveC, true);
   conditionallyAddTrivial(nominal, Id_CGFloat, getIdentifier("CoreGraphics"));
+  conditionallyAddTrivial(nominal, Id_CGFloat, getIdentifier("CoreFoundation"));
   const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
   {                                                                            \
