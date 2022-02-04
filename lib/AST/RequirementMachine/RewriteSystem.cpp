@@ -12,6 +12,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -130,6 +131,39 @@ unsigned Rule::getDepth() const {
   }
 
   return result;
+}
+
+/// Returns the nesting depth of the concrete symbol at the end of the
+/// left hand side, or 0 if there isn't one.
+unsigned Rule::getNesting() const {
+  if (LHS.back().hasSubstitutions()) {
+    auto type = LHS.back().getConcreteType();
+
+    struct Walker : TypeWalker {
+      unsigned Nesting = 0;
+      unsigned MaxNesting = 0;
+
+      Action walkToTypePre(Type ty) override {
+        ++Nesting;
+        MaxNesting = std::max(Nesting, MaxNesting);
+
+        return Action::Continue;
+      }
+
+      Action walkToTypePost(Type ty) override {
+        --Nesting;
+
+        return Action::Continue;
+      }
+    };
+
+    Walker walker;
+    type.walk(walker);
+
+    return walker.MaxNesting;
+  }
+
+  return 0;
 }
 
 /// Linear order on rules; compares LHS followed by RHS.

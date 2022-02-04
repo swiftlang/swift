@@ -518,6 +518,10 @@ namespace swift {
     /// algorithm.
     unsigned RequirementMachineMaxRuleLength = 12;
 
+    /// Maximum concrete type nesting depth for requirement machine property map
+    /// algorithm.
+    unsigned RequirementMachineMaxConcreteNesting = 30;
+
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.
     RequirementMachineMode RequirementMachineProtocolSignatures =

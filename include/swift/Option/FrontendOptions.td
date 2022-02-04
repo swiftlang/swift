@@ -351,6 +351,10 @@ def requirement_machine_max_rule_length : Joined<["-"], "requirement-machine-max
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum rule length before giving up">;
 
+def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machine-max-concrete-nesting=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum concrete type nesting depth before giving up">;
+
 def disable_requirement_machine_merged_associated_types : Flag<["-"], "disable-requirement-machine-merged-associated-types">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Disable merged associated types">;

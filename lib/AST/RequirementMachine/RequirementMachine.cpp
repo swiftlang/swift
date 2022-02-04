@@ -27,6 +27,7 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
   Dump = langOpts.DumpRequirementMachine;
   MaxRuleCount = langOpts.RequirementMachineMaxRuleCount;
   MaxRuleLength = langOpts.RequirementMachineMaxRuleLength;
+  MaxConcreteNesting = langOpts.RequirementMachineMaxConcreteNesting;
   Stats = ctx.getASTContext().Stats;
 
   if (Stats)
@@ -48,6 +49,11 @@ static void checkCompletionResult(const RequirementMachine &machine,
 
   case CompletionResult::MaxRuleLength:
     llvm::errs() << "Rewrite system exceeded rule length limit\n";
+    machine.dump(llvm::errs());
+    abort();
+
+  case CompletionResult::MaxConcreteNesting:
+    llvm::errs() << "Rewrite system exceeded concrete type nesting depth limit\n";
     machine.dump(llvm::errs());
     abort();
   }
@@ -265,6 +271,8 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
         const auto &newRule = System.getRule(ruleCount + i);
         if (newRule.getDepth() > MaxRuleLength)
           return CompletionResult::MaxRuleLength;
+        if (newRule.getNesting() > MaxConcreteNesting)
+          return CompletionResult::MaxConcreteNesting;
       }
 
       if (System.getRules().size() > MaxRuleCount)

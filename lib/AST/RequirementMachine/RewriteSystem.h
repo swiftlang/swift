@@ -181,6 +181,8 @@ public:
 
   unsigned getDepth() const;
 
+  unsigned getNesting() const;
+
   int compare(const Rule &other, RewriteContext &ctx) const;
 
   void dump(llvm::raw_ostream &out) const;
@@ -203,6 +205,8 @@ enum class CompletionResult {
   /// Maximum rule length exceeded.
   MaxRuleLength,
 
+  /// Maximum concrete type nesting depth exceeded.
+  MaxConcreteNesting
 };
 
 /// A term rewrite system for working with types in a generic signature.

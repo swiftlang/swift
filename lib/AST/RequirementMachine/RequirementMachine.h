@@ -65,6 +65,7 @@ class RequirementMachine final {
   /// Parameters to prevent runaway completion and property map construction.
   unsigned MaxRuleCount;
   unsigned MaxRuleLength;
+  unsigned MaxConcreteNesting;
 
   UnifiedStatsReporter *Stats;
 
