@@ -746,7 +746,7 @@ extension ProtocolRequirementDerivative {
 func multipleSemanticResults(_ x: inout Float) -> Float {
   return x
 }
-// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
+// expected-error @+1 {{cannot differentiate functions with both a differentiable 'inout' parameter and a result}}
 @derivative(of: multipleSemanticResults)
 func vjpMultipleSemanticResults(x: inout Float) -> (
   value: Float, pullback: (Float) -> Float
@@ -885,14 +885,14 @@ func vjpNoSemanticResults(_ x: Float) -> (value: Void, pullback: Void) {}
 
 extension InoutParameters {
   func multipleSemanticResults(_ x: inout Float) -> Float { x }
-  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
+  // expected-error @+1 {{cannot differentiate functions with both a differentiable 'inout' parameter and a result}}
   @derivative(of: multipleSemanticResults)
   func vjpMultipleSemanticResults(_ x: inout Float) -> (
     value: Float, pullback: (inout Float) -> Void
   ) { fatalError() }
 
   func inoutVoid(_ x: Float, _ void: inout Void) -> Float {}
-  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
+  // expected-error @+1 {{cannot differentiate functions with both a differentiable 'inout' parameter and a result}}
   @derivative(of: inoutVoid)
   func vjpInoutVoidParameter(_ x: Float, _ void: inout Void) -> (
     value: Float, pullback: (inout Float) -> Void

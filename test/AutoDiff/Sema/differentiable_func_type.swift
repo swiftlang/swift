@@ -40,10 +40,10 @@ let _: @differentiable(_linear) (Float) -> NonDiffType
 
 let _: @differentiable(_linear) (Float) -> Float
 
-// expected-error @+1 {{'@differentiable' function type cannot have both an 'inout' parameter and a differentiable result}}
+// expected-error @+1 {{'@differentiable' function type cannot have both a differentiable 'inout' parameter and a result}}
 let _: @differentiable(reverse) (inout Float) -> Float
 
-// expected-error @+1 {{'@differentiable' function type cannot have both an 'inout' parameter and a differentiable result}}
+// expected-error @+1 {{'@differentiable' function type cannot have both a differentiable 'inout' parameter and a result}}
 let _: @differentiable(_linear) (inout Float) -> Float
 
 // expected-error @+1 {{result type '@differentiable(reverse) (U) -> Float' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}

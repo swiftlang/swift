@@ -3462,8 +3462,8 @@ NOTE(autodiff_attr_original_decl_not_same_type_context,none,
 ERROR(autodiff_attr_original_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(autodiff_attr_original_multiple_semantic_results,none,
-      "cannot differentiate functions with both an 'inout' parameter and a "
-      "result", ())
+      "cannot differentiate functions with both a differentiable 'inout' "
+      "parameter and a result", ())
 ERROR(autodiff_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
@@ -5041,8 +5041,8 @@ ERROR(differentiable_function_type_invalid_result,none,
       "function type is '@differentiable%select{|(_linear)}1'",
       (StringRef, bool))
 ERROR(differentiable_function_type_multiple_semantic_results,none,
-      "'@differentiable' function type cannot have both an 'inout' parameter "
-      "and a differentiable result", ())
+      "'@differentiable' function type cannot have both a differentiable "
+      "'inout' parameter and a result", ())
 ERROR(differentiable_function_type_no_differentiability_parameters, 
       none,
       "'@differentiable' function type requires at least one differentiability "
