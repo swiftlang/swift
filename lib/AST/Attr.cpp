@@ -1188,6 +1188,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_BackDeploy: {
+    Printer.printAttrName("@_backDeploy");
+    Printer << "(";
+    auto Attr = cast<BackDeployAttr>(this);
+    Printer << platformString(Attr->Platform) << " " <<
+      Attr->Version.getAsString();
+    Printer << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1356,6 +1366,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_typeSequence";
   case DAK_UnavailableFromAsync:
     return "_unavailableFromAsync";
+  case DAK_BackDeploy:
+    return "_backDeploy";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

@@ -1531,6 +1531,15 @@ WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
 
+WARNING(attr_availability_wildcard_ignored,none,
+        "* as platform name has no effect in '%0' attribute", (StringRef))
+
+ERROR(attr_availability_need_platform_version,none,
+     "expected at least one platform version in in '%0' attribute", (StringRef))
+
+WARNING(attr_availability_platform_version_major_minor_only,none,
+        "'%0' only uses major and minor version number", (StringRef))
+
 // availability macro
 ERROR(attr_availability_wildcard_in_macro, none,
       "future platforms identified by '*' cannot be used in "
@@ -1548,12 +1557,15 @@ ERROR(attr_availability_duplicate,none,
       (StringRef, StringRef))
 
 // originallyDefinedIn
+// FIXME: Refactor to share between attributes
 ERROR(originally_defined_in_missing_rparen,none,
       "expected ')' in @_originallyDefinedIn argument list", ())
 
+// FIXME: Refactor to share between attributes
 ERROR(originally_defined_in_unrecognized_platform,none,
       "unrecognized platform name in @_originallyDefinedIn argument list", ())
 
+// FIXME: This is unused and can be removed
 ERROR(originally_defined_in_unrecognized_property,none,
       "unrecognized property in @_originallyDefinedIn argument list", ())
 
@@ -1564,15 +1576,19 @@ ERROR(originally_defined_in_need_original_module_name,none,
 ERROR(originally_defined_in_need_nonempty_module_name,none,
       "original module name cannot be empty in @_originallyDefinedIn", ())
 
+// FIXME: Refactor to share between attributes
 ERROR(originally_defined_in_need_platform_version,none,
      "expected at least one platform version in @_originallyDefinedIn", ())
 
+// FIXME: Refactor to share between attributes
 WARNING(originally_defined_in_major_minor_only,none,
         "@_originallyDefinedIn only uses major and minor version number", ())
 
+// FIXME: Refactor to share between attributes
 WARNING(originally_defined_in_missing_platform_name,none,
         "* as platform name has no effect", ())
 
+// FIXME: Refactor to share between attributes
 WARNING(originally_defined_in_swift_version, none,
         "Swift language version checks has no effect "
         "in @_originallyDefinedIn", ())
@@ -1580,6 +1596,10 @@ WARNING(originally_defined_in_swift_version, none,
 WARNING(originally_defined_in_package_description, none,
         "PackageDescription version checks has no effect "
         "in @_originallyDefinedIn", ())
+
+// backDeploy
+ERROR(attr_back_deploy_missing_rparen,none,
+      "expected ')' in '@_backDeploy' argument list", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,

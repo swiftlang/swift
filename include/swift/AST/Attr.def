@@ -713,6 +713,12 @@ DECL_ATTR(exclusivity, Exclusivity,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   128)
 
+DECL_ATTR(_backDeploy, BackDeploy,
+  OnAbstractFunction |
+  AllowMultipleAttributes | LongAttribute | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  129)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 

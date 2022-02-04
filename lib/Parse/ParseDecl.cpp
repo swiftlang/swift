@@ -2855,6 +2855,85 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         message, AtLoc, SourceRange(Loc, Tok.getLoc()), false));
     break;
   }
+  case DAK_BackDeploy: {
+    auto LeftLoc = Tok.getLoc();
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+    SourceLoc RightLoc;
+    bool SuppressLaterDiags = false;
+    llvm::SmallVector<std::pair<PlatformKind, llvm::VersionTuple>, 4>
+      PlatformAndVersions;
+    
+    StringRef AttrName = "@_backDeploy";
+    if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
+                  diag::attr_back_deploy_missing_rparen,
+                  SyntaxKind::Unknown, [&]() -> ParserStatus {
+      // FIXME(backDeploy): Parse availability macros (e.g. SwiftStdlib: 5.1)
+      
+      // Parse a platform and version tuple (e.g. 'macOS 13.13').
+      if ((Tok.is(tok::identifier) || Tok.is(tok::oper_binary_spaced)) &&
+          (peekToken().is(tok::floating_literal) ||
+           peekToken().is(tok::integer_literal))) {
+        PlatformKind Platform;
+        // Parse platform name.
+        auto Plat = platformFromString(Tok.getText());
+        if (!Plat.hasValue()) {
+          diagnose(Tok.getLoc(), diag::attr_availability_unknown_platform,
+                   Tok.getText(), AttrName);
+          SuppressLaterDiags = true;
+          return makeParserError();
+        } else {
+          consumeToken();
+          Platform = *Plat;
+        }
+        // Parse version number
+        llvm::VersionTuple VerTuple;
+        SourceRange VersionRange;
+        if (parseVersionTuple(VerTuple, VersionRange,
+              Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+          SuppressLaterDiags = true;
+          return makeParserError();
+        } else {
+          if (VerTuple.getSubminor().hasValue() ||
+              VerTuple.getBuild().hasValue()) {
+            diagnose(Tok.getLoc(),
+                     diag::attr_availability_platform_version_major_minor_only,
+                     AttrName);
+          }
+          // * as platform name isn't supported.
+          if (Platform == PlatformKind::none) {
+            diagnose(AtLoc, diag::attr_availability_wildcard_ignored, AttrName);
+          } else {
+            PlatformAndVersions.emplace_back(Platform, VerTuple);
+          }
+          return makeParserSuccess();
+        }
+      }
+      diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
+      SuppressLaterDiags = true;
+      return makeParserError();
+    }).isErrorOrHasCompletion() || SuppressLaterDiags) {
+      return false;
+    }
+
+    if (PlatformAndVersions.empty()) {
+      diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
+      return false;
+    }
+    
+    assert(!PlatformAndVersions.empty());
+    AttrRange = SourceRange(Loc, Tok.getLoc());
+    for (auto &Item: PlatformAndVersions) {
+      Attributes.add(new (Context) BackDeployAttr(AtLoc, AttrRange,
+                                                  Item.first,
+                                                  Item.second,
+                                                  /*IsImplicit*/false));
+    }
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
