@@ -175,8 +175,6 @@ public:
 
   LayoutConstraint getLayoutConstraint() const;
 
-  CanType getSuperclass() const;
-
   CanType getConcreteType() const;
 
   ArrayRef<Term> getSubstitutions() const;

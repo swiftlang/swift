@@ -198,15 +198,11 @@ LayoutConstraint Symbol::getLayoutConstraint() const {
   return Ptr->Layout;
 }
 
-/// Get the superclass type associated with a superclass symbol.
-CanType Symbol::getSuperclass() const {
-  assert(getKind() == Kind::Superclass);
-  return Ptr->ConcreteType;
-}
-
-/// Get the concrete type associated with a concrete type symbol.
+/// Get the concrete type associated with a superclass, concrete type or
+/// concrete conformance symbol.
 CanType Symbol::getConcreteType() const {
-  assert(getKind() == Kind::ConcreteType ||
+  assert(getKind() == Kind::Superclass ||
+         getKind() == Kind::ConcreteType ||
          getKind() == Kind::ConcreteConformance);
   return Ptr->ConcreteType;
 }
@@ -635,10 +631,7 @@ int Symbol::compare(Symbol other, RewriteContext &ctx) const {
 
   case Kind::Superclass:
   case Kind::ConcreteType: {
-    if (kind == Kind::Superclass
-        ? (getSuperclass() == other.getSuperclass())
-        : (getConcreteType() == other.getConcreteType())) {
-
+    if (getConcreteType() == other.getConcreteType()) {
       // If the concrete types are identical, compare substitution terms.
       assert(getSubstitutions().size() == other.getSubstitutions().size());
       for (unsigned i : indices(getSubstitutions())) {
@@ -676,7 +669,7 @@ Symbol Symbol::withConcreteSubstitutions(
     RewriteContext &ctx) const {
   switch (getKind()) {
   case Kind::Superclass:
-    return Symbol::forSuperclass(getSuperclass(), substitutions, ctx);
+    return Symbol::forSuperclass(getConcreteType(), substitutions, ctx);
 
   case Kind::ConcreteType:
     return Symbol::forConcreteType(getConcreteType(), substitutions, ctx);
@@ -787,7 +780,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     return;
 
   case Kind::Superclass:
-    out << "[superclass: " << getSuperclass();
+    out << "[superclass: " << getConcreteType();
     dumpSubstitutions();
     out << "]";
     return;

@@ -263,6 +263,7 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
                                           RewritePath *path) const {
   assert(symbol.hasSubstitutions());
 
+  // Fast path if the type is fully concrete.
   auto substitutions = symbol.getSubstitutions();
   if (substitutions.empty())
     return false;
@@ -272,10 +273,12 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
   unsigned oldSize = (path ? path->size() : 0);
 
   if (path) {
-    // The term is on the A stack. Push all substitutions onto the A stack.
-    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/false));
+    // The term is at the top of the primary stack. Push all substitutions onto
+    // the primary stack.
+    path->add(RewriteStep::forDecompose(substitutions.size(),
+                                        /*inverse=*/false));
 
-    // Move all substitutions but the first one to the B stack.
+    // Move all substitutions but the first one to the secondary stack.
     for (unsigned i = 1; i < substitutions.size(); ++i)
       path->add(RewriteStep::forShift(/*inverse=*/false));
   }
@@ -287,12 +290,12 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
   bool first = true;
   bool anyChanged = false;
   for (auto substitution : substitutions) {
-    // Move the next substitution from the B stack to the A stack.
+    // Move the next substitution from the secondary stack to the primary stack.
     if (!first && path)
       path->add(RewriteStep::forShift(/*inverse=*/true));
     first = false;
 
-    // The current substitution is at the top of the A stack; simplify it.
+    // The current substitution is at the top of the primary stack; simplify it.
     MutableTerm mutTerm(substitution);
     anyChanged |= simplify(mutTerm, path);
 
@@ -300,10 +303,12 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
     newSubstitutions.push_back(Term::get(mutTerm, Context));
   }
 
-  // All simplified substitutions are now on the A stack. Collect them to
+  // All simplified substitutions are now on the primary stack. Collect them to
   // produce the new term.
-  if (path)
-    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/true));
+  if (path) {
+    path->add(RewriteStep::forDecompose(substitutions.size(),
+                                        /*inverse=*/true));
+  }
 
   // If nothing changed, we don't have to rebuild the symbol.
   if (!anyChanged) {
@@ -566,7 +571,7 @@ void RewriteSystem::simplifyRightHandSides() {
   }
 }
 
-/// Simplify substitutions in superclass, concrete type and concrete
+/// Simplify substitution terms in superclass, concrete type and concrete
 /// conformance symbols.
 void RewriteSystem::simplifyLeftHandSideSubstitutions() {
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
@@ -628,6 +633,9 @@ bool RewriteSystem::isInMinimizationDomain(
 
 void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
                                       RewritePath path) {
+  RewriteLoop loop(basepoint, path);
+  loop.verify(*this);
+
   if (!RecordLoops)
     return;
 
@@ -635,7 +643,7 @@ void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
   if (!isInMinimizationDomain(basepoint.getRootProtocols()))
     return;
 
-  Loops.emplace_back(basepoint, path);
+  Loops.push_back(loop);
 }
 
 void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
@@ -668,8 +676,6 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
       // which are immediately simplified away.
       if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !rule.isSubstitutionSimplified() &&
           index != 0 && index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
@@ -680,9 +686,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       // Permanent rules contain name symbols at the end, like
       // [P].T => [P:T].
-      if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !rule.isSubstitutionSimplified() &&
+      if (!rule.isRHSSimplified() &&
           (!rule.isPermanent() || index == rhs.size() - 1)) {
         // This is only true if the input requirements were valid.
         if (policy == DisallowInvalidRequirements) {
@@ -701,10 +705,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
       // which are immediately simplified away.
-      if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !rule.isSubstitutionSimplified() &&
-          index != 0) {
+      if (!rule.isRHSSimplified() && index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
