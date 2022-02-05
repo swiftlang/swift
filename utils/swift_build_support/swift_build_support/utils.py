@@ -12,7 +12,12 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import json
+import os
 import sys
+
+
+from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
 
 
 def fatal_error(message, stream=sys.stderr):
@@ -30,3 +35,25 @@ def exit_rejecting_arguments(message, parser=None):
     if parser:
         parser.print_usage(sys.stderr)
     sys.exit(2)  # 2 is the same as `argparse` error exit code.
+
+
+def log_time_path():
+    return os.path.join(SWIFT_BUILD_ROOT, '.build_script_log')
+
+
+def clear_log_time():
+    f = open(log_time_path(), "w")
+    f.close()
+
+
+def log_time(event, command, duration=0):
+    f = open(log_time_path(), "a")
+
+    log_event = {
+        "event": event,
+        "command": command,
+        "duration": "%.2f" % float(duration),
+    }
+
+    f.write("{}\n".format(json.dumps(log_event)))
+    f.close()
