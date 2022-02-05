@@ -1190,28 +1190,7 @@ public:
     if (!ConformancesAddr)
       return "unable to read value of " + ConformancesPointerName;
 
-    auto Root = getReader().readPointer(ConformancesAddr->getResolvedAddress(),
-                                        sizeof(StoredPointer));
-    auto ReaderCount = Root->getResolvedAddress().getAddressData();
-
-    // ReaderCount will be the root pointer if the conformance cache is a
-    // ConcurrentMap. It's very unlikely that there would ever be more readers
-    // than the least valid pointer value, so compare with that to distinguish.
-    // TODO: once the old conformance cache is gone for good, remove that code.
-    uint64_t LeastValidPointerValue;
-    if (!getReader().queryDataLayout(
-            DataLayoutQueryType::DLQ_GetLeastValidPointerValue, nullptr,
-            &LeastValidPointerValue)) {
-      return std::string("unable to query least valid pointer value");
-    }
-
-    if (ReaderCount < LeastValidPointerValue)
-      IterateConformanceTable(ConformancesAddr->getResolvedAddress(), Call);
-    else {
-      // The old code has the root address at this location.
-      auto RootAddr = ReaderCount;
-      iterateConformanceTree(RootAddr, Call);
-    }
+    IterateConformanceTable(ConformancesAddr->getResolvedAddress(), Call);
     return llvm::None;
   }
   
