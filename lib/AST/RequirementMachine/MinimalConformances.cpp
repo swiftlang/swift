@@ -417,14 +417,6 @@ void MinimalConformances::collectConformanceRules() {
       MutableTerm mutTerm(lhs.begin(), lhs.end() - 2);
       assert(!mutTerm.empty());
 
-#ifndef NDEBUG
-      bool simplified = System.simplify(mutTerm);
-      // FIXME: Perhaps even if the rule is LHS-simplified, it's parent should be
-      // canonical?
-      assert(!simplified || rule.isRHSSimplified());
-      (void) simplified;
-#endif
-
       mutTerm.add(Symbol::forProtocol(parentProto, Context));
 
       // Get a conformance path for X.[P] and record it.

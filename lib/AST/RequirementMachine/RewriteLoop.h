@@ -73,12 +73,24 @@ struct RewriteStep {
     Shift,
 
     /// If not inverted: the top of the primary stack must be a term ending
-    /// with a superclass or concrete type symbol. Each concrete substitution
-    /// in the term is pushed onto the primary stack.
+    /// with a superclass or concrete type symbol:
     ///
-    /// If inverted: pop concrete substitutions from the primary stack, which
-    /// must follow a term ending with a superclass or concrete type symbol.
-    /// The new substitutions replace the substitutions in that symbol.
+    ///    T.[concrete: C<...> with <X1, X2...>]
+    ///
+    /// Each concrete substitution Xn is pushed onto the primary stack,
+    /// producing:
+    ///
+    ///    T.[concrete: C<...> with <X1, X2...>] X1 X2...
+    ///
+    /// If inverted: pop concrete substitutions Xn' from the primary stack,
+    /// which must follow a term ending with a superclass or concrete type
+    /// symbol:
+    ///
+    ///    T.[concrete: C<...> with <X1, X2...>] X1' X2'...
+    ///
+    /// The new substitutions replace the substitutions in that symbol:
+    ///
+    ///    T.[concrete: C<...> with <X1', X2'...>]
     ///
     /// The Arg field encodes the number of substitutions.
     Decompose,
@@ -286,6 +298,8 @@ public:
                           ProtocolConformanceRules, 2> &result,
       const RewriteSystem &system) const;
 
+  void verify(const RewriteSystem &system) const;
+
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
 };
 
@@ -299,7 +313,8 @@ struct AppliedRewriteStep {
 
 /// A rewrite path is a list of instructions for a two-stack interpreter.
 ///
-/// - Shift moves a term from A to B (if not inverted) or B to A (if inverted).
+/// - Shift moves a term from the primary stack to the secondary stack
+///   (if not inverted) or secondary to primary (if inverted).
 ///
 /// - Decompose splits off the substitutions from a superclass or concrete type
 ///   symbol at the top of the primary stack (if not inverted) or assembles a
@@ -352,9 +367,6 @@ struct RewritePathEvaluator {
   AppliedRewriteStep
   applyRelation(const RewriteStep &step,
                 const RewriteSystem &system);
-
-  void applyConcreteConformance(const RewriteStep &step,
-                                const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
 };

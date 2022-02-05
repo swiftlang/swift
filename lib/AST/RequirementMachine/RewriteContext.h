@@ -162,6 +162,8 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
+  static unsigned getGenericParamIndex(Type type);
+
   Term getTermForType(CanType paramType, const ProtocolDecl *proto);
 
   MutableTerm getMutableTermForType(CanType paramType,

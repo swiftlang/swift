@@ -32,27 +32,30 @@ enum class DebugFlags : unsigned {
   /// Print debug output from the Knuth-Bendix algorithm.
   Completion = (1<<3),
 
+  /// Print debug output from property map construction.
+  PropertyMap = (1<<4),
+
   /// Print debug output when unifying concrete types in the property map.
-  ConcreteUnification = (1<<4),
+  ConcreteUnification = (1<<5),
 
   /// Print debug output when concretizing nested types in the property map.
-  ConcretizeNestedTypes = (1<<5),
+  ConcretizeNestedTypes = (1<<6),
 
   /// Print debug output when inferring conditional requirements in the
   /// property map.
-  ConditionalRequirements = (1<<6),
+  ConditionalRequirements = (1<<7),
 
   /// Print debug output from the homotopy reduction algorithm.
-  HomotopyReduction = (1<<7),
+  HomotopyReduction = (1<<8),
 
   /// Print debug output from the minimal conformances algorithm.
-  MinimalConformances = (1<<8),
+  MinimalConformances = (1<<9),
 
   /// Print debug output from the protocol dependency graph.
-  ProtocolDependencies = (1<<9),
+  ProtocolDependencies = (1<<10),
 
   /// Print debug output from generic signature minimization.
-  Minimization = (1<<10),
+  Minimization = (1<<11),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

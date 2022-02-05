@@ -21,7 +21,7 @@
 //
 // Redundant rules that are not part of the minimal set are redundant are
 // detected by analyzing the set of rewrite loops computed by the completion
-// procedure.
+// procedure. See RewriteLoop.cpp for a discussion of rewrite loops.
 //
 // If a rewrite rule appears exactly once in a loop and without context, the
 // loop witnesses a redundancy; the rewrite rule is equivalent to traveling
@@ -475,9 +475,6 @@ void RewriteSystem::minimizeRewriteSystem() {
   assert(!Minimized);
   Minimized = 1;
 
-  // Check invariants before homotopy reduction.
-  verifyRewriteLoops();
-
   propagateExplicitBits();
 
   // First pass:
@@ -623,24 +620,7 @@ RewriteSystem::getMinimizedGenericSignatureRules() const {
 void RewriteSystem::verifyRewriteLoops() const {
 #ifndef NDEBUG
   for (const auto &loop : Loops) {
-    RewritePathEvaluator evaluator(loop.Basepoint);
-
-    for (const auto &step : loop.Path) {
-      evaluator.apply(step, *this);
-    }
-
-    if (evaluator.getCurrentTerm() != loop.Basepoint) {
-      llvm::errs() << "Not a loop: ";
-      loop.dump(llvm::errs(), *this);
-      llvm::errs() << "\n";
-      abort();
-    }
-
-    if (evaluator.isInContext()) {
-      llvm::errs() << "Leftover terms on evaluator stack\n";
-      evaluator.dump(llvm::errs());
-      abort();
-    }
+    loop.verify(*this);
   }
 #endif
 }
