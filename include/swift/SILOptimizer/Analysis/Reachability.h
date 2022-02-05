@@ -43,7 +43,7 @@ namespace swift {
 ///
 ///   // Mark the beginning of a block reachable. Only called once per block.
 ///   // Typically a BasicBlockSet wrapper.
-///   boid markReachableBegin(SILBasicBlock *block);
+///   void markReachableBegin(SILBasicBlock *block);
 /// 
 ///   // Mark the end of a block reachable. Only called once per block.
 ///   // Typically a BasicBlockSet wrapper.

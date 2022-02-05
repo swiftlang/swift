@@ -151,6 +151,10 @@ bool shrinkBorrowScope(
     BeginBorrowInst *bbi, InstructionDeleter &deleter,
     SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts);
 
+bool foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
+                                       DominanceInfo &dominanceTree,
+                                       InstructionDeleter &deleter);
+
 } // namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEBORROWSCOPES_H
