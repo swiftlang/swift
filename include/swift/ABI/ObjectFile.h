@@ -132,7 +132,7 @@ public:
     case protocs:
       return ".sw5prt$B";
     case mpenum:
-      return ".sw5mpen";
+      return ".sw5mpen$B";
     }
     llvm_unreachable("Section  not found.");
   }
