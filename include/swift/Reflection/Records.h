@@ -400,11 +400,7 @@ private:
   // Only present if `usePayloadSpareBits()`
 
   int getPayloadSpareBitMaskByteCountIndex() const {
-    if (usesPayloadSpareBits()) {
-      return getSizeFlagsIndex() + 1;
-    } else {
-      return getSizeFlagsIndex();
-    }
+    return getSizeFlagsIndex() + 1;
   }
 
   // uint8_t  *PayloadSpareBits;
@@ -412,18 +408,15 @@ private:
   // Only present if `usePayloadSpareBits()`
 
   int getPayloadSpareBitsIndex() const {
-    if (usesPayloadSpareBits()) {
-      return getPayloadSpareBitMaskByteCountIndex() + 1;
-    } else {
-      return getPayloadSpareBitMaskByteCountIndex();
-    }
+    int PayloadSpareBitMaskByteCountFieldSize = usesPayloadSpareBits() ? 1 : 0;
+    return getPayloadSpareBitMaskByteCountIndex() + PayloadSpareBitMaskByteCountFieldSize;
   }
 
   // uint32_t foo;
   // TODO: Some future field
   // int getFooIndex() const {
-  //   return getPayloadSpareBitsIndex()
-  //   + getPayloadSpareBitMaskByteCount() / 4;
+  //   int PayloadSpareBitMaskFieldSize = (getPayloadSpareBitMaskByteCount() + 3) / 4;
+  //   return getPayloadSpareBitsIndex() + PayloadSpareBitMaskFieldSize;
   // }
 
   // uint32_t getFoo() const {
@@ -444,11 +437,13 @@ public:
   }
 
   size_t getSizeInBytes() const {
+//    assert(getContentsSizeInWords() > 0 && "Malformed MPEnum reflection record");
     size_t sizeInBytes = sizeof(TypeName) + getContentsSizeInWords() * 4;
     return sizeInBytes;
   }
 
   uint32_t getFlags() const {
+    assert(getContentsSizeInWords() > 0 && "Malformed MPEnum reflection record");
     return contents[getSizeFlagsIndex()] & 0xffff;
   }
 
@@ -466,7 +461,10 @@ public:
 
   uint32_t getPayloadSpareBitMaskByteCount() const {
     if (usesPayloadSpareBits()) {
-      return contents[getPayloadSpareBitMaskByteCountIndex()] & 0xffff;
+      auto byteCount = contents[getPayloadSpareBitMaskByteCountIndex()] & 0xffff;
+      assert(getContentsSizeInWords() >= 2 + (byteCount + 3) / 4
+            && "Malformed MPEnum reflection record: mask bigger than record");
+      return byteCount;
     } else {
       return 0;
     }
