@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -requirement-machine-protocol-signatures=verify 2>&1 | %FileCheck %s
 
+// rdar://problem/88135912
+// XFAIL: *
+
 protocol P {
   associatedtype T
 }
