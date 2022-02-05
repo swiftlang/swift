@@ -1047,36 +1047,36 @@ public:
     uint32_t byteOffset = bits.countTrailingZeros() / 8;
     bits.lshrInPlace(byteOffset * 8); // Trim zero bytes from bottom end
 
-    auto bitCount = bits.getActiveBits(); // Ignore high-order zero bits
-    auto usesPayloadSpareBits = bitCount > 0;
-    uint32_t byteCount = (bitCount + 7) / 8;
-    auto wordCount = (byteCount + 3) / 4;
-    bits = bits.zextOrTrunc(wordCount * 32);
+    auto bitsInMask = bits.getActiveBits(); // Ignore high-order zero bits
+    auto usesPayloadSpareBits = bitsInMask > 0;
+    uint32_t bytesInMask = (bitsInMask + 7) / 8;
+    auto wordsInMask = (bytesInMask + 3) / 4;
+    bits = bits.zextOrTrunc(wordsInMask * 32);
 
     // Never write an MPE descriptor bigger than 16k
     // The runtime will fall back on its own internal
     // spare bits calculation for this (very rare) case.
-    if (byteCount > 16384) {
+    if (bytesInMask > 16384) {
       return;
     }
 
     addTypeRef(type, CanGenericSignature());
 
     // MPE record contents are a multiple of 32-bits
-    uint32_t contentSizeInWords = 1; /* Size + flags is mandatory */
-    if (wordCount > 0) {
-      contentSizeInWords +=
+    uint32_t contentsSizeInWords = 1; /* Size + flags is mandatory */
+    if (wordsInMask > 0) {
+      contentsSizeInWords +=
         1 /* SpareBits byte count */
-        + wordCount;
+        + wordsInMask;
     }
     uint32_t flags = usesPayloadSpareBits ? 1 : 0;
 
-    B.addInt32((contentSizeInWords << 16) | flags);
+    B.addInt32((contentsSizeInWords << 16) | flags);
 
-    if (byteCount > 0) {
-      B.addInt32((byteOffset << 16) | byteCount);
+    if (bytesInMask > 0) {
+      B.addInt32((byteOffset << 16) | bytesInMask);
       // TODO: Endianness??
-      for (unsigned i = 0; i < wordCount; ++i) {
+      for (unsigned i = 0; i < wordsInMask; ++i) {
         uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
         B.addInt32(nextWord);
         bits.lshrInPlace(32);
