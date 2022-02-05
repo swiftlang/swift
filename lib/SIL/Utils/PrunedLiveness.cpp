@@ -167,6 +167,20 @@ bool PrunedLiveness::areUsesWithinBoundary(ArrayRef<Operand *> uses,
   return true;
 }
 
+bool PrunedLiveness::areUsesOutsideBoundary(
+    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
+  auto checkDeadEnd = [deadEndBlocks](SILInstruction *inst) {
+    return deadEndBlocks && deadEndBlocks->isDeadEnd(inst->getParent());
+  };
+
+  for (auto *use : uses) {
+    auto *user = use->getUser();
+    if (isWithinBoundary(user) || checkDeadEnd(user))
+      return false;
+  }
+  return true;
+}
+
 // An SSA def meets all the criteria for pruned liveness--def dominates all uses
 // with no holes in the liverange. The lifetime-ending uses are also
 // recorded--destroy_value or end_borrow. However destroy_values may not

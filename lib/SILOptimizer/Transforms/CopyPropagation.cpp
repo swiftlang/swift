@@ -434,21 +434,50 @@ void CopyPropagation::run() {
     }
   }
 
-  // NOTE: We assume that the function is in reverse post order so visiting the
-  //       blocks and pushing begin_borrows as we see them and then popping them
-  //       off the end will result in shrinking inner borrow scopes first.
-  while (auto *bbi = beginBorrowsToShrink.pop()) {
-    SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
-    changed |= shrinkBorrowScope(bbi, deleter, modifiedCopyValueInsts);
-    for (auto *cvi : modifiedCopyValueInsts)
-      defWorklist.updateForCopy(cvi);
-  }
-  deleter.cleanupDeadInstructions();
-
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
   CanonicalizeOSSALifetime canonicalizer(pruneDebug, poisonRefs,
                                          accessBlockAnalysis, domTree, deleter);
+
+  // NOTE: We assume that the function is in reverse post order so visiting the
+  //       blocks and pushing begin_borrows as we see them and then popping them
+  //       off the end will result in shrinking inner borrow scopes first.
+  while (auto *bbi = beginBorrowsToShrink.pop()) {
+    bool firstRun = true;
+    // Run the sequence of utilities:
+    // - ShrinkBorrowScope
+    // - CanonicalizeOSSALifetime
+    // - LexicalDestroyFolder
+    // at least once and then until each stops making changes.
+    while (true) {
+      SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
+      auto shrunk = shrinkBorrowScope(bbi, deleter, modifiedCopyValueInsts);
+      for (auto *cvi : modifiedCopyValueInsts)
+        defWorklist.updateForCopy(cvi);
+      changed |= shrunk;
+      if (!shrunk && !firstRun)
+        break;
+
+      // If borrowed value is not owned, neither CanonicalizeOSSALifetime nor
+      // LexicalDestroyFolding will do anything with it.  Just bail out now.
+      auto borrowee = bbi->getOperand();
+      if (borrowee.getOwnershipKind() != OwnershipKind::Owned)
+        break;
+
+      auto canonicalized = canonicalizer.canonicalizeValueLifetime(borrowee);
+      if (!canonicalized && !firstRun)
+        break;
+
+      auto folded = foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
+      if (!folded)
+        break;
+      // We don't add the produced move_value instruction to the worklist
+      // because it can't handle propagation.
+      firstRun = false;
+    }
+  }
+  deleter.cleanupDeadInstructions();
+
   // For now, only modify forwarding instructions
   // At -Onone, we do nothing but rewrite copies of owned values.
   if (canonicalizeBorrows) {

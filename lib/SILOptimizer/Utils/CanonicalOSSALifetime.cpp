@@ -492,9 +492,10 @@ void CanonicalizeOSSALifetime::findOrInsertDestroyInBlock(SILBasicBlock *bb) {
       return;
     }
     // This is not a potential last user. Keep scanning.
-    // Allow lifetimes to be artificially extended up to the next call. The goal
-    // is to prevent repeated destroy rewriting without inhibiting optimization.
-    if (ApplySite::isa(inst)) {
+    // Allow lifetimes to be artificially extended up to the next non-ignored
+    // instruction. The goal is to prevent repeated destroy rewriting without
+    // inhibiting optimization.
+    if (!ignoredByDestroyHoisting(inst->getKind())) {
       existingDestroy = nullptr;
     } else if (!existingDestroy) {
       if (auto *destroy = dyn_cast<DestroyValueInst>(inst)) {
