@@ -4,11 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-// rdar://87568630 - segmentation fault on 32-bit WatchOS simulator
-// UNSUPPORTED: OS=watchos && CPU=i386
-// rdar://88340451 - segmentation fault on arm64_32 WatchOS simulator
-// UNSUPPORTED: OS=watchos && CPU=arm64_32
-
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
@@ -19,6 +14,7 @@
 // FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
 // UNSUPPORTED: linux
 
+import Foundation
 import _Distributed
 
 final class Obj: @unchecked Sendable, Codable  {}
@@ -38,9 +34,6 @@ enum E : Sendable, Codable {
 struct S<T: Codable> : Codable {
   var data: T
 }
-
-@_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
 
 distributed actor Greeter {
   distributed func echo(name: String, age: Int) -> String {
@@ -92,6 +85,20 @@ distributed actor Greeter {
     print("---> B = \(b), type(of:) = \(type(of: b))")
     print("---> C = \(c), type(of:) = \(type(of: c))")
     print("---> D = \(d), type(of:) = \(type(of: d))")
+
+    // try encoding generic arguments to make sure that witness tables are passed correctly
+    let json = JSONEncoder()
+
+    let jsonA = try! String(data: json.encode(a), encoding: .utf8)
+    let jsonB = try! String(data: json.encode(b), encoding: .utf8)
+    let jsonC = try! String(data: json.encode(c), encoding: .utf8)
+    let jsonD = try! String(data: json.encode(d), encoding: .utf8)
+
+    print("---> A(JSON) = \(jsonA!)")
+    print("---> B(JSON) = \(jsonB!)")
+    print("---> C(JSON) = \(jsonC!)")
+    print("---> D(JSON) = \(jsonD!)")
+
   }
 
   distributed func genericOptional<T: Codable>(t: T?) {
@@ -450,6 +457,10 @@ func test() async throws {
   // CHECK-NEXT: ---> B = S<Int>(data: 42), type(of:) = S<Int>
   // CHECK-NEXT: ---> C = Hello, World!, type(of:) = String
   // CHECK-NEXT: ---> D = [0.0, 3737844653.0], type(of:) = Array<Double>
+  // CHECK-NEXT: ---> A(JSON) = 42
+  // CHECK-NEXT: ---> B(JSON) = {"data":42}
+  // CHECK-NEXT: ---> C(JSON) = "Hello, World!"
+  // CHECK-NEXT: ---> D(JSON) = [0,3737844653]
   // CHECK-NEXT: RETURN: ()
 
   var genericOptInvocation = system.makeInvocationEncoder()
