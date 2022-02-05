@@ -513,15 +513,17 @@ void DistributedAccessor::emitLoadOfWitnessTables(llvm::Value *witnessTables,
 
   IGF.Builder.emitBlock(contBB);
 
-  witnessTables = IGF.Builder.CreateBitCast(witnessTables, IGM.Int8PtrPtrTy);
+  witnessTables = IGF.Builder.CreateBitCast(witnessTables,
+                                            IGM.Int8PtrPtrTy->getPointerTo());
 
   for (unsigned i = 0, n = expectedWitnessTables; i != n; ++i) {
     auto offset = Size(i * IGM.getPointerSize());
     auto alignment = IGM.getPointerAlignment();
 
     auto witnessTableAddr = IGF.emitAddressAtOffset(
-        witnessTables, Offset(offset), IGM.Int8PtrTy, Alignment(alignment));
-    arguments.add(witnessTableAddr.getAddress());
+        witnessTables, Offset(offset), IGM.Int8PtrPtrTy, Alignment(alignment));
+
+    arguments.add(IGF.Builder.CreateLoad(witnessTableAddr));
   }
 }
 
