@@ -1,0 +1,5 @@
+// SR-15822: Only existence of this module does matter.
+module SR15822ClangModule {
+  header "../SR15822.h"
+  export *
+}
