@@ -7054,6 +7054,20 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
 bool UnableToInferClosureReturnType::diagnoseAsError() {
   auto *closure = castToExpr<ClosureExpr>(getRawAnchor());
 
+  auto *body = closure->getBody();
+  // For empty closures, let's produce a tailored message and suggest
+  // adding an expression to the body.
+  if (body->empty()) {
+    auto diagnostic =
+        emitDiagnostic(diag::cannot_infer_empty_closure_result_type);
+
+    diagnostic.fixItInsertAfter(closure->getInLoc().isValid()
+                                    ? closure->getInLoc()
+                                    : body->getLBraceLoc(),
+                                "<#result#>");
+    return true;
+  }
+
   auto diagnostic = emitDiagnostic(diag::cannot_infer_closure_result_type);
 
   // If there is a location for an 'in' token, then the argument list was
@@ -7068,7 +7082,7 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
     //
     // As such, we insert " () -> ReturnType in " right after the '{' that
     // starts the closure body.
-    diagnostic.fixItInsertAfter(closure->getBody()->getLBraceLoc(),
+    diagnostic.fixItInsertAfter(body->getLBraceLoc(),
                                 diag::insert_closure_return_type_placeholder,
                                 /*argListSpecified=*/true);
   }
