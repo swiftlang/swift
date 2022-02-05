@@ -1148,6 +1148,10 @@ bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const 
     if (isa<EnumElementDecl>(d)) {
       return true;
     }
+    // We should allow using a const variable reference
+    if (d->getAttrs().getAttribute(DeclAttrKind::DAK_CompileTimeConst)) {
+      return true;
+    }
   }
   NotCompileTimeConstFailure failure(solution, locator);
   return failure.diagnose(asNote);

@@ -257,8 +257,10 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   llvm::SmallVector<VarDecl *, 2> vars;
   binding->getPattern(entryNumber)->collectVariables(vars);
   bool isReq = false;
+  bool shouldRequireStatic = false;
   if (auto *d = binding->getDeclContext()->getAsDecl()) {
     isReq = isa<ProtocolDecl>(d);
+    shouldRequireStatic = isa<NominalTypeDecl>(d);
   }
   for (auto *sv: vars) {
     bool hasConst = sv->getAttrs().getAttribute<CompileTimeConstAttr>();
@@ -266,7 +268,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
       continue;
     bool hasStatic = StaticSpelling != StaticSpellingKind::None;
     // only static _const let/var is supported
-    if (!hasStatic) {
+    if (shouldRequireStatic && !hasStatic) {
       binding->diagnose(diag::require_static_for_const);
       continue;
     }

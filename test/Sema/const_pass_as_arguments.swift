@@ -71,3 +71,26 @@ class ConstFanClassWrong4: ConstFan {
 	static func giveMeString() -> String { return "" }
 	static _const let v: String = giveMeString() // expected-error {{_const let should be initialized with a compile-time literal}}
 }
+
+_const let globalConst = 3
+takeIntConst(globalConst)
+
+let globalNonConst = 3
+takeIntConst(globalNonConst) // expected-error {{expect a compile-time constant literal}}
+
+class ConstFanClassWrong5 {
+	static _const let memberConst = 3
+	static let memberNonConst = 3
+	func foo() {
+		_const let localConst = 3
+		let localNonConst = 3
+
+		// Correct
+		takeIntConst(ConstFanClassWrong5.memberConst)
+		takeIntConst(localConst)
+
+		// Incorrect
+		takeIntConst(ConstFanClassWrong5.memberNonConst) // expected-error {{expect a compile-time constant literal}}
+		takeIntConst(localNonConst) // expected-error {{expect a compile-time constant literal}}
+	}
+}
