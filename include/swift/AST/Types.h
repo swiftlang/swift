@@ -689,7 +689,7 @@ public:
   bool canDynamicallyBeOptionalType(bool includeExistential);
 
   /// Determine whether this type contains a type parameter somewhere in it.
-  bool hasTypeParameter() {
+  bool hasTypeParameter() const {
     return getRecursiveProperties().hasTypeParameter();
   }
 

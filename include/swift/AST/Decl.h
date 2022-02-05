@@ -2175,6 +2175,9 @@ class GenericParameterReferenceInfo final {
   using OptionalTypePosition = OptionalEnum<decltype(TypePosition::Covariant)>;
 
 public:
+  /// Whether the uncurried interface type of the declaration, stipped of any
+  /// optionality, is a direct reference to the generic parameter at hand. For
+  /// example, "func foo(x: Int) -> () -> Self?" has a covariant 'Self' result.
   bool hasCovariantSelfResult;
 
   OptionalTypePosition selfRef;
@@ -2183,6 +2186,12 @@ public:
   /// A reference to 'Self'.
   static GenericParameterReferenceInfo forSelfRef(TypePosition position) {
     return GenericParameterReferenceInfo(false, position, llvm::None);
+  }
+
+  /// A reference to the generic parameter in covariant result position.
+  static GenericParameterReferenceInfo forCovariantResult() {
+    return GenericParameterReferenceInfo(true, TypePosition::Covariant,
+                                         llvm::None);
   }
 
   /// A reference to 'Self' through an associated type.
@@ -2685,13 +2694,14 @@ public:
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
 
-  /// Report 'Self' references within the type of this declaration as a
-  /// member of the given existential base type.
+  /// Find references to 'Self' in the type signature of this declaration in the
+  /// context of the given existential base type.
   ///
-  /// \param treatNonResultCovariantSelfAsInvariant If true, 'Self' or 'Self?'
-  /// is considered covariant only when it appears as the immediate type of a
-  /// property, or the uncurried result type of a method/subscript, e.g.
-  /// '() -> () -> Self'.
+  /// \param treatNonResultCovariantSelfAsInvariant When set, covariant 'Self'
+  /// references that are not in covariant result type position are considered
+  /// invariant. This position is the uncurried interface type of a declaration,
+  /// stipped of any optionality. For example, this is true for 'Self' in
+  /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
 };
@@ -7885,8 +7895,11 @@ public:
   }
 };
 
-/// Find references to the given generic paramaeter in the generic signature
-/// and the type of the given value.
+/// Find references to the given generic paramater in the type signature of the
+/// given declaration using the given generic signature.
+///
+/// \param skipParamIndex If the value is a function or subscript declaration,
+/// specifies the index of the parameter that shall be skipped.
 GenericParameterReferenceInfo findGenericParameterReferences(
     const ValueDecl *value,
     CanGenericSignature sig, GenericTypeParamType *genericParam,
