@@ -101,21 +101,24 @@ using namespace swift;
 //                       MARK: LexicalDestroyFolding
 //===----------------------------------------------------------------------===//
 
-class LexicalDestroyFolding {
-  // The instruction that begins the borrow scope.
+namespace LexicalDestroyFolding {
+
+/// The environment within which to fold.
+struct Context final {
+  /// The instruction that begins the borrow scope.
   BeginBorrowInst *const introducer;
 
-  // The function containing the introducer.
-  //
-  // introducer->getFunction()
+  /// The function containing the introducer.
+  ///
+  /// introducer->getFunction()
   SILFunction *const function;
 
-  // BorrowedValue(introducer)
+  /// BorrowedValue(introducer)
   BorrowedValue const borrowedValue;
 
-  // The value whose lifetime is guaranteed by the lexical borrow scope.
-  //
-  // introducer->getOperand()
+  /// The value whose lifetime is guaranteed by the lexical borrow scope.
+  ///
+  /// introducer->getOperand()
   SILValue const borrowee;
 
   DominanceInfo &dominanceTree;
@@ -123,9 +126,8 @@ class LexicalDestroyFolding {
   InstructionDeleter &deleter;
 
 public:
-  LexicalDestroyFolding(BeginBorrowInst *introducer,
-                        DominanceInfo &dominanceTree,
-                        InstructionDeleter &deleter)
+  Context(BeginBorrowInst *introducer, DominanceInfo &dominanceTree,
+          InstructionDeleter &deleter)
       : introducer(introducer), function(introducer->getFunction()),
         borrowedValue(BorrowedValue(introducer)),
         borrowee(introducer->getOperand()), dominanceTree(dominanceTree),
@@ -135,48 +137,79 @@ public:
            OwnershipKind::Owned);
     assert(borrowedValue.isLocalScope());
   }
+};
 
-  bool run();
+/// Fold within the specified context.
+bool run(Context &);
+
+/// The consuming use pattern we are trying to match and transform.
+struct Match final {
+  ApplyInst *ai = nullptr;
+  EndBorrowInst *ebi = nullptr;
+  DestroyValueInst *dvi = nullptr;
+
+  /// Whether the match is a candidate for folding.
+  ///
+  /// A partial match--which has both the end_borrow and the destroy value
+  /// but no apply--cannot itself be folded but is not an obstruction to
+  /// folding other candidates.
+  bool isFullMatch() {
+    assert(ebi != nullptr);
+    assert(dvi != nullptr);
+    return ai != nullptr;
+  }
+};
+
+/// A sequence of instructions under consideration for folding
+struct Candidate final {
+  /// The instruction sequence itself.
+  Match match;
+  /// Whether the candidate could indeed be folded as determined by
+  /// isViableMatch.
+  bool viable;
+  /// The indices of the arguments of the apply to rewrite as determined by
+  /// rewritableArgumentIndicesForApply.
+  SmallVector<int, 2> argumentIndices;
+};
+
+/// The degree to which a match is a candidate for folding.
+enum class MatchViability {
+  /// This match can be folded, supposing any can.
+  Viable,
+  /// This match cannot be folded, even if others can.
+  Nonviable,
+  /// Neither this match nor any other can be folded.
+  Illegal
+};
+
+struct Candidates final {
+  /// The sequences of scope ending instructions that are under consideration
+  /// for folding.
+  llvm::SmallVector<Candidate, 4> vector;
+};
+
+/// Quickly filter scope ends of %lifetime that MIGHT BE foldable.
+class FindCandidates final {
+
+  Context const &context;
+
+public:
+  FindCandidates(Context const &context) : context(context) {}
+
+  /// Find among the scope ending instructions of %lifetime any that match the
+  /// expected instruction sequence pattern.
+  ///
+  /// Uses definesMatchingInstructionSequence to determine whether an
+  /// instruction is a candidate for folding.
+  ///
+  /// Includes both full matches which could potentially be folded and partial
+  /// matches which need to be verified later aren't illegal in isViableMatch.
+  ///
+  /// returns true if any full matches are found
+  ///         false otherwise
+  bool run(Candidates &);
 
 private:
-  /// The consuming use pattern we are trying to match and transform.
-  struct Match {
-    ApplyInst *ai = nullptr;
-    EndBorrowInst *ebi = nullptr;
-    DestroyValueInst *dvi = nullptr;
-
-    /// Whether the match is a candidate for folding.
-    ///
-    /// A partial match--which has both the end_borrow and the destroy value
-    /// but no apply--cannot itself be folded but is not an obstruction to
-    /// folding other candidates.
-    bool isFullMatch() {
-      assert(ebi != nullptr);
-      assert(dvi != nullptr);
-      return ai != nullptr;
-    }
-  };
-  /// A sequence of instructions under consideration for folding
-  struct Candidate {
-    /// The instruction sequence itself.
-    Match match;
-    /// Whether the candidate could indeed be folded as determined by
-    /// isViableMatch.
-    bool viable;
-    /// The indices of the arguments of the apply to rewrite as determined by
-    /// rewritableArgumentIndicesForApply.
-    SmallVector<int, 2> argumentIndices;
-  };
-  /// The degree to which a match is a candidate for folding.
-  enum class MatchViability {
-    /// This match can be folded, supposing any can.
-    Viable,
-    /// This match cannot be folded, even if others can.
-    Nonviable,
-    /// Neither this match nor any other can be folded.
-    Illegal
-  };
-
   /// Fast check for whether the given instruction is a candidate for folding.
   ///
   /// Tries to find patterns like
@@ -202,18 +235,18 @@ private:
   /// CanonicalizeOSSALifetime will put destroy_value instructions after every
   /// final non-consuming use of %borrowee.  So it will put a
   /// destroy_value after an
-  ///     end_borrow %introducer
+  ///     end_borrow %lifetime
   /// if there are no subsequent uses of %borrowee.  However, if there
   /// is already one or more other instructions whose opcodes satisfy
   /// CanonicalizeOSSALifetime::ignoredByDestroyHoisting just after
-  ///     end_borrow %introducer,
+  ///     end_borrow %lifetime,
   /// it won't hoist the
   ///     destroy_value %borrowee
   /// over them.
   ///
   /// Consequently, it's not good enough just to look at the instruction
   /// immediately following
-  ///     end_borrow %introducer
+  ///     end_borrow %lifetime
   /// Instead, we need to look over the sequence of them.
   ///
   /// To be certain that the sequence is valid, we need to check that none of
@@ -224,42 +257,54 @@ private:
   /// returns the destroy_value instruction in the sequence that destroys
   ///         %borrowee or nullptr if there isn't one
   DestroyValueInst *findNextBorroweeDestroy(SILInstruction *) const;
+};
 
-  /// Slow check, dependent on finding users, that a Match found by
-  /// definesMatchingInstructionSequence can be folded.
-  MatchViability isViableMatch(Match &, SmallVectorImpl<int> &) const;
+/// How %lifetime is used.
+struct IntroducerUsage final {
+  /// The operands that are uses of introducer.
+  SmallPtrSet<Operand *, 16> uses;
+  /// The instructions that are users of the simple extended borrow scope.
+  SmallPtrSet<SILInstruction *, 16> users;
+};
 
-  /// Find among the scope ending instructions of %lifetime any that match the
-  /// expected instruction sequence pattern.
-  ///
-  /// Uses definesMatchingInstructionSequence to determine whether an
-  /// instruction is a candidate for folding.
-  ///
-  /// Includes both full matches which could potentially be folded and partial
-  /// matches which need to be verified later aren't illegal in isViableMatch.
-  ///
-  /// returns true if any full matches are found
-  ///         false otherwise
-  bool findCandidates();
+/// Identifies all the simple extended users of %lifetime.
+///
+/// returns true if none of the uses of %lifetime escaped
+///         false otherwise
+bool findIntroducerUsage(Context const &, IntroducerUsage &);
 
-  /// Identifies all the simple extended users of %introducer.
+/// How %borrowee is used.
+struct BorroweeUsage final {
+  /// The operands that are uses of the borrowee.
+  SmallVector<Operand *, 16> uses;
+  /// The instructions that are users of the borrowee.
   ///
-  /// Populates: users.
-  ///
-  /// returns true if none of the uses of %introducer escaped
-  ///         false otherwise
-  bool findUsers();
+  /// A set of the users of uses for fast membership checking.
+  SmallPtrSet<SILInstruction *, 16> users;
+};
 
-  /// Find all uses of %borrowee that are dominated by introducer.
-  ///
-  /// We are only interested in those dominated by introducer because those are
-  /// the uses all of which must be "outside" the liveness boundary of
-  /// %introducer.  In detail, PrunedLiveness::isWithinBoundary relies on
-  /// clients to know that instructions are after the start of liveness.  We
-  /// determine this via the dominance tree.
-  ///
-  /// Populates: borroweeUses.
-  bool findDominatedUsesOfBorrowee();
+/// Find all uses of %borrowee that are dominated by introducer.
+///
+/// We are only interested in those dominated by introducer because those are
+/// the uses all of which must be "outside" the liveness boundary of
+/// %lifetime.  In detail, PrunedLiveness::isWithinBoundary relies on
+/// clients to know that instructions are after the start of liveness.  We
+/// determine this via the dominance tree.
+bool findBorroweeUsage(Context &, BorroweeUsage &);
+
+/// Sift scope ends of %lifetime for those that CAN be folded.
+class FilterCandidates final {
+
+  Context const &context;
+  IntroducerUsage const &introducerUsage;
+  BorroweeUsage const &borroweeUsage;
+
+public:
+  FilterCandidates(Context const &context,
+                   IntroducerUsage const &introducerUsage,
+                   BorroweeUsage const &borroweeUsage)
+      : context(context), introducerUsage(introducerUsage),
+        borroweeUsage(borroweeUsage){};
 
   /// Determines whether each candidate is viable for folding.
   ///
@@ -268,33 +313,58 @@ private:
   ///
   /// returns true if any candidates were viable
   ///         false otherwise
-  bool filterCandidates();
+  bool run(Candidates &candidates);
 
-  /// Whether there are any uses of the borrowee within the borrow scope.
+private:
+  /// Slow check, dependent on finding users, that a Match found by
+  /// definesMatchingInstructionSequence can be folded.
+  MatchViability isViableMatch(Match &, SmallVectorImpl<int> &) const;
+
+  /// Find the arguments in the specified apply that could be rewritten.
+  bool rewritableArgumentIndicesForApply(ApplySite,
+                                         SmallVectorImpl<int> &indices) const;
+
+  /// Whether the specified value is %lifetime or its iterated copy_value.
   ///
-  /// If there are, we can't fold the apply.  Specifically, we can't introduce
-  /// a move_value [lexical] %borrowee because that value still needs to be used
-  /// in those locations.  While updateSSA would happily rewrite those uses to
-  /// be uses of the move, that is not a semantically valid transformation.
-  ///
-  /// For example, given the following SIL
-  ///     %borrowee : @owned
-  ///     %lifetime = begin_borrow [lexical] %borrowee
-  ///     apply %take_guaranteed(%borrowee)
-  ///     %copy = copy_value %lifetime
-  ///     apply %take_owned(%copy)
-  ///     end_borrow %lifetime
-  ///     destroy_value %borrowee
-  /// we can't rewrite like
-  ///     %borrowee : @owned
-  ///     %move = move_value [lexical] %borrowee
-  ///     %lifetime = begin_borrow [lexical] %move
-  ///     apply %take_guaranteed(??????)
-  ///     apply %take_owned(%move)
-  /// because there is no appropriate value to pass to %take_guaranteed.
-  /// Specifically, it's not legal to use %move there because that would make
-  /// the instruction a user of the lexical scope which it was not before.
-  bool borroweeHasUsesWithinBorrowScope();
+  /// In other words, it has to be a simple extended def of %lifetime.
+  bool isSimpleExtendedIntroducerDef(SILValue value) const;
+};
+
+/// Whether there are any uses of the borrowee within the borrow scope.
+///
+/// If there are, we can't fold the apply.  Specifically, we can't introduce
+/// a move_value [lexical] %borrowee because that value still needs to be used
+/// in those locations.  While updateSSA would happily rewrite those uses to
+/// be uses of the move, that is not a semantically valid transformation.
+///
+/// For example, given the following SIL
+///     %borrowee : @owned
+///     %lifetime = begin_borrow [lexical] %borrowee
+///     apply %take_guaranteed(%borrowee)
+///     %copy = copy_value %lifetime
+///     apply %take_owned(%copy)
+///     end_borrow %lifetime
+///     destroy_value %borrowee
+/// we can't rewrite like
+///     %borrowee : @owned
+///     %move = move_value [lexical] %borrowee
+///     %lifetime = begin_borrow [lexical] %move
+///     apply %take_guaranteed(??????)
+///     apply %take_owned(%move)
+/// because there is no appropriate value to pass to %take_guaranteed.
+/// Specifically, it's not legal to use %move there because that would make
+/// the instruction a user of the lexical scope which it was not before.
+bool borroweeHasUsesWithinBorrowScope(Context const &, BorroweeUsage const &);
+
+/// Rewrite the appropriate scope ends of %lifetime.
+class Rewriter final {
+
+  Context &context;
+  Candidates const &candidates;
+
+public:
+  Rewriter(Context &context, Candidates const &candidates)
+      : context(context), candidates(candidates){};
 
   /// Make all changes required to fold the viable candidates.
   ///
@@ -313,8 +383,9 @@ private:
   ///       ...
   /// - update SSA now that a second def has been introduced for
   ///   %borrowee
-  void rewrite();
+  void run();
 
+private:
   /// Add the new move_value [lexical] above the begin_borrow [lexical].
   ///
   /// At most one will be created per run of LexicalDestroyFolding.
@@ -345,39 +416,6 @@ private:
   // defs for the "same value".
   void updateSSA();
 
-  /// Whether the specified value is %introducer or its iterated copy_value.
-  ///
-  /// In other words, it has to be a simple extended def of %introducer.
-  bool isSimpleExtendedIntroducerDef(SILValue value) const;
-
-  /// Find the arguments in the specified apply that could be rewritten.
-  bool rewritableArgumentIndicesForApply(ApplySite,
-                                         SmallVectorImpl<int> &indices) const;
-
-private:
-  // State calculated over the course of the run.
-
-  /// The sequences of scope ending instructions that are under consideration
-  /// for folding.
-  llvm::SmallVector<Candidate, 4> candidates;
-  // The operands that are uses of the borrowee.
-  //
-  // Populated in findDominatedUsesOfBorrowee.
-  SmallVector<Operand *, 16> borroweeUses;
-  // The instructions that are users of the borrowee.
-  //
-  // A set of the users of borroweeUses for fast membership checking.
-  //
-  // Populated in findDominatedUsesOfBorrowee.
-  SmallPtrSet<SILInstruction *, 16> borroweeUsers;
-  // The operands that are uses of introducer.
-  //
-  // Populated in findUsers.
-  SmallPtrSet<Operand *, 16> uses;
-  // The instructions that are users of the simple extended borrow scope.
-  //
-  // Populated during findUsers.
-  SmallPtrSet<SILInstruction *, 16> users;
   // The move_value [lexical] instruction that was added during the run.
   //
   // Defined during createMove.
@@ -391,35 +429,36 @@ private:
 /// Perform any possible folding.
 ///
 /// Returns whether any change was made.
-bool LexicalDestroyFolding::run() {
+bool run(Context &context) {
+  Candidates candidates;
+
   // Do a cheap search for scope ending instructions that could potentially be
   // candidates for folding.
-  if (!findCandidates())
+  if (!FindCandidates(context).run(candidates))
     return false;
 
   // At least one full match was found and more expensive checks on the matches
   // are in order.
 
-  // First, calculate a few values that are required to do the expensive checks:
-  // - borroweeUses
-  // - borroweeUsers
-  // - users
-  if (!findDominatedUsesOfBorrowee())
+  BorroweeUsage borroweeUsage;
+  if (!findBorroweeUsage(context, borroweeUsage))
     return false;
-  if (!findUsers())
+  IntroducerUsage introducerUsage;
+  if (!findIntroducerUsage(context, introducerUsage))
     return false;
 
   // Now, filter the candidates using those values.
-  if (!filterCandidates())
+  if (!FilterCandidates(context, introducerUsage, borroweeUsage)
+           .run(candidates))
     return false;
 
-  // Finally, check that %borrowee has no uses within %introducer's
+  // Finally, check that %borrowee has no uses within %lifetime's
   // borrow scope.
-  if (borroweeHasUsesWithinBorrowScope())
+  if (borroweeHasUsesWithinBorrowScope(context, borroweeUsage))
     return false;
 
   // It is safe to rewrite the viable candidates.  Do so.
-  rewrite();
+  Rewriter(context, candidates).run();
 
   return true;
 }
@@ -428,11 +467,12 @@ bool LexicalDestroyFolding::run() {
 //                             MARK: Rewriting
 //===----------------------------------------------------------------------===//
 
-void LexicalDestroyFolding::rewrite() {
+void Rewriter::run() {
   bool foldedAny = false;
   (void)foldedAny;
-  for (unsigned index = 0, count = candidates.size(); index < count; ++index) {
-    auto candidate = candidates[index];
+  for (unsigned index = 0, count = candidates.vector.size(); index < count;
+       ++index) {
+    auto candidate = candidates.vector[index];
     if (!candidate.viable)
       continue;
     createMove();
@@ -451,21 +491,22 @@ void LexicalDestroyFolding::rewrite() {
   updateSSA();
 }
 
-bool LexicalDestroyFolding::createMove() {
+bool Rewriter::createMove() {
   // We only will create a single MoveValueInst.
   if (mvi)
     return false;
 
-  auto introducerBuilder = SILBuilderWithScope(introducer);
+  auto introducerBuilder = SILBuilderWithScope(context.introducer);
   mvi = introducerBuilder.createMoveValue(
-      RegularLocation::getAutoGeneratedLocation(introducer->getLoc()), borrowee,
+      RegularLocation::getAutoGeneratedLocation(context.introducer->getLoc()),
+      context.borrowee,
       /*isLexical=*/true);
-  introducer->setOperand(mvi);
+  context.introducer->setOperand(mvi);
   return true;
 }
 
-void LexicalDestroyFolding::fold(
-    Match candidate, SmallVectorImpl<int> const &rewritableArgumentIndices) {
+void Rewriter::fold(Match candidate,
+                    SmallVectorImpl<int> const &rewritableArgumentIndices) {
   // First, rewrite the apply in terms of the move_value.
   unsigned argumentNumber = 0;
   for (auto index : rewritableArgumentIndices) {
@@ -473,7 +514,7 @@ void LexicalDestroyFolding::fold(
     auto *cvi = cast<CopyValueInst>(argument);
     if (argumentNumber == 0) {
       candidate.ai->setArgument(index, mvi);
-      if (!deleter.deleteIfDead(cvi)) {
+      if (!context.deleter.deleteIfDead(cvi)) {
         // We can't delete the copy_value because it has other users.  Instead,
         // add a compensating destroy just before the apply.
         auto applyBuilder = SILBuilderWithScope(candidate.ai);
@@ -502,22 +543,24 @@ void LexicalDestroyFolding::fold(
   auto applyBuilder = SILBuilderWithScope(candidate.ai);
   applyBuilder.createEndBorrow(
       RegularLocation::getAutoGeneratedLocation(candidate.ai->getLoc()),
-      introducer);
-  deleter.forceDelete(candidate.ebi);
+      context.introducer);
+  context.deleter.forceDelete(candidate.ebi);
 
   // We have introduced a consuming use of %borrowee--the move_value-- and we
   // just rewrote the apply to consume it.  Delete the old destroy_value.
-  deleter.forceDelete(candidate.dvi);
+  context.deleter.forceDelete(candidate.dvi);
 }
 
-void LexicalDestroyFolding::updateSSA() {
+void Rewriter::updateSSA() {
   SILSSAUpdater updater;
-  updater.initialize(borrowee->getType(), borrowee.getOwnershipKind());
-  updater.addAvailableValue(borrowee->getParentBlock(), borrowee);
+  updater.initialize(context.borrowee->getType(),
+                     context.borrowee.getOwnershipKind());
+  updater.addAvailableValue(context.borrowee->getParentBlock(),
+                            context.borrowee);
   updater.addAvailableValue(mvi->getParentBlock(), mvi);
 
   SmallVector<Operand *> uses;
-  for (auto use : borrowee->getUses()) {
+  for (auto use : context.borrowee->getUses()) {
     if (use->getUser() == mvi)
       continue;
     uses.push_back(use);
@@ -532,17 +575,17 @@ void LexicalDestroyFolding::updateSSA() {
 //                             MARK: Lookups
 //===----------------------------------------------------------------------===//
 
-bool LexicalDestroyFolding::findCandidates() {
+bool FindCandidates::run(Candidates &candidates) {
   llvm::SmallVector<SILInstruction *, 16> scopeEndingInsts;
-  borrowedValue.getLocalScopeEndingInstructions(scopeEndingInsts);
+  context.borrowedValue.getLocalScopeEndingInstructions(scopeEndingInsts);
 
   bool foundAnyFull = false;
 
   for (auto *instruction : scopeEndingInsts) {
     if (auto match = definesMatchingInstructionSequence(instruction)) {
-      assert(match->ebi->getOperand() == introducer);
-      assert(match->dvi->getOperand() == borrowee);
-      candidates.push_back({*match, false, {}});
+      assert(match->ebi->getOperand() == context.introducer);
+      assert(match->dvi->getOperand() == context.borrowee);
+      candidates.vector.push_back({*match, false, {}});
 
       foundAnyFull = foundAnyFull || match->isFullMatch();
     } else {
@@ -555,26 +598,28 @@ bool LexicalDestroyFolding::findCandidates() {
   return foundAnyFull;
 }
 
-bool LexicalDestroyFolding::findUsers() {
+bool findIntroducerUsage(Context const &context, IntroducerUsage &usage) {
   SmallVector<Operand *> useVector;
-  if (!findExtendedUsesOfSimpleBorrowedValue(borrowedValue, &useVector)) {
+  if (!findExtendedUsesOfSimpleBorrowedValue(context.borrowedValue,
+                                             &useVector)) {
     // If the value produced by begin_borrow escapes, don't shrink the borrow
     // scope over the apply.
     return false;
   }
   for (auto *use : useVector) {
-    uses.insert(use);
-    users.insert(use->getUser());
+    usage.uses.insert(use);
+    usage.users.insert(use->getUser());
   }
   return true;
 }
 
-bool LexicalDestroyFolding::filterCandidates() {
+bool FilterCandidates::run(Candidates &candidates) {
   bool anyViable = false;
 
   // We have some end_borrows that might be candidates for folding.
-  for (unsigned index = 0, count = candidates.size(); index < count; ++index) {
-    auto &candidate = candidates[index];
+  for (unsigned index = 0, count = candidates.vector.size(); index < count;
+       ++index) {
+    auto &candidate = candidates.vector[index];
     SmallVector<int, 2> rewritableArgumentIndices;
     auto viability = isViableMatch(candidate.match, candidate.argumentIndices);
     switch (viability) {
@@ -593,16 +638,16 @@ bool LexicalDestroyFolding::filterCandidates() {
   return anyViable;
 }
 
-bool LexicalDestroyFolding::findDominatedUsesOfBorrowee() {
+bool findBorroweeUsage(Context &context, BorroweeUsage &usage) {
   auto recordUse = [&](Operand *use) {
-    if (!dominanceTree.dominates(introducer, use->getUser()))
+    if (!context.dominanceTree.dominates(context.introducer, use->getUser()))
       return;
-    borroweeUses.push_back(use);
-    borroweeUsers.insert(use->getUser());
+    usage.uses.push_back(use);
+    usage.users.insert(use->getUser());
   };
-  for (auto *use : borrowee->getUses()) {
+  for (auto *use : context.borrowee->getUses()) {
     auto *user = use->getUser();
-    if (user == introducer)
+    if (user == context.introducer)
       continue;
     if (use->getOperandOwnership() == OperandOwnership::Borrow) {
       if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
@@ -620,20 +665,20 @@ bool LexicalDestroyFolding::findDominatedUsesOfBorrowee() {
   return true;
 }
 
-bool LexicalDestroyFolding::borroweeHasUsesWithinBorrowScope() {
+bool borroweeHasUsesWithinBorrowScope(Context const &context,
+                                      BorroweeUsage const &usage) {
   PrunedLiveness liveness;
-  borrowedValue.computeLiveness(liveness);
-  DeadEndBlocks deadEndBlocks(function);
-  return !liveness.areUsesOutsideBoundary(borroweeUses, &deadEndBlocks);
+  context.borrowedValue.computeLiveness(liveness);
+  DeadEndBlocks deadEndBlocks(context.function);
+  return !liveness.areUsesOutsideBoundary(usage.uses, &deadEndBlocks);
 }
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Predicates
 //===----------------------------------------------------------------------===//
 
-Optional<LexicalDestroyFolding::Match>
-LexicalDestroyFolding::definesMatchingInstructionSequence(
-    SILInstruction *inst) const {
+Optional<Match>
+FindCandidates::definesMatchingInstructionSequence(SILInstruction *inst) const {
   // Look specifically for
   //
   //   apply
@@ -654,7 +699,7 @@ LexicalDestroyFolding::definesMatchingInstructionSequence(
 }
 
 DestroyValueInst *
-LexicalDestroyFolding::findNextBorroweeDestroy(SILInstruction *from) const {
+FindCandidates::findNextBorroweeDestroy(SILInstruction *from) const {
   for (auto *inst = from; inst; inst = inst->getNextInstruction()) {
     if (!CanonicalizeOSSALifetime::ignoredByDestroyHoisting(inst->getKind())) {
       // This is not an instruction that CanonicalOSSALifetime would not hoist a
@@ -665,7 +710,7 @@ LexicalDestroyFolding::findNextBorroweeDestroy(SILInstruction *from) const {
       return nullptr;
     }
     if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
-      if (dvi->getOperand() == borrowee) {
+      if (dvi->getOperand() == context.borrowee) {
         return dvi;
       }
     }
@@ -673,11 +718,11 @@ LexicalDestroyFolding::findNextBorroweeDestroy(SILInstruction *from) const {
   return nullptr;
 }
 
-LexicalDestroyFolding::MatchViability LexicalDestroyFolding::isViableMatch(
+MatchViability FilterCandidates::isViableMatch(
     Match &candidate, SmallVectorImpl<int> &rewritableArgumentIndices) const {
   for (SILInstruction *inst = candidate.ebi; inst != candidate.dvi;
        inst = inst->getNextInstruction()) {
-    if (borroweeUsers.contains(inst)) {
+    if (borroweeUsage.users.contains(inst)) {
       // In the sequence of instructions
       //     end_borrow %lifetime
       //     ...
@@ -697,10 +742,10 @@ LexicalDestroyFolding::MatchViability LexicalDestroyFolding::isViableMatch(
   // If the apply isn't a user of the extended simple value, then this
   // transformation can't be done: the callee can't end the lexical lifetime
   // of a value it doesn't see.  Presumably, this apply is a deinit barrier.
-  if (!users.contains(candidate.ai))
+  if (!introducerUsage.users.contains(candidate.ai))
     return MatchViability::Nonviable;
 
-  // We aren't able to rewrite every simple extended use of %introducer
+  // We aren't able to rewrite every simple extended use of %lifetime
   // in the apply.
   if (!rewritableArgumentIndicesForApply(candidate.ai,
                                          rewritableArgumentIndices))
@@ -709,13 +754,12 @@ LexicalDestroyFolding::MatchViability LexicalDestroyFolding::isViableMatch(
   return MatchViability::Viable;
 }
 
-bool LexicalDestroyFolding::isSimpleExtendedIntroducerDef(
-    SILValue value) const {
+bool FilterCandidates::isSimpleExtendedIntroducerDef(SILValue value) const {
   while (true) {
     auto *instruction = value.getDefiningInstruction();
     if (!instruction)
       return false;
-    if (instruction == introducer)
+    if (instruction == context.introducer)
       return true;
     if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
       value = cvi->getOperand();
@@ -725,22 +769,22 @@ bool LexicalDestroyFolding::isSimpleExtendedIntroducerDef(
   }
 }
 
-bool LexicalDestroyFolding::rewritableArgumentIndicesForApply(
+bool FilterCandidates::rewritableArgumentIndicesForApply(
     ApplySite apply, SmallVectorImpl<int> &indices) const {
   for (auto &operand : apply->getAllOperands()) {
-    if (uses.contains(&operand)) {
+    if (introducerUsage.uses.contains(&operand)) {
       if (apply.isArgumentOperand(operand)) {
         auto convention = apply.getArgumentConvention(operand);
         if (isSimpleExtendedIntroducerDef(operand.get()) &&
             convention.isOwnedConvention()) {
           indices.push_back(apply.getCalleeArgIndex(operand));
         } else {
-          // This argument is a use of %introducer but not an owned use that we
+          // This argument is a use of %lifetime but not an owned use that we
           // can rewrite.
           return false;
         }
       } else {
-        // If %introducer is used in some non-argument position, e.g. as the
+        // If %lifetime is used in some non-argument position, e.g. as the
         // callee, we can't fold.
         return false;
       }
@@ -748,6 +792,8 @@ bool LexicalDestroyFolding::rewritableArgumentIndicesForApply(
   }
   return true;
 }
+
+} // namespace LexicalDestroyFolding
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Entry Point
@@ -764,6 +810,6 @@ bool swift::foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
   if (!dominanceTree.isReachableFromEntry(bbi->getParentBlock()))
     return false;
 
-  auto folder = LexicalDestroyFolding(bbi, dominanceTree, deleter);
-  return folder.run();
+  auto context = LexicalDestroyFolding::Context(bbi, dominanceTree, deleter);
+  return LexicalDestroyFolding::run(context);
 }
