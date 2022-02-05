@@ -149,65 +149,6 @@ substituteFunctionTypeAndParamList(ASTContext &ctx, AbstractFunctionDecl *fdecl,
   return {newFnType, newParamList};
 }
 
-static ValueDecl *generateSpecializedCXXFunctionTemplate(
-    ASTContext &ctx, AbstractFunctionDecl *oldDecl, SubstitutionMap subst,
-    clang::FunctionDecl *specialized) {
-  auto newFnTypeAndParams = substituteFunctionTypeAndParamList(ctx, oldDecl, subst);
-  auto newFnType = newFnTypeAndParams.first;
-  auto paramList = newFnTypeAndParams.second;
-
-  SmallVector<ParamDecl *, 4> newParamsWithoutMetatypes;
-  for (auto param : *paramList ) {
-    if (isa<FuncDecl>(oldDecl) &&
-        isa<MetatypeType>(param->getType().getPointer())) {
-      // Metatype parameters are added synthetically to account for template
-      // params that don't make it to the function signature. These shouldn't
-      // exist in the resulting specialized FuncDecl. Note that this doesn't
-      // affect constructors because all template params for a constructor
-      // must be in the function signature by design.
-      continue;
-    }
-    newParamsWithoutMetatypes.push_back(param);
-  }
-  auto *newParamList =
-      ParameterList::create(ctx, SourceLoc(), newParamsWithoutMetatypes, SourceLoc());
-
-  if (isa<ConstructorDecl>(oldDecl)) {
-    DeclName ctorName(ctx, DeclBaseName::createConstructor(), newParamList);
-    auto newCtorDecl = ConstructorDecl::createImported(
-        ctx, specialized, ctorName, oldDecl->getLoc(), 
-        /*failable=*/false, /*failabilityLoc=*/SourceLoc(),
-        /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-        /*throws=*/false, /*throwsLoc=*/SourceLoc(), 
-        newParamList, /*genericParams=*/nullptr,
-        oldDecl->getDeclContext());
-    return newCtorDecl;
-  }
-
-  // Generate a name for the specialized function.
-  std::string newNameStr;
-  llvm::raw_string_ostream buffer(newNameStr);
-  std::unique_ptr<clang::MangleContext> mangler(
-      specialized->getASTContext().createMangleContext());
-  mangler->mangleName(specialized, buffer);
-  buffer.flush();
-  // Add all parameters as empty parameters.
-  auto newName = DeclName(
-      ctx, DeclName(ctx.getIdentifier(newNameStr)).getBaseName(), newParamList);
-
-  auto newFnDecl = FuncDecl::createImported(
-      ctx, oldDecl->getLoc(), newName, oldDecl->getNameLoc(),
-      /*Async=*/false, oldDecl->hasThrows(), newParamList,
-      newFnType->getResult(), /*GenericParams=*/nullptr,
-      oldDecl->getDeclContext(), specialized);
-  if (oldDecl->isStatic()) {
-    newFnDecl->setStatic();
-    newFnDecl->setImportAsStaticMember();
-  }
-  newFnDecl->setSelfAccessKind(cast<FuncDecl>(oldDecl)->getSelfAccessKind());
-  return newFnDecl;
-}
-
 // Synthesizes the body of a thunk that takes extra metatype arguments and
 // skips over them to forward them along to the FuncDecl contained by context.
 // This is used when importing a C++ templated function where the template params
@@ -285,8 +226,13 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
                 const_cast<clang::FunctionTemplateDecl *>(
                     cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
                 subst);
-    auto newDecl = generateSpecializedCXXFunctionTemplate(
-        decl->getASTContext(), cast<AbstractFunctionDecl>(decl), subst, newFn);
+    // We failed to specialize this function template. The compiler is going to
+    // exit soon. Return something valid in the meantime.
+    if (!newFn)
+      return ConcreteDeclRef(decl);
+
+    auto newDecl = cast<ValueDecl>(decl->getASTContext().getClangModuleLoader()->importDeclDirectly(newFn));
+
     if (auto fn = dyn_cast<FuncDecl>(decl)) {
       if (newFn->getNumParams() != fn->getParameters()->size()) {
         // We added additional metatype parameters to aid template
