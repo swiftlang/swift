@@ -522,7 +522,7 @@ extension UnsafeMutableBufferPointer {
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
   @discardableResult
   @inlinable
-  public mutating func _mergeRuns(
+  internal mutating func _mergeRuns(
     _ runs: inout [Range<Index>],
     at i: Int,
     buffer: UnsafeMutablePointer<Element>,
@@ -559,7 +559,7 @@ extension UnsafeMutableBufferPointer {
   ///   any i, `runs[i].upperBound == runs[i + 1].lowerBound`.
   @discardableResult
   @inlinable
-  public mutating func _mergeTopRuns(
+  internal mutating func _mergeTopRuns(
     _ runs: inout [Range<Index>],
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -636,7 +636,7 @@ extension UnsafeMutableBufferPointer {
   ///   any i, `runs[i].upperBound == runs[i + 1].lowerBound`.
   @discardableResult
   @inlinable
-  public mutating func _finalizeRuns(
+  internal mutating func _finalizeRuns(
     _ runs: inout [Range<Index>],
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
