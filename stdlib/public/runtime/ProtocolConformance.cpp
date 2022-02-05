@@ -53,7 +53,25 @@ _dyld_find_foreign_type_protocol_conformance(const void *protocol,
 
 LLVM_ATTRIBUTE_WEAK
 uint32_t _dyld_swift_optimizations_version(void);
-#endif
+
+#if DYLD_FIND_PROTOCOL_ON_DISK_CONFORMANCE_DEFINED
+// Redeclare these functions as weak as well.
+LLVM_ATTRIBUTE_WEAK bool _dyld_has_preoptimized_swift_protocol_conformances(
+    const struct mach_header *mh);
+
+LLVM_ATTRIBUTE_WEAK struct _dyld_protocol_conformance_result
+_dyld_find_protocol_conformance_on_disk(const void *protocolDescriptor,
+                                        const void *metadataType,
+                                        const void *typeDescriptor,
+                                        uint32_t flags);
+
+LLVM_ATTRIBUTE_WEAK struct _dyld_protocol_conformance_result
+_dyld_find_foreign_type_protocol_conformance_on_disk(
+    const void *protocol, const char *foreignTypeIdentityStart,
+    size_t foreignTypeIdentityLength, uint32_t flags);
+#endif // DYLD_FIND_PROTOCOL_ON_DISK_CONFORMANCE_DEFINED
+
+#endif // __has_include(<mach-o/dyld_priv.h>)
 
 // Set this to 1 to enable logging of calls to the dyld shared cache conformance
 // table
@@ -411,19 +429,20 @@ struct ConformanceState {
   uintptr_t dyldSharedCacheStart;
   uintptr_t dyldSharedCacheEnd;
   bool hasOverriddenImage;
-  bool validateSharedCacheResults;
+  bool validateDyldResults;
 
-  // Only populated when validateSharedCacheResults is enabled.
-  ConcurrentReadableArray<ConformanceSection> SharedCacheSections;
+  // Only populated when validateDyldResults is enabled.
+  ConcurrentReadableArray<ConformanceSection> DyldOptimizedSections;
 
   bool inSharedCache(const void *ptr) {
     auto uintPtr = reinterpret_cast<uintptr_t>(ptr);
     return dyldSharedCacheStart <= uintPtr && uintPtr < dyldSharedCacheEnd;
   }
 
-  bool sharedCacheOptimizationsActive() { return dyldSharedCacheStart != 0; }
+  bool dyldOptimizationsActive() { return dyldSharedCacheStart != 0; }
 #else
-  bool sharedCacheOptimizationsActive() { return false; }
+  bool dyldOptimizationsActive() { return false; }
+
 #endif
 
   ConformanceState() {
@@ -441,7 +460,7 @@ struct ConformanceState {
                 (uintptr_t)_dyld_get_shared_cache_range(&length);
             dyldSharedCacheEnd =
                 dyldSharedCacheStart ? dyldSharedCacheStart + length : 0;
-            validateSharedCacheResults = runtime::environment::
+            validateDyldResults = runtime::environment::
                 SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES();
             SHARED_CACHE_LOG("Shared cache range is %#lx-%#lx",
                              dyldSharedCacheStart, dyldSharedCacheEnd);
@@ -557,10 +576,21 @@ void swift::addImageProtocolConformanceBlockCallbackUnsafe(
     if (C.inSharedCache(conformances)) {
       SHARED_CACHE_LOG("Skipping conformances section %p in the shared cache",
                        conformances);
-      if (C.validateSharedCacheResults)
-        C.SharedCacheSections.push_back(
+      if (C.validateDyldResults)
+        C.DyldOptimizedSections.push_back(
             ConformanceSection{conformances, conformancesSize});
       return;
+#if DYLD_FIND_PROTOCOL_ON_DISK_CONFORMANCE_DEFINED
+    } else if (_dyld_has_preoptimized_swift_protocol_conformances(
+                   reinterpret_cast<const mach_header *>(baseAddress))) {
+      // dyld may optimize images outside the shared cache. Skip those too.
+      SHARED_CACHE_LOG("Skipping conformances section %p optimized by dyld",
+                       conformances);
+      if (C.validateDyldResults)
+        C.DyldOptimizedSections.push_back(
+            ConformanceSection{conformances, conformancesSize});
+      return;
+#endif
     } else {
       SHARED_CACHE_LOG(
           "Adding conformances section %p outside the shared cache",
@@ -705,18 +735,18 @@ namespace {
   };
 }
 
-static void validateSharedCacheResults(
+static void validateDyldResults(
     ConformanceState &C, const Metadata *type,
     const ProtocolDescriptor *protocol,
     const WitnessTable *dyldCachedWitnessTable,
     const ProtocolConformanceDescriptor *dyldCachedConformanceDescriptor,
     bool instantiateSuperclassMetadata) {
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
-  if (!C.sharedCacheOptimizationsActive() || !C.validateSharedCacheResults)
+  if (!C.dyldOptimizationsActive() || !C.validateDyldResults)
     return;
 
   llvm::SmallVector<const ProtocolConformanceDescriptor *, 8> conformances;
-  for (auto &section : C.SharedCacheSections.snapshot()) {
+  for (auto &section : C.DyldOptimizedSections.snapshot()) {
     for (const auto &record : section) {
       auto &descriptor = *record.get();
       if (descriptor.getProtocol() != protocol)
@@ -765,15 +795,61 @@ static void validateSharedCacheResults(
 #endif
 }
 
-/// Query the shared cache for a protocol conformance, if supported. The return
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
+static _dyld_protocol_conformance_result getDyldSharedCacheConformance(
+    ConformanceState &C, const ProtocolDescriptor *protocol,
+    const ClassMetadata *objcClassMetadata,
+    const ContextDescriptor *description, llvm::StringRef foreignTypeIdentity) {
+  if (!foreignTypeIdentity.empty()) {
+    SHARED_CACHE_LOG(
+        "_dyld_find_foreign_type_protocol_conformance(%p, %.*s, %zu)", protocol,
+        (int)foreignTypeIdentity.size(), foreignTypeIdentity.data(),
+        foreignTypeIdentity.size());
+    return _dyld_find_foreign_type_protocol_conformance(
+        protocol, foreignTypeIdentity.data(), foreignTypeIdentity.size());
+  } else {
+    SHARED_CACHE_LOG("_dyld_find_protocol_conformance(%p, %p, %p)", protocol,
+                     objcClassMetadata, description);
+    return _dyld_find_protocol_conformance(protocol, objcClassMetadata,
+                                           description);
+  }
+}
+
+static _dyld_protocol_conformance_result getDyldOnDiskConformance(
+    ConformanceState &C, const ProtocolDescriptor *protocol,
+    const ClassMetadata *objcClassMetadata,
+    const ContextDescriptor *description, llvm::StringRef foreignTypeIdentity) {
+#if DYLD_FIND_PROTOCOL_ON_DISK_CONFORMANCE_DEFINED
+  if (&_dyld_find_foreign_type_protocol_conformance_on_disk &&
+      &_dyld_find_protocol_conformance_on_disk) {
+    if (!foreignTypeIdentity.empty()) {
+      SHARED_CACHE_LOG("_dyld_find_foreign_type_protocol_conformance_on_disk(%"
+                       "p, %.*s, %zu, 0)",
+                       protocol, (int)foreignTypeIdentity.size(),
+                       foreignTypeIdentity.data(), foreignTypeIdentity.size());
+      return _dyld_find_foreign_type_protocol_conformance_on_disk(
+          protocol, foreignTypeIdentity.data(), foreignTypeIdentity.size(), 0);
+    } else {
+      SHARED_CACHE_LOG("_dyld_find_protocol_conformance_on_disk(%p, %p, %p, 0)",
+                       protocol, objcClassMetadata, description);
+      return _dyld_find_protocol_conformance_on_disk(
+          protocol, objcClassMetadata, description, 0);
+    }
+  }
+#endif
+  return {_dyld_protocol_conformance_result_kind_not_found, nullptr};
+}
+#endif
+
+/// Query dyld for a protocol conformance, if supported. The return
 /// value is a tuple consisting of the found witness table (if any), the found
 /// conformance descriptor (if any), and a bool that's true if a failure is
 /// definitive.
 static std::tuple<const WitnessTable *, const ProtocolConformanceDescriptor *,
                   bool>
-findSharedCacheConformance(ConformanceState &C, const Metadata *type,
-                           const ProtocolDescriptor *protocol,
-                           bool instantiateSuperclassMetadata) {
+findConformanceWithDyld(ConformanceState &C, const Metadata *type,
+                        const ProtocolDescriptor *protocol,
+                        bool instantiateSuperclassMetadata) {
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   const ContextDescriptor *description;
   llvm::StringRef foreignTypeIdentity;
@@ -787,6 +863,21 @@ findSharedCacheConformance(ConformanceState &C, const Metadata *type,
                    typeName.data, protocol->Name.get());
 #endif
   _dyld_protocol_conformance_result dyldResult;
+  if (C.scanSectionsBackwards) {
+    // Search "on disk" first, then shared cache.
+    dyldResult = getDyldOnDiskConformance(C, protocol, objcClassMetadata,
+                                          description, foreignTypeIdentity);
+    if (dyldResult.kind == _dyld_protocol_conformance_result_kind_not_found)
+      dyldResult = getDyldSharedCacheConformance(
+          C, protocol, objcClassMetadata, description, foreignTypeIdentity);
+  } else {
+    // In normal operation, search the shared cache first.
+    dyldResult = getDyldSharedCacheConformance(
+        C, protocol, objcClassMetadata, description, foreignTypeIdentity);
+    if (dyldResult.kind == _dyld_protocol_conformance_result_kind_not_found)
+      dyldResult = getDyldOnDiskConformance(C, protocol, objcClassMetadata,
+                                            description, foreignTypeIdentity);
+  }
   if (!foreignTypeIdentity.empty()) {
     SHARED_CACHE_LOG(
         "_dyld_find_foreign_type_protocol_conformance(%p, %.*s, %zu)", protocol,
@@ -876,14 +967,14 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
 
   // Search the shared cache tables for a conformance for this type, and for
   // superclasses (if it's a class).
-  if (C.sharedCacheOptimizationsActive()) {
+  if (C.dyldOptimizationsActive()) {
     for (auto dyldSearchType : iterateMaybeIncompleteSuperclasses(
              type, instantiateSuperclassMetadata)) {
       bool definitiveFailure;
       std::tie(dyldCachedWitnessTable, dyldCachedConformanceDescriptor,
                definitiveFailure) =
-          findSharedCacheConformance(C, dyldSearchType, protocol,
-                                     instantiateSuperclassMetadata);
+          findConformanceWithDyld(C, dyldSearchType, protocol,
+                                  instantiateSuperclassMetadata);
 
       if (definitiveFailure)
         return {nullptr, false};
@@ -892,9 +983,9 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
         break;
     }
 
-    validateSharedCacheResults(C, type, protocol, dyldCachedWitnessTable,
-                               dyldCachedConformanceDescriptor,
-                               instantiateSuperclassMetadata);
+    validateDyldResults(C, type, protocol, dyldCachedWitnessTable,
+                        dyldCachedConformanceDescriptor,
+                        instantiateSuperclassMetadata);
     // Return a cached result if we got a witness table. We can't do this if
     // scanSectionsBackwards is set, since a scanned conformance can override a
     // cached result in that case.

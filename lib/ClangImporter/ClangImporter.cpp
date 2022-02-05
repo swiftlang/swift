@@ -2441,8 +2441,7 @@ void ClangImporter::Implementation::addImportDiagnostic(
     ImportDiagnosticTarget target, Diagnostic &&diag,
     const clang::SourceLocation &loc) {
   ImportDiagnostic importDiag = ImportDiagnostic(target, diag, loc);
-  if (!(SwiftContext.LangOpts.EnableExperimentalClangImporterDiagnostics ||
-        SwiftContext.LangOpts.EnableExperimentalEagerClangModuleDiagnostics) ||
+  if (SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics ||
       CollectedDiagnostics.count(importDiag))
     return;
 

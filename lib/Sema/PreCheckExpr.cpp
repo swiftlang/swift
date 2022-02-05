@@ -590,7 +590,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           .diagnose(Loc, diag::cannot_find_in_scope, Name,
                     Name.isOperator())
           .highlight(UDRE->getSourceRange());
-      if (Context.LangOpts.EnableExperimentalClangImporterDiagnostics) {
+      if (!Context.LangOpts.DisableExperimentalClangImporterDiagnostics) {
         Context.getClangModuleLoader()->diagnoseTopLevelValue(
             Name.getFullName());
       }

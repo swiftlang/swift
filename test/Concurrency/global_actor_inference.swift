@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/dynamically_replaceable.swiftmodule -module-name dynamically_replaceable -warn-concurrency %S/Inputs/dynamically_replaceable.swift
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -warn-concurrency %S/Inputs/other_global_actor_inference.swift
 // RUN: %target-typecheck-verify-swift -I %t -disable-availability-checking
 // REQUIRES: concurrency
-import dynamically_replaceable
+import other_global_actor_inference
 
 actor SomeActor { }
 
@@ -30,6 +30,14 @@ struct GenericGlobalActor<T> {
 }
 @MainActor class Copper {}
 @MainActor func iron() {}
+
+struct Carbon {
+  @IntWrapper var atomicWeight: Int
+
+  func getWeight() -> Int {
+    return atomicWeight
+  }
+}
 
 // ----------------------------------------------------------------------
 // Check that @MainActor(blah) doesn't work
@@ -263,6 +271,22 @@ func barSync() {
 }
 
 // ----------------------------------------------------------------------
+// Property observers
+// ----------------------------------------------------------------------
+
+@OtherGlobalActor
+struct Observed {
+  var thing: Int = 0 { // expected-note {{property declared here}}
+    didSet {}
+    willSet {}
+  }
+}
+
+func checkObserved(_ o: Observed) { // expected-note {{add '@OtherGlobalActor' to make global function 'checkObserved' part of global actor 'OtherGlobalActor'}}
+  _ = o.thing // expected-error {{property 'thing' isolated to global actor 'OtherGlobalActor' can not be referenced from this synchronous context}}
+}
+
+// ----------------------------------------------------------------------
 // Property wrappers
 // ----------------------------------------------------------------------
 
@@ -290,7 +314,19 @@ struct WrapperOnActor<Wrapped: Sendable> {
 @propertyWrapper
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
+  
   public var wrappedValue: Wrapped
+
+  public var accessCount: Int
+
+  nonisolated public init(wrappedValue: Wrapped) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+@propertyWrapper
+public struct WrapperOnMainActor2<Wrapped> {
+  @MainActor public var wrappedValue: Wrapped
 
   public init(wrappedValue: Wrapped) {
     self.wrappedValue = wrappedValue
@@ -494,7 +530,7 @@ struct HasWrapperOnUnsafeActor {
   nonisolated func testErrors() {
     _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from}}
     _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from}}
-    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from}}
+    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from a non-isolated synchronous context}}
   }
 
   @MainActor mutating func testOnMain() {

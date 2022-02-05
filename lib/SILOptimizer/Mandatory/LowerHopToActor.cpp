@@ -102,9 +102,19 @@ bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
   B.setInsertionPoint(hop);
   B.setCurrentDebugScope(hop->getDebugScope());
 
-  // Get the dominating executor value for this actor, if available,
-  // or else emit code to derive it.
-  SILValue executor = emitGetExecutor(hop->getLoc(), actor, /*optional*/true);
+  SILValue executor;
+  if (actor->getType().is<BuiltinExecutorType>()) {
+    // IRGen expects an optional Builtin.Executor, not a Builtin.Executor
+    // but we can wrap it nicely
+    executor = B.createOptionalSome(
+        hop->getLoc(), actor,
+        SILType::getOptionalType(actor->getType()));
+  } else {
+    // Get the dominating executor value for this actor, if available,
+    // or else emit code to derive it.
+    executor = emitGetExecutor(hop->getLoc(), actor, /*optional*/true);
+  }
+  assert(executor && "executor not set");
 
   B.createHopToExecutor(hop->getLoc(), executor, /*mandatory*/ false);
 

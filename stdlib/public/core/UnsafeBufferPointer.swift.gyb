@@ -205,7 +205,14 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return i + 1
+    // NOTE: Wrapping math because we allow unsafe buffer pointers not to verify
+    // index preconditions in release builds. Our (optimistic) assumption is
+    // that the caller is already ensuring that indices are valid, so we can
+    // elide the usual checks to help the optimizer generate better code.
+    // However, we still check for overflow in debug mode.
+    let result = i.addingReportingOverflow(1)
+    _debugPrecondition(!result.overflow)
+    return result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -215,7 +222,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    i += 1
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let result = i.addingReportingOverflow(1)
+    _debugPrecondition(!result.overflow)
+    i = result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -225,7 +235,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return i - 1
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let result = i.subtractingReportingOverflow(1)
+    _debugPrecondition(!result.overflow)
+    return result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -235,7 +248,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    i -= 1
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let result = i.subtractingReportingOverflow(1)
+    _debugPrecondition(!result.overflow)
+    i = result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -245,7 +261,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return i + n
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let result = i.addingReportingOverflow(n)
+    _debugPrecondition(!result.overflow)
+    return result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -255,11 +274,18 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     // optimizer is not capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    let l = limit - i
+    // See note on wrapping arithmetic in `index(after:)` above.
+    let maxOffset = limit.subtractingReportingOverflow(i)
+    _debugPrecondition(!maxOffset.overflow)
+    let l = maxOffset.partialValue
+
     if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
       return nil
     }
-    return i + n
+
+    let result = i.addingReportingOverflow(n)
+    _debugPrecondition(!result.overflow)
+    return result.partialValue
   }
 
   @inlinable // unsafe-performance
@@ -295,7 +321,8 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 
   @inlinable // unsafe-performance
   public var indices: Indices {
-    return startIndex..<endIndex
+    // Not checked because init forbids negative count.
+    return Indices(uncheckedBounds: (startIndex, endIndex))
   }
 
   /// Accesses the element at the specified position.

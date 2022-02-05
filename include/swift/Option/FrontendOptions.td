@@ -287,9 +287,9 @@ def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
   HelpText<"Enable flow-sensitive concurrent captures">;
 
-def enable_experimental_clang_importer_diagnostics :
-  Flag<["-"], "enable-experimental-clang-importer-diagnostics">,
-  HelpText<"Enable experimental diagnostics when importing C, C++, and Objective-C libraries">;
+def disable_experimental_clang_importer_diagnostics :
+  Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
+  HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
 
 def enable_experimental_eager_clang_module_diagnostics :
   Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,

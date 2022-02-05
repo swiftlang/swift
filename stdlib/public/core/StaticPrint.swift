@@ -849,10 +849,12 @@ internal func constant_vprintf_backend(
 @_semantics("oslog.requires_constant_arguments")
 @inlinable
 @_transparent
+@_alwaysEmitIntoClient
 @_optimize(none)
 public func constant_vprintf(_ message: ConstantVPrintFMessage) {
   let formatString = message.interpolation.formatString
   let argumentClosures = message.interpolation.arguments.argumentClosures
+  if Bool(_builtinBooleanLiteral: Builtin.ifdef_PRINT_DISABLED()) { return }
   let formatStringPointer = _getGlobalStringTablePointer(formatString)
   constant_vprintf_backend(
     fmt: formatStringPointer,

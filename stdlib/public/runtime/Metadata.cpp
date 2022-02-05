@@ -4999,6 +4999,8 @@ WitnessTableCacheEntry::allocate(
 static WitnessTable *
 getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
                             const Metadata *type) {
+  assert(conformance->getGenericWitnessTable()->PrivateData != nullptr);
+
   // Check whether the table has already been instantiated.
   auto tablePtr = reinterpret_cast<std::atomic<WitnessTable*> *>(
                      conformance->getGenericWitnessTable()->PrivateData.get());
@@ -5065,7 +5067,8 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // least, not today). However, a generic type conformance may also be
   // nondependent if it 
   auto typeDescription = conformance->getTypeDescriptor();
-  if (typeDescription && !typeDescription->isGeneric()) {
+  if (typeDescription && !typeDescription->isGeneric() &&
+      genericTable->PrivateData != nullptr) {
     return getNondependentWitnessTable(conformance, type);
   }
 

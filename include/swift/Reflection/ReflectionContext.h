@@ -101,6 +101,12 @@ class ReflectionContext
   std::vector<MemoryReader::ReadBytesResult> savedBuffers;
   std::vector<std::tuple<RemoteAddress, RemoteAddress>> imageRanges;
 
+  bool setupTargetPointers = false;
+  typename super::StoredPointer target_non_future_adapter = 0;
+  typename super::StoredPointer target_future_adapter = 0;
+  typename super::StoredPointer target_task_wait_throwing_resume_adapter = 0;
+  typename super::StoredPointer target_task_future_wait_resume_adapter = 0;
+
 public:
   using super::getBuilder;
   using super::readDemanglingForContextDescriptor;
@@ -135,6 +141,21 @@ public:
     StoredPointer NextSlab;
     StoredSize SlabSize;
     std::vector<AsyncTaskAllocationChunk> Chunks;
+  };
+
+  struct AsyncTaskInfo {
+    uint32_t JobFlags;
+    uint64_t TaskStatusFlags;
+    uint64_t Id;
+    StoredPointer RunJob;
+    StoredPointer AllocatorSlabPtr;
+    std::vector<StoredPointer> ChildTasks;
+    std::vector<StoredPointer> AsyncBacktraceFrames;
+  };
+
+  struct ActorInfo {
+    StoredSize Flags;
+    StoredPointer FirstJob;
   };
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
@@ -1083,6 +1104,31 @@ public:
     return dyn_cast_or_null<const RecordTypeInfo>(TypeInfo);
   }
 
+  bool metadataIsActor(StoredPointer MetadataAddress) {
+    auto Metadata = readMetadata(MetadataAddress);
+    if (!Metadata)
+      return false;
+
+    // Only classes can be actors.
+    if (Metadata->getKind() != MetadataKind::Class)
+      return false;
+
+    auto DescriptorAddress =
+        super::readAddressOfNominalTypeDescriptor(Metadata);
+    if (!DescriptorAddress)
+      return false;
+
+    auto DescriptorBytes =
+        getReader().readBytes(RemoteAddress(DescriptorAddress),
+                              sizeof(TargetTypeContextDescriptor<Runtime>));
+    if (!DescriptorBytes)
+      return false;
+    auto Descriptor =
+        reinterpret_cast<const TargetTypeContextDescriptor<Runtime> *>(
+            DescriptorBytes.get());
+    return Descriptor->getTypeContextDescriptorFlags().class_isActor();
+  }
+
   /// Iterate the protocol conformance cache tree rooted at NodePtr, calling
   /// Call with the type and protocol in each node.
   void iterateConformanceTree(StoredPointer NodePtr,
@@ -1394,22 +1440,179 @@ public:
     return {llvm::None, {Slab->Next, SlabSize, {Chunk}}};
   }
 
-  std::pair<llvm::Optional<std::string>, StoredPointer>
-  asyncTaskSlabPtr(StoredPointer AsyncTaskPtr) {
-    using AsyncTask = AsyncTask<Runtime>;
-
-    auto AsyncTaskBytes =
-        getReader().readBytes(RemoteAddress(AsyncTaskPtr), sizeof(AsyncTask));
-    auto *AsyncTaskObj =
-        reinterpret_cast<const AsyncTask *>(AsyncTaskBytes.get());
+  std::pair<llvm::Optional<std::string>, AsyncTaskInfo>
+  asyncTaskInfo(StoredPointer AsyncTaskPtr) {
+    auto AsyncTaskObj = readObj<AsyncTask<Runtime>>(AsyncTaskPtr);
     if (!AsyncTaskObj)
-      return {std::string("failure reading async task"), 0};
+      return {std::string("failure reading async task"), {}};
 
-    StoredPointer SlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
-    return {llvm::None, SlabPtr};
+    AsyncTaskInfo Info{};
+    Info.JobFlags = AsyncTaskObj->Flags;
+    Info.TaskStatusFlags = AsyncTaskObj->PrivateStorage.Status.Flags;
+    Info.Id =
+        AsyncTaskObj->Id | ((uint64_t)AsyncTaskObj->PrivateStorage.Id << 32);
+    Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
+    Info.RunJob = getRunJob(AsyncTaskObj.get());
+
+    // Find all child tasks.
+    auto RecordPtr = AsyncTaskObj->PrivateStorage.Status.Record;
+    while (RecordPtr) {
+      auto RecordObj = readObj<TaskStatusRecord<Runtime>>(RecordPtr);
+      if (!RecordObj)
+        break;
+
+      // This cuts off high bits if our size_t doesn't match the target's. We
+      // only read the Kind bits which are at the bottom, so that's OK here.
+      // Beware of this when reading anything else.
+      TaskStatusRecordFlags Flags{RecordObj->Flags};
+      auto Kind = Flags.getKind();
+
+      StoredPointer ChildTask = 0;
+      if (Kind == TaskStatusRecordKind::ChildTask) {
+        auto RecordObj = readObj<ChildTaskStatusRecord<Runtime>>(RecordPtr);
+        if (RecordObj)
+          ChildTask = RecordObj->FirstChild;
+      } else if (Kind == TaskStatusRecordKind::TaskGroup) {
+        auto RecordObj = readObj<TaskGroupTaskStatusRecord<Runtime>>(RecordPtr);
+        if (RecordObj)
+          ChildTask = RecordObj->FirstChild;
+      }
+
+      while (ChildTask) {
+        Info.ChildTasks.push_back(ChildTask);
+
+        StoredPointer ChildFragmentAddr =
+            ChildTask + sizeof(AsyncTask<Runtime>);
+        auto ChildFragmentObj =
+            readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
+        if (ChildFragmentObj)
+          ChildTask = ChildFragmentObj->NextChild;
+        else
+          ChildTask = 0;
+      }
+
+      RecordPtr = RecordObj->Parent;
+    }
+
+    // Walk the async backtrace if the task isn't running or cancelled.
+    // TODO: Use isEnqueued from https://github.com/apple/swift/pull/41088/ once
+    // that's available.
+    int IsCancelledFlag = 0x100;
+    int IsRunningFlag = 0x800;
+    if (!(AsyncTaskObj->PrivateStorage.Status.Flags & IsCancelledFlag) &&
+        !(AsyncTaskObj->PrivateStorage.Status.Flags & IsRunningFlag)) {
+      auto ResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
+      while (ResumeContext) {
+        auto ResumeContextObj = readObj<AsyncContext<Runtime>>(ResumeContext);
+        if (!ResumeContextObj)
+          break;
+        Info.AsyncBacktraceFrames.push_back(
+            stripSignedPointer(ResumeContextObj->ResumeParent));
+        ResumeContext = stripSignedPointer(ResumeContextObj->Parent);
+      }
+    }
+
+    return {llvm::None, Info};
+  }
+
+  std::pair<llvm::Optional<std::string>, ActorInfo>
+  actorInfo(StoredPointer ActorPtr) {
+    using DefaultActorImpl = DefaultActorImpl<Runtime>;
+
+    auto ActorObj = readObj<DefaultActorImpl>(ActorPtr);
+    if (!ActorObj)
+      return {std::string("failure reading actor"), {}};
+
+    ActorInfo Info{};
+    Info.Flags = ActorObj->Flags;
+
+    // Status is the low 3 bits of Flags. Status of 0 is Idle. Don't read
+    // FirstJob when idle.
+    auto Status = Info.Flags & 0x7;
+    if (Status != 0) {
+      // This is a JobRef which stores flags in the low bits.
+      Info.FirstJob = ActorObj->FirstJob & ~StoredPointer(0x3);
+    }
+    return {llvm::None, Info};
+  }
+
+  StoredPointer nextJob(StoredPointer JobPtr) {
+    using Job = Job<Runtime>;
+
+    auto JobBytes = getReader().readBytes(RemoteAddress(JobPtr), sizeof(Job));
+    auto *JobObj = reinterpret_cast<const Job *>(JobBytes.get());
+    if (!JobObj)
+      return 0;
+
+    // This is a JobRef which stores flags in the low bits.
+    return JobObj->SchedulerPrivate[0] & ~StoredPointer(0x3);
   }
 
 private:
+  // Get the most human meaningful "run job" function pointer from the task,
+  // like AsyncTask::getResumeFunctionForLogging does.
+  StoredPointer getRunJob(const AsyncTask<Runtime> *AsyncTaskObj) {
+    auto Fptr = stripSignedPointer(AsyncTaskObj->RunJob);
+
+    loadTargetPointers();
+    auto ResumeContextPtr = AsyncTaskObj->ResumeContextAndReserved[0];
+    if (target_non_future_adapter && Fptr == target_non_future_adapter) {
+      using Prefix = AsyncContextPrefix<Runtime>;
+      auto PrefixAddr = ResumeContextPtr - sizeof(Prefix);
+      auto PrefixBytes =
+          getReader().readBytes(RemoteAddress(PrefixAddr), sizeof(Prefix));
+      if (PrefixBytes) {
+        auto PrefixPtr = reinterpret_cast<const Prefix *>(PrefixBytes.get());
+        return stripSignedPointer(PrefixPtr->AsyncEntryPoint);
+      }
+    } else if (target_future_adapter && Fptr == target_future_adapter) {
+      using Prefix = FutureAsyncContextPrefix<Runtime>;
+      auto PrefixAddr = ResumeContextPtr - sizeof(Prefix);
+      auto PrefixBytes =
+          getReader().readBytes(RemoteAddress(PrefixAddr), sizeof(Prefix));
+      if (PrefixBytes) {
+        auto PrefixPtr = reinterpret_cast<const Prefix *>(PrefixBytes.get());
+        return stripSignedPointer(PrefixPtr->AsyncEntryPoint);
+      }
+    } else if ((target_task_wait_throwing_resume_adapter &&
+                Fptr == target_task_wait_throwing_resume_adapter) ||
+               (target_task_future_wait_resume_adapter &&
+                Fptr == target_task_future_wait_resume_adapter)) {
+      auto ContextBytes = getReader().readBytes(RemoteAddress(ResumeContextPtr),
+                                                sizeof(AsyncContext<Runtime>));
+      if (ContextBytes) {
+        auto ContextPtr =
+            reinterpret_cast<const AsyncContext<Runtime> *>(ContextBytes.get());
+        return stripSignedPointer(ContextPtr->ResumeParent);
+      }
+    }
+
+    return Fptr;
+  }
+
+  void loadTargetPointers() {
+    if (setupTargetPointers)
+      return;
+
+    auto getFunc = [&](const std::string &name) -> StoredPointer {
+      auto Symbol = getReader().getSymbolAddress(name);
+      if (!Symbol)
+        return 0;
+      auto Pointer = getReader().readPointer(Symbol, sizeof(StoredPointer));
+      if (!Pointer)
+        return 0;
+      return Pointer->getResolvedAddress().getAddressData();
+    };
+    target_non_future_adapter =
+        getFunc("_swift_concurrency_debug_non_future_adapter");
+    target_future_adapter = getFunc("_swift_concurrency_debug_future_adapter");
+    target_task_wait_throwing_resume_adapter =
+        getFunc("_swift_concurrency_debug_task_wait_throwing_resume_adapter");
+    target_task_future_wait_resume_adapter =
+        getFunc("_swift_concurrency_debug_task_future_wait_resume_adapter");
+    setupTargetPointers = true;
+  }
+
   const TypeInfo *
   getClosureContextInfo(StoredPointer Context, const ClosureContextInfo &Info,
                         remote::TypeInfoProvider *ExternalTypeInfo) {
@@ -1630,6 +1833,11 @@ private:
     }
 
     return llvm::None;
+  }
+
+  template <typename T>
+  MemoryReader::ReadObjResult<T> readObj(StoredPointer Ptr) {
+    return getReader().template readObj<T>(RemoteAddress(Ptr));
   }
 };
 

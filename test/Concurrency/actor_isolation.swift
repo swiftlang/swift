@@ -46,7 +46,7 @@ actor MySuperActor {
   }
 }
 
-class Point { // expected-note{{class 'Point' does not conform to the 'Sendable' protocol}}
+class Point { // expected-note 5{{class 'Point' does not conform to the 'Sendable' protocol}}
   var x : Int = 0
   var y : Int = 0
 }
@@ -108,6 +108,66 @@ func checkAsyncPropertyAccess() async {
 
   _ = act.point  // expected-warning{{non-sendable type 'Point' in asynchronous access to actor-isolated property 'point' cannot cross actor boundary}}
 }
+
+/// ------------------------------------------------------------------
+/// -- Value types do not need isolation on their stored properties --
+protocol MainCounter {
+  @MainActor var counter: Int { get set }
+  @MainActor var ticker: Int { get set }
+}
+
+struct InferredFromConformance: MainCounter {
+  var counter = 0
+  var ticker: Int {
+    get { 1 }
+    set {}
+  }
+}
+
+@MainActor
+struct InferredFromContext {
+  var point = Point()
+  var polygon: [Point] {
+    get { [] }
+  }
+
+  nonisolated var status: Bool = true // expected-error {{'nonisolated' can not be applied to stored properties}}{{3-15=}}
+
+  nonisolated let flag: Bool = false // expected-warning {{'nonisolated' is redundant on struct's stored properties; this is an error in Swift 6}}{{3-15=}}
+
+  subscript(_ i: Int) -> Int { return i }
+
+  static var stuff: [Int] = []
+}
+
+func checkIsolationValueType(_ formance: InferredFromConformance,
+                             _ ext: InferredFromContext,
+                             _ anno: NoGlobalActorValueType) async {
+  // these still do need an await in Swift 5
+  _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
+  _ = await formance.counter
+  _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
+  _ = anno.counter
+
+  // these will always need an await
+  _ = await (formance as MainCounter).counter
+  _ = await ext[1]
+  _ = await formance.ticker
+  _ = await ext.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated property 'polygon' cannot cross actor boundary}}
+  _ = await InferredFromContext.stuff
+  _ = await NoGlobalActorValueType.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated static property 'polygon' cannot cross actor boundary}}
+}
+
+// check for instance members that do not need global-actor protection
+struct NoGlobalActorValueType {
+  @SomeGlobalActor var point: Point // expected-warning {{stored property 'point' within struct cannot have a global actor; this is an error in Swift 6}}
+
+  @MainActor let counter: Int // expected-warning {{stored property 'counter' within struct cannot have a global actor; this is an error in Swift 6}}
+
+  @MainActor static var polygon: [Point] = []
+}
+
+/// -----------------------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)
 extension MyActor {

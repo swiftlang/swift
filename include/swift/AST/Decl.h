@@ -5240,6 +5240,10 @@ public:
   /// Is this an "async let" property?
   bool isAsyncLet() const;
 
+  /// Is this a stored property that will _not_ trigger any user-defined code
+  /// upon any kind of access?
+  bool isOrdinaryStoredProperty() const;
+
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
   }

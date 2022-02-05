@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-clang-importer-diagnostics -typecheck %s 2>&1 | %FileCheck %s --strict-whitespace
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s 2>&1 | %FileCheck %s --strict-whitespace
 
 import macros
 
@@ -12,7 +12,6 @@ _ = INVALID_INTEGER_LITERAL_2
 // CHECK-NEXT: macros.h:{{[0-9]+}}:35: note: invalid numeric literal
 // CHECK-NEXT:      #define INVALID_INTEGER_LITERAL_2 10abc
 // CHECK-NEXT: {{^}}                                  ^
-
 
 _ = FUNC_LIKE_MACRO()
 // CHECK:      experimental_diagnostics_cmacros.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'FUNC_LIKE_MACRO' in scope

@@ -3368,8 +3368,32 @@ bool ValueDecl::shouldHideFromEditor() const {
   if (AvailableAttr::isUnavailable(this))
     return true;
 
+  // Hide 'swift_private' clang decls. They are imported with '__' prefix.
   if (auto *ClangD = getClangDecl()) {
-    if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
+    bool bypassSwiftPrivate = false;
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(this)) {
+      if (AFD->getForeignAsyncConvention().hasValue()) {
+        // For imported 'async' declartions, visibility can be controlled by
+        // 'swift_async(...)' attribute.
+        if (auto *asyncAttr = ClangD->getAttr<clang::SwiftAsyncAttr>()) {
+          bypassSwiftPrivate = true;
+          switch (asyncAttr->getKind()) {
+          case clang::SwiftAsyncAttr::None:
+            // Should be unreachable.
+            return true;
+          case clang::SwiftAsyncAttr::SwiftPrivate:
+            // Hide 'swift_async(swift_private, ...)'.
+            return true;
+          case clang::SwiftAsyncAttr::NotSwiftPrivate:
+            break;
+          }
+        } else if (ClangD->getAttr<clang::SwiftAsyncNameAttr>()) {
+          // Manually specifying the name bypasses 'swift_private' attr.
+          bypassSwiftPrivate = true;
+        }
+      }
+    }
+    if (!bypassSwiftPrivate && ClangD->hasAttr<clang::SwiftPrivateAttr>())
       return true;
   }
 
@@ -6278,6 +6302,16 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
 
 bool VarDecl::isAsyncLet() const {
   return getAttrs().hasAttribute<AsyncAttr>();
+}
+
+bool VarDecl::isOrdinaryStoredProperty() const {
+  // we assume if it hasAttachedPropertyWrapper, it has no storage.
+  //
+  // also, we don't expect someone to call this on a local property, so for
+  // efficiency we don't check if it's not async-let. feel free to promote
+  // the assert into a full-fledged part of the condition if needed.
+  assert(!isAsyncLet());
+  return hasStorage() && !hasObservers();
 }
 
 void ParamDecl::setSpecifier(Specifier specifier) {
