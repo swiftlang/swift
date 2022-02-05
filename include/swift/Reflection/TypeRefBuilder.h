@@ -102,7 +102,7 @@ public:
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
-        fputs("reflection section too small!\n", stderr);
+        std::cerr << "!!! Reflection section too small to contain first record\n" << std::endl;
         std::cerr << "Section Type: " << Name << std::endl;
         std::cerr << "Section size: "
                   << Size
@@ -130,23 +130,22 @@ public:
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
-        fputs("reflection section too small!\n", stderr);
+        int offset = (int)(OriginalSize - Size);
+        std::cerr << "!!! Reflection section too small to contain next record\n" << std::endl;
         std::cerr << "Section Type: " << Name << std::endl;
-        std::cerr << "Remaining section size: "
-                  << Size
-                  << "(of " << OriginalSize << ")"
-                  << ", size of next record: "
-                  << NextSize
+        std::cerr << "Remaining section size: " << Size
+                  << ", total section size: " << OriginalSize
+                  << ", offset in section: " << offset
+                  << ", size of next record: " << NextSize
                   << std::endl;
         const uint8_t *p = reinterpret_cast<const uint8_t *>(Cur.getLocalBuffer());
-        std::cerr << "Previous bytes: ";
-        int position = (int)(OriginalSize - Size);
-        for (int i = std::max(-8, -position); i < 0; i++) {
+        std::cerr << "Last bytes of previous record: ";
+        for (int i = std::max(-8, -offset); i < 0; i++) {
           std::cerr << std::hex << std::setw(2) << (int)p[i] << " ";
         }
         std::cerr << std::endl;
-        std::cerr << "Next bytes: ";
-        for (unsigned i = 0; i < Size && i < 8; i++) {
+        std::cerr << "Next bytes in section: ";
+        for (unsigned i = 0; i < Size && i < 16; i++) {
           std::cerr << std::hex << std::setw(2) << (int)p[i] << " ";
         }
         std::cerr << std::endl;
