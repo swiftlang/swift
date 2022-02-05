@@ -341,14 +341,36 @@ GlobalActorAttributeRequest::evaluate(
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     // Subscripts and properties are fine...
     if (auto var = dyn_cast<VarDecl>(storage)) {
+
+      // ... but not if it's an async-context top-level global
       if (var->isTopLevelGlobal() && var->getDeclContext()->isAsyncContext()) {
         var->diagnose(diag::global_actor_top_level_var)
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
-      } else if (var->getDeclContext()->isLocalContext()) {
+      }
+      
+      // ... and not if it's local property
+      if (var->getDeclContext()->isLocalContext()) {
         var->diagnose(diag::global_actor_on_local_variable, var->getName())
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
+      }
+
+      // ... and not if it's the instance storage of a struct
+      if (!var->isStatic() && var->isOrdinaryStoredProperty()) {
+        if (auto *nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
+          if (isa<StructDecl>(nominal) && !isWrappedValueOfPropWrapper(var)) {
+
+            var->diagnose(diag::global_actor_on_storage_of_value_type,
+                          var->getName(), nominal->getDescriptiveKind())
+              .highlight(globalActorAttr->getRangeWithAt())
+              .warnUntilSwiftVersion(6);
+
+            // In Swift 6, once the diag above is an error, it is disallowed.
+            if (var->getASTContext().isSwiftVersionAtLeast(6))
+              return None;
+          }
+        }
       }
     }
   } else if (isa<ExtensionDecl>(decl)) {
@@ -3604,6 +3626,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
     case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor: {
+      // Stored properties of a struct don't need global-actor isolation.
+      if (ctx.isSwiftVersionAtLeast(6))
+        if (auto *var = dyn_cast<VarDecl>(value))
+          if (!var->isStatic() && var->isOrdinaryStoredProperty())
+            if (auto *varDC = var->getDeclContext())
+              if (auto *nominal = varDC->getSelfNominalTypeDecl())
+                if (isa<StructDecl>(nominal) &&
+                    !isWrappedValueOfPropWrapper(var))
+                  return ActorIsolation::forUnspecified();
+
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
       auto attr = CustomAttr::create(
           ctx, SourceLoc(), typeExpr, /*implicit=*/true);

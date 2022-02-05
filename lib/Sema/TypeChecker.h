@@ -1276,6 +1276,10 @@ Expr *buildPropertyWrapperInitCall(
     PropertyWrapperInitKind initKind,
     llvm::function_ref<void(ApplyExpr *)> callback = [](ApplyExpr *) {});
 
+/// Check if this var is the \c wrappedValue property belonging to
+/// a property wrapper type declaration.
+bool isWrappedValueOfPropWrapper(VarDecl *var);
+
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {
   /// The keyword is never required.
