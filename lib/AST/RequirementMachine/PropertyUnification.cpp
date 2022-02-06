@@ -629,7 +629,7 @@ void PropertyMap::addConcreteTypeProperty(
     Term key, Symbol property, unsigned ruleID) {
   auto *props = getOrCreateProperties(key);
 
-  const auto &rule = System.getRule(ruleID);
+  auto &rule = System.getRule(ruleID);
   assert(rule.getRHS() == key);
 
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
@@ -782,6 +782,8 @@ void PropertyMap::addConcreteTypeProperty(
       buildRewritePathForUnifier(*props->ConcreteTypeRule, ruleID, System,
                                  path);
       System.recordRewriteLoop(MutableTerm(rule.getLHS()), path);
+
+      rule.markSubstitutionSimplified();
     }
   }
 }
