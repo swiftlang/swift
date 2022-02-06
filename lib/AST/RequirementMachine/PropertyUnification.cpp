@@ -400,6 +400,51 @@ void PropertyMap::addSuperclassProperty(
   }
 }
 
+/// Given two rules (V.[LHS] => V) and (V'.[RHS] => V'), build a rewrite
+/// path from T.[RHS] to T.[LHS], where T is the longer of the two terms
+/// V and V'.
+static void buildRewritePathForUnifier(unsigned lhsRuleID,
+                                       unsigned rhsRuleID,
+                                       const RewriteSystem &system,
+                                       RewritePath &path) {
+  unsigned lhsLength = system.getRule(lhsRuleID).getRHS().size();
+  unsigned rhsLength = system.getRule(rhsRuleID).getRHS().size();
+
+  unsigned lhsPrefix = 0, rhsPrefix = 0;
+  if (lhsLength < rhsLength)
+    lhsPrefix = rhsLength - lhsLength;
+  if (rhsLength < lhsLength)
+    rhsPrefix = lhsLength - rhsLength;
+
+  assert(lhsPrefix == 0 || rhsPrefix == 0);
+
+  // If the rule was actually (V.[RHS] => V) with T == U.V for some
+  // |U| > 0, strip U from the prefix of each substitution of [RHS].
+  if (rhsPrefix > 0) {
+    path.add(RewriteStep::forPrefixSubstitutions(/*prefix=*/rhsPrefix,
+                                                 /*endOffset=*/0,
+                                                 /*inverse=*/true));
+  }
+
+  // Apply the rule (V.[RHS] => V).
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/rhsPrefix, /*endOffset=*/0,
+      /*ruleID=*/rhsRuleID, /*inverse=*/false));
+
+  // Apply the inverted rule (V' => V'.[LHS]).
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/lhsPrefix, /*endOffset=*/0,
+      /*ruleID=*/lhsRuleID, /*inverse=*/true));
+
+  // If the rule was actually (V.[LHS] => V) with T == U.V for some
+  // |U| > 0, prefix each substitution of [LHS] with U.
+  if (lhsPrefix > 0) {
+    path.add(RewriteStep::forPrefixSubstitutions(/*prefix=*/lhsPrefix,
+                                                 /*endOffset=*/0,
+                                                 /*inverse=*/false));
+  }
+}
+
 /// Build a rewrite path for a rule induced by concrete type unification.
 ///
 /// Consider two concrete type rules (T.[LHS] => T) and (T.[RHS] => T), a
@@ -457,46 +502,11 @@ static void buildRewritePathForInducedRule(unsigned differenceID,
                                            unsigned substitutionIndex,
                                            const RewriteSystem &system,
                                            RewritePath &path) {
-  unsigned lhsLength = system.getRule(lhsRuleID).getRHS().size();
-  unsigned rhsLength = system.getRule(rhsRuleID).getRHS().size();
-
-  unsigned lhsPrefix = 0, rhsPrefix = 0;
-  if (lhsLength < rhsLength)
-    lhsPrefix = rhsLength - lhsLength;
-  if (rhsLength < lhsLength)
-    rhsPrefix = lhsLength - rhsLength;
-
-  assert(lhsPrefix == 0 || rhsPrefix == 0);
-
   // Replace f(Xn) with Xn and push T.[RHS] on the stack.
   path.add(RewriteStep::forRightConcreteProjection(
       differenceID, substitutionIndex, /*inverse=*/false));
 
-  // If the rule was actually (V.[RHS] => V) with T == U.V for some
-  // |U| > 0, strip U from the prefix of each substitution of [RHS].
-  if (rhsPrefix > 0) {
-    path.add(RewriteStep::forPrefixSubstitutions(/*prefix=*/rhsPrefix,
-                                                 /*endOffset=*/0,
-                                                 /*inverse=*/true));
-  }
-
-  // Apply the rule (V.[RHS] => V).
-  path.add(RewriteStep::forRewriteRule(
-      /*startOffset=*/rhsPrefix, /*endOffset=*/0,
-      /*ruleID=*/rhsRuleID, /*inverse=*/false));
-
-  // Apply the inverted rule (V' => V'.[LHS]).
-  path.add(RewriteStep::forRewriteRule(
-      /*startOffset=*/lhsPrefix, /*endOffset=*/0,
-      /*ruleID=*/lhsRuleID, /*inverse=*/true));
-
-  // If the rule was actually (V.[LHS] => V) with T == U.V for some
-  // |U| > 0, prefix each substitution of [LHS] with U.
-  if (lhsPrefix > 0) {
-    path.add(RewriteStep::forPrefixSubstitutions(/*prefix=*/lhsPrefix,
-                                                 /*endOffset=*/0,
-                                                 /*inverse=*/false));
-  }
+  buildRewritePathForUnifier(lhsRuleID, rhsRuleID, system, path);
 
   // Pop T.[LHS] from the stack, leaving behind Xn.
   path.add(RewriteStep::forLeftConcreteProjection(
@@ -718,33 +728,10 @@ void PropertyMap::addConcreteTypeProperty(
     //
     // Since the new rule appears without context, it becomes redundant.
     if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID)) {
-      const auto &otherRule = System.getRule(*props->ConcreteTypeRule);
-      assert(otherRule.getRHS().size() < key.size());
-
-      unsigned prefixLength = (key.size() - otherRule.getRHS().size());
-
-      // Build a loop that rewrites U.V back into itself via the two rules,
-      // with a prefix substitutions step in the middle.
       RewritePath path;
-
-      // Add a rewrite step U.(V => V.[concrete: G<...> with <X, Y>]).
-      path.add(RewriteStep::forRewriteRule(/*startOffset=*/prefixLength,
-                                           /*endOffset=*/0,
-                                           *props->ConcreteTypeRule,
-                                           /*inverse=*/true));
-
-      // Add a rewrite step to prefix 'U' to the substitutions.
-      path.add(RewriteStep::forPrefixSubstitutions(/*length=*/prefixLength,
-                                                   /*endOffset=*/0,
-                                                   /*inverse=*/false));
-
-      // Add a rewrite step (U.V.[concrete: G<...> with <U.X, U.Y>] => U.V).
-      path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
-                                           /*endOffset=*/0,
-                                           ruleID,
-                                           /*inverse=*/false));
-
-      System.recordRewriteLoop(MutableTerm(key), path);
+      buildRewritePathForUnifier(*props->ConcreteTypeRule, ruleID, System,
+                                 path);
+      System.recordRewriteLoop(MutableTerm(rule.getLHS()), path);
     }
   }
 }
