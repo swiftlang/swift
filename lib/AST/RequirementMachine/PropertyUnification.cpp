@@ -522,10 +522,8 @@ static void buildRewritePathForInducedRule(unsigned differenceID,
 /// concrete type rules, since the concrete type rules imply the induced
 /// rules and make them redundant.
 ///
-/// The implication going in the other direction -- where one of the
-/// two concrete type rules together with the induced rules implies the
-/// other concrete type rule -- is recorded in
-/// concretelySimplifyLeftHandSideSubstitutions().
+/// Finally, builds a rewrite loop relating the two concrete type rules
+/// via the induced rules.
 void PropertyMap::processTypeDifference(const TypeDifference &difference,
                                         unsigned differenceID,
                                         unsigned lhsRuleID,
@@ -536,23 +534,75 @@ void PropertyMap::processTypeDifference(const TypeDifference &difference,
     difference.dump(llvm::dbgs());
   }
 
-  for (unsigned index : indices(difference.LHS.getSubstitutions())) {
+  RewritePath unificationPath;
+
+  auto substitutions = difference.LHS.getSubstitutions();
+
+  // The term is at the top of the primary stack. Push all substitutions onto
+  // the primary stack.
+  unificationPath.add(RewriteStep::forDecompose(substitutions.size(),
+                                                /*inverse=*/false));
+
+  // Move all substitutions but the first one to the secondary stack.
+  for (unsigned i = 1; i < substitutions.size(); ++i)
+    unificationPath.add(RewriteStep::forShift(/*inverse=*/false));
+
+  for (unsigned index : indices(substitutions)) {
+    // Move the next substitution from the secondary stack to the primary stack.
+    if (index != 0)
+      unificationPath.add(RewriteStep::forShift(/*inverse=*/true));
+
     auto lhsTerm = difference.getReplacementSubstitution(index);
     auto rhsTerm = difference.getOriginalSubstitution(index);
 
-    RewritePath path;
+    RewritePath inducedRulePath;
     buildRewritePathForInducedRule(differenceID, lhsRuleID, rhsRuleID,
-                                   index, System, path);
+                                   index, System, inducedRulePath);
 
     if (debug) {
       llvm::dbgs() << "%% Induced rule " << lhsTerm
                    << " => " << rhsTerm << " with path ";
-      path.dump(llvm::dbgs(), lhsTerm, System);
+      inducedRulePath.dump(llvm::dbgs(), lhsTerm, System);
       llvm::dbgs() << "\n";
     }
 
-    System.addRule(lhsTerm, rhsTerm, &path);
+    System.addRule(lhsTerm, rhsTerm, &inducedRulePath);
+
+    // Build a path from rhsTerm (the original substitution) to
+    // lhsTerm (the replacement substitution).
+    MutableTerm mutRhsTerm(rhsTerm);
+    (void) System.simplify(mutRhsTerm, &unificationPath);
+
+    RewritePath lhsPath;
+    MutableTerm mutLhsTerm(lhsTerm);
+    (void) System.simplify(mutLhsTerm, &lhsPath);
+
+    assert(mutLhsTerm == mutRhsTerm && "Terms should be joinable");
+    lhsPath.invert();
+    unificationPath.append(lhsPath);
   }
+
+  // All simplified substitutions are now on the primary stack. Collect them to
+  // produce the new term.
+  unificationPath.add(RewriteStep::forDecomposeConcrete(differenceID,
+                                                        /*inverse=*/true));
+
+  // We now have a unification path from T.[RHS] to T.[LHS] using the
+  // newly-recorded induced rules. Close the loop with a path from
+  // T.[RHS] to R.[LHS] via the concrete type rules being unified.
+  buildRewritePathForUnifier(lhsRuleID, rhsRuleID, System, unificationPath);
+
+  // Record a rewrite loop at T.[LHS].
+  MutableTerm basepoint(difference.BaseTerm);
+  basepoint.add(difference.LHS);
+  System.recordRewriteLoop(basepoint, unificationPath);
+
+  // Optimization: If the LHS rule applies to the entire base term and not
+  // a suffix, mark it substitution-simplified so that we can skip recording
+  // the same rewrite loop in concretelySimplifyLeftHandSideSubstitutions().
+  auto &lhsRule = System.getRule(lhsRuleID);
+  if (lhsRule.getRHS() == difference.BaseTerm)
+    lhsRule.markSubstitutionSimplified();
 }
 
 /// When a type parameter has two concrete types, we have to unify the
