@@ -12,9 +12,11 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import contextlib
 import json
 import os
 import sys
+import time
 
 
 from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
@@ -57,6 +59,16 @@ def log_time(event, command, duration=0):
 
     f.write("{}\n".format(json.dumps(log_event)))
     f.close()
+
+
+@contextlib.contextmanager
+def log_time_in_scope(action_name):
+    log_time('start', action_name)
+    t_start = time.time()
+    try:
+        yield
+    finally:
+        log_time('end', action_name, time.time() - t_start)
 
 
 def log_analyzer():
