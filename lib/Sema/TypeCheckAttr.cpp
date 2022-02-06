@@ -5539,9 +5539,14 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 
   // distributed can be applied to actor definitions and their methods
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
-    // distributed can not be applied to stored properties
-    diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
-    return;
+    if (varDecl->isDistributed()) {
+      if (checkDistributedActorProperty(varDecl, /*diagnose=*/true))
+        return;
+    } else {
+      // distributed can not be applied to stored properties
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
+      return;
+    }
   }
 
   // distributed can only be declared on an `actor`
