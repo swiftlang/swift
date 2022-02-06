@@ -393,7 +393,7 @@ Type PropertyMap::getRelativeTypeForTerm(
 /// have a depth of 0, and an index into an array of substitution terms.
 ///
 /// See RewriteSystemBuilder::getConcreteSubstitutionSchema().
-static unsigned getGenericParamIndex(Type type) {
+unsigned RewriteContext::getGenericParamIndex(Type type) {
   auto *paramTy = type->castTo<GenericTypeParamType>();
   assert(paramTy->getDepth() == 0);
   return paramTy->getIndex();
@@ -472,7 +472,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
 
   return schema.transformRec([&](Type t) -> Optional<Type> {
     if (t->is<GenericTypeParamType>()) {
-      auto index = getGenericParamIndex(t);
+      auto index = RewriteContext::getGenericParamIndex(t);
       auto substitution = substitutions[index];
 
       // Prepend the prefix of the lookup key to the substitution.

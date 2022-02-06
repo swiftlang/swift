@@ -23,6 +23,10 @@
 // pair to the other. This can introduce more overlaps with existing rules, and
 // the process iterates until fixed point.
 //
+// When completion records a new rewrite rule, it also constructs a rewrite loop
+// describing how this rule is derived from existing rules. See RewriteLoop.cpp
+// for a discussion of rewrite loops.
+//
 // This implementation also extends Knuth-Bendix to introduce new _generators_,
 // in addition to new relations as in the standard algorithm. See the comment at
 // the top of RewriteSystem::processMergedAssociatedTypes() for a description.

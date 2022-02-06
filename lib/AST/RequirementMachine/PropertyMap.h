@@ -106,7 +106,7 @@ public:
   }
 
   CanType getSuperclassBound() const {
-    return Superclass->getSuperclass();
+    return Superclass->getConcreteType();
   }
 
   Type getSuperclassBound(

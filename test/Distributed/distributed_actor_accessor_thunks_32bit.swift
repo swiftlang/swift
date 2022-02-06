@@ -386,11 +386,16 @@ public distributed actor MyOtherActor {
 // CHECK: incorrect-witness-tables:
 // CHECK-NEXT: unreachable
 
-// CHECK: [[WITNESS_BUF:%.*]] = bitcast i8* [[WITNESS_TABLES]] to i8**
-// CHECK-NEXT: [[T_ENCODABLE:%.*]] = getelementptr inbounds i8*, i8** [[WITNESS_BUF]], i32 0
-// CHECK-NEXT: [[T_DECODABLE:%.*]] = getelementptr inbounds i8*, i8** [[WITNESS_BUF]], i32 1
-// CHECK-NEXT: [[U_ENCODABLE:%.*]] = getelementptr inbounds i8*, i8** [[WITNESS_BUF]], i32 2
-// CHECK-NEXT: [[U_DECODABLE:%.*]] = getelementptr inbounds i8*, i8** [[WITNESS_BUF]], i32 3
+// CHECK: [[WITNESS_BUF:%.*]] = bitcast i8* [[WITNESS_TABLES]] to i8***
+// CHECK-NEXT: [[T_ENCODABLE_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[WITNESS_BUF]], i32 0
+// CHECK-NEXT: [[T_ENCODABLE:%.*]] = load i8**, i8*** [[T_ENCODABLE_ADDR]]
+// CHECK-NEXT: [[T_DECODABLE_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[WITNESS_BUF]], i32 1
+// CHECK-NEXT: [[T_DECODABLE:%.*]] = load i8**, i8*** [[T_DECODABLE_ADDR]]
+// CHECK-NEXT: [[U_ENCODABLE_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[WITNESS_BUF]], i32 2
+// CHECK-NEXT: [[U_ENCODABLE:%.*]] = load i8**, i8*** [[U_ENCODABLE_ADDR]]
+// CHECK-NEXT: [[U_DECODABLE_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[WITNESS_BUF]], i32 3
+// CHECK-NEXT: [[U_DECODABLE:%.*]] = load i8**, i8*** [[U_DECODABLE_ADDR]]
+
 
 /// ---> Check that distributed thunk code is formed correctly
 

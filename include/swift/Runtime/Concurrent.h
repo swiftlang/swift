@@ -812,7 +812,7 @@ private:
   /// the first element of a variable-length array, whose size is determined by
   /// the allocation.
   struct ElementStorage {
-    uint32_t Capacity;
+    uintptr_t Capacity : 32;
     ElemTy Elem;
 
     static ElementStorage *allocate(size_t capacity) {

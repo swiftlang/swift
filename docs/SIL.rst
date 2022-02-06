@@ -2065,7 +2065,7 @@ called a "forwarding instruction" and any use with such a user instruction a
 "forwarding use". This inference generally occurs upon instruction construction
 and as a result:
 
-* When manipulating forwarding instructions programatically, one must manually
+* When manipulating forwarding instructions programmatically, one must manually
   update their forwarded ownership since most of the time the ownership is
   stored in the instruction itself. Don't worry though because the SIL verifier
   will catch this error for you if you forget to do so!
@@ -2075,7 +2075,7 @@ and as a result:
   parsed operand.
   In some cases the forwarding ownership kind is different from the ownership kind
   of its operand. In such cases, textual SIL represents the forwarding ownership kind
-  explicity.
+  explicitly.
   Eg: ::
 
     %cast = unchecked_ref_cast %val : $Klass to $Optional<Klass>, forwarding: @unowned

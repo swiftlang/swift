@@ -274,6 +274,8 @@ ERROR(cannot_infer_closure_parameter_type,none,
        (StringRef))
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
+ERROR(cannot_infer_empty_closure_result_type,none,
+      "cannot infer return type of empty closure", ())
 ERROR(cannot_infer_closure_result_type,none,
       "cannot infer return type for closure with multiple statements; "
       "add explicit type to disambiguate", ())
