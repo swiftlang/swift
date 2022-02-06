@@ -411,6 +411,13 @@ module WinSDK [system] {
     link "sensorsapi.lib"
   }
 
+  module ToolHelp {
+    header "TlHelp32.h"
+    export *
+
+    link "kernel32.Lib"
+  }
+
   module UI {
     module XAML {
       module Hosting {
