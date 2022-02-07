@@ -335,7 +335,7 @@ SILInstruction *AnalysisInfo::findNonisolatedBlame(SILInstruction* startInst) {
   llvm_unreachable("failed to find nonisolated blame.");
 }
 
-ValueDecl *findCallee(ApplySite &apply) {
+static ValueDecl *findCallee(ApplySite &apply) {
   SILValue callee = apply.getCalleeOrigin();
 
   auto check = [](ValueDecl *decl) -> ValueDecl* {
@@ -359,7 +359,7 @@ ValueDecl *findCallee(ApplySite &apply) {
   return nullptr;
 }
 
-StringRef verbForInvoking(ValueDecl *value) {
+static StringRef verbForInvoking(ValueDecl *value) {
   // Only computed properties need a different verb.
   if (isa<AbstractStorageDecl>(value))
     return "accessing ";
@@ -371,7 +371,7 @@ StringRef verbForInvoking(ValueDecl *value) {
 /// introducing non-isolation, this function produces the values needed
 /// to describe it to the user. Thus, the implementation of this function is
 /// closely tied to that diagnostic.
-std::tuple<StringRef, StringRef, DeclName>
+static std::tuple<StringRef, StringRef, DeclName>
 describe(SILInstruction *blame) {
   auto &ctx = blame->getModule().getASTContext();
 
