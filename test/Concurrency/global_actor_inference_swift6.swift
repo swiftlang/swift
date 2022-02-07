@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -swift-version 6 -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -warn-concurrency %S/Inputs/other_global_actor_inference.swift
 // RUN: %target-typecheck-verify-swift -swift-version 6 -I %t -disable-availability-checking
 // REQUIRES: concurrency
+// REQUIRES: asserts
 import other_global_actor_inference
 
 actor SomeActor { }
