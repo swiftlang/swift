@@ -478,9 +478,11 @@ PropertyMap::concretelySimplifySubstitutions(Term baseTerm, Symbol symbol,
                                                 /*ruleID=*/*props->ConcreteTypeRule,
                                                 /*inverse=*/true));
 
-          path->add(RewriteStep::forPrefixSubstitutions(/*length=*/prefix.size(),
-                                                        /*endOffset=*/0,
-                                                        /*inverse=*/false));
+          if (!prefix.empty()) {
+            path->add(RewriteStep::forPrefixSubstitutions(/*length=*/prefix.size(),
+                                                          /*endOffset=*/0,
+                                                          /*inverse=*/false));
+          }
         }
       }
     }
