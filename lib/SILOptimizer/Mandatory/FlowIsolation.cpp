@@ -335,7 +335,7 @@ SILInstruction *AnalysisInfo::findNonisolatedBlame(SILInstruction* startInst) {
   llvm_unreachable("failed to find nonisolated blame.");
 }
 
-ValueDecl *findCallee(ApplySite &apply) {
+static ValueDecl *findCallee(ApplySite &apply) {
   SILValue callee = apply.getCalleeOrigin();
 
   auto check = [](ValueDecl *decl) -> ValueDecl* {
@@ -359,7 +359,7 @@ ValueDecl *findCallee(ApplySite &apply) {
   return nullptr;
 }
 
-StringRef verbForInvoking(ValueDecl *value) {
+static StringRef verbForInvoking(ValueDecl *value) {
   // Only computed properties need a different verb.
   if (isa<AbstractStorageDecl>(value))
     return "accessing ";
@@ -371,7 +371,7 @@ StringRef verbForInvoking(ValueDecl *value) {
 /// introducing non-isolation, this function produces the values needed
 /// to describe it to the user. Thus, the implementation of this function is
 /// closely tied to that diagnostic.
-std::tuple<StringRef, StringRef, DeclName>
+static std::tuple<StringRef, StringRef, DeclName>
 describe(SILInstruction *blame) {
   auto &ctx = blame->getModule().getASTContext();
 
@@ -385,21 +385,21 @@ describe(SILInstruction *blame) {
 
     // if we have no callee info, all we know is it's a call involving self.
     if (!callee)
-      return {"a call involving", "", ctx.Id_self};
+      return std::make_tuple("a call involving", "", ctx.Id_self);
 
-    return {
+    return std::make_tuple(
       verbForInvoking(callee),
       callee->getDescriptiveKindName(callee->getDescriptiveKind()),
       callee->getName()
-    };
+    );
   }
 
   // handle non-call blames
   switch (blame->getKind()) {
     case SILInstructionKind::CopyValueInst:
-      return {"making a copy of", "", ctx.Id_self};
+      return std::make_tuple("making a copy of", "", ctx.Id_self);
     default:
-      return {"this use of", "", ctx.Id_self};
+      return std::make_tuple("this use of", "", ctx.Id_self);
   }
 }
 
