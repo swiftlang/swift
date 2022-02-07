@@ -47,7 +47,7 @@ extension AsyncSequence {
   ///   the error.
   @inlinable
   public __consuming func filter(
-    _ isIncluded: @escaping (Element) async throws -> Bool
+    _ isIncluded: @Sendable @escaping (Element) async throws -> Bool
   ) -> AsyncThrowingFilterSequence<Self> {
     return AsyncThrowingFilterSequence(self, isIncluded: isIncluded)
   }
@@ -61,12 +61,12 @@ public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
   let base: Base
   
   @usableFromInline
-  let isIncluded: (Element) async throws -> Bool
+  let isIncluded: @Sendable (Element) async throws -> Bool
 
   @usableFromInline
   init(
     _ base: Base, 
-    isIncluded: @escaping (Base.Element) async throws -> Bool
+    isIncluded: @Sendable @escaping (Base.Element) async throws -> Bool
   ) {
     self.base = base
     self.isIncluded = isIncluded
@@ -89,7 +89,7 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let isIncluded: (Base.Element) async throws -> Bool
+    let isIncluded: @Sendable (Base.Element) async throws -> Bool
 
     @usableFromInline
     var finished = false
@@ -97,7 +97,7 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      isIncluded: @escaping (Base.Element) async throws -> Bool
+      isIncluded: @Sendable @escaping (Base.Element) async throws -> Bool
     ) {
       self.baseIterator = baseIterator
       self.isIncluded = isIncluded
@@ -136,3 +136,11 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), isIncluded: isIncluded)
   }
 }
+
+extension AsyncThrowingFilterSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+extension AsyncThrowingFilterSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

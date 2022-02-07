@@ -45,7 +45,7 @@ extension AsyncSequence {
   ///   produced by the `transform` closure.
   @inlinable
   public __consuming func map<Transformed>(
-    _ transform: @escaping (Element) async -> Transformed
+    _ transform: @Sendable @escaping (Element) async -> Transformed
   ) -> AsyncMapSequence<Self, Transformed> {
     return AsyncMapSequence(self, transform: transform)
   }
@@ -59,12 +59,12 @@ public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   let base: Base
 
   @usableFromInline
-  let transform: (Base.Element) async -> Transformed
+  let transform: @Sendable (Base.Element) async -> Transformed
 
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @escaping (Base.Element) async -> Transformed
+    transform: @Sendable @escaping (Base.Element) async -> Transformed
   ) {
     self.base = base
     self.transform = transform
@@ -87,12 +87,12 @@ extension AsyncMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: (Base.Element) async -> Transformed
+    let transform: @Sendable (Base.Element) async -> Transformed
 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @escaping (Base.Element) async -> Transformed
+      transform: @Sendable @escaping (Base.Element) async -> Transformed
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -117,3 +117,13 @@ extension AsyncMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+extension AsyncMapSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable, 
+        Transformed: Sendable { }
+
+extension AsyncMapSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable, 
+        Transformed: Sendable { }

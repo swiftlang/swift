@@ -135,3 +135,11 @@ extension AsyncDropFirstSequence {
     return AsyncDropFirstSequence(base, dropping: self.count + count)
   }
 }
+
+extension AsyncDropFirstSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+extension AsyncDropFirstSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

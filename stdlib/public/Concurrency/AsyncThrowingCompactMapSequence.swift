@@ -59,7 +59,7 @@ extension AsyncSequence {
   ///   error.
   @inlinable
   public __consuming func compactMap<ElementOfResult>(
-    _ transform: @escaping (Element) async throws -> ElementOfResult?
+    _ transform: @Sendable @escaping (Element) async throws -> ElementOfResult?
   ) -> AsyncThrowingCompactMapSequence<Self, ElementOfResult> {
     return AsyncThrowingCompactMapSequence(self, transform: transform)
   }
@@ -73,12 +73,12 @@ public struct AsyncThrowingCompactMapSequence<Base: AsyncSequence, ElementOfResu
   let base: Base
 
   @usableFromInline
-  let transform: (Base.Element) async throws -> ElementOfResult?
+  let transform: @Sendable (Base.Element) async throws -> ElementOfResult?
 
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @escaping (Base.Element) async throws -> ElementOfResult?
+    transform: @Sendable @escaping (Base.Element) async throws -> ElementOfResult?
   ) {
     self.base = base
     self.transform = transform
@@ -103,7 +103,7 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: (Base.Element) async throws -> ElementOfResult?
+    let transform: @Sendable (Base.Element) async throws -> ElementOfResult?
 
     @usableFromInline
     var finished = false
@@ -111,7 +111,7 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @escaping (Base.Element) async throws -> ElementOfResult?
+      transform: @Sendable @escaping (Base.Element) async throws -> ElementOfResult?
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -151,3 +151,12 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+extension AsyncThrowingCompactMapSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+extension AsyncThrowingCompactMapSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }
+

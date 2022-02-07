@@ -109,3 +109,11 @@ extension AsyncPrefixSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), count: count)
   }
 }
+
+extension AsyncPrefixSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+extension AsyncPrefixSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

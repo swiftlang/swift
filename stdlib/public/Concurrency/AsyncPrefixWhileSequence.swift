@@ -40,7 +40,7 @@ extension AsyncSequence {
   ///   elements that satisfy `predicate`.
   @inlinable
   public __consuming func prefix(
-    while predicate: @escaping (Element) async -> Bool
+    while predicate: @Sendable @escaping (Element) async -> Bool
   ) rethrows -> AsyncPrefixWhileSequence<Self> {
     return AsyncPrefixWhileSequence(self, predicate: predicate)
   }
@@ -54,12 +54,12 @@ public struct AsyncPrefixWhileSequence<Base: AsyncSequence> {
   let base: Base
 
   @usableFromInline
-  let predicate: (Base.Element) async -> Bool
+  let predicate: @Sendable (Base.Element) async -> Bool
 
   @usableFromInline
   init(
     _ base: Base, 
-    predicate: @escaping (Base.Element) async -> Bool
+    predicate: @Sendable @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
     self.predicate = predicate
@@ -85,12 +85,12 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let predicate: (Base.Element) async -> Bool
+    let predicate: @Sendable (Base.Element) async -> Bool
 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      predicate: @escaping (Base.Element) async -> Bool
+      predicate: @Sendable @escaping (Base.Element) async -> Bool
     ) {
       self.baseIterator = baseIterator
       self.predicate = predicate
@@ -120,3 +120,11 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), predicate: predicate)
   }
 }
+
+extension AsyncPrefixWhileSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+extension AsyncPrefixWhileSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

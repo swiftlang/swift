@@ -41,7 +41,7 @@ extension AsyncSequence {
   ///   elements in all the asychronous sequences produced by `transform`.
  @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
-    _ transform: @escaping (Element) async -> SegmentOfResult
+    _ transform: @Sendable @escaping (Element) async -> SegmentOfResult
   ) -> AsyncFlatMapSequence<Self, SegmentOfResult> {
     return AsyncFlatMapSequence(self, transform: transform)
   }
@@ -55,12 +55,12 @@ public struct AsyncFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSe
   let base: Base
 
   @usableFromInline
-  let transform: (Base.Element) async -> SegmentOfResult
+  let transform: @Sendable (Base.Element) async -> SegmentOfResult
 
   @usableFromInline
   init(
     _ base: Base,
-    transform: @escaping (Base.Element) async -> SegmentOfResult
+    transform: @Sendable @escaping (Base.Element) async -> SegmentOfResult
   ) {
     self.base = base
     self.transform = transform
@@ -83,7 +83,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: (Base.Element) async -> SegmentOfResult
+    let transform: @Sendable (Base.Element) async -> SegmentOfResult
 
     @usableFromInline
     var currentIterator: SegmentOfResult.AsyncIterator?
@@ -94,7 +94,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      transform: @escaping (Base.Element) async -> SegmentOfResult
+      transform: @Sendable @escaping (Base.Element) async -> SegmentOfResult
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -154,3 +154,16 @@ extension AsyncFlatMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+extension AsyncFlatMapSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable, 
+        SegmentOfResult: Sendable, 
+        SegmentOfResult.Element: Sendable { }
+
+extension AsyncFlatMapSequence: Sendable.Iterator 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable, 
+        SegmentOfResult: Sendable, 
+        SegmentOfResult.Element: Sendable, 
+        SegmentOfResult.AsyncIterator: Sendable { }

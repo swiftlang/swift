@@ -55,7 +55,7 @@ extension AsyncSequence {
   ///   element from base sequence ends, or when `transform` throws an error.
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
-    _ transform: @escaping (Element) async throws -> SegmentOfResult
+    _ transform: @Sendable @escaping (Element) async throws -> SegmentOfResult
   ) -> AsyncThrowingFlatMapSequence<Self, SegmentOfResult> {
     return AsyncThrowingFlatMapSequence(self, transform: transform)
   }
@@ -69,12 +69,12 @@ public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult:
   let base: Base
 
   @usableFromInline
-  let transform: (Base.Element) async throws -> SegmentOfResult
+  let transform: @Sendable (Base.Element) async throws -> SegmentOfResult
 
   @usableFromInline
   init(
     _ base: Base,
-    transform: @escaping (Base.Element) async throws -> SegmentOfResult
+    transform: @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
   ) {
     self.base = base
     self.transform = transform
@@ -97,7 +97,7 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: (Base.Element) async throws -> SegmentOfResult
+    let transform: @Sendable (Base.Element) async throws -> SegmentOfResult
 
     @usableFromInline
     var currentIterator: SegmentOfResult.AsyncIterator?
@@ -108,7 +108,7 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      transform: @escaping (Base.Element) async throws -> SegmentOfResult
+      transform: @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -169,3 +169,18 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+
+extension AsyncThrowingFlatMapSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable, 
+        SegmentOfResult: Sendable, 
+        SegmentOfResult.Element: Sendable { }
+
+extension AsyncThrowingFlatMapSequence: Sendable.Iterator 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable, 
+        SegmentOfResult: Sendable, 
+        SegmentOfResult.Element: Sendable, 
+        SegmentOfResult.AsyncIterator: Sendable { }
+

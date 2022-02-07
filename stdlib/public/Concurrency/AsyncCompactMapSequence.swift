@@ -47,7 +47,7 @@ extension AsyncSequence {
   ///   non-`nil` elements produced by the `transform` closure.
   @inlinable
   public __consuming func compactMap<ElementOfResult>(
-    _ transform: @escaping (Element) async -> ElementOfResult?
+    _ transform: @Sendable @escaping (Element) async -> ElementOfResult?
   ) -> AsyncCompactMapSequence<Self, ElementOfResult> {
     return AsyncCompactMapSequence(self, transform: transform)
   }
@@ -61,12 +61,12 @@ public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   let base: Base
 
   @usableFromInline
-  let transform: (Base.Element) async -> ElementOfResult?
+  let transform: @Sendable (Base.Element) async -> ElementOfResult?
 
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @escaping (Base.Element) async -> ElementOfResult?
+    transform: @Sendable @escaping (Base.Element) async -> ElementOfResult?
   ) {
     self.base = base
     self.transform = transform
@@ -91,12 +91,12 @@ extension AsyncCompactMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: (Base.Element) async -> ElementOfResult?
+    let transform: @Sendable (Base.Element) async -> ElementOfResult?
 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @escaping (Base.Element) async -> ElementOfResult?
+      transform: @Sendable @escaping (Base.Element) async -> ElementOfResult?
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
@@ -129,3 +129,13 @@ extension AsyncCompactMapSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }
+
+extension AsyncCompactMapSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable, 
+        ElementOfResult: Sendable { }
+
+extension AsyncCompactMapSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable, 
+        ElementOfResult: Sendable { }

@@ -43,7 +43,7 @@ extension AsyncSequence {
   ///   base sequence until the provided closure returns `false`.
   @inlinable
   public __consuming func drop(
-    while predicate: @escaping (Element) async -> Bool
+    while predicate: @Sendable @escaping (Element) async -> Bool
   ) -> AsyncDropWhileSequence<Self> {
     AsyncDropWhileSequence(self, predicate: predicate)
   }
@@ -58,12 +58,12 @@ public struct AsyncDropWhileSequence<Base: AsyncSequence> {
   let base: Base
 
   @usableFromInline
-  let predicate: (Base.Element) async -> Bool
+  let predicate: @Sendable (Base.Element) async -> Bool
 
   @usableFromInline
   init(
     _ base: Base, 
-    predicate: @escaping (Base.Element) async -> Bool
+    predicate: @Sendable @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
     self.predicate = predicate
@@ -92,7 +92,7 @@ extension AsyncDropWhileSequence: AsyncSequence {
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      predicate: @escaping (Base.Element) async -> Bool
+      predicate: @Sendable @escaping (Base.Element) async -> Bool
     ) {
       self.baseIterator = baseIterator
       self.predicate = predicate
@@ -127,3 +127,11 @@ extension AsyncDropWhileSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), predicate: predicate)
   }
 }
+
+extension AsyncDropWhileSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+extension AsyncDropWhileSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }

@@ -35,7 +35,7 @@ extension AsyncSequence {
   ///   of the base sequence that satisfy the given predicate.
   @inlinable
   public __consuming func filter(
-    _ isIncluded: @escaping (Element) async -> Bool
+    _ isIncluded: @Sendable @escaping (Element) async -> Bool
   ) -> AsyncFilterSequence<Self> {
     return AsyncFilterSequence(self, isIncluded: isIncluded)
   }
@@ -49,12 +49,12 @@ public struct AsyncFilterSequence<Base: AsyncSequence> {
   let base: Base
 
   @usableFromInline
-  let isIncluded: (Element) async -> Bool
+  let isIncluded: @Sendable (Element) async -> Bool
 
   @usableFromInline
   init(
     _ base: Base, 
-    isIncluded: @escaping (Base.Element) async -> Bool
+    isIncluded: @Sendable @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
     self.isIncluded = isIncluded
@@ -82,7 +82,7 @@ extension AsyncFilterSequence: AsyncSequence {
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      isIncluded: @escaping (Base.Element) async -> Bool
+      isIncluded: @Sendable @escaping (Base.Element) async -> Bool
     ) {
       self.baseIterator = baseIterator
       self.isIncluded = isIncluded
@@ -113,3 +113,11 @@ extension AsyncFilterSequence: AsyncSequence {
     return Iterator(base.makeAsyncIterator(), isIncluded: isIncluded)
   }
 }
+
+extension AsyncFilterSequence: Sendable 
+  where Base: Sendable, 
+        Base.Element: Sendable { }
+
+extension AsyncFilterSequence.Iterator: Sendable 
+  where Base.AsyncIterator: Sendable, 
+        Base.Element: Sendable { }
