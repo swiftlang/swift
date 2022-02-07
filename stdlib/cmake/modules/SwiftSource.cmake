@@ -480,7 +480,7 @@ function(_compile_swift_files
   endif()
 
   if(NOT SWIFT_ENABLE_REFLECTION)
-    list(APPEND swift_flags "-Xfrontend" "-disable-reflection-metadata")
+    list(APPEND swift_flags "-Xfrontend" "-reflection-metadata-for-debugger-only")
   else()
     list(APPEND swift_flags "-D" "SWIFT_ENABLE_REFLECTION")
   endif()
