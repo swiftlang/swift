@@ -425,26 +425,42 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     // we've found so far.
     const auto &otherRule = getRule(found->second);
 
-    unsigned ruleNesting = rule.getNesting();
-    unsigned otherRuleNesting = otherRule.getNesting();
+    const auto &loop = Loops[pair.first];
+    const auto &otherLoop = Loops[found->first];
 
-    // If both rules are concrete type requirements, first compare nesting
-    // depth. This breaks the tie when we have two rules that each imply
-    // the other via an induced rule that comes from a protocol.
+    // If one of the rules was a concrete unification projection, prefer to
+    // eliminate the *other* rule.
     //
-    // For example,
+    // For example, if 'X.T == G<U, V>' is implied by the conformance on X,
+    // and the following three rules are defined in the current protocol:
     //
-    //    T == G<Int>
-    //    U == Int
+    //    X.T == G<Int, W>
+    //    X.U == Int
+    //    X.V == W
     //
-    // Where T == G<U> is implied elsewhere.
-    if (ruleNesting > 0 && otherRuleNesting > 0) {
-      if (ruleNesting > otherRuleNesting) {
+    // Then we can either eliminate a) alone, or b) and c). Since b) and c)
+    // are projections, they are "simpler", and we would rather keep both and
+    // eliminate a).
+    unsigned projectionCount = loop.getProjectionCount(*this);
+    unsigned otherProjectionCount = otherLoop.getProjectionCount(*this);
+
+    if (projectionCount != otherProjectionCount) {
+      if (projectionCount < otherProjectionCount)
         found = pair;
-        continue;
-      } else if (otherRuleNesting > ruleNesting) {
-        continue;
-      }
+
+      continue;
+    }
+
+    // If one of the rules is a concrete type requirement, prefer to
+    // eliminate the *other* rule.
+    bool ruleIsConcrete = rule.getLHS().back().hasSubstitutions();
+    bool otherRuleIsConcrete = otherRule.getRHS().back().hasSubstitutions();
+
+    if (ruleIsConcrete != otherRuleIsConcrete) {
+      if (otherRuleIsConcrete)
+        found = pair;
+
+      continue;
     }
 
     // Otherwise, perform a shortlex comparison on (LHS, RHS).
