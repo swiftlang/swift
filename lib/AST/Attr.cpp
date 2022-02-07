@@ -1300,9 +1300,8 @@ StringRef DeclAttribute::getAttrName() const {
       return "exclusivity(checked)";
     case ExclusivityAttr::Unchecked:
       return "exclusivity(unchecked)";
-    default:
-      llvm_unreachable("Invalid optimization kind");
     }
+    llvm_unreachable("Invalid optimization kind");
   }
   case DAK_Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
