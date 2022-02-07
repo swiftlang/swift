@@ -385,21 +385,21 @@ describe(SILInstruction *blame) {
 
     // if we have no callee info, all we know is it's a call involving self.
     if (!callee)
-      return {"a call involving", "", ctx.Id_self};
+      return std::make_tuple("a call involving", "", ctx.Id_self);
 
-    return {
+    return std::make_tuple(
       verbForInvoking(callee),
       callee->getDescriptiveKindName(callee->getDescriptiveKind()),
       callee->getName()
-    };
+    );
   }
 
   // handle non-call blames
   switch (blame->getKind()) {
     case SILInstructionKind::CopyValueInst:
-      return {"making a copy of", "", ctx.Id_self};
+      return std::make_tuple("making a copy of", "", ctx.Id_self);
     default:
-      return {"this use of", "", ctx.Id_self};
+      return std::make_tuple("this use of", "", ctx.Id_self);
   }
 }
 
