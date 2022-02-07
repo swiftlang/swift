@@ -45,6 +45,14 @@ inline LoadableIntWrapper operator>>(LoadableIntWrapper lhs, LoadableIntWrapper 
   return LoadableIntWrapper{.value = lhs.value >> rhs.value};
 }
 
+inline LoadableIntWrapper operator++(LoadableIntWrapper lhs) {
+  return LoadableIntWrapper{.value = lhs.value++};
+}
+
+inline LoadableIntWrapper operator--(LoadableIntWrapper lhs) {
+  return LoadableIntWrapper{.value = lhs.value--};
+}
+
 inline bool operator<(LoadableIntWrapper lhs, LoadableIntWrapper rhs) { return lhs.value < rhs.value; }
 
 inline bool operator>(LoadableIntWrapper lhs, LoadableIntWrapper rhs) { return lhs.value > rhs.value; }

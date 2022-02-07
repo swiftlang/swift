@@ -21,6 +21,8 @@ let resultEqualEqual = lhs == rhs
 let resultExclaimEqual = lhs != rhs
 let resultLessEqual = lhs <= rhs
 let resultGreaterEqual = lhs >= rhs
+let reusltPlusPlus = lhs ++ rhs
+let reusltMinusMinus = lhs -- rhs
 
 var lhsBool = LoadableBoolWrapper(value: true)
 var rhsBool = LoadableBoolWrapper(value: false)

@@ -169,4 +169,22 @@ OperatorsTestSuite.test("pipe pipe (||)") {
   expectEqual(true, result.value)
 }
 
+OperatorsTestSuite.test("plus plus (++)") {
+  let lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 1)
+
+  let result = lhs ++ rhs
+
+  expectEqual(43, result.value)
+}
+
+OperatorsTestSuite.test("minus minus (--)") {
+  let lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 1)
+  
+  let result = lhs -- 1
+
+  expectEqual(41, result.value)
+}
+
 runAllTests()

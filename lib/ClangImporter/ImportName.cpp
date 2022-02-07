@@ -1802,6 +1802,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe:
+    case clang::OverloadedOperatorKind::OO_PlusPlus:
+    case clang::OverloadedOperatorKind::OO_MinusMinus:
       baseName = clang::getOperatorSpelling(op);
       isFunction = true;
       argumentNames.resize(
