@@ -9228,7 +9228,8 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   FrontendStatsTracer StatsTracer(SwiftContext.Stats,
                                   "import-clang-decl", ClangDecl);
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
-                                    Instance->getSourceManager(), "importing");
+                                    DefaultCompiler.Instance->getSourceManager(),
+                                    "importing");
 
   auto Canon = cast<clang::NamedDecl>(UseCanonicalDecl? ClangDecl->getCanonicalDecl(): ClangDecl);
 
@@ -9273,7 +9274,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
     return nullptr;
 
   clang::PrettyStackTraceDecl trace(decl, clang::SourceLocation(),
-                                    Instance->getSourceManager(),
+                                    DefaultCompiler.Instance->getSourceManager(),
                                     "importing (mirrored)");
 
   auto canon = decl->getCanonicalDecl();
@@ -10077,7 +10078,7 @@ static void loadMembersOfBaseImportedFromClang(ExtensionDecl *ext) {
 void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
     Decl *D, const clang::ObjCContainerDecl *objcContainer) {
   clang::PrettyStackTraceDecl trace(objcContainer, clang::SourceLocation(),
-                                    Instance->getSourceManager(),
+                                    DefaultCompiler.Instance->getSourceManager(),
                                     "loading members for");
 
   assert(isa<ExtensionDecl>(D) || isa<NominalTypeDecl>(D));

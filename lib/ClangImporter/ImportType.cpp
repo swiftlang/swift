@@ -2825,7 +2825,7 @@ Type ClangImporter::Implementation::getNamedSwiftType(StringRef moduleName,
 }
 
 Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
-  auto &sema = Instance->getSema();
+  auto &sema = DefaultCompiler.Instance->getSema();
 
   // Map the name. If we can't represent the Swift name in Clang, bail out now.
   auto clangName = &getClangASTContext().Idents.get(name);

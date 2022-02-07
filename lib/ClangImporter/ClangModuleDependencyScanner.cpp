@@ -196,7 +196,7 @@ void ClangImporter::recordModuleDependencies(
       fileDeps.push_back(fileDep.getKey().str());
     }
     // Inherit all Clang driver args when creating the clang importer.
-    ArrayRef<std::string> allArgs = Impl.ClangArgs;
+    ArrayRef<std::string> allArgs = Impl.DefaultCompiler.ClangArgs;
     ClangImporterOptions Opts;
 
     // Ensure the arguments we collected is sufficient to create a Clang

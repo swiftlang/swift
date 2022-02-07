@@ -456,25 +456,40 @@ private:
   /// Used to avoid running the AST verifier over the same declarations.
   size_t VerifiedDeclsCounter = 0;
 
-  /// Clang compiler invocation.
-  std::shared_ptr<clang::CompilerInvocation> Invocation;
+  /// A wrapper for clang compiler.
+  class ClangCompiler {
+    friend ClangImporter;
+    friend ClangImporter::Implementation;
 
-  /// Clang compiler instance, which is used to actually load Clang
-  /// modules.
-  std::unique_ptr<clang::CompilerInstance> Instance;
+    /// Clang compiler invocation.
+    std::shared_ptr<clang::CompilerInvocation> Invocation;
 
-  /// Clang compiler action, which is used to actually run the
-  /// parser.
-  std::unique_ptr<clang::FrontendAction> Action;
+    /// Clang compiler instance, which is used to actually load Clang
+    /// modules.
+    std::unique_ptr<clang::CompilerInstance> Instance;
 
-  /// Clang parser, which is used to load textual headers.
-  std::unique_ptr<clang::Parser> Parser;
+    /// Clang compiler action, which is used to actually run the
+    /// parser.
+    std::unique_ptr<clang::FrontendAction> Action;
 
-  /// Clang parser, which is used to load textual headers.
-  std::unique_ptr<clang::MangleContext> Mangler;
+    /// Clang parser, which is used to load textual headers.
+    std::unique_ptr<clang::Parser> Parser;
 
-  /// Clang arguments used to create the Clang invocation.
-  std::vector<std::string> ClangArgs;
+    /// Clang parser, which is used to load textual headers.
+    std::unique_ptr<clang::MangleContext> Mangler;
+
+    /// Clang arguments used to create the Clang invocation.
+    std::vector<std::string> ClangArgs;
+  };
+
+  ClangCompiler DefaultCompiler;
+
+  std::vector<ClangCompiler *> &getAllClangCompilers() {
+    auto allClangCompilers = new std::vector<ClangCompiler *> {
+      &DefaultCompiler,
+    };
+    return *allClangCompilers;
+  }
 
   /// Mapping from Clang swift_attr attribute text to the Swift source buffer
   /// IDs that contain that attribute text. These are re-used when parsing the
@@ -541,7 +556,7 @@ public:
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
   clang::CompilerInstance *getClangInstance() {
-    return Instance.get();
+    return DefaultCompiler.Instance.get();
   }
 
 private:
@@ -760,21 +775,21 @@ public:
 
   /// Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
-    return Instance->getASTContext();
+    return DefaultCompiler.Instance->getASTContext();
   }
 
   /// Retrieve the Clang Sema object.
   clang::Sema &getClangSema() const {
-    return Instance->getSema();
+    return DefaultCompiler.Instance->getSema();
   }
 
   /// Retrieve the Clang AST context.
   clang::Preprocessor &getClangPreprocessor() const {
-    return Instance->getPreprocessor();
+    return DefaultCompiler.Instance->getPreprocessor();
   }
   
   clang::CodeGenOptions &getClangCodeGenOpts() const {
-    return Instance->getCodeGenOpts();
+    return DefaultCompiler.Instance->getCodeGenOpts();
   }
 
   importer::ClangSourceBufferImporter &getBufferImporterForDiagnostics() {
