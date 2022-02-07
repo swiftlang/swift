@@ -628,6 +628,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\toolchain\ ^
   -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
+  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
   -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
 :: TODO(compnerd) actually perform the code-signing
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\toolchain\toolchain.msi
