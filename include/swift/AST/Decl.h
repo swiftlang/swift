@@ -5396,6 +5396,10 @@ public:
   /// an attached property wrapper.
   VarDecl *getPropertyWrapperWrappedValueVar() const;
 
+  /// Return true if this property either has storage or has an attached property
+  /// wrapper that has storage.
+  bool hasStorageOrWrapsStorage() const;
+  
   /// Visit all auxiliary declarations to this VarDecl.
   ///
   /// An auxiliary declaration is a declaration synthesized by the compiler to support

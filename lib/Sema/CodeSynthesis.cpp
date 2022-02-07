@@ -928,10 +928,7 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
           if (VD->getAttrs().hasAttribute<NSManagedAttr>())
             CheckDefaultInitializer = false;
 
-          if (VD->hasStorage())
-            HasStorage = true;
-          auto *backing = VD->getPropertyWrapperBackingProperty();
-          if (backing && backing->hasStorage())
+          if (VD->hasStorageOrWrapsStorage())
             HasStorage = true;
         });
 
