@@ -375,6 +375,10 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
 
   Optional<std::pair<unsigned, unsigned>> found;
 
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    llvm::dbgs() << "\n";
+  }
+
   for (const auto &pair : redundancyCandidates) {
     unsigned ruleID = pair.second;
     const auto &rule = getRule(ruleID);
@@ -402,7 +406,7 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
       continue;
     }
 
-    if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
       llvm::dbgs() << "** Candidate " << rule << " from loop #"
                    << pair.first << "\n";
     }
@@ -474,7 +478,8 @@ void RewriteSystem::deleteRule(unsigned ruleID,
                                const RewritePath &replacementPath) {
   // Replace all occurrences of the rule with the replacement path in
   // all remaining rewrite loops.
-  for (auto &loop : Loops) {
+  for (unsigned loopID : indices(Loops)) {
+    auto &loop = Loops[loopID];
     if (loop.isDeleted())
       continue;
 
@@ -486,8 +491,8 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     // result of findRulesAppearingOnceInEmptyContext().
     loop.markDirty();
 
-    if (Debug.contains(DebugFlags::HomotopyReduction)) {
-      llvm::dbgs() << "** Updated loop: ";
+    if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
+      llvm::dbgs() << "** Updated loop #" << loopID << ": ";
       loop.dump(llvm::dbgs(), *this);
       llvm::dbgs() << "\n";
     }
@@ -534,6 +539,12 @@ void RewriteSystem::performHomotopyReduction(
 ///
 /// Redundant rules are mutated to set their isRedundant() bit.
 void RewriteSystem::minimizeRewriteSystem() {
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    llvm::dbgs() << "-----------------------------\n";
+    llvm::dbgs() << "- Minimizing rewrite system -\n";
+    llvm::dbgs() << "-----------------------------\n";
+  }
+
   assert(Complete);
   assert(!Minimized);
   Minimized = 1;
@@ -545,7 +556,9 @@ void RewriteSystem::minimizeRewriteSystem() {
   // - Eliminate all RHS-simplified and substitution-simplified rules.
   // - Eliminate all rules with unresolved symbols.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "\nFirst pass: simplified and unresolved rules\n\n";
+    llvm::dbgs() << "---------------------------------------------\n";
+    llvm::dbgs() << "First pass: simplified and unresolved rules -\n";
+    llvm::dbgs() << "---------------------------------------------\n";
   }
 
   performHomotopyReduction([&](unsigned ruleID) -> bool {
@@ -577,7 +590,9 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   // Second pass: Eliminate all non-minimal conformance rules.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "\nSecond pass: non-minimal conformance rules\n\n";
+    llvm::dbgs() << "--------------------------------------------\n";
+    llvm::dbgs() << "Second pass: non-minimal conformance rules -\n";
+    llvm::dbgs() << "--------------------------------------------\n";
   }
 
   performHomotopyReduction([&](unsigned ruleID) -> bool {
@@ -592,7 +607,9 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   // Third pass: Eliminate all other redundant non-conformance rules.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "\nThird pass: all other redundant rules\n\n";
+    llvm::dbgs() << "---------------------------------------\n";
+    llvm::dbgs() << "Third pass: all other redundant rules -\n";
+    llvm::dbgs() << "---------------------------------------\n";
   }
 
   performHomotopyReduction([&](unsigned ruleID) -> bool {

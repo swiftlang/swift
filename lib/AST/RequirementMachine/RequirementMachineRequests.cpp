@@ -171,7 +171,7 @@ RequirementMachine::buildRequirementsFromRules(
   };
 
   if (getDebugOptions().contains(DebugFlags::Minimization)) {
-    llvm::dbgs() << "Minimized rules:\n";
+    llvm::dbgs() << "\nMinimized rules:\n";
   }
 
   // Build the list of requirements, storing same-type requirements off

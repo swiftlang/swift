@@ -48,14 +48,17 @@ enum class DebugFlags : unsigned {
   /// Print debug output from the homotopy reduction algorithm.
   HomotopyReduction = (1<<8),
 
+  /// Print more detailed debug output from the homotopy reduction algorithm.
+  HomotopyReductionDetail = (1<<9),
+
   /// Print debug output from the minimal conformances algorithm.
-  MinimalConformances = (1<<9),
+  MinimalConformances = (1<<10),
 
   /// Print debug output from the protocol dependency graph.
-  ProtocolDependencies = (1<<10),
+  ProtocolDependencies = (1<<11),
 
   /// Print debug output from generic signature minimization.
-  Minimization = (1<<11),
+  Minimization = (1<<12),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;
