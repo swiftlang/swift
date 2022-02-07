@@ -223,7 +223,7 @@ public:
 
   ArrayRef<const ProtocolDecl *> getRootProtocols() const;
 
-  int compare(Symbol other, RewriteContext &ctx) const;
+  Optional<int> compare(Symbol other, RewriteContext &ctx) const;
 
   Symbol withConcreteSubstitutions(
       ArrayRef<Term> substitutions,
