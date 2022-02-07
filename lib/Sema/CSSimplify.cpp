@@ -1364,12 +1364,19 @@ shouldOpenExistentialCallArgument(
   if (param->isVariadic() && !param->getVarargBaseTy()->hasTypeSequence())
     return None;
 
+  // If the argument is of an existential metatype, look through the
+  // metatype on the parameter.
+  auto formalParamTy = param->getInterfaceType();
+  if (argTy->is<AnyMetatypeType>()) {
+    formalParamTy = formalParamTy->getMetatypeInstanceType();
+    paramTy = paramTy->getMetatypeInstanceType();
+  }
+
   // The parameter type must be a type variable.
   auto paramTypeVar = paramTy->getAs<TypeVariableType>();
   if (!paramTypeVar)
     return None;
 
-  auto formalParamTy = param->getInterfaceType();
   auto genericParam = formalParamTy->getAs<GenericTypeParamType>();
   if (!genericParam)
     return None;

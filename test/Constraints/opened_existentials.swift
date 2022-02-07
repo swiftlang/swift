@@ -61,6 +61,16 @@ func testMultipleOpened(a: any P, b: any P & Q) {
   let _: Int = r2  // expected-error{{cannot convert value of type '(Q, Q)?' to specified type 'Int'}}  
 }
 
+// --- Opening existential metatypes
+func conjureValue<T: P>(of type: T.Type) -> T? {
+  nil
+}
+
+func testMagic(pt: any P.Type) {
+  let pOpt = conjureValue(of: pt)
+  let _: Int = pOpt // expected-error{{cannot convert value of type 'P?' to specified type 'Int'}}
+}
+
 // --- With primary associated types and opaque parameter types
 protocol CollectionOf: Collection {
   @_primaryAssociatedType associatedtype Element
