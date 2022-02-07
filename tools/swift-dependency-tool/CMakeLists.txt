@@ -8,3 +8,4 @@ target_link_libraries(swift-dependency-tool
                         swiftAST
                         swiftParse
                         swiftClangImporter)
+
