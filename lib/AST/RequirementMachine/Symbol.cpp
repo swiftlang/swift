@@ -13,6 +13,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
@@ -38,50 +39,40 @@ const StringRef Symbol::Kinds[] = {
 /// the Storage type is the allocated backing storage.
 struct Symbol::Storage final
   : public llvm::FoldingSetNode,
-    public llvm::TrailingObjects<Storage, const ProtocolDecl *, Term> {
+    public llvm::TrailingObjects<Storage, unsigned, Term> {
   friend class Symbol;
 
-  unsigned Kind : 3;
-  unsigned NumSubstitutions : 14;
+  llvm::PointerIntPair<const ProtocolDecl *, 3> ProtoAndKind;
 
   union {
     Identifier Name;
     CanType ConcreteType;
     LayoutConstraint Layout;
-    const ProtocolDecl *Proto;
     GenericTypeParamType *GenericParam;
   };
 
   explicit Storage(Identifier name) {
-    Kind = unsigned(Symbol::Kind::Name);
-    NumSubstitutions = 0;
+    ProtoAndKind.setInt(unsigned(Symbol::Kind::Name));
     Name = name;
   }
 
   explicit Storage(LayoutConstraint layout) {
-    Kind = unsigned(Symbol::Kind::Layout);
-    NumSubstitutions = 0;
+    ProtoAndKind.setInt(unsigned(Symbol::Kind::Layout));
     Layout = layout;
   }
 
   explicit Storage(const ProtocolDecl *proto) {
-    Kind = unsigned(Symbol::Kind::Protocol);
-    NumSubstitutions = 0;
-    Proto = proto;
+    ProtoAndKind.setPointerAndInt(proto, unsigned(Symbol::Kind::Protocol));
   }
 
   explicit Storage(GenericTypeParamType *param) {
-    Kind = unsigned(Symbol::Kind::GenericParam);
-    NumSubstitutions = 0;
+    ProtoAndKind.setInt(unsigned(Symbol::Kind::GenericParam));
     GenericParam = param;
   }
 
   Storage(const ProtocolDecl *proto, Identifier name) {
-    Kind = unsigned(Symbol::Kind::AssociatedType);
-    NumSubstitutions = 0;
+    ProtoAndKind.setPointerAndInt(proto, unsigned(Symbol::Kind::AssociatedType));
     Name = name;
-
-    *getTrailingObjects<const ProtocolDecl *>() = proto;
   }
 
   Storage(Symbol::Kind kind, CanType type, ArrayRef<Term> substitutions) {
@@ -90,9 +81,10 @@ struct Symbol::Storage final
     assert(!type->hasTypeVariable());
     assert(type->hasTypeParameter() != substitutions.empty());
 
-    Kind = unsigned(kind);
-    NumSubstitutions = substitutions.size();
+    ProtoAndKind.setInt(unsigned(kind));
     ConcreteType = type;
+
+    *getTrailingObjects<unsigned>() = substitutions.size();
 
     for (unsigned i : indices(substitutions))
       getSubstitutions()[i] = substitutions[i];
@@ -102,38 +94,44 @@ struct Symbol::Storage final
     assert(!type->hasTypeVariable());
     assert(type->hasTypeParameter() != substitutions.empty());
 
-    Kind = unsigned(Symbol::Kind::ConcreteConformance);
-    NumSubstitutions = substitutions.size();
+    ProtoAndKind.setPointerAndInt(proto, unsigned(Symbol::Kind::ConcreteConformance));
+
+    *getTrailingObjects<unsigned>() = substitutions.size();
     ConcreteType = type;
 
     for (unsigned i : indices(substitutions))
       getSubstitutions()[i] = substitutions[i];
-
-    *getTrailingObjects<const ProtocolDecl *>() = proto;
   }
 
-  size_t numTrailingObjects(OverloadToken<const ProtocolDecl *>) const {
-    return (Kind == unsigned(Symbol::Kind::AssociatedType) ||
-            Kind == unsigned(Symbol::Kind::ConcreteConformance));
+  size_t numTrailingObjects(OverloadToken<unsigned>) const {
+    auto kind = Symbol::Kind(ProtoAndKind.getInt());
+    return (kind == Symbol::Kind::Superclass ||
+            kind == Symbol::Kind::ConcreteType ||
+            kind == Symbol::Kind::ConcreteConformance);
   }
 
   size_t numTrailingObjects(OverloadToken<Term>) const {
-    return NumSubstitutions;
+    return getNumSubstitutions();
+  }
+
+  unsigned getNumSubstitutions() const {
+    assert(numTrailingObjects(OverloadToken<unsigned>()) == 1);
+    return *getTrailingObjects<unsigned>();
   }
 
   MutableArrayRef<Term> getSubstitutions() {
-    return {getTrailingObjects<Term>(), NumSubstitutions};
+    return {getTrailingObjects<Term>(), getNumSubstitutions()};
   }
 
   ArrayRef<Term> getSubstitutions() const {
-    return {getTrailingObjects<Term>(), NumSubstitutions};
+    return {getTrailingObjects<Term>(), getNumSubstitutions()};
   }
 
   void Profile(llvm::FoldingSetNodeID &id) const;
 };
 
 Symbol::Kind Symbol::getKind() const {
-  return Kind(Ptr->Kind);
+  return Kind(Ptr->ProtoAndKind.getInt());
 }
 
 /// Get the identifier associated with an unbound name symbol or an
@@ -147,12 +145,10 @@ Identifier Symbol::getName() const {
 /// Get the protocol declaration associated with a protocol or associated type
 /// symbol.
 const ProtocolDecl *Symbol::getProtocol() const {
-  if (getKind() == Kind::Protocol)
-    return Ptr->Proto;
-
-  assert(getKind() == Kind::AssociatedType ||
+  assert(getKind() == Kind::Protocol ||
+         getKind() == Kind::AssociatedType ||
          getKind() == Kind::ConcreteConformance);
-  return *Ptr->getTrailingObjects<const ProtocolDecl *>();
+  return Ptr->ProtoAndKind.getPointer();
 }
 
 /// Get the generic parameter associated with a generic parameter symbol.
@@ -179,9 +175,6 @@ CanType Symbol::getConcreteType() const {
 /// Get the list of substitution terms associated with a superclass,
 /// concrete type or concrete conformance symbol.
 ArrayRef<Term> Symbol::getSubstitutions() const {
-  assert(getKind() == Kind::Superclass ||
-         getKind() == Kind::ConcreteType ||
-         getKind() == Kind::ConcreteConformance);
   return Ptr->getSubstitutions();
 }
 
@@ -196,7 +189,7 @@ Symbol Symbol::forName(Identifier name,
   if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
     return symbol;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *symbol = new (mem) Storage(name);
 
@@ -225,7 +218,7 @@ Symbol Symbol::forProtocol(const ProtocolDecl *proto,
   if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
     return symbol;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *symbol = new (mem) Storage(proto);
 
@@ -254,8 +247,7 @@ Symbol Symbol::forAssociatedType(const ProtocolDecl *proto,
   if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
     return symbol;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
-      1, 0);
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *symbol = new (mem) Storage(proto, name);
 
@@ -286,7 +278,7 @@ Symbol Symbol::forGenericParam(GenericTypeParamType *param,
   if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
     return symbol;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *symbol = new (mem) Storage(param);
 
@@ -313,7 +305,7 @@ Symbol Symbol::forLayout(LayoutConstraint layout,
   if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
     return symbol;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *symbol = new (mem) Storage(layout);
 
@@ -344,8 +336,8 @@ Symbol Symbol::forSuperclass(CanType type, ArrayRef<Term> substitutions,
   if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
     return symbol;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
-      0, substitutions.size());
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(
+      1, substitutions.size());
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *symbol = new (mem) Storage(Kind::Superclass, type, substitutions);
 
@@ -375,8 +367,8 @@ Symbol Symbol::forConcreteType(CanType type, ArrayRef<Term> substitutions,
   if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
     return symbol;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
-      0, substitutions.size());
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(
+      1, substitutions.size());
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *symbol = new (mem) Storage(Kind::ConcreteType, type, substitutions);
 
@@ -399,18 +391,18 @@ Symbol Symbol::forConcreteConformance(CanType type,
                                       RewriteContext &ctx) {
   llvm::FoldingSetNodeID id;
   id.AddInteger(unsigned(Kind::ConcreteConformance));
+  id.AddPointer(proto);
   id.AddPointer(type.getPointer());
   id.AddInteger(unsigned(substitutions.size()));
   for (auto substitution : substitutions)
     id.AddPointer(substitution.getOpaquePointer());
-  id.AddPointer(proto);
 
   void *insertPos = nullptr;
   if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
     return symbol;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
-      /*protos=*/1, substitutions.size());
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(
+      1, substitutions.size());
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *symbol = new (mem) Storage(type, substitutions, proto);
 
@@ -712,9 +704,9 @@ void Symbol::dump(llvm::raw_ostream &out) const {
 }
 
 void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
-  id.AddInteger(Kind);
+  id.AddInteger(ProtoAndKind.getInt());
 
-  switch (Symbol::Kind(Kind)) {
+  switch (Symbol::Kind(ProtoAndKind.getInt())) {
   case Symbol::Kind::Name:
     id.AddPointer(Name.get());
     return;
@@ -724,7 +716,7 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     return;
 
   case Symbol::Kind::Protocol:
-    id.AddPointer(Proto);
+    id.AddPointer(ProtoAndKind.getPointer());
     return;
 
   case Symbol::Kind::GenericParam:
@@ -732,7 +724,7 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     return;
 
   case Symbol::Kind::AssociatedType: {
-    id.AddPointer(*getTrailingObjects<const ProtocolDecl *>());
+    id.AddPointer(ProtoAndKind.getPointer());
     id.AddPointer(Name.get());
     return;
   }
@@ -740,8 +732,7 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
   case Symbol::Kind::Superclass:
   case Symbol::Kind::ConcreteType: {
     id.AddPointer(ConcreteType.getPointer());
-
-    id.AddInteger(NumSubstitutions);
+    id.AddInteger(getNumSubstitutions());
     for (auto term : getSubstitutions())
       id.AddPointer(term.getOpaquePointer());
 
@@ -749,13 +740,13 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
   }
 
   case Symbol::Kind::ConcreteConformance: {
+    id.AddPointer(ProtoAndKind.getPointer());
     id.AddPointer(ConcreteType.getPointer());
 
-    id.AddInteger(NumSubstitutions);
+    id.AddInteger(getNumSubstitutions());
     for (auto term : getSubstitutions())
       id.AddPointer(term.getOpaquePointer());
 
-    id.AddPointer(*getTrailingObjects<const ProtocolDecl *>());
     return;
   }
   }
