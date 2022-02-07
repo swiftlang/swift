@@ -498,7 +498,8 @@ ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
   llvm_unreachable("Bad root symbol");
 }
 
-/// Linear order on symbols.
+/// Linear order on symbols, returning -1, 0, 1 or None if the symbols are
+/// incomparable.
 ///
 /// First, we order different kinds as follows, from smallest to largest:
 ///
@@ -548,8 +549,8 @@ ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
 /// * For concrete conformance symbols with distinct protocols, we compare
 ///   the protocols.
 ///
-/// All other symbol kinds are incomparable.
-int Symbol::compare(Symbol other, RewriteContext &ctx) const {
+/// All other symbol kinds are incomparable, in which case we return None.
+Optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
   // Exit early if the symbols are equal.
   if (Ptr == other.Ptr)
     return 0;
@@ -638,8 +639,8 @@ int Symbol::compare(Symbol other, RewriteContext &ctx) const {
         auto term = getSubstitutions()[i];
         auto otherTerm = other.getSubstitutions()[i];
 
-        result = term.compare(otherTerm, ctx);
-        if (result != 0)
+        Optional<int> result = term.compare(otherTerm, ctx);
+        if (!result.hasValue() || *result != 0)
           return result;
       }
 
@@ -647,10 +648,7 @@ int Symbol::compare(Symbol other, RewriteContext &ctx) const {
     }
 
     // We don't support comparing arbitrary concrete types.
-    llvm::errs() << "Cannot compare concrete types yet\n";
-    llvm::errs() << "LHS: " << *this << "\n";
-    llvm::errs() << "RHS: " << other << "\n";
-    abort();
+    return None;
   }
   }
 

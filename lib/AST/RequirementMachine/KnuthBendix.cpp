@@ -90,7 +90,7 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs) {
   assert(lhs.getKind() == Symbol::Kind::AssociatedType);
   assert(rhs.getKind() == Symbol::Kind::AssociatedType);
   assert(lhs.getName() == rhs.getName());
-  assert(lhs.compare(rhs, *this) > 0);
+  assert(*lhs.compare(rhs, *this) > 0);
 
   auto protos = lhs.getProtocols();
   auto otherProtos = rhs.getProtocols();
@@ -320,8 +320,8 @@ void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
     // We must have mergedSymbol <= rhs < lhs, therefore mergedSymbol != lhs.
     assert(lhs.back() != mergedSymbol &&
            "Left hand side should not already end with merged symbol?");
-    assert(mergedSymbol.compare(rhs.back(), Context) <= 0);
-    assert(rhs.back().compare(lhs.back(), Context) < 0);
+    assert(*mergedSymbol.compare(rhs.back(), Context) <= 0);
+    assert(*rhs.back().compare(lhs.back(), Context) < 0);
 
     // If the merge didn't actually produce a new symbol, there is nothing else
     // to do.
@@ -452,15 +452,15 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                                          getRuleID(lhs),
                                          /*inverse=*/true));
 
-    // (2) Next, if the right hand side rule ends with a concrete type symbol,
-    // perform the concrete type adjustment:
+    // (2) Next, if the right hand side rule ends with a superclass or concrete
+    // type symbol, remove the prefix 'T' from each substitution in the symbol.
     //
     //     (σ - T)
     if (xv.back().hasSubstitutions() &&
         !xv.back().getSubstitutions().empty() &&
         t.size() > 0) {
-      path.add(RewriteStep::forAdjustment(t.size(), /*endOffset=*/0,
-                                          /*inverse=*/true));
+      path.add(RewriteStep::forPrefixSubstitutions(t.size(), /*endOffset=*/0,
+                                                   /*inverse=*/true));
 
       xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
           t, Context);
@@ -486,28 +486,30 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
   return true;
 }
 
-/// Computes the confluent completion using the Knuth-Bendix algorithm.
+/// Computes the confluent completion using the Knuth-Bendix algorithm and
+/// returns a status code.
 ///
-/// Returns a pair consisting of a status and number of iterations executed.
+/// The first element of the pair is a status.
 ///
-/// The status is CompletionResult::MaxIterations if we exceed \p maxIterations
-/// iterations.
+/// The status is CompletionResult::MaxRuleCount if we add more than
+/// \p maxRuleCount rules.
 ///
-/// The status is CompletionResult::MaxDepth if we produce a rewrite rule whose
-/// left hand side has a length exceeding \p maxDepth.
+/// The status is CompletionResult::MaxRuleLength if we produce a rewrite rule
+/// whose left hand side has a length exceeding \p maxRuleLength.
 ///
-/// Otherwise, the status is CompletionResult::Success.
+/// In the above two cases, the second element of the pair is a rule ID.
+///
+/// Otherwise, the status is CompletionResult::Success and the second element
+/// is zero.
 std::pair<CompletionResult, unsigned>
-RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
-                                          unsigned maxDepth) {
+RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
+                                          unsigned maxRuleLength) {
   assert(Initialized);
   assert(!Minimized);
 
   // Complete might already be set, if we're re-running completion after
   // adding new rules in the property map's concrete type unification procedure.
   Complete = 1;
-
-  unsigned steps = 0;
 
   bool again = false;
 
@@ -605,18 +607,16 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     again = false;
     for (const auto &pair : resolvedCriticalPairs) {
       // Check if we've already done too much work.
-      if (Rules.size() > maxIterations)
-        return std::make_pair(CompletionResult::MaxIterations, steps);
+      if (Rules.size() > maxRuleCount)
+        return std::make_pair(CompletionResult::MaxRuleCount, Rules.size() - 1);
 
       if (!addRule(pair.LHS, pair.RHS, &pair.Path))
         continue;
 
       // Check if the new rule is too long.
-      if (Rules.back().getDepth() > maxDepth)
-        return std::make_pair(CompletionResult::MaxDepth, steps);
+      if (Rules.back().getDepth() > maxRuleLength)
+        return std::make_pair(CompletionResult::MaxRuleLength, Rules.size() - 1);
 
-      // Only count a 'step' once we add a new rule.
-      ++steps;
       again = true;
     }
 
@@ -640,5 +640,5 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
   assert(MergedAssociatedTypes.empty() &&
          "Should have processed all merge candidates");
 
-  return std::make_pair(CompletionResult::Success, steps);
+  return std::make_pair(CompletionResult::Success, 0);
 }

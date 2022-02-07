@@ -57,6 +57,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Range.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include "RewriteSystem.h"
@@ -85,8 +86,8 @@ void RewriteStep::dump(llvm::raw_ostream &out,
 
     break;
   }
-  case AdjustConcreteType: {
-    auto pair = evaluator.applyAdjustment(*this, system);
+  case PrefixSubstitutions: {
+    auto pair = evaluator.applyPrefixSubstitutions(*this, system);
 
     out << "(σ";
     out << (Inverse ? " - " : " + ");
@@ -123,6 +124,38 @@ void RewriteStep::dump(llvm::raw_ostream &out,
       out << result.suffix;
     }
 
+    break;
+  }
+  case DecomposeConcrete: {
+    evaluator.applyDecomposeConcrete(*this, system);
+
+    out << (Inverse ? "ComposeConcrete(" : "DecomposeConcrete(");
+
+    const auto &difference = system.getTypeDifference(Arg);
+
+    out << difference.LHS << " : " << difference.RHS << ")";
+    break;
+  }
+  case LeftConcreteProjection: {
+    evaluator.applyLeftConcreteProjection(*this, system);
+
+    out << "LeftConcrete" << (Inverse ? "In" : "Pro") << "jection(";
+
+    const auto &difference = system.getTypeDifference(
+        getTypeDifferenceID());
+
+    out << difference.LHS << " : " << difference.RHS << ")";
+    break;
+  }
+  case RightConcreteProjection: {
+    evaluator.applyRightConcreteProjection(*this, system);
+
+    out << "RightConcrete" << (Inverse ? "In" : "Pro") << "jection(";
+
+    const auto &difference = system.getTypeDifference(
+        getTypeDifferenceID());
+
+    out << difference.LHS << " : " << difference.RHS << ")";
     break;
   }
   }
@@ -260,11 +293,11 @@ RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
 }
 
 std::pair<MutableTerm, MutableTerm>
-RewritePathEvaluator::applyAdjustment(const RewriteStep &step,
-                                      const RewriteSystem &system) {
+RewritePathEvaluator::applyPrefixSubstitutions(const RewriteStep &step,
+                                               const RewriteSystem &system) {
   auto &term = getCurrentTerm();
 
-  assert(step.Kind == RewriteStep::AdjustConcreteType);
+  assert(step.Kind == RewriteStep::PrefixSubstitutions);
 
   auto &ctx = system.getRewriteContext();
   MutableTerm prefix(term.begin() + step.StartOffset,
@@ -444,6 +477,204 @@ RewritePathEvaluator::applyRelation(const RewriteStep &step,
   return {lhs, rhs, prefix, suffix};
 }
 
+void RewritePathEvaluator::applyDecomposeConcrete(const RewriteStep &step,
+                                                  const RewriteSystem &system) {
+  assert(step.Kind == RewriteStep::DecomposeConcrete);
+
+  const auto &difference = system.getTypeDifference(step.Arg);
+  auto bug = [&](StringRef msg) {
+    llvm::errs() << msg << "\n";
+    llvm::errs() << "- StartOffset: " << step.StartOffset << "\n";
+    llvm::errs() << "- EndOffset: " << step.EndOffset << "\n";
+    llvm::errs() << "- DifferenceID: " << step.Arg << "\n";
+    llvm::errs() << "\nType difference:\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << "\nEvaluator state:\n";
+    dump(llvm::errs());
+    abort();
+  };
+
+  auto substitutions = difference.LHS.getSubstitutions();
+
+  if (!step.Inverse) {
+    auto &term = getCurrentTerm();
+
+    auto concreteSymbol = *(term.end() - step.EndOffset - 1);
+    if (concreteSymbol != difference.RHS)
+      bug("Concrete symbol not equal to expected RHS");
+
+    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset - 1);
+    newTerm.add(difference.LHS);
+    newTerm.append(term.end() - step.EndOffset, term.end());
+    term = newTerm;
+
+    for (unsigned n : indices(substitutions))
+      Primary.push_back(difference.getReplacementSubstitution(n));
+
+  } else {
+    unsigned numSubstitutions = substitutions.size();
+
+    if (Primary.size() < numSubstitutions + 1)
+      bug("Not enough terms on the stack");
+
+    for (unsigned n : indices(substitutions)) {
+      const auto &otherSubstitution = *(Primary.end() - numSubstitutions + n);
+      auto expectedSubstitution = difference.getReplacementSubstitution(n);
+      if (otherSubstitution != expectedSubstitution) {
+        llvm::errs() << "Got: " << otherSubstitution << "\n";
+        llvm::errs() << "Expected: " << expectedSubstitution << "\n";
+        bug("Unexpected substitution term on the stack");
+      }
+    }
+
+    Primary.resize(Primary.size() - numSubstitutions);
+
+    auto &term = getCurrentTerm();
+
+    auto concreteSymbol = *(term.end() - step.EndOffset - 1);
+    if (concreteSymbol != difference.LHS)
+      bug("Concrete symbol not equal to expected LHS");
+
+    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset - 1);
+    newTerm.add(difference.RHS);
+    newTerm.append(term.end() - step.EndOffset, term.end());
+    term = newTerm;
+  }
+}
+
+void
+RewritePathEvaluator::applyLeftConcreteProjection(const RewriteStep &step,
+                                                  const RewriteSystem &system) {
+  assert(step.Kind == RewriteStep::LeftConcreteProjection);
+
+  const auto &difference = system.getTypeDifference(step.getTypeDifferenceID());
+  unsigned index = step.getSubstitutionIndex();
+
+  auto leftProjection = difference.getOriginalSubstitution(index);
+
+  MutableTerm leftBaseTerm(difference.BaseTerm);
+  leftBaseTerm.add(difference.LHS);
+
+  auto bug = [&](StringRef msg) {
+    llvm::errs() << msg << "\n";
+    llvm::errs() << "- StartOffset: " << step.StartOffset << "\n";
+    llvm::errs() << "- EndOffset: " << step.EndOffset << "\n";
+    llvm::errs() << "- SubstitutionIndex: " << index << "\n";
+    llvm::errs() << "- LeftProjection: " << leftProjection << "\n";
+    llvm::errs() << "- LeftBaseTerm: " << leftBaseTerm << "\n";
+    llvm::errs() << "- DifferenceID: " << step.getTypeDifferenceID() << "\n";
+    llvm::errs() << "\nType difference:\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << ":\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << "\nEvaluator state:\n";
+    dump(llvm::errs());
+    abort();
+  };
+
+  if (!step.Inverse) {
+    const auto &term = getCurrentTerm();
+
+    MutableTerm subTerm(term.begin() + step.StartOffset,
+                        term.end() - step.EndOffset);
+    if (subTerm != MutableTerm(leftProjection))
+      bug("Incorrect left projection term");
+
+    Primary.push_back(leftBaseTerm);
+  } else {
+    if (Primary.size() < 2)
+      bug("Too few elements on the primary stack");
+
+    if (Primary.back() != leftBaseTerm)
+      bug("Incorrect left base term");
+
+    Primary.pop_back();
+
+    const auto &term = getCurrentTerm();
+
+    MutableTerm subTerm(term.begin() + step.StartOffset,
+                        term.end() - step.EndOffset);
+    if (subTerm != leftProjection)
+      bug("Incorrect left projection term");
+  }
+}
+
+void
+RewritePathEvaluator::applyRightConcreteProjection(const RewriteStep &step,
+                                                   const RewriteSystem &system) {
+  assert(step.Kind == RewriteStep::RightConcreteProjection);
+
+  const auto &difference = system.getTypeDifference(step.getTypeDifferenceID());
+  unsigned index = step.getSubstitutionIndex();
+
+  auto leftProjection = difference.getOriginalSubstitution(index);
+  auto rightProjection = difference.getReplacementSubstitution(index);
+
+  MutableTerm leftBaseTerm(difference.BaseTerm);
+  leftBaseTerm.add(difference.LHS);
+
+  MutableTerm rightBaseTerm(difference.BaseTerm);
+  rightBaseTerm.add(difference.RHS);
+
+  auto bug = [&](StringRef msg) {
+    llvm::errs() << msg << "\n";
+    llvm::errs() << "- StartOffset: " << step.StartOffset << "\n";
+    llvm::errs() << "- EndOffset: " << step.EndOffset << "\n";
+    llvm::errs() << "- SubstitutionIndex: " << index << "\n";
+    llvm::errs() << "- LeftProjection: " << leftProjection << "\n";
+    llvm::errs() << "- RightProjection: " << rightProjection << "\n";
+    llvm::errs() << "- LeftBaseTerm: " << leftBaseTerm << "\n";
+    llvm::errs() << "- RightBaseTerm: " << rightBaseTerm << "\n";
+    llvm::errs() << "- DifferenceID: " << step.getTypeDifferenceID() << "\n";
+    llvm::errs() << "\nType difference:\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << ":\n";
+    difference.dump(llvm::errs());
+    llvm::errs() << "\nEvaluator state:\n";
+    dump(llvm::errs());
+    abort();
+  };
+
+  if (!step.Inverse) {
+    auto &term = getCurrentTerm();
+
+    MutableTerm subTerm(term.begin() + step.StartOffset,
+                        term.end() - step.EndOffset);
+
+    if (subTerm != rightProjection)
+      bug("Incorrect right projection term");
+
+    MutableTerm newTerm(term.begin(), term.begin() + step.StartOffset);
+    newTerm.append(leftProjection);
+    newTerm.append(term.end() - step.EndOffset, term.end());
+
+    term = newTerm;
+
+    Primary.push_back(rightBaseTerm);
+  } else {
+    if (Primary.size() < 2)
+      bug("Too few elements on the primary stack");
+
+    if (Primary.back() != rightBaseTerm)
+      bug("Incorrect right base term");
+
+    Primary.pop_back();
+
+    auto &term = getCurrentTerm();
+
+    MutableTerm subTerm(term.begin() + step.StartOffset,
+                        term.end() - step.EndOffset);
+    if (subTerm != leftProjection)
+      bug("Incorrect left projection term");
+
+    MutableTerm newTerm(term.begin(), term.begin() + step.StartOffset);
+    newTerm.append(rightProjection);
+    newTerm.append(term.end() - step.EndOffset, term.end());
+
+    term = newTerm;
+  }
+}
+
 void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
@@ -451,8 +682,8 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
     (void) applyRewriteRule(step, system);
     break;
 
-  case RewriteStep::AdjustConcreteType:
-    (void) applyAdjustment(step, system);
+  case RewriteStep::PrefixSubstitutions:
+    (void) applyPrefixSubstitutions(step, system);
     break;
 
   case RewriteStep::Shift:
@@ -465,6 +696,18 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
 
   case RewriteStep::Relation:
     applyRelation(step, system);
+    break;
+
+  case RewriteStep::DecomposeConcrete:
+    applyDecomposeConcrete(step, system);
+    break;
+
+  case RewriteStep::LeftConcreteProjection:
+    applyLeftConcreteProjection(step, system);
+    break;
+
+  case RewriteStep::RightConcreteProjection:
+    applyRightConcreteProjection(step, system);
     break;
   }
 }

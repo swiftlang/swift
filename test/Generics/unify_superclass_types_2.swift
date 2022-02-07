@@ -34,8 +34,9 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK:      - τ_0_0.[P2:A2].[concrete: Int] => τ_0_0.[P2:A2]
 // CHECK-NEXT: - τ_0_0.[P1:A1].[concrete: String] => τ_0_0.[P1:A1]
 // CHECK-NEXT: - τ_0_0.[P2:B2] => τ_0_0.[P1:B1]
+// CHECK-NEXT: - τ_0_0.[P1:X].[superclass: Generic<τ_0_0, String, τ_0_1> with <τ_0_0.[P2:A2], τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
 // CHECK-NEXT: - τ_0_0.B2 => τ_0_0.[P1:B1]
-// CHECK:      - τ_0_0.[P1:X].[superclass: Generic<τ_0_0, String, τ_0_1> with <τ_0_0.[P2:A2], τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
+// CHECK:      - τ_0_0.[P1:X].[superclass: Generic<Int, String, τ_0_0> with <τ_0_0.[P1:B1]>] => τ_0_0.[P1:X]
 // CHECK:      }
 // CHECK: Property map: {
 // CHECK-NEXT:   [P1] => { conforms_to: [P1] }
@@ -45,5 +46,5 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P1 P2] }
 // CHECK-NEXT:   τ_0_0.[P2:A2] => { concrete_type: [concrete: Int] }
 // CHECK-NEXT:   τ_0_0.[P1:A1] => { concrete_type: [concrete: String] }
-// CHECK-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Generic<τ_0_0, String, τ_0_1> with <τ_0_0.[P2:A2], τ_0_0.[P1:B1]>] }
+// CHECK-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Generic<Int, String, τ_0_0> with <τ_0_0.[P1:B1]>] }
 // CHECK-NEXT: }

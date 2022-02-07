@@ -94,10 +94,13 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
       break;
     }
 
-    case RewriteStep::AdjustConcreteType:
+    case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::RightConcreteProjection:
       break;
     }
 
@@ -213,10 +216,13 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
       sawRule = true;
       continue;
     }
-    case RewriteStep::AdjustConcreteType:
+    case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::RightConcreteProjection:
       break;
     }
 
@@ -265,29 +271,32 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
   SmallVector<RewriteStep, 4> newSteps;
 
-  // Keep track of Decompose/Compose pairs. Any rewrite steps in
-  // between do not need to be re-contextualized, since they
-  // operate on new terms that were pushed on the stack by the
-  // Compose operation.
-  unsigned decomposeCount = 0;
-
   for (const auto &step : Steps) {
     switch (step.Kind) {
     case RewriteStep::Rule: {
+      // All other rewrite rules remain unchanged.
       if (step.getRuleID() != ruleID) {
         newSteps.push_back(step);
         break;
       }
 
-      auto adjustStep = [&](RewriteStep newStep) {
+      // Ok, we found a rewrite step referencing the redundant rule.
+      // Replace this step with the provided path. If this rewrite step has
+      // context, the path's own steps must be re-contextualized.
+
+      // Keep track of rewrite step pairs which push and pop the stack. Any
+      // rewrite steps enclosed with a push/pop are not re-contextualized.
+      unsigned pushCount = 0;
+
+      auto recontextualizeStep = [&](RewriteStep newStep) {
         bool inverse = newStep.Inverse ^ step.Inverse;
 
-        if (newStep.Kind == RewriteStep::Decompose && inverse) {
-          assert(decomposeCount > 0);
-          --decomposeCount;
+        if (newStep.pushesTermsOnStack() && inverse) {
+          assert(pushCount > 0);
+          --pushCount;
         }
 
-        if (decomposeCount == 0) {
+        if (pushCount == 0) {
           newStep.StartOffset += step.StartOffset;
           newStep.EndOffset += step.EndOffset;
         }
@@ -295,25 +304,32 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
         newStep.Inverse = inverse;
         newSteps.push_back(newStep);
 
-        if (newStep.Kind == RewriteStep::Decompose && !inverse) {
-          ++decomposeCount;
+        if (newStep.pushesTermsOnStack() && !inverse) {
+          ++pushCount;
         }
       };
 
+      // If this rewrite step is inverted, invert the entire path.
       if (step.Inverse) {
         for (auto newStep : llvm::reverse(path))
-          adjustStep(newStep);
+          recontextualizeStep(newStep);
       } else {
         for (auto newStep : path)
-          adjustStep(newStep);
+          recontextualizeStep(newStep);
       }
+
+      // Rewrite steps which push and pop the stack must come in balanced pairs.
+      assert(pushCount == 0);
 
       break;
     }
-    case RewriteStep::AdjustConcreteType:
+    case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
+    case RewriteStep::DecomposeConcrete:
+    case RewriteStep::LeftConcreteProjection:
+    case RewriteStep::RightConcreteProjection:
       newSteps.push_back(step);
       break;
     }
@@ -324,7 +340,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 }
 
 /// Find a rule to delete by looking through all loops for rewrite rules appearing
-/// once in empty context. Returns a redundant rule to delete if one was found,
+/// once in empty context. Returns a pair consisting of a loop ID and a rule ID,
 /// otherwise returns None.
 ///
 /// Minimization performs three passes over the rewrite system.
@@ -337,9 +353,8 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 /// 3) Finally, redundant conformance rules are deleted, with
 /// \p redundantConformances equal to the set of conformance rules that are
 ///    not minimal conformances.
-Optional<unsigned> RewriteSystem::
-findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
-                 RewritePath &replacementPath) {
+Optional<std::pair<unsigned, unsigned>> RewriteSystem::
+findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
   for (unsigned loopID : indices(Loops)) {
     auto &loop = Loops[loopID];
@@ -376,6 +391,9 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
     if (rule.isPermanent())
       continue;
 
+    // Homotopy reduction runs multiple passes with different filters to
+    // prioritize the deletion of certain rules ahead of others. Apply
+    // the filter now.
     if (!isRedundantRuleFn(ruleID))
       continue;
 
@@ -384,50 +402,76 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
       continue;
     }
 
+    if (Debug.contains(DebugFlags::HomotopyReduction)) {
+      llvm::dbgs() << "** Candidate " << rule << " from loop #"
+                   << pair.first << "\n";
+    }
+
+    // 'rule' is the candidate rule; 'otherRule' is the best rule to eliminate
+    // we've found so far.
     const auto &otherRule = getRule(found->second);
 
-    // If the new rule is conflicting, don't compare the rules at all
-    // and prefer to delete the new rule. Otherwise, prefer to delete
-    // the less canonical of the two rules.
-    if (rule.isConflicting() ||
-        rule.compare(otherRule, Context) > 0) {
+    unsigned ruleNesting = rule.getNesting();
+    unsigned otherRuleNesting = otherRule.getNesting();
+
+    // If both rules are concrete type requirements, first compare nesting
+    // depth. This breaks the tie when we have two rules that each imply
+    // the other via an induced rule that comes from a protocol.
+    //
+    // For example,
+    //
+    //    T == G<Int>
+    //    U == Int
+    //
+    // Where T == G<U> is implied elsewhere.
+    if (ruleNesting > 0 && otherRuleNesting > 0) {
+      if (ruleNesting > otherRuleNesting) {
+        found = pair;
+        continue;
+      } else if (otherRuleNesting > ruleNesting) {
+        continue;
+      }
+    }
+
+    // Otherwise, perform a shortlex comparison on (LHS, RHS).
+    Optional<int> comparison = rule.compare(otherRule, Context);
+    if (!comparison.hasValue()) {
+      // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
+      // C and C' are superclass, concrete type or concrete conformance
+      // symbols.
+      //
+      // This should only arise in two limited situations:
+      // - The new rule was marked invalid due to a conflict.
+      // - The new rule was substitution-simplified.
+      //
+      // In both cases, the new rule becomes the new candidate for
+      // elimination.
+      if (!rule.isConflicting() && !rule.isSubstitutionSimplified()) {
+        llvm::errs() << "Incomparable rules in homotopy reduction:\n";
+        llvm::errs() << "- Candidate rule: " << rule << "\n";
+        llvm::errs() << "- Best rule so far: " << otherRule << "\n";
+        abort();
+      }
+
       found = pair;
+      continue;
+    }
+
+    if (*comparison > 0) {
+      // Otherwise, if the new rule is less canonical than the best one so
+      // far, it becomes the new candidate for elimination.
+      found = pair;
+      continue;
     }
   }
 
-  if (!found)
-    return None;
-
-  unsigned loopID = found->first;
-  unsigned ruleID = found->second;
-  assert(replacementPath.empty());
-
-  auto &loop = Loops[loopID];
-  replacementPath = loop.Path.splitCycleAtRule(ruleID);
-
-  loop.markDeleted();
-
-  auto &rule = getRule(ruleID);
-  rule.markRedundant();
-
-  return ruleID;
+  return found;
 }
 
 /// Delete a rewrite rule that is known to be redundant, replacing all
 /// occurrences of the rule in all loops with the replacement path.
 void RewriteSystem::deleteRule(unsigned ruleID,
                                const RewritePath &replacementPath) {
-  if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    const auto &rule = getRule(ruleID);
-    llvm::dbgs() << "* Deleting rule ";
-    rule.dump(llvm::dbgs());
-    llvm::dbgs() << " (#" << ruleID << ")\n";
-    llvm::dbgs() << "* Replacement path: ";
-    MutableTerm mutTerm(rule.getLHS());
-    replacementPath.dump(llvm::dbgs(), mutTerm, *this);
-    llvm::dbgs() << "\n";
-  }
-
   // Replace all occurrences of the rule with the replacement path in
   // all remaining rewrite loops.
   for (auto &loop : Loops) {
@@ -453,15 +497,34 @@ void RewriteSystem::deleteRule(unsigned ruleID,
 void RewriteSystem::performHomotopyReduction(
     llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
   while (true) {
-    RewritePath replacementPath;
-    auto optRuleID = findRuleToDelete(isRedundantRuleFn,
-                                      replacementPath);
+    auto optPair = findRuleToDelete(isRedundantRuleFn);
 
     // If no redundant rules remain which can be eliminated by this pass, stop.
-    if (!optRuleID)
+    if (!optPair)
       return;
 
-    deleteRule(*optRuleID, replacementPath);
+    unsigned loopID = optPair->first;
+    unsigned ruleID = optPair->second;
+
+    auto &loop = Loops[loopID];
+    auto replacementPath = loop.Path.splitCycleAtRule(ruleID);
+
+    loop.markDeleted();
+
+    auto &rule = getRule(ruleID);
+
+    if (Debug.contains(DebugFlags::HomotopyReduction)) {
+      llvm::dbgs() << "** Deleting rule " << rule << " from loop #"
+                   << loopID << "\n";
+      llvm::dbgs() << "* Replacement path: ";
+      MutableTerm mutTerm(getRule(ruleID).getLHS());
+      replacementPath.dump(llvm::dbgs(), mutTerm, *this);
+      llvm::dbgs() << "\n";
+    }
+
+    rule.markRedundant();
+
+    deleteRule(ruleID, replacementPath);
   }
 }
 
@@ -481,6 +544,10 @@ void RewriteSystem::minimizeRewriteSystem() {
   // - Eliminate all LHS-simplified non-conformance rules.
   // - Eliminate all RHS-simplified and substitution-simplified rules.
   // - Eliminate all rules with unresolved symbols.
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    llvm::dbgs() << "\nFirst pass: simplified and unresolved rules\n\n";
+  }
+
   performHomotopyReduction([&](unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
@@ -509,6 +576,10 @@ void RewriteSystem::minimizeRewriteSystem() {
   computeMinimalConformances(redundantConformances);
 
   // Second pass: Eliminate all non-minimal conformance rules.
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    llvm::dbgs() << "\nSecond pass: non-minimal conformance rules\n\n";
+  }
+
   performHomotopyReduction([&](unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
@@ -520,6 +591,10 @@ void RewriteSystem::minimizeRewriteSystem() {
   });
 
   // Third pass: Eliminate all other redundant non-conformance rules.
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    llvm::dbgs() << "\nThird pass: all other redundant rules\n\n";
+  }
+
   performHomotopyReduction([&](unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
