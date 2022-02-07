@@ -71,8 +71,8 @@ public:
 
   static Term get(const MutableTerm &term, RewriteContext &ctx);
 
-  ArrayRef<const ProtocolDecl *> getRootProtocols() const {
-    return begin()->getRootProtocols();
+  const ProtocolDecl *getRootProtocol() const {
+    return begin()->getRootProtocol();
   }
 
   bool containsUnresolvedSymbols() const;
@@ -150,8 +150,8 @@ public:
 
   size_t size() const { return Symbols.size(); }
 
-  ArrayRef<const ProtocolDecl *> getRootProtocols() const {
-    return begin()->getRootProtocols();
+  const ProtocolDecl *getRootProtocol() const {
+    return begin()->getRootProtocol();
   }
 
   const Symbol *begin() const { return Symbols.begin(); }

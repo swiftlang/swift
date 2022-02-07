@@ -452,7 +452,7 @@ public:
   void recordRewriteLoop(MutableTerm basepoint,
                          RewritePath path);
 
-  bool isInMinimizationDomain(ArrayRef<const ProtocolDecl *> protos) const;
+  bool isInMinimizationDomain(const ProtocolDecl *proto) const;
 
   ArrayRef<RewriteLoop> getLoops() const {
     return Loops;

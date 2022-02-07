@@ -647,15 +647,13 @@ void RewriteSystem::simplifyLeftHandSideSubstitutions() {
 ///
 /// All other loops can be discarded since they do not encode redundancies
 /// that are relevant to us.
-bool RewriteSystem::isInMinimizationDomain(
-    ArrayRef<const ProtocolDecl *> protos) const {
-  assert(protos.size() <= 1);
-  assert(Protos.empty() || !protos.empty());
+bool RewriteSystem::isInMinimizationDomain(const ProtocolDecl *proto) const {
+  assert(Protos.empty() || proto != nullptr);
 
-  if (protos.empty() && Protos.empty())
+  if (proto == nullptr && Protos.empty())
     return true;
 
-  if (std::find(Protos.begin(), Protos.end(), protos[0]) != Protos.end())
+  if (std::find(Protos.begin(), Protos.end(), proto) != Protos.end())
     return true;
 
   return false;
@@ -670,7 +668,7 @@ void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
     return;
 
   // Ignore the rewrite rule if it is not part of our minimization domain.
-  if (!isInMinimizationDomain(basepoint.getRootProtocols()))
+  if (!isInMinimizationDomain(basepoint.getRootProtocol()))
     return;
 
   Loops.push_back(loop);
@@ -740,8 +738,8 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       }
     }
 
-    auto lhsDomain = lhs.getRootProtocols();
-    auto rhsDomain = rhs.getRootProtocols();
+    auto lhsDomain = lhs.getRootProtocol();
+    auto rhsDomain = rhs.getRootProtocol();
 
     ASSERT_RULE(lhsDomain == rhsDomain);
   }

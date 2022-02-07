@@ -101,9 +101,8 @@ unsigned RewriteSystem::recordConcreteTypeWitnessRelation(
          Symbol::Kind::ConcreteConformance);
   assert(associatedTypeSymbol.getKind() ==
          Symbol::Kind::AssociatedType);
-  assert(associatedTypeSymbol.getProtocols().size() == 1);
   assert(concreteConformanceSymbol.getProtocol() ==
-         associatedTypeSymbol.getProtocols()[0]);
+         associatedTypeSymbol.getProtocol());
   assert(typeWitnessSymbol.getKind() == Symbol::Kind::ConcreteType);
 
   MutableTerm rhsTerm;

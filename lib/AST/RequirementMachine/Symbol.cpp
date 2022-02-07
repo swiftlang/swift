@@ -42,7 +42,6 @@ struct Symbol::Storage final
   friend class Symbol;
 
   unsigned Kind : 3;
-  unsigned NumProtocols : 15;
   unsigned NumSubstitutions : 14;
 
   union {
@@ -55,43 +54,34 @@ struct Symbol::Storage final
 
   explicit Storage(Identifier name) {
     Kind = unsigned(Symbol::Kind::Name);
-    NumProtocols = 0;
     NumSubstitutions = 0;
     Name = name;
   }
 
   explicit Storage(LayoutConstraint layout) {
     Kind = unsigned(Symbol::Kind::Layout);
-    NumProtocols = 0;
     NumSubstitutions = 0;
     Layout = layout;
   }
 
   explicit Storage(const ProtocolDecl *proto) {
     Kind = unsigned(Symbol::Kind::Protocol);
-    NumProtocols = 0;
     NumSubstitutions = 0;
     Proto = proto;
   }
 
   explicit Storage(GenericTypeParamType *param) {
     Kind = unsigned(Symbol::Kind::GenericParam);
-    NumProtocols = 0;
     NumSubstitutions = 0;
     GenericParam = param;
   }
 
-  Storage(ArrayRef<const ProtocolDecl *> protos, Identifier name) {
-    assert(!protos.empty());
-
+  Storage(const ProtocolDecl *proto, Identifier name) {
     Kind = unsigned(Symbol::Kind::AssociatedType);
-    NumProtocols = protos.size();
-    assert(NumProtocols == protos.size() && "Overflow");
     NumSubstitutions = 0;
     Name = name;
 
-    for (unsigned i : indices(protos))
-      getProtocols()[i] = protos[i];
+    *getTrailingObjects<const ProtocolDecl *>() = proto;
   }
 
   Storage(Symbol::Kind kind, CanType type, ArrayRef<Term> substitutions) {
@@ -101,7 +91,6 @@ struct Symbol::Storage final
     assert(type->hasTypeParameter() != substitutions.empty());
 
     Kind = unsigned(kind);
-    NumProtocols = 0;
     NumSubstitutions = substitutions.size();
     ConcreteType = type;
 
@@ -114,30 +103,22 @@ struct Symbol::Storage final
     assert(type->hasTypeParameter() != substitutions.empty());
 
     Kind = unsigned(Symbol::Kind::ConcreteConformance);
-    NumProtocols = 1;
     NumSubstitutions = substitutions.size();
     ConcreteType = type;
 
     for (unsigned i : indices(substitutions))
       getSubstitutions()[i] = substitutions[i];
 
-    getProtocols()[0] = proto;
+    *getTrailingObjects<const ProtocolDecl *>() = proto;
   }
 
   size_t numTrailingObjects(OverloadToken<const ProtocolDecl *>) const {
-    return NumProtocols;
+    return (Kind == unsigned(Symbol::Kind::AssociatedType) ||
+            Kind == unsigned(Symbol::Kind::ConcreteConformance));
   }
 
   size_t numTrailingObjects(OverloadToken<Term>) const {
     return NumSubstitutions;
-  }
-
-  MutableArrayRef<const ProtocolDecl *> getProtocols() {
-    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
-  }
-
-  ArrayRef<const ProtocolDecl *> getProtocols() const {
-    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
   }
 
   MutableArrayRef<Term> getSubstitutions() {
@@ -163,27 +144,15 @@ Identifier Symbol::getName() const {
   return Ptr->Name;
 }
 
-/// Get the single protocol declaration associated with a protocol symbol.
+/// Get the protocol declaration associated with a protocol or associated type
+/// symbol.
 const ProtocolDecl *Symbol::getProtocol() const {
   if (getKind() == Kind::Protocol)
     return Ptr->Proto;
 
-  assert(getKind() == Kind::ConcreteConformance);
-  assert(Ptr->getProtocols().size() == 1);
-  return Ptr->getProtocols()[0];
-}
-
-/// Get the list of protocols associated with a protocol or associated type
-/// symbol. Note that if this is a protocol symbol, the return value will have
-/// exactly one element.
-ArrayRef<const ProtocolDecl *> Symbol::getProtocols() const {
-  auto protos = Ptr->getProtocols();
-  if (protos.empty()) {
-    assert(getKind() == Kind::Protocol);
-    return {&Ptr->Proto, 1};
-  }
-  assert(getKind() == Kind::AssociatedType);
-  return protos;
+  assert(getKind() == Kind::AssociatedType ||
+         getKind() == Kind::ConcreteConformance);
+  return *Ptr->getTrailingObjects<const ProtocolDecl *>();
 }
 
 /// Get the generic parameter associated with a generic parameter symbol.
@@ -207,6 +176,8 @@ CanType Symbol::getConcreteType() const {
   return Ptr->ConcreteType;
 }
 
+/// Get the list of substitution terms associated with a superclass,
+/// concrete type or concrete conformance symbol.
 ArrayRef<Term> Symbol::getSubstitutions() const {
   assert(getKind() == Kind::Superclass ||
          getKind() == Kind::ConcreteType ||
@@ -270,27 +241,13 @@ Symbol Symbol::forProtocol(const ProtocolDecl *proto,
   return symbol;
 }
 
-/// Creates a new associated type symbol for a single protocol.
+/// Creates a new associated type symbol.
 Symbol Symbol::forAssociatedType(const ProtocolDecl *proto,
-                                 Identifier name,
-                                 RewriteContext &ctx) {
-  SmallVector<const ProtocolDecl *, 1> protos;
-  protos.push_back(proto);
-
-  return forAssociatedType(protos, name, ctx);
-}
-
-/// Creates a merged associated type symbol to represent a nested
-/// type that conforms to multiple protocols, all of which have
-/// an associated type with the same name.
-Symbol Symbol::forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
                                  Identifier name,
                                  RewriteContext &ctx) {
   llvm::FoldingSetNodeID id;
   id.AddInteger(unsigned(Kind::AssociatedType));
-  id.AddInteger(protos.size());
-  for (const auto *proto : protos)
-    id.AddPointer(proto);
+  id.AddPointer(proto);
   id.AddPointer(name.get());
 
   void *insertPos = nullptr;
@@ -298,9 +255,9 @@ Symbol Symbol::forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
-      protos.size(), 0);
+      1, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
-  auto *symbol = new (mem) Storage(protos, name);
+  auto *symbol = new (mem) Storage(proto, name);
 
 #ifndef NDEBUG
   llvm::FoldingSetNodeID newID;
@@ -472,20 +429,19 @@ Symbol Symbol::forConcreteConformance(CanType type,
 /// Given that this symbol is the first symbol of a term, return the
 /// "domain" of the term.
 ///
-/// - If the first symbol is a protocol symbol [P], the domain is P.
-/// - If the first symbol is an associated type symbol [P1&...&Pn],
-///   the domain is {P1, ..., Pn}.
+/// - If the first symbol is a protocol symbol [P] or associated type
+/// symbol [P:T], the domain is P.
 /// - If the first symbol is a generic parameter symbol, the domain is
-///   the empty set {}.
+///   nullptr.
 /// - Anything else will assert.
-ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
+const ProtocolDecl *Symbol::getRootProtocol() const {
   switch (getKind()) {
   case Symbol::Kind::Protocol:
   case Symbol::Kind::AssociatedType:
-    return getProtocols();
+    return getProtocol();
 
   case Symbol::Kind::GenericParam:
-    return ArrayRef<const ProtocolDecl *>();
+    return nullptr;
 
   case Symbol::Kind::Name:
   case Symbol::Kind::Layout:
@@ -514,35 +470,18 @@ ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
 ///
 /// Then we break ties when both symbols have the same kind as follows:
 ///
-/// * For associated type symbols, symbols with larger support are smaller
-///   than those with smaller support.
-///
-///   This ensures that if P inherits from Q, then [P:T] < [Q:T].
-///
-///   Furthermore, if P1...Pm and Q1...Qn are two minimal sets of protocols,
-///   this ensures that the following holds, where merge() is the
-///   RewriteContext::mergeAssociatedTypes() operation:
-///
-///     [merge(P1&...&Pm, Q1&...&Qn):T] < [P1&...&Pm:T]
-///     [merge(P1&...&Pm, Q1&...&Qn):T] < [Q1&...&Qn:T]
-///
-///   For example, if P1 and P2 are unrelated protocols, and P3 inherits
-///   both P1 and P2, then
-///
-///     [P1&P2:T] < [P1:T]
-///     [P1&P2:T] < [P2:T]
-///     [P3:T] < [P1&P2:T]
-///
-///   If two different lists of protocols have the same support, the tie is
-///   broken by a lexshort comparison on the lists.
+/// * For associated type symbols, we compare the name first, followed by
+///   the protocols, which are compared just like protocol symbols,
+///   described below.
 ///
 /// * For generic parameter symbols, we first order by depth, then index.
 ///
 /// * For unbound name symbols, we compare identifiers lexicographically.
 ///
-/// * For protocol symbols, protocols with larger support are ordered before
-///   those with smaller support. The type order defined in TypeDecl::compare()
-///   is used to break ties; based on the protocol name and parent module.
+/// * For protocol symbols, protocols with more inherited protocols are ordered
+///   before those with fewer inherited protocols. The type order defined in
+///   TypeDecl::compare() is used to break ties; based on the protocol name
+///   and parent module.
 ///
 /// * For layout symbols, we use LayoutConstraint::compare().
 ///
@@ -573,29 +512,10 @@ Optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
     break;
 
   case Kind::AssociatedType: {
-    auto protos = getProtocols();
-    auto otherProtos = other.getProtocols();
-
     if (getName() != other.getName())
       return getName().compare(other.getName());
 
-    // Symbols with larger support are *smaller* than those with
-    // smaller support.
-    unsigned support = ctx.getProtocolSupport(protos);
-    unsigned otherSupport = ctx.getProtocolSupport(otherProtos);
-    if (support != otherSupport)
-      return support > otherSupport ? -1 : 1;
-
-    // Otherwise, perform a shortlex comparison in the protocols.
-    if (protos.size() != otherProtos.size())
-      return protos.size() < otherProtos.size() ? -1 : 1;
-
-    for (unsigned i : indices(protos)) {
-      int result = ctx.compareProtocols(protos[i], otherProtos[i]);
-      if (result)
-        return result;
-    }
-
+    result = ctx.compareProtocols(getProtocol(), other.getProtocol());
     break;
   }
 
@@ -753,17 +673,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     return;
 
   case Kind::AssociatedType: {
-    out << "[";
-    bool first = true;
-    for (const auto *proto : getProtocols()) {
-      if (first) {
-        first = false;
-      } else {
-        out << "&";
-      }
-      out << proto->getName();
-    }
-    out << ":" << getName() << "]";
+    out << "[" << getProtocol()->getName() << ":" << getName() << "]";
     return;
   }
 
@@ -822,12 +732,7 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     return;
 
   case Symbol::Kind::AssociatedType: {
-    auto protos = getProtocols();
-    id.AddInteger(protos.size());
-
-    for (const auto *proto : protos)
-      id.AddPointer(proto);
-
+    id.AddPointer(*getTrailingObjects<const ProtocolDecl *>());
     id.AddPointer(Name.get());
     return;
   }
@@ -850,7 +755,7 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     for (auto term : getSubstitutions())
       id.AddPointer(term.getOpaquePointer());
 
-    id.AddPointer(getProtocols()[0]);
+    id.AddPointer(*getTrailingObjects<const ProtocolDecl *>());
     return;
   }
   }
