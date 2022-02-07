@@ -559,7 +559,7 @@ void Rewriter::updateSSA() {
                             context.borrowee);
   updater.addAvailableValue(mvi->getParentBlock(), mvi);
 
-  SmallVector<Operand *> uses;
+  SmallVector<Operand *, 16> uses;
   for (auto use : context.borrowee->getUses()) {
     if (use->getUser() == mvi)
       continue;
@@ -599,7 +599,7 @@ bool FindCandidates::run(Candidates &candidates) {
 }
 
 bool findIntroducerUsage(Context const &context, IntroducerUsage &usage) {
-  SmallVector<Operand *> useVector;
+  SmallVector<Operand *, 16> useVector;
   if (!findExtendedUsesOfSimpleBorrowedValue(context.borrowedValue,
                                              &useVector)) {
     // If the value produced by begin_borrow escapes, don't shrink the borrow
