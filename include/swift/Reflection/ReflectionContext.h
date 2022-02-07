@@ -1157,7 +1157,7 @@ public:
         reinterpret_cast<const ConcurrentHashMap<Runtime> *>(MapBytes.get());
 
     auto Count = MapData->ElementCount;
-    auto Size = Count * sizeof(ConformanceCacheEntry<Runtime>);
+    auto Size = Count * sizeof(ConformanceCacheEntry<Runtime>) + sizeof(StoredPointer);
 
     auto ElementsBytes =
         getReader().readBytes(RemoteAddress(MapData->Elements), Size);
@@ -1165,7 +1165,7 @@ public:
       return;
     auto ElementsData =
         reinterpret_cast<const ConformanceCacheEntry<Runtime> *>(
-            ElementsBytes.get());
+            reinterpret_cast<const char *>(ElementsBytes.get()) + sizeof(StoredPointer));
 
     for (StoredSize i = 0; i < Count; i++) {
       auto &Element = ElementsData[i];
