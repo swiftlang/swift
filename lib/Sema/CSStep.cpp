@@ -816,6 +816,10 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // by dropping all scoring information.
   CS.CurrentScore = Score();
 
+  // Reset the scope counter to avoid "too complex" failures
+  // when closure has a lot of elements in the body.
+  CS.CountScopes = 0;
+
   auto success = element.attempt(CS);
 
   // If element attempt has failed, mark whole conjunction

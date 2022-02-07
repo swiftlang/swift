@@ -857,6 +857,10 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// The score established before conjunction is attempted.
   Score CurrentScore;
 
+  /// The number of constraint solver scopes already explored
+  /// before accepting this conjunction.
+  llvm::SaveAndRestore<unsigned> OuterScopeCount;
+
   /// Conjunction constraint associated with this step.
   Constraint *Conjunction;
   /// Position of the conjunction in the inactive constraints
@@ -889,8 +893,8 @@ public:
       : BindingStep(cs, {cs, conjunction},
                     conjunction->isIsolated() ? IsolatedSolutions : solutions),
         BestScore(getBestScore()), CurrentScore(getCurrentScore()),
-        Conjunction(conjunction), AfterConjunction(erase(conjunction)),
-        OuterSolutions(solutions) {
+        OuterScopeCount(cs.CountScopes, 0), Conjunction(conjunction),
+        AfterConjunction(erase(conjunction)), OuterSolutions(solutions) {
     assert(conjunction->getKind() == ConstraintKind::Conjunction);
 
     // Make a snapshot of the constraint system state before conjunction.
