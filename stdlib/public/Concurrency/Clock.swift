@@ -16,16 +16,16 @@ public protocol Clock: Sendable {
   associatedtype Instant: InstantProtocol
 
   var now: Instant { get }
-  var minimumResolution: Instant.Interval { get }
+  var minimumResolution: Instant.Duration { get }
 
-  func sleep(until deadline: Instant, tolerance: Instant.Interval?) async throws
+  func sleep(until deadline: Instant, tolerance: Instant.Duration?) async throws
 }
 
 
 @available(SwiftStdlib 9999, *)
 extension Clock {
   @available(SwiftStdlib 9999, *)
-  public func measure(_ work: () throws -> Void) rethrows -> Instant.Interval {
+  public func measure(_ work: () throws -> Void) rethrows -> Instant.Duration {
     let start = now
     try work()
     let end = now
@@ -35,7 +35,7 @@ extension Clock {
   @available(SwiftStdlib 9999, *)
   public func measure(
     _ work: () async throws -> Void
-  ) async rethrows -> Instant.Interval {
+  ) async rethrows -> Instant.Duration {
     let start = now
     try await work()
     let end = now

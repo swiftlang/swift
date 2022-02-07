@@ -14,9 +14,9 @@ import Swift
 @available(SwiftStdlib 9999, *)
 public struct ContinuousClock {
   public struct Instant: Codable, Sendable {
-    internal var _value: Duration
+    internal var _value: Swift.Duration
 
-    internal init(_value: Duration) {
+    internal init(_value: Swift.Duration) {
       self._value = _value
     }
   }
@@ -36,7 +36,7 @@ extension ContinuousClock: Clock {
     ContinuousClock.now
   }
 
-  public var minimumResolution: Duration {
+  public var minimumResolution: Swift.Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
     _getClockRes(
@@ -58,7 +58,7 @@ extension ContinuousClock: Clock {
   }
 
   public func sleep(
-    until deadline: Instant, tolerance: Duration? = nil
+    until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
     try await Task._sleep(until:
       deadline._value.seconds, deadline._value.nanoseconds,
@@ -71,11 +71,11 @@ extension ContinuousClock: Clock {
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }
 
-  public func advanced(by duration: Duration) -> ContinuousClock.Instant {
+  public func advanced(by duration: Swift.Duration) -> ContinuousClock.Instant {
     return ContinuousClock.Instant(_value: _value + duration)
   }
 
-  public func duration(to other: ContinuousClock.Instant) -> Duration {
+  public func duration(to other: ContinuousClock.Instant) -> Swift.Duration {
     other._value - _value
   }
 
@@ -98,7 +98,7 @@ extension ContinuousClock.Instant: InstantProtocol {
   @_alwaysEmitIntoClient
   @inlinable
   public static func + (
-    _ lhs: ContinuousClock.Instant, _ rhs: Duration
+    _ lhs: ContinuousClock.Instant, _ rhs: Swift.Duration
   ) -> ContinuousClock.Instant {
     lhs.advanced(by: rhs)
   }
@@ -106,7 +106,7 @@ extension ContinuousClock.Instant: InstantProtocol {
   @_alwaysEmitIntoClient
   @inlinable
   public static func += (
-    _ lhs: inout ContinuousClock.Instant, _ rhs: Duration
+    _ lhs: inout ContinuousClock.Instant, _ rhs: Swift.Duration
   ) {
     lhs = lhs.advanced(by: rhs)
   }
@@ -114,7 +114,7 @@ extension ContinuousClock.Instant: InstantProtocol {
   @_alwaysEmitIntoClient
   @inlinable
   public static func - (
-    _ lhs: ContinuousClock.Instant, _ rhs: Duration
+    _ lhs: ContinuousClock.Instant, _ rhs: Swift.Duration
   ) -> ContinuousClock.Instant {
     lhs.advanced(by: .zero - rhs)
   }
@@ -122,7 +122,7 @@ extension ContinuousClock.Instant: InstantProtocol {
   @_alwaysEmitIntoClient
   @inlinable
   public static func -= (
-    _ lhs: inout ContinuousClock.Instant, _ rhs: Duration
+    _ lhs: inout ContinuousClock.Instant, _ rhs: Swift.Duration
   ) {
     lhs = lhs.advanced(by: .zero - rhs)
   }
@@ -131,7 +131,7 @@ extension ContinuousClock.Instant: InstantProtocol {
   @inlinable
   public static func - (
     _ lhs: ContinuousClock.Instant, _ rhs: ContinuousClock.Instant
-  ) -> Duration {
+  ) -> Swift.Duration {
     rhs.duration(to: lhs)
   }
 }

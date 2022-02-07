@@ -14,9 +14,9 @@ import Swift
 @available(SwiftStdlib 9999, *)
 public struct SuspendingClock {
   public struct Instant: Codable, Sendable {
-    internal var _value: Duration
+    internal var _value: Swift.Duration
 
-    internal init(_value: Duration) {
+    internal init(_value: Swift.Duration) {
       self._value = _value
     }
   }
@@ -50,7 +50,7 @@ extension SuspendingClock: Clock {
   }
 
   @available(SwiftStdlib 9999, *)
-  public var minimumResolution: Duration {
+  public var minimumResolution: Swift.Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
     _getClockRes(
@@ -62,7 +62,7 @@ extension SuspendingClock: Clock {
 
   @available(SwiftStdlib 9999, *)
   public func sleep(
-    until deadline: Instant, tolerance: Duration? = nil
+    until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
     try await Task._sleep(until:
       deadline._value.seconds, deadline._value.nanoseconds,
@@ -77,12 +77,12 @@ extension SuspendingClock.Instant: InstantProtocol {
   public static var now: SuspendingClock.Instant { SuspendingClock().now }
 
   @available(SwiftStdlib 9999, *)
-  public func advanced(by duration: Duration) -> SuspendingClock.Instant {
+  public func advanced(by duration: Swift.Duration) -> SuspendingClock.Instant {
     SuspendingClock.Instant(_value: _value + duration)
   }
 
   @available(SwiftStdlib 9999, *)
-  public func duration(to other: SuspendingClock.Instant) -> Duration {
+  public func duration(to other: SuspendingClock.Instant) -> Swift.Duration {
     other._value - _value
   }
 
@@ -107,28 +107,28 @@ extension SuspendingClock.Instant: InstantProtocol {
 
   @available(SwiftStdlib 9999, *)
   public static func + (
-    _ lhs: SuspendingClock.Instant, _ rhs: Duration
+    _ lhs: SuspendingClock.Instant, _ rhs: Swift.Duration
   ) -> SuspendingClock.Instant {
     lhs.advanced(by: rhs)
   }
 
   @available(SwiftStdlib 9999, *)
   public static func += (
-    _ lhs: inout SuspendingClock.Instant, _ rhs: Duration
+    _ lhs: inout SuspendingClock.Instant, _ rhs: Swift.Duration
   ) {
     lhs = lhs.advanced(by: rhs)
   }
 
   @available(SwiftStdlib 9999, *)
   public static func - (
-    _ lhs: SuspendingClock.Instant, _ rhs: Duration
+    _ lhs: SuspendingClock.Instant, _ rhs: Swift.Duration
   ) -> SuspendingClock.Instant {
     lhs.advanced(by: .zero - rhs)
   }
 
   @available(SwiftStdlib 9999, *)
   public static func -= (
-    _ lhs: inout SuspendingClock.Instant, _ rhs: Duration
+    _ lhs: inout SuspendingClock.Instant, _ rhs: Swift.Duration
   ) {
     lhs = lhs.advanced(by: .zero - rhs)
   }
@@ -136,7 +136,7 @@ extension SuspendingClock.Instant: InstantProtocol {
   @available(SwiftStdlib 9999, *)
   public static func - (
     _ lhs: SuspendingClock.Instant, _ rhs: SuspendingClock.Instant
-  ) -> Duration {
+  ) -> Swift.Duration {
     rhs.duration(to: lhs)
   }
 }
