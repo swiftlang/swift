@@ -1318,6 +1318,77 @@ public:
 };
 }
 
+/// Determine whether we should open up the existential argument to the
+/// given parameters.
+///
+/// \param callee The function or subscript being called.
+/// \param paramIdx The index specifying which function parameter is being
+/// initialized.
+/// \param paramTy The type of the parameter as it was opened in the constraint
+/// system.
+/// \param argTy The type of the argument.
+///
+/// \returns If the argument type is existential and opening it can bind a
+/// generic parameter in the callee, returns the type variable (from the
+/// opened parameter type) and the existential type that needs to be opened
+/// (from the argument type).
+static Optional<std::pair<TypeVariableType *, Type>>
+shouldOpenExistentialCallArgument(
+    ValueDecl *callee, unsigned paramIdx, Type paramTy, Type argTy) {
+  if (!callee)
+    return None;
+
+  // _openExistential handles its own opening.
+  if (TypeChecker::getDeclTypeCheckingSemantics(callee) ==
+        DeclTypeCheckingSemantics::OpenExistential)
+    return None;
+
+  ASTContext &ctx = callee->getASTContext();
+  if (!ctx.LangOpts.EnableOpenedExistentialTypes)
+    return None;
+
+  // The actual parameter type needs to involve a type variable, otherwise
+  // type inference won't be possible.
+  if (!paramTy->hasTypeVariable())
+    return None;
+
+  // The argument type needs to be an existential type or metatype thereof.
+  if (!argTy->isAnyExistentialType())
+    return None;
+
+  auto param = getParameterAt(callee, paramIdx);
+  if (!param)
+    return None;
+
+  // If the parameter is non-generic variadic, don't open.
+  if (param->isVariadic() && !param->getVarargBaseTy()->hasTypeSequence())
+    return None;
+
+  // The parameter type must be a type variable.
+  auto paramTypeVar = paramTy->getAs<TypeVariableType>();
+  if (!paramTypeVar)
+    return None;
+
+  auto formalParamTy = param->getInterfaceType();
+  auto genericParam = formalParamTy->getAs<GenericTypeParamType>();
+  if (!genericParam)
+    return None;
+
+  // Ensure that the formal parameter is only used in covariant positions,
+  // because it won't match anywhere else.
+  auto genericSig = callee->getAsGenericContext()->getGenericSignatureOfContext()
+      .getCanonicalSignature();
+  auto referenceInfo = findGenericParameterReferences(
+      callee, genericSig, genericParam,
+      /*treatNonResultCovarianceAsInvariant=*/false,
+      /*skipParamIdx=*/paramIdx);
+  if (referenceInfo.selfRef > TypePosition::Covariant ||
+      referenceInfo.assocTypeRef > TypePosition::Covariant)
+    return None;
+
+  return std::make_pair(paramTypeVar, argTy);
+}
+
 // Match the argument of a call to the parameter.
 static ConstraintSystem::TypeMatchResult matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType,
@@ -1552,23 +1623,14 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
 
       // If the argument is an existential type and the parameter is generic,
       // consider opening the existential type.
-      if (argTy->isAnyExistentialType() &&
-          cs.getASTContext().LangOpts.EnableOpenedExistentialTypes &&
-          paramTy->hasTypeVariable() &&
-          !(callee &&
-            TypeChecker::getDeclTypeCheckingSemantics(callee) ==
-              DeclTypeCheckingSemantics::OpenExistential)) {
-        if (auto param = getParameterAt(callee, argIdx)) {
-          if (auto paramTypeVar = paramTy->getAs<TypeVariableType>()) {
-            if (param->getInterfaceType()->is<GenericTypeParamType>()) {
-              OpenedArchetypeType *opened;
-              std::tie(argTy, opened) = cs.openExistentialType(
-                  argTy, cs.getConstraintLocator(loc));
+      if (auto existentialArg = shouldOpenExistentialCallArgument(
+              callee, paramIdx, paramTy, argTy)) {
+        assert(existentialArg->second->isEqual(argTy));
+        OpenedArchetypeType *opened;
+        std::tie(argTy, opened) = cs.openExistentialType(
+            argTy, cs.getConstraintLocator(loc));
 
-              openedExistentials.push_back({paramTypeVar, opened});
-            }
-          }
-        }
+        openedExistentials.push_back({existentialArg->first, opened});
       }
 
       auto argLabel = argument.getLabel();
