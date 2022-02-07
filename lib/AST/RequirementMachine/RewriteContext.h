@@ -182,8 +182,6 @@ public:
 
   AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol);
 
-  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs);
-
   //////////////////////////////////////////////////////////////////////////////
   ///
   /// Construction of requirement machines for connected components in the
