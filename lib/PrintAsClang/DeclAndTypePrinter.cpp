@@ -1835,7 +1835,8 @@ private:
 
   void visitExistentialType(ExistentialType *ET,
                             Optional<OptionalTypeKind> optionalKind) {
-    visitPart(ET->getConstraintType(), optionalKind);
+    visitExistentialType(ET, optionalKind,
+        /*isMetatype=*/ET->getConstraintType()->is<AnyMetatypeType>());
   }
 
   void visitExistentialMetatypeType(ExistentialMetatypeType *MT,
