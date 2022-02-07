@@ -1368,7 +1368,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     bool signExt = clangResultTy->hasSignedIntegerRepresentation();
     assert((signExt || clangResultTy->hasUnsignedIntegerRepresentation()) &&
            "Invalid attempt to add extension attribute to argument!");
-     Attrs = Attrs.addRetAttribute(IGM.getLLVMContext(),
+    Attrs = Attrs.addRetAttribute(IGM.getLLVMContext(),
                                   attrKindForExtending(signExt));
   }
 
