@@ -422,19 +422,19 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     // depth. This breaks the tie when we have two rules that each imply
     // the other via an induced rule that comes from a protocol.
     //
-    // For example,
+    // For example, if 'X.T == G<U>' is implied by the conformance on X,
+    // and the following two rules are defined in the current protocol:
     //
-    //    T == G<Int>
-    //    U == Int
+    //    X.T == G<Int>
+    //    X.U == Int
     //
-    // Where T == G<U> is implied elsewhere.
-    if (ruleNesting > 0 && otherRuleNesting > 0) {
-      if (ruleNesting > otherRuleNesting) {
-        found = pair;
-        continue;
-      } else if (otherRuleNesting > ruleNesting) {
-        continue;
-      }
+    // Then 'X.T == G<Int>' is a better candidate for elimination than
+    // 'X.U == Int'.
+    if (ruleNesting > otherRuleNesting) {
+      found = pair;
+      continue;
+    } else if (otherRuleNesting > ruleNesting) {
+      continue;
     }
 
     // Otherwise, perform a shortlex comparison on (LHS, RHS).
