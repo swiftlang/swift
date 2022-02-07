@@ -69,6 +69,7 @@ protocol CollectionOf: Collection {
 extension Array: CollectionOf { }
 extension Set: CollectionOf { }
 
+// expected-note@+2{{required by global function 'reverseIt' where 'some CollectionOf<T>' = 'CollectionOf'}}
 @available(SwiftStdlib 5.1, *)
 func reverseIt<T>(_ c: some CollectionOf<T>) -> some CollectionOf<T> {
   return c.reversed()
@@ -76,8 +77,9 @@ func reverseIt<T>(_ c: some CollectionOf<T>) -> some CollectionOf<T> {
 
 @available(SwiftStdlib 5.1, *)
 func useReverseIt(_ c: any CollectionOf) {
-  let c = reverseIt(c)
-  let _: Int = c // expected-error{{cannot convert value of type 'CollectionOf' to specified type 'Int'}}
+  // Can't type-erase the `T` from the result.
+  _ = reverseIt(c) // expected-error{{protocol 'CollectionOf' as a type cannot conform to the protocol itself}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 
 /// --- Opening existentials when returning opaque types.
@@ -94,9 +96,51 @@ extension P {
 }
 
 @available(SwiftStdlib 5.1, *)
+func getPQ<T: P>(_: T) -> some Q {
+  let a: T.A? = nil
+  return a!
+}
+
+// expected-note@+2{{required by global function 'getCollectionOfP' where 'T' = 'P'}}
+@available(SwiftStdlib 5.1, *)
+func getCollectionOfP<T: P>(_: T) -> some CollectionOf<T.A> {
+  return [] as [T.A]
+}
+
+func funnyIdentity<T: P>(_ value: T) -> T? {
+  value
+}
+
+func arrayOfOne<T: P>(_ value: T) -> [T] {
+  [value]
+}
+
+struct X<T: P> {
+}
+
+// expected-note@+1{{required by global function 'createX' where 'T' = 'P'}}
+func createX<T: P>(_ value: T) -> X<T> {
+  X<T>()
+}
+
+@available(SwiftStdlib 5.1, *)
 func testReturningOpaqueTypes(p: any P) {
   let q = p.getQ()
   let _: Int = q  // expected-error{{cannot convert value of type 'Q' to specified type 'Int'}}
 
   p.getCollectionOf() // expected-error{{member 'getCollectionOf' cannot be used on value of protocol type 'P'; use a generic constraint instead}}
+
+  let q2 = getPQ(p)
+  let _: Int = q2  // expected-error{{cannot convert value of type 'Q' to specified type 'Int'}}
+
+  getCollectionOfP(p) // expected-error{{protocol 'P' as a type cannot conform to the protocol itself}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+
+  let fi = funnyIdentity(p)
+  let _: Int = fi // expected-error{{cannot convert value of type 'P?' to specified type 'Int'}}
+
+  _ = arrayOfOne(p) // okay, arrays are covariant in their argument
+
+  _ = createX(p) // expected-error{{protocol 'P' as a type cannot conform to the protocol itself}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
 }
