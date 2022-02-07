@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-concurrency -swift-version 6
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 final class ImmutablePoint: Sendable {
   let x : Int = 0
