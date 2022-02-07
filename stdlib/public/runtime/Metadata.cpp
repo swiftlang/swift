@@ -5918,7 +5918,7 @@ namespace {
 alignas(void *) static struct {
   char Pool[InitialPoolSize];
 } InitialAllocationPool;
-static std::atomic<PoolRange>
+static swift::atomic<PoolRange>
 AllocationPool{PoolRange{InitialAllocationPool.Pool,
                          sizeof(InitialAllocationPool.Pool)}};
 
@@ -6071,10 +6071,9 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
     }
 
     // Swap in the new state.
-    if (std::atomic_compare_exchange_weak_explicit(&AllocationPool,
-                                                   &curState, newState,
-                                              std::memory_order_relaxed,
-                                              std::memory_order_relaxed)) {
+    if (AllocationPool.compare_exchange_weak(curState, newState,
+                                             std::memory_order_relaxed,
+                                             std::memory_order_relaxed)) {
       // If that succeeded, we've successfully allocated.
       __msan_allocated_memory(allocation, sizeWithHeader);
       __asan_unpoison_memory_region(allocation, sizeWithHeader);
@@ -6129,11 +6128,10 @@ void MetadataAllocator::Deallocate(const void *allocation, size_t size,
   // don't bother trying again; we'll just leak the allocation.
   PoolRange newState = { reinterpret_cast<char*>(const_cast<void*>(allocation)),
                          curState.Remaining + size };
-  (void)
-    std::atomic_compare_exchange_strong_explicit(&AllocationPool,
-                                                 &curState, newState,
-                                                 std::memory_order_relaxed,
-                                                 std::memory_order_relaxed);
+
+  AllocationPool.compare_exchange_weak(curState, newState,
+                                       std::memory_order_relaxed,
+                                       std::memory_order_relaxed);
 }
 
 #endif
