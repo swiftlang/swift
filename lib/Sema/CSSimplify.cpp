@@ -1354,6 +1354,11 @@ shouldOpenExistentialCallArgument(
     break;
   }
 
+  // C++ function templates require specialization, which is not possible with
+  // opened existential archetypes, so do not open.
+  if (isa_and_nonnull<clang::FunctionTemplateDecl>(callee->getClangDecl()))
+    return None;
+
   ASTContext &ctx = callee->getASTContext();
   if (!ctx.LangOpts.EnableOpenedExistentialTypes)
     return None;
