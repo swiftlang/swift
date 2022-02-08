@@ -199,13 +199,19 @@ public:
     return endTime.getProcessTime() - StartTime.getProcessTime();
   }
 
+  /// Return the remaining process time in milliseconds until the
+  /// threshold specified during construction is reached.
+  unsigned getRemainingProcessTimeInMillis() const {
+    auto elapsed = unsigned(getElapsedProcessTimeInFractionalSeconds());
+    return elapsed >= ThresholdInMillis ? 0 : ThresholdInMillis - elapsed;
+  }
+
   // Disable emission of warnings about expressions that take longer
   // than the warning threshold.
   void disableWarning() { PrintWarning = false; }
 
   bool isExpired() const {
-    auto elapsed = getElapsedProcessTimeInFractionalSeconds();
-    return unsigned(elapsed) > ThresholdInMillis;
+    return getRemainingProcessTimeInMillis() == 0;
   }
 };
 
