@@ -42,7 +42,3 @@ module SwiftOverlayShims {
 module _SwiftDispatchOverlayShims {
   header "DispatchOverlayShims.h"
 }
-
-module _SwiftXCTestOverlayShims {
-  header "XCTestOverlayShims.h"
-}
