@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeCodableForDistributedTests.swiftmodule -module-name FakeCodableForDistributedTests -disable-availability-checking %S/../Inputs/FakeCodableForDistributedTests.swift
+// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeCodableForDistributedTests.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s --color --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -11,10 +14,6 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
-// FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
-// UNSUPPORTED: linux
-
-import Foundation
 import _Distributed
 
 final class Obj: @unchecked Sendable, Codable  {}
@@ -87,18 +86,17 @@ distributed actor Greeter {
     print("---> D = \(d), type(of:) = \(type(of: d))")
 
     // try encoding generic arguments to make sure that witness tables are passed correctly
-    let json = JSONEncoder()
+    let json = FakeEncoder()
 
-    let jsonA = try! String(data: json.encode(a), encoding: .utf8)
-    let jsonB = try! String(data: json.encode(b), encoding: .utf8)
-    let jsonC = try! String(data: json.encode(c), encoding: .utf8)
-    let jsonD = try! String(data: json.encode(d), encoding: .utf8)
+    let jsonA = try! json.encode(a)
+    let jsonB = try! json.encode(b)
+    let jsonC = try! json.encode(c)
+    let jsonD = try! json.encode(d)
 
-    print("---> A(JSON) = \(jsonA!)")
-    print("---> B(JSON) = \(jsonB!)")
-    print("---> C(JSON) = \(jsonC!)")
-    print("---> D(JSON) = \(jsonD!)")
-
+    print("---> A(SER) = \(jsonA)")
+    print("---> B(SER) = \(jsonB)")
+    print("---> C(SER) = \(jsonC)")
+    print("---> D(SER) = \(jsonD)")
   }
 
   distributed func genericOptional<T: Codable>(t: T?) {
@@ -275,6 +273,8 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
   }
 }
 
+// ==== ------------------------------------------------------------------------
+
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
@@ -439,11 +439,11 @@ func test() async throws {
   try generic5Invocation.recordGenericSubstitution(Int.self)
   try generic5Invocation.recordGenericSubstitution(Int.self)
   try generic5Invocation.recordGenericSubstitution(String.self)
-  try generic5Invocation.recordGenericSubstitution([Double].self)
+  try generic5Invocation.recordGenericSubstitution([Int].self)
   try generic5Invocation.recordArgument(42)
   try generic5Invocation.recordArgument(S(data: 42))
   try generic5Invocation.recordArgument("Hello, World!")
-  try generic5Invocation.recordArgument([0.0, 0xdecafbad])
+  try generic5Invocation.recordArgument([0, 42])
   try generic5Invocation.doneRecording()
 
   let generic5Decoder = generic5Invocation.makeDecoder()
@@ -456,17 +456,17 @@ func test() async throws {
   // CHECK: ---> A = 42, type(of:) = Int
   // CHECK-NEXT: ---> B = S<Int>(data: 42), type(of:) = S<Int>
   // CHECK-NEXT: ---> C = Hello, World!, type(of:) = String
-  // CHECK-NEXT: ---> D = [0.0, 3737844653.0], type(of:) = Array<Double>
-  // CHECK-NEXT: ---> A(JSON) = 42
-  // CHECK-NEXT: ---> B(JSON) = {"data":42}
-  // CHECK-NEXT: ---> C(JSON) = "Hello, World!"
-  // CHECK-NEXT: ---> D(JSON) = [0,3737844653]
+  // CHECK-NEXT: ---> D = [0, 42], type(of:) = Array<Int>
+  // CHECK-NEXT: ---> A(SER) = 42;
+  // CHECK-NEXT: ---> B(SER) = data: 42;
+  // CHECK-NEXT: ---> C(SER) = Hello, World!;
+  // CHECK-NEXT: ---> D(SER) = 0: 0; 1: 42;
   // CHECK-NEXT: RETURN: ()
 
   var genericOptInvocation = system.makeInvocationEncoder()
 
-  try genericOptInvocation.recordGenericSubstitution([Double].self)
-  try genericOptInvocation.recordArgument([0.0, 0xdecafbad])
+  try genericOptInvocation.recordGenericSubstitution([Int].self)
+  try genericOptInvocation.recordArgument([0, 42])
   try genericOptInvocation.doneRecording()
 
   let genericOptDecoder = genericOptInvocation.makeDecoder()
@@ -476,7 +476,7 @@ func test() async throws {
     invocationDecoder: genericOptDecoder,
     handler: FakeResultHandler()
   )
-  // CHECK: ---> T = [0.0, 3737844653.0], type(of:) = Optional<Array<Double>>
+  // CHECK: ---> T = [0, 42], type(of:) = Optional<Array<Int>>
   // CHECK-NEXT: RETURN: ()
 
   var decodeErrInvocation = system.makeInvocationEncoder()
