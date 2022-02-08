@@ -64,8 +64,9 @@ extension SuspendingClock: Clock {
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    try await Task._sleep(until:
-      deadline._value.seconds, deadline._value.nanoseconds,
+    let (seconds, attoseconds) = deadline._value.components
+    let nanoseconds = attoseconds / 1_000_000_000
+    try await Task._sleep(until:seconds, nanoseconds,
       tolerance: tolerance,
       clock: .suspending)
   }

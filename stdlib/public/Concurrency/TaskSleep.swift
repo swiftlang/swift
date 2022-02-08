@@ -342,8 +342,16 @@ extension Task where Success == Never, Failure == Never {
               let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
                 onSleepWake(wordPtr)
               }
-              let toleranceSeconds = tolerance?.seconds ?? 0
-              let toleranceNanoseconds = tolerance?.nanoseconds ?? -1
+              let toleranceSeconds: Int64
+              let toleranceNanoseconds: Int64
+              if let components = tolerance?.components {
+                toleranceSeconds = components.seconds
+                toleranceNanoseconds = components.attoseconds / 1_000_000_000
+              } else {
+                toleranceSeconds = 0
+                toleranceNanoseconds = -1
+              }
+
               _enqueueJobGlobalWithDeadline(
                   seconds, nanoseconds,
                   toleranceSeconds, toleranceNanoseconds,

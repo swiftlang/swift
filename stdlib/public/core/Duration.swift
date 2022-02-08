@@ -26,23 +26,20 @@ public struct Duration: Sendable {
     self._high = _attoseconds.high
   }
 
-  internal init(_seconds: Int64, nanoseconds: Int64) {
-    self = Duration.seconds(_seconds) + Duration.nanoseconds(nanoseconds)
+  public init(seconds: Int64, attoseconds: Int64) {
+    self = Duration.seconds(seconds) + 
+           Duration(_attoseconds: _Int128(attoseconds))
   }
 
   internal var _attoseconds: _Int128 {
     _Int128(high: _high, low: _low)
   }
 
-  public var seconds: Int64 {
-    Int64(_attoseconds / 1_000_000_000_000_000_000)
-  }
-
-  public var nanoseconds: Int64 {
+  public var components: (seconds: Int64, attoseconds: Int64) {
     let seconds = _attoseconds / 1_000_000_000_000_000_000
-    let nanoseconds =
-      Int64((_attoseconds - seconds * 1_000_000_000_000_000_000) / 1_000_000_000)
-    return nanoseconds
+    let attoseconds =
+      Int64((_attoseconds - seconds * 1_000_000_000_000_000_000))
+    return (Int64(seconds), attoseconds)
   }
 }
 
@@ -98,7 +95,36 @@ extension Duration {
 }
 
 @available(SwiftStdlib 9999, *)
-extension Duration: Codable { }
+extension Duration: Codable { 
+  private enum CodingKeys: String, CodingKey {
+    case attoseconds = "attoseconds"
+  }
+
+  private enum DecodingFailure: Error, CustomStringConvertible {
+    case conversionFailure(String)
+
+    var description: String {
+      switch self {
+      case .conversionFailure(let str):
+        return "Unable to convert \(str) to Int128"
+      }
+    }
+  }
+  
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let str = try container.decode(String.self, forKey: .attoseconds)
+    guard let attoseconds = _Int128(str, radix: 10) else {
+      throw DecodingFailure.conversionFailure(str)
+    }
+    self.init(_attoseconds: attoseconds)
+  }
+  
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(String(_attoseconds, radix: 10), forKey: .attoseconds)
+  }
+}
 
 @available(SwiftStdlib 9999, *)
 extension Duration: Hashable { }
