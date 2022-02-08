@@ -990,7 +990,7 @@ def create_argument_parser():
            help='Build optional StdlibUnittest components')
 
     option('--build-swift-stdlib-static-print', toggle_true,
-           help='Build constant_vprintf support')
+           help='Build constant-folding print() support')
 
     option('--build-swift-stdlib-unicode-data', toggle_true,
            default=True,

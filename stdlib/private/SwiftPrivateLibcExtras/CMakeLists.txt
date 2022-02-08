@@ -3,6 +3,10 @@ if(SWIFT_STDLIB_HAS_ENVIRON)
   set(swift_private_libc_extras_flags "-D" "SWIFT_STDLIB_HAS_ENVIRON")
 endif()
 
+if(SWIFT_STDLIB_STATIC_PRINT)
+  list(APPEND swift_private_libc_extras_flags "-D" "SWIFT_STDLIB_STATIC_PRINT")
+endif()
+
 set(swift_private_libc_extras_incorporate_object_libraries)
 if(SWIFT_STDLIB_HAS_COMMANDLINE)
   list(APPEND swift_private_libc_extras_flags "-D" "SWIFT_STDLIB_HAS_COMMANDLINE")
