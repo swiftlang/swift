@@ -820,6 +820,14 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // when closure has a lot of elements in the body.
   CS.CountScopes = 0;
 
+  // If timer is enabled, let's reset it so that each element
+  // (expression) gets a fresh time slice to get solved. This
+  // is important for closures with large number of statements
+  // in them.
+  if (CS.Timer) {
+    CS.Timer.emplace(element.getLocator(), CS);
+  }
+
   auto success = element.attempt(CS);
 
   // If element attempt has failed, mark whole conjunction

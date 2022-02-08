@@ -167,8 +167,10 @@ public:
 
 
 class ExpressionTimer {
+public:
   using AnchorType = llvm::PointerUnion<Expr *, ConstraintLocator *>;
 
+private:
   AnchorType Anchor;
   ASTContext &Context;
   llvm::TimeRecord StartTime;
@@ -187,6 +189,8 @@ public:
   ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS, unsigned thresholdInMillis);
 
   ~ExpressionTimer();
+
+  AnchorType getAnchor() const { return Anchor; }
 
   unsigned getWarnLimit() const {
     return Context.TypeCheckerOpts.WarnLongExpressionTypeChecking;
@@ -5680,6 +5684,8 @@ public:
   ConjunctionElement(Constraint *element) : Element(element) {}
 
   bool attempt(ConstraintSystem &cs) const;
+
+  ConstraintLocator *getLocator() const { return Element->getLocator(); }
 
   void print(llvm::raw_ostream &Out, SourceManager *SM) const {
     Out << "conjunction element ";

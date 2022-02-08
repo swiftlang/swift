@@ -861,6 +861,11 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// before accepting this conjunction.
   llvm::SaveAndRestore<unsigned> OuterScopeCount;
 
+  /// The number of milliseconds until outer constraint system
+  /// is considered "too complex" if timer is enabled.
+  Optional<std::pair<ExpressionTimer::AnchorType, unsigned>>
+      OuterTimeRemaining = None;
+
   /// Conjunction constraint associated with this step.
   Constraint *Conjunction;
   /// Position of the conjunction in the inactive constraints
@@ -900,6 +905,11 @@ public:
     // Make a snapshot of the constraint system state before conjunction.
     if (conjunction->isIsolated())
       Snapshot.emplace(cs, conjunction);
+
+    if (cs.Timer) {
+      auto remainingTime = cs.Timer->getRemainingProcessTimeInMillis();
+      OuterTimeRemaining.emplace(cs.Timer->getAnchor(), remainingTime);
+    }
   }
 
   ~ConjunctionStep() override {
@@ -915,6 +925,12 @@ public:
     // successful outcome should keep a score set by `restoreOuterState`.
     if (HadFailure)
       restoreOriginalScores();
+
+    if (OuterTimeRemaining) {
+      auto anchor = OuterTimeRemaining->first;
+      auto remainingTime = OuterTimeRemaining->second;
+      CS.Timer.emplace(anchor, CS, remainingTime);
+    }
   }
 
   StepResult resume(bool prevFailed) override;
