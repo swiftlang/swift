@@ -16,8 +16,6 @@ _ = bar.methodReturningForwardDeclaredInterface()
 // CHECK-NOT: error
 // CHECK-NOT: note
 
-// CHECK-NOT: warning
-// CHECK-NOT: error
 let s: PartialImport
 s.c = 5
 // CHECK: experimental_diagnostics_opt_out.swift:{{[0-9]+}}:{{[0-9]+}}: error: value of type 'PartialImport' has no member 'c'
@@ -27,8 +25,6 @@ s.c = 5
 // CHECK-NOT: error
 // CHECK-NOT: note
 
-// CHECK-NOT: warning
-// CHECK-NOT: error
 unsupported_parameter_type(1,2)
 // CHECK: experimental_diagnostics_opt_out.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'unsupported_parameter_type' in scope
 // CHECK-NOT: warning
