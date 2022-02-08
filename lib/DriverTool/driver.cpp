@@ -184,7 +184,8 @@ static bool appendSwiftDriverName(SmallString<256> &buffer) {
 }
 
 static int run_driver(StringRef ExecName,
-                       const ArrayRef<const char *> argv) {
+                       const ArrayRef<const char *> argv,
+                       const ArrayRef<const char *> originalArgv) {
   // This is done here and not done in FrontendTool.cpp, because
   // FrontendTool.cpp is linked to tools, which don't use libswift.
   initializeLibSwift();
@@ -244,7 +245,8 @@ static int run_driver(StringRef ExecName,
       subCommandArgs.push_back(NewDriverPath.c_str());
 
       // Push on the source program arguments
-      subCommandArgs.insert(subCommandArgs.end(), argv.begin() + 1, argv.end());
+      subCommandArgs.insert(subCommandArgs.end(),
+                            originalArgv.begin() + 1, originalArgv.end());
 
       // Execute the subcommand.
       subCommandArgs.push_back(nullptr);
@@ -393,12 +395,13 @@ int swift::mainEntry(int argc_, const char **argv_) {
     return 2;
   }
 
+  ArrayRef<const char *> originalArgv(argv_, &argv_[argc_]);
   if (isRepl) {
     // Preserve argv for the stack trace.
     SmallVector<const char *, 256> replArgs(argv.begin(), argv.end());
     replArgs.erase(&replArgs[1]);
-    return run_driver(ExecName, replArgs);
+    return run_driver(ExecName, replArgs, originalArgv);
   } else {
-    return run_driver(ExecName, argv);
+    return run_driver(ExecName, argv, originalArgv);
   }
 }
