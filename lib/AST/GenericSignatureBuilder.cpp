@@ -5834,7 +5834,7 @@ void GenericSignatureBuilder::checkIfRequirementCanBeDerived(
 }
 
 static bool involvesNonSelfSubjectTypes(const RequirementSource *source) {
-  while (source->kind != RequirementSource::RequirementSignatureSelf) {
+  while (source && source->kind != RequirementSource::RequirementSignatureSelf) {
     if (source->isProtocolRequirement() &&
         !source->getStoredType()->is<GenericTypeParamType>())
       return true;
