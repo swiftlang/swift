@@ -651,10 +651,7 @@ RewriteSystem::getMinimizedProtocolRules() const {
       continue;
     }
 
-    auto domain = rule.getLHS()[0].getProtocols();
-    assert(domain.size() == 1);
-
-    const auto *proto = domain[0];
+    const auto *proto = rule.getLHS().begin()->getProtocol();
     if (std::find(Protos.begin(), Protos.end(), proto) != Protos.end())
       rules[proto].push_back(ruleID);
   }
@@ -734,7 +731,7 @@ void RewriteSystem::verifyMinimizedRules(
     const auto &rule = getRule(ruleID);
 
     // Ignore the rewrite rule if it is not part of our minimization domain.
-    if (!isInMinimizationDomain(rule.getLHS().getRootProtocols()))
+    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
       continue;
 
     // Note that sometimes permanent rules can be simplified, but they can never

@@ -309,9 +309,7 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
 
   // Compute domain(V).
   const auto &lhs = rule.getLHS();
-  auto protocols = lhs[0].getProtocols();
-  assert(protocols.size() == 1);
-  auto protocol = Symbol::forProtocol(protocols[0], Context);
+  auto protocol = Symbol::forProtocol(lhs[0].getProtocol(), Context);
 
   // A same-type requirement of the form 'Self.Foo == Self' can induce a
   // conformance rule [P].[P] => [P], and we can end up with a minimal
@@ -356,10 +354,7 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
 
     // If we have a rule of the form X.[P:Y].[Q] => X.[P:Y] wih non-empty X,
     // then the parent type is X.[P].
-    const auto protos = parentSymbol.getProtocols();
-    assert(protos.size() == 1);
-
-    return protos[0];
+    return parentSymbol.getProtocol();
   }
 
   case Symbol::Kind::GenericParam:
@@ -401,7 +396,7 @@ void MinimalConformances::collectConformanceRules() {
     if (!rule.isAnyConformanceRule())
       continue;
 
-    if (!System.isInMinimizationDomain(rule.getLHS().getRootProtocols()))
+    if (!System.isInMinimizationDomain(rule.getLHS().getRootProtocol()))
       continue;
 
     ConformanceRules.push_back(ruleID);
