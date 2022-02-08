@@ -1338,10 +1338,17 @@ shouldOpenExistentialCallArgument(
   if (!callee)
     return None;
 
-  // _openExistential handles its own opening.
-  if (TypeChecker::getDeclTypeCheckingSemantics(callee) ==
-        DeclTypeCheckingSemantics::OpenExistential)
+  // Special semantics prohibit opening existentials.
+  switch (TypeChecker::getDeclTypeCheckingSemantics(callee)) {
+  case DeclTypeCheckingSemantics::OpenExistential:
+  case DeclTypeCheckingSemantics::TypeOf:
+    // type(of:) and _openExistential handle their own opening.
     return None;
+
+  case DeclTypeCheckingSemantics::Normal:
+  case DeclTypeCheckingSemantics::WithoutActuallyEscaping:
+    break;
+  }
 
   ASTContext &ctx = callee->getASTContext();
   if (!ctx.LangOpts.EnableOpenedExistentialTypes)
