@@ -38,7 +38,7 @@ distributed actor D {
     "nope!"
   }
 
-  // expected-error@+1{{result type 'NotCodable' of distributed property 'notCodable' does not conform to 'Codable'}}
+  // expected-error@+1{{result type 'NotCodable' of distributed property 'notCodable' does not conform to serialization requirement 'Codable'}}
   distributed var notCodable: NotCodable {
     .init()
   }

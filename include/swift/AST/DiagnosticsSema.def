@@ -4566,10 +4566,10 @@ ERROR(distributed_actor_isolated_method,none,
       "only 'distributed' instance methods can be called on a potentially remote distributed actor",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
-      "parameter '%0' of type %1 in %2 does not conform to '%3'",
+      "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
       (StringRef, Type, DescriptiveDeclKind, StringRef))
 ERROR(distributed_actor_target_result_not_codable,none,
-      "result type %0 of %1 %2 does not conform to '%3'",
+      "result type %0 of %1 %2 does not conform to serialization requirement '%3'",
       (Type, DescriptiveDeclKind, Identifier, StringRef))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
       "distributed instance method's %0 remote counterpart %1 cannot not be implemented manually.",

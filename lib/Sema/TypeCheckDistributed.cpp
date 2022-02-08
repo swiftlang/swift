@@ -248,7 +248,6 @@ static bool checkDistributedTargetResultType(
         TypeChecker::conformsToProtocol(resultType, serializationReq, module);
     if (conformance.isInvalid()) {
       if (diagnose) {
-        serializationReq->dump();
         llvm::StringRef conformanceToSuggest = isCodableRequirement ?
             "Codable" : // Codable is a typealias, easier to diagnose like that
             serializationReq->getNameStr();
@@ -282,14 +281,31 @@ static bool checkDistributedTargetResultType(
 /// \returns \c true if there was a problem with adding the attribute, \c false
 /// otherwise.
 bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
-  // === All parameters and the result type must conform SerializationRequirement
+  assert(func->isDistributed());
 
-  auto actorDecl = func->getDeclContext()->getSelfNominalTypeDecl();
-
-  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements =
-      getDistributedSerializationRequirementProtocols(actorDecl);
-
+  auto &C = func->getASTContext();
+  auto declContext = func->getDeclContext();
   auto module = func->getParentModule();
+
+  // === All parameters and the result type must conform SerializationRequirement
+  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements;
+  if (auto extension = dyn_cast<ExtensionDecl>(declContext)) {
+    serializationRequirements = extractDistributedSerializationRequirements(
+        C, extension->getGenericRequirements());
+  } else if (auto actor = dyn_cast<ClassDecl>(declContext)) {
+    serializationRequirements =
+        getDistributedSerializationRequirementProtocols(actor);
+  } // TODO(distributed): need to handle ProtocolDecl too?
+
+  // If the requirement is exactly `Codable` we diagnose it ia bit nicer.
+  auto serializationRequirementIsCodable = false;
+  if (serializationRequirements.size() == 2) {
+      auto encodableType = C.getProtocol(KnownProtocolKind::Encodable);
+      auto decodableType = C.getProtocol(KnownProtocolKind::Decodable);
+      llvm::SmallPtrSet<ProtocolDecl *, 2> codableRequirements = {encodableType, decodableType};
+      serializationRequirementIsCodable =
+          serializationRequirements == codableRequirements;
+  }
 
   // --- Check parameters for 'Codable' conformance
   for (auto param : *func->getParameters()) {
@@ -303,7 +319,7 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
               param->getArgumentName().str(),
               param->getInterfaceType(),
               func->getDescriptiveKind(),
-              req->getNameStr()); // TODO(distributed): handle Codable better
+              serializationRequirementIsCodable ? "Codable" : req->getNameStr());
 
           if (auto paramNominalTy = paramTy->getAnyNominal()) {
             addCodableFixIt(paramNominalTy, diag);
@@ -383,10 +399,6 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   auto serializationRequirements =
       getDistributedSerializationRequirementProtocols(
           var->getDeclContext()->getSelfNominalTypeDecl());
-
-  //  auto encodableType = C.getProtocol(KnownProtocolKind::Encodable);
-//  auto decodableType = C.getProtocol(KnownProtocolKind::Decodable);
-//  llvm::ArrayRef<ProtocolDecl*> serializationRequirements = {encodableType, decodableType};
 
   auto module = var->getModuleContext();
   if (checkDistributedTargetResultType(module, var, serializationRequirements, diagnose)) {
@@ -487,7 +499,6 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
 
 static Type getAssociatedTypeOfDistributedSystem(NominalTypeDecl *actor,
                                                  Identifier member) {
-  assert(actor->isDistributedActor());
   auto &ctx = actor->getASTContext();
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
@@ -501,12 +512,12 @@ static Type getAssociatedTypeOfDistributedSystem(NominalTypeDecl *actor,
 
   auto actorSystemProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
   if (!actorSystemProtocol)
-    return ErrorType::get(ctx);
+    return Type();
 
   AssociatedTypeDecl *assocTypeDecl =
       actorSystemProtocol->getAssociatedType(member);
   if (!assocTypeDecl)
-    return ErrorType::get(ctx);
+    return Type();
 
   auto module = actor->getParentModule();
   Type selfType = actor->getSelfInterfaceType();
@@ -523,22 +534,74 @@ llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::getDistributedSerializationRequirementProtocols(NominalTypeDecl *nominal) {
   auto &ctx = nominal->getASTContext();
 
-  auto serialReqType = ctx.getDistributedSerializationRequirementType(nominal)
-                            ->castTo<ExistentialType>()
-                            ->getConstraintType()
-                            ->getDesugaredType();
+  auto ty = ctx.getDistributedSerializationRequirementType(nominal);
+  if (ty->hasError())
+    return {};
+
+  auto serialReqType =
+      ty->castTo<ExistentialType>()->getConstraintType()->getDesugaredType();
 
   // TODO(distributed): check what happens with Any
+  return flattenDistributedSerializationTypeToRequiredProtocols(serialReqType);
+}
 
+llvm::SmallPtrSet<ProtocolDecl *, 2>
+swift::flattenDistributedSerializationTypeToRequiredProtocols(TypeBase *serializationRequirement) {
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-  if (auto composition = serialReqType->getAs<ProtocolCompositionType>()) {
+  if (auto composition = serializationRequirement->getAs<ProtocolCompositionType>()) {
     for (auto member : composition->getMembers()) {
       if (auto *protocol = member->getAs<ProtocolType>())
         serializationReqs.insert(protocol->getDecl());
     }
   } else {
-    auto protocol = serialReqType->castTo<ProtocolType>()->getDecl();
+    auto protocol = serializationRequirement->castTo<ProtocolType>()->getDecl();
     serializationReqs.insert(protocol);
+  }
+
+  return serializationReqs;
+}
+
+llvm::SmallPtrSet<ProtocolDecl *, 2>
+swift::extractDistributedSerializationRequirements(
+    ASTContext &C,
+    ArrayRef<Requirement> allRequirements) {
+  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
+
+  auto systemProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  auto serializationReqAssocType =
+      systemProto->getAssociatedType(C.Id_SerializationRequirement);
+  auto systemSerializationReqTy =
+      serializationReqAssocType->getInterfaceType();
+
+  for (auto req : allRequirements) {
+    if (req.getSecondType()->isAny()) {
+      continue;
+    }
+    if (!req.getFirstType()->hasDependentMember())
+      continue;
+
+    if (auto dependentMemberType = req.getFirstType()->castTo<DependentMemberType>()) {
+      auto dependentTy =
+          dependentMemberType->getAssocType()->getInterfaceType();
+
+      if (dependentTy->isEqual(systemSerializationReqTy)) {
+        auto requirementProto = req.getSecondType();
+        if (auto proto = dyn_cast_or_null<ProtocolDecl>(requirementProto->getAnyNominal())) {
+          serializationReqs.insert(proto);
+        } else {
+          auto serialReqType = requirementProto
+                                   ->castTo<ExistentialType>()
+                                   ->getConstraintType()
+                                   ->getDesugaredType();
+          auto flattenedRequirements =
+              flattenDistributedSerializationTypeToRequiredProtocols(
+                  serialReqType);
+          for (auto p : flattenedRequirements) {
+            serializationReqs.insert(p);
+          }
+        }
+      }
+    }
   }
 
   return serializationReqs;
@@ -613,21 +676,6 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
   // typealias SerializationRequirement = any ...
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs =
       getDistributedSerializationRequirementProtocols(actor);
-//  auto serialReqType = ctx.getDistributedSerializationRequirementType(actor)
-//                            ->castTo<ExistentialType>()
-//                            ->getConstraintType()
-//                            ->getDesugaredType();
-//
-//  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-//  if (auto composition = serialReqType->getAs<ProtocolCompositionType>()) {
-//    for (auto member : composition->getMembers()) {
-//      if (auto *protocol = member->getAs<ProtocolType>())
-//        serializationReqs.insert(protocol->getDecl());
-//    }
-//  } else {
-//    auto protocol = serialReqType->castTo<ProtocolType>()->getDecl();
-//    serializationReqs.insert(protocol);
-//  }
 
   SmallVector<FuncDecl *, 2> candidates;
   // Looking for `decodeNextArgument<Arg: <SerializationReq>>() throws -> Arg`

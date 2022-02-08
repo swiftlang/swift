@@ -28,8 +28,8 @@ struct NotCodableValue { }
 
 distributed actor DistributedActor_1 {
 
-  let name: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}
-  var mutable: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}
+  let name: String = "alice" // expected-note{{access to this property is only permitted within the distributed actor 'DistributedActor_1'}}
+  var mutable: String = "alice" // expected-note{{access to this property is only permitted within the distributed actor 'DistributedActor_1'}}
   var computedMutable: String {
     get {
       "hey"
@@ -39,11 +39,8 @@ distributed actor DistributedActor_1 {
     }
   }
 
-  distributed let letProperty: String = "" // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-  distributed var varProperty: String = "" // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-  distributed var computedProperty: String { // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-    ""
-  }
+  distributed let letProperty: String = "" // expected-error{{static property 'letProperty' cannot be 'distributed', because it is not a computed get-only property}}
+  distributed var varProperty: String = "" // expected-error{{'distributed' computed property 'varProperty' can only be have a 'get' implementation}}
 
   distributed static func distributedStatic() {} // expected-error{{'distributed' method cannot be 'static'}}
   distributed class func distributedClass() {}
@@ -64,10 +61,10 @@ distributed actor DistributedActor_1 {
   distributed func distIntString(int: Int, two: String) async throws -> (String) { "\(int) + \(two)" } // ok
 
   distributed func dist(notCodable: NotCodableValue) async throws {
-    // expected-error@-1 {{parameter 'notCodable' of type 'NotCodableValue' in distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1 {{parameter 'notCodable' of type 'NotCodableValue' in distributed instance method does not conform to serialization requirement 'Codable'}}
   }
   distributed func distBadReturn(int: Int) async throws -> NotCodableValue {
-    // expected-error@-1 {{result type 'NotCodableValue' of distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1 {{result type 'NotCodableValue' of distributed instance method 'distBadReturn' does not conform to serialization requirement 'Codable'}}
     fatalError()
   }
 
@@ -76,7 +73,7 @@ distributed actor DistributedActor_1 {
   }
 
   distributed func closure(close: () -> String) {
-    // expected-error@-1{{parameter 'close' of type '() -> String' in distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1{{parameter 'close' of type '() -> String' in distributed instance method does not conform to serialization requirement 'Codable'}}
   }
 
   distributed func noInout(inNOut burger: inout String) {
@@ -90,7 +87,7 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
   distributed func distBadReturnGeneric<T: Sendable>(int: Int) async throws -> T {
-    // expected-error@-1 {{result type 'T' of distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1 {{result type 'T' of distributed instance method 'distBadReturnGeneric' does not conform to serialization requirement 'Codable'}}
     fatalError()
   }
 
@@ -101,7 +98,7 @@ distributed actor DistributedActor_1 {
     value
   }
   distributed func distBadGenericParam<T: Sendable>(int: T) async throws {
-    // expected-error@-1 {{parameter 'int' of type 'T' in distributed instance method does not conform to 'Codable'}}
+    // expected-error@-1 {{parameter 'int' of type 'T' in distributed instance method does not conform to serialization requirement 'Codable'}}
     fatalError()
   }
 
@@ -146,8 +143,8 @@ func test_outside(
 
   _ = local.name // ok, special case that let constants are okey
   let _: String = local.mutable // ok, special case that let constants are okey
-  _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can only be referenced inside the distributed actor}}
-  _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can only be referenced inside the distributed actor}}
+  _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can not be accessed from a non-isolated context}}
+  _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can not be accessed from a non-isolated context}}
 
   // ==== special properties (nonisolated, implicitly replicated)
   // the distributed actor's special fields may always be referred to

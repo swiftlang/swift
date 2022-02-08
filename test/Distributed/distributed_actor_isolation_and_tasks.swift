@@ -18,7 +18,7 @@ struct Logger {
 
 distributed actor Philosopher {
   let log: Logger
-  // expected-note@-1{{distributed actor state is only available within the actor instance}}
+  // expected-note@-1{{access to this property is only permitted within the distributed actor 'Philosopher'}}
   var variable = 12
   var variable_fromDetach = 12
   let INITIALIZED: Int
@@ -62,7 +62,7 @@ distributed actor Philosopher {
 
 func test_outside(system: FakeActorSystem) async throws {
   _ = try await Philosopher(system: system).dist()
-  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can only be referenced inside the distributed actor}}
+  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can not be accessed from a non-isolated context}}
 
   _ = Philosopher(system: system).id
   _ = Philosopher(system: system).actorSystem
