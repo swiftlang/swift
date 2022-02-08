@@ -41,6 +41,17 @@
 #endif
 #endif
 
+// Does the runtime provide priority escalation support?
+#ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
+    __has_include(<dispatch/swift_concurrency_private.h>) && __APPLE__ && \
+    SWIFT_POINTER_IS_8_BYTES
+#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 1
+#else
+#define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0
+#endif
+#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
+
 namespace swift {
 class DefaultActor;
 class TaskOptionRecord;
@@ -615,6 +626,17 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
                        TaskContinuationFunction *resumeFunction,
                        ExecutorRef newExecutor);
+
+/// Mark a task for enqueue on a new executor and then enqueue it.
+///
+/// The resumption function pointer and continuation should be set
+/// appropriately in the task.
+///
+/// Generally you should call swift_task_switch to switch execution
+/// synchronously when possible.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void
+swift_task_enqueueTaskOnExecutor(AsyncTask *task, ExecutorRef executor);
 
 /// Enqueue the given job to run asynchronously on the given executor.
 ///
