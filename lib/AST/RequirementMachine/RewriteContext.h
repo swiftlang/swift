@@ -52,10 +52,6 @@ class RewriteContext final {
   llvm::DenseMap<const ProtocolDecl *,
                  llvm::TinyPtrVector<const ProtocolDecl *>> AllInherited;
 
-  /// Cached support of sets of protocols, which is the number of elements in
-  /// the transitive closure of the set under protocol inheritance.
-  llvm::DenseMap<ArrayRef<const ProtocolDecl *>, unsigned> Support;
-
   /// Cache for associated type declarations.
   llvm::DenseMap<Symbol, AssociatedTypeDecl *> AssocTypes;
 
@@ -148,10 +144,6 @@ public:
   const llvm::TinyPtrVector<const ProtocolDecl *> &
   getInheritedProtocols(const ProtocolDecl *proto);
 
-  unsigned getProtocolSupport(const ProtocolDecl *proto);
-
-  unsigned getProtocolSupport(ArrayRef<const ProtocolDecl *> protos);
-
   int compareProtocols(const ProtocolDecl *lhs,
                        const ProtocolDecl *rhs);
 
@@ -181,8 +173,6 @@ public:
                                                 SmallVectorImpl<Term> &result);
 
   AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol);
-
-  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
