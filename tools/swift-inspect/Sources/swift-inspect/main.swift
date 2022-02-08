@@ -100,9 +100,9 @@ func dumpArrays(
     guard metadata != 0 else { return }
     guard context.isAContiguousArray(metadata: metadata) else { return }
     let isClass = context.isAContiguousArrayOfClassElementType(metadata: metadata)
-    let count = context.arrayCount(array: pointer, reader: inspector.read)
+    let count = context.arrayCount(array: swift_reflection_ptr_t(pointer), reader: inspector.read)
     let countStr = count.map({ String($0) }) ?? "<unknown>"
-    print("\(hex: pointer)\t\(size)\t\(countStr)\t\(isClass)")
+    print("\(hex: swift_reflection_ptr_t(pointer))\t\(size)\t\(countStr)\t\(isClass)")
   })
 }
 

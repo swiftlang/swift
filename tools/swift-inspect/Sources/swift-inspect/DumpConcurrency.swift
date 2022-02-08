@@ -70,11 +70,11 @@ fileprivate class ConcurrencyDumper {
     inspector.enumerateMallocs { (pointer, size) in
       let metadata = swift_reflection_ptr_t(swift_reflection_metadataForObject(context, UInt(pointer)))
       if metadata == jobMetadata {
-        result.jobs.append(pointer)
+        result.jobs.append(swift_reflection_ptr_t(pointer))
       } else if metadata == taskMetadata {
-        result.tasks.append(pointer)
+        result.tasks.append(swift_reflection_ptr_t(pointer))
       } else if isActorMetadata(metadata) {
-        result.actors.append(pointer)
+        result.actors.append(swift_reflection_ptr_t(pointer))
       }
     }
 
@@ -85,7 +85,7 @@ fileprivate class ConcurrencyDumper {
     var map: [swift_reflection_ptr_t: TaskInfo] = [:]
     var tasksToScan: Set<swift_reflection_ptr_t> = []
     tasksToScan.formUnion(heapInfo.tasks)
-    tasksToScan.formUnion(threadCurrentTasks.map{ $0.currentTask }.filter{ $0 != 0 })
+    tasksToScan.formUnion(threadCurrentTasks.map{ swift_reflection_ptr_t($0.currentTask) }.filter{ $0 != 0 })
 
     while !tasksToScan.isEmpty {
       let taskToScan = tasksToScan.removeFirst()
@@ -205,7 +205,7 @@ fileprivate class ConcurrencyDumper {
   }
 
   func symbolicateBacktracePointer(ptr: swift_reflection_ptr_t) -> String {
-    guard let name = inspector.getSymbol(address: ptr).name else {
+    guard let name = inspector.getSymbol(address: swift_addr_t(ptr)).name else {
       return "<\(hex: ptr)>"
     }
 
@@ -286,10 +286,8 @@ fileprivate class ConcurrencyDumper {
       lastChilds.removeSubrange(level...)
       lastChilds.append(lastChild)
 
-      let nextEntry = i < hierarchy.count - 1 ? hierarchy[i + 1] : nil
       let prevEntry = i > 0 ? hierarchy[i - 1] : nil
 
-      let levelWillDecrease = level > (nextEntry?.level ?? -1)
       let levelDidIncrease = level > (prevEntry?.level ?? -1)
 
       var prefix = ""
@@ -311,7 +309,7 @@ fileprivate class ConcurrencyDumper {
         firstLine = false
       }
 
-      let runJobSymbol = inspector.getSymbol(address: task.runJob)
+      let runJobSymbol = inspector.getSymbol(address: swift_addr_t(task.runJob))
       let runJobLibrary = runJobSymbol.library ?? "<unknown>"
 
       let symbolicatedBacktrace = task.asyncBacktrace.map(symbolicateBacktracePointer)
@@ -390,7 +388,7 @@ fileprivate class ConcurrencyDumper {
 
     for (thread, task) in threadCurrentTasks {
       let taskStr: String
-      if let info = tasks[task] {
+      if let info = tasks[swift_reflection_ptr_t(task)] {
         taskStr = "\(hex: info.id)"
       } else {
         taskStr = "<unknown task \(hex: task)>"

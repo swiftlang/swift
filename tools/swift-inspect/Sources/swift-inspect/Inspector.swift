@@ -52,6 +52,12 @@ class Inspector {
       return 0
     }
 
+#if os(tvOS) || os(watchOS)
+    if tryForkCorpse {
+      print("warning: unable to generate corpse on this OS")
+    }
+    return task
+#else
     if !tryForkCorpse {
       return task
     }
@@ -66,6 +72,7 @@ class Inspector {
       print("warning: unable to generate corpse for pid \(pid): \(machErrStr(kr))", to: &Std.err)
       return task
     }
+#endif
   }
   
   func passContext() -> UnsafeMutableRawPointer {
@@ -129,7 +136,7 @@ class Inspector {
       }
 
       // Deallocate the thread list.
-      let ptr = vm_address_t(bitPattern: threadList)
+      let ptr = vm_address_t(truncatingIfNeeded: Int(bitPattern: threadList))
       let size = vm_size_t(MemoryLayout<thread_t>.size) * vm_size_t(threadCount)
       vm_deallocate(mach_task_self_, ptr, size);
     }
