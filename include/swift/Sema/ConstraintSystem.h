@@ -171,11 +171,18 @@ class ExpressionTimer {
   ASTContext &Context;
   llvm::TimeRecord StartTime;
 
+  /// The number of milliseconds from creation until
+  /// this timer is considered expired.
+  unsigned ThresholdInMillis;
+
   bool PrintDebugTiming;
   bool PrintWarning;
 
 public:
+  /// This constructor sets a default threshold defined for all expressions
+  /// via compiler flag `solver-expression-time-threshold`.
   ExpressionTimer(Expr *E, ConstraintSystem &CS);
+  ExpressionTimer(Expr *E, ConstraintSystem &CS, unsigned thresholdInMillis);
 
   ~ExpressionTimer();
 
@@ -196,9 +203,9 @@ public:
   // than the warning threshold.
   void disableWarning() { PrintWarning = false; }
 
-  bool isExpired(unsigned thresholdInMillis) const {
+  bool isExpired() const {
     auto elapsed = getElapsedProcessTimeInFractionalSeconds();
-    return unsigned(elapsed) > thresholdInMillis;
+    return unsigned(elapsed) > ThresholdInMillis;
   }
 };
 
@@ -5226,9 +5233,7 @@ public:
       return isExpressionAlreadyTooComplex= true;
     }
 
-    const auto timeoutThresholdInMillis =
-        getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
-    if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
+    if (Timer && Timer->isExpired()) {
       // Disable warnings about expressions that go over the warning
       // threshold since we're arbitrarily ending evaluation and
       // emitting an error.
