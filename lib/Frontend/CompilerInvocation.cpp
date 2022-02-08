@@ -1560,6 +1560,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     }
   }
 
+  // Implicitly disable lexical lifetimes for the Swift module.
+  if (!enableLexicalLifetimesFlag && FEOpts.ModuleName == "Swift") {
+    enableLexicalLifetimesFlag = false;
+  }
+
   if (enableLexicalLifetimesFlag.getValueOr(false) &&
       !enableLexicalBorrowScopesFlag.getValueOr(true)) {
     // Error if lexical lifetimes have been enabled but lexical borrow scopes--
