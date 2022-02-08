@@ -261,7 +261,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// The magnitude of a floating-point value `x` of type `F` can be calculated
   /// by using the following formula, where `**` is exponentiation:
   ///
-  ///     let magnitude = x.significand * F.radix ** x.exponent
+  ///     x.significand * (F.radix ** x.exponent)
   ///
   /// A conforming type may use any integer radix, but values other than 2 (for
   /// binary floating-point types) or 10 (for decimal floating-point types)
