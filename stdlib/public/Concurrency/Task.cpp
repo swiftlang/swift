@@ -148,7 +148,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
 
       // Escalate the priority of this task based on the priority
       // of the waiting task.
-      auto status = waitingTask->_private().Status.load(std::memory_order_relaxed);
+      auto status = waitingTask->_private()._status().load(std::memory_order_relaxed);
       swift_task_escalate(this, status.getStoredPriority());
 
       _swift_task_clearCurrent();
@@ -491,7 +491,7 @@ const void *AsyncTask::getResumeFunctionForLogging() {
 JobPriority swift::swift_task_currentPriority(AsyncTask *task)
 {
   // This is racey but this is to be used in an API is inherently racey anyways.
-  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   return oldStatus.getStoredPriority();
 }
 

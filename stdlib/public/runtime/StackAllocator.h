@@ -64,15 +64,15 @@ private:
   /// The first slab.
   Slab *firstSlab;
 
+  uint32_t firstSlabIsPreallocated:1;
   /// Used for unit testing.
-  int32_t numAllocatedSlabs = 0;
+  uint32_t numAllocatedSlabs:31 = 0;
 
   /// True if the first slab is pre-allocated.
-  bool firstSlabIsPreallocated;
 
   /// The minimal alignment of allocated memory.
   static constexpr size_t alignment = MaximumAlignment;
-  
+
   /// If set to true, memory allocations are checked for buffer overflows and
   /// use-after-free, similar to guard-malloc.
   static constexpr bool guardAllocations =
