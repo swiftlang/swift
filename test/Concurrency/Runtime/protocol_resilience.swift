@@ -15,6 +15,10 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// XFAIL: windows
+// UNSUPPORTED: linux
+// UNSUPPORTED: openbsd
+
 import StdlibUnittest
 import resilient_protocol
 
