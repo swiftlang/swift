@@ -418,6 +418,15 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     unsigned ruleNesting = rule.getNesting();
     unsigned otherRuleNesting = otherRule.getNesting();
 
+    // If one of the rules is not a concrete type requirement, prefer to
+    // eliminate that rule.
+    if ((ruleNesting == 0) != (otherRuleNesting == 0)) {
+      if (ruleNesting == 0)
+        found = pair;
+
+      continue;
+    }
+
     // If both rules are concrete type requirements, first compare nesting
     // depth. This breaks the tie when we have two rules that each imply
     // the other via an induced rule that comes from a protocol.
@@ -430,10 +439,10 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     //
     // Then 'X.T == G<Int>' is a better candidate for elimination than
     // 'X.U == Int'.
-    if (ruleNesting > otherRuleNesting) {
-      found = pair;
-      continue;
-    } else if (otherRuleNesting > ruleNesting) {
+    if (ruleNesting != otherRuleNesting) {
+      if (ruleNesting > otherRuleNesting)
+        found = pair;
+
       continue;
     }
 
