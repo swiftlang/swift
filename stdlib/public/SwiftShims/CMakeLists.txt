@@ -25,7 +25,6 @@ set(sources
   _SwiftDistributed.h
 
   DispatchOverlayShims.h
-  XCTestOverlayShims.h
 
   module.modulemap
   )
