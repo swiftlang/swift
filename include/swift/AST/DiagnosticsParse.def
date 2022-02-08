@@ -1559,11 +1559,11 @@ ERROR(attr_availability_duplicate,none,
       (StringRef, StringRef))
 
 // originallyDefinedIn
-// FIXME: Refactor to share between attributes
+// FIXME(backDeploy): Refactor to share with back deployment attr
 ERROR(originally_defined_in_missing_rparen,none,
       "expected ')' in @_originallyDefinedIn argument list", ())
 
-// FIXME: Refactor to share between attributes
+// FIXME(backDeploy): Refactor to share with back deployment attr
 ERROR(originally_defined_in_unrecognized_platform,none,
       "unrecognized platform name in @_originallyDefinedIn argument list", ())
 
@@ -1578,19 +1578,19 @@ ERROR(originally_defined_in_need_original_module_name,none,
 ERROR(originally_defined_in_need_nonempty_module_name,none,
       "original module name cannot be empty in @_originallyDefinedIn", ())
 
-// FIXME: Refactor to share between attributes
+// FIXME(backDeploy): Refactor to share with back deployment attr
 ERROR(originally_defined_in_need_platform_version,none,
      "expected at least one platform version in @_originallyDefinedIn", ())
 
-// FIXME: Refactor to share between attributes
+// FIXME(backDeploy): Refactor to share with back deployment attr
 WARNING(originally_defined_in_major_minor_only,none,
         "@_originallyDefinedIn only uses major and minor version number", ())
 
-// FIXME: Refactor to share between attributes
+// FIXME(backDeploy): Refactor to share with back deployment attr
 WARNING(originally_defined_in_missing_platform_name,none,
         "* as platform name has no effect", ())
 
-// FIXME: Refactor to share between attributes
+// FIXME(backDeploy): Refactor to share with back deployment attr
 WARNING(originally_defined_in_swift_version, none,
         "Swift language version checks has no effect "
         "in @_originallyDefinedIn", ())
