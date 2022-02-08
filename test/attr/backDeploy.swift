@@ -118,7 +118,7 @@ public func duplicatePlatformsFunc1() {}
 public func duplicatePlatformsFunc2() {}
 
 @available(macOS 12.0, *)
-@_backDeploy() // expected-error {{expected at least one platform version in in '@_backDeploy' attribute}}
+@_backDeploy() // expected-error {{expected at least one platform version in '@_backDeploy' attribute}}
 public func zeroPlatformVersionsFunc() {}
 
 @available(macOS 12.0, *)
