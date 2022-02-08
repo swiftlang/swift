@@ -66,10 +66,25 @@ public var cannotBackDeployTopLevelVar = 79
 @_backDeploy(macOS 11.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@_backDeploy'}}
 public func unknownOSFunc() {}
 
-// FIXME(backDeploy): The error here should be specific about the missing version for iOS
 @available(macOS 12.0, *)
-@_backDeploy(macOS 11.0, iOS) // expected-error {{expected at least one platform version in in '@_backDeploy' attribute}}
-public func missingVersionForPlatformFunc() {}
+@_backDeploy(@) // expected-error {{expected platform in '@_backDeploy' attribute}}
+public func badPlatformFunc1() {}
+
+@available(macOS 12.0, *)
+@_backDeploy(@ 12.0) // expected-error {{expected platform in '@_backDeploy' attribute}}
+public func badPlatformFunc2() {}
+
+@available(macOS 12.0, *)
+@_backDeploy(macOS) // expected-error {{expected version number in '@_backDeploy' attribute}}
+public func missingVersionFunc1() {}
+
+@available(macOS 12.0, *)
+@_backDeploy(macOS 11.0, iOS) // expected-error {{expected version number in '@_backDeploy' attribute}}
+public func missingVersionFunc2() {}
+
+@available(macOS 12.0, *)
+@_backDeploy(macOS, iOS) // expected-error 2{{expected version number in '@_backDeploy' attribute}}
+public func missingVersionFunc3() {}
 
 @available(macOS 12.0, *)
 @_backDeploy(macOS 11.0, iOS 14.0,) // expected-error {{unexpected ',' separator}}
@@ -81,12 +96,15 @@ public func patchVersionFunc() {}
 
 @available(macOS 12.0, *)
 @_backDeploy(macOS 11.0, * 9.0) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
-public func wildcardPlatformNameFunc() {}
+public func wildcardWithVersionFunc() {}
 
-// FIXME(backDeploy): The error here should be about * being ignored
 @available(macOS 12.0, *)
-@_backDeploy(macOS 11.0, *) // expected-error {{expected at least one platform version in in '@_backDeploy' attribute}}
-public func trailingWildcardPlatformFunc() {}
+@_backDeploy(macOS 11.0, *) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
+public func trailingWildcardFunc() {}
+
+@available(macOS 12.0, *)
+@_backDeploy(macOS 11.0, *, iOS 14.0) // expected-warning {{* as platform name has no effect in '@_backDeploy' attribute}}
+public func embeddedWildcardFunc() {}
 
 // FIXME(backDeploy): Expect error for duplicate platforms in same attribute
 @available(macOS 12.0, *)

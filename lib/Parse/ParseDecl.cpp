@@ -1738,6 +1738,64 @@ void Parser::parseAllAvailabilityMacroArguments() {
   AvailabilityMacrosComputed = true;
 }
 
+ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
+    llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions) {
+  // FIXME(backDeploy): Parse availability macros (e.g. SwiftStdlib: 5.1)
+  SyntaxParsingContext argumentContext(SyntaxContext,
+      SyntaxKind::AvailabilityVersionRestriction);
+
+  // Expect a possible platform name (e.g. 'macOS' or '*').
+  if (!Tok.isAny(tok::identifier, tok::oper_binary_spaced)) {
+    diagnose(Tok, diag::attr_availability_expected_platform, AttrName);
+    return makeParserError();
+  }
+
+  // Parse the platform name.
+  auto MaybePlatform = platformFromString(Tok.getText());
+  SourceLoc PlatformLoc = Tok.getLoc();
+  if (!MaybePlatform.hasValue()) {
+    diagnose(PlatformLoc, diag::attr_availability_unknown_platform,
+             Tok.getText(), AttrName);
+    return makeParserError();
+  }
+  consumeToken();
+  PlatformKind Platform = *MaybePlatform;
+
+  // Wildcards ('*') aren't supported in this kind of list. If this list
+  // entry is just a wildcard, skip it. Wildcards with a version are
+  // diagnosed below.
+  if (Platform == PlatformKind::none && Tok.isAny(tok::comma, tok::r_paren)) {
+    diagnose(PlatformLoc, diag::attr_availability_wildcard_ignored,
+             AttrName);
+    return makeParserSuccess();
+  }
+
+  // Parse version number.
+  llvm::VersionTuple VerTuple;
+  SourceRange VersionRange;
+  if (parseVersionTuple(VerTuple, VersionRange,
+      Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+    return makeParserError();
+  }
+
+  // Diagnose specification of patch versions (e.g. '13.0.1').
+  if (VerTuple.getSubminor().hasValue() ||
+      VerTuple.getBuild().hasValue()) {
+    diagnose(VersionRange.Start,
+             diag::attr_availability_platform_version_major_minor_only,
+             AttrName);
+  }
+
+  // Wildcards ('*') aren't supported in this kind of list.
+  if (Platform == PlatformKind::none) {
+    diagnose(PlatformLoc, diag::attr_availability_wildcard_ignored,
+             AttrName);
+  } else {
+    PlatformAndVersions.emplace_back(Platform, VerTuple);
+  }
+  return makeParserSuccess();
+}
+
 /// Processes a parsed option name by attempting to match it to a list of
 /// alternative name/value pairs provided by a chain of \c when() calls, ending
 /// in either \c whenOmitted() if omitting the option is allowed, or
@@ -2862,65 +2920,27 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                DeclAttribute::isDeclModifier(DK));
       return false;
     }
-    SourceLoc RightLoc;
+
     bool SuppressLaterDiags = false;
-    llvm::SmallVector<std::pair<PlatformKind, llvm::VersionTuple>, 4>
-      PlatformAndVersions;
-    
+    SourceLoc RightLoc;
+    llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
     StringRef AttrName = "@_backDeploy";
-    if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
-                  diag::attr_back_deploy_missing_rparen,
-                  SyntaxKind::Unknown, [&]() -> ParserStatus {
-      // FIXME(backDeploy): Parse availability macros (e.g. SwiftStdlib: 5.1)
-      
-      // Parse a platform and version tuple (e.g. 'macOS 13.13').
-      if ((Tok.is(tok::identifier) || Tok.is(tok::oper_binary_spaced)) &&
-          (peekToken().is(tok::floating_literal) ||
-           peekToken().is(tok::integer_literal))) {
-        PlatformKind Platform;
-        // Parse platform name.
-        auto Plat = platformFromString(Tok.getText());
-        if (!Plat.hasValue()) {
-          diagnose(Tok.getLoc(), diag::attr_availability_unknown_platform,
-                   Tok.getText(), AttrName);
-          SuppressLaterDiags = true;
-          return makeParserError();
-        } else {
-          consumeToken();
-          Platform = *Plat;
-        }
-        // Parse version number
-        llvm::VersionTuple VerTuple;
-        SourceRange VersionRange;
-        if (parseVersionTuple(VerTuple, VersionRange,
-              Diagnostic(diag::attr_availability_expected_version, AttrName))) {
-          SuppressLaterDiags = true;
-          return makeParserError();
-        } else {
-          if (VerTuple.getSubminor().hasValue() ||
-              VerTuple.getBuild().hasValue()) {
-            diagnose(Tok.getLoc(),
-                     diag::attr_availability_platform_version_major_minor_only,
-                     AttrName);
-          }
-          // * as platform name isn't supported.
-          if (Platform == PlatformKind::none) {
-            diagnose(AtLoc, diag::attr_availability_wildcard_ignored, AttrName);
-          } else {
-            PlatformAndVersions.emplace_back(Platform, VerTuple);
-          }
-          return makeParserSuccess();
-        }
-      }
-      diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
-      SuppressLaterDiags = true;
-      return makeParserError();
-    }).isErrorOrHasCompletion() || SuppressLaterDiags) {
+    ParserStatus Status = parseList(tok::r_paren, LeftLoc, RightLoc, false,
+                                    diag::attr_back_deploy_missing_rparen,
+                                    SyntaxKind::Unknown, [&]() -> ParserStatus {
+      ParserStatus ListItemStatus =
+          parsePlatformVersionInList(AttrName, PlatformAndVersions);
+      if (ListItemStatus.isErrorOrHasCompletion())
+        SuppressLaterDiags = true;
+      return ListItemStatus;
+    });
+
+    if (Status.isErrorOrHasCompletion() || SuppressLaterDiags) {
       return false;
     }
 
     if (PlatformAndVersions.empty()) {
-      diagnose(AtLoc, diag::attr_availability_need_platform_version, AttrName);
+      diagnose(Loc, diag::attr_availability_need_platform_version, AttrName);
       return false;
     }
     
