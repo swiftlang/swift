@@ -167,7 +167,9 @@ public:
 
 
 class ExpressionTimer {
-  Expr* E;
+  using AnchorType = llvm::PointerUnion<Expr *, ConstraintLocator *>;
+
+  AnchorType Anchor;
   ASTContext &Context;
   llvm::TimeRecord StartTime;
 
@@ -181,8 +183,8 @@ class ExpressionTimer {
 public:
   /// This constructor sets a default threshold defined for all expressions
   /// via compiler flag `solver-expression-time-threshold`.
-  ExpressionTimer(Expr *E, ConstraintSystem &CS);
-  ExpressionTimer(Expr *E, ConstraintSystem &CS, unsigned thresholdInMillis);
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS);
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS, unsigned thresholdInMillis);
 
   ~ExpressionTimer();
 
