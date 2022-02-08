@@ -28,6 +28,8 @@ class SwiftObjectFileFormat {
 public:
   virtual ~SwiftObjectFileFormat() {}
   virtual llvm::StringRef getSectionName(ReflectionSectionKind section) = 0;
+  /// Predicate to identify if the named section can contain reflection data.
+  virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) = 0;
 };
 
 /// Responsible for providing the Mach-O reflection section identifiers.
@@ -49,6 +51,10 @@ public:
       return "__swift5_reflstr";
     }
     llvm_unreachable("Section type not found.");
+  }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith("__swift5_") || sectionName == "__const";
   }
 };
 
@@ -72,6 +78,10 @@ public:
     }
     llvm_unreachable("Section type not found.");
   }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith("swift5_");
+  }
 };
 
 /// Responsible for providing the COFF reflection section identifiers
@@ -93,6 +103,10 @@ public:
       return ".sw5rfst";
     }
     llvm_unreachable("Section  not found.");
+  }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith(".sw5");
   }
 };
 } // namespace swift
