@@ -1338,6 +1338,10 @@ shouldOpenExistentialCallArgument(
   if (!callee)
     return None;
 
+  // Only applies to functions and subscripts.
+  if (!isa<AbstractFunctionDecl>(callee) && !isa<SubscriptDecl>(callee))
+    return None;
+
   // Special semantics prohibit opening existentials.
   switch (TypeChecker::getDeclTypeCheckingSemantics(callee)) {
   case DeclTypeCheckingSemantics::OpenExistential:
@@ -1390,8 +1394,8 @@ shouldOpenExistentialCallArgument(
 
   // Ensure that the formal parameter is only used in covariant positions,
   // because it won't match anywhere else.
-  auto genericSig = callee->getAsGenericContext()->getGenericSignatureOfContext()
-      .getCanonicalSignature();
+  auto genericSig = callee->getInnermostDeclContext()
+      ->getGenericSignatureOfContext().getCanonicalSignature();
   auto referenceInfo = findGenericParameterReferences(
       callee, genericSig, genericParam,
       /*treatNonResultCovarianceAsInvariant=*/false,
