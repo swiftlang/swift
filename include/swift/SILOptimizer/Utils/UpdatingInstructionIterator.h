@@ -169,14 +169,48 @@ class UpdatingInstructionIteratorRegistry {
   SmallVector<UpdatingInstructionIterator *, 4> forwardIterators;
   SmallVector<UpdatingReverseInstructionIterator *, 4> reverseIterators;
 
+  std::function<void(SILInstruction *)> chainedDelete;
+  std::function<void(SILInstruction *)> chainedNew;
+
   /// Callbacks used when adding/deleting instructions.
   InstModCallbacks callbacks;
 
+
 public:
-  UpdatingInstructionIteratorRegistry(
-      InstModCallbacks chainedCallbacks = InstModCallbacks()) {
-    rechainCallbacks(chainedCallbacks);
-  }
+  UpdatingInstructionIteratorRegistry() :
+    callbacks(InstModCallbacks()
+                    .onDelete([this](SILInstruction *toDelete) {
+                      notifyDelete(toDelete);
+                      toDelete->eraseFromParent();
+                    })
+                    .onCreateNewInst(
+                        [this](SILInstruction *newlyCreatedInst) {
+                          notifyNew(newlyCreatedInst);
+                        }))
+  {}
+
+  UpdatingInstructionIteratorRegistry(InstModCallbacks &&chainedCallbacks) :
+    // Copy the two std::functions that we need. The rest of the callbacks are
+    // copied implicitly by assignment.
+    chainedDelete(std::move(chainedCallbacks.deleteInstFunc)),
+    chainedNew(std::move(chainedCallbacks.createdNewInstFunc)),
+    callbacks(std::move(chainedCallbacks
+                    .onDelete([this](SILInstruction *toDelete) {
+                      notifyDelete(toDelete);
+                      if (chainedDelete) {
+                        chainedDelete(toDelete);
+                        return;
+                      }
+                      toDelete->eraseFromParent();
+                    })
+                    .onCreateNewInst(
+                        [this](SILInstruction *newlyCreatedInst) {
+                          notifyNew(newlyCreatedInst);
+                          if (chainedNew) {
+                            chainedNew(newlyCreatedInst);
+                          }
+                        })))
+  {}
 
   // The callbacks capture 'this'. So copying is invalid.
   UpdatingInstructionIteratorRegistry(
@@ -186,29 +220,6 @@ public:
   operator=(const UpdatingInstructionIteratorRegistry &) = delete;
 
   InstModCallbacks &getCallbacks() { return callbacks; }
-
-  void rechainCallbacks(InstModCallbacks chainedCallbacks) {
-    // Copy the two std::functions that we need. The rest of the callbacks are
-    // copied implicitly by assignment.
-    auto chainedDelete = chainedCallbacks.deleteInstFunc;
-    auto chainedNew = chainedCallbacks.createdNewInstFunc;
-    callbacks = chainedCallbacks
-                    .onDelete([this, chainedDelete](SILInstruction *toDelete) {
-                      notifyDelete(toDelete);
-                      if (chainedDelete) {
-                        chainedDelete(toDelete);
-                        return;
-                      }
-                      toDelete->eraseFromParent();
-                    })
-                    .onCreateNewInst(
-                        [this, chainedNew](SILInstruction *newlyCreatedInst) {
-                          notifyNew(newlyCreatedInst);
-                          if (chainedNew) {
-                            chainedNew(newlyCreatedInst);
-                          }
-                        });
-  }
 
   void registerIterator(UpdatingInstructionIterator *i) {
     forwardIterators.push_back(i);

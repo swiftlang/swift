@@ -134,10 +134,13 @@ void RewriteLoop::findProtocolConformanceRules(
         break;
       }
 
-      case RewriteStep::AdjustConcreteType:
+      case RewriteStep::PrefixSubstitutions:
       case RewriteStep::Shift:
       case RewriteStep::Decompose:
       case RewriteStep::Relation:
+      case RewriteStep::DecomposeConcrete:
+      case RewriteStep::LeftConcreteProjection:
+      case RewriteStep::RightConcreteProjection:
         break;
       }
     }
@@ -434,7 +437,7 @@ void MinimalConformances::collectConformanceRules() {
               if (lhsRule.isExplicit() != rhsRule.isExplicit())
                 return !lhsRule.isExplicit();
 
-              return lhsRule.getLHS().compare(rhsRule.getLHS(), Context) > 0;
+              return *lhsRule.getLHS().compare(rhsRule.getLHS(), Context) > 0;
             });
 
   Context.ConformanceRulesHistogram.add(ConformanceRules.size());

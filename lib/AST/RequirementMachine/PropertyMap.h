@@ -206,9 +206,7 @@ public:
                                 std::reverse_iterator<const Symbol *> end) const;
   PropertyBag *lookUpProperties(const MutableTerm &key) const;
 
-  std::pair<CompletionResult, unsigned>
-  buildPropertyMap(unsigned maxIterations,
-                   unsigned maxDepth);
+  void buildPropertyMap();
 
   void dump(llvm::raw_ostream &out) const;
 
@@ -245,6 +243,16 @@ private:
 
   void addProperty(Term key, Symbol property, unsigned ruleID);
 
+  void processTypeDifference(const TypeDifference &difference,
+                             unsigned differenceID,
+                             unsigned lhsRuleID,
+                             unsigned rhsRuleID);
+
+  void addConformanceProperty(Term key, Symbol property, unsigned ruleID);
+  void addLayoutProperty(Term key, Symbol property, unsigned ruleID);
+  void addSuperclassProperty(Term key, Symbol property, unsigned ruleID);
+  void addConcreteTypeProperty(Term key, Symbol property, unsigned ruleID);
+
   void checkConcreteTypeRequirements();
 
   void concretizeNestedTypesFromConcreteParents();
@@ -280,6 +288,12 @@ private:
     unsigned conformanceRuleID,
     RequirementKind requirementKind,
     Symbol concreteConformanceSymbol) const;
+
+  Optional<unsigned> concretelySimplifySubstitutions(Term baseTerm,
+                                                     Symbol symbol,
+                                                     RewritePath *path) const;
+
+  void concretelySimplifyLeftHandSideSubstitutions() const;
 
   void verify() const;
 };

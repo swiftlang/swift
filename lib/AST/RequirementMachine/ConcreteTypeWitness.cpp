@@ -458,17 +458,17 @@ void PropertyMap::recordConcreteConformanceRule(
       /*ruleID=*/concreteRuleID,
       /*inverse=*/true));
 
-  // Apply a concrete type adjustment to the concrete symbol if T' is shorter
-  // than T.
+  // If T' is a suffix of T, prepend the prefix to the concrete type's
+  // substitutions.
   auto concreteSymbol = *concreteRule.isPropertyRule();
-  unsigned adjustment = rhs.size() - concreteRule.getRHS().size();
+  unsigned prefixLength = rhs.size() - concreteRule.getRHS().size();
 
-  if (adjustment > 0 &&
+  if (prefixLength > 0 &&
       !concreteConformanceSymbol.getSubstitutions().empty()) {
-    path.add(RewriteStep::forAdjustment(adjustment, /*endOffset=*/1,
-                                        /*inverse=*/false));
+    path.add(RewriteStep::forPrefixSubstitutions(prefixLength, /*endOffset=*/1,
+                                                 /*inverse=*/false));
 
-    MutableTerm prefix(rhs.begin(), rhs.begin() + adjustment);
+    MutableTerm prefix(rhs.begin(), rhs.begin() + prefixLength);
     concreteSymbol = concreteSymbol.prependPrefixToConcreteSubstitutions(
         prefix, Context);
   }

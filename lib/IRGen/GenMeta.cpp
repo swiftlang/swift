@@ -240,8 +240,12 @@ static bool needsForeignMetadataCompletionFunction(IRGenModule &IGM,
 
 template <class Flags>
 static Flags getMethodDescriptorFlags(ValueDecl *fn) {
-  if (isa<ConstructorDecl>(fn))
-    return Flags(Flags::Kind::Init); // 'init' is considered static
+  if (isa<ConstructorDecl>(fn)) {
+    auto flags = Flags(Flags::Kind::Init); // 'init' is considered static
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(fn))
+      flags = flags.withIsAsync(afd->hasAsync());
+    return flags;
+  }
 
   auto kind = [&] {
     auto accessor = dyn_cast<AccessorDecl>(fn);

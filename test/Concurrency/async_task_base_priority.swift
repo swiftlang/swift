@@ -9,8 +9,17 @@
 // UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
-import Darwin
 import Dispatch
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif os(WASI)
+import WASILibc
+#elseif os(Windows)
+import CRT
+import WinSDK
+#endif
 
 func loopUntil(priority: TaskPriority) async {
   while (Task.currentPriority != priority) {

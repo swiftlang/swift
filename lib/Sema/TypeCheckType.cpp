@@ -3499,6 +3499,17 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     return ExistentialType::get(result);
   }
 
+  if (!options.isConstraintImplicitExistential()) {
+    // Imported existential typealiases, e.g. id<P>, can be
+    // used as constraints by extracting the underlying protocol
+    // types.
+    auto *typeAlias = dyn_cast<TypeAliasType>(result.getPointer());
+    if (typeAlias && typeAlias->is<ExistentialType>() &&
+        typeAlias->getDecl()->hasClangNode()) {
+      return typeAlias->getAs<ExistentialType>()->getConstraintType();
+    }
+  }
+
   // Hack to apply context-specific @escaping to a typealias with an underlying
   // function type.
   if (result->is<FunctionType>())

@@ -12,6 +12,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -132,10 +133,43 @@ unsigned Rule::getDepth() const {
   return result;
 }
 
+/// Returns the nesting depth of the concrete symbol at the end of the
+/// left hand side, or 0 if there isn't one.
+unsigned Rule::getNesting() const {
+  if (LHS.back().hasSubstitutions()) {
+    auto type = LHS.back().getConcreteType();
+
+    struct Walker : TypeWalker {
+      unsigned Nesting = 0;
+      unsigned MaxNesting = 0;
+
+      Action walkToTypePre(Type ty) override {
+        ++Nesting;
+        MaxNesting = std::max(Nesting, MaxNesting);
+
+        return Action::Continue;
+      }
+
+      Action walkToTypePost(Type ty) override {
+        --Nesting;
+
+        return Action::Continue;
+      }
+    };
+
+    Walker walker;
+    type.walk(walker);
+
+    return walker.MaxNesting;
+  }
+
+  return 0;
+}
+
 /// Linear order on rules; compares LHS followed by RHS.
-int Rule::compare(const Rule &other, RewriteContext &ctx) const {
-  int compare = LHS.compare(other.LHS, ctx);
-  if (compare != 0)
+Optional<int> Rule::compare(const Rule &other, RewriteContext &ctx) const {
+  Optional<int> compare = LHS.compare(other.LHS, ctx);
+  if (!compare.hasValue() || *compare != 0)
     return compare;
 
   return RHS.compare(other.RHS, ctx);
@@ -381,8 +415,8 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // If the left hand side and right hand side are already equivalent, we're
   // done.
-  int result = lhs.compare(rhs, Context);
-  if (result == 0) {
+  Optional<int> result = lhs.compare(rhs, Context);
+  if (*result == 0) {
     // If this rule is a consequence of existing rules, add a homotopy
     // generator.
     if (path) {
@@ -402,12 +436,12 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // Orient the two terms so that the left hand side is greater than the
   // right hand side.
-  if (result < 0) {
+  if (*result < 0) {
     std::swap(lhs, rhs);
     loop.invert();
   }
 
-  assert(lhs.compare(rhs, Context) > 0);
+  assert(*lhs.compare(rhs, Context) > 0);
 
   if (Debug.contains(DebugFlags::Add)) {
     llvm::dbgs() << "## Simplified and oriented rule " << lhs << " => " << rhs << "\n\n";
@@ -729,6 +763,12 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Relations: {\n";
   for (const auto &relation : Relations) {
     out << "- " << relation.first << " =>> " << relation.second << "\n";
+  }
+  out << "}\n";
+  out << "Type differences: {\n";
+  for (const auto &difference : Differences) {
+    difference.dump(out);
+    out << "\n";
   }
   out << "}\n";
   out << "Rewrite loops: {\n";

@@ -79,7 +79,7 @@ public:
 
   void dump(llvm::raw_ostream &out) const;
 
-  int compare(Term other, RewriteContext &ctx) const;
+  Optional<int> compare(Term other, RewriteContext &ctx) const;
 
   friend bool operator==(Term lhs, Term rhs) {
     return lhs.Ptr == rhs.Ptr;
@@ -144,7 +144,7 @@ public:
     Symbols.append(from, to);
   }
 
-  int compare(const MutableTerm &other, RewriteContext &ctx) const;
+  Optional<int> compare(const MutableTerm &other, RewriteContext &ctx) const;
 
   bool empty() const { return Symbols.empty(); }
 
