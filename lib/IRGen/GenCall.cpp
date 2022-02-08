@@ -1278,7 +1278,7 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
 }
 
 /// Expand the result and parameter types to the appropriate LLVM IR
-/// types for C and Objective-C signatures.
+/// types for C, C++ and Objective-C signatures.
 void SignatureExpansion::expandExternalSignatureTypes() {
   assert(FnType->getLanguage() == SILFunctionLanguage::C);
 
