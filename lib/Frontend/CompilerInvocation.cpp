@@ -1560,8 +1560,15 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     }
   }
 
-  // Implicitly disable lexical lifetimes for the Swift module.
-  if (!enableLexicalLifetimesFlag && FEOpts.ModuleName == "Swift") {
+  // Implicitly disable lexical lifetimes for the Swift modules and helpers.
+  if (!enableLexicalLifetimesFlag &&
+      (FEOpts.ModuleName == "Swift" ||
+       FEOpts.ModuleName == "_Concurrency" ||
+       FEOpts.ModuleName == "_Distributed" ||
+       FEOpts.ModuleName == "_MatchingEngine" ||
+       FEOpts.ModuleName == "_StringProcessing" ||
+       FEOpts.ModuleName == "SwiftOnoneSupport" ||
+       FEOpts.ModuleName == "OSLogTestHelper")) {
     enableLexicalLifetimesFlag = false;
   }
 
