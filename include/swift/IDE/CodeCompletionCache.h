@@ -61,8 +61,14 @@ public:
   };
 
   struct Value : public llvm::ThreadSafeRefCountedBase<Value> {
+    /// The allocator used to allocate the results stored in this cache.
+    std::shared_ptr<llvm::BumpPtrAllocator> Allocator;
+
     llvm::sys::TimePoint<> ModuleModificationTime;
-    CodeCompletionResultSink Sink;
+
+    std::vector<const ContextFreeCodeCompletionResult *> Results;
+
+    Value() : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}
   };
   using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
 
