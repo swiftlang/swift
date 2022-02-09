@@ -532,7 +532,6 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       if (auto destructor = dyn_cast<DestructorDecl>(dc)) {
         switch (getActorIsolation(destructor)) {
         case ActorIsolation::ActorInstance:
-        case ActorIsolation::DistributedActorInstance:
           return true;
 
         case ActorIsolation::GlobalActor:
@@ -600,11 +599,6 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
         }
       }
       break;
-
-    case ActorIsolation::DistributedActorInstance: {
-      // TODO: perhaps here we can emit our special handling to make a message?
-      LLVM_FALLTHROUGH;
-    }
 
     case ActorIsolation::ActorInstance: {
       // Only produce an executor for actor-isolated functions that are async
@@ -804,8 +798,7 @@ Optional<SILValue> SILGenFunction::emitExecutor(
   case ActorIsolation::Independent:
     return None;
 
-  case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance: {
+  case ActorIsolation::ActorInstance: {
     // "self" here means the actor instance's "self" value.
     assert(maybeSelf.hasValue() && "actor-instance but no self provided?");
     auto self = maybeSelf.getValue();
