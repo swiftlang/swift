@@ -4496,8 +4496,8 @@ ERROR(actor_isolated_non_self_reference,none,
         "from the main actor|from a non-isolated context}3",
         (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
 ERROR(distributed_actor_isolated_non_self_reference,none,
-      "distributed actor-isolated %0 %1 can only be referenced inside the "
-      "distributed actor",
+      "distributed actor-isolated %0 %1 can not be accessed from a "
+      "non-isolated context",
       (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'_Distributed' module not imported, required for 'distributed actor'",
@@ -4569,11 +4569,11 @@ ERROR(distributed_actor_isolated_method,none,
       "only 'distributed' instance methods can be called on a potentially remote distributed actor",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
-      "parameter '%0' of type %1 in %2 does not conform to '%3'",
+      "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
       (StringRef, Type, DescriptiveDeclKind, StringRef))
-ERROR(distributed_actor_func_result_not_codable,none,
-      "result type %0 of %1 does not conform to '%2'",
-      (Type, DescriptiveDeclKind, StringRef))
+ERROR(distributed_actor_target_result_not_codable,none,
+      "result type %0 of %1 %2 does not conform to serialization requirement '%3'",
+      (Type, DescriptiveDeclKind, Identifier, StringRef))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
       "distributed instance method's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
@@ -4764,9 +4764,18 @@ ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",
       (DeclName))
+ERROR(distributed_property_can_only_be_computed_get_only,none,
+      "'distributed' computed property %0 cannot have setter",
+      (DeclName))
+ERROR(distributed_property_cannot_be_static,none,
+      "'distributed' property %0 cannot be 'static'",
+      (DeclName))
+ERROR(distributed_property_can_only_be_computed,none,
+      "%0 %1 cannot be 'distributed', only computed properties can",
+      (DescriptiveDeclKind, DeclName))
 NOTE(distributed_actor_isolated_property,none,
-      "distributed actor state is only available within the actor instance", // TODO: reword in terms of isolation
-      ())
+      "access to %0 %1 is only permitted within distributed actor %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
