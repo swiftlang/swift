@@ -1055,15 +1055,15 @@ public:
 };
 
 // Recursively populate the spare bit mask for this single type
-static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask);
+static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask, uint64_t mpePointerSpareBits);
 
 // Recursively populate the spare bit mask for this collection of
 // record fields or enum cases.
-static bool populateSpareBitsMask(const std::vector<FieldInfo> &Fields, BitMask &mask) {
+static bool populateSpareBitsMask(const std::vector<FieldInfo> &Fields, BitMask &mask, uint64_t mpePointerSpareBits) {
   for (auto Field : Fields) {
     if (Field.TR != 0) {
       BitMask submask(Field.TI.getSize());
-      if (!populateSpareBitsMask(&Field.TI, submask)) {
+      if (!populateSpareBitsMask(&Field.TI, submask, mpePointerSpareBits)) {
         return false;
       }
       mask.andMask(submask, Field.Offset);
@@ -1073,36 +1073,27 @@ static bool populateSpareBitsMask(const std::vector<FieldInfo> &Fields, BitMask 
 }
 
 // General recursive type walk to combine spare bit info from nested structures.
-static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask) {
+static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask, uint64_t mpePointerSpareBits) {
   switch (TI->getKind()) {
   case TypeInfoKind::Reference: {
-    // TODO: The reflection libraries don't have a good
-    // way to identify the actual CPU architecture of the
-    // target.
-    if (TI->getSize() == sizeof(void *)) {
-      // If the target is the same size as the host, assume it's
-      // the same architecture.
-      mask.andMask(_swift_abi_SwiftSpareBitsMask, 0);
-    } else if (TI->getSize() == 8) {
-      // ARM64 masking (x86_64 is different)
-      mask.andMask(SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK, 0);
+    if (TI->getSize() == 8) {
+      mask.andMask(mpePointerSpareBits, 0);
     } else /* TI->getSize() == 4 */ {
-      // Note: All 32-bit platforms have the same mask,
-      // so this is actually correct.
-      mask.andMask(SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK, 0);
+      uint32_t pointerMask = (uint32_t)mpePointerSpareBits;
+      mask.andMask(pointerMask, 0);
     }
     break;
   }
   case TypeInfoKind::Enum: {
     auto EnumTI = reinterpret_cast<const EnumTypeInfo *>(TI);
-    if (!populateSpareBitsMask(EnumTI->getCases(), mask)) {
+    if (!populateSpareBitsMask(EnumTI->getCases(), mask, mpePointerSpareBits)) {
       return false;
     }
     break;
   }
   case TypeInfoKind::Record: {
     auto RecordTI = dyn_cast<RecordTypeInfo>(TI);
-    if (!populateSpareBitsMask(RecordTI->getFields(), mask)) {
+    if (!populateSpareBitsMask(RecordTI->getFields(), mask, mpePointerSpareBits)) {
       return false;
     }
     break;
@@ -2041,8 +2032,9 @@ public:
               // either the compiler is emitting the wrong thing or the
               // local runtime computation isn't quite right.
               BitMask locallyComputedSpareBitsMask(PayloadSize);
+              auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
               auto locallyComputedSpareBitsMaskIsValid
-                = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask);
+                = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask, mpePointerSpareBits);
               assert(locallyComputedSpareBitsMaskIsValid);
               assert(locallyComputedSpareBitsMask == spareBitsMask);
 #endif
@@ -2068,7 +2060,8 @@ public:
         // (This is less robust, but necessary to support images from older
         // compilers.)
         BitMask spareBitsMask(PayloadSize);
-        auto validSpareBitsMask = populateSpareBitsMask(Cases, spareBitsMask);
+        auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+        auto validSpareBitsMask = populateSpareBitsMask(Cases, spareBitsMask, mpePointerSpareBits);
         if (!validSpareBitsMask) {
           // If we couldn't correctly determine the spare bits mask,
           // return a TI that will always fail when asked for XIs or value.

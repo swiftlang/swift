@@ -736,6 +736,7 @@ private:
   using ByteReader = std::function<remote::MemoryReader::ReadBytesResult (remote::RemoteAddress, unsigned)>;
   using StringReader = std::function<bool (remote::RemoteAddress, std::string &)>;
   using PointerReader = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress, unsigned)>;
+  using IntVariableReader = std::function<llvm::Optional<uint64_t> (std::string, unsigned)>;
 
   // These fields are captured from the MetadataReader template passed into the
   // TypeRefBuilder struct, to isolate its template-ness from the rest of
@@ -748,7 +749,8 @@ private:
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
   PointerReader OpaquePointerReader;
-  
+  IntVariableReader OpaqueIntVariableReader;
+
 public:
   template<typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader)
@@ -773,8 +775,37 @@ public:
       }),
       OpaquePointerReader([&reader](remote::RemoteAddress address, unsigned size) -> llvm::Optional<remote::RemoteAbsolutePointer> {
         return reader.Reader->readPointer(address, size);
+      }),
+      OpaqueIntVariableReader(
+        [&reader](std::string symbol, unsigned size) -> llvm::Optional<uint64_t> {
+          llvm::Optional<uint64_t> result;
+          if (auto Reader = reader.Reader) {
+            auto Addr = Reader->getSymbolAddress(symbol);
+            if (Addr) {
+              switch (size) {
+              case 8: {
+                uint64_t i;
+                if (Reader->readInteger(Addr, &i)) {
+                  result = i;
+                }
+                break;
+              }
+              case 4: {
+                uint32_t i;
+                if (Reader->readInteger(Addr, &i)) {
+                  result = i;
+                }
+                break;
+              }
+              default: {
+                assert(false && "Can only read 4- or 8-byte integer variables from image");
+              }
+              }
+            }
+          }
+          return result;
       })
-  {}
+  { }
 
   Demangle::Node *demangleTypeRef(RemoteRef<char> string,
                                   bool useOpaqueTypeSymbolicReferences = true) {
@@ -810,6 +841,37 @@ public:
 
   /// Get the multipayload enum projection information for a given TR
   RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR);
+
+private:
+  llvm::Optional<uint64_t> multiPayloadEnumPointerMask;
+
+public:
+  /// Retrieve the MPE pointer mask from the target
+  // If it can't read it, it will make an educated guess
+  // Note: This is a pointer-sized value stored in a uint64_t
+  // If the target is 32 bits, the mask is in the lower 32 bits
+  uint64_t getMultiPayloadEnumPointerMask() {
+    unsigned pointerSize = TC.targetPointerSize();
+    if (!multiPayloadEnumPointerMask.hasValue()) {
+      // Ask the target for the spare bits mask
+      multiPayloadEnumPointerMask
+        = OpaqueIntVariableReader("_swift_debug_multiPayloadEnumPointerSpareBitsMask", pointerSize);
+    }
+    if (!multiPayloadEnumPointerMask.hasValue()) {
+      if (pointerSize == sizeof(void *)) {
+        // Most reflection tools run on the target machine,
+        // in which case, they use the same configuration:
+        multiPayloadEnumPointerMask = _swift_abi_SwiftSpareBitsMask;
+      } else if (pointerSize == 4) {
+        // All 32-bit platforms are the same, so this is always correct.
+        multiPayloadEnumPointerMask = SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK;
+      } else {
+        // This is not always correct.  But we can't do any better?
+        multiPayloadEnumPointerMask = SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK;
+      }
+    }
+    return multiPayloadEnumPointerMask.getValue();
+  }
 
   ///
   /// Dumping typerefs, field declarations, associated types
