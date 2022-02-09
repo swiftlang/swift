@@ -160,33 +160,6 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
   return StringRef();
 }
 
-Optional<SILDebugVariable>
-SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
-  Optional<SILDebugVariable> VarInfo;
-  if (const auto *ASI = dyn_cast_or_null<AllocStackInst>(AI))
-    VarInfo = ASI->getVarInfo();
-  // TODO: Support AllocBoxInst
-
-  if (!VarInfo)
-    return VarInfo;
-
-  // Copy everything but the DIExpr
-  VarInfo->DIExpr.clear();
-
-  // Coalesce the debug loc attached on AI into VarInfo
-  SILType Type = AI->getType();
-  SILLocation InstLoc = AI->getLoc();
-  const SILDebugScope *InstDS = AI->getDebugScope();
-  if (!VarInfo->Type)
-    VarInfo->Type = Type;
-  if (!VarInfo->Loc)
-    VarInfo->Loc = InstLoc;
-  if (!VarInfo->Scope)
-    VarInfo->Scope = InstDS;
-
-  return VarInfo;
-}
-
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F, Optional<SILDebugVariable> Var,

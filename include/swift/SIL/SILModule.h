@@ -193,6 +193,7 @@ private:
   friend SILWitnessTable;
   friend Lowering::SILGenModule;
   friend Lowering::TypeConverter;
+  friend SILDebugVariable;
   class SerializationCallback;
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
@@ -379,6 +380,9 @@ private:
   /// Symbols (e.g. function names) which are made public by the
   /// CrossModuleOptimization pass and therefore must be included in the TBD file.
   TBDSymbolSetPtr publicCMOSymbols;
+
+  /// Folding set for SILDebugVariable::Storage.
+  llvm::FoldingSet<SILDebugVariable::Storage> SILDebugVariableStorageSet;
 
 public:
   ~SILModule();

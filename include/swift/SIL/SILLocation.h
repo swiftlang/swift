@@ -13,10 +13,11 @@
 #ifndef SWIFT_SIL_LOCATION_H
 #define SWIFT_SIL_LOCATION_H
 
-#include "llvm/ADT/PointerUnion.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/SILAllocated.h"
-#include "swift/AST/TypeAlignments.h"
+#include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/PointerUnion.h"
 
 #include <cstddef>
 #include <type_traits>
@@ -437,6 +438,11 @@ public:
   }
 
   inline bool operator!=(const SILLocation &R) const { return !(*this == R); }
+
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    id.AddInteger(kindAndFlags.packedKindAndFlags);
+    id.AddPointer(storage.filePositionLoc);
+  }
 };
 
 /// Convert a SILLocation into a loc. Keep in sync with operator== on SILLocation!

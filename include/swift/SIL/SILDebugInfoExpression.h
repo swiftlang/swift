@@ -15,11 +15,14 @@
 /// (debug info) operator and operand.
 ///
 //===----------------------------------------------------------------------===//
+
 #ifndef SWIFT_SIL_DEBUGINFOEXPRESSION_H
 #define SWIFT_SIL_DEBUGINFOEXPRESSION_H
+
 #include "swift/AST/Decl.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/raw_ostream.h"
@@ -75,6 +78,36 @@ private:
   explicit SILDIExprElement(Kind OpK) : OpKind(OpK) {}
 
 public:
+  SILDIExprElement(const SILDIExprElement &other) : OpKind(other.OpKind) {
+    switch (OpKind) {
+    case SILDIExprElement::OperatorKind:
+      Operator = other.getAsOperator();
+      break;
+    case SILDIExprElement::DeclKind:
+      Declaration = other.getAsDecl();
+      break;
+    case SILDIExprElement::ConstIntKind:
+      ConstantInt = *other.getAsConstInt();
+      break;
+    }
+  }
+
+  SILDIExprElement &operator=(const SILDIExprElement &other) {
+    OpKind = other.OpKind;
+    switch (OpKind) {
+    case SILDIExprElement::OperatorKind:
+      Operator = other.getAsOperator();
+      break;
+    case SILDIExprElement::DeclKind:
+      Declaration = other.getAsDecl();
+      break;
+    case SILDIExprElement::ConstIntKind:
+      ConstantInt = *other.getAsConstInt();
+      break;
+    }
+    return *this;
+  }
+
   Kind getKind() const { return OpKind; }
 
   SILDIExprOperator getAsOperator() const {
@@ -107,7 +140,34 @@ public:
     DIOp.ConstantInt = V;
     return DIOp;
   }
+
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    id.AddInteger(unsigned(getKind()));
+    switch (getKind()) {
+    case SILDIExprElement::OperatorKind:
+      id.AddInteger(unsigned(getAsOperator()));
+      break;
+    case SILDIExprElement::DeclKind:
+      id.AddPointer(getAsDecl());
+      break;
+    case SILDIExprElement::ConstIntKind:
+      id.AddInteger(*getAsConstInt());
+      break;
+    }
+  }
 };
+
+/// Returns the hashcode for a SILDebugVariable.
+inline llvm::hash_code hash_value(const swift::SILDIExprElement &elt) {
+  switch (elt.getKind()) {
+  case swift::SILDIExprElement::OperatorKind:
+    return llvm::hash_value(unsigned(elt.getAsOperator()));
+  case swift::SILDIExprElement::DeclKind:
+    return llvm::hash_value(elt.getAsDecl());
+  case swift::SILDIExprElement::ConstIntKind:
+    return llvm::hash_value(elt.getAsConstInt());
+  }
+}
 
 /// For a given SILDIExprOperator, provides information
 /// like its textual name and operand types.
@@ -272,6 +332,8 @@ public:
            Elements[Elements.size() - 2].getAsOperator() ==
             SILDIExprOperator::Fragment;
   }
+
+  ArrayRef<SILDIExprElement> getElementArray() const { return Elements; }
 };
 } // end namespace swift
 #endif

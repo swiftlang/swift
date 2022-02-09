@@ -13,6 +13,7 @@ target_sources(swiftSIL PRIVATE
   SILCoverageMap.cpp
   SILDebugInfoExpression.cpp
   SILDebugScope.cpp
+  SILDebugVariable.cpp
   SILDeclRef.cpp
   SILDefaultWitnessTable.cpp
   SILDifferentiabilityWitness.cpp
