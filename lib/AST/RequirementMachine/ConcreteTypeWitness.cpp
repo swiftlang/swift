@@ -200,7 +200,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
 
     // We only infer conditional requirements in top-level generic signatures,
     // not in protocol requirement signatures.
-    if (key.getRootProtocols().empty())
+    if (key.getRootProtocol() == nullptr)
       inferConditionalRequirements(concrete, substitutions);
   }
 }

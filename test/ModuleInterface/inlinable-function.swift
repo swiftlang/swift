@@ -4,8 +4,6 @@
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-module-interface-path %t/TestFromModule.swiftinterface -module-name Test
 // RUN: %FileCheck %s --check-prefix FROMMODULE --check-prefix CHECK < %t/TestFromModule.swiftinterface
 
-// FIXME: These shouldn't be different, or we'll get different output from
-// WMO and non-WMO builds.
 // CHECK-LABEL: public struct Foo : Swift.Hashable {
 public struct Foo: Hashable {
   // CHECK: public var inlinableGetPublicSet: Swift.Int {

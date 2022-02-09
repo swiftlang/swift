@@ -26,7 +26,7 @@ struct Backtrace {
     ptr: swift_reflection_ptr_t,
     inspector: Inspector
   ) -> String {
-    let symbol = inspector.getSymbol(address: ptr)
+    let symbol = inspector.getSymbol(address: swift_addr_t(ptr))
     let name = symbol.name ?? "<unknown>"
     let library = symbol.library ?? "<unknown>"
     return "\(hex: ptr) (\(library)) \(name)"

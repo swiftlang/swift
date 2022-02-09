@@ -550,9 +550,20 @@ function(_add_swift_lipo_target)
     if(LIPO_CODESIGN)
       set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
+
+    set(lipo_lto_env)
+    # When lipo-ing LTO-based libraries with lipo on Darwin, the tool uses
+    # libLTO.dylib to inspect the bitcode files. However, by default the "host"
+    # libLTO.dylib is loaded, which might be too old and not understand the
+    # just-built bitcode format. Let's ask lipo to use the just-built
+    # libLTO.dylib from the toolchain that we're using to build.
+    if(APPLE AND SWIFT_NATIVE_CLANG_TOOLS_PATH)
+      set(lipo_lto_env "LIBLTO_PATH=${SWIFT_NATIVE_CLANG_TOOLS_PATH}/../lib/libLTO.dylib")
+    endif()
+
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
-        COMMAND "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
+        COMMAND "${CMAKE_COMMAND}" "-E" "env" ${lipo_lto_env} "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
         ${codesign_command}
         CUSTOM_TARGET_NAME "${LIPO_TARGET}"
         OUTPUT "${LIPO_OUTPUT}"

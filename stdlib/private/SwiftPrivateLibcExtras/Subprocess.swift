@@ -244,6 +244,13 @@ var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
 }
 #endif
 
+#if SWIFT_STDLIB_STATIC_PRINT
+func print(_ s: String) {
+  let data = Array("\(s)\n".utf8)
+  write(STDOUT_FILENO, data, data.count)
+}
+#endif
+
 /// Start the same executable as a child process, redirecting its stdout and
 /// stderr.
 public func spawnChild(_ args: [String])

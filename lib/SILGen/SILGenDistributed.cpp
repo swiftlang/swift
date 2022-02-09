@@ -1154,15 +1154,17 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           subTypes.push_back(paramTy);
 
           // --- Codable: Decodable
-          auto decodableRequirementTy =
-              ctx.getProtocol(KnownProtocolKind::Decodable); // FIXME: actually use SerializatioNRequirement
+          auto decodableRequirementTy = ctx.getProtocol(
+              KnownProtocolKind::Decodable); // FIXME(distributed): actually use
+                                             // SerializationRequirement
           auto paramDecodableTypeConfRef = module->lookupConformance(
               paramTy, decodableRequirementTy);
           subConformances.push_back(paramDecodableTypeConfRef);
 
           // --- Codable: Encodable
           auto encodableRequirementTy = ctx.getProtocol(
-              KnownProtocolKind::Encodable); // FIXME: actually use SerializatioNRequirement
+              KnownProtocolKind::Encodable); // FIXME(distributed): actually use
+                                             // SerializationRequirement
           auto paramEncodableTypeConfRef = module->lookupConformance(
               paramTy, encodableRequirementTy);
           subConformances.push_back(paramEncodableTypeConfRef);

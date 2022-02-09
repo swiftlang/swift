@@ -66,12 +66,7 @@ public:
   }
 
   bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
-    // For Mach-O, the caller must call this function twice, once with just the
-    // section name (ex `__swift5_fieldmd`), and again with the segment
-    // qualified section name (ex `__DATA,__const`).
-    return sectionName.startswith("__swift5_") ||
-           sectionName == "__DATA_CONST,__const" ||
-           sectionName == "__DATA,__const";
+    return sectionName.startswith("__swift5_") || sectionName == "__const";
   }
 };
 

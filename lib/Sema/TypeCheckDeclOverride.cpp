@@ -1567,6 +1567,8 @@ namespace  {
 
     UNINTERESTING_ATTR(PrimaryAssociatedType)
 
+    UNINTERESTING_ATTR(BackDeploy)
+
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

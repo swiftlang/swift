@@ -18,7 +18,11 @@
 #ifndef SWIFT_SIL_BRIDGEDSWIFTOBJECT_H
 #define SWIFT_SIL_BRIDGEDSWIFTOBJECT_H
 
+#if defined(__OpenBSD__)
+#include <sys/stdint.h>
+#else
 #include <stdint.h>
+#endif
 
 #if !defined(__has_feature)
 #define __has_feature(feature) 0

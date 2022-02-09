@@ -1321,6 +1321,7 @@ public:
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType,
+    ArgumentList *argList,
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
@@ -1340,8 +1341,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   ParameterListInfo paramInfo(params, callee, appliedSelf);
 
-  // Dig out the argument information.
-  auto *argList = cs.getArgumentList(loc);
+  // Make sure that argument list is available.
   assert(argList);
 
   // Apply labels to arguments.
@@ -10494,6 +10494,32 @@ bool ConstraintSystem::simplifyAppliedOverloads(
                                       numOptionalUnwraps, locator);
 }
 
+/// Create an implicit dot-member reference expression to be used
+/// as a root for injected `.callAsFunction` call.
+static UnresolvedDotExpr *
+createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
+                                    ArgumentList *arguments,
+                                    ConstraintLocator *calleeLocator) {
+  auto &ctx = cs.getASTContext();
+  auto *baseExpr = castToExpr(calleeLocator->getAnchor());
+
+  SmallVector<Identifier, 2> closureLabelsScratch;
+  // Create implicit `.callAsFunction` expression to use as an anchor
+  // for new argument list that only has trailing closures in it.
+  auto *implicitRef = UnresolvedDotExpr::createImplicit(
+      ctx, baseExpr, {ctx.Id_callAsFunction},
+      arguments->getArgumentLabels(closureLabelsScratch));
+
+  {
+    // Record a type of the new reference in the constraint system.
+    cs.setType(implicitRef, refType);
+    // Record new `.callAsFunction` in the constraint system.
+    cs.recordCallAsFunction(implicitRef, arguments, calleeLocator);
+  }
+
+  return implicitRef;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
     Type type1, Type type2,
@@ -10548,17 +10574,20 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   };
 
   // Local function to form an unsolved result.
-  auto formUnsolved = [&] {
+  auto formUnsolved = [&](bool activate = false) {
     if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::createApplicableFunction(
+      auto *application = Constraint::createApplicableFunction(
           *this, type1, type2, trailingClosureMatching,
-          getConstraintLocator(locator)));
+          getConstraintLocator(locator));
+
+      addUnsolvedConstraint(application);
+      if (activate)
+        activateConstraint(application);
+
       return SolutionKind::Solved;
     }
     
     return SolutionKind::Unsolved;
-
   };
 
   // If right-hand side is a type variable, the constraint is unsolved.
@@ -10633,15 +10662,97 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                               ? ConstraintKind::OperatorArgumentConversion
                               : ConstraintKind::ArgumentConversion);
 
+    auto *argumentsLoc = getConstraintLocator(
+        outerLocator.withPathElement(ConstraintLocator::ApplyArgument));
+
+    auto *argumentList = getArgumentList(argumentsLoc);
     // The argument type must be convertible to the input type.
     auto matchCallResult = ::matchCallArguments(
-        *this, func2, func1->getParams(), func2->getParams(), subKind,
-        outerLocator.withPathElement(ConstraintLocator::ApplyArgument),
-        trailingClosureMatching);
+        *this, func2, argumentList, func1->getParams(), func2->getParams(),
+        subKind, argumentsLoc, trailingClosureMatching);
 
     switch (matchCallResult) {
-    case SolutionKind::Error:
+    case SolutionKind::Error: {
+      auto resultTy = func2->getResult();
+
+      // If this is a call that constructs a callable type with
+      // trailing closure(s), closure(s) might not belong to
+      // the constructor but rather to implicit `callAsFunction`,
+      // there is no way to determine that without trying.
+      if (resultTy->isCallableNominalType(DC) &&
+          argumentList->hasAnyTrailingClosures()) {
+        auto *calleeLoc = getCalleeLocator(argumentsLoc);
+
+        bool isInit = false;
+        if (auto overload = findSelectedOverloadFor(calleeLoc)) {
+          isInit = bool(dyn_cast_or_null<ConstructorDecl>(
+              overload->choice.getDeclOrNull()));
+        }
+
+        if (!isInit)
+          return SolutionKind::Error;
+
+        auto &ctx = getASTContext();
+        auto numTrailing = argumentList->getNumTrailingClosures();
+
+        SmallVector<Argument, 4> newArguments(
+            argumentList->getNonTrailingArgs());
+        SmallVector<Argument, 4> trailingClosures(
+            argumentList->getTrailingClosures());
+
+        // Original argument list with all the trailing closures removed.
+        auto *newArgumentList = ArgumentList::createParsed(
+            ctx, argumentList->getLParenLoc(), newArguments,
+            argumentList->getRParenLoc(),
+            /*firstTrailingClosureIndex=*/None);
+
+        auto trailingClosureTypes = func1->getParams().take_back(numTrailing);
+        // The original result type is going to become a result of
+        // implicit `.callAsFunction` instead since `.callAsFunction`
+        // is inserted between `.init` and trailing closures.
+        auto callAsFunctionResultTy = func1->getResult();
+
+        // The implicit replacement for original result type which
+        // represents a callable type produced by `.init` call.
+        auto callableType =
+            createTypeVariable(getConstraintLocator({}), /*flags=*/0);
+
+        // The original application type with all the trailing closures
+        // dropped from it and result replaced to the implicit variable.
+        func1 = FunctionType::get(func1->getParams().drop_back(numTrailing),
+                                  callableType, func1->getExtInfo());
+
+        auto matchCallResult = ::matchCallArguments(
+            *this, func2, newArgumentList, func1->getParams(),
+            func2->getParams(), subKind, argumentsLoc, trailingClosureMatching);
+
+        if (matchCallResult != SolutionKind::Solved)
+          return SolutionKind::Error;
+
+        auto *implicitCallArgumentList =
+            ArgumentList::createImplicit(ctx, trailingClosures,
+                                         /*firstTrailingClosureIndex=*/0);
+
+        auto *implicitRef = createImplicitRootForCallAsFunction(
+            *this, callAsFunctionResultTy, implicitCallArgumentList, calleeLoc);
+
+        auto callAsFunctionArguments =
+            FunctionType::get(trailingClosureTypes, callAsFunctionResultTy,
+                              FunctionType::ExtInfo());
+
+        // Form an unsolved constraint to apply trailing closures to a
+        // callable type produced by `.init`. This constraint would become
+        // active when `callableType` is bound.
+        addUnsolvedConstraint(Constraint::create(
+            *this, ConstraintKind::ApplicableFunction, callAsFunctionArguments,
+            callableType,
+            getConstraintLocator(implicitRef,
+                                 ConstraintLocator::ApplyFunction)));
+        break;
+      }
+
       return SolutionKind::Error;
+    }
 
     case SolutionKind::Unsolved: {
       // Only occurs when there is an ambiguity between forward scanning and
@@ -10690,6 +10801,26 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     auto instance2 = getFixedTypeRecursive(meta2->getInstanceType(), true);
     if (instance2->isTypeVariableOrMember())
       return formUnsolved();
+
+    auto *argumentsLoc = getConstraintLocator(
+        outerLocator.withPathElement(ConstraintLocator::ApplyArgument));
+
+    auto *argumentList = getArgumentList(argumentsLoc);
+    assert(argumentList);
+
+    // Cannot simplify construction of callable types during constraint
+    // generation when trailing closures are present because such calls
+    // have special trailing closure matching semantics. It's unclear
+    // whether trailing arguments belong to `.init` or implicit
+    // `.callAsFunction` in this case.
+    //
+    // Note that the constraint has to be activate so that solver attempts
+    // once constraint generation is done.
+    if (getPhase() == ConstraintSystemPhase::ConstraintGeneration &&
+        argumentList->hasAnyTrailingClosures() &&
+        instance2->isCallableNominalType(DC)) {
+      return formUnsolved(/*activate=*/true);
+    }
 
     // Construct the instance from the input arguments.
     auto simplified = simplifyConstructionConstraint(instance2, func1, subflags,
@@ -11579,6 +11710,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (!ArgumentLists.count(memberLoc)) {
       auto *argList = ArgumentList::createImplicit(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
+          /*firstTrailingClosureIndex=*/None,
           AllocationArena::ConstraintSolver);
       ArgumentLists.insert({memberLoc, argList});
     }
@@ -11865,6 +11997,15 @@ void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
   argumentMatchingChoices.insert({locator, result});
+}
+
+void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,
+                                            ArgumentList *arguments,
+                                            ConstraintLocator *locator) {
+  ImplicitCallAsFunctionRoots.insert({locator, root});
+
+  associateArgumentList(
+      getConstraintLocator(root, ConstraintLocator::ApplyArgument), arguments);
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(

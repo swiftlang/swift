@@ -1069,7 +1069,7 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
   unsigned NumResults = 0;
   for (auto Result : Results) {
     if (!IncludeKeywords &&
-        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
+        Result->getKind() == CodeCompletionResultKind::Keyword)
       continue;
     ++NumResults;
   }
@@ -1079,7 +1079,7 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
   OS << "Begin completions, " << NumResults << " items\n";
   for (auto Result : Results) {
     if (!IncludeKeywords &&
-        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
+        Result->getKind() == CodeCompletionResultKind::Keyword)
       continue;
     Result->printPrefix(OS);
     if (PrintAnnotatedDescription) {
@@ -4179,10 +4179,25 @@ int main(int argc, char *argv[]) {
         // FIXME: error?
         continue;
       }
+      // Make contextual CodeCompletionResults from the
+      // ContextFreeCodeCompletionResults so we can print them.
+      std::vector<CodeCompletionResult *> contextualResults;
+      contextualResults.reserve(resultsOpt->get()->Results.size());
+      for (auto contextFreeResult : resultsOpt->get()->Results) {
+        // We are leaking these results but it doesn't matter since the process
+        // just terminates afterwards anyway.
+        auto contextualResult = new CodeCompletionResult(
+            *contextFreeResult, SemanticContextKind::OtherModule,
+            CodeCompletionFlair(),
+            /*numBytesToErase=*/0,
+            CodeCompletionResult::ExpectedTypeRelation::Unknown,
+            ContextualNotRecommendedReason::None,
+            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+        contextualResults.push_back(contextualResult);
+      }
       printCodeCompletionResultsImpl(
-          resultsOpt->get()->Sink.Results, llvm::outs(),
-          options::CodeCompletionKeywords, options::CodeCompletionComments,
-          options::CodeCompletionSourceText,
+          contextualResults, llvm::outs(), options::CodeCompletionKeywords,
+          options::CodeCompletionComments, options::CodeCompletionSourceText,
           options::CodeCompletionAnnotateResults);
     }
 

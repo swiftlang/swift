@@ -62,7 +62,7 @@ extension SwiftReflectionContextRef {
     reader: (swift_addr_t, Int) -> UnsafeRawPointer?
   ) -> UInt? {
     let size = MemoryLayout<UInt>.stride * 3
-    guard let ptr = reader(array, size) else { return nil }
+    guard let ptr = reader(swift_addr_t(array), size) else { return nil }
     let typedPtr = ptr.bindMemory(to: UInt.self, capacity: 3)
     // Array layout goes: metadata, refcount, count
     return typedPtr[2]
