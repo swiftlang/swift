@@ -314,6 +314,14 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     return result;
   }
 
+  // Compute the concrete type symbol [concrete: C.X].
+  SmallVector<Term, 3> result;
+  auto typeWitnessSchema =
+      Context.getRelativeSubstitutionSchemaFromType(typeWitness, substitutions,
+                                                    result);
+  auto typeWitnessSymbol =
+      Symbol::forConcreteType(typeWitnessSchema, result, Context);
+
   // If the type witness is completely concrete, check if one of our prefix
   // types has the same concrete type, and if so, introduce a same-type
   // requirement between the subject type and the prefix.
@@ -326,10 +334,14 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
       if (auto *props = lookUpProperties(prefix)) {
         if (props->isConcreteType() &&
             props->getConcreteType() == typeWitness) {
-          auto result = props->getKey();
+          // Record a relation U.[concrete: C.X] =>> U.V.[concrete: C : P].[P:X]
+          // where U is the parent such that U.[concrete: C:X] => U.
+          MutableTerm result(props->getKey());
+          result.add(typeWitnessSymbol);
 
           unsigned relationID = System.recordRelation(
-              result, Term::get(subjectType, Context));
+              Term::get(result, Context),
+              Term::get(subjectType, Context));
           path.add(RewriteStep::forRelation(
               /*startOffset=*/0, relationID,
               /*inverse=*/false));
@@ -339,7 +351,7 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
                           << result << "\n";
           }
 
-          return MutableTerm(result);
+          return result;
         }
       }
 
@@ -349,14 +361,6 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
   // Otherwise the type witness is concrete, but may contain type
   // parameters in structural position.
-
-  // Compute the concrete type symbol [concrete: C.X].
-  SmallVector<Term, 3> result;
-  auto typeWitnessSchema =
-      Context.getRelativeSubstitutionSchemaFromType(typeWitness, substitutions,
-                                                    result);
-  auto typeWitnessSymbol =
-      Symbol::forConcreteType(typeWitnessSchema, result, Context);
 
   auto concreteConformanceSymbol = *(subjectType.end() - 2);
   auto associatedTypeSymbol = *(subjectType.end() - 1);

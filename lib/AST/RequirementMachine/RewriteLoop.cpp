@@ -295,6 +295,8 @@ RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
 std::pair<MutableTerm, MutableTerm>
 RewritePathEvaluator::applyPrefixSubstitutions(const RewriteStep &step,
                                                const RewriteSystem &system) {
+  assert(step.Arg != 0);
+
   auto &term = getCurrentTerm();
 
   assert(step.Kind == RewriteStep::PrefixSubstitutions);

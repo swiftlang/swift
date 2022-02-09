@@ -754,25 +754,32 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
     out << "- " << rule << "\n";
   }
   out << "}\n";
-  out << "Relations: {\n";
-  for (const auto &relation : Relations) {
-    out << "- " << relation.first << " =>> " << relation.second << "\n";
+  if (!Relations.empty()) {
+    out << "Relations: {\n";
+    for (const auto &relation : Relations) {
+      out << "- " << relation.first << " =>> " << relation.second << "\n";
+    }
+    out << "}\n";
   }
-  out << "}\n";
-  out << "Type differences: {\n";
-  for (const auto &difference : Differences) {
-    difference.dump(out);
-    out << "\n";
+  if (!Differences.empty()) {
+    out << "Type differences: {\n";
+    for (const auto &difference : Differences) {
+      difference.dump(out);
+      out << "\n";
+    }
+    out << "}\n";
   }
-  out << "}\n";
-  out << "Rewrite loops: {\n";
-  for (const auto &loop : Loops) {
-    if (loop.isDeleted())
-      continue;
+  if (!Loops.empty()) {
+    out << "Rewrite loops: {\n";
+    for (unsigned loopID : indices(Loops)) {
+      const auto &loop = Loops[loopID];
+      if (loop.isDeleted())
+        continue;
 
-    out << "- ";
-    loop.dump(out, *this);
-    out << "\n";
+      out << "- (#" << loopID << ") ";
+      loop.dump(out, *this);
+      out << "\n";
+    }
   }
   out << "}\n";
 }
