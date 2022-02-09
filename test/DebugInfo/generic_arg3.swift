@@ -5,7 +5,7 @@ func apply<Type>(_ T : Type, fn: (Type) -> Type) -> Type { return fn(T) }
 public func f<Type>(_ value : Type)
 {
   // CHECK: define {{.*}}$s12generic_arg31fyyxlFxxXEfU_
-  // CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %[[ALLOCA:[^,]+]],
+  // CHECK: call void @llvm.dbg.addr(metadata %swift.opaque** %[[ALLOCA:[^,]+]],
   // CHECK-SAME: metadata ![[ARG:.*]], metadata !DIExpression(DW_OP_deref))
   // CHECK: store %swift.opaque* %1, %swift.opaque** %[[ALLOCA]], align
   // No deref here.

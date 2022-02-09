@@ -3,10 +3,10 @@ import StdlibUnittest
 func foo<T>(_ x: T) -> () {
   // CHECK: define {{.*}} @"$s11generic_arg3fooyyxlF"
   // CHECK: %[[T:.*]] = alloca %swift.type*
-  // CHECK: call void @llvm.dbg.declare(metadata %swift.type** %[[T]],
+  // CHECK: call void @llvm.dbg.addr(metadata %swift.type** %[[T]],
   // CHECK-SAME:               metadata ![[T1:.*]], metadata !DIExpression())
   // CHECK: %[[X:.*]] = alloca %swift.opaque*
-  // CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %[[X]],
+  // CHECK: call void @llvm.dbg.addr(metadata %swift.opaque** %[[X]],
   // CHECK-SAME: metadata ![[X1:.*]], metadata !DIExpression(DW_OP_deref))
   // CHECK: store %swift.type* %T, %swift.type** %[[T]],
   // CHECK: store %swift.opaque* %0, %swift.opaque** %[[X]],

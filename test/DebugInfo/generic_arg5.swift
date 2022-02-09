@@ -7,8 +7,8 @@ public struct S<Type>
 public func foo<Type>(_ values : [S<Type>])
 {
   // CHECK: define {{.*}}$s12generic_arg53fooyySayAA1SVyxGGlFAESgAEXEfU_
-  // CHECK: call void @llvm.dbg.declare
-  // CHECK: call void @llvm.dbg.declare(metadata %[[TY:.*]]** %[[ALLOCA:[^,]+]],
+  // CHECK: call void @llvm.dbg.addr
+  // CHECK: call void @llvm.dbg.addr(metadata %[[TY:.*]]** %[[ALLOCA:[^,]+]],
   // CHECK-SAME:       metadata ![[ARG:[0-9]+]],
   // CHECK-SAME:       metadata !DIExpression(DW_OP_deref))
   // CHECK: store %[[TY]]* %1, %[[TY]]** %[[ALLOCA]], align

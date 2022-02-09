@@ -334,15 +334,15 @@ func customFactoryMethodsInherited() {
 
 // CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir30testCompatibilityAliasMangling3objySo13SwiftNameTestC_tF"
 func testCompatibilityAliasMangling(obj: SwiftNameAlias) {
-  // CHECK: call void @llvm.dbg.declare(metadata %TSo13SwiftNameTestC** {{%.+}}, metadata ![[SWIFT_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
+  // CHECK: call void @llvm.dbg.addr(metadata %TSo13SwiftNameTestC** {{%.+}}, metadata ![[SWIFT_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
 }
 
 func testGenericCompatibilityAliasMangling(generic_obj: SwiftGenericNameAlias<NSNumber>) {
-  // CHECK: call void @llvm.dbg.declare(metadata %TSo20SwiftGenericNameTestCySo8NSNumberCG** {{%.+}}, metadata ![[SWIFT_GENERIC_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
+  // CHECK: call void @llvm.dbg.addr(metadata %TSo20SwiftGenericNameTestCySo8NSNumberCG** {{%.+}}, metadata ![[SWIFT_GENERIC_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
 }
 
 func testConstrGenericCompatibilityAliasMangling(constr_generic_obj: SwiftConstrGenericNameAlias<NSNumber>) {
-  // CHECK: call void @llvm.dbg.declare(metadata %TSo26SwiftConstrGenericNameTestCySo8NSNumberCG** {{%.+}}, metadata ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
+  // CHECK: call void @llvm.dbg.addr(metadata %TSo26SwiftConstrGenericNameTestCySo8NSNumberCG** {{%.+}}, metadata ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
 }
 
 // CHECK-LABEL: s7objc_ir22testBlocksWithGenerics3hbaypSo13HasBlockArrayC_tF

@@ -9,7 +9,7 @@ public extension P {
   public func f() -> Int32 {
     // CHECK-NEXT: entry:
     // CHECK-NEXT: %[[ALLOCA:.*]] = alloca %swift.type*,
-    // CHECK-NEXT: @llvm.dbg.declare(metadata %swift.type** %[[ALLOCA]],
+    // CHECK-NEXT: @llvm.dbg.addr(metadata %swift.type** %[[ALLOCA]],
     // CHECK-SAME:    metadata ![[SELFMETA:.*]], metadata !DIExpression())
     return v
   }
