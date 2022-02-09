@@ -157,16 +157,18 @@ namespace {
     ASTContext &Ctx;
     ClangImporter &Importer;
     ClangImporter::Implementation &Impl;
+    ClangImporter::Implementation::ClangCompiler &Compiler;
     const ClangImporterOptions &ImporterOpts;
     std::string SwiftPCHHash;
   public:
     explicit ParsingAction(ASTContext &ctx,
                            ClangImporter &importer,
                            ClangImporter::Implementation &impl,
+                           ClangImporter::Implementation::ClangCompiler &compiler,
                            const ClangImporterOptions &importerOpts,
                            std::string swiftPCHHash)
-      : Ctx(ctx), Importer(importer), Impl(impl), ImporterOpts(importerOpts),
-        SwiftPCHHash(swiftPCHHash) {}
+      : Ctx(ctx), Importer(importer), Impl(impl), Compiler(compiler),
+        ImporterOpts(importerOpts), SwiftPCHHash(swiftPCHHash) {}
     std::unique_ptr<clang::ASTConsumer>
     CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
       return std::make_unique<HeaderParsingASTConsumer>(Impl);
@@ -178,18 +180,17 @@ namespace {
       // and (b) search paths are always added after -Xcc options.
       SearchPathOptions &searchPathOpts = Ctx.SearchPathOpts;
       for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
-        Importer.addSearchPath(framepath.Path, /*isFramework*/true,
+        Compiler.addSearchPath(framepath.Path, /*isFramework*/true,
                                framepath.IsSystem);
       }
 
       for (const auto &path : searchPathOpts.getImportSearchPaths()) {
-        Importer.addSearchPath(path, /*isFramework*/false, /*isSystem=*/false);
+        Compiler.addSearchPath(path, /*isFramework*/false, /*isSystem=*/false);
       }
 
       auto PCH = Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash);
       if (PCH.hasValue()) {
-        Impl.getClangInstance()->getPreprocessorOpts().ImplicitPCHInclude =
-            PCH.getValue();
+        Compiler.getPreprocessorOpts().ImplicitPCHInclude = PCH.getValue();
         Impl.IsReadingBridgingPCH = true;
         Impl.setSinglePCHImport(PCH.getValue());
       }
@@ -1194,6 +1195,7 @@ ClangImporter::create(ASTContext &ctx,
     // Create the associated action.
     compiler.Action.reset(new ParsingAction(ctx, *importer,
                                                   importer->Impl,
+                                                  compiler,
                                                   importerOpts,
                                                   swiftPCHHash));
     auto *action = compiler.Action.get();
@@ -1268,15 +1270,18 @@ ClangImporter::create(ASTContext &ctx,
   for (auto &compiler: importer->Impl.getAllClangCompilers())
     if (initializeCompiler(*compiler))
       return nullptr;
-    else if (shouldEarlyReturn)
-      return importer;
 
+  if (shouldEarlyReturn)
+    return importer;
+
+
+  auto &headerCompiler = importer->Impl.BridgingHeaderCompiler;
 
   // FIXME: These decls are not being parsed correctly since (a) some of the
   // callbacks are still being added, and (b) the logic to parse them has
   // changed.
   clang::Parser::DeclGroupPtrTy parsed;
-  while (!importer->Impl.DefaultCompiler.Parser->ParseTopLevelDecl(parsed)) {
+  while (!headerCompiler.Parser->ParseTopLevelDecl(parsed)) {
     for (auto *D : parsed.get()) {
       importer->Impl.addBridgeHeaderTopLevelDecls(D);
 
@@ -1289,7 +1294,7 @@ ClangImporter::create(ASTContext &ctx,
 
   // FIXME: This is missing implicit includes.
   auto *CB = new HeaderImportCallbacks(importer->Impl);
-  importer->Impl.DefaultCompiler.Instance->getPreprocessor().addPPCallbacks(
+  headerCompiler.getPreprocessor().addPPCallbacks(
     std::unique_ptr<clang::PPCallbacks>(CB));
 
   // Create the selectors we'll be looking for.
@@ -1326,16 +1331,15 @@ ClangImporter::create(ASTContext &ctx,
   return importer;
 }
 
-bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
-                                  bool isSystem) {
-  auto &compiler = Impl.DefaultCompiler;
-  clang::FileManager &fileMgr = compiler.Instance->getFileManager();
+bool ClangImporter::Implementation::ClangCompiler::addSearchPath(
+  StringRef newSearchPath, bool isFramework, bool isSystem) {
+  clang::FileManager &fileMgr = Instance->getFileManager();
   auto optionalEntry = fileMgr.getOptionalDirectoryRef(newSearchPath);
   if (!optionalEntry)
     return true;
   auto entry = *optionalEntry;
 
-  auto &headerSearchInfo = Impl.getClangPreprocessor().getHeaderSearchInfo();
+  auto &headerSearchInfo = getPreprocessor().getHeaderSearchInfo();
   auto exists = std::any_of(headerSearchInfo.search_dir_begin(),
                             headerSearchInfo.search_dir_end(),
                             [&](const clang::DirectoryLookup &lookup) -> bool {
@@ -1355,10 +1359,20 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
 
   // In addition to changing the current preprocessor directly, we still need
   // to change the options structure for future module-building.
-  compiler.Instance->getHeaderSearchOpts().AddPath(newSearchPath,
+  Instance->getHeaderSearchOpts().AddPath(newSearchPath,
     isSystem ? clang::frontend::System : clang::frontend::Angled, isFramework,
     /*IgnoreSysRoot=*/true);
   return false;
+}
+
+bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
+                                  bool isSystem) {
+  bool result = false;
+  for (auto &compiler: Impl.getAllClangCompilers()) {
+    result = result ||
+      compiler->addSearchPath(newSearchPath, isFramework, isSystem);
+  }
+  return result;
 }
 
 clang::SourceLocation
@@ -1398,7 +1412,7 @@ bool ClangImporter::Implementation::importHeader(
 
   // Don't even try to load the bridging header if the Clang AST is in a bad
   // state. It could cause a crash.
-  auto &clangDiags = getClangASTContext().getDiagnostics();
+  auto &clangDiags = BridgingHeaderCompiler.getASTContext().getDiagnostics();
   if (clangDiags.hasUnrecoverableErrorOccurred() &&
       !getClangInstance()->getPreprocessorOpts().AllowPCHWithCompilerErrors)
     return true;
@@ -1408,17 +1422,18 @@ bool ClangImporter::Implementation::importHeader(
 
   bool hadError = clangDiags.hasErrorOccurred();
 
-  clang::SourceManager &sourceMgr = getClangInstance()->getSourceManager();
+  clang::SourceManager &sourceMgr =
+    BridgingHeaderCompiler.Instance->getSourceManager();
   clang::FileID bufferID = sourceMgr.createFileID(std::move(sourceBuffer),
                                                   clang::SrcMgr::C_User,
                                                   /*LoadedID=*/0,
                                                   /*LoadedOffset=*/0,
                                                   getNextIncludeLoc());
   auto &consumer = static_cast<HeaderParsingASTConsumer &>(
-    getClangInstance()->getASTConsumer());
+    BridgingHeaderCompiler.Instance->getASTConsumer());
   consumer.reset();
 
-  clang::Preprocessor &pp = getClangPreprocessor();
+  clang::Preprocessor &pp = BridgingHeaderCompiler.getPreprocessor();
   pp.EnterSourceFile(bufferID, /*Dir=*/nullptr, /*Loc=*/{});
   // Force the import to occur.
   pp.LookAhead(0);
@@ -1435,7 +1450,7 @@ bool ClangImporter::Implementation::importHeader(
   };
 
   clang::Parser::DeclGroupPtrTy parsed;
-  while (!DefaultCompiler.Parser->ParseTopLevelDecl(parsed)) {
+  while (!BridgingHeaderCompiler.Parser->ParseTopLevelDecl(parsed)) {
     if (parsed)
       handleParsed(parsed.get());
     for (auto additionalParsedGroup : consumer.getAdditionalParsedDecls())
@@ -1501,7 +1516,7 @@ bool ClangImporter::Implementation::importHeader(
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred() &&
-      !getClangInstance()->getPreprocessorOpts().AllowPCHWithCompilerErrors) {
+      !BridgingHeaderCompiler.getPreprocessorOpts().AllowPCHWithCompilerErrors) {
     diagnose(diagLoc, diag::bridging_header_error, headerName);
     return true;
   }
@@ -1513,7 +1528,7 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
                                  off_t expectedSize, time_t expectedModTime,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager =
-    Impl.DefaultCompiler.Instance->getFileManager();
+    Impl.BridgingHeaderCompiler.Instance->getFileManager();
   auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
   if (headerFile && (*headerFile)->getSize() == expectedSize &&
       (*headerFile)->getModificationTime() == expectedModTime) {
@@ -1549,7 +1564,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   }
 
   clang::FileManager &fileManager =
-    Impl.DefaultCompiler.Instance->getFileManager();
+    Impl.BridgingHeaderCompiler.Instance->getFileManager();
   auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
   if (!headerFile) {
     Impl.diagnose(diagLoc, diag::bridging_header_missing, header);
@@ -1576,7 +1591,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
 std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
                                                      off_t &fileSize,
                                                      time_t &fileModTime) {
-  auto &compiler = Impl.DefaultCompiler;
+  auto &compiler = Impl.BridgingHeaderCompiler;
   auto invocation =
     std::make_shared<clang::CompilerInvocation>(*compiler.Invocation);
 
@@ -2093,7 +2108,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
 // in response to an import directive in a bridging header -- and call
 // finishLoadingClangModule on each.
 void ClangImporter::Implementation::handleDeferredImports(SourceLoc diagLoc) {
-  clang::ASTReader &R = *DefaultCompiler.Instance->getASTReader();
+  clang::ASTReader &R = *BridgingHeaderCompiler.Instance->getASTReader();
   llvm::SmallSet<clang::serialization::SubmoduleID, 32> seenSubmodules;
   for (clang::serialization::SubmoduleID ID : PCHImportedSubmodules) {
     if (!seenSubmodules.insert(ID).second)

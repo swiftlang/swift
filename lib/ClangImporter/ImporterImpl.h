@@ -456,11 +456,13 @@ private:
   /// Used to avoid running the AST verifier over the same declarations.
   size_t VerifiedDeclsCounter = 0;
 
+public:
   /// A wrapper for clang compiler.
   class ClangCompiler {
     friend ClangImporter;
     friend ClangImporter::Implementation;
 
+  private:
     /// Clang compiler invocation.
     std::shared_ptr<clang::CompilerInvocation> Invocation;
 
@@ -480,13 +482,47 @@ private:
 
     /// Clang arguments used to create the Clang invocation.
     std::vector<std::string> ClangArgs;
+
+  public:
+    bool addSearchPath(StringRef newSearchPath, bool isFramework, bool isSystem);
+
+    /// Retrieve the Clang AST context.
+    clang::ASTContext &getASTContext() const {
+      return Instance->getASTContext();
+    }
+
+    /// Retrieve the Clang Sema object.
+    clang::Sema &getSema() const {
+      return Instance->getSema();
+    }
+
+    /// Retrieve the Clang Preprocessor.
+    clang::Preprocessor &getPreprocessor() const {
+      return Instance->getPreprocessor();
+    }
+
+    clang::PreprocessorOptions &getPreprocessorOpts() const {
+      return Instance->getPreprocessorOpts();
+    }
+
+    clang::CodeGenOptions &getCodeGenOpts() const {
+      return Instance->getCodeGenOpts();
+    }
+
+    clang::SourceManager &getSourceManager() const {
+      return Instance->getSourceManager();
+    }
   };
 
+private:
   ClangCompiler DefaultCompiler;
+
+  ClangCompiler BridgingHeaderCompiler;
 
   std::vector<ClangCompiler *> &getAllClangCompilers() {
     auto allClangCompilers = new std::vector<ClangCompiler *> {
       &DefaultCompiler,
+      &BridgingHeaderCompiler,
     };
     return *allClangCompilers;
   }
@@ -557,6 +593,10 @@ public:
 
   clang::CompilerInstance *getClangInstance() {
     return DefaultCompiler.Instance.get();
+  }
+
+  clang::CompilerInstance *getBridgingHeaderCompilerInstance() {
+    return BridgingHeaderCompiler.Instance.get();
   }
 
 private:
