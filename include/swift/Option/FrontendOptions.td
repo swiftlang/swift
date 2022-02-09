@@ -237,6 +237,15 @@ def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_lexical_lifetimes :
+    Joined<["-"], "enable-lexical-lifetimes=">,
+    HelpText<"Whether to enable lexical lifetimes">,
+    MetaVarName<"true|false">;
+  def enable_lexical_lifetimes_noArg :
+    Flag<["-"], "enable-lexical-lifetimes">,
+    HelpText<"Enable lexical lifetimes">;
+}
 
 // Flags that are saved into module interfaces
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
@@ -266,14 +275,6 @@ def enable_lexical_borrow_scopes :
   Joined<["-"], "enable-lexical-borrow-scopes=">,
   HelpText<"Whether to emit lexical borrow scopes (default: true)">,
   MetaVarName<"true|false">;
-          
-def enable_lexical_lifetimes :
-  Joined<["-"], "enable-lexical-lifetimes=">,
-  HelpText<"Whether to enable lexical lifetimes">,
-  MetaVarName<"true|false">;
-def enable_lexical_lifetimes_noArg :
-  Flag<["-"], "enable-lexical-lifetimes">,
-  HelpText<"Enable lexical lifetimes">;
 
 def enable_experimental_move_only :
   Flag<["-"], "enable-experimental-move-only">,
