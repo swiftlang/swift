@@ -201,6 +201,10 @@ Solution ConstraintSystem::finalize() {
     solution.argumentLists.insert(argListMapping);
   }
 
+  for (const auto &implicitRoot : ImplicitCallAsFunctionRoots) {
+    solution.ImplicitCallAsFunctionRoots.insert(implicitRoot);
+  }
+
   return solution;
 }
 
@@ -306,6 +310,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register the argument lists.
   for (auto &argListMapping : solution.argumentLists) {
     ArgumentLists.insert(argListMapping);
+  }
+
+  for (auto &implicitRoot : solution.ImplicitCallAsFunctionRoots) {
+    ImplicitCallAsFunctionRoots.insert(implicitRoot);
   }
 
   // Register any fixes produced along this path.
@@ -529,6 +537,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numIsolatedParams = cs.isolatedParams.size();
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
   numArgumentLists = cs.ArgumentLists.size();
+  numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -642,6 +651,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any argument lists no longer in scope.
   truncate(cs.ArgumentLists, numArgumentLists);
+
+  // Remove any implicitly generated root expressions for `.callAsFunction`
+  // which are no longer in scope.
+  truncate(cs.ImplicitCallAsFunctionRoots, numImplicitCallAsFunctionRoots);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
