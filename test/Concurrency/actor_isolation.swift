@@ -844,7 +844,7 @@ actor SomeActorWithInits {
     let _ = self.nonSendable // OK only through typechecking, not SIL.
 
     defer {
-      isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated deinit; this is an error in Swift 6}}
       mutableState += 1 // okay
       nonisolated()
     }
@@ -860,7 +860,7 @@ actor SomeActorWithInits {
   }
 
 
-  func isolated() { } // expected-note 9 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+  func isolated() { } // expected-note 8 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func nonisolated() {}
 }
 
