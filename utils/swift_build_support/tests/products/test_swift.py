@@ -64,7 +64,8 @@ class SwiftTestCase(unittest.TestCase):
             build_swift_stdlib_static_print=False,
             build_swift_stdlib_unicode_data=True,
             swift_freestanding_is_darwin=False,
-            build_swift_private_stdlib=True)
+            build_swift_private_stdlib=True,
+            swift_tools_ld64_lto_codegen_only_for_supporting_targets=False)
 
         # Setup shell
         shell.dry_run = True
@@ -102,6 +103,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
             '-DSWIFT_STDLIB_ENABLE_UNICODE_DATA=TRUE',
+            '-DSWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL=FALSE',
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -124,6 +126,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
             '-DSWIFT_STDLIB_ENABLE_UNICODE_DATA=TRUE',
+            '-DSWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL=FALSE',
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 
@@ -388,3 +391,16 @@ class SwiftTestCase(unittest.TestCase):
              'FALSE'],
             [x for x in swift.cmake_options
                 if 'SWIFT_STDLIB_BUILD_PRIVATE' in x])
+
+    def test_swift_tools_ld64_lto_codegen_only_for_supporting_targets(self):
+        self.args.swift_tools_ld64_lto_codegen_only_for_supporting_targets = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+                if 'SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS' in x])
