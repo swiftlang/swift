@@ -97,8 +97,12 @@ ArchetypeToConcreteConvertUInt8(t: c)
 ArchetypeToConcreteConvertUInt8(t: f)
 
 // x -> x where x is not a class.
+//
+// TODO: Why is the optimizer cloning twice here.
+//
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8{{[_0-9a-zA-Z]*}}3Not{{.*}}Tg5 : $@convention(thin) (NotUInt8) -> NotUInt8 {
 // CHECK: bb0
+// CHECK-NEXT: debug_value %0
 // CHECK-NEXT: debug_value %0
 // CHECK-NEXT: return %0
 
@@ -119,6 +123,7 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // x -> x where x is a class.
 // CHECK-LABEL: sil shared [noinline] @$s37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{[_0-9a-zA-Z]*}}Tg5 : $@convention(thin) (@guaranteed C) -> @owned C {
 // CHECK: bb0([[ARG:%.*]] : $C)
+// CHECK-NEXT: debug_value [[ARG]]
 // CHECK-NEXT: debug_value [[ARG]]
 // CHECK-NEXT: strong_retain [[ARG]]
 // CHECK-NEXT: return [[ARG]]

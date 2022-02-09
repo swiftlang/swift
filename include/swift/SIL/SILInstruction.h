@@ -1811,7 +1811,7 @@ struct SILDebugVariable {
   bool operator==(const SILDebugVariable &V) {
     return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name &&
            Implicit == V.Implicit && Type == V.Type && Loc == V.Loc &&
-           Scope == V.Scope && DIExpr == DIExpr;
+           Scope == V.Scope && DIExpr == V.DIExpr;
   }
 
   bool isLet() const { return Name.size() && Constant; }
