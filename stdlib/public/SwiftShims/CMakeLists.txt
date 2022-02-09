@@ -24,8 +24,6 @@ set(sources
   _SwiftConcurrency.h
   _SwiftDistributed.h
 
-  DispatchOverlayShims.h
-
   module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
