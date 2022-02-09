@@ -14,18 +14,18 @@ struct NotCodable {}
 
 distributed actor D {
 
-  // expected-note@+1{{access to this property is only permitted within the distributed actor 'D'}}
+  // expected-note@+1{{access to property 'normal' is only permitted within distributed actor 'D'}}
   var normal: String = "normal"
 
-  // expected-note@+1{{access to this property is only permitted within the distributed actor 'D'}}
+  // expected-note@+1{{access to property 'computed' is only permitted within distributed actor 'D'}}
   var computed: String  {
     "normal"
   }
 
-  // expected-error@+1{{property 'dlet' cannot be 'distributed', because it is not a computed get-only property}}
+  // expected-error@+1{{property 'dlet' cannot be 'distributed', only computed properties can}}
   distributed let dlet: String = "illegal"
 
-  // expected-error@+1{{'distributed' computed property 'dletvar' can only be have a 'get' implementation}}
+  // expected-error@+1{{distributed property 'dletvar' cannot be 'distributed', only computed properties can}}
   distributed var dletvar: String = "illegal"
 
   // OK:
@@ -43,7 +43,7 @@ distributed actor D {
     .init()
   }
 
-  //expected-error@+1{{'distributed' computed property 'dist_nope' can only be have a 'get' implementation}}
+  //expected-error@+1{{'distributed' computed property 'dist_nope' cannot have setter}}
   distributed var dist_nope: String {
     get {
       "dist"

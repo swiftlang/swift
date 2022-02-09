@@ -18,7 +18,8 @@ struct Logger {
 
 distributed actor Philosopher {
   let log: Logger
-  // expected-note@-1{{access to this property is only permitted within the distributed actor 'Philosopher'}}
+  // expected-note@-1{{access to property 'log' is only permitted within distributed actor 'Philosopher'}}
+
   var variable = 12
   var variable_fromDetach = 12
   let INITIALIZED: Int

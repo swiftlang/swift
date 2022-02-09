@@ -215,9 +215,8 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
 }
 
 static bool checkDistributedTargetResultType(
-    ModuleDecl *module,
-    ValueDecl *valueDecl,
-    llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements,
+    ModuleDecl *module, ValueDecl *valueDecl,
+    const llvm::SmallPtrSetImpl<ProtocolDecl *> &serializationRequirements,
     bool diagnose) {
   auto &C = valueDecl->getASTContext();
 
@@ -227,7 +226,7 @@ static bool checkDistributedTargetResultType(
   } else if (auto var = dyn_cast<VarDecl>(valueDecl)) {
     resultType = var->getInterfaceType();
   } else {
-    assert(false && "Unsupported distributed target");
+    llvm_unreachable("Unsupported distributed target");
   }
 
   if (resultType->isVoid())
@@ -241,7 +240,8 @@ static bool checkDistributedTargetResultType(
   };
 
   auto isCodableRequirement =
-      serializationRequirements == codableRequirements;
+      checkDistributedSerializationRequirementIsExactlyCodable(
+          C, serializationRequirements);
 
   for(auto serializationReq : serializationRequirements) {
     auto conformance =
@@ -298,14 +298,9 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   } // TODO(distributed): need to handle ProtocolDecl too?
 
   // If the requirement is exactly `Codable` we diagnose it ia bit nicer.
-  auto serializationRequirementIsCodable = false;
-  if (serializationRequirements.size() == 2) {
-      auto encodableType = C.getProtocol(KnownProtocolKind::Encodable);
-      auto decodableType = C.getProtocol(KnownProtocolKind::Decodable);
-      llvm::SmallPtrSet<ProtocolDecl *, 2> codableRequirements = {encodableType, decodableType};
-      serializationRequirementIsCodable =
-          serializationRequirements == codableRequirements;
-  }
+  auto serializationRequirementIsCodable =
+      checkDistributedSerializationRequirementIsExactlyCodable(
+          C, serializationRequirements);
 
   // --- Check parameters for 'Codable' conformance
   for (auto param : *func->getParameters()) {
@@ -372,27 +367,18 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
     return true;
   }
 
-  // only get-only computed properties are allowed to be distributed
-  if (var->getReadImpl() == swift::ReadImplKind::Get) {
-    if (var->getWriteImpl() != swift::WriteImplKind::Immutable) {
-      var->diagnose(
-          diag::distributed_property_can_only_be_computed_get_only,
-          var->getName());
-      return true;
-    }
-  } else {
-    // it is not a computed property
-    if (var->isLet()) {
-      var->diagnose(
-          diag::distributed_property_can_only_be_computed,
-          var->getName());
-      return true;
-    } else {
-      var->diagnose(
-          diag::distributed_property_can_only_be_computed_get_only,
-          var->getName());
-      return true;
-    }
+  // it is not a computed property
+  if (var->isLet() || var->hasStorageOrWrapsStorage()) {
+    var->diagnose(diag::distributed_property_can_only_be_computed,
+                  var->getDescriptiveKind(), var->getName());
+    return true;
+  }
+
+  // distributed properties cannot have setters
+  if (var->getWriteImpl() != swift::WriteImplKind::Immutable) {
+    var->diagnose(diag::distributed_property_can_only_be_computed_get_only,
+                  var->getName());
+    return true;
   }
 
   // === Check the type of the property
@@ -559,6 +545,16 @@ swift::flattenDistributedSerializationTypeToRequiredProtocols(TypeBase *serializ
   }
 
   return serializationReqs;
+}
+
+bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
+    ASTContext &C,
+    const llvm::SmallPtrSetImpl<ProtocolDecl *> &allRequirements) {
+  auto encodable = C.getProtocol(KnownProtocolKind::Encodable);
+  auto decodable = C.getProtocol(KnownProtocolKind::Decodable);
+
+  return allRequirements.size() == 2 && allRequirements.count(encodable) &&
+         allRequirements.count(decodable);
 }
 
 llvm::SmallPtrSet<ProtocolDecl *, 2>

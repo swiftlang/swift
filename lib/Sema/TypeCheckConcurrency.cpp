@@ -1960,9 +1960,10 @@ namespace {
       // FIXME: Make this diagnostic more sensitive to the isolation context of
       // the declaration.
       if (isDistributedActor) {
-        if (dyn_cast<VarDecl>(decl)) {
+        if (isa<VarDecl>(decl)) {
           // Distributed actor properties are never accessible externally.
           decl->diagnose(diag::distributed_actor_isolated_property,
+                         decl->getDescriptiveKind(), decl->getName(),
                          nominal->getName());
         } else {
           // it's a function or subscript

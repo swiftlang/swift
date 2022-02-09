@@ -13,8 +13,8 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 distributed actor DA {
 
   let local: Int = 42
-  // expected-note@-1{{access to this property is only permitted within the distributed actor 'DA'}}
-  // expected-note@-2{{access to this property is only permitted within the distributed actor 'DA'}}
+  // expected-note@-1{{access to property 'local' is only permitted within distributed actor 'DA'}}
+  // expected-note@-2{{access to property 'local' is only permitted within distributed actor 'DA'}}
 
   nonisolated let nope: Int = 13
   // expected-error@-1{{'nonisolated' can not be applied to distributed actor stored properties}}

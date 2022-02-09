@@ -28,8 +28,8 @@ struct NotCodableValue { }
 
 distributed actor DistributedActor_1 {
 
-  let name: String = "alice" // expected-note{{access to this property is only permitted within the distributed actor 'DistributedActor_1'}}
-  var mutable: String = "alice" // expected-note{{access to this property is only permitted within the distributed actor 'DistributedActor_1'}}
+  let name: String = "alice" // expected-note{{access to property 'name' is only permitted within distributed actor 'DistributedActor_1'}}
+  var mutable: String = "alice" // expected-note{{access to property 'mutable' is only permitted within distributed actor 'DistributedActor_1'}}
   var computedMutable: String {
     get {
       "hey"
@@ -39,8 +39,8 @@ distributed actor DistributedActor_1 {
     }
   }
 
-  distributed let letProperty: String = "" // expected-error{{static property 'letProperty' cannot be 'distributed', because it is not a computed get-only property}}
-  distributed var varProperty: String = "" // expected-error{{'distributed' computed property 'varProperty' can only be have a 'get' implementation}}
+  distributed let letProperty: String = "" // expected-error{{property 'letProperty' cannot be 'distributed', only computed properties can}}
+  distributed var varProperty: String = "" // expected-error{{property 'varProperty' cannot be 'distributed', only computed properties can}}
 
   distributed static func distributedStatic() {} // expected-error{{'distributed' method cannot be 'static'}}
   distributed class func distributedClass() {}

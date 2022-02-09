@@ -4762,18 +4762,17 @@ ERROR(distributed_actor_user_defined_special_property,none,
       "distributed actor synthesized stored property",
       (DeclName))
 ERROR(distributed_property_can_only_be_computed_get_only,none,
-      "'distributed' computed property %0 can only be have a 'get' implementation",
+      "'distributed' computed property %0 cannot have setter",
       (DeclName))
 ERROR(distributed_property_cannot_be_static,none,
       "'distributed' property %0 cannot be 'static'",
       (DeclName))
 ERROR(distributed_property_can_only_be_computed,none,
-      "static property %0 cannot be 'distributed', because it is not a computed "
-      "get-only property",
-      (DeclName))
+      "%0 %1 cannot be 'distributed', only computed properties can",
+      (DescriptiveDeclKind, DeclName))
 NOTE(distributed_actor_isolated_property,none,
-      "access to this property is only permitted within the distributed actor %0",
-      (DeclName))
+      "access to %0 %1 is only permitted within distributed actor %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "

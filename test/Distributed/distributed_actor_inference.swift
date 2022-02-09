@@ -59,8 +59,8 @@ distributed actor SomeDistributedActor_6 {
 
 distributed actor BadValuesDistributedActor_7 {
   distributed var varItNope: Int { 13 } // we allow these
-  distributed let letItNope: Int = 13 // expected-error{{static property 'letItNope' cannot be 'distributed', because it is not a computed get-only property}}
-  distributed lazy var lazyVarNope: Int = 13 // expected-error{{'distributed' computed property 'lazyVarNope' can only be have a 'get' implementation}}
+  distributed let letItNope: Int = 13 // expected-error{{property 'letItNope' cannot be 'distributed', only computed properties can}}
+  distributed lazy var lazyVarNope: Int = 13 // expected-error{{property 'lazyVarNope' cannot be 'distributed', only computed properties can}}
   distributed subscript(nope: Int) -> Int { nope * 2 } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
   distributed static let staticLetNope: Int = 13 // expected-error{{'distributed' property 'staticLetNope' cannot be 'static'}}
   distributed static var staticVarNope: Int { 13 } // expected-error{{'distributed' property 'staticVarNope' cannot be 'static'}}
