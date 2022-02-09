@@ -2581,6 +2581,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_BackDeploy: {
+      auto *theAttr = cast<BackDeployAttr>(DA);
+      ENCODE_VER_TUPLE(Version, llvm::Optional<llvm::VersionTuple>(theAttr->Version));
+      auto abbrCode = S.DeclTypeAbbrCodes[BackDeployDeclAttrLayout::Code];
+      BackDeployDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          theAttr->isImplicit(),
+          LIST_VER_TUPLE_PIECES(Version),
+          static_cast<unsigned>(theAttr->Platform));
+      return;
+    }
+
     case DAK_ObjC: {
       auto *theAttr = cast<ObjCAttr>(DA);
       SmallVector<IdentifierID, 4> pieces;
