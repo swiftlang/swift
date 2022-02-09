@@ -5670,7 +5670,8 @@ ERROR(usable_from_inline_attr_with_explicit_access,
       (DeclName, AccessLevel))
 
 WARNING(inlinable_implies_usable_from_inline,none,
-        "'@inlinable' declaration is already '@usableFromInline'",())
+        "'@usableFromInline' attribute has no effect on '@inlinable' %0 %1",
+        (DescriptiveDeclKind, DeclName))
 
 ERROR(usable_from_inline_attr_in_protocol,none,
       "'@usableFromInline' attribute cannot be used in protocols", ())
