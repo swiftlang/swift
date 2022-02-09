@@ -1808,13 +1808,10 @@ struct SILDebugVariable {
   static Optional<SILDebugVariable>
   createFromAllocation(const AllocationInst *AI);
 
-  // We're not comparing DIExpr here because strictly speaking,
-  // DIExpr is not part of the debug variable. We simply piggyback
-  // it in this class so that's it's easier to carry DIExpr around.
   bool operator==(const SILDebugVariable &V) {
     return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name &&
            Implicit == V.Implicit && Type == V.Type && Loc == V.Loc &&
-           Scope == V.Scope;
+           Scope == V.Scope && DIExpr == DIExpr;
   }
 
   bool isLet() const { return Name.size() && Constant; }
