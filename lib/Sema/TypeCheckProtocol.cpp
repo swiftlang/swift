@@ -2937,12 +2937,13 @@ bool ConformanceChecker::checkActorIsolation(
 
     // An actor-isolated witness can only conform to an actor-isolated
     // requirement.
-    if (requirementIsolation == ActorIsolation::ActorInstance) {
+    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
+    if (requirementIsolation == ActorIsolation::ActorInstance &&
+        !(requirementFunc && requirementFunc->isDistributed())) {
       return false;
     }
 
     auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
-    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
     auto nominal = dyn_cast<NominalTypeDecl>(witness->getDeclContext());
     auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
     if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
@@ -3170,11 +3171,6 @@ bool ConformanceChecker::checkActorIsolation(
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
     llvm_unreachable("There are not actor protocols");
-  case ActorIsolation::DistributedActorInstance:
-    // A requirement inside a distributed actor, where it has a protocol that was
-    // bound requiring a `DistributedActor` conformance (`protocol D: DistributedActor`),
-    // results in the requirement being isolated to given distributed actor.
-    break;
 
   case ActorIsolation::GlobalActorUnsafe:
     requirementIsUnsafe = true;

@@ -568,7 +568,7 @@ void SILGenFunction::emitDistributedActorClassMemberDestruction(
     B.emitBlock(remoteMemberDestroyBB);
 
     for (VarDecl *vd : cd->getStoredProperties()) {
-      if (getActorIsolation(vd) == ActorIsolation::DistributedActorInstance)
+      if (getActorIsolation(vd) == ActorIsolation::ActorInstance)
         continue;
 
       destroyClassMember(cleanupLoc, selfValue, vd);
