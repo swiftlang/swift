@@ -2,7 +2,7 @@
 
 // Ensure @_backDeploy attributes and function bodies are printed in
 // swiftinterface files.
-// RUN: %swiftc_driver -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/Test.swiftinterface -enable-library-evolution -verify-emitted-module-interface -module-name Test %s
+// RUN: %target-swiftc_driver -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/Test.swiftinterface -enable-library-evolution -verify-emitted-module-interface -module-name Test %s
 // RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix CHECK < %t/Test.swiftinterface
 
 // FIXME(backDeploy): Remove this step in favor of a test that exercises using
