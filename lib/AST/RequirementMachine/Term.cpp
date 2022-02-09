@@ -132,11 +132,32 @@ static Optional<int>
 shortlexCompare(const Symbol *lhsBegin, const Symbol *lhsEnd,
                 const Symbol *rhsBegin, const Symbol *rhsEnd,
                 RewriteContext &ctx) {
+  // First, compare the number of name symbols.
+  unsigned lhsNameCount = 0;
+  for (auto *iter = lhsBegin; iter != lhsEnd; ++iter) {
+    if (iter->getKind() == Symbol::Kind::Name)
+      ++lhsNameCount;
+  }
+
+  unsigned rhsNameCount = 0;
+  for (auto *iter = rhsBegin; iter != rhsEnd; ++iter) {
+    if (iter->getKind() == Symbol::Kind::Name)
+      ++rhsNameCount;
+  }
+
+  // A term with more name symbols orders after a term with fewer name symbols.
+  if (lhsNameCount != rhsNameCount)
+    return lhsNameCount > rhsNameCount ? 1 : -1;
+
+  // Next, compare term length.
   unsigned lhsSize = (lhsEnd - lhsBegin);
   unsigned rhsSize = (rhsEnd - rhsBegin);
+
+  // A longer term orders after a shorter term.
   if (lhsSize != rhsSize)
     return lhsSize < rhsSize ? -1 : 1;
 
+  // Finally, compare symbols pairwise.
   while (lhsBegin != lhsEnd) {
     auto lhs = *lhsBegin;
     auto rhs = *rhsBegin;
