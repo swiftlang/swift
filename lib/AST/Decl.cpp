@@ -2013,14 +2013,13 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
           return true;
 
         switch (getActorIsolation(type)) {
-          case swift::ActorIsolation::Unspecified:
-          case swift::ActorIsolation::GlobalActorUnsafe:
+          case ActorIsolation::Unspecified:
+          case ActorIsolation::GlobalActorUnsafe:
             break;
 
-          case swift::ActorIsolation::ActorInstance:
-          case swift::ActorIsolation::DistributedActorInstance:
-          case swift::ActorIsolation::Independent:
-          case swift::ActorIsolation::GlobalActor:
+          case ActorIsolation::ActorInstance:
+          case ActorIsolation::Independent:
+          case ActorIsolation::GlobalActor:
             return true;
         }
       }

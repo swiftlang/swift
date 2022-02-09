@@ -925,7 +925,6 @@ void LifetimeChecker::injectActorHops() {
   // Must be an initializer that is isolated to self.
   switch (getActorIsolation(ctor)) {
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
       break;
 
     case ActorIsolation::Unspecified:
