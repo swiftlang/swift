@@ -2580,7 +2580,8 @@ namespace {
         ctx.Diags.diagnose(
             loc, diag::concurrent_access_of_local_capture,
             parent.dyn_cast<LoadExpr *>(),
-            var->getDescriptiveKind(), var->getName());
+            var->getDescriptiveKind(), var->getName())
+          .warnUntilSwiftVersion(6);
         return true;
       }
 
