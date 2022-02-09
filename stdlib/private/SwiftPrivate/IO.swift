@@ -16,12 +16,16 @@ import SwiftShims
 #if canImport(Darwin)
 import Darwin
 let (platform_read, platform_write, platform_close) = (read, write, close)
-#elseif canImport(Glibc)
-import Glibc
-let (platform_read, platform_write, platform_close) = (read, write, close)
 #elseif os(Windows)
 import CRT
 import WinSDK
+#else
+#if os(WASI)
+import WASILibc
+#elseif canImport(Glibc)
+import Glibc
+#endif
+let (platform_read, platform_write, platform_close) = (read, write, close)
 #endif
 
 #if os(Windows)
