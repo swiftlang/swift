@@ -49,6 +49,8 @@
 ///     space (`" "`).
 ///   - terminator: The string to print after all items have been printed. The
 ///     default is a newline (`"\n"`).
+
+#if !SWIFT_STDLIB_STATIC_PRINT
 public func print(
   _ items: Any...,
   separator: String = " ",
@@ -64,6 +66,7 @@ public func print(
     _print(items, separator: separator, terminator: terminator, to: &output)
   }
 }
+#endif
 
 /// Writes the textual representations of the given items most suitable for
 /// debugging into the standard output.
@@ -158,6 +161,7 @@ public func debugPrint(
 ///     default is a newline (`"\n"`).
 ///   - output: An output stream to receive the text representation of each
 ///     item.
+#if !SWIFT_STDLIB_STATIC_PRINT
 public func print<Target: TextOutputStream>(
   _ items: Any...,
   separator: String = " ",
@@ -166,6 +170,7 @@ public func print<Target: TextOutputStream>(
 ) {
   _print(items, separator: separator, terminator: terminator, to: &output)
 }
+#endif
 
 /// Writes the textual representations of the given items most suitable for
 /// debugging into the given output stream.
