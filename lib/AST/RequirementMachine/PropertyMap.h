@@ -250,6 +250,13 @@ private:
 
   void addConformanceProperty(Term key, Symbol property, unsigned ruleID);
   void addLayoutProperty(Term key, Symbol property, unsigned ruleID);
+
+  void unifyConcreteTypes(Term key,
+                          Optional<Symbol> &existingProperty,
+                          Optional<unsigned> &existingRuleID,
+                          Symbol property,
+                          unsigned ruleID);
+
   void addSuperclassProperty(Term key, Symbol property, unsigned ruleID);
   void addConcreteTypeProperty(Term key, Symbol property, unsigned ruleID);
 

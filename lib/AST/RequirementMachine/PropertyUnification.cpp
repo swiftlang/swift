@@ -111,6 +111,11 @@ static void recordRelation(Term key,
   (void) system.addRule(lhs, rhs, &path);
 }
 
+/// Given a term T == U.V, an existing rule (V.[C] => V) and a new rule
+/// (U.V.[D] => U.V) where [C] and [D] are understood to be two property
+/// symbols in conflict with each other, mark the new rule as conflicting,
+/// and if the existing rule applies to the entire term T (that is, if
+/// |U| == 0) also mark the existing rule as conflicting.
 static void recordConflict(Term key,
                            unsigned existingRuleID,
                            unsigned newRuleID,
@@ -605,53 +610,36 @@ void PropertyMap::processTypeDifference(const TypeDifference &difference,
     lhsRule.markSubstitutionSimplified();
 }
 
-/// When a type parameter has two concrete types, we have to unify the
-/// type constructor arguments.
-///
-/// For example, suppose that we have two concrete same-type requirements:
-///
-///   T == Foo<X.Y, Z, String>
-///   T == Foo<Int, A.B, W>
-///
-/// These lower to the following two rules:
-///
-///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}] => T
-///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}] => T
-///
-/// The two concrete type symbols will be added to the property bag of 'T',
-/// and we will eventually end up in this method, where we will generate three
-/// induced rules:
-///
-///   X.Y.[concrete: Int] => X.Y
-///   A.B => Z
-///   W.[concrete: String] => W
-void PropertyMap::addConcreteTypeProperty(
-    Term key, Symbol property, unsigned ruleID) {
-  auto *props = getOrCreateProperties(key);
-
+/// Utility used by addSuperclassProperty() and addConcreteTypeProperty().
+void PropertyMap::unifyConcreteTypes(
+    Term key,
+    Optional<Symbol> &existingProperty,
+    Optional<unsigned> &existingRuleID,
+    Symbol property,
+    unsigned ruleID) {
   auto &rule = System.getRule(ruleID);
   assert(rule.getRHS() == key);
 
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
-  if (!props->ConcreteType) {
-    props->ConcreteType = property;
-    props->ConcreteTypeRule = ruleID;
+  if (!existingProperty.hasValue()) {
+    existingProperty = property;
+    existingRuleID = ruleID;
     return;
   }
 
-  assert(props->ConcreteTypeRule.hasValue());
+  assert(existingRuleID.hasValue());
 
   if (debug) {
-    llvm::dbgs() << "% Unifying " << *props->ConcreteType;
-    llvm::dbgs() << " with " << property << "\n";
+    llvm::dbgs() << "% Unifying " << *existingProperty
+                 << " with " << property << "\n";
   }
 
   Optional<unsigned> lhsDifferenceID;
   Optional<unsigned> rhsDifferenceID;
 
   bool conflict = System.computeTypeDifference(key,
-                                               *props->ConcreteType, property,
+                                               *existingProperty, property,
                                                lhsDifferenceID,
                                                rhsDifferenceID);
 
@@ -660,7 +648,7 @@ void PropertyMap::addConcreteTypeProperty(
     if (debug) {
       llvm::dbgs() << "%% Concrete type conflict\n";
     }
-    recordConflict(key, *props->ConcreteTypeRule, ruleID, System);
+    recordConflict(key, *existingRuleID, ruleID, System);
     return;
   }
 
@@ -679,7 +667,7 @@ void PropertyMap::addConcreteTypeProperty(
     MutableTerm lhsTerm(key);
     lhsTerm.add(newProperty);
 
-    if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID)) {
+    if (checkRulePairOnce(*existingRuleID, ruleID)) {
       assert(lhsDifference.RHS == rhsDifference.RHS);
 
       if (debug) {
@@ -707,9 +695,9 @@ void PropertyMap::addConcreteTypeProperty(
     unsigned newRuleID = path.begin()->getRuleID();
 
     // Process LHS -> (LHS ∧ RHS).
-    if (checkRulePairOnce(*props->ConcreteTypeRule, newRuleID))
+    if (checkRulePairOnce(*existingRuleID, newRuleID))
       processTypeDifference(lhsDifference, *lhsDifferenceID,
-                            *props->ConcreteTypeRule, newRuleID);
+                            *existingRuleID, newRuleID);
 
     // Process RHS -> (LHS ∧ RHS).
     if (checkRulePairOnce(ruleID, newRuleID))
@@ -718,8 +706,8 @@ void PropertyMap::addConcreteTypeProperty(
 
     // The new property is more specific, so update ConcreteType and
     // ConcreteTypeRule.
-    props->ConcreteType = newProperty;
-    props->ConcreteTypeRule = ruleID;
+    existingProperty = newProperty;
+    existingRuleID = ruleID;
 
     return;
   }
@@ -729,17 +717,17 @@ void PropertyMap::addConcreteTypeProperty(
     assert(!rhsDifferenceID);
 
     const auto &lhsDifference = System.getTypeDifference(*lhsDifferenceID);
-    assert(*props->ConcreteType == lhsDifference.LHS);
+    assert(*existingProperty == lhsDifference.LHS);
     assert(property == lhsDifference.RHS);
 
-    if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID))
+    if (checkRulePairOnce(*existingRuleID, ruleID))
       processTypeDifference(lhsDifference, *lhsDifferenceID,
-                            *props->ConcreteTypeRule, ruleID);
+                            *existingRuleID, ruleID);
 
-    // The new property is more specific, so update ConcreteType and
-    // ConcreteTypeRule.
-    props->ConcreteType = property;
-    props->ConcreteTypeRule = ruleID;
+    // The new property is more specific, so update existingProperty and
+    // existingRuleID.
+    existingProperty = property;
+    existingRuleID = ruleID;
 
     return;
   }
@@ -750,20 +738,20 @@ void PropertyMap::addConcreteTypeProperty(
 
     const auto &rhsDifference = System.getTypeDifference(*rhsDifferenceID);
     assert(property == rhsDifference.LHS);
-    assert(*props->ConcreteType == rhsDifference.RHS);
+    assert(*existingProperty == rhsDifference.RHS);
 
-    if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID))
+    if (checkRulePairOnce(*existingRuleID, ruleID))
       processTypeDifference(rhsDifference, *rhsDifferenceID,
-                            ruleID, *props->ConcreteTypeRule);
+                            ruleID, *existingRuleID);
 
-    // The new property is less specific, so ConcreteType and ConcreteTypeRule
+    // The new property is less specific, so existingProperty and existingRuleID
     // remain unchanged.
     return;
   }
 
-  assert(property == *props->ConcreteType);
+  assert(property == *existingProperty);
 
-  if (*props->ConcreteTypeRule != ruleID) {
+  if (*existingRuleID != ruleID) {
     // If the rules are different but the concrete types are identical, then
     // the key is some term U.V, the existing rule is a rule of the form:
     //
@@ -777,15 +765,42 @@ void PropertyMap::addConcreteTypeProperty(
     // the symbol's substitutions.
     //
     // Since the new rule appears without context, it becomes redundant.
-    if (checkRulePairOnce(*props->ConcreteTypeRule, ruleID)) {
+    if (checkRulePairOnce(*existingRuleID, ruleID)) {
       RewritePath path;
-      buildRewritePathForUnifier(*props->ConcreteTypeRule, ruleID, System,
-                                 path);
+      buildRewritePathForUnifier(*existingRuleID, ruleID, System, path);
       System.recordRewriteLoop(MutableTerm(rule.getLHS()), path);
 
       rule.markSubstitutionSimplified();
     }
   }
+}
+
+/// When a type parameter has two concrete types, we have to unify the
+/// type constructor arguments.
+///
+/// For example, suppose that we have two concrete same-type requirements:
+///
+///   T == Foo<X.Y, Z, String>
+///   T == Foo<Int, A.B, W>
+///
+/// These lower to the following two rules:
+///
+///   T.[concrete: Foo<τ_0_0, τ_0_1, String> with {X.Y, Z}] => T
+///   T.[concrete: Foo<Int, τ_0_0, τ_0_1> with {A.B, W}] => T
+///
+/// The two concrete type symbols will be added to the property bag of 'T',
+/// and we will eventually end up in this method, where we will generate three
+/// induced rules:
+///
+///   X.Y.[concrete: Int] => X.Y
+///   A.B => Z
+///   W.[concrete: String] => W
+void PropertyMap::addConcreteTypeProperty(
+    Term key, Symbol property, unsigned ruleID) {
+  auto *props = getOrCreateProperties(key);
+
+  unifyConcreteTypes(key, props->ConcreteType, props->ConcreteTypeRule,
+                     property, ruleID);
 }
 
 /// Record a protocol conformance, layout or superclass constraint on the given
