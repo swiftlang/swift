@@ -63,18 +63,13 @@
 using namespace swift;
 using namespace rewriting;
 
-/// A rewrite rule is redundant if it appears exactly once in a loop
-/// without context.
-///
-/// This method will cache the result; markDirty() must be called after
-/// the underlying rewrite path is modified to invalidate the cached
-/// result.
-ArrayRef<unsigned>
-RewriteLoop::findRulesAppearingOnceInEmptyContext(
-    const RewriteSystem &system) const {
-  // If we're allowed to use the cached result, return that.
+/// Recompute RulesInEmptyContext and DecomposeCount if needed.
+void RewriteLoop::recompute(const RewriteSystem &system) {
   if (!Dirty)
-    return RulesInEmptyContext;
+    return;
+  Dirty = 0;
+
+  ProjectionCount = 0;
 
   // Rules appearing in empty context (possibly more than once).
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
@@ -94,12 +89,15 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
       break;
     }
 
+    case RewriteStep::LeftConcreteProjection:
+      ++ProjectionCount;
+      break;
+
     case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
     case RewriteStep::DecomposeConcrete:
-    case RewriteStep::LeftConcreteProjection:
     case RewriteStep::RightConcreteProjection:
       break;
     }
@@ -107,8 +105,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     evaluator.apply(step, system);
   }
 
-  auto *mutThis = const_cast<RewriteLoop *>(this);
-  mutThis->RulesInEmptyContext.clear();
+  RulesInEmptyContext.clear();
 
   // Collect all rules that we saw exactly once in empty context.
   for (auto rule : rulesInEmptyContext) {
@@ -116,12 +113,25 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     assert(found != ruleMultiplicity.end());
 
     if (found->second == 1)
-      mutThis->RulesInEmptyContext.push_back(rule);
+      RulesInEmptyContext.push_back(rule);
   }
+}
 
-  // Cache the result for later.
-  mutThis->Dirty = 0;
+/// A rewrite rule is redundant if it appears exactly once in a loop
+/// without context.
+ArrayRef<unsigned>
+RewriteLoop::findRulesAppearingOnceInEmptyContext(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
   return RulesInEmptyContext;
+}
+
+/// The number of LeftConcreteProjection steps, used by the elimination order to
+/// prioritize loops that are not concrete unification projections.
+unsigned RewriteLoop::getProjectionCount(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return ProjectionCount;
 }
 
 /// If a rewrite loop contains an explicit rule in empty context, propagate the
