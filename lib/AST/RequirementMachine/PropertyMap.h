@@ -44,6 +44,16 @@ namespace rewriting {
 class MutableTerm;
 class Term;
 
+/// Records a superclass constraint at a given level in the class hierarchy.
+struct SuperclassRequirement {
+  /// The most specific superclass constraint (in type difference order) for
+  /// this level in the class hierarchy.
+  Optional<Symbol> SuperclassType;
+
+  /// The corresponding superclass rule for the above.
+  Optional<unsigned> SuperclassRule;
+};
+
 /// Stores a convenient representation of all "property-like" rewrite rules of
 /// the form T.[p] => T, where [p] is a property symbol, for some term 'T'.
 class PropertyBag {
@@ -64,11 +74,14 @@ class PropertyBag {
   /// The corresponding layout rule for the above.
   Optional<unsigned> LayoutRule;
 
-  /// The most specific superclass constraint this type satisfies.
-  Optional<Symbol> Superclass;
+  /// The most specific superclass declaration for which this type has a
+  /// superclass constraint.
+  const ClassDecl *SuperclassDecl = nullptr;
 
-  /// The corresponding superclass rule for the above.
-  Optional<unsigned> SuperclassRule;
+  /// Used for unifying superclass rules at different levels in the class
+  /// hierarchy. For each class declaration, stores a symbol and rule pair
+  /// for the most specific substituted type.
+  llvm::SmallDenseMap<const ClassDecl *, SuperclassRequirement, 2> Superclasses;
 
   /// All concrete conformances of Superclass to the protocols in the
   /// ConformsTo list.
@@ -97,16 +110,22 @@ class PropertyBag {
   PropertyBag &operator=(const PropertyBag &) = delete;
   PropertyBag &operator=(PropertyBag &&) = delete;
 
+  const SuperclassRequirement &getSuperclassRequirement() const {
+    assert(SuperclassDecl != nullptr);
+    auto found = Superclasses.find(SuperclassDecl);
+    return found->second;
+  }
+
 public:
   Term getKey() const { return Key; }
   void dump(llvm::raw_ostream &out) const;
 
   bool hasSuperclassBound() const {
-    return Superclass.hasValue();
+    return SuperclassDecl != nullptr;
   }
 
   CanType getSuperclassBound() const {
-    return Superclass->getConcreteType();
+    return getSuperclassRequirement().SuperclassType->getConcreteType();
   }
 
   Type getSuperclassBound(
@@ -256,6 +275,11 @@ private:
                           Optional<unsigned> &existingRuleID,
                           Symbol property,
                           unsigned ruleID);
+
+  void recordSuperclassRelation(Term key,
+                                Symbol superclassType,
+                                unsigned superclassRuleID,
+                                const ClassDecl *otherClass);
 
   void addSuperclassProperty(Term key, Symbol property, unsigned ruleID);
   void addConcreteTypeProperty(Term key, Symbol property, unsigned ruleID);
