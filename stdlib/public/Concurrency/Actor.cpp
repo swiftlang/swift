@@ -1564,10 +1564,13 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
     asImpl(executor.getDefaultActor())->giveUpThread(runner);
 }
 
+// TODO (rokhinip): Workaround rdar://88700717. To be removed with
+// rdar://88711954
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,
-                                  ExecutorRef newExecutor) {
+                                  ExecutorRef newExecutor) SWIFT_OPTNONE {
+
   auto trackingInfo = ExecutorTrackingInfo::current();
   auto currentExecutor =
     (trackingInfo ? trackingInfo->getActiveExecutor()
