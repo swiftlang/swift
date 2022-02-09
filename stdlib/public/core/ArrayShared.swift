@@ -98,6 +98,7 @@ extension Collection {
   internal func _makeCollectionDescription(
     withTypeName type: String? = nil
   ) -> String {
+#if !SWIFT_STDLIB_STATIC_PRINT
     var result = ""
     if let type = type {
       result += "\(type)(["
@@ -116,6 +117,9 @@ extension Collection {
     }
     result += type != nil ? "])" : "]"
     return result
+#else
+    return "(collection printing not available)"
+#endif
   }
 }
 
