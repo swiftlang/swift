@@ -144,6 +144,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Property,
   StaticProperty,
   ClassProperty,
+  DistributedProperty,
   InfixOperator,
   PrefixOperator,
   PostfixOperator,
@@ -5239,6 +5240,9 @@ public:
 
   /// Is this an "async let" property?
   bool isAsyncLet() const;
+
+  /// Does this have a 'distributed' modifier?
+  bool isDistributed() const;
 
   /// Is this a stored property that will _not_ trigger any user-defined code
   /// upon any kind of access?

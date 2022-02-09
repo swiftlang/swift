@@ -1953,16 +1953,18 @@ namespace {
     void noteIsolatedActorMember(ValueDecl *decl, Expr *context) {
       // detect if it is a distributed actor, to provide better isolation notes
 
-      auto isDistributedActor = false;
-      if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl())
-        isDistributedActor = nominal->isDistributedActor();
+      auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
+      bool isDistributedActor = false;
+      if (nominal) isDistributedActor = nominal->isDistributedActor();
 
       // FIXME: Make this diagnostic more sensitive to the isolation context of
       // the declaration.
       if (isDistributedActor) {
-        if (dyn_cast<VarDecl>(decl)) {
+        if (isa<VarDecl>(decl)) {
           // Distributed actor properties are never accessible externally.
-          decl->diagnose(diag::distributed_actor_isolated_property);
+          decl->diagnose(diag::distributed_actor_isolated_property,
+                         decl->getDescriptiveKind(), decl->getName(),
+                         nominal->getName());
         } else {
           // it's a function or subscript
           decl->diagnose(diag::note_distributed_actor_isolated_method,
@@ -4705,9 +4707,9 @@ bool swift::isPotentiallyIsolatedActor(
 
   if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
     // FIXME(distributed): we did a dynamic check and know that this actor is
-    // local,
-    //  but we can't express that to the type system; the real implementation
-    //  will have to mark 'self' as "known to be local" after an is-local check.
+    //   local, but we can't express that to the type system; the real
+    //   implementation will have to mark 'self' as "known to be local" after
+    //   an is-local check.
     return true;
   }
 
