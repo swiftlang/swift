@@ -4772,6 +4772,21 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::BackDeploy_DECL_ATTR: {
+        bool isImplicit;
+        unsigned Platform;
+        DEF_VER_TUPLE_PIECES(Version);
+        serialization::decls_block::BackDeployDeclAttrLayout::readRecord(
+            scratch, isImplicit, LIST_VER_TUPLE_PIECES(Version), Platform);
+        llvm::VersionTuple Version;
+        DECODE_VER_TUPLE(Version)
+        Attr = new (ctx) BackDeployAttr(SourceLoc(), SourceRange(),
+                                        (PlatformKind)Platform,
+                                        Version,
+                                        isImplicit);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \

@@ -2172,6 +2172,30 @@ public:
   }
 };
 
+/// The @_backDeploy(...) attribute, used to make function declarations available
+/// for back deployment to older OSes via emission into the client binary.
+class BackDeployAttr: public DeclAttribute {
+public:
+  BackDeployAttr(SourceLoc AtLoc, SourceRange Range,
+                 PlatformKind Platform,
+                 const llvm::VersionTuple Version,
+                 bool Implicit)
+    : DeclAttribute(DAK_BackDeploy, AtLoc, Range, Implicit),
+      Platform(Platform),
+      Version(Version) {}
+
+  /// The platform the symbol is available for back deployment on.
+  const PlatformKind Platform;
+
+  /// The earliest platform version that may use the back deployed implementation.
+  const llvm::VersionTuple Version;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_BackDeploy;
+  }
+};
+
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.

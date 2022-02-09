@@ -118,6 +118,7 @@ public:
   IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Isolated)
   IGNORED_ATTR(Preconcurrency)
+  IGNORED_ATTR(BackDeploy)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -275,6 +276,8 @@ public:
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitPrimaryAssociatedTypeAttr(PrimaryAssociatedTypeAttr *attr);
+
+  void checkBackDeployAttrs(Decl *D, ArrayRef<BackDeployAttr *> Attrs);
 };
 
 } // end anonymous namespace
@@ -3458,6 +3461,11 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
       return;
     }
   }
+}
+
+void AttributeChecker::checkBackDeployAttrs(Decl *D,
+    ArrayRef<BackDeployAttr *> Attrs) {
+  // FIXME(backDeploy): Diagnose incompatible uses of `@_backDeploy
 }
 
 Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
