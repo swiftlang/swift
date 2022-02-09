@@ -406,6 +406,9 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     if (I == nullptr)
       continue;
 
+    if (!parentTransform->continueWithNextSubpassRun(I))
+      return false;
+
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I)) {
       LLVM_DEBUG(llvm::dbgs() << "SC: DCE: " << *I << '\n');
