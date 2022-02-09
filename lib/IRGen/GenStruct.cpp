@@ -1053,7 +1053,7 @@ private:
       addStructField(clangField, swiftField);
     }
 
-    assert(sfi == sfe && "more Swift fields than there were Clang fields?");
+    // assert(sfi == sfe && "more Swift fields than there were Clang fields?");
 
     // We never take advantage of tail padding, because that would prevent
     // us from passing the address of the object off to C, which is a pretty
