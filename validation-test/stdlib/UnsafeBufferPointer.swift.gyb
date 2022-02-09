@@ -386,6 +386,7 @@ UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable
     let c = test.collection.map { MinimalEquatableValue($0.value) }
     let buffer = UnsafeMutableBufferPointer<MinimalEquatableValue>.allocate(
       capacity: test.collection.count)
+    defer { buffer.deallocate() }
     var (it, idx) = buffer.initialize(from: c)
     expectEqual(buffer.endIndex, idx)
     expectNil(it.next())
