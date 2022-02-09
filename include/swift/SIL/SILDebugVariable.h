@@ -62,6 +62,12 @@ struct SILDebugVariable {
            Scope == V.Scope && DIExpr == V.DIExpr;
   }
 
+  SILDebugVariable withoutDIExpr() const {
+    auto result = *this;
+    result.DIExpr = {};
+    return result;
+  }
+
   bool isLet() const { return Name.size() && Constant; }
 
   bool isVar() const { return Name.size() && !Constant; }
