@@ -206,6 +206,9 @@ public:
   }
 
 private:
+  DeinitBarriers(DeinitBarriers const &) = delete;
+  DeinitBarriers &operator=(DeinitBarriers const &) = delete;
+
   // Conforms to BackwardReachability::BlockReachability
   class DestroyReachability {
     const KnownStorageUses &knownUses;
