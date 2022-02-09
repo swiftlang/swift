@@ -290,7 +290,7 @@ struct BorroweeUsage final {
 /// %lifetime.  In detail, PrunedLiveness::isWithinBoundary relies on
 /// clients to know that instructions are after the start of liveness.  We
 /// determine this via the dominance tree.
-bool findBorroweeUsage(Context &, BorroweeUsage &);
+bool findBorroweeUsage(Context const &, BorroweeUsage &);
 
 /// Sift scope ends of %lifetime for those that CAN be folded.
 class FilterCandidates final {
@@ -616,7 +616,7 @@ bool FilterCandidates::run(Candidates &candidates) {
   return anyViable;
 }
 
-bool findBorroweeUsage(Context &context, BorroweeUsage &usage) {
+bool findBorroweeUsage(Context const &context, BorroweeUsage &usage) {
   auto recordUse = [&](Operand *use) {
     // Ignore uses that aren't dominated by the introducer.  PrunedLiveness
     // relies on us doing this check.
