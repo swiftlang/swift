@@ -948,6 +948,8 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
   if _isDebugAssertConfiguration() || isOutOfBounds() {
     if expectedValues == nil { expectCrashLater() }
   }
+%     else:
+  _ = isOutOfBounds
 %     end
   let range = test.rangeSelection.${RangeName}(in: buffer)
 
