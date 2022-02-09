@@ -2724,13 +2724,11 @@ bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
     return func->isAsyncContext();
 
-  if (auto abstractClosure = dyn_cast<AbstractClosureExpr>(dc)) {
-    if (Type type = GetClosureType{*this}(abstractClosure)) {
-      if (auto fnType = type->getAs<AnyFunctionType>())
-        return fnType->isAsync();
-    }
-
-    return abstractClosure->isBodyAsync();
+  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
+    return evaluateOrDefault(
+        getASTContext().evaluator,
+        ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
+        FunctionType::ExtInfo()).isAsync();
   }
 
   return false;
