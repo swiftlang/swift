@@ -3627,6 +3627,7 @@ namespace {
       }
 
       result->setMemberLoader(&Impl, 0);
+      result->dump();
       return result;
     }
 
@@ -4365,8 +4366,7 @@ namespace {
         // Find if we have a getter.
         auto pred = [](auto attr) {
           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-            return swiftAttr->getAttribute() == "import_as_getter" ||
-                   swiftAttr->getAttribute() == "import_as_setter";
+            return swiftAttr->getAttribute() == "import_as_getter";
           }
           return false;
           // for setter
@@ -4401,14 +4401,14 @@ namespace {
           if (!dc)
             return nullptr;
 
-          auto importedType =
-              Impl.importType(decl->getReturnType(), ImportTypeKind::Result,
-                              isInSystemModule(dc), Bridgeability::None);
-          if (!importedType)
-            return nullptr;
-
-          auto type = importedType.getType();
-          auto It = Impl.GetterSetterMap.find(name);
+//          auto importedType =
+//              Impl.importType(decl->getReturnType(), ImportTypeKind::Result,
+//                              isInSystemModule(dc), Bridgeability::None);
+//          if (!importedType)
+//            return nullptr;
+//
+//          auto type = importedType.getType();
+//          auto It = Impl.GetterSetterMap.find(name);
 
           Impl.GetterSetterMap[name].first = static_cast<FuncDecl *>(method);
           // store the cxx methods then generate the property accessors
@@ -4433,14 +4433,14 @@ namespace {
           if (!dc)
             return nullptr;
 
-          auto importedType =
-              Impl.importType(decl->getReturnType(), ImportTypeKind::Result,
-                              isInSystemModule(dc), Bridgeability::None);
-          if (!importedType)
-            return nullptr;
-
-          auto type = importedType.getType();
-          auto It = Impl.GetterSetterMap.find(name);
+//          auto importedType =
+//              Impl.importType(decl->getReturnType(), ImportTypeKind::Result,
+//                              isInSystemModule(dc), Bridgeability::None);
+//          if (!importedType)
+//            return nullptr;
+//
+//          auto type = importedType.getType();
+//          auto It = Impl.GetterSetterMap.find(name);
 
           Impl.GetterSetterMap[name].second = static_cast<FuncDecl *>(method);
           // store the cxx methods then generate the property accessors
@@ -7916,11 +7916,12 @@ VarDecl *SwiftDeclConverter::makeProperty(Identifier identifier, FuncDecl *gette
 
   //  VarDecl::createImported(ctx, name, )
   auto &ctx = Impl.SwiftContext;
-  DeclName name(ctx, DeclBaseName(identifier), {});
+//  DeclName name(identifier);
   auto dc = getter->getDeclContext();
 
-  auto result = VarDecl::createImported(ctx, name, getter->getStartLoc(), getter->getStartLoc(), getter->getInterfaceType(), dc, getter->getClangNode());
+  auto result = VarDecl::createImported(ctx, identifier, getter->getStartLoc(), getter->getStartLoc(), getter->getResultInterfaceType(), dc, getter->getClangNode());
   result->setAccess(AccessLevel::Public);
+  result->setImplInfo(StorageImplInfo::getMutableComputed());
 
   AccessorDecl *getterDecl = AccessorDecl::create(ctx,
                                                   getter->getLoc(),
@@ -7931,7 +7932,8 @@ VarDecl *SwiftDeclConverter::makeProperty(Identifier identifier, FuncDecl *gette
                                                   StaticSpellingKind::None,
                                                   /*async*/ false, SourceLoc(),
                                                   /*throws*/ false, SourceLoc(),
-                                                  nullptr, {},
+                                                  nullptr,
+                                                  ParameterList::createEmpty(ctx),
                                                   getter->getResultInterfaceType(),
                                                   dc);
   getterDecl->setAccess(AccessLevel::Public);

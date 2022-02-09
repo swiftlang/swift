@@ -7,14 +7,35 @@ import ImplicitComputedProperties
 
 var ImplicitComputedPropertiesTestSuite = TestSuite("ImplicitComputedProperties")
 
-ImplicitComputedPropertiesTestSuite.test("getters") {
+ImplicitComputedPropertiesTestSuite.test("LongNameAllLower") {
+    var VoidGetter = LongNameAllLower()
+
+    expectEqual(VoidGetter.get, 42)
+
+}
+ImplicitComputedPropertiesTestSuite.test("LongNameAllUpper") {
+    var VoidGetter = LongNameAllUpper()
+
+    expectEqual(VoidGetter.get, 42)
+
+}
+ImplicitComputedPropertiesTestSuite.test("LongNameMix") {
+    var VoidGetter = LongNameMix()
+
+    expectEqual(VoidGetter.get, 42)
+
+}
+ImplicitComputedPropertiesTestSuite.test("GetterOnly") {
+    var VoidGetter = GetterOnly()
+
+    expectEqual(VoidGetter.get, 42)
 
 }
 
 ImplicitComputedPropertiesTestSuite.test("setters") {
     var Object = X()
     Object.x = 1
-
     expectEqual(Object.x, 1)
 }
+
 runAllTests()

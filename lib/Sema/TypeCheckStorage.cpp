@@ -2412,6 +2412,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
           break;
         }
       }
+      if (storage->hasClangNode())
+          break;
       if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
         break;
       }
