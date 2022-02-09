@@ -6,7 +6,7 @@
 // expected-error@-1 {{'@inlinable' attribute cannot be applied to this declaration}}
 
 @inlinable @usableFromInline func redundantAttribute() {}
-// expected-warning@-1 {{'@inlinable' declaration is already '@usableFromInline'}}
+// expected-warning@-1 {{'@usableFromInline' attribute has no effect on '@inlinable' global function 'redundantAttribute()'}} {{12-30=}}
 
 private func privateFunction() {}
 // expected-note@-1 2{{global function 'privateFunction()' is not '@usableFromInline' or public}}
