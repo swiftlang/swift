@@ -1677,6 +1677,7 @@ extension Collection {
   internal func _makeKeyValuePairDescription<K, V>(
     withTypeName type: String? = nil
   ) -> String where Element == (key: K, value: V) {
+#if !SWIFT_STDLIB_STATIC_PRINT
     if self.isEmpty {
       return "[:]"
     }
@@ -1695,6 +1696,9 @@ extension Collection {
     }
     result += "]"
     return result
+#else
+    return "(collection printing not available)"
+#endif
   }
 }
 
