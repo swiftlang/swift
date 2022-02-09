@@ -234,8 +234,8 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 
 /// Return true if \p instruction is a deinitialization barrier.
 ///
-/// Deinitialization barriers constrain variable lifetimes. Lexical end_borrow
-/// and destroy_addr cannot be hoisted above them.
+/// Deinitialization barriers constrain variable lifetimes. Lexical end_borrow,
+/// destroy_value, and destroy_addr cannot be hoisted above them.
 bool isDeinitBarrier(SILInstruction *instruction);
 
 } // end namespace swift
