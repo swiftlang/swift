@@ -96,9 +96,7 @@ bool checkDistributedSerializationRequirementIsExactlyCodable(
 /// return type checking of distributed targets.
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 extractDistributedSerializationRequirements(
-    ASTContext &C,
-    ArrayRef<Requirement> allRequirements);
-
+    ASTContext &C, ArrayRef<Requirement> allRequirements);
 
 /// Diagnose a distributed func declaration in a not-distributed actor protocol.
 void diagnoseDistributedFunctionInNonDistributedActorProtocol(

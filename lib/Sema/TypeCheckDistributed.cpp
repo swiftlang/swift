@@ -287,7 +287,8 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   auto declContext = func->getDeclContext();
   auto module = func->getParentModule();
 
-  // === All parameters and the result type must conform SerializationRequirement
+  // === All parameters and the result type must conform
+  // SerializationRequirement
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements;
   if (auto extension = dyn_cast<ExtensionDecl>(declContext)) {
     serializationRequirements = extractDistributedSerializationRequirements(
@@ -311,10 +312,10 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
         if (diagnose) {
           auto diag = func->diagnose(
               diag::distributed_actor_func_param_not_codable,
-              param->getArgumentName().str(),
-              param->getInterfaceType(),
+              param->getArgumentName().str(), param->getInterfaceType(),
               func->getDescriptiveKind(),
-              serializationRequirementIsCodable ? "Codable" : req->getNameStr());
+              serializationRequirementIsCodable ? "Codable"
+                                                : req->getNameStr());
 
           if (auto paramNominalTy = paramTy->getAnyNominal()) {
             addCodableFixIt(paramNominalTy, diag);
@@ -532,9 +533,11 @@ swift::getDistributedSerializationRequirementProtocols(NominalTypeDecl *nominal)
 }
 
 llvm::SmallPtrSet<ProtocolDecl *, 2>
-swift::flattenDistributedSerializationTypeToRequiredProtocols(TypeBase *serializationRequirement) {
+swift::flattenDistributedSerializationTypeToRequiredProtocols(
+    TypeBase *serializationRequirement) {
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-  if (auto composition = serializationRequirement->getAs<ProtocolCompositionType>()) {
+  if (auto composition =
+          serializationRequirement->getAs<ProtocolCompositionType>()) {
     for (auto member : composition->getMembers()) {
       if (auto *protocol = member->getAs<ProtocolType>())
         serializationReqs.insert(protocol->getDecl());
@@ -559,15 +562,13 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
 
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::extractDistributedSerializationRequirements(
-    ASTContext &C,
-    ArrayRef<Requirement> allRequirements) {
+    ASTContext &C, ArrayRef<Requirement> allRequirements) {
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
 
   auto systemProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
   auto serializationReqAssocType =
       systemProto->getAssociatedType(C.Id_SerializationRequirement);
-  auto systemSerializationReqTy =
-      serializationReqAssocType->getInterfaceType();
+  auto systemSerializationReqTy = serializationReqAssocType->getInterfaceType();
 
   for (auto req : allRequirements) {
     if (req.getSecondType()->isAny()) {
@@ -576,17 +577,18 @@ swift::extractDistributedSerializationRequirements(
     if (!req.getFirstType()->hasDependentMember())
       continue;
 
-    if (auto dependentMemberType = req.getFirstType()->castTo<DependentMemberType>()) {
+    if (auto dependentMemberType =
+            req.getFirstType()->castTo<DependentMemberType>()) {
       auto dependentTy =
           dependentMemberType->getAssocType()->getInterfaceType();
 
       if (dependentTy->isEqual(systemSerializationReqTy)) {
         auto requirementProto = req.getSecondType();
-        if (auto proto = dyn_cast_or_null<ProtocolDecl>(requirementProto->getAnyNominal())) {
+        if (auto proto = dyn_cast_or_null<ProtocolDecl>(
+                requirementProto->getAnyNominal())) {
           serializationReqs.insert(proto);
         } else {
-          auto serialReqType = requirementProto
-                                   ->castTo<ExistentialType>()
+          auto serialReqType = requirementProto->castTo<ExistentialType>()
                                    ->getConstraintType()
                                    ->getDesugaredType();
           auto flattenedRequirements =
