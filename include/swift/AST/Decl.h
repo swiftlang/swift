@@ -4026,7 +4026,7 @@ public:
   ClassDecl *getSuperclassDecl() const;
 
   /// Check if this class is a superclass or equal to the given class.
-  bool isSuperclassOf(ClassDecl *other) const;
+  bool isSuperclassOf(const ClassDecl *other) const;
 
   /// Set the superclass of this class.
   void setSuperclass(Type superclass);
@@ -4121,7 +4121,7 @@ public:
 
   /// Whether the class uses the ObjC object model (reference counting,
   /// allocation, etc.), the Swift model, or has no reference counting at all.
-  ReferenceCounting getObjectModel() {
+  ReferenceCounting getObjectModel() const {
     if (isForeignReferenceType())
       return ReferenceCounting::None;
 
@@ -4131,7 +4131,7 @@ public:
     return ReferenceCounting::Native;
   }
 
-  LayoutConstraintKind getLayoutConstraintKind() {
+  LayoutConstraintKind getLayoutConstraintKind() const {
     if (getObjectModel() == ReferenceCounting::ObjC)
       return LayoutConstraintKind::Class;
 
@@ -4261,7 +4261,7 @@ public:
   /// Used to determine if this class decl is a foriegn reference type. I.e., a
   /// non-reference-counted swift reference type that was imported from a C++
   /// record.
-  bool isForeignReferenceType();
+  bool isForeignReferenceType() const;
 };
 
 /// The set of known protocols for which derived conformances are supported.
