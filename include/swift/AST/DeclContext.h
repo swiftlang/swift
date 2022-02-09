@@ -201,6 +201,7 @@ struct FragileFunctionKind {
     AlwaysEmitIntoClient,
     DefaultArgument,
     PropertyInitializer,
+    BackDeploy,
     None
   };
 
