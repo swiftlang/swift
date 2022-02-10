@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift-c/DependencyScan/DependencyScan.h"
+#include "swift-c/CommonString/CommonString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include <string>
@@ -18,7 +18,7 @@
 
 //=== Private Utility Functions--------------------------------------------===//
 namespace swift {
-namespace dependencies {
+namespace c_string_utils {
 
 /// Create null string
 swiftscan_string_ref_t create_null();
