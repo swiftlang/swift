@@ -98,7 +98,7 @@ extension Duration {
 extension Duration: Codable { 
   @available(SwiftStdlib 5.7, *)
   public init(from decoder: Decoder) throws {
-    let container = try decoder.unkeyedContainer()
+    var container = try decoder.unkeyedContainer()
     let high = container.decode(Int64.self)
     let low = container.decode(UInt64.self)
     self.init(_attoseconds: _Int128(high: high, low: low))
