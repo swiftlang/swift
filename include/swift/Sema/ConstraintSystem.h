@@ -167,17 +167,30 @@ public:
 
 
 class ExpressionTimer {
-  Expr* E;
+public:
+  using AnchorType = llvm::PointerUnion<Expr *, ConstraintLocator *>;
+
+private:
+  AnchorType Anchor;
   ASTContext &Context;
   llvm::TimeRecord StartTime;
+
+  /// The number of milliseconds from creation until
+  /// this timer is considered expired.
+  unsigned ThresholdInMillis;
 
   bool PrintDebugTiming;
   bool PrintWarning;
 
 public:
-  ExpressionTimer(Expr *E, ConstraintSystem &CS);
+  /// This constructor sets a default threshold defined for all expressions
+  /// via compiler flag `solver-expression-time-threshold`.
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS);
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS, unsigned thresholdInMillis);
 
   ~ExpressionTimer();
+
+  AnchorType getAnchor() const { return Anchor; }
 
   unsigned getWarnLimit() const {
     return Context.TypeCheckerOpts.WarnLongExpressionTypeChecking;
@@ -192,13 +205,19 @@ public:
     return endTime.getProcessTime() - StartTime.getProcessTime();
   }
 
+  /// Return the remaining process time in milliseconds until the
+  /// threshold specified during construction is reached.
+  unsigned getRemainingProcessTimeInMillis() const {
+    auto elapsed = unsigned(getElapsedProcessTimeInFractionalSeconds());
+    return elapsed >= ThresholdInMillis ? 0 : ThresholdInMillis - elapsed;
+  }
+
   // Disable emission of warnings about expressions that take longer
   // than the warning threshold.
   void disableWarning() { PrintWarning = false; }
 
-  bool isExpired(unsigned thresholdInMillis) const {
-    auto elapsed = getElapsedProcessTimeInFractionalSeconds();
-    return unsigned(elapsed) > thresholdInMillis;
+  bool isExpired() const {
+    return getRemainingProcessTimeInMillis() == 0;
   }
 };
 
@@ -5244,9 +5263,7 @@ public:
       return isExpressionAlreadyTooComplex= true;
     }
 
-    const auto timeoutThresholdInMillis =
-        getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
-    if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
+    if (Timer && Timer->isExpired()) {
       // Disable warnings about expressions that go over the warning
       // threshold since we're arbitrarily ending evaluation and
       // emitting an error.
@@ -5686,6 +5703,8 @@ public:
   ConjunctionElement(Constraint *element) : Element(element) {}
 
   bool attempt(ConstraintSystem &cs) const;
+
+  ConstraintLocator *getLocator() const { return Element->getLocator(); }
 
   void print(llvm::raw_ostream &Out, SourceManager *SM) const {
     Out << "conjunction element ";
