@@ -54,17 +54,19 @@ using namespace rewriting;
 /// Desugar a same-type requirement that possibly has concrete types on either
 /// side into a series of same-type and concrete-type requirements where the
 /// left hand side is always a type parameter.
-static void desugarSameTypeRequirement(Type lhs, Type rhs,
+static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
                                        SmallVectorImpl<Requirement> &result,
                                        SmallVectorImpl<RequirementError> &errors) {
   class Matcher : public TypeMatcher<Matcher> {
+    SourceLoc loc;
     SmallVectorImpl<Requirement> &result;
     SmallVectorImpl<RequirementError> &errors;
 
   public:
-    explicit Matcher(SmallVectorImpl<Requirement> &result,
+    explicit Matcher(SourceLoc loc,
+                     SmallVectorImpl<Requirement> &result,
                      SmallVectorImpl<RequirementError> &errors)
-      : result(result), errors(errors) {}
+      : loc(loc), result(result), errors(errors) {}
 
     bool mismatch(TypeBase *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
@@ -86,10 +88,13 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs,
         return true;
       }
 
-      // FIXME: Record concrete type conflict, diagnose upstream
+      errors.push_back(
+          RequirementError::forConcreteTypeMismatch(firstType,
+                                                    secondType,
+                                                    loc));
       return true;
     }
-  } matcher(result, errors);
+  } matcher(loc, result, errors);
 
   if (lhs->hasError() || rhs->hasError())
     return;
@@ -178,7 +183,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
 
     auto memberType = lookupMemberType(subjectType, protoDecl, assocType);
     desugarSameTypeRequirement(memberType, paramType->getArgumentType(),
-                               result, errors);
+                               SourceLoc(), result, errors);
     return;
   }
 
@@ -226,7 +231,7 @@ swift::rewriting::desugarRequirement(Requirement req,
 
   case RequirementKind::SameType:
     desugarSameTypeRequirement(firstType, req.getSecondType(),
-                               result, errors);
+                               SourceLoc(), result, errors);
     break;
   }
 }
@@ -443,7 +448,8 @@ void swift::rewriting::realizeRequirement(
     }
 
     SmallVector<Requirement, 2> reqs;
-    desugarSameTypeRequirement(req.getFirstType(), secondType, reqs, errors);
+    desugarSameTypeRequirement(req.getFirstType(), secondType, loc,
+                               reqs, errors);
 
     for (auto req : reqs)
       result.push_back({req, loc, /*wasInferred=*/false});
@@ -488,6 +494,8 @@ void swift::rewriting::diagnoseRequirementErrors(
 
   for (auto error : errors) {
     SourceLoc loc = error.loc;
+    if (!loc.isValid())
+      continue;
 
     switch (error.kind) {
     case RequirementError::Kind::InvalidConformance: {
@@ -521,6 +529,18 @@ void swift::rewriting::diagnoseRequirementErrors(
         ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
                            subjectTypeNameWithoutSelf, constraintString)
              .fixItReplace(loc, " == ");
+      }
+
+      break;
+    }
+
+    case RequirementError::Kind::ConcreteTypeMismatch: {
+      auto type1 = error.concreteTypeMismatch.type1;
+      auto type2 = error.concreteTypeMismatch.type2;
+
+      if (!type1->hasError() && !type2->hasError()) {
+        ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
+                           type1, type2);
       }
 
       break;
@@ -672,7 +692,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   auto recordInheritedTypeRequirement = [&](TypeDecl *first, TypeDecl *second) {
     desugarSameTypeRequirement(getStructuralType(first),
                                getStructuralType(second),
-                               result, errors);
+                               SourceLoc(), result, errors);
   };
 
   // Local function to find the insertion point for the protocol's "where"

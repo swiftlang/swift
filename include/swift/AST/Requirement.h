@@ -132,6 +132,7 @@ struct StructuralRequirement {
 struct RequirementError {
   enum class Kind {
     InvalidConformance,
+    ConcreteTypeMismatch,
   } kind;
 
   union {
@@ -139,6 +140,11 @@ struct RequirementError {
       Type subjectType;
       Type constraint;
     } invalidConformance;
+
+    struct {
+      Type type1;
+      Type type2;
+    } concreteTypeMismatch;
   };
 
   SourceLoc loc;
@@ -154,6 +160,15 @@ public:
     RequirementError error(Kind::InvalidConformance, loc);
     error.invalidConformance.subjectType = subjectType;
     error.invalidConformance.constraint = constraint;
+    return error;
+  }
+
+  static RequirementError forConcreteTypeMismatch(Type type1,
+                                                  Type type2,
+                                                  SourceLoc loc) {
+    RequirementError error(Kind::ConcreteTypeMismatch, loc);
+    error.concreteTypeMismatch.type1 = type1;
+    error.concreteTypeMismatch.type2 = type2;
     return error;
   }
 };

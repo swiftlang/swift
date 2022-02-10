@@ -13,3 +13,11 @@ func testInvalidConformance() {
     func method() where T: Int {}
   }
 }
+
+// Check directly-concrete same-type constraints
+typealias NotAnInt = Double
+
+protocol X {}
+
+// expected-error@+1{{generic signature requires types 'Double' and 'Int' to be the same}}
+extension X where NotAnInt == Int {}
