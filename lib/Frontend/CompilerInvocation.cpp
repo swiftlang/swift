@@ -451,6 +451,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableOpenedExistentialTypes |=
       Args.hasArg(OPT_enable_experimental_opened_existential_types);
 
+  // SwiftOnoneSupport produces different symbols when opening existentials,
+  // so disable it.
+  if (FrontendOpts.ModuleName == SWIFT_ONONE_SUPPORT)
+    Opts.EnableOpenedExistentialTypes = false;
+
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
 
