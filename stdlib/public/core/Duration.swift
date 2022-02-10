@@ -26,9 +26,9 @@ public struct Duration: Sendable {
     self._high = _attoseconds.high
   }
 
-  public init(secondsComponent: Int64, secondsComponent: Int64) {
+  public init(secondsComponent: Int64, attosecondsComponent: Int64) {
     self = Duration.seconds(secondsComponent) +
-           Duration(_attoseconds: _Int128(secondsComponent))
+           Duration(_attoseconds: _Int128(attosecondsComponent))
   }
 
   internal var _attoseconds: _Int128 {
@@ -99,8 +99,8 @@ extension Duration: Codable {
   @available(SwiftStdlib 5.7, *)
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
-    let high = container.decode(Int64.self)
-    let low = container.decode(UInt64.self)
+    let high = try container.decode(Int64.self)
+    let low = try container.decode(UInt64.self)
     self.init(_attoseconds: _Int128(high: high, low: low))
   }
   
