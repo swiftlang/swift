@@ -948,6 +948,13 @@ function(_compile_swift_files
         OUTPUT ${module_outputs_static}
         DEPENDS
           "${module_dependency_target}"
+          "${line_directive_tool}"
+          "${file_path}"
+          ${swift_compiler_tool_dep}
+          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${swift_ide_test_dependency}
+          ${create_dirs_dependency_target}
+          ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
       set("${dependency_module_target_out_var_name}" "${module_dependency_target_static}" PARENT_SCOPE)
     else()
