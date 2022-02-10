@@ -2,8 +2,6 @@
 //
 // REQUIRES: executable_test
 //
-// Crash when running on windows: rdar://88391102
-// XFAIL: OS=windows-msvc
 
 import StdlibUnittest
 import AmbiguousMethods
