@@ -281,10 +281,7 @@ struct InferRequirementsWalker : public TypeWalker {
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
           auto *protocol = assocType->getProtocol();
-          auto *module = protocol->getParentModule();
-          auto conf = module->lookupConformance(firstType, protocol);
-          auto secondType = conf.getAssociatedType(
-              firstType, assocType->getDeclaredInterfaceType());
+          auto secondType = lookupMemberType(firstType, protocol, assocType);
           Requirement req(RequirementKind::SameType, firstType, secondType);
           desugarRequirement(req, reqs);
         };
