@@ -30,6 +30,9 @@ class AbstractFunctionDecl;
 class SILModule;
 class SourceManager;
 
+class SILLocation;
+llvm::hash_code hash_value(SILLocation);
+
 /// Represents a source location.
 ///
 /// In most cases this is a pointer to an AST node from which the source
@@ -37,6 +40,8 @@ class SourceManager;
 /// or deserialized SIL file, the source location is represented differently.
 /// For details see SILLocation::Storage.
 class SILLocation {
+  friend llvm::hash_code hash_value(SILLocation);
+
 public:
   enum LocationKind : uint8_t {
     RegularKind = 1,
@@ -425,6 +430,7 @@ public:
   void dump() const;
   void print(raw_ostream &OS, const SourceManager &SM) const;
 
+  // Keep in sync with hash_code below!
   inline bool operator==(const SILLocation& R) const {
     return kindAndFlags.packedKindAndFlags == R.kindAndFlags.packedKindAndFlags
            && storage.filePositionLoc == R.storage.filePositionLoc;
@@ -432,6 +438,12 @@ public:
 
   inline bool operator!=(const SILLocation &R) const { return !(*this == R); }
 };
+
+/// Convert a SILLocation into a loc. Keep in sync with operator== on SILLocation!
+inline llvm::hash_code hash_value(SILLocation loc) {
+  return llvm::hash_combine(loc.kindAndFlags.packedKindAndFlags,
+                            loc.storage.filePositionLoc);
+}
 
 /// Allowed on any instruction.
 class RegularLocation : public SILLocation {
