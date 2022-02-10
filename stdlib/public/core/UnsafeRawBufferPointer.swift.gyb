@@ -442,6 +442,16 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// type `U`. Calling `storeBytes(of:toByteOffset:as:)` does not change the
   /// bound type of the memory.
   ///
+  /// - Note: A trivial type can be copied with just a bit-for-bit copy without
+  ///   any indirection or reference-counting operations. Generally, native
+  ///   Swift types that do not contain strong or weak references or other
+  ///   forms of indirection are trivial, as are imported C structs and enums.
+  ///
+  /// If you need to store into memory a copy of a value of a type that isn't
+  /// trivial, you cannot use the `storeBytes(of:toByteOffset:as:)` method.
+  /// Instead, you must know either initialize the memory or,
+  /// if you know the memory was already bound to `type`, assign to the memory.
+  ///
   /// - Parameters:
   ///   - value: The value to store as raw bytes.
   ///   - offset: The offset in bytes into the buffer pointer's memory to begin
@@ -452,6 +462,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.
   @inlinable
+  @_alwaysEmitIntoClient
+  @_silgen_name("_swift_seNNNN_UnsafeMutableRawBufferPointer_storeBytes")
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -459,7 +471,25 @@ extension Unsafe${Mutable}RawBufferPointer {
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
       "${Self}.storeBytes out of bounds")
 
-    baseAddress!.storeBytes(of: value, toByteOffset: offset, as: T.self)
+    let pointer = baseAddress._unsafelyUnwrappedUnchecked
+    pointer.storeBytes(of: value, toByteOffset: offset, as: T.self)
+  }
+
+  // This unavailable implementation uses the expected mangled name
+  // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
+  // any binary compiled against the stlib binary for Swift 5.6 and older.
+  @available(*, unavailable)
+  @_silgen_name("$sSw10storeBytes2of12toByteOffset2asyx_SixmtlF")
+  @usableFromInline func _legacy_se0349_storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
+    _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
+    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
+      "${Self}.storeBytes out of bounds")
+
+    baseAddress!._legacy_se0349_storeBytes_internal(
+      of: value, toByteOffset: offset, as: T.self
+    )
   }
 
   /// Copies the bytes from the given buffer to this buffer's memory.
