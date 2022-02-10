@@ -61,6 +61,10 @@
 
 using namespace swift;
 
+/******************************************************************************/
+/************** Distributed Actor System Associated Types *********************/
+/******************************************************************************/
+
 Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   assert(actor->isDistributedActor());
   auto &ctx = actor->getASTContext();
@@ -96,11 +100,24 @@ Type swift::getDistributedActorSystemSerializationRequirementType(NominalTypeDec
   return conformance.getTypeWitnessByName(selfType, ctx.Id_SerializationRequirement);
 }
 
+Type swift::getDistributedActorSystemActorIDRequirementType(NominalTypeDecl *system) {
+  assert(!system->isDistributedActor());
+  auto &ctx = system->getASTContext();
+
+  auto protocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  if (!protocol)
+    return Type();
+
+  // Dig out the serialization requirement type.
+  auto module = system->getParentModule();
+  Type selfType = system->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, protocol);
+  return conformance.getTypeWitnessByName(selfType, ctx.Id_ActorID);
+}
+
 Type ASTContext::getAssociatedTypeOfDistributedSystem(NominalTypeDecl *actor,
                                                       Identifier member) {
   auto &ctx = actor->getASTContext();
-  assert(actor->isDistributedActor() &&
-         "Function intended to be used with distributed actor type");
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
   if (!actorProtocol)
@@ -109,7 +126,7 @@ Type ASTContext::getAssociatedTypeOfDistributedSystem(NominalTypeDecl *actor,
   AssociatedTypeDecl *actorSystemDecl =
       actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
   if (!actorSystemDecl)
-    return ErrorType::get(ctx);
+    return Type();
 
   auto actorSystemProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
   if (!actorSystemProtocol)
@@ -155,9 +172,87 @@ ASTContext::getDistributedActorInvocationDecoder(NominalTypeDecl *actor) {
       evaluator, GetDistributedActorInvocationDecoderRequest{actor}, nullptr);
 }
 
+bool
+swift::getDistributedActorSystemSerializationRequirements(
+    NominalTypeDecl *systemNominal,
+    llvm::SmallPtrSetImpl<ProtocolDecl *> &requirementProtos) {
+  auto existentialRequirementTy =
+      getDistributedActorSystemSerializationRequirementType(systemNominal);
+  if (existentialRequirementTy->hasError()) {
+    fprintf(stderr, "[%s:%d] (%s) if (SerializationRequirementTy->hasError())\n", __FILE__, __LINE__, __FUNCTION__);
+    return false;
+  }
+
+  if (existentialRequirementTy->isAny())
+    return true; // we're done here, any means there are no requirements
+
+  fprintf(stderr, "[%s:%d] (%s) existentialRequirementTy\n", __FILE__, __LINE__, __FUNCTION__);
+  existentialRequirementTy.dump();
+
+  fprintf(stderr, "[%s:%d] (%s) ---------------------\n", __FILE__, __LINE__, __FUNCTION__);
+
+  auto serialReqType = existentialRequirementTy->castTo<ExistentialType>()
+                           ->getConstraintType()
+                           ->getDesugaredType();
+  fprintf(stderr, "[%s:%d] (%s) serialReqType serialReqType serialReqType serialReqType serialReqType serialReqType\n", __FILE__, __LINE__, __FUNCTION__);
+  serialReqType->dump();
+  auto flattenedRequirements =
+      flattenDistributedSerializationTypeToRequiredProtocols(
+          serialReqType);
+  for (auto p : flattenedRequirements) {
+    fprintf(stderr, "[%s:%d] (%s) PROTO %s\n", __FILE__, __LINE__, __FUNCTION__, p->getNameStr().str().c_str());
+    requirementProtos.insert(p);
+  }
+
+  return true;
+}
+
+llvm::SmallPtrSet<ProtocolDecl *, 2>
+swift::flattenDistributedSerializationTypeToRequiredProtocols(
+    TypeBase *serializationRequirement) {
+  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
+  if (auto composition =
+          serializationRequirement->getAs<ProtocolCompositionType>()) {
+    for (auto member : composition->getMembers()) {
+      if (auto comp = member->getAs<ProtocolCompositionType>()) {
+        for (auto protocol :
+             flattenDistributedSerializationTypeToRequiredProtocols(comp)) {
+          serializationReqs.insert(protocol);
+        }
+      } else if (auto *protocol = member->getAs<ProtocolType>()) {
+        serializationReqs.insert(protocol->getDecl());
+      }
+    }
+  } else {
+    auto protocol = serializationRequirement->castTo<ProtocolType>()->getDecl();
+    serializationReqs.insert(protocol);
+  }
+
+  return serializationReqs;
+}
+
+bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
+    ASTContext &C,
+    const llvm::SmallPtrSetImpl<ProtocolDecl *> &allRequirements) {
+  auto encodable = C.getProtocol(KnownProtocolKind::Encodable);
+  auto decodable = C.getProtocol(KnownProtocolKind::Decodable);
+
+  if (allRequirements.size() != 2)
+    return false;
+
+  return allRequirements.count(encodable) &&
+         allRequirements.count(decodable);
+}
+
+/******************************************************************************/
+/********************* Ad-hoc protocol requirement checks *********************/
+/******************************************************************************/
+
 bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn) const {
   auto &C = getASTContext();
   auto module = getParentModule();
+
+  auto decl = dyn_cast<NominalTypeDecl>(getParent());
 
   fprintf(stderr, "[%s:%d] (%s) ====================================================\n", __FILE__, __LINE__, __FUNCTION__);
   fprintf(stderr, "[%s:%d] (%s) ====================================================\n", __FILE__, __LINE__, __FUNCTION__);
@@ -215,47 +310,17 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // === Get the SerializationRequirement
-  fprintf(stderr, "[%s:%d] (%s) SYSTEM ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
-  systemNominal->dump();
-  fprintf(stderr, "[%s:%d] (%s) SYSTEM ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
-//  auto SerializationRequirementTy =
-//      systemProto->getAssociatedType(C.Id_SerializationRequirement);
-  auto SerializationRequirementTy = // existential
-      getDistributedActorSystemSerializationRequirementType(systemNominal);
-//  auto SerializationRequirementTy = // existential
-//      getDistributedSerializationRequirementProtocols(systemNominal);
-  fprintf(stderr, "[%s:%d] (%s) REQ VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV\n", __FILE__, __LINE__, __FUNCTION__);
-  SerializationRequirementTy->dump();
-  fprintf(stderr, "[%s:%d] (%s) REQ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n", __FILE__, __LINE__, __FUNCTION__);
-  if (SerializationRequirementTy->hasError()) {
-    fprintf(stderr, "[%s:%d] (%s) if (SerializationRequirementTy->hasError())\n", __FILE__, __LINE__, __FUNCTION__);
+  SmallPtrSet<ProtocolDecl*, 2> requirementProtos;
+  if (!getDistributedActorSystemSerializationRequirements(
+          systemNominal, requirementProtos)) {
     return false;
   }
 
-  fprintf(stderr, "[%s:%d] (%s) ---------------------\n", __FILE__, __LINE__, __FUNCTION__);
-
-  llvm::SmallPtrSet<ProtocolDecl*, 2> serializationReqs;
-      auto serialReqType = SerializationRequirementTy->castTo<ExistentialType>()
-                               ->getConstraintType()
-                               ->getDesugaredType();
-      auto flattenedRequirements =
-          flattenDistributedSerializationTypeToRequiredProtocols(
-              serialReqType);
-      for (auto p : flattenedRequirements) {
-        fprintf(stderr, "[%s:%d] (%s) PROTO %s\n", __FILE__, __LINE__, __FUNCTION__, p->getNameStr().str().c_str());
-        serializationReqs.insert(p);
-      }
-
-//  auto flattenedRequirements =
-//      flattenDistributedSerializationTypeToRequiredProtocols(SerializationRequirementTy);
-//  extractDistributedSerializationRequirements(
-//      C, serializationReqNominal->getGenericRequirements());
-
   // -- Check number of generic requirements
   size_t expectedRequirementsNum = 3;
+  auto serializationRequirementsNum = 0;
   if (!isVoidReturn) {
-    // TODO(distributed): support alternative SerializationRequirements here
-    auto serializationRequirementsNum = 2; // Codable == Encodable, Decodable
+    serializationRequirementsNum = requirementProtos.size();
     expectedRequirementsNum += serializationRequirementsNum;
   }
 
@@ -307,29 +372,60 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
     }
   }
 
+  fprintf(stderr, "[%s:%d] (%s) GENERIC PARAMS\n", __FILE__, __LINE__, __FUNCTION__);
+  for (auto param : genericParams->getParams()) {
+    param->dump();
+  }
   // === Check generic parameters in detail
   // --- Check: Act: DistributedActor,
   //            Act.ID == Self.ActorID
   GenericTypeParamDecl *ActParam = genericParams->getParams()[0];
+  auto ActConformance = module->lookupConformance(
+      mapTypeIntoContext(ActParam->getDeclaredInterfaceType()),
+      C.getProtocol(KnownProtocolKind::DistributedActor));
+  if (ActConformance.isInvalid()) {
+    fprintf(stderr, "[%s:%d] (%s) if (ActConformance.isInvalid()) {\n", __FILE__, __LINE__, __FUNCTION__);
+    return false;
+  }
 
   // --- Check: Err: Error
   GenericTypeParamDecl *ErrParam = genericParams->getParams()[1];
-  module->lookupConformance(
+  auto ErrConformance = module->lookupConformance(
       mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::Error));
+  if (ErrConformance.isInvalid()) {
+    fprintf(stderr, "[%s:%d] (%s) if (ErrConformance.isInvalid())\n", __FILE__, __LINE__, __FUNCTION__);
+    return false;
+  }
 
-  /// --- Check: Res: SerializationRequirement
-  GenericTypeParamDecl *ResParam =
-      isVoidReturn ? nullptr : genericParams->getParams().back();
-
+  // --- Check: Res: SerializationRequirement
+  // We could have the `SerializationRequirement = Any` in which case there are
+  // no requirements to check on `Res`
+  GenericTypeParamDecl *ResParam = nullptr;
+  if (!isVoidReturn) {
+    ResParam = genericParams->getParams().back();
+  }
 
   auto sig = getGenericSignature();
   auto requirements = sig.getRequirements();
+
+  fprintf(stderr, "[%s:%d] (%s) REQUIREMENTS requirements::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
+  for (auto r : requirements) {
+    r.dump();
+  }
+  fprintf(stderr, "[%s:%d] (%s) REQUIREMENT PROTOS ::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
+  for (auto r : requirementProtos) {
+    r->dump();
+  }
+
   if (requirements.size() != expectedRequirementsNum) {
+    fprintf(stderr, "[%s:%d] (%s) requirements.size() = %d\n", __FILE__, __LINE__, __FUNCTION__, requirements.size());
+    fprintf(stderr, "[%s:%d] (%s) expectedRequirementsNum = %d\n", __FILE__, __LINE__, __FUNCTION__, expectedRequirementsNum);
     fprintf(stderr, "[%s:%d] (%s) if (requirements.size() != expectedRequirementsNum)\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
+  // --- Check the expected requirements
   // conforms_to: Act DistributedActor
   // conforms_to: Err Error
   // --- all the Res requirements ---
@@ -338,61 +434,89 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // ...
   // --------------------------------
   // same_type: Act.ID FakeActorSystem.ActorID // LAST one
+
+  // --- Check requirement: conforms_to: Act DistributedActor
   auto actorReq = requirements[0];
-  auto errorReq = requirements[1];
-  auto actorIDReq = requirements.back();
-
-  bool ActConformsDistributedActor = false;
-  bool ErrConformsError = false;
-  bool ResConformsSerializationRequirement = false;
-  bool ActIDIsSameSystemID = false;
-
   auto distActorTy = C.getProtocol(KnownProtocolKind::DistributedActor)
-                         ->getInterfaceType()
-                         ->getMetatypeInstanceType();
-  if (actorReq.getSecondType()->isEqual(distActorTy)) {
-    ActConformsDistributedActor = actorReq.getKind() == RequirementKind::Conformance;
+                       ->getInterfaceType()
+                       ->getMetatypeInstanceType();
+  if (actorReq.getKind() != RequirementKind::Conformance) {
+    fprintf(stderr, "[%s:%d] (%s) if (actorReq.getKind() != RequirementKind::Conformance) {\n", __FILE__, __LINE__, __FUNCTION__);
+    return false;
   }
-
-  auto errorTy = C.getProtocol(KnownProtocolKind::Error)
-                     ->getInterfaceType()
-                     ->getMetatypeInstanceType();
-  if (errorReq.getSecondType()->isEqual(errorTy)) {
-    ErrConformsError = errorReq.getKind() == RequirementKind::Conformance;
-  }
-
-  if (isVoidReturn) {
-    if (auto func = dyn_cast<FuncDecl>(this)) {
-      if (func->getResultInterfaceType()->isVoid()) {
-        ResConformsSerializationRequirement = true;
-      }
-    }
-  } else {
-    // FIXME(distributed): implement checking return type for serialization requirement
-    assert(ResParam && "Non void function, yet no Res generic parameter found");
-    if (auto func = dyn_cast<FuncDecl>(this)) {
-      auto resultType = func->getResultInterfaceType();
-      // The result of the function must be the `Res` generic argument.
-      if (resultType->getMetatypeInstanceType()->isEqual(
-              ResParam->getInterfaceType()->getMetatypeInstanceType())) {
-        // FIXME: this is too simple, it has to check the SerializationRequirement is applied
-        ResConformsSerializationRequirement = true;
-      }
-    }
-  }
-
-  // FIXME(distributed): implement checking ActIDIsSameSystemID
-
-  // If any of the requirements is off, we fail the lookup
-  if (!ActConformsDistributedActor ||
-        !ErrConformsError ||
-        !ResConformsSerializationRequirement
-//      || !ActIDIsSameSystemID
-        ) {
-    fprintf(stderr, "[%s:%d] (%s) // If any of the requirements is off, we fail the lookup\n", __FILE__, __LINE__, __FUNCTION__);
+  if (!actorReq.getSecondType()->isEqual(distActorTy)) {
+    fprintf(stderr, "[%s:%d] (%s)   if (actorReq.getSecondType()->isEqual(distActorTy)) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
+  // --- Check requirement: conforms_to: Err Error
+  auto errorReq = requirements[1];
+  auto errorTy = C.getProtocol(KnownProtocolKind::Error)
+                     ->getInterfaceType()
+                     ->getMetatypeInstanceType();
+  if (errorReq.getKind() != RequirementKind::Conformance) {
+    fprintf(stderr, "[%s:%d] (%s)   if (errorReq.getKind() != RequirementKind::Conformance) {\n", __FILE__, __LINE__, __FUNCTION__);
+    return false;
+  }
+  if (!errorReq.getSecondType()->isEqual(errorTy)) {
+    fprintf(stderr, "[%s:%d] (%s) if (errorReq.getSecondType()->isEqual(errorTy)) {\n", __FILE__, __LINE__, __FUNCTION__);
+    return false;
+  }
+
+  // --- Check requirement: Res either Void or all SerializationRequirements
+  if (isVoidReturn) {
+    if (auto func = dyn_cast<FuncDecl>(this)) {
+      if (!func->getResultInterfaceType()->isVoid()) {
+        fprintf(stderr, "[%s:%d] (%s) if (!func->getResultInterfaceType()->isVoid()) {\n", __FILE__, __LINE__, __FUNCTION__);
+        return false;
+      }
+    }
+  } else if (ResParam) {
+    // FIXME(distributed): implement checking return type for serialization requirement
+    assert(ResParam && "Non void function, yet no Res generic parameter found");
+    if (auto func = dyn_cast<FuncDecl>(this)) {
+      auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType());
+      // The result of the function must be the `Res` generic argument.
+      if (!resultType->getMetatypeInstanceType()->getDesugaredType()->isEqual(
+              func->mapTypeIntoContext(ResParam->getInterfaceType()->getMetatypeInstanceType()))) {
+        fprintf(stderr, "[%s:%d] (%s) resultType->getMetatypeInstanceType()\n", __FILE__, __LINE__, __FUNCTION__);
+        resultType->getMetatypeInstanceType().dump();
+        fprintf(stderr, "[%s:%d] (%s) ResParam->getInterfaceType()->getMetatypeInstanceType()\n", __FILE__, __LINE__, __FUNCTION__);
+        ResParam->getInterfaceType()->getMetatypeInstanceType().dump();
+
+        fprintf(stderr, "[%s:%d] (%s) if (!resultType->getMetatypeInstanceType()->isEqual(ResParam->getInterfaceType()->getMetatypeInstanceType()))\n", __FILE__, __LINE__, __FUNCTION__);
+        return false;
+      }
+
+      // FIXME: look at requirements
+
+      for (auto requirementProto : requirementProtos) {
+        auto conformance = module->lookupConformance(resultType, requirementProto);
+        if (conformance.isInvalid()) {
+//          fprintf(stderr, "[%s:%d] (%s) %s missing conformance to %s\n", __FILE__, __LINE__, __FUNCTION__,
+//                  resultType->getAnyNominal()->getNameStr().str().c_str(),
+//                  requirementProto->getInterfaceType()->getAnyNominal()->getNameStr().str().c_str());
+          return false;
+        }
+      }
+    }
+  }
+
+  // -- Check requirement: same_type Actor.ID Self.ActorID
+  auto actorIdReq = requirements.back();
+  if (actorIdReq.getKind() != RequirementKind::SameType) {
+    fprintf(stderr, "[%s:%d] (%s) if (actorIdReq.getKind() != RequirementKind::SameType){ \n", __FILE__, __LINE__, __FUNCTION__);
+    return false;
+  }
+  auto expectedActorIdTy =
+      getDistributedActorSystemActorIDRequirementType(systemNominal);
+  actorIdReq.dump();
+  if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {
+    fprintf(stderr, "[%s:%d] (%s)   if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {\n", __FILE__, __LINE__, __FUNCTION__);
+    return false;
+  }
+
+  fprintf(stderr, "[%s:%d] (%s)   OKEY!!!! %s.%s\n", __FILE__, __LINE__, __FUNCTION__, decl->getNameStr().str().c_str(), getNameStr().str().c_str());
   return true;
 }
 
@@ -440,39 +564,29 @@ swift::extractDistributedSerializationRequirements(
   return serializationReqs;
 }
 
+/******************************************************************************/
+/********************** Distributed Functions *********************************/
+/******************************************************************************/
 
 bool AbstractFunctionDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
-ConstructorDecl*
+ConstructorDecl *
 NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
-  auto &C = this->getASTContext();
-
-  // FIXME(distributed): implement more properly... do with caching etc
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
-  for (auto value : mutableThis->getMembers()) {
-    auto ctor = dyn_cast<ConstructorDecl>(value);
-    if (!ctor)
-      continue;
-
-    auto params = ctor->getParameters();
-    if (params->size() != 1)
-      return nullptr;
-
-    if (params->get(0)->getArgumentName() == C.getIdentifier("_mangledName"))
-      return ctor;
-
-    return nullptr;
-  }
-
-  // TODO(distributed): make a Request for it?
-  return nullptr;
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedRemoteCallTargetInitFunctionRequest(mutableThis), nullptr);
 }
+
+/******************************************************************************/
+/********************** Distributed Actor Properties **************************/
+/******************************************************************************/
 
 VarDecl*
 NominalTypeDecl::getDistributedActorSystemProperty() const {
-  if (!this->isDistributedActor())
+  if (!isDistributedActor())
     return nullptr;
 
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
@@ -484,7 +598,7 @@ NominalTypeDecl::getDistributedActorSystemProperty() const {
 
 VarDecl*
 NominalTypeDecl::getDistributedActorIDProperty() const {
-  if (!this->isDistributedActor())
+  if (!isDistributedActor())
     return nullptr;
 
   auto mutableThis = const_cast<NominalTypeDecl *>(this);

@@ -38,7 +38,6 @@ using namespace swift;
 // The "derived" mechanisms are not really geared towards emitting for
 // what already has a witness.
 static VarDecl *addImplicitDistributedActorIDProperty(
-//    DeclContext *parentDC,
     NominalTypeDecl *nominal) {
   if (!nominal || !nominal->isDistributedActor())
     return nullptr;

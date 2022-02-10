@@ -470,7 +470,7 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
   if (transportParamsCount == 0) {
     ctor->diagnose(diag::distributed_actor_designated_ctor_missing_transport_param,
                    ctor->getName());
-    // TODO(distributed): offer fixit to insert 'transport: DistributedActorSystem'
+    // TODO(distributed): offer fixit to insert 'system: DistributedActorSystem'
     return;
   }
 
@@ -515,39 +515,6 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
   (void)decl->getDistributedActorIDProperty();
 }
 
-//static Type getAssociatedTypeOfDistributedSystem(NominalTypeDecl *actor,
-//                                                 Identifier member) {
-//  auto &ctx = actor->getASTContext();
-//
-//  auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-//  if (!actorProtocol)
-//    return ErrorType::get(ctx);
-//
-//  AssociatedTypeDecl *actorSystemDecl =
-//      actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
-//  if (!actorSystemDecl)
-//    return ErrorType::get(ctx);
-//
-//  auto actorSystemProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
-//  if (!actorSystemProtocol)
-//    return Type();
-//
-//  AssociatedTypeDecl *assocTypeDecl =
-//      actorSystemProtocol->getAssociatedType(member);
-//  if (!assocTypeDecl)
-//    return Type();
-//
-//  auto module = actor->getParentModule();
-//  Type selfType = actor->getSelfInterfaceType();
-//  auto conformance = module->lookupConformance(selfType, actorProtocol);
-//  Type dependentType = actorProtocol->getSelfInterfaceType();
-//  dependentType = DependentMemberType::get(dependentType, actorSystemDecl);
-//  dependentType = DependentMemberType::get(dependentType, assocTypeDecl);
-//
-//  return dependentType.subst(SubstitutionMap::getProtocolSubstitutions(
-//      actorProtocol, selfType, conformance));
-//}
-
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::getDistributedSerializationRequirementProtocols(NominalTypeDecl *nominal) {
   auto &ctx = nominal->getASTContext();
@@ -563,32 +530,38 @@ swift::getDistributedSerializationRequirementProtocols(NominalTypeDecl *nominal)
   return flattenDistributedSerializationTypeToRequiredProtocols(serialReqType);
 }
 
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-swift::flattenDistributedSerializationTypeToRequiredProtocols(
-    TypeBase *serializationRequirement) {
-  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-  if (auto composition =
-          serializationRequirement->getAs<ProtocolCompositionType>()) {
-    for (auto member : composition->getMembers()) {
-      if (auto *protocol = member->getAs<ProtocolType>())
-        serializationReqs.insert(protocol->getDecl());
-    }
-  } else {
-    auto protocol = serializationRequirement->castTo<ProtocolType>()->getDecl();
-    serializationReqs.insert(protocol);
+ConstructorDecl*
+GetDistributedRemoteCallTargetInitFunctionRequest::evaluate(
+    Evaluator &evaluator,
+    NominalTypeDecl *nominal) const {
+  auto &C = nominal->getASTContext();
+
+  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
+
+  if (!nominal->getDeclaredInterfaceType()->isEqual(
+          C.getRemoteCallTargetType()))
+    return nullptr;
+
+  for (auto value : nominal->getMembers()) {
+    auto ctor = dyn_cast<ConstructorDecl>(value);
+    if (!ctor)
+      continue;
+
+    auto params = ctor->getParameters();
+    if (params->size() != 1)
+      return nullptr;
+
+    if (params->get(0)->getArgumentName() == C.getIdentifier("_mangledName"))
+      return ctor;
+
+    return nullptr;
   }
 
-  return serializationReqs;
-}
-
-bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
-    ASTContext &C,
-    const llvm::SmallPtrSetImpl<ProtocolDecl *> &allRequirements) {
-  auto encodable = C.getProtocol(KnownProtocolKind::Encodable);
-  auto decodable = C.getProtocol(KnownProtocolKind::Decodable);
-
-  return allRequirements.size() == 2 && allRequirements.count(encodable) &&
-         allRequirements.count(decodable);
+  // TODO(distributed): make a Request for it?
+  return nullptr;
 }
 
 NominalTypeDecl *

@@ -31,18 +31,21 @@ class DeclContext;
 class FuncDecl;
 class NominalTypeDecl;
 
-/// Determine the distributed actor transport type for the given actor.
+/// Determine the `ActorSystem` type for the given actor.
 Type getDistributedActorSystemType(NominalTypeDecl *actor);
 
-/// Determine the distributed actor identity type for the given actor.
+/// Determine the `ID` type for the given actor.
 Type getDistributedActorIDType(NominalTypeDecl *actor);
 
 Type getDistributedActorSystemSerializationRequirementType(
     NominalTypeDecl *system);
 
+Type getDistributedActorSystemActorIDRequirementType(
+    NominalTypeDecl *system);
+
 /// Determine the serialization requirement for the given actor, actor system
 /// or other type that has the SerializationRequirement associated type.
-Type getDistributedSerializationRequirementType(NominalTypeDecl *nominal);
+Type getDistributedSerializationRequirementType(NominalTypeDecl *actor);
 
 /// Get the specific protocols that the `SerializationRequirement` specifies,
 /// and all parameters / return types of distributed targets must conform to.
@@ -54,16 +57,28 @@ Type getDistributedSerializationRequirementType(NominalTypeDecl *nominal);
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 getDistributedSerializationRequirementProtocols(NominalTypeDecl *decl);
 
+/// Desugar and flatten the `SerializationRequirement` type into a set of
+/// specific protocol declarations.
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 flattenDistributedSerializationTypeToRequiredProtocols(
     TypeBase *serializationRequirement);
 
 /// Check if the `allRequirements` represent *exactly* the
 /// `Encodable & Decodable` (also known as `Codable`) requirement.
+///
 /// If so, we can emit slightly nicer diagnostics.
 bool checkDistributedSerializationRequirementIsExactlyCodable(
     ASTContext &C,
     const llvm::SmallPtrSetImpl<ProtocolDecl *> &allRequirements);
+
+/// Get the `SerializationRequirement`, explode it into the specific
+/// protocol requirements and insert them into `requirements`.
+///
+/// Returns false if failed to get the protocol decls.
+bool
+getDistributedActorSystemSerializationRequirements(
+    NominalTypeDecl *systemDecl,
+    llvm::SmallPtrSetImpl<ProtocolDecl *> &requirementProtos);
 
 /// Given any set of generic requirements, locate those which are about the
 /// `SerializationRequirement`. Those need to be applied in the parameter and

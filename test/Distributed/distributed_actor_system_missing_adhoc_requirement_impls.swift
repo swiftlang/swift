@@ -6,13 +6,6 @@
 
 import _Distributed
 
-public struct ActorAddress: Sendable, Hashable, Codable {
-  let address: String
-  init(parse address: String) {
-    self.address = address
-  }
-}
-
 struct MissingRemoteCall: DistributedActorSystem {
   // expected-error@-1{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCall'}}
   // expected-note@-2{{protocol 'MissingRemoteCall' requires function 'remoteCall' with signature:}}
@@ -221,7 +214,7 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
     target: RemoteCallTarget,
     invocation invocationEncoder: inout InvocationEncoder,
     throwing: Err.Type
-  ) async throws 
+  ) async throws
     where Act: DistributedActor,
     Act.ID == ActorID,
     Err: Error {
@@ -229,11 +222,247 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
   }
 }
 
+public struct BadRemoteCall_badResultConformance: DistributedActorSystem {
+  // expected-error@-1{{struct 'BadRemoteCall_badResultConformance' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-2{{protocol 'BadRemoteCall_badResultConformance' requires function 'remoteCall' with signature:}}
+
+  public typealias ActorID = ActorAddress
+  public typealias InvocationDecoder = PublicFakeInvocationDecoder
+  public typealias InvocationEncoder = PublicFakeInvocationEncoder
+  public typealias SerializationRequirement = Codable
+
+  public func resolve<Act>(id: ActorID, as actorType: Act.Type)
+    throws -> Act? where Act: DistributedActor {
+    return nil
+  }
+
+  public func assignID<Act>(_ actorType: Act.Type) -> ActorID
+    where Act: DistributedActor {
+    ActorAddress(parse: "fake://123")
+  }
+
+  public func actorReady<Act>(_ actor: Act)
+    where Act: DistributedActor,
+    Act.ID == ActorID {}
+  public func resignID(_ id: ActorID) {}
+  public func makeInvocationEncoder() -> InvocationEncoder {
+  }
+
+  public func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SomeProtocol { // ERROR: bad, this must be SerializationRequirement
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+
+  public func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Act.ID == ActorID,
+    Err: Error {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+}
+
+// This tests the ability to handle composite types with multiple layers
+// Codable & SomeProtocol -> Encodable & Decodable & SomeProtocol
+struct BadRemoteCall_largeSerializationRequirement: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias InvocationDecoder = LargeSerializationReqFakeInvocationDecoder
+  typealias InvocationEncoder = LargeSerializationReqFakeInvocationEncoder
+  typealias SerializationRequirement = Codable & SomeProtocol
+
+  func resolve<Act>(id: ActorID, as actorType: Act.Type)
+    throws -> Act? where Act: DistributedActor {
+    return nil
+  }
+
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+    where Act: DistributedActor {
+    ActorAddress(parse: "fake://123")
+  }
+
+  func actorReady<Act>(_ actor: Act)
+    where Act: DistributedActor,
+    Act.ID == ActorID {}
+  func resignID(_ id: ActorID) {}
+  func makeInvocationEncoder() -> InvocationEncoder {
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Act.ID == ActorID,
+    Err: Error {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+}
+
+struct BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition: DistributedActorSystem {
+  // expected-error@-1{{struct 'BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-2{{protocol 'BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition' requires function 'remoteCall' with signature:}}
+
+  typealias ActorID = ActorAddress
+  typealias InvocationDecoder = LargeSerializationReqFakeInvocationDecoder
+  typealias InvocationEncoder = LargeSerializationReqFakeInvocationEncoder
+  typealias SerializationRequirement = Codable & SomeProtocol
+
+  func resolve<Act>(id: ActorID, as actorType: Act.Type)
+    throws -> Act? where Act: DistributedActor {
+    return nil
+  }
+
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+    where Act: DistributedActor {
+    ActorAddress(parse: "fake://123")
+  }
+
+  func actorReady<Act>(_ actor: Act)
+    where Act: DistributedActor,
+    Act.ID == ActorID {}
+  func resignID(_ id: ActorID) {}
+  func makeInvocationEncoder() -> InvocationEncoder {
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SomeProtocol { // ERROR: missing Codable!!!
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Act.ID == ActorID,
+    Err: Error {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+}
+
+struct BadRemoteCall_anySerializationRequirement: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias InvocationDecoder = AnyInvocationDecoder
+  typealias InvocationEncoder = AnyInvocationEncoder
+  typealias SerializationRequirement = Any // !!
+
+  func resolve<Act>(id: ActorID, as actorType: Act.Type)
+    throws -> Act? where Act: DistributedActor {
+    return nil
+  }
+
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+    where Act: DistributedActor {
+    ActorAddress(parse: "fake://123")
+  }
+
+  func actorReady<Act>(_ actor: Act)
+    where Act: DistributedActor,
+    Act.ID == ActorID {}
+  func resignID(_ id: ActorID) {}
+  func makeInvocationEncoder() -> InvocationEncoder {
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+    Act.ID == ActorID,
+    Err: Error {
+    throw ExecuteDistributedTargetError(message: "Not implemented.")
+  }
+}
 
 // ==== ------------------------------------------------------------------------
 
+public struct ActorAddress: Sendable, Hashable, Codable {
+  let address: String
+  init(parse address: String) {
+    self.address = address
+  }
+}
+
+public protocol SomeProtocol: Sendable {}
+
 struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
+struct AnyInvocationEncoder: DistributedTargetInvocationEncoder {
+  typealias SerializationRequirement = Any
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
+struct LargeSerializationReqFakeInvocationEncoder: DistributedTargetInvocationEncoder {
+  typealias SerializationRequirement = Codable & SomeProtocol
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
@@ -252,8 +481,26 @@ public struct PublicFakeInvocationEncoder: DistributedTargetInvocationEncoder {
   public mutating func doneRecording() throws {}
 }
 
-class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
+
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
+}
+
+class AnyInvocationDecoder: DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Any
+
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
+}
+
+class LargeSerializationReqFakeInvocationDecoder : DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable & SomeProtocol
 
   func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
   func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
