@@ -4,8 +4,7 @@
 _ = '/abc/'
 
 _ = ('/[*/', '/+]/', '/.]/')
-// expected-error@-1 {{cannot parse regular expression: quantifier '+' must appear after expression}}
-// expected-error@-2 {{cannot parse regular expression: expected ']'}}
+// expected-error@-1 {{cannot parse regular expression}}
 
 _ = '/\w+/'
 _ = '/\'\\/'
