@@ -63,12 +63,13 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents() {
         llvm::dbgs() << "- via superclass requirement\n";
       }
 
+      const auto &superclassReq = props->getSuperclassRequirement();
       concretizeNestedTypesFromConcreteParent(
           props->getKey(),
           RequirementKind::Superclass,
-          *props->SuperclassRule,
-          props->Superclass->getConcreteType(),
-          props->Superclass->getSubstitutions(),
+          *superclassReq.SuperclassRule,
+          superclassReq.SuperclassType->getConcreteType(),
+          superclassReq.SuperclassType->getSubstitutions(),
           props->ConformsToRules,
           props->ConformsTo,
           props->SuperclassConformances);
