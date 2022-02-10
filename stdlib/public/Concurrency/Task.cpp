@@ -234,7 +234,7 @@ void AsyncTask::completeFuture(AsyncContext *context) {
 
     // Enqueue the waiter on the global executor.
     // TODO: allow waiters to fill in a suggested executor
-    waitingTask->flagAsEnqueuedOnExecutor(ExecutorRef::generic());
+    waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
 
     // Move to the next task.
     waitingTask = nextWaitingTask;
@@ -847,7 +847,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // If we're supposed to enqueue the task, do so now.
   if (taskCreateFlags.enqueueJob()) {
     swift_retain(task);
-    task->flagAsEnqueuedOnExecutor(executor);
+    task->flagAsAndEnqueueOnExecutor(executor);
   }
 
   return {task, initialContext};
@@ -1020,7 +1020,7 @@ SWIFT_CC(swift)
 static void
 swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task, ExecutorRef executor)
 {
-  task->flagAsEnqueuedOnExecutor(executor);
+  task->flagAsAndEnqueueOnExecutor(executor);
 }
 
 SWIFT_CC(swift)
@@ -1151,7 +1151,7 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
   // to make a stronger best-effort attempt to catch racing attempts to
   // resume the continuation?
 
-  task->flagAsEnqueuedOnExecutor(context->ResumeToExecutor);
+  task->flagAsAndEnqueueOnExecutor(context->ResumeToExecutor);
 }
 
 SWIFT_CC(swift)

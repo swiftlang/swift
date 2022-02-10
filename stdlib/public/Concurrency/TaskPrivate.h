@@ -697,9 +697,9 @@ retry:;
 /// original enqueueing thread.
 ///
 /// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
-inline void AsyncTask::flagAsEnqueuedOnExecutor(ExecutorRef newExecutor) {
+inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
 
-  SWIFT_TASK_DEBUG_LOG("%p->flagAsEnqueuedOnExecutor()", this);
+  SWIFT_TASK_DEBUG_LOG("%p->flagAsAndEnqueueOnExecutor()", this);
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
 
