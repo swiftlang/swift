@@ -167,30 +167,36 @@ static void promoteDebugValueAddr(DebugValueInst *dvai, SILValue value,
   assert(dvai->getOperand()->getType().isLoadable(*dvai->getFunction()) &&
          "Unexpected promotion of address-only type!");
   assert(value && "Expected valid value");
+
   // Avoid inserting the same debug_value twice.
+  //
+  // We remove the di expression when comparing since:
+  //
+  // 1. dvai is on will always have the deref diexpr since it is on addresses.
+  //
+  // 2. We are only trying to delete debug_var that are on values... values will
+  //    never have an op_deref meaning that the comparison will always fail and
+  //    not serve out purpose here.
+  auto dvaiWithoutDIExpr = dvai->getVarInfo()->withoutDIExpr();
   for (auto *use : value->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
-      // Since we're not comparing di-expression in
-      // SILDebugVariable::operator==(), it's necessary to distinguish
-      // debug_value w/ normal values from that with address-type values.
-      if (!dvi->hasAddrVal() &&
-          *dvi->getVarInfo() == *dvai->getVarInfo()) {
+      if (!dvi->hasAddrVal() && *dvi->getVarInfo() == dvaiWithoutDIExpr) {
         deleter.forceDelete(dvai);
         return;
       }
     }
   }
 
-  auto VarInfo = *dvai->getVarInfo();
   // Drop op_deref if dvai is actually a debug_value instruction
+  auto varInfo = *dvai->getVarInfo();
   if (isa<DebugValueInst>(dvai)) {
-    auto &DIExpr = VarInfo.DIExpr;
-    if (DIExpr)
-      DIExpr.eraseElement(DIExpr.element_begin());
+    auto &diExpr = varInfo.DIExpr;
+    if (diExpr)
+      diExpr.eraseElement(diExpr.element_begin());
   }
 
   SILBuilderWithScope b(dvai, ctx);
-  b.createDebugValue(dvai->getLoc(), value, std::move(VarInfo));
+  b.createDebugValue(dvai->getLoc(), value, std::move(varInfo));
   deleter.forceDelete(dvai);
 }
 
