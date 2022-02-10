@@ -96,33 +96,19 @@ extension Duration {
 
 @available(SwiftStdlib 5.7, *)
 extension Duration: Codable { 
-  private enum CodingKeys: String, CodingKey {
-    case attoseconds = "attoseconds"
-  }
-
-  private enum DecodingFailure: Error, CustomStringConvertible {
-    case conversionFailure(String)
-
-    var description: String {
-      switch self {
-      case .conversionFailure(let str):
-        return "Unable to convert \(str) to Int128"
-      }
-    }
-  }
-  
+  @available(SwiftStdlib 5.7, *)
   public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    let str = try container.decode(String.self, forKey: .attoseconds)
-    guard let attoseconds = _Int128(str, radix: 10) else {
-      throw DecodingFailure.conversionFailure(str)
-    }
-    self.init(_attoseconds: attoseconds)
+    let container = try decoder.unkeyedContainer()
+    let high = container.decode(Int64.self)
+    let low = container.decode(UInt64.self)
+    self.init(_attoseconds: _Int128(high: high, low: low))
   }
   
+  @available(SwiftStdlib 5.7, *)
   public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(String(_attoseconds, radix: 10), forKey: .attoseconds)
+    var container = encoder.unkeyedContainer()
+    try container.encode(_high)
+    try container.encode(_low)
   }
 }
 
