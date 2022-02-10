@@ -1318,6 +1318,18 @@ public:
 };
 }
 
+namespace {
+  /// Flags that should be applied to the existential argument type after
+  /// opening.
+  enum class OpenedExistentialAdjustmentFlags {
+    /// The argument should be made inout after opening.
+    InOut = 0x01,
+  };
+
+  using OpenedExistentialAdjustments =
+    OptionSet<OpenedExistentialAdjustmentFlags>;
+}
+
 /// Determine whether we should open up the existential argument to the
 /// given parameters.
 ///
@@ -1330,9 +1342,11 @@ public:
 ///
 /// \returns If the argument type is existential and opening it can bind a
 /// generic parameter in the callee, returns the type variable (from the
-/// opened parameter type) and the existential type that needs to be opened
-/// (from the argument type).
-static Optional<std::pair<TypeVariableType *, Type>>
+/// opened parameter type) the existential type that needs to be opened
+/// (from the argument type), and the adjustements that need to be applied to
+/// the existential type after it is opened.
+static Optional<
+    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
 shouldOpenExistentialCallArgument(
     ValueDecl *callee, unsigned paramIdx, Type paramTy, Type argTy) {
   if (!callee)
@@ -1368,6 +1382,14 @@ shouldOpenExistentialCallArgument(
   if (!paramTy->hasTypeVariable())
     return None;
 
+  OpenedExistentialAdjustments adjustments;
+
+  // If the argument is inout, strip it off and we can add it back.
+  if (auto inOutArg = argTy->getAs<InOutType>()) {
+    argTy = inOutArg->getObjectType();
+    adjustments |= OpenedExistentialAdjustmentFlags::InOut;
+  }
+
   // The argument type needs to be an existential type or metatype thereof.
   if (!argTy->isAnyExistentialType())
     return None;
@@ -1380,13 +1402,18 @@ shouldOpenExistentialCallArgument(
   if (param->isVariadic() && !param->getVarargBaseTy()->hasTypeSequence())
     return None;
 
+  // Look through an inout type on the formal type of the parameter.
+  auto formalParamTy = param->getInterfaceType()->getInOutObjectType();
+
   // If the argument is of an existential metatype, look through the
   // metatype on the parameter.
-  auto formalParamTy = param->getInterfaceType();
   if (argTy->is<AnyMetatypeType>()) {
     formalParamTy = formalParamTy->getMetatypeInstanceType();
     paramTy = paramTy->getMetatypeInstanceType();
   }
+
+  // Look through an inout type on the parameter.
+  paramTy = paramTy->getInOutObjectType();
 
   // The parameter type must be a type variable.
   auto paramTypeVar = paramTy->getAs<TypeVariableType>();
@@ -1418,7 +1445,7 @@ shouldOpenExistentialCallArgument(
       referenceInfo.assocTypeRef > TypePosition::Covariant)
     return None;
 
-  return std::make_pair(paramTypeVar, argTy);
+  return std::make_tuple(paramTypeVar, argTy, adjustments);
 }
 
 // Match the argument of a call to the parameter.
@@ -1657,12 +1684,20 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       // consider opening the existential type.
       if (auto existentialArg = shouldOpenExistentialCallArgument(
               callee, paramIdx, paramTy, argTy)) {
-        assert(existentialArg->second->isEqual(argTy));
+        // My kingdom for a decent "if let" in C++.
+        TypeVariableType *openedTypeVar;
+        Type existentialType;
+        OpenedExistentialAdjustments adjustments;
+        std::tie(openedTypeVar, existentialType, adjustments) = *existentialArg;
+
         OpenedArchetypeType *opened;
         std::tie(argTy, opened) = cs.openExistentialType(
-            argTy, cs.getConstraintLocator(loc));
+            existentialType, cs.getConstraintLocator(loc));
 
-        openedExistentials.push_back({existentialArg->first, opened});
+        if (adjustments.contains(OpenedExistentialAdjustmentFlags::InOut))
+          argTy = InOutType::get(argTy);
+
+        openedExistentials.push_back({openedTypeVar, opened});
       }
 
       auto argLabel = argument.getLabel();
