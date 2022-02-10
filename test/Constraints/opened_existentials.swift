@@ -126,11 +126,18 @@ func arrayOfOne<T: P>(_ value: T) -> [T] {
 }
 
 struct X<T: P> {
+  // expected-note@-1{{required by generic struct 'X' where 'T' = 'P'}}
+  func f(_: T) { }
 }
 
 // expected-note@+1{{required by global function 'createX' where 'T' = 'P'}}
 func createX<T: P>(_ value: T) -> X<T> {
   X<T>()
+}
+
+func doNotOpenOuter(p: any P) {
+  _ = X().f(p) // expected-error{{protocol 'P' as a type cannot conform to the protocol itself}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 
 @available(SwiftStdlib 5.1, *)
