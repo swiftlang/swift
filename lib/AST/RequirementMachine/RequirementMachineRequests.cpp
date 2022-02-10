@@ -123,14 +123,22 @@ RequirementMachine::buildRequirementsFromRules(
         return;
 
       case Symbol::Kind::Superclass: {
-        // For compatibility with the old GenericSignatureBuilder, drop requirements
-        // containing ErrorTypes.
+        // Requirements containing unresolved name symbols originate from
+        // invalid code and should not appear in the generic signature.
+        for (auto term : prop->getSubstitutions()) {
+          if (term.containsUnresolvedSymbols())
+            return;
+        }
+
+        // Requirements containing error types originate from invalid code
+        // and should not appear in the generic signature.
+        if (prop->getConcreteType()->hasError())
+          return;
+
         auto superclassType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 genericParams, MutableTerm());
-        if (superclassType->hasError())
-          return;
 
         reqs.emplace_back(RequirementKind::Superclass,
                           subjectType, superclassType);
@@ -138,6 +146,18 @@ RequirementMachine::buildRequirementsFromRules(
       }
 
       case Symbol::Kind::ConcreteType: {
+        // Requirements containing unresolved name symbols originate from
+        // invalid code and should not appear in the generic signature.
+        for (auto term : prop->getSubstitutions()) {
+          if (term.containsUnresolvedSymbols())
+            return;
+        }
+
+        // Requirements containing error types originate from invalid code
+        // and should not appear in the generic signature.
+        if (prop->getConcreteType()->hasError())
+          return;
+
         auto concreteType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
