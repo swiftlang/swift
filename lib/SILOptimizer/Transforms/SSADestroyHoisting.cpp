@@ -389,9 +389,13 @@ bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
 bool HoistDestroys::foldBarrier(SILInstruction *barrier) {
   if (auto *load = dyn_cast<LoadInst>(barrier)) {
     if (load->getOperand() == storageRoot) {
-      assert(load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy);
-      load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
-      return true;
+      if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+        load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
+        return true;
+      } else {
+        assert(load->getOperand()->getType().isTrivial(*load->getFunction()));
+        return false;
+      }
     }
   }
   if (auto *copy = dyn_cast<CopyAddrInst>(barrier)) {
