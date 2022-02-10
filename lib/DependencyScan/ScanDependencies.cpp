@@ -47,6 +47,7 @@
 
 using namespace swift;
 using namespace swift::dependencies;
+using namespace swift::c_string_utils;
 using namespace llvm::yaml;
 
 namespace {

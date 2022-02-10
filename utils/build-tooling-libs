@@ -1,18 +1,19 @@
 #!/usr/bin/env python
-# utils/build-parser-lib - Helper tool for building the parser library -*- python -*-
+# utils/build-tooling-libs - Helper tool for building the SwiftSyntax paresr
+# and SwiftStaticMirror libraries -*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-# This is a utility for building only the syntax parser library as fast as possible
-# by only building the necessary libraries for the parser library and nothing
-# extraneous. To achieve this it does a single unified CMake configuration for
-# llvm/clang/swift and builds only the parser library target.
+# This is a utility for building only the syntax parser and swift static-mirror
+# libraries as fast as possible by only building the necessary dependency libraries
+# and nothing extraneous. To achieve this it does a single unified CMake configuration for
+# llvm/clang/swift and builds only the required CMake targets for the two libraries.
 # This mechanism is fundamentally different from build-script, which builds llvm/clang
 # in a separate build directory than swift.
 #
@@ -42,6 +43,9 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 isDarwin = platform.system() == "Darwin"
 isSwiftContainedInLLVMProject = os.path.exists(os.path.join(SWIFT_SOURCE_ROOT, "llvm"))
 
+syntaxParserLibTarget = "tools/swift/tools/libSwiftSyntaxParser/install"
+staticMirrorLibTarget = "tools/swift/tools/libStaticMirror/install"
+syntaxParserTesterTarget = "swift-syntax-parser-test"
 
 class Builder(object):
     def __init__(
@@ -266,12 +270,22 @@ class Builder(object):
         cmake_args += [llvm_src_path]
         self.call(cmake_args, env=environment)
 
-    def build_target(self, build_dir, target, env=None):
+    def build_targets(self, build_dir, targets, env=None):
         invocation = [self.toolchain.cmake, "--build", build_dir]
         invocation += ["--", "-j%d" % self.jobs]
+
+        # libStaticMirror requires a DESTDIR for the build action
+        # Ensure that if one was not provided, we still have a temporary
+        # location for it.
+        if env is None or (env is not None and env["DESTDIR"] is not None):
+            if self.install_destdir:
+                env = {"DESTDIR": self.install_destdir}
+            else:
+                env = {"DESTDIR": os.path.join(build_dir, "install")}
+
         if self.verbose:
             invocation += ["-v"]
-        invocation += [target]
+        invocation += targets
         self.call(invocation, env=env, without_sleeping=True)
 
     def install(self):
@@ -279,8 +293,9 @@ class Builder(object):
         env = None
         if self.install_destdir:
             env = {"DESTDIR": self.install_destdir}
-        self.build_target(
-            self.build_dir, "tools/swift/tools/libSwiftSyntaxParser/install", env=env
+        self.build_targets(
+            self.build_dir, [syntaxParserLibTarget,
+                             staticMirrorLibTarget], env=env
         )
 
     def get_profile_data(self, profile_dir):
@@ -288,13 +303,13 @@ class Builder(object):
         instrumentation = "IR" if self.pgo_type == "ir" else "Frontend"
         with shell.pushd(profile_dir, dry_run=self.dry_run):
             self.configure(enable_debuginfo=False, instrumentation=instrumentation)
-            self.build_target(profile_dir, "swift-syntax-parser-test")
+            self.build_targets(profile_dir, [syntaxParserTesterTarget])
             # Delete existing profile data that were generated during building from
             # running tablegen.
             shell.rmtree("profiles", dry_run=self.dry_run)
             self.call(
                 [
-                    os.path.join("bin", "swift-syntax-parser-test"),
+                    os.path.join("bin", syntaxParserTesterTarget),
                     self.profile_input,
                     "-time",
                 ]
@@ -314,7 +329,7 @@ class Builder(object):
         with shell.pushd(self.build_dir, dry_run=self.dry_run):
             self.configure(enable_debuginfo=True, profile_data=self.profile_data)
 
-        self.build_target(self.build_dir, "swift-syntax-parser-test")
+        self.build_targets(self.build_dir, [syntaxParserTesterTarget, staticMirrorLibTarget])
 
         if self.install_destdir:
             self.install()
@@ -340,20 +355,20 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""
-Builds Swift Syntax Parser library.
+Builds Swift Syntax Parser and Swift Static Mirror libraries.
 
 Example invocations:
 
 * Building for host (macOS, linux):
 
-  $ utils/build-parser-lib --release --no-assertions --build-dir /tmp/parser-lib-build
+  $ utils/build-tooling-libs --release --no-assertions --build-dir /tmp/tooling-libs-build
 
 * Building for iOS
 
-  $ utils/build-parser-lib --release --no-assertions --build-dir \
-/tmp/parser-lib-build-iossim --host iphonesimulator --architectures x86_64
-  $ utils/build-parser-lib --release --no-assertions --build-dir \
-/tmp/parser-lib-build-ios --host iphoneos --architectures arm64
+  $ utils/build-tooling-libs --release --no-assertions --build-dir \
+/tmp/tooling-libs-build-iossim --host iphonesimulator --architectures x86_64
+  $ utils/build-tooling-libs --release --no-assertions --build-dir \
+/tmp/tooling-libs-build-ios --host iphoneos --architectures arm64
 
 """,
     )
@@ -372,7 +387,7 @@ Example invocations:
         SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "profile-input.swift"
     )
     default_jobs = multiprocessing.cpu_count()
-    default_build_dir = os.path.join(SWIFT_BUILD_ROOT, "parser-lib")
+    default_build_dir = os.path.join(SWIFT_BUILD_ROOT, "tooling-libs")
     default_install_prefix = (
         defaults.DARWIN_INSTALL_PREFIX if isDarwin else defaults.UNIX_INSTALL_PREFIX
     )
@@ -554,8 +569,7 @@ Example invocations:
                 shell.makedirs(native_build_dir, dry_run=tmpargs.dry_run)
                 with shell.pushd(native_build_dir, dry_run=tmpargs.dry_run):
                     builder.configure(enable_debuginfo=False)
-                    builder.build_target(native_build_dir, "llvm-tblgen")
-                    builder.build_target(native_build_dir, "clang-tblgen")
+                    builder.build_targets(native_build_dir, ["llvm-tblgen", "clang-tblgen"])
 
         for arch in architectures:
             args.build_dir = os.path.join(objroot, arch, "obj")
