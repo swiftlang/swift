@@ -17,9 +17,6 @@
 // rdar://87568630 - segmentation fault on 32-bit WatchOS simulator
 // UNSUPPORTED: OS=watchos && CPU=i386
 
-// rdar://88228867 - remoteCall_* tests have been disabled due to random failures
-// OK: rdar88228867
-
 import _Distributed
 import FakeDistributedActorSystems
 

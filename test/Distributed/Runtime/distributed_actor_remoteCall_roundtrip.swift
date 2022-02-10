@@ -16,9 +16,6 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
-// rdar://88228867 - remoteCall_* tests have been disabled due to random failures
-// OK: rdar88228867
-
 import _Distributed
 import FakeDistributedActorSystems
 
