@@ -92,7 +92,7 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
 
       if (info.completionContext->typeContextKind ==
               TypeContextKind::Required &&
-          result->getKind() == SwiftResult::ResultKind::Declaration) {
+          result->getKind() == CodeCompletionResultKind::Declaration) {
         // FIXME: because other-module results are cached, they will not be
         // given a type-relation of invalid.  As a hack, we look at the text of
         // the result type and look for 'Void'.
@@ -154,11 +154,19 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     auto chunk = Chunk::createWithText(Chunk::ChunkKind::Text, 0, nameCopy);
     auto *completionString =
         CodeCompletionString::create(sink.allocator, chunk);
+    auto *contextFreeResult =
+        new (sink.allocator) ContextFreeCodeCompletionResult(
+            CodeCompletionResultKind::Pattern, completionString,
+            CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
+            ContextFreeNotRecommendedReason::None,
+            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
-        CodeCompletion::SwiftResult::ResultKind::Pattern,
-        SemanticContextKind::Local, CodeCompletionFlairBit::ExpressionSpecific,
-        /*NumBytesToErase=*/0, completionString,
-        CodeCompletionResult::ExpectedTypeRelation::Unknown);
+        *contextFreeResult, SemanticContextKind::Local,
+        CodeCompletionFlairBit::ExpressionSpecific,
+        /*NumBytesToErase=*/0,
+        CodeCompletionResult::ExpectedTypeRelation::Unknown,
+        ContextualNotRecommendedReason::None,
+        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
 
     CompletionBuilder builder(sink, *swiftResult);
     builder.setCustomKind(customCompletion.Kind);
@@ -414,10 +422,10 @@ bool FilterRules::hideCompletion(const SwiftResult &completion,
   }
 
   switch (completion.getKind()) {
-  case SwiftResult::ResultKind::BuiltinOperator:
-  case SwiftResult::ResultKind::Declaration:
+  case CodeCompletionResultKind::BuiltinOperator:
+  case CodeCompletionResultKind::Declaration:
     break;
-  case SwiftResult::ResultKind::Keyword: {
+  case CodeCompletionResultKind::Keyword: {
     auto I = hideKeyword.find(completion.getKeywordKind());
     if (I != hideKeyword.end())
       return I->second;
@@ -425,7 +433,7 @@ bool FilterRules::hideCompletion(const SwiftResult &completion,
       return true;
     break;
   }
-  case SwiftResult::ResultKind::Pattern: {
+  case CodeCompletionResultKind::Pattern: {
     if (customKind) {
       // FIXME: individual custom completions
       if (hideCustomCompletions)
@@ -433,7 +441,7 @@ bool FilterRules::hideCompletion(const SwiftResult &completion,
     }
     break;
   }
-  case SwiftResult::ResultKind::Literal: {
+  case CodeCompletionResultKind::Literal: {
     auto I = hideValueLiteral.find(completion.getLiteralKind());
     if (I != hideValueLiteral.end())
       return I->second;
@@ -484,7 +492,7 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
 
       bool hideByNameStyle =
           options.hideByNameStyle &&
-          completion->getKind() == SwiftResult::ResultKind::Declaration &&
+          completion->getKind() == CodeCompletionResultKind::Declaration &&
           !matchesExpectedStyle(completion, style);
 
       hideByNameStyle |= hideUnderscore;
@@ -503,12 +511,12 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
         }
         if (completion->getExpectedTypeRelation() >=
                 SwiftResult::ExpectedTypeRelation::Convertible ||
-            (completion->getKind() == SwiftResult::ResultKind::Literal &&
+            (completion->getKind() == CodeCompletionResultKind::Literal &&
              completionKind != CompletionKind::StmtOrExpr &&
              typeContextKind < TypeContextKind::Required))
           break;
 
-        if (completion->getKind() == SwiftResult::ResultKind::Keyword &&
+        if (completion->getKind() == CodeCompletionResultKind::Keyword &&
             completionKind == CompletionKind::StmtOrExpr &&
             isHighPriorityKeyword(completion->getKeywordKind()))
           break;
@@ -534,7 +542,7 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
 
     // Hide literals other than the ones that are also keywords if they don't
     // match the expected types.
-    if (completion->getKind() == SwiftResult::ResultKind::Literal &&
+    if (completion->getKind() == CodeCompletionResultKind::Literal &&
         typeContextKind == TypeContextKind::Required &&
         completion->getExpectedTypeRelation() <
             SwiftResult::ExpectedTypeRelation::Convertible &&
@@ -606,7 +614,7 @@ static double getSemanticContextScore(bool useImportDepth,
   }
   case SemanticContextKind::None: {
     order =
-        completion->getKind() == SwiftResult::ResultKind::Keyword ? 5.5 : 8.0;
+        completion->getKind() == CodeCompletionResultKind::Keyword ? 5.5 : 8.0;
     break;
   }
   }
@@ -677,7 +685,7 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
     return ResultBucket::Operator;
 
   switch (completion->getKind()) {
-  case SwiftResult::ResultKind::Literal:
+  case CodeCompletionResultKind::Literal:
     if (completion->getExpectedTypeRelation() >=
         SwiftResult::ExpectedTypeRelation::Convertible) {
       return ResultBucket::LiteralTypeMatch;
@@ -688,12 +696,12 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
       // but we treat them as keywords instead of literals for prioritization.
       return ResultBucket::Normal;
     }
-  case SwiftResult::ResultKind::Keyword:
+  case CodeCompletionResultKind::Keyword:
     return isHighPriorityKeyword(completion->getKeywordKind())
                ? ResultBucket::HighPriorityKeyword
                : ResultBucket::Normal;
-  case SwiftResult::ResultKind::Pattern:
-  case SwiftResult::ResultKind::Declaration:
+  case CodeCompletionResultKind::Pattern:
+  case CodeCompletionResultKind::Declaration:
     switch (completion->getExpectedTypeRelation()) {
     case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Convertible:
     case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Identical:
@@ -707,7 +715,7 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
         return ResultBucket::NotRecommended;
       return ResultBucket::Normal;
     }
-  case SwiftResult::ResultKind::BuiltinOperator:
+  case CodeCompletionResultKind::BuiltinOperator:
     llvm_unreachable("operators should be handled above");
   }
 }
@@ -1176,18 +1184,26 @@ Completion *CompletionBuilder::finish() {
     if (base.isOperator())
       opKind = base.getOperatorKind();
 
-    if (base.getKind() == SwiftResult::ResultKind::Declaration) {
-      newBase = new (sink.allocator) SwiftResult(
-          semanticContext, flair, base.getNumBytesToErase(), completionString,
-          base.getAssociatedDeclKind(), base.isSystem(), base.getModuleName(),
-          base.getNotRecommendedReason(), base.getDiagnosticSeverity(),
-          base.getDiagnosticMessage(), base.getBriefDocComment(),
-          base.getAssociatedUSRs(), typeRelation, opKind);
-    } else {
-      newBase = new (sink.allocator) SwiftResult(
-          base.getKind(), semanticContext, flair, base.getNumBytesToErase(),
-          completionString, typeRelation, opKind);
-    }
+    const ContextFreeCodeCompletionResult &contextFreeBase =
+        base.getContextFreeResult();
+
+    ContextFreeCodeCompletionResult *contextFreeResult =
+        new (sink.allocator) ContextFreeCodeCompletionResult(
+            contextFreeBase.getKind(),
+            contextFreeBase.getOpaqueAssociatedKind(), opKind,
+            contextFreeBase.isSystem(), completionString,
+            contextFreeBase.getModuleName(),
+            contextFreeBase.getBriefDocComment(),
+            contextFreeBase.getAssociatedUSRs(),
+            contextFreeBase.getNotRecommendedReason(),
+            contextFreeBase.getDiagnosticSeverity(),
+            contextFreeBase.getDiagnosticMessage());
+
+    newBase = new (sink.allocator) SwiftResult(
+        *contextFreeResult, semanticContext, flair, base.getNumBytesToErase(),
+        typeRelation, base.getContextualNotRecommendedReason(),
+        base.getContextualDiagnosticSeverity(),
+        base.getContextualDiagnosticMessage());
 
     llvm::raw_svector_ostream OSS(nameStorage);
     ide::printCodeCompletionResultFilterName(*newBase, OSS);

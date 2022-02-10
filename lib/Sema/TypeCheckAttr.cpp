@@ -118,6 +118,7 @@ public:
   IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Isolated)
   IGNORED_ATTR(Preconcurrency)
+  IGNORED_ATTR(BackDeploy)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -275,6 +276,8 @@ public:
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitPrimaryAssociatedTypeAttr(PrimaryAssociatedTypeAttr *attr);
+
+  void checkBackDeployAttrs(Decl *D, ArrayRef<BackDeployAttr *> Attrs);
 };
 
 } // end anonymous namespace
@@ -2414,7 +2417,8 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
     if (Ctx.isSwiftVersionAtLeast(4,2))
-      diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline);
+      diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline,
+                            VD->getDescriptiveKind(), VD->getName());
     return;
   }
 }
@@ -3458,6 +3462,11 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
       return;
     }
   }
+}
+
+void AttributeChecker::checkBackDeployAttrs(Decl *D,
+    ArrayRef<BackDeployAttr *> Attrs) {
+  // FIXME(backDeploy): Diagnose incompatible uses of `@_backDeploy
 }
 
 Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
@@ -5539,9 +5548,14 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 
   // distributed can be applied to actor definitions and their methods
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
-    // distributed can not be applied to stored properties
-    diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
-    return;
+    if (varDecl->isDistributed()) {
+      if (checkDistributedActorProperty(varDecl, /*diagnose=*/true))
+        return;
+    } else {
+      // distributed can not be applied to stored properties
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
+      return;
+    }
   }
 
   // distributed can only be declared on an `actor`

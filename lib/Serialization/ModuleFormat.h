@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 666; // mark_must_check initial
+const uint16_t SWIFTMODULE_VERSION_MINOR = 667; // @_backDeploy
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2042,6 +2042,13 @@ namespace decls_block {
     UnavailableFromAsync_DECL_ATTR,
     BCFixed<1>, // Implicit flag
     BCBlob      // Message
+  >;
+
+  using BackDeployDeclAttrLayout = BCRecordLayout<
+    BackDeploy_DECL_ATTR,
+    BCFixed<1>,     // implicit flag
+    BC_AVAIL_TUPLE, // OS version
+    BCVBR<5>        // platform
   >;
 }
 

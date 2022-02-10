@@ -3,6 +3,7 @@ add_swift_host_tool(swift-ide-test
   ModuleAPIDiff.cpp
   XMLValidator.cpp
   SWIFT_COMPONENT tools
+  THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
 )
 target_link_libraries(swift-ide-test
                       PRIVATE

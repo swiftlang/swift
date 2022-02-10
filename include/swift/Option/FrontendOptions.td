@@ -355,14 +355,6 @@ def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machin
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete type nesting depth before giving up">;
 
-def disable_requirement_machine_merged_associated_types : Flag<["-"], "disable-requirement-machine-merged-associated-types">,
-  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Disable merged associated types">;
-
-def enable_requirement_machine_merged_associated_types : Flag<["-"], "enable-requirement-machine-merged-associated-types">,
-  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Enable merged associated types">;
-
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 

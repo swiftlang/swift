@@ -638,7 +638,7 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(options HAS_SWIFT_MODULES)
+  set(options HAS_SWIFT_MODULES THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
   set(single_parameter_options SWIFT_COMPONENT BOOTSTRAPPING)
   set(multiple_parameter_options LLVM_LINK_COMPONENTS)
 
@@ -859,6 +859,19 @@ function(add_swift_host_tool executable)
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
         )
     endif()
+  endif()
+
+  if(ASHT_THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
+    string(CONCAT lto_codegen_only_link_options
+      "$<"
+        "$<AND:"
+          "$<BOOL:${LLVM_LINKER_IS_LD64}>,"
+          "$<BOOL:${SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS}>,"
+          "$<STREQUAL:${SWIFT_TOOLS_ENABLE_LTO},thin>"
+        ">:"
+        "LINKER:-flto-codegen-only"
+      ">")
+    target_link_options(${executable} PRIVATE "${lto_codegen_only_link_options}")
   endif()
 
   if(NOT ${ASHT_SWIFT_COMPONENT} STREQUAL "no_component")
