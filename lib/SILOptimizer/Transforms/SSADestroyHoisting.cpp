@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// This is a light-weight utility for hoisting destroy instructions for unique
-/// storage--typically alloc_stac or owned incoming arguments. Shrinking an
+/// storage--typically alloc_stack or owned incoming arguments. Shrinking an
 /// object's memory lifetime can allow removal of copy_addr and other
 /// optimization.
 ///
