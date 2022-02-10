@@ -169,6 +169,14 @@ bool findExtendedTransitiveGuaranteedUses(
   SILValue guaranteedValue,
   SmallVectorImpl<Operand *> &usePoints);
 
+/// Find non-transitive uses of a simple (i.e. without looking through
+/// reborrows) value.
+///
+/// The scope-ending use of borrows of the value are included.  If a borrow of
+/// the value is reborrowed, returns false.
+bool findUsesOfSimpleValue(SILValue value,
+                           SmallVectorImpl<Operand *> *usePoints = nullptr);
+
 /// An operand that forwards ownership to one or more results.
 class ForwardingOperand {
   Operand *use = nullptr;
