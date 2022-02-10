@@ -40,7 +40,7 @@ enum class RegexCaptureStructureCode: uint8_t {
 bool decodeRegexCaptureTypes(ASTContext &ctx,
                              llvm::ArrayRef<uint8_t> serialization,
                              Type atomType,
-                             llvm::SmallVectorImpl<TupleTypeElt> &result);
+                             llvm::SmallVectorImpl<Type> &result);
 
 } // end namespace swift
 

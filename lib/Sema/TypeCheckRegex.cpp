@@ -33,7 +33,7 @@ using namespace swift;
 bool swift::decodeRegexCaptureTypes(ASTContext &ctx,
                                     ArrayRef<uint8_t> serialization,
                                     Type atomType,
-                                    SmallVectorImpl<TupleTypeElt> &result) {
+                                    SmallVectorImpl<Type> &result) {
   using Version = RegexLiteralExpr::CaptureStructureSerializationVersion;
   static const Version implVersion = 1;
   unsigned size = serialization.size();
@@ -46,7 +46,7 @@ bool swift::decodeRegexCaptureTypes(ASTContext &ctx,
   if (version != implVersion)
     return true;
   // Read contents.
-  SmallVector<SmallVector<TupleTypeElt, 4>, 4> scopes(1);
+  SmallVector<SmallVector<Type, 4>, 4> scopes(1);
   unsigned offset = sizeof(Version);
   auto consumeCode = [&]() -> Optional<RegexCaptureStructureCode> {
     auto rawValue = serialization[offset];
@@ -73,21 +73,22 @@ bool swift::decodeRegexCaptureTypes(ASTContext &ctx,
       if (length >= size - offset)
         return true; // Unterminated string.
       StringRef name(namePtr, length);
-      scopes.back().push_back(
-          TupleTypeElt(atomType, ctx.getIdentifier(name)));
+      // The name is currently unused becuase we are forming a nominal
+      // `Tuple{n}` type. We will switch back to native tuples when there is
+      // variadic generics.
+      (void)name;
+      scopes.back().push_back(atomType);
       offset += length + /*NUL*/ 1;
       break;
     }
     case RegexCaptureStructureCode::FormArray: {
-      auto &element = scopes.back().back();
-      element = TupleTypeElt(ArraySliceType::get(element.getType()),
-                             element.getName());
+      auto &type = scopes.back().back();
+      type = ArraySliceType::get(type);
       break;
     }
     case RegexCaptureStructureCode::FormOptional: {
-      auto &element = scopes.back().back();
-      element = TupleTypeElt(OptionalType::get(element.getType()),
-                             element.getName());
+      auto &type = scopes.back().back();
+      type = OptionalType::get(type);
       break;
     }
     case RegexCaptureStructureCode::BeginTuple:
@@ -95,7 +96,10 @@ bool swift::decodeRegexCaptureTypes(ASTContext &ctx,
       break;
     case RegexCaptureStructureCode::EndTuple: {
       auto children = scopes.pop_back_val();
-      auto type = TupleType::get(children, ctx);
+      if (children.size() > ctx.getStringProcessingTupleDeclMaxArity())
+        return true;
+      auto tupleDecl = ctx.getStringProcessingTupleDecl(children.size());
+      auto type = BoundGenericStructType::get(tupleDecl, Type(), children);
       scopes.back().push_back(type);
       break;
     }
