@@ -136,7 +136,23 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
     if (!subjectType->isTypeParameter()) {
-      // FIXME: Check conformance, diagnose redundancy or conflict upstream
+      // Check if the subject type actually conforms.
+      auto *protoDecl = constraintType->castTo<ProtocolType>()->getDecl();
+      auto *module = protoDecl->getParentModule();
+      auto conformance = module->lookupConformance(subjectType, protoDecl);
+      if (conformance.isInvalid()) {
+        // FIXME: Diagnose a conflict.
+        return;
+      }
+
+      // FIXME: Diagnose a redundancy.
+      assert(conformance.isConcrete());
+      auto *concrete = conformance.getConcrete();
+
+      // Introduce conditional requirements if the subject type is concrete.
+      for (auto req : concrete->getConditionalRequirements()) {
+        desugarRequirement(req, result);
+      }
       return;
     }
 
