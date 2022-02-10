@@ -31,10 +31,12 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("add", DebugFlags::Add)
       .Case("merge", DebugFlags::Merge)
       .Case("completion", DebugFlags::Completion)
+      .Case("property-map", DebugFlags::PropertyMap)
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
       .Case("conditional-requirements", DebugFlags::ConditionalRequirements)
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
+      .Case("homotopy-reduction-detail", DebugFlags::HomotopyReductionDetail)
       .Case("minimal-conformances", DebugFlags::MinimalConformances)
       .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
       .Case("minimization", DebugFlags::Minimization)
@@ -98,39 +100,10 @@ RewriteContext::getInheritedProtocols(const ProtocolDecl *proto) {
   return result;
 }
 
-unsigned RewriteContext::getProtocolSupport(
-    const ProtocolDecl *proto) {
-  return getInheritedProtocols(proto).size() + 1;
-}
-
-unsigned RewriteContext::getProtocolSupport(
-    ArrayRef<const ProtocolDecl *> protos) {
-  auto found = Support.find(protos);
-  if (found != Support.end())
-    return found->second;
-
-  unsigned result;
-  if (protos.size() == 1) {
-    result = getProtocolSupport(protos[0]);
-  } else {
-    llvm::DenseSet<const ProtocolDecl *> visited;
-    for (const auto *proto : protos) {
-      visited.insert(proto);
-      for (const auto *inheritedProto : getInheritedProtocols(proto))
-        visited.insert(inheritedProto);
-    }
-
-    result = visited.size();
-  }
-
-  Support[protos] = result;
-  return result;
-}
-
 int RewriteContext::compareProtocols(const ProtocolDecl *lhs,
                                      const ProtocolDecl *rhs) {
-  unsigned lhsSupport = getProtocolSupport(lhs);
-  unsigned rhsSupport = getProtocolSupport(rhs);
+  unsigned lhsSupport = getInheritedProtocols(lhs).size();
+  unsigned rhsSupport = getInheritedProtocols(rhs).size();
 
   if (lhsSupport != rhsSupport)
     return rhsSupport - lhsSupport;

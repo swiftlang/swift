@@ -144,6 +144,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Property,
   StaticProperty,
   ClassProperty,
+  DistributedProperty,
   InfixOperator,
   PrefixOperator,
   PostfixOperator,
@@ -4025,7 +4026,7 @@ public:
   ClassDecl *getSuperclassDecl() const;
 
   /// Check if this class is a superclass or equal to the given class.
-  bool isSuperclassOf(ClassDecl *other) const;
+  bool isSuperclassOf(const ClassDecl *other) const;
 
   /// Set the superclass of this class.
   void setSuperclass(Type superclass);
@@ -4120,7 +4121,7 @@ public:
 
   /// Whether the class uses the ObjC object model (reference counting,
   /// allocation, etc.), the Swift model, or has no reference counting at all.
-  ReferenceCounting getObjectModel() {
+  ReferenceCounting getObjectModel() const {
     if (isForeignReferenceType())
       return ReferenceCounting::None;
 
@@ -4130,7 +4131,7 @@ public:
     return ReferenceCounting::Native;
   }
 
-  LayoutConstraintKind getLayoutConstraintKind() {
+  LayoutConstraintKind getLayoutConstraintKind() const {
     if (getObjectModel() == ReferenceCounting::ObjC)
       return LayoutConstraintKind::Class;
 
@@ -4260,7 +4261,7 @@ public:
   /// Used to determine if this class decl is a foriegn reference type. I.e., a
   /// non-reference-counted swift reference type that was imported from a C++
   /// record.
-  bool isForeignReferenceType();
+  bool isForeignReferenceType() const;
 };
 
 /// The set of known protocols for which derived conformances are supported.
@@ -5240,6 +5241,13 @@ public:
   /// Is this an "async let" property?
   bool isAsyncLet() const;
 
+  /// Does this have a 'distributed' modifier?
+  bool isDistributed() const;
+
+  /// Is this a stored property that will _not_ trigger any user-defined code
+  /// upon any kind of access?
+  bool isOrdinaryStoredProperty() const;
+
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
   }
@@ -5392,6 +5400,10 @@ public:
   /// an attached property wrapper.
   VarDecl *getPropertyWrapperWrappedValueVar() const;
 
+  /// Return true if this property either has storage or has an attached property
+  /// wrapper that has storage.
+  bool hasStorageOrWrapsStorage() const;
+  
   /// Visit all auxiliary declarations to this VarDecl.
   ///
   /// An auxiliary declaration is a declaration synthesized by the compiler to support

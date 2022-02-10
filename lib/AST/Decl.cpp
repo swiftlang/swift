@@ -191,8 +191,13 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
      auto var = cast<VarDecl>(this);
      switch (var->getCorrectStaticSpelling()) {
      case StaticSpellingKind::None:
-       if (var->getDeclContext()->isTypeContext())
+       if (var->getDeclContext()->isTypeContext()) {
+         if (var->isDistributed() && !var->isLet()) {
+           return DescriptiveDeclKind::DistributedProperty;
+         }
+
          return DescriptiveDeclKind::Property;
+       }
        return var->isLet() ? DescriptiveDeclKind::Let
                            : DescriptiveDeclKind::Var;
      case StaticSpellingKind::KeywordStatic:
@@ -299,6 +304,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Property, "property");
   ENTRY(StaticProperty, "static property");
   ENTRY(ClassProperty, "class property");
+  ENTRY(DistributedProperty, "distributed property");
   ENTRY(PrecedenceGroup, "precedence group");
   ENTRY(InfixOperator, "infix operator");
   ENTRY(PrefixOperator, "prefix operator");
@@ -2007,14 +2013,13 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
           return true;
 
         switch (getActorIsolation(type)) {
-          case swift::ActorIsolation::Unspecified:
-          case swift::ActorIsolation::GlobalActorUnsafe:
+          case ActorIsolation::Unspecified:
+          case ActorIsolation::GlobalActorUnsafe:
             break;
 
-          case swift::ActorIsolation::ActorInstance:
-          case swift::ActorIsolation::DistributedActorInstance:
-          case swift::ActorIsolation::Independent:
-          case swift::ActorIsolation::GlobalActor:
+          case ActorIsolation::ActorInstance:
+          case ActorIsolation::Independent:
+          case ActorIsolation::GlobalActor:
             return true;
         }
       }
@@ -4931,7 +4936,7 @@ void swift::simple_display(llvm::raw_ostream &out, AncestryFlags value) {
   out << " }";
 }
 
-bool ClassDecl::isSuperclassOf(ClassDecl *other) const {
+bool ClassDecl::isSuperclassOf(const ClassDecl *other) const {
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
 
   do {
@@ -5076,7 +5081,7 @@ bool ClassDecl::walkSuperclasses(
   return false;
 }
 
-bool ClassDecl::isForeignReferenceType() {
+bool ClassDecl::isForeignReferenceType() const {
   return getClangDecl() && isa<clang::RecordDecl>(getClangDecl());
 }
 
@@ -6304,6 +6309,20 @@ bool VarDecl::isAsyncLet() const {
   return getAttrs().hasAttribute<AsyncAttr>();
 }
 
+bool VarDecl::isDistributed() const {
+  return getAttrs().hasAttribute<DistributedActorAttr>();
+}
+
+bool VarDecl::isOrdinaryStoredProperty() const {
+  // we assume if it hasAttachedPropertyWrapper, it has no storage.
+  //
+  // also, we don't expect someone to call this on a local property, so for
+  // efficiency we don't check if it's not async-let. feel free to promote
+  // the assert into a full-fledged part of the condition if needed.
+  assert(!isAsyncLet());
+  return hasStorage() && !hasObservers();
+}
+
 void ParamDecl::setSpecifier(Specifier specifier) {
   // FIXME: Revisit this; in particular shouldn't __owned parameters be
   // ::Let also?
@@ -6512,6 +6531,20 @@ VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
 
 VarDecl *VarDecl::getPropertyWrapperWrappedValueVar() const {
   return getPropertyWrapperAuxiliaryVariables().localWrappedValueVar;
+}
+
+bool VarDecl::hasStorageOrWrapsStorage() const {
+  if (hasStorage())
+    return true;
+  
+  if (getAttrs().hasAttribute<LazyAttr>())
+    return true;
+  
+  auto *backing = getPropertyWrapperBackingProperty();
+  if (backing && backing->hasStorage())
+    return true;
+  
+  return false;
 }
 
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {

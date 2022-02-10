@@ -343,7 +343,6 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
   // must be instance isolated
   switch (isolation) {
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
       return true;
 
     case ActorIsolation::Unspecified:

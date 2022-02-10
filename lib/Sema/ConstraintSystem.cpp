@@ -43,13 +43,18 @@ using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
-ExpressionTimer::ExpressionTimer(Expr *E, ConstraintSystem &CS)
-  : E(E),
-      Context(CS.getASTContext()),
+ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS)
+    : ExpressionTimer(
+          Anchor, CS,
+          CS.getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold) {}
+
+ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
+                                 unsigned thresholdInMillis)
+    : Anchor(Anchor), Context(CS.getASTContext()),
       StartTime(llvm::TimeRecord::getCurrentTime()),
+      ThresholdInMillis(thresholdInMillis),
       PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
-      PrintWarning(true) {
-}
+      PrintWarning(true) {}
 
 ExpressionTimer::~ExpressionTimer() {
   auto elapsed = getElapsedProcessTimeInFractionalSeconds();
@@ -59,20 +64,38 @@ ExpressionTimer::~ExpressionTimer() {
     // Round up to the nearest 100th of a millisecond.
     llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100)
                  << "ms\t";
-    E->getLoc().print(llvm::errs(), Context.SourceMgr);
+    if (auto *E = Anchor.dyn_cast<Expr *>()) {
+      E->getLoc().print(llvm::errs(), Context.SourceMgr);
+    } else {
+      auto *locator = Anchor.get<ConstraintLocator *>();
+      locator->dump(&Context.SourceMgr, llvm::errs());
+    }
     llvm::errs() << "\n";
   }
 
   if (!PrintWarning)
     return;
 
-  const auto WarnLimit = getWarnLimit();
-  if (WarnLimit != 0 && elapsedMS >= WarnLimit && E->getLoc().isValid())
-    Context.Diags.diagnose(E->getLoc(), diag::debug_long_expression,
-                           elapsedMS, WarnLimit)
-      .highlight(E->getSourceRange());
-}
+  ASTNode anchor;
+  if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
+    anchor = simplifyLocatorToAnchor(locator);
+    // If locator couldn't be simplified down to a single AST
+    // element, let's warn about its root.
+    if (!anchor)
+      anchor = locator->getAnchor();
+  } else {
+    anchor = Anchor.get<Expr *>();
+  }
 
+  const auto WarnLimit = getWarnLimit();
+  if (WarnLimit != 0 && elapsedMS >= WarnLimit &&
+      anchor.getStartLoc().isValid()) {
+    Context.Diags
+        .diagnose(anchor.getStartLoc(), diag::debug_long_expression, elapsedMS,
+                  WarnLimit)
+        .highlight(anchor.getSourceRange());
+  }
+}
 
 ConstraintSystem::ConstraintSystem(DeclContext *dc,
                                    ConstraintSystemOptions options)
@@ -2724,13 +2747,11 @@ bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
     return func->isAsyncContext();
 
-  if (auto abstractClosure = dyn_cast<AbstractClosureExpr>(dc)) {
-    if (Type type = GetClosureType{*this}(abstractClosure)) {
-      if (auto fnType = type->getAs<AnyFunctionType>())
-        return fnType->isAsync();
-    }
-
-    return abstractClosure->isBodyAsync();
+  if (auto closure = dyn_cast<ClosureExpr>(dc)) {
+    return evaluateOrDefault(
+        getASTContext().evaluator,
+        ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
+        FunctionType::ExtInfo()).isAsync();
   }
 
   return false;
@@ -2828,6 +2849,7 @@ void ConstraintSystem::bindOverloadType(
     if (!argList) {
       argList = ArgumentList::createImplicit(
           ctx, {Argument(SourceLoc(), ctx.Id_dynamicMember, /*expr*/ nullptr)},
+          /*firstTrailingClosureIndex=*/None,
           AllocationArena::ConstraintSolver);
     }
 
@@ -3353,7 +3375,8 @@ size_t Solution::getTotalMemory() const {
          ConstraintRestrictions.getMemorySize() +
          llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
-         (DefaultedConstraints.size() * sizeof(void *));
+         (DefaultedConstraints.size() * sizeof(void *)) +
+         ImplicitCallAsFunctionRoots.getMemorySize();
 }
 
 DeclContext *Solution::getDC() const { return constraintSystem->DC; }

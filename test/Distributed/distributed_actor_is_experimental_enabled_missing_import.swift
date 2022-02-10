@@ -16,8 +16,8 @@ actor A {
   distributed func dist() {} // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
   distributed func distAsync() async {} // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 
-  distributed var neverOk: String { // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-    "vars are not allowed to be distributed *ever* anyway"
+  distributed var neverOk: String {
+    ""
   }
 }
 
@@ -27,8 +27,8 @@ distributed actor DA2 {
   distributed func dist() {}
   distributed func distAsync() async {}
 
-  distributed var neverOk: String { // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-    "vars are not allowed to be distributed *ever* anyway"
+  distributed var neverOk: String {
+    ""
   }
 }
 

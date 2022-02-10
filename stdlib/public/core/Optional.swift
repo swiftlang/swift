@@ -295,10 +295,14 @@ extension Optional: CustomDebugStringConvertible {
   public var debugDescription: String {
     switch self {
     case .some(let value):
+#if !SWIFT_STDLIB_STATIC_PRINT
       var result = "Optional("
       debugPrint(value, terminator: "", to: &result)
       result += ")"
       return result
+#else
+    return "(optional printing not available)"
+#endif
     case .none:
       return "nil"
     }

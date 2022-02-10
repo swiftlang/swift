@@ -74,6 +74,7 @@ add_swift_host_library(swiftAST STATIC
   ProtocolConformance.cpp
   RawComment.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/ConcreteTypeWitness.cpp
   RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/HomotopyReduction.cpp
   RequirementMachine/InterfaceType.cpp
@@ -90,6 +91,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/RewriteSystem.cpp
   RequirementMachine/Symbol.cpp
   RequirementMachine/Term.cpp
+  RequirementMachine/TypeDifference.cpp
   SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp

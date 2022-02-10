@@ -338,6 +338,10 @@ public:
   bool areUsesWithinBoundary(ArrayRef<Operand *> uses,
                              DeadEndBlocks *deadEndBlocks) const;
 
+  /// \p deadEndBlocks is optional.
+  bool areUsesOutsideBoundary(ArrayRef<Operand *> uses,
+                              DeadEndBlocks *deadEndBlocks) const;
+
   /// Compute liveness for a single SSA definition.
   void computeSSALiveness(SILValue def);
 };

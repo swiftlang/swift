@@ -173,12 +173,13 @@ inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
                         AsyncLet *asyncLet) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
+  auto parentID = parent ? parent->getTaskId() : 0;
   os_signpost_interval_begin(
       TaskLog, id, SWIFT_LOG_TASK_LIFETIME_NAME,
       "task=%" PRIx64 " resumefn=%p flags=0x%" PRIx32
-      " parent=%p group=%p asyncLet=%p",
+      " parent=%" PRIx64 " group=%p asyncLet=%p",
       task->getTaskId(), task->getResumeFunctionForLogging(),
-      task->Flags.getOpaqueValue(), parent, group, asyncLet);
+      task->Flags.getOpaqueValue(), parentID, group, asyncLet);
 }
 
 inline void task_destroy(AsyncTask *task) {
@@ -208,9 +209,10 @@ inline void task_flags_changed(AsyncTask *task, uint32_t flags) {
 inline void task_wait(AsyncTask *task, AsyncTask *waitingOn, uintptr_t status) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
+  auto waitingID = waitingOn ? waitingOn->getTaskId() : 0;
   os_signpost_event_emit(TaskLog, id, SWIFT_LOG_TASK_WAIT_NAME,
-                         "task=%" PRIx64 " waitingOnTask=%p status=0x%" PRIxPTR,
-                         task->getTaskId(), waitingOn, status);
+                         "task=%" PRIx64 " waitingOnTask=%" PRIx64 " status=0x%" PRIxPTR,
+                         task->getTaskId(), waitingID, status);
 }
 
 inline void job_enqueue_global(Job *job) {

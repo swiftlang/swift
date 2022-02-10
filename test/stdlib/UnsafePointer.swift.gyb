@@ -29,7 +29,7 @@ extension UnsafeMutablePointer where Pointee : TestProtocol1 {
 }
 
 // Check that the generic parameter is called 'Element'.
-extension UnsafeBufferPointerIterator where Element : TestProtocol1 {
+extension UnsafeBufferPointer.Iterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -364,7 +364,7 @@ UnsafeMutablePointerTestSuite.test("initialize:from:.Right") {
 #endif
 
 UnsafeMutablePointerTestSuite.test("initialize:from:/immutable") {
-  var ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 3)
+  let ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 3)
   defer {
     ptr.deinitialize(count: 3)
     ptr.deallocate()
@@ -379,7 +379,7 @@ UnsafeMutablePointerTestSuite.test("initialize:from:/immutable") {
 }
 
 UnsafeMutablePointerTestSuite.test("assign/immutable") {
-  var ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 2)
+  let ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 2)
   defer {
     ptr.deinitialize(count: 2)
     ptr.deallocate()
@@ -469,10 +469,32 @@ ${SelfName}TestSuite.test("withMemoryRebound") {
   let ptrI = ${SelfName}<Int>(mutablePtrI)
   ptrI.withMemoryRebound(to: UInt.self, capacity: 4) {
     // Make sure the closure argument isa $SelfName
-    var ptrU: ${SelfName}<UInt> = $0
+    let ptrU: ${SelfName}<UInt> = $0
     // and that the element type is UInt.
-    var mutablePtrU = UnsafeMutablePointer(mutating: ptrU)
+    let mutablePtrU = UnsafeMutablePointer(mutating: ptrU)
     expectType(UInt.self, &mutablePtrU.pointee)
+  }
+}
+
+${SelfName}TestSuite.test("withMemoryReboundSE0333") {
+  let mutablePtrI = UnsafeMutablePointer<Int>.allocate(capacity: 4)
+  defer { mutablePtrI.deallocate() }
+  let ptrI = ${SelfName}<Int>(mutablePtrI)
+  // test rebinding to a wider type with the same alignment
+  ptrI.withMemoryRebound(to: (Int, Int).self, capacity: 2) {
+    // Make sure the closure argument isa $SelfName
+    let ptrT: ${SelfName}<(Int, Int)> = $0
+    // and that the element type is (Int, Int).
+    let mutablePtrT = UnsafeMutablePointer(mutating: ptrT)
+    expectType((Int, Int).self, &mutablePtrT.pointee)
+    // test rebinding to a narrower type
+    ptrT.withMemoryRebound(to: UInt.self, capacity: 4) {
+      // Make sure the closure argument isa $SelfName
+      let ptrU: ${SelfName}<UInt> = $0
+      // and that the element type is UInt.
+      let mutablePtrU = UnsafeMutablePointer(mutating: ptrU)
+      expectType(UInt.self, &mutablePtrU.pointee)
+    }
   }
 }
 

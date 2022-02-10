@@ -12,6 +12,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -132,10 +133,43 @@ unsigned Rule::getDepth() const {
   return result;
 }
 
+/// Returns the nesting depth of the concrete symbol at the end of the
+/// left hand side, or 0 if there isn't one.
+unsigned Rule::getNesting() const {
+  if (LHS.back().hasSubstitutions()) {
+    auto type = LHS.back().getConcreteType();
+
+    struct Walker : TypeWalker {
+      unsigned Nesting = 0;
+      unsigned MaxNesting = 0;
+
+      Action walkToTypePre(Type ty) override {
+        ++Nesting;
+        MaxNesting = std::max(Nesting, MaxNesting);
+
+        return Action::Continue;
+      }
+
+      Action walkToTypePost(Type ty) override {
+        --Nesting;
+
+        return Action::Continue;
+      }
+    };
+
+    Walker walker;
+    type.walk(walker);
+
+    return walker.MaxNesting;
+  }
+
+  return 0;
+}
+
 /// Linear order on rules; compares LHS followed by RHS.
-int Rule::compare(const Rule &other, RewriteContext &ctx) const {
-  int compare = LHS.compare(other.LHS, ctx);
-  if (compare != 0)
+Optional<int> Rule::compare(const Rule &other, RewriteContext &ctx) const {
+  Optional<int> compare = LHS.compare(other.LHS, ctx);
+  if (!compare.hasValue() || *compare != 0)
     return compare;
 
   return RHS.compare(other.RHS, ctx);
@@ -263,6 +297,7 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
                                           RewritePath *path) const {
   assert(symbol.hasSubstitutions());
 
+  // Fast path if the type is fully concrete.
   auto substitutions = symbol.getSubstitutions();
   if (substitutions.empty())
     return false;
@@ -272,10 +307,12 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
   unsigned oldSize = (path ? path->size() : 0);
 
   if (path) {
-    // The term is on the A stack. Push all substitutions onto the A stack.
-    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/false));
+    // The term is at the top of the primary stack. Push all substitutions onto
+    // the primary stack.
+    path->add(RewriteStep::forDecompose(substitutions.size(),
+                                        /*inverse=*/false));
 
-    // Move all substitutions but the first one to the B stack.
+    // Move all substitutions but the first one to the secondary stack.
     for (unsigned i = 1; i < substitutions.size(); ++i)
       path->add(RewriteStep::forShift(/*inverse=*/false));
   }
@@ -287,12 +324,12 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
   bool first = true;
   bool anyChanged = false;
   for (auto substitution : substitutions) {
-    // Move the next substitution from the B stack to the A stack.
+    // Move the next substitution from the secondary stack to the primary stack.
     if (!first && path)
       path->add(RewriteStep::forShift(/*inverse=*/true));
     first = false;
 
-    // The current substitution is at the top of the A stack; simplify it.
+    // The current substitution is at the top of the primary stack; simplify it.
     MutableTerm mutTerm(substitution);
     anyChanged |= simplify(mutTerm, path);
 
@@ -300,10 +337,12 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
     newSubstitutions.push_back(Term::get(mutTerm, Context));
   }
 
-  // All simplified substitutions are now on the A stack. Collect them to
+  // All simplified substitutions are now on the primary stack. Collect them to
   // produce the new term.
-  if (path)
-    path->add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/true));
+  if (path) {
+    path->add(RewriteStep::forDecompose(substitutions.size(),
+                                        /*inverse=*/true));
+  }
 
   // If nothing changed, we don't have to rebuild the symbol.
   if (!anyChanged) {
@@ -376,8 +415,8 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // If the left hand side and right hand side are already equivalent, we're
   // done.
-  int result = lhs.compare(rhs, Context);
-  if (result == 0) {
+  Optional<int> result = lhs.compare(rhs, Context);
+  if (*result == 0) {
     // If this rule is a consequence of existing rules, add a homotopy
     // generator.
     if (path) {
@@ -397,12 +436,12 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // Orient the two terms so that the left hand side is greater than the
   // right hand side.
-  if (result < 0) {
+  if (*result < 0) {
     std::swap(lhs, rhs);
     loop.invert();
   }
 
-  assert(lhs.compare(rhs, Context) > 0);
+  assert(*lhs.compare(rhs, Context) > 0);
 
   if (Debug.contains(DebugFlags::Add)) {
     llvm::dbgs() << "## Simplified and oriented rule " << lhs << " => " << rhs << "\n\n";
@@ -410,9 +449,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   unsigned newRuleID = Rules.size();
 
-  auto uniquedLHS = Term::get(lhs, Context);
-  auto uniquedRHS = Term::get(rhs, Context);
-  Rules.emplace_back(uniquedLHS, uniquedRHS);
+  Rules.emplace_back(Term::get(lhs, Context), Term::get(rhs, Context));
 
   if (path) {
     // We have a rewrite path from the simplified lhs to the simplified rhs;
@@ -442,8 +479,6 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     dump(llvm::errs());
     abort();
   }
-
-  checkMergedAssociatedType(uniquedLHS, uniquedRHS);
 
   // Tell the caller that we added a new rule.
   return true;
@@ -566,7 +601,7 @@ void RewriteSystem::simplifyRightHandSides() {
   }
 }
 
-/// Simplify substitutions in superclass, concrete type and concrete
+/// Simplify substitution terms in superclass, concrete type and concrete
 /// conformance symbols.
 void RewriteSystem::simplifyLeftHandSideSubstitutions() {
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
@@ -612,15 +647,13 @@ void RewriteSystem::simplifyLeftHandSideSubstitutions() {
 ///
 /// All other loops can be discarded since they do not encode redundancies
 /// that are relevant to us.
-bool RewriteSystem::isInMinimizationDomain(
-    ArrayRef<const ProtocolDecl *> protos) const {
-  assert(protos.size() <= 1);
-  assert(Protos.empty() || !protos.empty());
+bool RewriteSystem::isInMinimizationDomain(const ProtocolDecl *proto) const {
+  assert(Protos.empty() || proto != nullptr);
 
-  if (protos.empty() && Protos.empty())
+  if (proto == nullptr && Protos.empty())
     return true;
 
-  if (std::find(Protos.begin(), Protos.end(), protos[0]) != Protos.end())
+  if (std::find(Protos.begin(), Protos.end(), proto) != Protos.end())
     return true;
 
   return false;
@@ -628,14 +661,17 @@ bool RewriteSystem::isInMinimizationDomain(
 
 void RewriteSystem::recordRewriteLoop(MutableTerm basepoint,
                                       RewritePath path) {
+  RewriteLoop loop(basepoint, path);
+  loop.verify(*this);
+
   if (!RecordLoops)
     return;
 
   // Ignore the rewrite rule if it is not part of our minimization domain.
-  if (!isInMinimizationDomain(basepoint.getRootProtocols()))
+  if (!isInMinimizationDomain(basepoint.getRootProtocol()))
     return;
 
-  Loops.emplace_back(basepoint, path);
+  Loops.push_back(loop);
 }
 
 void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
@@ -668,8 +704,6 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
       // which are immediately simplified away.
       if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !rule.isSubstitutionSimplified() &&
           index != 0 && index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
@@ -680,9 +714,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       // Permanent rules contain name symbols at the end, like
       // [P].T => [P:T].
-      if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !rule.isSubstitutionSimplified() &&
+      if (!rule.isRHSSimplified() &&
           (!rule.isPermanent() || index == rhs.size() - 1)) {
         // This is only true if the input requirements were valid.
         if (policy == DisallowInvalidRequirements) {
@@ -701,16 +733,13 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       // Completion can produce rules like [P:T].[Q].[R] => [P:T].[Q]
       // which are immediately simplified away.
-      if (!rule.isLHSSimplified() &&
-          !rule.isRHSSimplified() &&
-          !rule.isSubstitutionSimplified() &&
-          index != 0) {
+      if (!rule.isRHSSimplified() && index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
 
-    auto lhsDomain = lhs.getRootProtocols();
-    auto rhsDomain = rhs.getRootProtocols();
+    auto lhsDomain = lhs.getRootProtocol();
+    auto rhsDomain = rhs.getRootProtocol();
 
     ASSERT_RULE(lhsDomain == rhsDomain);
   }
@@ -725,19 +754,32 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
     out << "- " << rule << "\n";
   }
   out << "}\n";
-  out << "Relations: {\n";
-  for (const auto &relation : Relations) {
-    out << "- " << relation.first << " =>> " << relation.second << "\n";
+  if (!Relations.empty()) {
+    out << "Relations: {\n";
+    for (const auto &relation : Relations) {
+      out << "- " << relation.first << " =>> " << relation.second << "\n";
+    }
+    out << "}\n";
   }
-  out << "}\n";
-  out << "Rewrite loops: {\n";
-  for (const auto &loop : Loops) {
-    if (loop.isDeleted())
-      continue;
+  if (!Differences.empty()) {
+    out << "Type differences: {\n";
+    for (const auto &difference : Differences) {
+      difference.dump(out);
+      out << "\n";
+    }
+    out << "}\n";
+  }
+  if (!Loops.empty()) {
+    out << "Rewrite loops: {\n";
+    for (unsigned loopID : indices(Loops)) {
+      const auto &loop = Loops[loopID];
+      if (loop.isDeleted())
+        continue;
 
-    out << "- ";
-    loop.dump(out, *this);
-    out << "\n";
+      out << "- (#" << loopID << ") ";
+      loop.dump(out, *this);
+      out << "\n";
+    }
   }
   out << "}\n";
 }

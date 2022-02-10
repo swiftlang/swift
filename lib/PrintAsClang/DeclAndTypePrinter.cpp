@@ -1474,8 +1474,10 @@ private:
       specialNames[{ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean")}]
         = { "Boolean", false};
 
-      Identifier ID_CoreGraphics = ctx.getIdentifier("CoreGraphics");
-      specialNames[{ID_CoreGraphics, ctx.getIdentifier("CGFloat")}]
+      specialNames[{ctx.Id_CoreGraphics, ctx.Id_CGFloat}]
+        = { "CGFloat", false };
+
+      specialNames[{ctx.Id_CoreFoundation, ctx.Id_CGFloat}]
         = { "CGFloat", false };
 
       // Use typedefs we set up for SIMD vector types.
@@ -1835,7 +1837,8 @@ private:
 
   void visitExistentialType(ExistentialType *ET,
                             Optional<OptionalTypeKind> optionalKind) {
-    visitPart(ET->getConstraintType(), optionalKind);
+    visitExistentialType(ET, optionalKind,
+        /*isMetatype=*/ET->getConstraintType()->is<AnyMetatypeType>());
   }
 
   void visitExistentialMetatypeType(ExistentialMetatypeType *MT,

@@ -107,7 +107,6 @@ static bool requiresFlowIsolation(ActorIsolation typeIso,
       return false;
 
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
       return !(ctor->hasAsync()); // need flow-isolation for non-async.
   };
 }
@@ -137,10 +136,7 @@ bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn) {
       return true;
 
     // construct an isolation corresponding to the type.
-    auto actorTypeIso =
-      nominal->isDistributedActor()
-        ? ActorIsolation::forDistributedActorInstance(nominal)
-        : ActorIsolation::forActorInstance(nominal);
+    auto actorTypeIso = ActorIsolation::forActorInstance(nominal);
 
     return requiresFlowIsolation(actorTypeIso, cast<ConstructorDecl>(fn));
   }
@@ -341,14 +337,36 @@ GlobalActorAttributeRequest::evaluate(
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     // Subscripts and properties are fine...
     if (auto var = dyn_cast<VarDecl>(storage)) {
+
+      // ... but not if it's an async-context top-level global
       if (var->isTopLevelGlobal() && var->getDeclContext()->isAsyncContext()) {
         var->diagnose(diag::global_actor_top_level_var)
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
-      } else if (var->getDeclContext()->isLocalContext()) {
+      }
+      
+      // ... and not if it's local property
+      if (var->getDeclContext()->isLocalContext()) {
         var->diagnose(diag::global_actor_on_local_variable, var->getName())
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
+      }
+
+      // ... and not if it's the instance storage of a struct
+      if (!var->isStatic() && var->isOrdinaryStoredProperty()) {
+        if (auto *nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
+          if (isa<StructDecl>(nominal) && !isWrappedValueOfPropWrapper(var)) {
+
+            var->diagnose(diag::global_actor_on_storage_of_value_type,
+                          var->getName(), nominal->getDescriptiveKind())
+              .highlight(globalActorAttr->getRangeWithAt())
+              .warnUntilSwiftVersion(6);
+
+            // In Swift 6, once the diag above is an error, it is disallowed.
+            if (var->getASTContext().isSwiftVersionAtLeast(6))
+              return None;
+          }
+        }
       }
     }
   } else if (isa<ExtensionDecl>(decl)) {
@@ -496,10 +514,6 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
       // Protected actor instance members can only be accessed on 'self'.
       return forActorSelf(isolation.getActor(),
           isAccessibleAcrossActors || isa<ConstructorDecl>(decl));
-
-    case ActorIsolation::DistributedActorInstance:
-      return forDistributedActorSelf(isolation.getActor(),
-       /*isCrossActor*/ isAccessibleAcrossActors || isa<ConstructorDecl>(decl));
 
     case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor: {
@@ -1863,7 +1877,6 @@ namespace {
               var, isPotentiallyIsolated, isolation.getGlobalActor());
 
         case ActorIsolation::ActorInstance:
-        case ActorIsolation::DistributedActorInstance:
           break;
         }
       }
@@ -1906,7 +1919,6 @@ namespace {
             (!fn->isAsyncContext() || fn != dc)) {
           switch (getActorIsolation(fn)) {
           case ActorIsolation::ActorInstance:
-          case ActorIsolation::DistributedActorInstance:
           case ActorIsolation::GlobalActor:
           case ActorIsolation::GlobalActorUnsafe:
           case ActorIsolation::Independent:
@@ -1931,16 +1943,18 @@ namespace {
     void noteIsolatedActorMember(ValueDecl *decl, Expr *context) {
       // detect if it is a distributed actor, to provide better isolation notes
 
-      auto isDistributedActor = false;
-      if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl())
-        isDistributedActor = nominal->isDistributedActor();
+      auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
+      bool isDistributedActor = false;
+      if (nominal) isDistributedActor = nominal->isDistributedActor();
 
       // FIXME: Make this diagnostic more sensitive to the isolation context of
       // the declaration.
       if (isDistributedActor) {
-        if (dyn_cast<VarDecl>(decl)) {
+        if (isa<VarDecl>(decl)) {
           // Distributed actor properties are never accessible externally.
-          decl->diagnose(diag::distributed_actor_isolated_property);
+          decl->diagnose(diag::distributed_actor_isolated_property,
+                         decl->getDescriptiveKind(), decl->getName(),
+                         nominal->getName());
         } else {
           // it's a function or subscript
           decl->diagnose(diag::note_distributed_actor_isolated_method,
@@ -2089,7 +2103,6 @@ namespace {
       // Retrieve the actor isolation of the context.
       switch (auto isolation = getActorIsolationOfContext(dc)) {
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance:
       case ActorIsolation::Independent:
       case ActorIsolation::Unspecified:
         return isolation;
@@ -2351,7 +2364,6 @@ namespace {
                 unsatisfiedIsolation->getGlobalActor()));
           break;
 
-        case ActorIsolation::DistributedActorInstance:
         case ActorIsolation::ActorInstance:
           apply->setImplicitlyAsync(
             ImplicitActorHopTarget::forIsolatedParameter(*isolatedParamIdx));
@@ -2430,7 +2442,6 @@ namespace {
 
       // Diagnose failures.
       switch (contextIsolation) {
-      case ActorIsolation::DistributedActorInstance:
       case ActorIsolation::ActorInstance: {
         auto useKind = static_cast<unsigned>(
             kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
@@ -2964,8 +2975,7 @@ namespace {
         return ClosureActorIsolation::forGlobalActor(globalActorType);
       }
 
-      case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance: {
+      case ActorIsolation::ActorInstance: {
         if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
           return ClosureActorIsolation::forActorInstance(param);
 
@@ -3175,7 +3185,6 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
       auto requirementIsolation = getActorIsolation(requirement);
       switch (requirementIsolation) {
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance:
       case ActorIsolation::Unspecified:
         continue;
 
@@ -3203,7 +3212,6 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
     auto isolation = std::get<1>(isolated);
     switch (isolation) {
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance:
         llvm_unreachable("protocol requirements cannot be actor instances");
 
       case ActorIsolation::Independent:
@@ -3255,7 +3263,6 @@ static Optional<ActorIsolation> getIsolationFromConformances(
        nominal->getLocalProtocols(ConformanceLookupKind::NonStructural)) {
     switch (auto protoIsolation = getActorIsolation(proto)) {
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Independent:
       break;
@@ -3306,7 +3313,6 @@ static Optional<ActorIsolation> getIsolationFromWrappers(
 
     switch (isolation) {
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Independent:
       break;
@@ -3495,7 +3501,6 @@ static bool checkClassGlobalActorIsolation(
     return false;
 
   case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
     // This is an error that will be diagnosed later. Ignore it here.
     return false;
 
@@ -3529,9 +3534,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
     auto actor = value->getDeclContext()->getSelfNominalTypeDecl();
     assert(actor && "could not find the actor that 'self' is isolated to");
-    return actor->isDistributedActor()
-        ? ActorIsolation::forDistributedActorInstance(actor)
-        : ActorIsolation::forActorInstance(actor);
+    return ActorIsolation::forActorInstance(actor);
   }
 
   auto isolationFromAttr = getIsolationFromAttributes(value);
@@ -3604,6 +3607,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
     case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor: {
+      // Stored properties of a struct don't need global-actor isolation.
+      if (ctx.isSwiftVersionAtLeast(6))
+        if (auto *var = dyn_cast<VarDecl>(value))
+          if (!var->isStatic() && var->isOrdinaryStoredProperty())
+            if (auto *varDC = var->getDeclContext())
+              if (auto *nominal = varDC->getSelfNominalTypeDecl())
+                if (isa<StructDecl>(nominal) &&
+                    !isWrappedValueOfPropWrapper(var))
+                  return ActorIsolation::forUnspecified();
+
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
       auto attr = CustomAttr::create(
           ctx, SourceLoc(), typeExpr, /*implicit=*/true);
@@ -3613,7 +3626,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
       break;
     }
 
-    case ActorIsolation::DistributedActorInstance:
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
       if (onlyGlobal)
@@ -3646,7 +3658,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
         break;
 
       case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance:
         if (auto param = func->getCaptureInfo().getIsolatedParamCapture())
           return inferredIsolation(enclosingIsolation);
         break;
@@ -3826,7 +3837,6 @@ bool HasIsolatedSelfRequest::evaluate(
       return false;
 
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
       if (isolation.getActor() != selfTypeDecl)
         return false;
       break;
@@ -3885,8 +3895,7 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   // the equality case above because the nominal type describing the actor
   // will differ when we're overriding.
   if (isolation.getKind() == overriddenIsolation.getKind() &&
-      (isolation.getKind() == ActorIsolation::ActorInstance ||
-       isolation.getKind() == ActorIsolation::DistributedActorInstance))
+      isolation.getKind() == ActorIsolation::ActorInstance)
     return;
 
   // If the overridden declaration is from Objective-C with no actor annotation,
@@ -4137,7 +4146,6 @@ bool swift::checkSendableConformance(
   switch (getActorIsolation(nominal)) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
   case ActorIsolation::Independent:
     break;
 
@@ -4540,7 +4548,6 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   if (decl) {
     switch (auto isolation = getActorIsolation(decl)) {
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
     case ActorIsolation::Independent:
     case ActorIsolation::Unspecified:
       return fnType;
@@ -4673,9 +4680,9 @@ bool swift::isPotentiallyIsolatedActor(
 
   if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
     // FIXME(distributed): we did a dynamic check and know that this actor is
-    // local,
-    //  but we can't express that to the type system; the real implementation
-    //  will have to mark 'self' as "known to be local" after an is-local check.
+    //   local, but we can't express that to the type system; the real
+    //   implementation will have to mark 'self' as "known to be local" after
+    //   an is-local check.
     return true;
   }
 

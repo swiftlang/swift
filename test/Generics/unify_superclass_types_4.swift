@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -dump-requirement-machine -disable-requirement-machine-merged-associated-types 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -dump-requirement-machine 2>&1 | %FileCheck %s
 
 // Note: The GSB fails this test, because it doesn't implement unification of
 // superclass type constructor arguments.
@@ -39,9 +39,10 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK:      - [P2:X].[superclass: Derived<τ_0_0> with <[P2:A2]>] => [P2:X] [explicit]
 // CHECK:      - τ_0_0.[P2:X] => τ_0_0.[P1:X]
 // CHECK:      - τ_0_0.[P1:X].[superclass: Derived<τ_0_0> with <τ_0_0.[P2:A2]>] => τ_0_0.[P1:X]
-// CHECK-NEXT: - [P1:X].[layout: _NativeClass] => [P1:X]
-// CHECK-NEXT: - [P2:X].[layout: _NativeClass] => [P2:X]
-// CHECK-NEXT: - τ_0_0.[P2:A2].[Q:T] => τ_0_0.[P1:A1]
+// CHECK:      - [P1:X].[layout: _NativeClass] => [P1:X]
+// CHECK:      - [P2:X].[layout: _NativeClass] => [P2:X]
+// CHECK:      - τ_0_0.[P1:X].[superclass: Base<τ_0_0> with <τ_0_0.[P2:A2].[Q:T]>] => τ_0_0.[P1:X]
+// CHECK:      - τ_0_0.[P2:A2].[Q:T] => τ_0_0.[P1:A1]
 // CHECK-NEXT: }
 // CHECK: Property map: {
 // CHECK-NEXT:   [P1] => { conforms_to: [P1] }

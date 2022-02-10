@@ -227,12 +227,10 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
 
       auto conformsTo = props->getConformsTo();
 
-      for (const auto *proto : symbol.getProtocols()) {
-        // T.[P:A] is valid iff T conforms to P.
-        if (std::find(conformsTo.begin(), conformsTo.end(), proto)
-              == conformsTo.end())
-          return prefix;
-      }
+      // T.[P:A] is valid iff T conforms to P.
+      if (std::find(conformsTo.begin(), conformsTo.end(), symbol.getProtocol())
+            == conformsTo.end())
+        return prefix;
 
       break;
     }
@@ -720,7 +718,7 @@ void RequirementMachine::verify(const MutableTerm &term) const {
         continue;
 
       case Symbol::Kind::AssociatedType:
-        erased.add(Symbol::forProtocol(symbol.getProtocols()[0], Context));
+        erased.add(Symbol::forProtocol(symbol.getProtocol(), Context));
         break;
 
       case Symbol::Kind::Name:

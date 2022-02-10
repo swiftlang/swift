@@ -126,7 +126,7 @@ RequirementMachine::buildRequirementsFromRules(
         // For compatibility with the old GenericSignatureBuilder, drop requirements
         // containing ErrorTypes.
         auto superclassType = Map.getTypeFromSubstitutionSchema(
-                                prop->getSuperclass(),
+                                prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 genericParams, MutableTerm());
         if (superclassType->hasError())
@@ -171,7 +171,7 @@ RequirementMachine::buildRequirementsFromRules(
   };
 
   if (getDebugOptions().contains(DebugFlags::Minimization)) {
-    llvm::dbgs() << "Minimized rules:\n";
+    llvm::dbgs() << "\nMinimized rules:\n";
   }
 
   // Build the list of requirements, storing same-type requirements off
@@ -259,14 +259,19 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       ctx.getRewriteContext()));
 
   auto status = machine->initWithProtocols(component);
-  if (status != CompletionResult::Success) {
+  if (status.first != CompletionResult::Success) {
     // All we can do at this point is diagnose and give each protocol an empty
     // requirement signature.
     for (const auto *otherProto : component) {
       ctx.Diags.diagnose(otherProto->getLoc(),
                          diag::requirement_machine_completion_failed,
                          /*protocol=*/1,
-                         status == CompletionResult::MaxIterations ? 0 : 1);
+                         unsigned(status.first));
+
+      auto rule = machine->getRuleAsStringForDiagnostics(status.second);
+      ctx.Diags.diagnose(otherProto->getLoc(),
+                         diag::requirement_machine_completion_rule,
+                         rule);
 
       if (otherProto != proto) {
         ctx.evaluator.cacheOutput(
@@ -500,11 +505,16 @@ InferredGenericSignatureRequestRQM::evaluate(
       ctx.getRewriteContext()));
 
   auto status = machine->initWithWrittenRequirements(genericParams, requirements);
-  if (status != CompletionResult::Success) {
+  if (status.first != CompletionResult::Success) {
     ctx.Diags.diagnose(loc,
                        diag::requirement_machine_completion_failed,
                        /*protocol=*/0,
-                       status == CompletionResult::MaxIterations ? 0 : 1);
+                       unsigned(status.first));
+
+    auto rule = machine->getRuleAsStringForDiagnostics(status.second);
+    ctx.Diags.diagnose(loc,
+                       diag::requirement_machine_completion_rule,
+                       rule);
 
     auto result = GenericSignature::get(genericParams, {});
     return GenericSignatureWithError(result, /*hadError=*/true);

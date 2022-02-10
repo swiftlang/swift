@@ -3,7 +3,7 @@
 // RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope --color
 
-// X: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library -Xfrontend -I -Xfrontend %t ) | %FileCheck %s --dump-input=always
+// X: %target-run-simple-swift( -Xfrontend -module-name=main -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library -Xfrontend -I -Xfrontend %t ) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -15,12 +15,6 @@
 
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
-
-// FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
-// UNSUPPORTED: linux
-
-// rdar://88228867 - remoteCall_* tests have been disabled due to random failures
-// OK: rdar88228867
 
 import _Distributed
 import FakeDistributedActorSystems

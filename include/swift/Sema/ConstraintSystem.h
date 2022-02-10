@@ -167,17 +167,30 @@ public:
 
 
 class ExpressionTimer {
-  Expr* E;
+public:
+  using AnchorType = llvm::PointerUnion<Expr *, ConstraintLocator *>;
+
+private:
+  AnchorType Anchor;
   ASTContext &Context;
   llvm::TimeRecord StartTime;
+
+  /// The number of milliseconds from creation until
+  /// this timer is considered expired.
+  unsigned ThresholdInMillis;
 
   bool PrintDebugTiming;
   bool PrintWarning;
 
 public:
-  ExpressionTimer(Expr *E, ConstraintSystem &CS);
+  /// This constructor sets a default threshold defined for all expressions
+  /// via compiler flag `solver-expression-time-threshold`.
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS);
+  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS, unsigned thresholdInMillis);
 
   ~ExpressionTimer();
+
+  AnchorType getAnchor() const { return Anchor; }
 
   unsigned getWarnLimit() const {
     return Context.TypeCheckerOpts.WarnLongExpressionTypeChecking;
@@ -192,13 +205,19 @@ public:
     return endTime.getProcessTime() - StartTime.getProcessTime();
   }
 
+  /// Return the remaining process time in milliseconds until the
+  /// threshold specified during construction is reached.
+  unsigned getRemainingProcessTimeInMillis() const {
+    auto elapsed = unsigned(getElapsedProcessTimeInFractionalSeconds());
+    return elapsed >= ThresholdInMillis ? 0 : ThresholdInMillis - elapsed;
+  }
+
   // Disable emission of warnings about expressions that take longer
   // than the warning threshold.
   void disableWarning() { PrintWarning = false; }
 
-  bool isExpired(unsigned thresholdInMillis) const {
-    auto elapsed = getElapsedProcessTimeInFractionalSeconds();
-    return unsigned(elapsed) > thresholdInMillis;
+  bool isExpired() const {
+    return getRemainingProcessTimeInMillis() == 0;
   }
 };
 
@@ -1219,6 +1238,10 @@ public:
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument lists for the call to that locator.
   llvm::MapVector<ConstraintLocator *, ArgumentList *> argumentLists;
+
+  /// The set of implicitly generated `.callAsFunction` root expressions.
+  llvm::DenseMap<ConstraintLocator *, UnresolvedDotExpr *>
+      ImplicitCallAsFunctionRoots;
 
   /// Record a new argument matching choice for given locator that maps a
   /// single argument to a single parameter.
@@ -2468,6 +2491,12 @@ public:
   /// types.
   llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
 
+  /// A cache of implicitly generated dot-member expressions used as roots
+  /// for some `.callAsFunction` calls. The key here is "base" locator for
+  /// the `.callAsFunction` member reference.
+  llvm::SmallMapVector<ConstraintLocator *, UnresolvedDotExpr *, 2>
+      ImplicitCallAsFunctionRoots;
+
 private:
   /// Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
@@ -2950,6 +2979,9 @@ public:
 
     /// The length of \c ArgumentLists.
     unsigned numArgumentLists;
+
+    /// The length of \c ImplicitCallAsFunctionRoots.
+    unsigned numImplicitCallAsFunctionRoots;
 
     /// The previous score.
     Score PreviousScore;
@@ -3474,6 +3506,11 @@ public:
 
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
+
+  /// Record implicitly generated `callAsFunction` with root at the
+  /// given expression, located at \c locator.
+  void recordCallAsFunction(UnresolvedDotExpr *root, ArgumentList *arguments,
+                            ConstraintLocator *locator);
 
   /// Walk a closure AST to determine its effects.
   ///
@@ -5226,9 +5263,7 @@ public:
       return isExpressionAlreadyTooComplex= true;
     }
 
-    const auto timeoutThresholdInMillis =
-        getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
-    if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
+    if (Timer && Timer->isExpired()) {
       // Disable warnings about expressions that go over the warning
       // threshold since we're arbitrarily ending evaluation and
       // emitting an error.
@@ -5474,6 +5509,7 @@ matchCallArguments(
 ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,
                    FunctionType *contextualType,
+                   ArgumentList *argumentList,
                    ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
                    ConstraintKind subKind,
@@ -5667,6 +5703,8 @@ public:
   ConjunctionElement(Constraint *element) : Element(element) {}
 
   bool attempt(ConstraintSystem &cs) const;
+
+  ConstraintLocator *getLocator() const { return Element->getLocator(); }
 
   void print(llvm::raw_ostream &Out, SourceManager *SM) const {
     Out << "conjunction element ";

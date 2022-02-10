@@ -177,26 +177,26 @@ AssociatedTypeDecl *RewriteContext::getAssociatedTypeForSymbol(Symbol symbol) {
   // The associated type An' is then the canonical associated type
   // representative of the associated type symbol [P0&...&Pn:A].
   //
-  for (auto *proto : symbol.getProtocols()) {
-    auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
-      otherAssocType = otherAssocType->getAssociatedTypeAnchor();
+  auto *proto = symbol.getProtocol();
 
-      if (otherAssocType->getName() == name &&
-          (assocType == nullptr ||
-           TypeDecl::compare(otherAssocType->getProtocol(),
-                             assocType->getProtocol()) < 0)) {
-        assocType = otherAssocType;
-      }
-    };
+  auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
+    otherAssocType = otherAssocType->getAssociatedTypeAnchor();
 
-    for (auto *otherAssocType : proto->getAssociatedTypeMembers()) {
-      checkOtherAssocType(otherAssocType);
+    if (otherAssocType->getName() == name &&
+        (assocType == nullptr ||
+         TypeDecl::compare(otherAssocType->getProtocol(),
+                           assocType->getProtocol()) < 0)) {
+      assocType = otherAssocType;
     }
+  };
 
-    for (auto *inheritedProto : getInheritedProtocols(proto)) {
-      for (auto *otherAssocType : inheritedProto->getAssociatedTypeMembers()) {
-        checkOtherAssocType(otherAssocType);
-      }
+  for (auto *otherAssocType : proto->getAssociatedTypeMembers()) {
+    checkOtherAssocType(otherAssocType);
+  }
+
+  for (auto *inheritedProto : getInheritedProtocols(proto)) {
+    for (auto *otherAssocType : inheritedProto->getAssociatedTypeMembers()) {
+      checkOtherAssocType(otherAssocType);
     }
   }
 
@@ -318,8 +318,8 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
 #ifndef NDEBUG
       // Ensure that the domain of the suffix contains P.
       if (iter + 1 < end) {
-        auto protos = (iter + 1)->getProtocols();
-        assert(std::find(protos.begin(), protos.end(), symbol.getProtocol()));
+        auto proto = (iter + 1)->getProtocol();
+        assert(proto == symbol.getProtocol());
       }
 #endif
       continue;
@@ -350,10 +350,9 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end, Type root,
       // of protocols that the prefix conforms to.
   #ifndef NDEBUG
       auto conformsTo = props->getConformsTo();
-      for (auto *otherProto : symbol.getProtocols()) {
-        assert(std::find(conformsTo.begin(), conformsTo.end(), otherProto)
-               != conformsTo.end());
-      }
+      assert(std::find(conformsTo.begin(), conformsTo.end(),
+                       symbol.getProtocol())
+             != conformsTo.end());
   #endif
 
       assocType = props->getAssociatedType(symbol.getName());
@@ -393,7 +392,7 @@ Type PropertyMap::getRelativeTypeForTerm(
 /// have a depth of 0, and an index into an array of substitution terms.
 ///
 /// See RewriteSystemBuilder::getConcreteSubstitutionSchema().
-static unsigned getGenericParamIndex(Type type) {
+unsigned RewriteContext::getGenericParamIndex(Type type) {
   auto *paramTy = type->castTo<GenericTypeParamType>();
   assert(paramTy->getDepth() == 0);
   return paramTy->getIndex();
@@ -472,7 +471,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
 
   return schema.transformRec([&](Type t) -> Optional<Type> {
     if (t->is<GenericTypeParamType>()) {
-      auto index = getGenericParamIndex(t);
+      auto index = RewriteContext::getGenericParamIndex(t);
       auto substitution = substitutions[index];
 
       // Prepend the prefix of the lookup key to the substitution.

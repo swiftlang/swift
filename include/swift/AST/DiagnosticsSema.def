@@ -274,6 +274,8 @@ ERROR(cannot_infer_closure_parameter_type,none,
        (StringRef))
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
+ERROR(cannot_infer_empty_closure_result_type,none,
+      "cannot infer return type of empty closure", ())
 ERROR(cannot_infer_closure_result_type,none,
       "cannot infer return type for closure with multiple statements; "
       "add explicit type to disambiguate", ())
@@ -1595,18 +1597,21 @@ WARNING(option_set_zero_constant,none,
 NOTE(option_set_empty_set_init,none,
      "use [] to silence this warning", ())
 
+// FIXME(backDeploy): Refactor to share with back deployment attr
 ERROR(originally_defined_in_dupe_platform,none,
       "duplicate version number for platform %0", (StringRef))
 
 ERROR(originally_definedin_topleve_decl,none,
       "@%0 is only applicable to top-level decl", (StringRef))
 
+// FIXME(backDeploy): Refactor to share with back deployment attr
 ERROR(originally_definedin_need_available,none,
       "need @available attribute for @%0", (StringRef))
 
 ERROR(originally_definedin_must_not_before_available_version,none,
       "symbols are moved to the current module before they were available in the OSs", (StringRef))
 
+// FIXME(backDeploy): Refactor to share with back deployment attr
 WARNING(originally_defined_in_on_non_public,
        none, "@%0 does not have any effect on "
        "%select{private|fileprivate|internal|%error|%error}1 declarations",
@@ -2557,8 +2562,10 @@ WARNING(associated_type_override_typealias,none,
 
 ERROR(requirement_machine_completion_failed,none,
       "cannot build rewrite system for %select{generic signature|protocol}0; "
-      "%select{step|depth}1 limit exceeded",
+      "%select{%error|rule count|rule length|concrete nesting}1 limit exceeded",
       (unsigned, unsigned))
+NOTE(requirement_machine_completion_rule,none,
+     "failed rewrite rule is %0", (StringRef))
 
 ERROR(associated_type_objc,none,
       "associated type %0 cannot be declared inside '@objc' protocol %1",
@@ -4489,8 +4496,8 @@ ERROR(actor_isolated_non_self_reference,none,
         "from the main actor|from a non-isolated context}3",
         (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
 ERROR(distributed_actor_isolated_non_self_reference,none,
-      "distributed actor-isolated %0 %1 can only be referenced inside the "
-      "distributed actor",
+      "distributed actor-isolated %0 %1 can not be accessed from a "
+      "non-isolated context",
       (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'_Distributed' module not imported, required for 'distributed actor'",
@@ -4562,17 +4569,20 @@ ERROR(distributed_actor_isolated_method,none,
       "only 'distributed' instance methods can be called on a potentially remote distributed actor",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
-      "parameter '%0' of type %1 in %2 does not conform to '%3'",
+      "parameter '%0' of type %1 in %2 does not conform to serialization requirement '%3'",
       (StringRef, Type, DescriptiveDeclKind, StringRef))
-ERROR(distributed_actor_func_result_not_codable,none,
-      "result type %0 of %1 does not conform to '%2'",
-      (Type, DescriptiveDeclKind, StringRef))
+ERROR(distributed_actor_target_result_not_codable,none,
+      "result type %0 of %1 %2 does not conform to serialization requirement '%3'",
+      (Type, DescriptiveDeclKind, Identifier, StringRef))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
       "distributed instance method's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
       ())
+ERROR(nonisolated_storage_value_type,none,
+      "'nonisolated' is redundant on %0's stored properties",
+      (DescriptiveDeclKind))
 ERROR(distributed_actor_func_nonisolated, none,
       "cannot declare method %0 as both 'nonisolated' and 'distributed'",
       (DeclName))
@@ -4754,9 +4764,18 @@ ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",
       (DeclName))
+ERROR(distributed_property_can_only_be_computed_get_only,none,
+      "'distributed' computed property %0 cannot have setter",
+      (DeclName))
+ERROR(distributed_property_cannot_be_static,none,
+      "'distributed' property %0 cannot be 'static'",
+      (DeclName))
+ERROR(distributed_property_can_only_be_computed,none,
+      "%0 %1 cannot be 'distributed', only computed properties can",
+      (DescriptiveDeclKind, DeclName))
 NOTE(distributed_actor_isolated_property,none,
-      "distributed actor state is only available within the actor instance", // TODO: reword in terms of isolation
-      ())
+      "access to %0 %1 is only permitted within distributed actor %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
@@ -4773,6 +4792,9 @@ ERROR(global_actor_on_actor_class,none,
       "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
+ERROR(global_actor_on_storage_of_value_type,none,
+      "stored property %0 within %1 cannot have a global actor",
+      (DeclName, DescriptiveDeclKind))
 ERROR(global_actor_non_unsafe_init,none,
       "global actor attribute %0 argument can only be '(unsafe)'", (Type))
 ERROR(global_actor_non_final_class,none,
@@ -5660,7 +5682,8 @@ ERROR(usable_from_inline_attr_with_explicit_access,
       (DeclName, AccessLevel))
 
 WARNING(inlinable_implies_usable_from_inline,none,
-        "'@inlinable' declaration is already '@usableFromInline'",())
+        "'@usableFromInline' attribute has no effect on '@inlinable' %0 %1",
+        (DescriptiveDeclKind, DeclName))
 
 ERROR(usable_from_inline_attr_in_protocol,none,
       "'@usableFromInline' attribute cannot be used in protocols", ())

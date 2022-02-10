@@ -118,6 +118,7 @@ public:
   IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Isolated)
   IGNORED_ATTR(Preconcurrency)
+  IGNORED_ATTR(BackDeploy)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -275,6 +276,8 @@ public:
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitPrimaryAssociatedTypeAttr(PrimaryAssociatedTypeAttr *attr);
+
+  void checkBackDeployAttrs(Decl *D, ArrayRef<BackDeployAttr *> Attrs);
 };
 
 } // end anonymous namespace
@@ -2414,7 +2417,8 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
     if (Ctx.isSwiftVersionAtLeast(4,2))
-      diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline);
+      diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline,
+                            VD->getDescriptiveKind(), VD->getName());
     return;
   }
 }
@@ -3460,6 +3464,11 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
   }
 }
 
+void AttributeChecker::checkBackDeployAttrs(Decl *D,
+    ArrayRef<BackDeployAttr *> Attrs) {
+  // FIXME(backDeploy): Diagnose incompatible uses of `@_backDeploy
+}
+
 Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
                                               ReferenceOwnershipAttr *attr) {
   auto &Diags = var->getASTContext().Diags;
@@ -3562,7 +3571,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    if (!VD->hasStorage())
+    if (!VD->hasStorageOrWrapsStorage())
       return None;
 
     // Do not permit potential availability of script-mode global variables;
@@ -5539,9 +5548,14 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 
   // distributed can be applied to actor definitions and their methods
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
-    // distributed can not be applied to stored properties
-    diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
-    return;
+    if (varDecl->isDistributed()) {
+      if (checkDistributedActorProperty(varDecl, /*diagnose=*/true))
+        return;
+    } else {
+      // distributed can not be applied to stored properties
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
+      return;
+    }
   }
 
   // distributed can only be declared on an `actor`
@@ -5605,28 +5619,40 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
     if (var->hasStorage()) {
-      auto nominal = dyn_cast<NominalTypeDecl>(dc);
-
-      // 'nonisolated' can not be applied to stored properties inside
-      // distributed actors. Attempts of nonisolated access would be
-      // cross-actor, and that means they might be accessing on a remote actor,
-      // in which case the stored property storage does not exist.
-      //
-      // The synthesized "id" and "actorSystem" are the only exceptions,
-      // because the implementation mirrors them.
-      if (nominal && nominal->isDistributedActor() &&
-          !(var->isImplicit() &&
-            (var->getName() == Ctx.Id_id ||
-             var->getName() == Ctx.Id_actorSystem))) {
-        diagnoseAndRemoveAttr(attr,
-                              diag::nonisolated_distributed_actor_storage);
-        return;
-      }
 
       // 'nonisolated' can not be applied to mutable stored properties.
       if (var->supportsMutation()) {
         diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
         return;
+      }
+
+      if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+        // 'nonisolated' can not be applied to stored properties inside
+        // distributed actors. Attempts of nonisolated access would be
+        // cross-actor, which means they might be accessing on a remote actor,
+        // in which case the stored property storage does not exist.
+        //
+        // The synthesized "id" and "actorSystem" are the only exceptions,
+        // because the implementation mirrors them.
+        if (nominal->isDistributedActor() &&
+            !(var->isImplicit() &&
+              (var->getName() == Ctx.Id_id ||
+               var->getName() == Ctx.Id_actorSystem))) {
+          diagnoseAndRemoveAttr(attr,
+                                diag::nonisolated_distributed_actor_storage);
+          return;
+        }
+
+        // 'nonisolated' is redundant for the stored properties of a struct.
+        if (isa<StructDecl>(nominal) &&
+            !var->isStatic() &&
+            var->isOrdinaryStoredProperty() &&
+            !isWrappedValueOfPropWrapper(var)) {
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_storage_value_type,
+                                nominal->getDescriptiveKind())
+            .warnUntilSwiftVersion(6);
+          return;
+        }
       }
     }
 

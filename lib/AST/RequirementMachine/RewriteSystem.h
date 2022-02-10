@@ -21,6 +21,7 @@
 #include "Symbol.h"
 #include "Term.h"
 #include "Trie.h"
+#include "TypeDifference.h"
 
 namespace llvm {
   class raw_ostream;
@@ -180,7 +181,9 @@ public:
 
   unsigned getDepth() const;
 
-  int compare(const Rule &other, RewriteContext &ctx) const;
+  unsigned getNesting() const;
+
+  Optional<int> compare(const Rule &other, RewriteContext &ctx) const;
 
   void dump(llvm::raw_ostream &out) const;
 
@@ -191,18 +194,19 @@ public:
   }
 };
 
-/// Result type for RewriteSystem::computeConfluentCompletion() and
-/// PropertyMap::buildPropertyMap().
+/// Result type for RequirementMachine::computeCompletion().
 enum class CompletionResult {
-  /// Confluent completion was computed successfully.
+  /// Completion was successful.
   Success,
 
-  /// Maximum number of iterations reached.
-  MaxIterations,
+  /// Maximum number of rules exceeded.
+  MaxRuleCount,
 
-  /// Completion produced a rewrite rule whose left hand side has a length
-  /// exceeding the limit.
-  MaxDepth
+  /// Maximum rule length exceeded.
+  MaxRuleLength,
+
+  /// Maximum concrete type nesting depth exceeded.
+  MaxConcreteNesting
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -322,8 +326,8 @@ public:
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
   std::pair<CompletionResult, unsigned>
-  computeConfluentCompletion(unsigned maxIterations,
-                             unsigned maxDepth);
+  computeConfluentCompletion(unsigned maxRuleCount,
+                             unsigned maxRuleLength);
 
   void simplifyLeftHandSides();
 
@@ -355,29 +359,6 @@ private:
       std::vector<CriticalPair> &pairs,
       std::vector<RewriteLoop> &loops) const;
 
-  /// Constructed from a rule of the form X.[P2:T] => X.[P1:T] by
-  /// checkMergedAssociatedType().
-  struct MergedAssociatedType {
-    /// The *right* hand side of the original rule, X.[P1:T].
-    Term rhs;
-
-    /// The associated type symbol appearing at the end of the *left*
-    /// hand side of the original rule, [P2:T].
-    Symbol lhsSymbol;
-
-    /// The merged associated type symbol, [P1&P2:T].
-    Symbol mergedSymbol;
-  };
-
-  /// A list of pending terms for the associated type merging completion
-  /// heuristic. Entries are added by checkMergedAssociatedType(), and
-  /// consumed in processMergedAssociatedTypes().
-  std::vector<MergedAssociatedType> MergedAssociatedTypes;
-
-  void processMergedAssociatedTypes();
-
-  void checkMergedAssociatedType(Term lhs, Term rhs);
-
   //////////////////////////////////////////////////////////////////////////////
   ///
   /// Relations are "pseudo-rules" introduced by the property map
@@ -389,6 +370,9 @@ public:
   using Relation = std::pair<Term, Term>;
 
 private:
+  /// The map's values are indices into the vector. The map is used for
+  /// uniquing, then the index is returned and lookups are performed into
+  /// the vector.
   llvm::DenseMap<Relation, unsigned> RelationMap;
   std::vector<Relation> Relations;
 
@@ -410,6 +394,23 @@ public:
   unsigned recordSameTypeWitnessRelation(
       Symbol concreteConformanceSymbol,
       Symbol associatedTypeSymbol);
+
+private:
+  /// The map's values are indices into the vector. The map is used for
+  /// uniquing, then the index is returned and lookups are performed into
+  /// the vector.
+  llvm::DenseMap<std::tuple<Term, Symbol, Symbol>, unsigned> DifferenceMap;
+  std::vector<TypeDifference> Differences;
+
+public:
+  unsigned recordTypeDifference(const TypeDifference &difference);
+
+  bool
+  computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
+                        Optional<unsigned> &lhsDifferenceID,
+                        Optional<unsigned> &rhsDifferenceID);
+
+  const TypeDifference &getTypeDifference(unsigned index) const;
 
 private:
   //////////////////////////////////////////////////////////////////////////////
@@ -434,14 +435,10 @@ private:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
-  void recordRewriteLoop(MutableTerm basepoint,
-                         RewritePath path);
-
   void propagateExplicitBits();
 
-  Optional<unsigned>
-  findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn,
-                   RewritePath &replacementPath);
+  Optional<std::pair<unsigned, unsigned>>
+  findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
@@ -452,7 +449,10 @@ private:
       llvm::DenseSet<unsigned> &redundantConformances);
 
 public:
-  bool isInMinimizationDomain(ArrayRef<const ProtocolDecl *> protos) const;
+  void recordRewriteLoop(MutableTerm basepoint,
+                         RewritePath path);
+
+  bool isInMinimizationDomain(const ProtocolDecl *proto) const;
 
   ArrayRef<RewriteLoop> getLoops() const {
     return Loops;
