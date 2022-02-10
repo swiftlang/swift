@@ -10,13 +10,107 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The Sendable protocol indicates that value of the given type can
-/// be safely used in concurrent code.
+/// A type whose values can safely be passed across concurrency domains by copying.
+///
+/// You can safely pass values of a sendable type
+/// from one concurrency domains to another ---
+/// for example, you can pass a sendable value as the argument
+/// when calling an actor's methods.
+/// All of the following can be marked as sendable:
+///
+/// - Value types
+/// - References to immutable reference types
+/// - Reference types that internally manage access to their state
+/// - Functions and closures
+///
+/// Although this protocol doesn't have any required methods or properties,
+/// it does have semantic requirements that are enforced at compile time.
+/// These requirements are listed in the sections below.
+/// Conformance to `Sendable` must be declared
+/// in the same file as the type's declaration.
+///
+/// To declare conformance to `Sendable` without any compiler enforcement,
+/// write `@unchecked Sendable`.
+/// You are responsible for the correctness of unchecked sendable types.
+/// Unchecked conformance to `Sendable` also disables enforcement
+/// of the rule that conformance must be in the same file.
+///
+/// For information about the language-level concurrency model that `Task` is part of,
+/// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
+///
+/// [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
+/// [tspl]: https://docs.swift.org/swift-book/
+///
+/// ### Sendable Structures and Enumerations
+///
+/// To satisfy the requirements of the `Sendable` protocol,
+/// an enumeration or structure must have only sendable
+/// members and associated values.
+/// In some cases, structures and enumerations
+/// that satisfy the requirements implicitly conform to `Sendable`:
+///
+/// -   Frozen structures and enumerations
+///
+/// -   Structures and enumerations
+///     that aren't public and aren't marked `@usableFromInline`.
+///
+/// Otherwise, you need to declare conformance to `Sendable` explicitly.
+///
+/// ### Sendable Actors and Classes
+///
+/// All actor types implicitly conform to `Sendable`.
+///
+/// To satisfy the requirements of the `Sendable` protocol,
+/// final classes must contain only immutable stored properties,
+/// and must either be a subclass of `NSObject` or have no superclass.
+///
+/// Other classes can be marked as `@unchecked Sendable`,
+/// disabling compile-time correctness checks,
+/// after you manually verify that they satisfy the semantic requirements.
+///
+/// ### Sendable Functions and Closures
+///
+/// Instead of conforming to the `Sendable` protocol,
+/// you mark sendable functions and closures with the `@Sendable` attribute.
+/// Any values that the function or closure captures must be sendable.
+/// In addition, sendable closures must use only by-value captures,
+/// and the captured values must be of a sendable type.
+///
+/// In a context that expects a sendable closure,
+/// a closure closure that satisfies the requirements
+/// implicitly conforms to `Sendable` ---
+/// for example, in a call to `Task.detached(priority:operation:)`.
+///
+/// You can explicitly mark a closure as sendable
+/// by writing `@Sendable` as part of a type annotation,
+/// or by writing `@Sendable` before the closure's parameters ---
+/// for example:
+///
+/// ```
+/// let sendableClosure = { @Sendable (number: Int) -> String in
+///     if number > 12 {
+///         return "More than a dozen."
+///     } else {
+///         return "Less than a dozen"
+///     }
+/// }
+/// ```
+///
+/// ### Sendable Tuples
+///
+/// To satisfy the requirements of the `Sendable` protocol,
+/// all of the elements of the tuple must be sendable.
+/// Tuples that satisfy the requirements implicitly conform to `Sendable`.
 @_marker public protocol Sendable { }
-
-/// The UnsafeSendable protocol indicates that value of the given type
-/// can be safely used in concurrent code, but disables some safety checking
-/// at the conformance site.
+///
+/// A type whose values can safely be passed across concurrency domains by copying,
+/// but which disables some safety checking at the conformance site.
+///
+/// Use an unchecked conformance to `Sendable` instead.
+///
+/// ```
+/// struct MyStructure: @unchecked Sendable { ... }
+/// ```
 @available(*, deprecated, message: "Use @unchecked Sendable instead")
 @_marker public protocol UnsafeSendable: Sendable { }
 
