@@ -7,13 +7,13 @@ struct HasAmbiguousMethods {
   void ping() { ++mutableMethodsCalledCount; }
   void ping() const {}
 
-  // One input
-  int increment(int a) {
-    ++mutableMethodsCalledCount;
+  // One input (const first)
+  int increment(int a) const {
     return a + 1;
   }
 
-  int increment(int a) const {
+  int increment(int a) {
+    ++mutableMethodsCalledCount;
     return a + 1;
   }
 
@@ -37,9 +37,9 @@ struct HasAmbiguousMethods {
     a += b;
   }
 
-  // No input with output
-  int numberOfMutableMethodsCalled() { return ++mutableMethodsCalledCount; }
+  // No input with output (const first)
   int numberOfMutableMethodsCalled() const { return mutableMethodsCalledCount; }
+  int numberOfMutableMethodsCalled() { return ++mutableMethodsCalledCount; }
 
 private:
   int mutableMethodsCalledCount = 0;
