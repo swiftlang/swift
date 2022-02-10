@@ -127,7 +127,12 @@ extension Duration: Codable {
 }
 
 @available(SwiftStdlib 5.7, *)
-extension Duration: Hashable { }
+extension Duration: Hashable { 
+  @available(SwiftStdlib 5.7, *)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_attoseconds)
+  }
+}
 
 @available(SwiftStdlib 5.7, *)
 extension Duration: Equatable {
