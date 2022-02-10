@@ -9555,17 +9555,17 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // we generated somewhat reasonable code that performed a force cast. To
   // maintain compatibility with that behavior, allow the coercion between
   // two collections, but add a warning fix telling the user to use as! or as?
-  // instead.
+  // instead. In Swift 6 mode, this becomes an error.
   //
   // We only need to perform this compatibility logic if this is a coercion of
   // something that isn't a collection expr (as collection exprs would have
   // crashed in codegen due to CSApply peepholing them). Additionally, the LHS
   // type must be a (potentially optional) type variable, as only such a
   // constraint could have been previously been left unsolved.
-  //
-  // FIXME: Once we get a new language version, change this condition to only
-  // preserve compatibility for Swift 5.x mode.
   auto canUseCompatFix = [&]() {
+    if (Context.isSwiftVersionAtLeast(6))
+      return false;
+
     if (!rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember())
       return false;
 
