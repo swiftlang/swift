@@ -14,14 +14,8 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
-// FIXME(distributed): remote calls seem to hang on linux - rdar://87240034
-// UNSUPPORTED: linux
-
 // rdar://87568630 - segmentation fault on 32-bit WatchOS simulator
 // UNSUPPORTED: OS=watchos && CPU=i386
-
-// rdar://88228867 - remoteCall_* tests have been disabled due to random failures
-// OK: rdar88228867
 
 import _Distributed
 import FakeDistributedActorSystems
