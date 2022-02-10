@@ -51,7 +51,8 @@ DECLARE_SWIFT_SECTION(sw5repl)
 DECLARE_SWIFT_SECTION(sw5reps)
 DECLARE_SWIFT_SECTION(sw5bltn)
 DECLARE_SWIFT_SECTION(sw5cptr)
- }
+DECLARE_SWIFT_SECTION(sw5acfn)
+}
 
 namespace {
 static swift::MetadataSections sections{};
@@ -81,6 +82,7 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(sw5reps),
       SWIFT_SECTION_RANGE(sw5bltn),
       SWIFT_SECTION_RANGE(sw5cptr),
+      SWIFT_SECTION_RANGE(sw5acfn),
   };
 
 #undef SWIFT_SECTION_RANGE
