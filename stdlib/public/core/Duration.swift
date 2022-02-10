@@ -26,9 +26,9 @@ public struct Duration: Sendable {
     self._high = _attoseconds.high
   }
 
-  public init(seconds: Int64, attoseconds: Int64) {
-    self = Duration.seconds(seconds) + 
-           Duration(_attoseconds: _Int128(attoseconds))
+  public init(secondsComponent: Int64, secondsComponent: Int64) {
+    self = Duration.seconds(secondsComponent) +
+           Duration(_attoseconds: _Int128(secondsComponent))
   }
 
   internal var _attoseconds: _Int128 {
