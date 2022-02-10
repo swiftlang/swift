@@ -49,7 +49,7 @@ extension ContinuousClock: Clock {
   public static var now: ContinuousClock.Instant {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
-    _getClockRes(
+    _getTime(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: .continuous)
