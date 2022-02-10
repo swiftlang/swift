@@ -25,9 +25,6 @@ struct HasMethods {
 
   NonTrivialInWrapper nonConstPassThroughAsWrapper(int a) { return {a}; }
   NonTrivialInWrapper constPassThroughAsWrapper(int a) const { return {a}; }
-
-  int increment(int a) { return a + 1; }
-  int increment(int a) const { return a + 1; }
 };
 
 #endif // TEST_INTEROP_CXX_CLASS_METHOD_METHODS_H

@@ -17,9 +17,3 @@
 
 // CHECK: mutating func nonConstPassThroughAsWrapper(_ a: Int32) -> NonTrivialInWrapper
 // CHECK: func constPassThroughAsWrapper(_ a: Int32) -> NonTrivialInWrapper
-
-// CHECK: mutating func incrementMutable(_ a: Int32) -> Int32
-// CHECK: func incrementMutable(_ a: Int32) -> Int32
-
-// CHECK: const func increment(_ a: Int32) -> Int32
-// CHECK: func increment(_ a: Int32) -> Int32
