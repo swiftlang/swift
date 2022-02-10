@@ -333,7 +333,7 @@ inline StringRef getDebugVarName(SILValue value) {
   if (auto *asi = dyn_cast<AllocStackInst>(value)) {
     DebugVarCarryingInst debugVar(asi);
     if (auto varInfo = debugVar.getVarInfo()) {
-      return varInfo->Name;
+      return varInfo->getName();
     } else {
       if (auto *decl = debugVar.getDecl()) {
         return decl->getBaseName().userFacingName();
@@ -345,7 +345,7 @@ inline StringRef getDebugVarName(SILValue value) {
   if (auto *use = getSingleDebugUse(value)) {
     DebugVarCarryingInst debugVar(use->getUser());
     if (auto varInfo = debugVar.getVarInfo()) {
-      varName = varInfo->Name;
+      varName = varInfo->getName();
     } else {
       if (auto *decl = debugVar.getDecl()) {
         varName = decl->getBaseName().userFacingName();

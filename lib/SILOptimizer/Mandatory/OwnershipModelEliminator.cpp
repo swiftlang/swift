@@ -359,8 +359,8 @@ static void injectDebugPoison(DestroyValueInst *destroy) {
     if (!varInfo)
       continue;
 
-    unsigned argNo = varInfo->ArgNo;
-    if (!poisonedVars.insert({argNo, {scope, varInfo->Name}}).second)
+    unsigned argNo = varInfo->getArgNo();
+    if (!poisonedVars.insert({argNo, {scope, varInfo->getName()}}).second)
       continue;
 
     SILBuilder builder(destroy);

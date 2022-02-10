@@ -123,10 +123,10 @@ void GenericCloner::populateCloned() {
               getBuilder().setCurrentDebugScope(
                   remapScope(DVI->getDebugScope()));
               auto VarInfo = DVI->getVarInfo();
-              assert(VarInfo && VarInfo->DIExpr &&
+              assert(VarInfo && VarInfo->getDIExpr() &&
                      "No DebugVarInfo or no DIExpr operand?");
               // Drop the op_deref
-              VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
+              VarInfo = VarInfo->removingFirstDIExprElement(DVI->getModule());
               getBuilder().createDebugValue(DVI->getLoc(), NewArg, *VarInfo);
               getBuilder().setCurrentDebugScope(oldScope);
               break;

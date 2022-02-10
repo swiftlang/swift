@@ -809,7 +809,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();
-    SILDebugVariable DbgVar(selfDecl->isLet(), ++ArgNo);
+    auto DbgVar = SILDebugVariable::get(getModule(), selfDecl->isLet(), ++ArgNo);
     B.createDebugValue(PrologueLoc, selfArg.getValue(), DbgVar);
   }
 
@@ -1237,8 +1237,9 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   SILValue selfArg = F.begin()->createFunctionArgument(selfTy, selfDecl);
   SILLocation PrologueLoc(selfDecl);
   PrologueLoc.markAsPrologue();
+
   // Hard-code self as argument number 1.
-  SILDebugVariable DbgVar(selfDecl->isLet(), 1);
+  auto DbgVar = SILDebugVariable::get(getModule(), selfDecl->isLet(), 1);
   B.createDebugValue(PrologueLoc, selfArg, DbgVar);
   selfArg = B.createMarkUninitialized(selfDecl, selfArg,
                                       MarkUninitializedInst::RootSelf);

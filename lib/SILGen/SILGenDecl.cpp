@@ -359,7 +359,7 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    SILDebugVariable DbgVar(decl->isLet(), ArgNo);
+    auto DbgVar = SILDebugVariable::get(SGF.getModule(), decl->isLet(), ArgNo);
     Box = SGF.B.createAllocBox(decl, boxType, DbgVar);
 
     // Mark the memory as uninitialized, so DI will track it for us.
@@ -590,7 +590,7 @@ public:
     if (!EmitDebugValueOnInit)
       return;
     PrologueLoc.markAsPrologue();
-    SILDebugVariable DbgVar(vd->isLet(), /*ArgNo=*/0);
+    auto DbgVar = SILDebugVariable::get(SGF.getModule(), vd->isLet(), /*ArgNo=*/0);
     SGF.B.emitDebugDescription(PrologueLoc, value, DbgVar);
   }
 

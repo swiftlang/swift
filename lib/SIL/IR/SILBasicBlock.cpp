@@ -305,9 +305,9 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
       // Special handling for SILDebugVariable.
       if (auto DVI = DebugVarCarryingInst(&II))
         if (auto VarInfo = DVI.getVarInfo())
-          if (VarInfo->Scope)
+          if (VarInfo->getScope())
             DVI.setDebugVarScope(
-                ScopeCloner.getOrCreateClonedScope(VarInfo->Scope));
+                ScopeCloner.getOrCreateClonedScope(VarInfo->getScope()));
     }
   }
 }

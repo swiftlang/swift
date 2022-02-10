@@ -1283,8 +1283,8 @@ public:
 
     // Retrive debug variable type
     SILType DebugVarTy;
-    if (varInfo->Type)
-      DebugVarTy = *varInfo->Type;
+    if (varInfo->getType())
+      DebugVarTy = *varInfo->getType();
     else {
       // Fetch from related SSA value
       switch (inst->getKind()) {
@@ -1295,7 +1295,7 @@ public:
       case SILInstructionKind::DebugValueInst:
         DebugVarTy = inst->getOperand(0)->getType();
         if (DebugVarTy.isAddress()) {
-          auto Expr = varInfo->DIExpr.operands();
+          auto Expr = varInfo->getDIExpr().operands();
           if (!Expr.empty() &&
               Expr.begin()->getOperator() == SILDIExprOperator::Dereference)
             DebugVarTy = DebugVarTy.getObjectType();
@@ -1307,8 +1307,8 @@ public:
     }
 
     auto *debugScope = inst->getDebugScope();
-    if (varInfo->ArgNo)
-      require(!varInfo->Name.empty(), "function argument without a name");
+    if (varInfo->getArgNo())
+      require(!varInfo->getName().empty(), "function argument without a name");
 
     // Check that there is at most one debug variable defined for each argument
     // slot if our debug scope is not an inlined call site.
@@ -1317,10 +1317,10 @@ public:
     // information (stored in the SILDebugScope) from debug-variable-carrying
     // instructions.
     if (debugScope && !debugScope->InlinedCallSite)
-      if (unsigned argNum = varInfo->ArgNo) {
+      if (unsigned argNum = varInfo->getArgNo()) {
         // It is a function argument.
         if (argNum < DebugVars.size() && !DebugVars[argNum].first.empty()) {
-          require(DebugVars[argNum].first == varInfo->Name,
+          require(DebugVars[argNum].first == varInfo->getName(),
                   "Scope contains conflicting debug variables for one function "
                   "argument");
           // Check for type
@@ -1332,17 +1332,17 @@ public:
             DebugVars.push_back({StringRef(), SILType()});
           }
         }
-        DebugVars[argNum] = {varInfo->Name, DebugVarTy};
+        DebugVars[argNum] = {varInfo->getName(), DebugVarTy};
       }
 
     // Check the (auxiliary) debug variable scope
-    if (const SILDebugScope *VarDS = varInfo->Scope)
+    if (const SILDebugScope *VarDS = varInfo->getScope())
       require(VarDS->getInlinedFunction() == debugScope->getInlinedFunction(),
               "Scope of the debug variable should have the same parent function"
               " as that of instruction.");
 
     // Check debug info expression
-    if (const auto &DIExpr = varInfo->DIExpr) {
+    if (const auto &DIExpr = varInfo->getDIExprRef()) {
       for (auto It = DIExpr.element_begin(), ItEnd = DIExpr.element_end();
            It != ItEnd;) {
         require(It->getKind() == SILDIExprElement::OperatorKind,

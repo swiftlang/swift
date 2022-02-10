@@ -367,15 +367,15 @@ public:
   Optional<SILDebugVariable>
   substituteAnonymousArgs(llvm::SmallString<4> Name,
                           Optional<SILDebugVariable> Var, SILLocation Loc) {
-    if (!Var || !Var->ArgNo || !Var->Name.empty())
+    if (!Var || !Var->getArgNo() || !Var->getName().empty())
       return Var;
 
     auto *VD = Loc.getAsASTNode<VarDecl>();
     if (VD && !VD->getName().empty())
       return Var;
 
-    llvm::raw_svector_ostream(Name) << '_' << (Var->ArgNo - 1);
-    Var->Name = Name;
+    llvm::raw_svector_ostream(Name) << '_' << (Var->getArgNo() - 1);
+    Var = Var->withName(F->getModule(), Name);
     return Var;
   }
 

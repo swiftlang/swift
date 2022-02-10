@@ -422,7 +422,7 @@ private:
     if (auto debugInfo = findDebugLocationAndVariable(originalValue)) {
       LLVM_DEBUG({
         auto &s = getADDebugStream();
-        s << "Found debug variable: \"" << debugInfo->second.Name
+        s << "Found debug variable: \"" << debugInfo->second.getName()
           << "\"\nLocation: ";
         debugInfo->first.getLocation().print(s, getASTContext().SourceMgr);
         s << '\n';
@@ -474,7 +474,7 @@ private:
     if (auto debugInfo = findDebugLocationAndVariable(originalValue)) {
       LLVM_DEBUG({
         auto &s = getADDebugStream();
-        s << "Found debug variable: \"" << debugInfo->second.Name
+        s << "Found debug variable: \"" << debugInfo->second.getName()
           << "\"\nLocation: ";
         debugInfo->first.getLocation().print(s, getASTContext().SourceMgr);
         s << '\n';
@@ -1435,7 +1435,7 @@ public:
       // Allocate a local buffer and store the adjoint value. This buffer will
       // be used for accumulation into the adjoint buffer.
       auto adjBuf = builder.createAllocStack(
-          loc, adjVal->getType(), SILDebugVariable());
+          loc, adjVal->getType(), SILDebugVariable::get(builder.getModule()));
       auto copy = builder.emitCopyValueOperation(loc, adjVal);
       builder.emitStoreValueOperation(loc, copy, adjBuf,
                                       StoreOwnershipQualifier::Init);

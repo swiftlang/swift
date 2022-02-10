@@ -2449,9 +2449,9 @@ bool IRGenDebugInfoImpl::handleFragmentDIExpr(
 
 bool IRGenDebugInfoImpl::buildDebugInfoExpression(
     const SILDebugVariable &VarInfo, SmallVectorImpl<uint64_t> &Operands) {
-  assert(VarInfo.DIExpr && "SIL debug info expression not found");
+  assert(VarInfo.getDIExpr() && "SIL debug info expression not found");
 
-  const auto &DIExpr = VarInfo.DIExpr;
+  const auto &DIExpr = VarInfo.getDIExpr();
   for (const SILDIExprOperand &ExprOperand : DIExpr.operands()) {
     switch (ExprOperand.getOperator()) {
     case SILDIExprOperator::Fragment:
@@ -2505,7 +2505,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
-  uint16_t ArgNo = VarInfo.ArgNo;
+  uint16_t ArgNo = VarInfo.getArgNo();
   if (ArgNo > 0) {
     while (isa<llvm::DILexicalBlock>(Scope))
       Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
@@ -2514,13 +2514,13 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   llvm::DIFile *Unit = getFile(Scope);
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   assert(DITy && "could not determine debug type of variable");
-  if (VarInfo.Constant)
+  if (VarInfo.isConstant())
     DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
 
   unsigned DInstLine = DInstLoc.line;
 
   // Self is always an artificial argument, so are variables without location.
-  if (!DInstLine || (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
+  if (!DInstLine || (ArgNo > 0 && VarInfo.getName() == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
@@ -2530,15 +2530,15 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   // Create the descriptor for the variable.
   unsigned DVarLine = DInstLine;
   uint16_t DVarCol = 0;
-  if (VarInfo.Loc) {
-    auto DVarLoc = getStartLocation(VarInfo.Loc);
+  if (VarInfo.getLoc()) {
+    auto DVarLoc = getStartLocation(VarInfo.getLoc());
     DVarLine = DVarLoc.line;
     DVarCol = DVarLoc.column;
   }
   llvm::DIScope *VarScope = Scope;
-  if (ArgNo == 0 && VarInfo.Scope) {
+  if (ArgNo == 0 && VarInfo.getScope()) {
     if (auto *VS = dyn_cast_or_null<llvm::DILocalScope>(
-            getOrCreateScope(VarInfo.Scope))) {
+            getOrCreateScope(VarInfo.getScope()))) {
       VarScope = VS;
     }
   }
@@ -2546,7 +2546,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   // Get or create the DILocalVariable.
   llvm::DILocalVariable *Var;
   // VarInfo.Name points into tail-allocated storage in debug_value insns.
-  llvm::StringRef UniqueName = VarNames.insert(VarInfo.Name).first->getKey();
+  llvm::StringRef UniqueName = VarNames.insert(VarInfo.getName()).first->getKey();
   VarID Key(VarScope, UniqueName, DVarLine, DVarCol);
   auto CachedVar = LocalVarCache.find(Key);
   if (CachedVar != LocalVarCache.end()) {
@@ -2558,16 +2558,16 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     bool Preserve = true;
     if (ArgNo > 0)
       Var = DBuilder.createParameterVariable(
-          VarScope, VarInfo.Name, ArgNo, Unit, DVarLine, DITy, Preserve, Flags);
+          VarScope, VarInfo.getName(), ArgNo, Unit, DVarLine, DITy, Preserve, Flags);
     else
-      Var = DBuilder.createAutoVariable(VarScope, VarInfo.Name, Unit, DVarLine,
+      Var = DBuilder.createAutoVariable(VarScope, VarInfo.getName(), Unit, DVarLine,
                                         DITy, Preserve, Flags);
     LocalVarCache.insert({Key, llvm::TrackingMDNodeRef(Var)});
   }
 
   auto appendDIExpression =
       [&VarInfo, this](llvm::DIExpression *DIExpr) -> llvm::DIExpression * {
-    if (VarInfo.DIExpr) {
+    if (VarInfo.getDIExpr()) {
       llvm::SmallVector<uint64_t, 2> Operands;
       if (!buildDebugInfoExpression(VarInfo, Operands))
         return nullptr;
@@ -2777,7 +2777,8 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          {}, {OS.str().str(), 0, false},
+                          {}, SILDebugVariable::get(IGF.getSILModule(),
+                                                    OS.str().str(), 0, false),
                           // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.

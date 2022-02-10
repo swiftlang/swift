@@ -2530,7 +2530,8 @@ void PatternMatchEmission::emitSharedCaseBlocks(
 
       // Emit a debug description of the incoming arg, nested within the scope
       // for the pattern match.
-      SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+      auto dbgVar = SILDebugVariable::get(SGF.getModule(),
+                                          vd->isLet(), /*ArgNo=*/0);
       SGF.B.emitDebugDescription(vd, mv.getValue(), dbgVar);
 
       if (vd->isLet()) {
@@ -2696,7 +2697,8 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
 
           // Emit a debug description for the variable, nested within a scope
           // for the pattern match.
-          SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+          auto dbgVar = SILDebugVariable::get(SGF.getModule(), vd->isLet(),
+                                              /*ArgNo=*/0);
           SGF.B.emitDebugDescription(vd, v.value, dbgVar);
         }
       }
@@ -3034,7 +3036,8 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
 
             // Emit a debug description of the incoming arg, nested within the scope
             // for the pattern match.
-            SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
+            auto dbgVar = SILDebugVariable::get(B.getModule(), vd->isLet(),
+                                                /*ArgNo=*/0);
             B.emitDebugDescription(vd, v.value, dbgVar);
           }
         }

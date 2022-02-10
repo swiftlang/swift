@@ -224,7 +224,7 @@ bool swift::hasOnlyEndOfScopeOrEndOfLifetimeUses(SILInstruction *inst) {
                              OptimizationMode::NoOptimization)
         if (auto DbgVarInst = DebugVarCarryingInst(user)) {
           auto VarInfo = DbgVarInst.getVarInfo();
-          if (VarInfo && !VarInfo->Implicit)
+          if (VarInfo && !VarInfo->isImplicit())
             return false;
         }
     }
@@ -1822,25 +1822,27 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       auto VarInfo = DbgInst->getVarInfo();
       if (!VarInfo)
         continue;
-      if (VarInfo->DIExpr.hasFragment())
+      if (VarInfo->hasFragment())
         // Since we can't merge two different op_fragment
         // now, we're simply bailing out if there is an
         // existing op_fragment in DIExpresison.
         // TODO: Try to merge two op_fragment expressions here.
         continue;
       for (VarDecl *FD : FieldDecls) {
-        SILDebugVariable NewVarInfo = *VarInfo;
+        auto NewVarInfo = *VarInfo;
+        SILDebugVariable::Builder Builder(STI->getModule(),
+                                          NewVarInfo);
         auto FieldVal = STI->getFieldValue(FD);
         // Build the corresponding fragment DIExpression
         auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
-        NewVarInfo.DIExpr.append(FragDIExpr);
+        Builder.appendingDIExprElements(FragDIExpr.getElementArray());
 
-        if (!NewVarInfo.Type)
-          NewVarInfo.Type = STI->getType();
+        if (!NewVarInfo.getType())
+          Builder.withType(STI->getType());
 
         // Create a new debug_value
         SILBuilder(DbgInst, DbgInst->getDebugScope())
-          .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+          .createDebugValue(DbgInst->getLoc(), FieldVal, std::move(Builder).finalize());
       }
     }
   }
@@ -1864,10 +1866,13 @@ void swift::salvageDebugInfo(SILInstruction *I) {
           auto VarInfo = DbgInst->getVarInfo();
           if (!VarInfo)
             continue;
-          VarInfo->DIExpr.prependElements(ExprElements);
+          SILDebugVariable::Builder Builder(DbgInst->getModule(),
+                                            *VarInfo);
+          Builder.prependingDIExprElements(ExprElements);
           // Create a new debug_value
           SILBuilder(DbgInst, DbgInst->getDebugScope())
-            .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
+            .createDebugValue(DbgInst->getLoc(), Base,
+                              std::move(Builder).finalize());
         }
       }
   }
@@ -1886,22 +1891,23 @@ void swift::createDebugFragments(SILValue oldValue, Projection proj,
 
     // Can't create a fragment of a fragment.
     auto varInfo = debugVal->getVarInfo();
-    if (!varInfo || varInfo->DIExpr.hasFragment())
+    if (!varInfo || varInfo->hasFragment())
       continue;
 
     SILType baseType = oldValue->getType();
 
     // Copy VarInfo and add the corresponding fragment DIExpression.
     SILDebugVariable newVarInfo = *varInfo;
-    newVarInfo.DIExpr.append(
-        SILDebugInfoExpression::createFragment(proj.getVarDecl(baseType)));
+    SILDebugVariable::Builder builder(debugVal->getModule(), newVarInfo);
+    builder.appendingDIExprElements(
+        SILDebugInfoExpression::createFragment(proj.getVarDecl(baseType)).getElementArray());
 
-    if (!newVarInfo.Type)
-      newVarInfo.Type = baseType;
+    if (!newVarInfo.getType())
+      builder.withType(baseType);
 
     // Create a new debug_value
     SILBuilder(debugVal, debugVal->getDebugScope())
-        .createDebugValue(debugVal->getLoc(), newValue, newVarInfo);
+      .createDebugValue(debugVal->getLoc(), newValue, std::move(builder).finalize());
   }
 }
 

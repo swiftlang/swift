@@ -116,11 +116,11 @@ static void *allocateDebugVarCarryingInst(SILModule &M,
                                           Optional<SILDebugVariable> Var,
                                           ArrayRef<SILValue> Operands = {}) {
   return M.allocateInst(
-      sizeof(INST) + (Var ? Var->Name.size() : 0) +
-          (Var && Var->Type ? sizeof(SILType) : 0) +
-          (Var && Var->Loc ? sizeof(SILLocation) : 0) +
-          (Var && Var->Scope ? sizeof(const SILDebugScope *) : 0) +
-          sizeof(SILDIExprElement) * (Var ? Var->DIExpr.getNumElements() : 0) +
+      sizeof(INST) + (Var ? Var->getName().size() : 0) +
+      (Var && Var->getType() ? sizeof(SILType) : 0) +
+      (Var && Var->getLoc() ? sizeof(SILLocation) : 0) +
+      (Var && Var->getScope() ? sizeof(const SILDebugScope *) : 0) +
+      sizeof(SILDIExprElement) * (Var ? Var->getDIExpr().getNumElements() : 0) +
           sizeof(Operand) * Operands.size(),
       alignof(INST));
 }
@@ -135,21 +135,21 @@ TailAllocatedDebugVariable::TailAllocatedDebugVariable(
   }
 
   Bits.Data.HasValue = true;
-  Bits.Data.Constant = Var->Constant;
-  Bits.Data.ArgNo = Var->ArgNo;
-  Bits.Data.Implicit = Var->Implicit;
-  Bits.Data.NameLength = Var->Name.size();
-  assert(Bits.Data.ArgNo == Var->ArgNo && "Truncation");
-  assert(Bits.Data.NameLength == Var->Name.size() && "Truncation");
-  memcpy(buf, Var->Name.data(), Bits.Data.NameLength);
-  if (AuxVarType && Var->Type)
-    *AuxVarType = *Var->Type;
-  if (DeclLoc && Var->Loc)
-    *DeclLoc = *Var->Loc;
-  if (DeclScope && Var->Scope)
-    *DeclScope = Var->Scope;
+  Bits.Data.Constant = Var->isConstant();
+  Bits.Data.ArgNo = Var->getArgNo();
+  Bits.Data.Implicit = Var->isImplicit();
+  Bits.Data.NameLength = Var->getName().size();
+  assert(Bits.Data.ArgNo == Var->getArgNo() && "Truncation");
+  assert(Bits.Data.NameLength == Var->getName().size() && "Truncation");
+  memcpy(buf, Var->getName().data(), Bits.Data.NameLength);
+  if (AuxVarType && Var->getType())
+    *AuxVarType = *Var->getType();
+  if (DeclLoc && Var->getLoc())
+    *DeclLoc = *Var->getLoc();
+  if (DeclScope && Var->getScope())
+    *DeclScope = Var->getScope();
   if (DIExprOps) {
-    llvm::ArrayRef<SILDIExprElement> Ops(Var->DIExpr.Elements);
+    llvm::ArrayRef<SILDIExprElement> Ops(Var->getDIExpr().Elements);
     memcpy(DIExprOps, Ops.data(), sizeof(SILDIExprElement) * Ops.size());
   }
 }
@@ -165,10 +165,10 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                SILFunction &F, Optional<SILDebugVariable> Var,
                                bool hasDynamicLifetime, bool isLexical)
     : InstructionBase(Loc, elementType.getAddressType()),
-      SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
-                                 Var ? Var->Type.hasValue() : false,
-                                 Var ? Var->Loc.hasValue() : false,
-                                 Var ? Var->Scope != nullptr : false),
+      SILDebugVariableSupplement(Var ? Var->getDIExpr().getNumElements() : 0,
+                                 Var ? Var->getType().hasValue() : false,
+                                 Var ? Var->getLoc().hasValue() : false,
+                                 Var ? Var->getScope() != nullptr : false),
       dynamicLifetime(hasDynamicLifetime), lexical(isLexical) {
   SILNode::Bits.AllocStackInst.NumOperands =
     TypeDependentOperands.size();
@@ -294,7 +294,7 @@ AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
-                                                   Var ? Var->Name.size() : 0);
+                                                   Var ? Var->getName().size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
   return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
                                   hasDynamicLifetime);
@@ -309,9 +309,9 @@ SILType AllocBoxInst::getAddressType() const {
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                SILDebugVariable Var, bool poisonRefs)
     : UnaryInstructionBase(DebugLoc, Operand),
-      SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
-                                 Var.Type.hasValue(), Var.Loc.hasValue(),
-                                 Var.Scope),
+      SILDebugVariableSupplement(Var.getDIExpr().getNumElements(),
+                                 Var.getType().hasValue(), Var.getLoc().hasValue(),
+                                 Var.getScope()),
       VarInfo(Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
@@ -334,8 +334,7 @@ DebugValueInst *DebugValueInst::createAddr(SILDebugLocation DebugLoc,
   // For alloc_stack, debug_value is used to annotate the associated
   // memory location, so we shouldn't attach op_deref.
   if (!isa<AllocStackInst>(Operand))
-    Var.DIExpr.prependElements(
-      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+    Var = Var.withDereference(M);
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf) DebugValueInst(DebugLoc, Operand, Var,
                                     /*poisonRefs=*/false);

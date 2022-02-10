@@ -1284,36 +1284,36 @@ public:
     if (!Var)
       return;
 
-    if (!Var->Name.empty()) {
-      if (Var->Constant)
+    if (!Var->getName().empty()) {
+      if (Var->isConstant())
         *this << ", let";
       else
         *this << ", var";
 
-      if ((Var->Loc || Var->Scope) && SM) {
-        *this << ", (name \"" << Var->Name << '"';
-        if (Var->Loc)
-          printDebugLocRef(*Var->Loc, *SM);
-        if (Var->Scope)
-          printDebugScopeRef(Var->Scope, *SM);
+      if ((Var->getLoc() || Var->getScope()) && SM) {
+        *this << ", (name \"" << Var->getName() << '"';
+        if (Var->getLoc())
+          printDebugLocRef(*Var->getLoc(), *SM);
+        if (Var->getScope())
+          printDebugScopeRef(Var->getScope(), *SM);
         *this << ")";
       } else
-        *this << ", name \"" << Var->Name << '"';
+        *this << ", name \"" << Var->getName() << '"';
 
-      if (Var->ArgNo)
-        *this << ", argno " << Var->ArgNo;
-      if (Var->Implicit)
+      if (Var->getArgNo())
+        *this << ", argno " << Var->getArgNo();
+      if (Var->isImplicit())
         *this << ", implicit";
-      if (Var->Type) {
+      if (Var->getType()) {
         *this << ", type ";
-        Var->Type->print(PrintState.OS, PrintState.ASTOptions);
+        Var->getType()->print(PrintState.OS, PrintState.ASTOptions);
       }
     }
     // Although it's rare in real-world use cases, but during testing,
     // sometimes we want to print out di-expression, even the debug
     // variable name is empty.
-    if (Var->DIExpr)
-      printDebugInfoExpression(Var->DIExpr);
+    if (Var->getDIExpr())
+      printDebugInfoExpression(Var->getDIExpr());
   }
 
   void visitAllocStackInst(AllocStackInst *AVI) {

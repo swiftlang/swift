@@ -545,7 +545,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     if (auto *use = getSingleDebugUse(markedValue)) {
       DebugVarCarryingInst debugVar(use->getUser());
       if (auto varInfo = debugVar.getVarInfo()) {
-        varName = varInfo->Name;
+        varName = varInfo->getName();
       } else {
         if (auto *decl = debugVar.getDecl()) {
           varName = decl->getBaseName().userFacingName();

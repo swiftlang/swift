@@ -262,8 +262,8 @@ public:
     if (!DbgVarInst)
       return;
     auto VarInfo = DbgVarInst.getVarInfo();
-    if (VarInfo && VarInfo->Scope)
-      DbgVarInst.setDebugVarScope(getOpScope(VarInfo->Scope));
+    if (VarInfo && VarInfo->getScope())
+      DbgVarInst.setDebugVarScope(getOpScope(VarInfo->getScope()));
   }
 
   ProtocolConformanceRef getOpConformance(Type ty,

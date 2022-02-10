@@ -1818,7 +1818,7 @@ public:
   void setImplicit(bool V = true) { Bits.Data.Implicit = V; }
 
   Optional<SILDebugVariable>
-  get(VarDecl *VD, const char *buf, Optional<SILType> AuxVarType = {},
+  get(SILModule &mod, VarDecl *VD, const char *buf, Optional<SILType> AuxVarType = {},
       Optional<SILLocation> DeclLoc = {},
       const SILDebugScope *DeclScope = nullptr,
       llvm::ArrayRef<SILDIExprElement> DIExprElements = {}) const {
@@ -1828,8 +1828,9 @@ public:
     StringRef name = getName(buf);
     if (VD && name.empty())
       name = VD->getName().str();
-    return SILDebugVariable(name, isLet(), getArgNo(), isImplicit(), AuxVarType,
-                            DeclLoc, DeclScope, DIExprElements);
+    return SILDebugVariable::get(mod, name, isLet(), getArgNo(), isImplicit(),
+                                 AuxVarType, DeclLoc, DeclScope,
+                                 DIExprElements);
   }
 };
 static_assert(sizeof(TailAllocatedDebugVariable) == 4,
@@ -1983,8 +1984,8 @@ public:
 
     auto RawValue = SILNode::Bits.AllocStackInst.VarInfo;
     auto VI = TailAllocatedDebugVariable(RawValue);
-    return VI.get(getDecl(), getTrailingObjects<char>(), AuxVarType, VarDeclLoc,
-                  VarDeclScope, DIExprElements);
+    return VI.get(getModule(), getDecl(), getTrailingObjects<char>(),
+                  AuxVarType, VarDeclLoc, VarDeclScope, DIExprElements);
   }
 
   bool isLet() const {
@@ -2219,7 +2220,7 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
-    return VarInfo.get(getDecl(), getTrailingObjects<char>());
+    return VarInfo.get(getModule(), getDecl(), getTrailingObjects<char>());
   };
 
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -4728,8 +4729,8 @@ public:
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
 
-    return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DIExprElements);
+    return VarInfo.get(getModule(), getDecl(), getTrailingObjects<char>(),
+                       AuxVarType, VarDeclLoc, VarDeclScope, DIExprElements);
   }
 
   void setDebugVarScope(const SILDebugScope *NewDS) {

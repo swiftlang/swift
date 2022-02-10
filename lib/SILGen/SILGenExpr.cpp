@@ -1032,14 +1032,14 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
   ty = ty.getObjectType();
   Optional<SILDebugVariable> DbgVar;
   if (auto *VD = loc.getAsASTNode<VarDecl>())
-    DbgVar = SILDebugVariable(VD->isLet(), 0);
+    DbgVar = SILDebugVariable::get(getModule(), VD->isLet(), 0);
   // Recognize "catch let errorvar" bindings.
   if (auto *DRE = loc.getAsASTNode<DeclRefExpr>())
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
       if (!isa<ParamDecl>(VD) && VD->isImplicit() &&
           VD->getType()->isExistentialType() &&
           VD->getType()->getExistentialLayout().isErrorExistential()) {
-        DbgVar = SILDebugVariable(VD->isLet(), 0);
+        DbgVar = SILDebugVariable::get(getModule(), VD->isLet(), 0);
         loc = SILLocation(VD);
       }
   auto *alloc =
