@@ -73,8 +73,14 @@ Solution ConstraintSystem::finalize() {
 
   // Update the best score we've seen so far.
   auto &ctx = getASTContext();
-  assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
-         !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+  if (isForCodeCompletion()) {
+    assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
+           !solverState->BestScore ||
+           CurrentScore.Data[SK_Fix] <= solverState->BestScore->Data[SK_Fix]);
+  } else {
+    assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
+           !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+  }
 
   if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
     solverState->BestScore = CurrentScore;

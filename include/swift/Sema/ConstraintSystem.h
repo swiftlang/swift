@@ -365,6 +365,10 @@ public:
 
   bool isTypeSequence() const;
 
+  /// Determine whether this type variable represents a code completion
+  /// expression.
+  bool isCodeCompletionToken() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -3032,10 +3036,25 @@ private:
     if (solutions.size() < 2)
       return;
 
-    if (auto best = findBestSolution(solutions, minimize)) {
-      if (*best != 0)
-        solutions[0] = std::move(solutions[*best]);
-      solutions.erase(solutions.begin() + 1, solutions.end());
+    if (isForCodeCompletion()) {
+      // For code completion remove solutions that have more fixes than the
+      // minimum but don't filter based on the lower-priority scores because we
+      // want to show all options even if they need to go through more
+      // conversions.
+      Score minScore = std::min_element(solutions.begin(), solutions.end(),
+                                        [](const Solution &a, const Solution &b) {
+        return a.getFixedScore() < b.getFixedScore();
+      })->getFixedScore();
+
+      llvm::erase_if(solutions, [&](const Solution &S) {
+        return S.getFixedScore().Data[SK_Fix] > minScore.Data[SK_Fix];
+      });
+    } else {
+      if (auto best = findBestSolution(solutions, minimize)) {
+        if (*best != 0)
+          solutions[0] = std::move(solutions[*best]);
+        solutions.erase(solutions.begin() + 1, solutions.end());
+      }
     }
   }
 

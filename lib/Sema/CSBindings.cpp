@@ -1788,7 +1788,12 @@ bool TypeVarBindingProducer::computeNext() {
     // Allow solving for T even for a binding kind where that's invalid
     // if fixes are allowed, because that gives us the opportunity to
     // match T? values to the T binding by adding an unwrap fix.
-    if (binding.Kind == BindingKind::Subtypes || CS.shouldAttemptFixes()) {
+    // But don't allow it when solving for code completion because otherwise
+    // we might also receive T as a contextual type and we can't differentiate
+    // that completion results should only be considered to have a convertible,
+    // not identical type relation.
+    if ((binding.Kind == BindingKind::Subtypes || CS.shouldAttemptFixes()) &&
+        !TypeVar->getImpl().isCodeCompletionToken()) {
       // If we were unsuccessful solving for T?, try solving for T.
       if (auto objTy = type->getOptionalObjectType()) {
         // If T is a type variable, only attempt this if both the
