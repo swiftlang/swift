@@ -209,9 +209,9 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
     returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
-    Act.ID == ActorID,
-    Err: Error,
-    Res: SerializationRequirement {
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
     throw ExecuteDistributedTargetError(message: "Not implemented.")
   }
 

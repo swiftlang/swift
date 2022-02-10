@@ -1,0 +1,76 @@
+//===-- DistributedDecl.h - Distributed declaration utils -------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file provides functions for working with declarations of distributed
+// actors and declarations related to them, like associated types and protocols.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_DECL_TYPECHECKDISTRIBUTED_H
+#define SWIFT_DECL_TYPECHECKDISTRIBUTED_H
+
+#include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Type.h"
+
+namespace swift {
+
+class ClassDecl;
+class ConstructorDecl;
+class Decl;
+class DeclContext;
+class FuncDecl;
+class NominalTypeDecl;
+
+/// Determine the distributed actor transport type for the given actor.
+Type getDistributedActorSystemType(NominalTypeDecl *actor);
+
+/// Determine the distributed actor identity type for the given actor.
+Type getDistributedActorIDType(NominalTypeDecl *actor);
+
+Type getDistributedActorSystemSerializationRequirementType(
+    NominalTypeDecl *system);
+
+/// Determine the serialization requirement for the given actor, actor system
+/// or other type that has the SerializationRequirement associated type.
+Type getDistributedSerializationRequirementType(NominalTypeDecl *nominal);
+
+/// Get the specific protocols that the `SerializationRequirement` specifies,
+/// and all parameters / return types of distributed targets must conform to.
+///
+/// E.g. if a system declares `typealias SerializationRequirement = Codable`
+/// then this will return `{encodableProtocol, decodableProtocol}`.
+///
+/// Returns an empty set if the requirement was `Any`.
+llvm::SmallPtrSet<ProtocolDecl *, 2>
+getDistributedSerializationRequirementProtocols(NominalTypeDecl *decl);
+
+llvm::SmallPtrSet<ProtocolDecl *, 2>
+flattenDistributedSerializationTypeToRequiredProtocols(
+    TypeBase *serializationRequirement);
+
+/// Check if the `allRequirements` represent *exactly* the
+/// `Encodable & Decodable` (also known as `Codable`) requirement.
+/// If so, we can emit slightly nicer diagnostics.
+bool checkDistributedSerializationRequirementIsExactlyCodable(
+    ASTContext &C,
+    const llvm::SmallPtrSetImpl<ProtocolDecl *> &allRequirements);
+
+/// Given any set of generic requirements, locate those which are about the
+/// `SerializationRequirement`. Those need to be applied in the parameter and
+/// return type checking of distributed targets.
+llvm::SmallPtrSet<ProtocolDecl *, 2>
+extractDistributedSerializationRequirements(
+    ASTContext &C, ArrayRef<Requirement> allRequirements);
+}
+
+#endif /* SWIFT_DECL_TYPECHECKDISTRIBUTED_H */

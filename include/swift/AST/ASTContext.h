@@ -1351,6 +1351,9 @@ public:
   /// alternative specified via the -entry-point-function-name frontend flag.
   std::string getEntryPointFunctionName() const;
 
+  Type getAssociatedTypeOfDistributedSystem(NominalTypeDecl *actor,
+                                            Identifier member);
+
   /// Find the type of SerializationRequirement on the passed nominal.
   ///
   /// This type exists as a typealias/associatedtype on all distributed actors,

@@ -60,44 +60,6 @@ bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
 /// They are effectively checked the same way as argument-less methods.
 bool checkDistributedActorProperty(VarDecl *decl, bool diagnose);
 
-/// Determine the distributed actor transport type for the given actor.
-Type getDistributedActorSystemType(NominalTypeDecl *actor);
-
-/// Determine the distributed actor identity type for the given actor.
-Type getDistributedActorIDType(NominalTypeDecl *actor);
-
-/// Determine the serialization requirement for the given actor, actor system
-/// or other type that has the SerializationRequirement associated type.
-Type getDistributedSerializationRequirementType(NominalTypeDecl *nominal);
-
-/// Get the specific protocols that the `SerializationRequirement` specifies,
-/// and all parameters / return types of distributed targets must conform to.
-///
-/// E.g. if a system declares `typealias SerializationRequirement = Codable`
-/// then this will return `{encodableProtocol, decodableProtocol}`.
-///
-/// Returns an empty set if the requirement was `Any`.
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-getDistributedSerializationRequirementProtocols(NominalTypeDecl *decl);
-
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-flattenDistributedSerializationTypeToRequiredProtocols(
-    TypeBase *serializationRequirement);
-
-/// Check if the `allRequirements` represent *exactly* the
-/// `Encodable & Decodable` (also known as `Codable`) requirement.
-/// If so, we can emit slightly nicer diagnostics.
-bool checkDistributedSerializationRequirementIsExactlyCodable(
-    ASTContext &C,
-    const llvm::SmallPtrSetImpl<ProtocolDecl *> &allRequirements);
-
-/// Given any set of generic requirements, locate those which are about the
-/// `SerializationRequirement`. Those need to be applied in the parameter and
-/// return type checking of distributed targets.
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-extractDistributedSerializationRequirements(
-    ASTContext &C, ArrayRef<Requirement> allRequirements);
-
 /// Diagnose a distributed func declaration in a not-distributed actor protocol.
 void diagnoseDistributedFunctionInNonDistributedActorProtocol(
   const ProtocolDecl *proto, InFlightDiagnostic &diag);
