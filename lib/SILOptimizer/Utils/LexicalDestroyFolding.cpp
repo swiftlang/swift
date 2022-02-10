@@ -406,7 +406,7 @@ private:
   ///     possible)
   /// (2) hoist the end_borrow
   /// (3) delete the destroy_value
-  void fold(Match, SmallVectorImpl<int> const &rewritableArgumentIndices);
+  void fold(Match, ArrayRef<int> rewritableArgumentIndices);
 
   // The move_value [lexical] instruction that was added during the run.
   //
@@ -503,8 +503,7 @@ bool Rewriter::createMove() {
   return true;
 }
 
-void Rewriter::fold(Match candidate,
-                    SmallVectorImpl<int> const &rewritableArgumentIndices) {
+void Rewriter::fold(Match candidate, ArrayRef<int> rewritableArgumentIndices) {
   // First, rewrite the apply in terms of the move_value.
   unsigned argumentNumber = 0;
   for (auto index : rewritableArgumentIndices) {
