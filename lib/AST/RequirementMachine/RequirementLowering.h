@@ -40,7 +40,9 @@ namespace rewriting {
 // documentation
 // comments.
 
-void desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
+void desugarRequirement(Requirement req,
+                        SmallVectorImpl<Requirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
 
 void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
                        SmallVectorImpl<StructuralRequirement> &result);

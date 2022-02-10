@@ -477,6 +477,11 @@ AbstractGenericSignatureRequestRQM::evaluate(
       baseSignature.getRequirements().begin(),
       baseSignature.getRequirements().end());
 
+  // We need to create this errors vector to pass to
+  // desugarRequirement, but this request should never
+  // diagnose errors.
+  SmallVector<RequirementError, 4> errors;
+
   // The requirements passed to this request may have been substituted,
   // meaning the subject type might be a concrete type and not a type
   // parameter.
@@ -488,7 +493,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
   // requirements where the subject type is always a type parameter,
   // which is what the RuleBuilder expects.
   for (auto req : addedRequirements)
-    desugarRequirement(req, requirements);
+    desugarRequirement(req, requirements, errors);
 
   // Heap-allocate the requirement machine to save stack space.
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(

@@ -55,13 +55,16 @@ using namespace rewriting;
 /// side into a series of same-type and concrete-type requirements where the
 /// left hand side is always a type parameter.
 static void desugarSameTypeRequirement(Type lhs, Type rhs,
-                                       SmallVectorImpl<Requirement> &result) {
+                                       SmallVectorImpl<Requirement> &result,
+                                       SmallVectorImpl<RequirementError> &errors) {
   class Matcher : public TypeMatcher<Matcher> {
     SmallVectorImpl<Requirement> &result;
+    SmallVectorImpl<RequirementError> &errors;
 
   public:
-    explicit Matcher(SmallVectorImpl<Requirement> &result)
-      : result(result) {}
+    explicit Matcher(SmallVectorImpl<Requirement> &result,
+                     SmallVectorImpl<RequirementError> &errors)
+      : result(result), errors(errors) {}
 
     bool mismatch(TypeBase *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
@@ -86,7 +89,7 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs,
       // FIXME: Record concrete type conflict, diagnose upstream
       return true;
     }
-  } matcher(result);
+  } matcher(result, errors);
 
   if (lhs->hasError() || rhs->hasError())
     return;
@@ -97,7 +100,8 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs,
 
 static void desugarSuperclassRequirement(Type subjectType,
                                          Type constraintType,
-                                         SmallVectorImpl<Requirement> &result) {
+                                         SmallVectorImpl<Requirement> &result,
+                                         SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
     // FIXME: Perform unification, diagnose redundancy or conflict upstream
     return;
@@ -108,7 +112,8 @@ static void desugarSuperclassRequirement(Type subjectType,
 
 static void desugarLayoutRequirement(Type subjectType,
                                      LayoutConstraint layout,
-                                     SmallVectorImpl<Requirement> &result) {
+                                     SmallVectorImpl<Requirement> &result,
+                                     SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
     // FIXME: Diagnose redundancy or conflict upstream
     return;
@@ -133,7 +138,8 @@ static Type lookupMemberType(Type subjectType, ProtocolDecl *protoDecl,
 /// compositions on the right hand side into conformance and superclass
 /// requirements.
 static void desugarConformanceRequirement(Type subjectType, Type constraintType,
-                                          SmallVectorImpl<Requirement> &result) {
+                                          SmallVectorImpl<Requirement> &result,
+                                          SmallVectorImpl<RequirementError> &errors) {
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
     if (!subjectType->isTypeParameter()) {
@@ -152,7 +158,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
 
       // Introduce conditional requirements if the subject type is concrete.
       for (auto req : concrete->getConditionalRequirements()) {
-        desugarRequirement(req, result);
+        desugarRequirement(req, result, errors);
       }
       return;
     }
@@ -166,13 +172,13 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
     auto *protoDecl = paramType->getBaseType()->getDecl();
 
     desugarConformanceRequirement(subjectType, paramType->getBaseType(),
-                                  result);
+                                  result, errors);
 
     auto *assocType = protoDecl->getPrimaryAssociatedType();
 
     auto memberType = lookupMemberType(subjectType, protoDecl, assocType);
     desugarSameTypeRequirement(memberType, paramType->getArgumentType(),
-                               result);
+                               result, errors);
     return;
   }
 
@@ -180,14 +186,15 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
   if (compositionType->hasExplicitAnyObject()) {
     desugarLayoutRequirement(subjectType,
                              LayoutConstraint::getLayoutConstraint(
-                                 LayoutConstraintKind::Class), result);
+                                 LayoutConstraintKind::Class),
+                             result, errors);
   }
 
   for (auto memberType : compositionType->getMembers()) {
     if (memberType->isExistentialType())
-      desugarConformanceRequirement(subjectType, memberType, result);
+      desugarConformanceRequirement(subjectType, memberType, result, errors);
     else
-      desugarSuperclassRequirement(subjectType, memberType, result);
+      desugarSuperclassRequirement(subjectType, memberType, result, errors);
   }
 }
 
@@ -197,24 +204,29 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
 /// converted into rewrite rules by the RuleBuilder.
 void
 swift::rewriting::desugarRequirement(Requirement req,
-                                     SmallVectorImpl<Requirement> &result) {
+                                     SmallVectorImpl<Requirement> &result,
+                                     SmallVectorImpl<RequirementError> &errors) {
   auto firstType = req.getFirstType();
 
   switch (req.getKind()) {
   case RequirementKind::Conformance:
-    desugarConformanceRequirement(firstType, req.getSecondType(), result);
+    desugarConformanceRequirement(firstType, req.getSecondType(),
+                                  result, errors);
     break;
 
   case RequirementKind::Superclass:
-    desugarSuperclassRequirement(firstType, req.getSecondType(), result);
+    desugarSuperclassRequirement(firstType, req.getSecondType(),
+                                 result, errors);
     break;
 
   case RequirementKind::Layout:
-    desugarLayoutRequirement(firstType, req.getLayoutConstraint(), result);
+    desugarLayoutRequirement(firstType, req.getLayoutConstraint(),
+                             result, errors);
     break;
 
   case RequirementKind::SameType:
-    desugarSameTypeRequirement(firstType, req.getSecondType(), result);
+    desugarSameTypeRequirement(firstType, req.getSecondType(),
+                               result, errors);
     break;
   }
 }
@@ -235,10 +247,10 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
 
   if (constraintType->isConstraintType()) {
     // Handle conformance requirements.
-    desugarConformanceRequirement(subjectType, constraintType, reqs);
+    desugarConformanceRequirement(subjectType, constraintType, reqs, errors);
   } else if (constraintType->getClassOrBoundGenericClass()) {
     // Handle superclass requirements.
-    desugarSuperclassRequirement(subjectType, constraintType, reqs);
+    desugarSuperclassRequirement(subjectType, constraintType, reqs, errors);
   } else {
     errors.push_back(
         RequirementError::forInvalidConformance(subjectType,
@@ -258,6 +270,7 @@ namespace {
 struct InferRequirementsWalker : public TypeWalker {
   ModuleDecl *module;
   SmallVector<Requirement, 2> reqs;
+  SmallVector<RequirementError, 2> errors;
 
   explicit InferRequirementsWalker(ModuleDecl *module) : module(module) {}
 
@@ -277,7 +290,7 @@ struct InferRequirementsWalker : public TypeWalker {
       auto subMap = typeAlias->getSubstitutionMap();
       for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
         if (auto req = rawReq.subst(subMap))
-          desugarRequirement(*req, reqs);
+          desugarRequirement(*req, reqs, errors);
       }
 
       return Action::Continue;
@@ -297,14 +310,14 @@ struct InferRequirementsWalker : public TypeWalker {
         auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
           Requirement req(RequirementKind::Conformance, type,
                           protocol->getDeclaredInterfaceType());
-          desugarRequirement(req, reqs);
+          desugarRequirement(req, reqs, errors);
         };
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
           auto *protocol = assocType->getProtocol();
           auto secondType = lookupMemberType(firstType, protocol, assocType);
           Requirement req(RequirementKind::SameType, firstType, secondType);
-          desugarRequirement(req, reqs);
+          desugarRequirement(req, reqs, errors);
         };
         auto *tangentVectorAssocType =
             differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
@@ -343,7 +356,7 @@ struct InferRequirementsWalker : public TypeWalker {
     // FIXME: Inaccurate TypeReprs.
     for (const auto &rawReq : genericSig.getRequirements()) {
       if (auto req = rawReq.subst(subMap))
-        desugarRequirement(*req, reqs);
+        desugarRequirement(*req, reqs, errors);
     }
 
     return Action::Continue;
@@ -408,7 +421,8 @@ void swift::rewriting::realizeRequirement(
     }
 
     SmallVector<Requirement, 2> reqs;
-    desugarLayoutRequirement(firstType, req.getLayoutConstraint(), reqs);
+    desugarLayoutRequirement(firstType, req.getLayoutConstraint(),
+                             reqs, errors);
 
     for (auto req : reqs)
       result.push_back({req, loc, /*wasInferred=*/false});
@@ -429,7 +443,7 @@ void swift::rewriting::realizeRequirement(
     }
 
     SmallVector<Requirement, 2> reqs;
-    desugarSameTypeRequirement(req.getFirstType(), secondType, reqs);
+    desugarSameTypeRequirement(req.getFirstType(), secondType, reqs, errors);
 
     for (auto req : reqs)
       result.push_back({req, loc, /*wasInferred=*/false});
@@ -615,6 +629,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   assert(!proto->hasLazyRequirementSignature());
 
   SmallVector<Requirement, 2> result;
+  SmallVector<RequirementError, 2> errors;
 
   auto &ctx = proto->getASTContext();
 
@@ -656,7 +671,8 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   // within this protocol or a protocol it inherits.
   auto recordInheritedTypeRequirement = [&](TypeDecl *first, TypeDecl *second) {
     desugarSameTypeRequirement(getStructuralType(first),
-                               getStructuralType(second), result);
+                               getStructuralType(second),
+                               result, errors);
   };
 
   // Local function to find the insertion point for the protocol's "where"
