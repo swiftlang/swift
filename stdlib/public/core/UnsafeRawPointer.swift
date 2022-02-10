@@ -1189,9 +1189,8 @@ public struct UnsafeMutableRawPointer: _Pointer {
 
   /// Stores the given value's bytes into raw memory at the specified offset.
   ///
-  /// The type `T` to be stored must be a trivial type. The memory at this
-  /// pointer plus `offset` must be properly aligned for accessing `T`. The
-  /// memory must also be uninitialized, initialized to `T`, or initialized to
+  /// The type `T` to be stored must be a trivial type. The memory
+  /// must also be uninitialized, initialized to `T`, or initialized to
   /// another trivial type that is layout compatible with `T`.
   ///
   /// After calling `storeBytes(of:toByteOffset:as:)`, the memory is
@@ -1205,14 +1204,14 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   Swift types that do not contain strong or weak references or other
   ///   forms of indirection are trivial, as are imported C structs and enums.
   ///
-  /// If you need to store a copy of a nontrivial value into memory, or to
-  /// store a value into memory that contains a nontrivial value, you cannot
-  /// use the `storeBytes(of:toByteOffset:as:)` method. Instead, you must know
-  /// the type of value previously in memory and initialize or assign the
-  /// memory. For example, to replace a value stored in a raw pointer `p`,
+  /// If you need to store into memory a copy of a value of a type that isn't
+  /// trivial, you cannot use the `storeBytes(of:toByteOffset:as:)` method.
+  /// Instead, you must know either initialize the memory or,
+  /// if you know the memory was already bound to `type`, assign to the memory.
+  /// For example, to replace a value stored in a raw pointer `p`,
   /// where `U` is the current type and `T` is the new type, use a typed
   /// pointer to access and deinitialize the current value before initializing
-  /// the memory with a new value.
+  /// the memory with a new value:
   ///
   ///     let typedPointer = p.bindMemory(to: U.self, capacity: 1)
   ///     typedPointer.deinitialize(count: 1)
@@ -1224,7 +1223,40 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
   @inlinable
+  @_alwaysEmitIntoClient
+  @_silgen_name("_swift_se0349_UnsafeMutableRawPointer_storeBytes")
   public func storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
+    _debugPrecondition(_isPOD(T.self))
+
+    withUnsafePointer(to: value) { source in
+      // FIXME: to be replaced by _memcpy when conversions are implemented.
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        (self + offset)._rawValue,
+        source._rawValue,
+        UInt64(MemoryLayout<T>.size)._value,
+        /*volatile:*/ false._value
+      )
+    }
+  }
+
+  // This unavailable implementation uses the expected mangled name
+  // of `storeBytes<T>(of:toByteOffset:as:)`, and provides an entry point for
+  // any binary compiled against the stlib binary for Swift 5.6 and older.
+  @available(*, unavailable)
+  @_silgen_name("sSv10storeBytes2of12toByteOffset2asyx_SixmtlF")
+  @usableFromInline func _legacy_se0349_storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
+    _legacy_se0349_storeBytes_internal(
+      of: value, toByteOffset: offset, as: T.self
+    )
+  }
+
+  // This is the implementation of `storeBytes` from SwiftStdlib 5.6
+  @_alwaysEmitIntoClient
+  internal func _legacy_se0349_storeBytes_internal<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
     _debugPrecondition(0 == (UInt(bitPattern: self + offset)
@@ -1240,7 +1272,7 @@ public struct UnsafeMutableRawPointer: _Pointer {
         /*volatile:*/ false._value)
     }
   }
-  
+
   /// Copies the specified number of bytes from the given raw pointer's memory
   /// into this pointer's memory.
   ///
