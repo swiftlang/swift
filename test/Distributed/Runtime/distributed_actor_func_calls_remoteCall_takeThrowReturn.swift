@@ -14,9 +14,6 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: windows
 
-// rdar://87568630 - segmentation fault on 32-bit WatchOS simulator
-// UNSUPPORTED: OS=watchos && CPU=i386
-
 import _Distributed
 import FakeDistributedActorSystems
 
