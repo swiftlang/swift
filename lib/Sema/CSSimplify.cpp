@@ -1397,10 +1397,19 @@ shouldOpenExistentialCallArgument(
   if (!genericParam)
     return None;
 
-  // Ensure that the formal parameter is only used in covariant positions,
-  // because it won't match anywhere else.
+  // Only allow opening the innermost generic parameters.
+  auto genericContext = callee->getAsGenericContext();
+  if (!genericContext || !genericContext->isGeneric())
+    return None;
+
   auto genericSig = callee->getInnermostDeclContext()
       ->getGenericSignatureOfContext().getCanonicalSignature();
+  if (genericParam->getDepth() <
+          genericSig.getGenericParams().back()->getDepth())
+    return None;
+
+  // Ensure that the formal parameter is only used in covariant positions,
+  // because it won't match anywhere else.
   auto referenceInfo = findGenericParameterReferences(
       callee, genericSig, genericParam,
       /*treatNonResultCovarianceAsInvariant=*/false,
