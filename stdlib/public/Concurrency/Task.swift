@@ -816,7 +816,7 @@ func _enqueueJobGlobal(_ task: Builtin.Job)
 @usableFromInline
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_task_enqueueGlobalWithDeadline")
 @usableFromInline
 func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.7, *)
 public struct ContinuousClock {
   public struct Instant: Codable, Sendable {
     internal var _value: Swift.Duration
@@ -24,13 +24,13 @@ public struct ContinuousClock {
   public init() { }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.7, *)
 extension Clock where Self == ContinuousClock {
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 5.7, *)
   public static var continuous: ContinuousClock { return ContinuousClock() }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.7, *)
 extension ContinuousClock: Clock {
   public var now: ContinuousClock.Instant {
     ContinuousClock.now
@@ -68,7 +68,7 @@ extension ContinuousClock: Clock {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.7, *)
 extension ContinuousClock.Instant: InstantProtocol {
   public static var now: ContinuousClock.Instant { ContinuousClock.now }
 

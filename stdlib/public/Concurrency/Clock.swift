@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.7, *)
 public protocol Clock: Sendable {
   associatedtype Instant: InstantProtocol
 
@@ -22,9 +22,9 @@ public protocol Clock: Sendable {
 }
 
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.7, *)
 extension Clock {
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 5.7, *)
   public func measure(_ work: () throws -> Void) rethrows -> Instant.Duration {
     let start = now
     try work()
@@ -32,7 +32,7 @@ extension Clock {
     return start.duration(to: end)
   }
 
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 5.7, *)
   public func measure(
     _ work: () async throws -> Void
   ) async rethrows -> Instant.Duration {
@@ -43,14 +43,14 @@ extension Clock {
   }
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.7, *)
 @usableFromInline
 enum _ClockID: Int32 {
   case continuous = 1
   case suspending = 2
 }
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_get_time")
 @usableFromInline
 internal func _getTime(
@@ -58,7 +58,7 @@ internal func _getTime(
   nanoseconds: UnsafeMutablePointer<Int64>,
   clock: _ClockID)
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_get_clock_res")
 @usableFromInline
 internal func _getClockRes(

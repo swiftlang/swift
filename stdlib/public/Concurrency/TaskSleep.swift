@@ -295,7 +295,7 @@ extension Task where Success == Never, Failure == Never {
     }
   }
 
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 5.7, *)
   internal static func _sleep(
     until seconds: Int64, _ nanoseconds: Int64,
     tolerance: Duration?,
@@ -406,7 +406,7 @@ extension Task where Success == Never, Failure == Never {
     }
   }
 
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 5.7, *)
   public static func sleep<C: Clock>(
     until deadine: C.Instant,
     tolerance: C.Instant.Duration? = nil,
