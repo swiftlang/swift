@@ -485,12 +485,14 @@ InferredGenericSignatureRequestRQM::evaluate(
                                      requirements);
       }
 
+      auto *lookupDC = (*gpList->begin())->getDeclContext();
+
       // Add the generic parameter list's 'where' clause to the builder.
       //
       // The only time generic parameter lists have a 'where' clause is
       // in SIL mode; all other generic declarations have a free-standing
       // 'where' clause, which will be visited below.
-      WhereClauseOwner(parentModule, gpList)
+      WhereClauseOwner(lookupDC, gpList)
         .visitRequirements(TypeResolutionStage::Structural,
                            visitRequirement);
     }
