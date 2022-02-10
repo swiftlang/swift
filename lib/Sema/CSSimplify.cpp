@@ -9557,14 +9557,33 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // two collections, but add a warning fix telling the user to use as! or as?
   // instead.
   //
-  // We only need to perform this compatibility logic if the LHS type is a
-  // (potentially optional) type variable, as only such a constraint could have
-  // been previously been left unsolved.
+  // We only need to perform this compatibility logic if this is a coercion of
+  // something that isn't a collection expr (as collection exprs would have
+  // crashed in codegen due to CSApply peepholing them). Additionally, the LHS
+  // type must be a (potentially optional) type variable, as only such a
+  // constraint could have been previously been left unsolved.
   //
   // FIXME: Once we get a new language version, change this condition to only
   // preserve compatibility for Swift 5.x mode.
-  auto canUseCompatFix =
-      rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
+  auto canUseCompatFix = [&]() {
+    if (!rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember())
+      return false;
+
+    SmallVector<LocatorPathElt, 4> elts;
+    auto anchor = locator.getLocatorParts(elts);
+    if (!elts.empty())
+      return false;
+
+    auto *coercion = getAsExpr<CoerceExpr>(anchor);
+    if (!coercion)
+      return false;
+
+    auto *subject = coercion->getSubExpr();
+    while (auto *paren = dyn_cast<ParenExpr>(subject))
+      subject = paren->getSubExpr();
+
+    return !isa<CollectionExpr>(subject);
+  }();
 
   // Unless we're allowing the collection compatibility fix, the source cannot
   // be more optional than the destination.
