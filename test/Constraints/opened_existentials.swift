@@ -140,6 +140,18 @@ func doNotOpenOuter(p: any P) {
   // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 
+func takesVariadic<T: P>(_ args: T...) { }
+// expected-note@-1 2{{required by global function 'takesVariadic' where 'T' = 'P'}}
+// expected-note@-2{{in call to function 'takesVariadic'}}
+
+func callVariadic(p1: any P, p2: any P) {
+  takesVariadic() // expected-error{{generic parameter 'T' could not be inferred}}
+  takesVariadic(p1) // expected-error{{protocol 'P' as a type cannot conform to the protocol itself}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+  takesVariadic(p1, p2) // expected-error{{protocol 'P' as a type cannot conform to the protocol itself}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+}
+
 @available(SwiftStdlib 5.1, *)
 func testReturningOpaqueTypes(p: any P) {
   let q = p.getQ()
