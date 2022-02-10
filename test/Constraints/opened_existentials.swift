@@ -152,6 +152,13 @@ func callVariadic(p1: any P, p2: any P) {
   // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
 }
 
+func takesInOut<T: P>(_ value: inout T) { }
+
+func passesInOut(i: Int) {
+  var p: any P = i
+  takesInOut(&p)
+}
+
 @available(SwiftStdlib 5.1, *)
 func testReturningOpaqueTypes(p: any P) {
   let q = p.getQ()

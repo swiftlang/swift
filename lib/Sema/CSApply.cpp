@@ -933,8 +933,16 @@ namespace {
       // Dig out the base type.
       Type baseTy = cs.getType(base);
 
-      // Look through lvalues.
+      // Look through inout.
       bool isLValue = false;
+      InOutExpr *origInOutBase = dyn_cast<InOutExpr>(base);
+      if (origInOutBase) {
+        base = origInOutBase->getSubExpr();
+        baseTy = baseTy->getInOutObjectType();
+        isLValue = true;
+      }
+
+      // Look through lvalues.
       if (auto lvalueTy = baseTy->getAs<LValueType>()) {
         isLValue = true;
         baseTy = lvalueTy->getObjectType();
@@ -952,7 +960,7 @@ namespace {
       // If the base was an lvalue but it will only be treated as an
       // rvalue, turn the base into an rvalue now. This results in
       // better SILGen.
-      if (isLValue &&
+      if (isLValue && !origInOutBase &&
           (isNonMutatingMember(member) ||
            member->getDeclContext()->getDeclaredInterfaceType()
              ->hasReferenceSemantics())) {
@@ -986,7 +994,15 @@ namespace {
       // Record the opened existential.
       OpenedExistentials.push_back({archetype, base, archetypeVal, depth});
 
-      return archetypeVal;
+      // Re-apply inout if needed.
+      Expr *resultExpr = archetypeVal;
+      if (origInOutBase) {
+        resultExpr = new (ctx) InOutExpr(
+            origInOutBase->getLoc(), resultExpr, opaqueType->getRValueType());
+        cs.cacheType(resultExpr);
+      }
+
+      return resultExpr;
     }
 
     /// Try to close the innermost active existential, if there is one.
@@ -5897,7 +5913,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
     // If the argument is an existential type that has been opened, perform
     // the open operation.
-    if (argType->isAnyExistentialType() && paramType->hasOpenedExistential()) {
+    if (argType->getInOutObjectType()->isAnyExistentialType() &&
+        paramType->hasOpenedExistential()) {
       // FIXME: Look for an opened existential and use it. We need to
       // know how far out we need to go to close the existentials. Huh.
       auto knownOpened = solution.OpenedExistentialTypes.find(
