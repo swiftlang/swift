@@ -488,7 +488,10 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
       
       auto newFunctionRef = B.createFunctionRef(loc, callee);
       auto boxTy = SILBoxType::get(C, newBoxLayout, pa->getSubstitutionMap());
-      auto newBox = B.createAllocBox(loc, boxTy);
+      auto newBox = B.createAllocBox(loc, boxTy,
+                                     /*debug variable*/ None,
+                                     /*dynamic lifetime*/ false,
+                                     /*reflection*/ true);
       
       // Transfer the formerly partially-applied arguments into the box.
       auto appliedArgs = pa->getArguments();
