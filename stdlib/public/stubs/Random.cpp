@@ -23,9 +23,9 @@
 #include <Bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
 #elif !defined(__APPLE__)
+
 #include <errno.h>
 #include <fcntl.h>
-#endif
 
 #if __has_include(<sys/random.h>)
 #include <sys/random.h>
@@ -35,6 +35,8 @@
 #endif
 #if __has_include(<sys/syscall.h>)
 #include <sys/syscall.h>
+#endif
+
 #endif
 
 #include <stdlib.h>
