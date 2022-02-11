@@ -491,8 +491,12 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     return ctx.AllocateCopy(result);
   }
 
-  // Add requirements for each of the associated types.
-  for (auto assocTypeDecl : proto->getAssociatedTypeMembers()) {
+  // Add requirements for each associated type.
+  llvm::SmallDenseSet<Identifier, 2> assocTypes;
+
+  for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
+    assocTypes.insert(assocTypeDecl->getName());
+
     // Add requirements placed directly on this associated type.
     auto assocType = assocTypeDecl->getDeclaredInterfaceType();
     realizeInheritedRequirements(assocTypeDecl, assocType,
@@ -508,6 +512,33 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                              result);
           return false;
         });
+  }
+
+  // Add requirements for each typealias.
+  for (auto *decl : proto->getMembers()) {
+    // Protocol typealiases are modeled as same-type requirements
+    // where the left hand side is 'Self.X' for some unresolved
+    // DependentMemberType X, and the right hand side is the
+    // underlying type of the typealias.
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+      if (!typeAliasDecl->isGeneric()) {
+        // Ignore the typealias if we have an associated type with the same anme
+        // in the same protocol. This is invalid anyway, but it's just here to
+        // ensure that we produce the same requirement signature on some tests
+        // with -requirement-machine-protocol-signatures=verify.
+        if (assocTypes.contains(typeAliasDecl->getName()))
+          continue;
+
+        auto underlyingType = typeAliasDecl->getStructuralType();
+
+        auto subjectType = DependentMemberType::get(
+            selfTy, typeAliasDecl->getName());
+        Requirement req(RequirementKind::SameType, subjectType,
+                        underlyingType);
+        result.push_back({req, typeAliasDecl->getLoc(),
+                          /*inferred=*/false});
+      }
+    }
   }
 
   return ctx.AllocateCopy(result);
