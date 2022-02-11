@@ -1268,6 +1268,17 @@ public:
     if (auto *term = dyn_cast<OwnershipForwardingTermInst>(i)) {
       checkOwnershipForwardingTermInst(term);
     }
+
+    // Address-only values are potentially move-only, and unmovable if they are
+    // borrowed. Ensure that guaranteed address-only values are forwarded with
+    // the same representation. Non-destructive projection is
+    // allowed. Aggregation and destructive disaggregation is not allowed.
+    if (ownership == OwnershipKind::Guaranteed
+        && OwnershipForwardingMixin::isAddressOnly(i)) {
+      require(OwnershipForwardingMixin::hasSameRepresentation(i),
+              "Forwarding a guaranteed address-only value requires the same "
+              "representation since no move or copy is allowed.");
+    }
   }
 
   void checkDebugVariable(SILInstruction *inst) {
