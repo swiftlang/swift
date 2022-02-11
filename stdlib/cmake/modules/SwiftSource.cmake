@@ -459,8 +459,8 @@ function(_compile_swift_files
 
   if(SWIFT_SIL_VERIFY_ALL_MACOS_ONLY)
     # Only add if we have a macOS build triple
-    if (STREQUAL "${SWIFTFILE_SDK}" "OSX" AND
-        STREQUAL "${SWIFTFILE_ARCHITECTURE}" "x86_64")
+    if ("${SWIFTFILE_SDK}" STREQUAL "OSX" AND
+        "${SWIFTFILE_ARCHITECTURE}" STREQUAL "x86_64")
       list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
     endif()
   endif()
