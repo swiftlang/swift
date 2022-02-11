@@ -181,8 +181,8 @@ namespace swift {
 }
 
 // FIXME: HACK: copied from HeapObject.cpp
-extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
-_swift_release_dealloc(swift::HeapObject *object);
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED __attribute__((swiftcall)) void
+_swift_release_dealloc(SWIFT_CONTEXT swift::HeapObject *object);
 
 namespace swift {
 
@@ -988,6 +988,7 @@ class RefCounts {
   // First slow path of doDecrement, where the object may need to be deinited.
   // Side table is handled in the second slow path, doDecrementSideTable().
   template <PerformDeinit performDeinit>
+  SWIFT_ALWAYS_INLINE
   bool doDecrementSlow(RefCountBits oldbits, uint32_t dec) {
     RefCountBits newbits;
     

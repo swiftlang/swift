@@ -332,8 +332,8 @@ HeapObject *swift::swift_allocEmptyBox() {
 }
 
 // Forward-declare this, but define it after swift_release.
-extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
-_swift_release_dealloc(HeapObject *object);
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED __attribute__((swiftcall)) void
+_swift_release_dealloc(SWIFT_CONTEXT HeapObject *object);
 
 SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_retain_(HeapObject *object) {
@@ -678,8 +678,9 @@ void swift::swift_unownedCheck(HeapObject *object) {
     swift::swift_abortRetainUnowned(object);
 }
 
-void _swift_release_dealloc(HeapObject *object) {
-  asFullMetadata(object->metadata)->destroy(object);
+__attribute__((swiftcall))
+void _swift_release_dealloc(SWIFT_CONTEXT HeapObject *object) {
+  __attribute__((musttail)) return asFullMetadata(object->metadata)->destroy(object);
 }
 
 #if SWIFT_OBJC_INTEROP
