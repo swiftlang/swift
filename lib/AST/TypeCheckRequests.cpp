@@ -820,6 +820,17 @@ void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 }
 
 //----------------------------------------------------------------------------//
+// StructuralTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto aliasDecl = std::get<0>(getStorage());
+  diags.diagnose(aliasDecl, diag::recursive_decl_reference,
+                 aliasDecl->getDescriptiveKind(),
+                 aliasDecl->getName());
+}
+
+//----------------------------------------------------------------------------//
 // EnumRawValuesRequest computation.
 //----------------------------------------------------------------------------//
 

@@ -874,6 +874,7 @@ private:
 public:
   // Caching.
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
 /// Request the fragile function kind for the context.
