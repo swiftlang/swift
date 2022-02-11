@@ -6307,10 +6307,14 @@ void Requirement::dump(raw_ostream &out) const {
     break;
   }
 
-  if (getFirstType())
-    out << getFirstType() << " ";
+  PrintOptions opts;
+  opts.ProtocolQualifiedDependentMemberTypes = true;
+
+  getFirstType().print(out, opts);
+  out << " ";
+
   if (getKind() != RequirementKind::Layout && getSecondType())
-    out << getSecondType();
+    getSecondType().print(out, opts);
   else if (getLayoutConstraint())
     out << getLayoutConstraint();
 }
