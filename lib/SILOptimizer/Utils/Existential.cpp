@@ -90,7 +90,7 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
         DebugValueInst::hasAddrVal(User) ||
         isa<DestroyAddrInst>(User) || isa<WitnessMethodInst>(User) ||
         isa<DeinitExistentialAddrInst>(User) ||
-        isa<OpenExistentialAddrInst>(User) || User == ASIUser) {
+        OpenExistentialAddrInst::isRead(User) || User == ASIUser) {
       continue;
     }
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
