@@ -779,6 +779,8 @@ class FlowIsolation : public SILFunctionTransform {
 
   /// The entry point to the checker.
   void run() override {
+    return; // FIXME: making pass inert temporarily.
+
     SILFunction *fn = getFunction();
 
     // Don't rerun diagnostics on deserialized functions.
