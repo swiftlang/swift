@@ -827,9 +827,6 @@ Type TypeResolution::applyUnboundGenericArguments(
         genericArgs.size() >= decl->getGenericParams()->size() - 1)) &&
       "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
-  auto genericSig = decl->getGenericSignature();
-  assert(!genericSig.isNull());
-
   TypeSubstitutionMap subs;
 
   // Get the interface type for the declaration. We will be substituting
@@ -855,6 +852,7 @@ Type TypeResolution::applyUnboundGenericArguments(
       if (!resultType->hasTypeParameter())
         return resultType;
 
+      auto genericSig = decl->getGenericSignature();
       auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
       for (auto gp : parentSig.getGenericParams())
         subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
@@ -864,18 +862,18 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
 
     skipRequirementsCheck |= parentTy->hasTypeVariable();
-  } else if (auto genericSig =
+  } else if (auto parentSig =
                  decl->getDeclContext()->getGenericSignatureOfContext()) {
-    for (auto gp : genericSig.getGenericParams()) {
+    for (auto gp : parentSig.getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] = gp;
     }
   }
 
   // Realize the types of the generic arguments and add them to the
   // substitution map.
-  auto innerParams = genericSig.getInnermostGenericParams();
-  for (unsigned i = 0; i < innerParams.size(); ++i) {
-    auto origTy = innerParams[i];
+  auto innerParams = decl->getGenericParams()->getParams();
+  for (unsigned i : indices(innerParams)) {
+    auto origTy = innerParams[i]->getDeclaredInterfaceType();
     auto origGP = origTy->getCanonicalType()->castTo<GenericTypeParamType>();
 
     if (!origGP->isTypeSequence()) {
@@ -894,7 +892,8 @@ Type TypeResolution::applyUnboundGenericArguments(
     // types we can bind to this type sequence parameter.
     unsigned tail;
     for (tail = 1; tail <= innerParams.size(); ++tail) {
-      auto tailTy = innerParams[innerParams.size() - tail];
+      auto tailTy = innerParams[innerParams.size() - tail]
+          ->getDeclaredInterfaceType();
       auto tailGP = tailTy->getCanonicalType()->castTo<GenericTypeParamType>();
       if (tailGP->isTypeSequence()) {
         assert(tailGP->isEqual(origGP) &&
@@ -943,6 +942,7 @@ Type TypeResolution::applyUnboundGenericArguments(
     if (noteLoc.isInvalid())
       noteLoc = loc;
 
+    auto genericSig = decl->getGenericSignature();
     auto result = TypeChecker::checkGenericArguments(
         module, loc, noteLoc,
         UnboundGenericType::get(decl, parentTy, getASTContext()),
