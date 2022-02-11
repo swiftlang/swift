@@ -10,6 +10,27 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A representation of high precision time.
+///
+/// `Duration` represents an elapsed time value with high precision in an 
+/// integral form. It may be used for measurements of varying clock sources. In 
+/// those cases it represents the elapsed time measured by that clock. 
+/// Calculations using `Duration` may span from a negative value to a positive 
+/// value and have a suitable range to at least cover attosecond scale for both
+/// small elapsed durations like sub-second precision to durations that span
+/// centuries.
+///
+/// Typical construction of `Duration` values should be created via the
+/// static methods for specific time values. 
+///
+///      var d: Duration = .seconds(3)
+///      d += .milliseconds(33)
+///      print(d) // 3.033 seconds
+///
+/// `Duration` itself does not ferry any additional information other than the 
+/// temporal measurement component; specifically leap seconds should be 
+/// represented as an additional accessor since that is specific only to certain
+/// clock implementations.
 @available(SwiftStdlib 5.7, *)
 @frozen
 public struct Duration: Sendable {
@@ -26,6 +47,32 @@ public struct Duration: Sendable {
     self._high = _attoseconds.high
   }
 
+  /// Construct a `Duration` by adding attoseconds to a seconds value.
+  ///
+  /// This is useful for when an external decomposed components of a `Duration`
+  /// has been stored and needs to be reconstituted. Since the values are added
+  /// no precondition is expressed for the attoseconds being limited to 1e18.
+  ///
+  ///       let d1 = Duration(
+  ///         secondsComponent: 3, 
+  ///         attosecondsComponent: 123000000000000000)
+  ///       print(d1) // 3.123 seconds
+  ///
+  ///       let d2 = Duration(
+  ///         secondsComponent: 3, 
+  ///         attosecondsComponent: -123000000000000000)
+  ///       print(d2) // 2.877 seconds
+  ///
+  ///       let d3 = Duration(
+  ///         secondsComponent: -3, 
+  ///         attosecondsComponent: -123000000000000000)
+  ///       print(d3) // -3.123 seconds
+  ///
+  /// - Parameters:
+  ///   - secondsComponent: The seconds component portion of the `Duration` 
+  ///                       value.
+  ///   - attosecondsComponent: The attosecond component portion of the 
+  ///                           `Duration` value.
   public init(secondsComponent: Int64, attosecondsComponent: Int64) {
     self = Duration.seconds(secondsComponent) +
            Duration(_attoseconds: _Int128(attosecondsComponent))
@@ -35,6 +82,10 @@ public struct Duration: Sendable {
     _Int128(high: _high, low: _low)
   }
 
+  /// The composite components of the `Duration`.
+  ///
+  /// This is intented for facilitating conversions to existing time types. The
+  /// attoseconds value will not exceed 1e18 or be lower than -1e18.
   public var components: (seconds: Int64, attoseconds: Int64) {
     let seconds = _attoseconds / 1_000_000_000_000_000_000
     let attoseconds =
@@ -45,18 +96,36 @@ public struct Duration: Sendable {
 
 @available(SwiftStdlib 5.7, *)
 extension Duration {
+  /// Construct a `Duration` given a number of seconds represented as a 
+  /// `BinaryInteger`.
+  ///
+  ///       let d: Duration = .seconds(77)
+  ///
+  /// - Returns: A `Duration` representing a given number of seconds.
   @available(SwiftStdlib 5.7, *)
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
     return Duration(_attoseconds: _Int128(seconds) *
                                  1_000_000_000_000_000_000)
   }
 
+  /// Construct a `Duration` given a number of seconds represented as a 
+  /// `Double` by converting the value into the closest attosecond scale value.
+  ///
+  ///       let d: Duration = .seconds(22.93)
+  ///
+  /// - Returns: A `Duration` representing a given number of seconds.
   @available(SwiftStdlib 5.7, *)
   public static func seconds(_ seconds: Double) -> Duration {
     return Duration(_attoseconds: _Int128(seconds *
                                  1_000_000_000_000_000_000))
   }
 
+  /// Construct a `Duration` given a number of milliseconds represented as a 
+  /// `BinaryInteger`.
+  ///
+  ///       let d: Duration = .milliseconds(645)
+  ///
+  /// - Returns: A `Duration` representing a given number of milliseconds.
   @available(SwiftStdlib 5.7, *)
   public static func milliseconds<T: BinaryInteger>(
     _ milliseconds: T
@@ -65,12 +134,24 @@ extension Duration {
                                  1_000_000_000_000_000)
   }
 
+  /// Construct a `Duration` given a number of seconds milliseconds as a 
+  /// `Double` by converting the value into the closest attosecond scale value.
+  ///
+  ///       let d: Duration = .milliseconds(88.3)
+  ///
+  /// - Returns: A `Duration` representing a given number of milliseconds.
   @available(SwiftStdlib 5.7, *)
   public static func milliseconds(_ milliseconds: Double) -> Duration {
     return Duration(_attoseconds: _Int128(milliseconds *
                                  1_000_000_000_000_000))
   }
 
+  /// Construct a `Duration` given a number of microseconds represented as a 
+  /// `BinaryInteger`.
+  ///
+  ///       let d: Duration = .microseconds(12)
+  ///
+  /// - Returns: A `Duration` representing a given number of microseconds.
   @available(SwiftStdlib 5.7, *)
   public static func microseconds<T: BinaryInteger>(
     _ microseconds: T
@@ -79,12 +160,24 @@ extension Duration {
                                  1_000_000_000_000)
   }
 
+  /// Construct a `Duration` given a number of seconds microseconds as a 
+  /// `Double` by converting the value into the closest attosecond scale value.
+  ///
+  ///       let d: Duration = .microseconds(382.9)
+  ///
+  /// - Returns: A `Duration` representing a given number of microseconds.
   @available(SwiftStdlib 5.7, *)
   public static func microseconds(_ microseconds: Double) -> Duration {
     return Duration(_attoseconds: _Int128(microseconds *
                                  1_000_000_000_000))
   }
 
+  /// Construct a `Duration` given a number of nanoseconds represented as a 
+  /// `BinaryInteger`.
+  ///
+  ///       let d: Duration = .nanoseconds(1929)
+  ///
+  /// - Returns: A `Duration` representing a given number of nanoseconds.
   @available(SwiftStdlib 5.7, *)
   public static func nanoseconds<T: BinaryInteger>(
     _ nanoseconds: T

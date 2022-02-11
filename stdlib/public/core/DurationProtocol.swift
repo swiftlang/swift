@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A type that defines a duration for a given `InstantProtocol` type.
 @available(SwiftStdlib 5.7, *)
 public protocol DurationProtocol: Comparable, AdditiveArithmetic, Sendable {
   static func / (_ lhs: Self, _ rhs: Int) -> Self
