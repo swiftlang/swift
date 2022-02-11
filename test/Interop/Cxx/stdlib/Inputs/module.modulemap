@@ -1,3 +1,8 @@
+module StdIteratorTraits {
+  header "std-iterator_traits.h"
+  requires cplusplus
+}
+
 module StdVector {
   header "std-vector.h"
   requires cplusplus
