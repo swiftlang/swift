@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_LAZYRESOLVER_H
 #define SWIFT_AST_LAZYRESOLVER_H
 
-#include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
@@ -32,6 +31,7 @@ class NominalTypeDecl;
 class NormalProtocolConformance;
 class ProtocolConformance;
 class ProtocolDecl;
+class ProtocolTypeAlias;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;
@@ -99,7 +99,8 @@ public:
   /// Loads the requirement signature for a protocol.
   virtual void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
-                           SmallVectorImpl<Requirement> &requirements) = 0;
+                           SmallVectorImpl<Requirement> &requirements,
+                           SmallVectorImpl<ProtocolTypeAlias> &typeAliases) = 0;
 
   /// Loads the associated types of a protocol.
   virtual void

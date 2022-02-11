@@ -8602,12 +8602,13 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto contextData = static_cast<LazyProtocolData *>(
         ctx.getOrCreateLazyContextData(proto, nullptr));
 
-    SmallVector<Requirement, 8> requirements;
+    SmallVector<Requirement, 2> requirements;
+    SmallVector<ProtocolTypeAlias, 2> typeAliases;
     contextData->loader->loadRequirementSignature(
-        proto, contextData->requirementSignatureData, requirements);
-    if (requirements.empty())
-      return RequirementSignature();
-    return RequirementSignature(ctx.AllocateCopy(requirements), None);
+        proto, contextData->requirementSignatureData,
+        requirements, typeAliases);
+    return RequirementSignature(ctx.AllocateCopy(requirements),
+                                ctx.AllocateCopy(typeAliases));
   }
 
   auto buildViaGSB = [&]() {

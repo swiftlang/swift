@@ -889,6 +889,53 @@ llvm::Error ModuleFile::readGenericRequirementsChecked(
   return llvm::Error::success();
 }
 
+void ModuleFile::readRequirementSignature(
+                   SmallVectorImpl<Requirement> &requirements,
+                   SmallVectorImpl<ProtocolTypeAlias> &typeAliases,
+                   llvm::BitstreamCursor &Cursor) {
+  readGenericRequirements(requirements, Cursor);
+
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(Cursor);
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  while (true) {
+    lastRecordOffset.reset();
+    bool shouldContinue = true;
+
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = fatalIfUnexpected(
+        Cursor.readRecord(entry.ID, scratch, &blobData));
+    switch (recordID) {
+    case PROTOCOL_TYPEALIAS: {
+      uint64_t rawName;
+      uint64_t rawTypeID;
+      ProtocolTypeAliasLayout::readRecord(scratch, rawName, rawTypeID);
+
+      auto name = getIdentifier(rawName);
+      auto underlyingType = getType(rawTypeID);
+
+      typeAliases.emplace_back(name, underlyingType);
+      break;
+    }
+    default:
+      // This record is not part of the protocol requirement signature.
+      shouldContinue = false;
+      break;
+    }
+
+    if (!shouldContinue)
+      break;
+  }
+}
+
 void ModuleFile::readAssociatedTypes(
                    SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
                    llvm::BitstreamCursor &Cursor) {
@@ -919,8 +966,10 @@ void ModuleFile::readAssociatedTypes(
   }
 }
 
-/// Advances past any records that might be part of a requirement signature.
-static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
+/// Advances past any records that might be part of a protocol requirement
+/// signature, which consists of generic requirements together with protocol
+/// typealias records.
+static llvm::Error skipRequirementSignature(llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
 
   BCOffsetRAII lastRecordOffset(Cursor);
@@ -940,6 +989,7 @@ static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
     switch (maybeRecordID.get()) {
     case GENERIC_REQUIREMENT:
     case LAYOUT_REQUIREMENT:
+    case PROTOCOL_TYPEALIAS:
       break;
 
     default:
@@ -3611,7 +3661,7 @@ public:
 
     proto->setLazyRequirementSignature(&MF,
                                        MF.DeclTypeCursor.GetCurrentBitNo());
-    if (llvm::Error Err = skipGenericRequirements(MF.DeclTypeCursor))
+    if (llvm::Error Err = skipRequirementSignature(MF.DeclTypeCursor))
       MF.fatal(std::move(Err));
 
     proto->setLazyAssociatedTypeMembers(&MF,
@@ -6755,10 +6805,11 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
 void ModuleFile::loadRequirementSignature(const ProtocolDecl *decl,
                                           uint64_t contextData,
-                                          SmallVectorImpl<Requirement> &reqs) {
+                                          SmallVectorImpl<Requirement> &reqs,
+                                          SmallVectorImpl<ProtocolTypeAlias> &typeAliases) {
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
-  readGenericRequirements(reqs, DeclTypeCursor);
+  readRequirementSignature(reqs, typeAliases, DeclTypeCursor);
 }
 
 void ModuleFile::loadAssociatedTypes(const ProtocolDecl *decl,
