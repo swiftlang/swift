@@ -130,11 +130,13 @@ extension AsyncCompactMapSequence: AsyncSequence {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncCompactMapSequence: Sendable 
   where Base: Sendable, 
         Base.Element: Sendable, 
         ElementOfResult: Sendable { }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncCompactMapSequence.Iterator: Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 

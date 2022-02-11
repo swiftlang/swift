@@ -141,12 +141,13 @@ extension AsyncThrowingMapSequence: AsyncSequence {
   }
 }
 
-
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingMapSequence: Sendable 
   where Base: Sendable, 
         Base.Element: Sendable, 
         Transformed: Sendable { }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingMapSequence.Iterator: Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 

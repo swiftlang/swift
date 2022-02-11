@@ -118,11 +118,13 @@ extension AsyncMapSequence: AsyncSequence {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncMapSequence: Sendable 
   where Base: Sendable, 
         Base.Element: Sendable, 
         Transformed: Sendable { }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncMapSequence.Iterator: Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 

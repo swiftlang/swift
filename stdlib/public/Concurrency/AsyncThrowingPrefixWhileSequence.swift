@@ -140,11 +140,12 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
   }
 }
 
-
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingPrefixWhileSequence: Sendable 
   where Base: Sendable, 
         Base.Element: Sendable { }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingPrefixWhileSequence.Iterator: Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable { }

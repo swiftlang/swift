@@ -137,10 +137,12 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingFilterSequence: Sendable 
   where Base: Sendable, 
         Base.Element: Sendable { }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingFilterSequence.Iterator: Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable { }

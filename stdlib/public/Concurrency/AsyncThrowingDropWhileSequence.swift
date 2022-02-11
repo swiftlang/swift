@@ -155,10 +155,12 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingDropWhileSequence: Sendable 
   where Base: Sendable, 
         Base.Element: Sendable { }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingDropWhileSequence.Iterator: Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable { }

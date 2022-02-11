@@ -170,13 +170,14 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
   }
 }
 
-
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingFlatMapSequence: Sendable 
   where Base: Sendable, 
         Base.Element: Sendable, 
         SegmentOfResult: Sendable, 
         SegmentOfResult.Element: Sendable { }
 
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingFlatMapSequence: Sendable.Iterator 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 
