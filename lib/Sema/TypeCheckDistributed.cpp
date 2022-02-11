@@ -147,6 +147,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
   // ==== ----------------------------------------------------------------------
   // Check the ad-hoc requirements of 'DistributedActorSystem":
   // - remoteCall
+  // - remoteCallVoid
   if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
     auto systemProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
 
@@ -202,31 +203,39 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
   }
 
   // ==== ----------------------------------------------------------------------
-  // Check the ad-hoc requirements of 'DistributedTargetInvocation'
-  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder)) {
-    // FIXME(distributed): implement finding this the requirements here
-
+  // Check the ad-hoc requirements of 'DistributedTargetInvocationEncoder'
+  // -
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder)) {
+    // - recordArgument
     if (!C.getRecordArgumentOnDistributedInvocationEncoder(decl)) {
       decl->diagnose(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), C.Id_recordArgument);
-      // TODO: add note to add signature
+      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+                     decl->getName(), C.Id_recordArgument,
+                     "mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws");
       anyMissingAdHocRequirements = true;
     }
 
+    // - recordErrorType
     if (!C.getRecordErrorTypeOnDistributedInvocationEncoder(decl)) {
       decl->diagnose(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), C.Id_recordErrorType);
-      // TODO: add note to add signature
+      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+                     decl->getName(), C.Id_recordErrorType,
+                     "mutating func recordErrorType<Err: Error>(_ errorType: Err.Type) throws");
       anyMissingAdHocRequirements = true;
     }
 
+    // - recordReturnType
     if (!C.getRecordReturnTypeOnDistributedInvocationEncoder(decl)) {
       decl->diagnose(
           diag::distributed_actor_system_conformance_missing_adhoc_requirement,
           decl->getDescriptiveKind(), decl->getName(), C.Id_recordReturnType);
-      // TODO: add note to add signature
+      decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
+                     decl->getName(), C.Id_recordReturnType,
+                     "mutating func recordReturnType<Res: SerializationRequirement>(_ resultType: Res.Type) throws");
       anyMissingAdHocRequirements = true;
     }
 
@@ -235,11 +244,17 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
   }
 
   // ==== ----------------------------------------------------------------------
-  // Check the ad-hoc requirements of 'DistributedTargetInvocationArgumentDecoder'
-  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler)) {
+  // Check the ad-hoc requirements of 'DistributedTargetInvocationDecoder'
+  // - decodeNextArgument
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder)) {
     // FIXME(distributed): implement finding this the requirements here
-//
-//    return true;
+  }
+
+  // === -----------------------------------------------------------------------
+  // Check the ad-hoc requirements of 'DistributedTargetInvocationResultHandler'
+  // - onReturn
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler)) {
+
   }
 
   return false;

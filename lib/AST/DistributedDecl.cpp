@@ -252,8 +252,6 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   auto &C = getASTContext();
   auto module = getParentModule();
 
-  auto decl = dyn_cast<NominalTypeDecl>(getParent());
-
   fprintf(stderr, "[%s:%d] (%s) ====================================================\n", __FILE__, __LINE__, __FUNCTION__);
   fprintf(stderr, "[%s:%d] (%s) ====================================================\n", __FILE__, __LINE__, __FUNCTION__);
   fprintf(stderr, "[%s:%d] (%s) ====================================================\n", __FILE__, __LINE__, __FUNCTION__);
@@ -318,7 +316,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
 
   // -- Check number of generic requirements
   size_t expectedRequirementsNum = 3;
-  auto serializationRequirementsNum = 0;
+  size_t serializationRequirementsNum = 0;
   if (!isVoidReturn) {
     serializationRequirementsNum = requirementProtos.size();
     expectedRequirementsNum += serializationRequirementsNum;
@@ -337,14 +335,12 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // --- Check parameter: on: Actor
   auto actorParam = params->get(0);
   if (actorParam->getArgumentName() != C.Id_on) {
-    fprintf(stderr, "[%s:%d] (%s) if (actorParam->getArgumentName() != C.Id_on)\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
   // --- Check parameter: target RemoteCallTarget
   auto targetParam = params->get(1);
   if (targetParam->getArgumentName() != C.Id_target) {
-    fprintf(stderr, "[%s:%d] (%s) if (targetParam->getArgumentName() != C.Id_target)\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -352,14 +348,12 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // FIXME: NOT INOUT, but we crash today if not
   auto invocationParam = params->get(2);
   if (invocationParam->getArgumentName() != C.Id_invocation) {
-    fprintf(stderr, "[%s:%d] (%s) if (invocationParam->getArgumentName() != C.Id_invocation) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
   // --- Check parameter: throwing: Err.Type
   auto thrownTypeParam = params->get(3);
   if (thrownTypeParam->getArgumentName() != C.Id_throwing) {
-    fprintf(stderr, "[%s:%d] (%s) if (thrownTypeParam->getArgumentName() != C.Id_throwing) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -367,7 +361,6 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   if (!isVoidReturn) {
     auto returnedTypeParam = params->get(4);
     if (returnedTypeParam->getArgumentName() != C.Id_returning) {
-      fprintf(stderr, "[%s:%d] (%s) if (thrownTypeParam->getArgumentName() != C.Id_throwing) {\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
   }
@@ -384,7 +377,6 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
       mapTypeIntoContext(ActParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::DistributedActor));
   if (ActConformance.isInvalid()) {
-    fprintf(stderr, "[%s:%d] (%s) if (ActConformance.isInvalid()) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -394,7 +386,6 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
       mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::Error));
   if (ErrConformance.isInvalid()) {
-    fprintf(stderr, "[%s:%d] (%s) if (ErrConformance.isInvalid())\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -419,9 +410,6 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   if (requirements.size() != expectedRequirementsNum) {
-    fprintf(stderr, "[%s:%d] (%s) requirements.size() = %d\n", __FILE__, __LINE__, __FUNCTION__, requirements.size());
-    fprintf(stderr, "[%s:%d] (%s) expectedRequirementsNum = %d\n", __FILE__, __LINE__, __FUNCTION__, expectedRequirementsNum);
-    fprintf(stderr, "[%s:%d] (%s) if (requirements.size() != expectedRequirementsNum)\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -441,11 +429,9 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
                        ->getInterfaceType()
                        ->getMetatypeInstanceType();
   if (actorReq.getKind() != RequirementKind::Conformance) {
-    fprintf(stderr, "[%s:%d] (%s) if (actorReq.getKind() != RequirementKind::Conformance) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
   if (!actorReq.getSecondType()->isEqual(distActorTy)) {
-    fprintf(stderr, "[%s:%d] (%s)   if (actorReq.getSecondType()->isEqual(distActorTy)) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -455,11 +441,9 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
                      ->getInterfaceType()
                      ->getMetatypeInstanceType();
   if (errorReq.getKind() != RequirementKind::Conformance) {
-    fprintf(stderr, "[%s:%d] (%s)   if (errorReq.getKind() != RequirementKind::Conformance) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
   if (!errorReq.getSecondType()->isEqual(errorTy)) {
-    fprintf(stderr, "[%s:%d] (%s) if (errorReq.getSecondType()->isEqual(errorTy)) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -467,35 +451,25 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   if (isVoidReturn) {
     if (auto func = dyn_cast<FuncDecl>(this)) {
       if (!func->getResultInterfaceType()->isVoid()) {
-        fprintf(stderr, "[%s:%d] (%s) if (!func->getResultInterfaceType()->isVoid()) {\n", __FILE__, __LINE__, __FUNCTION__);
         return false;
       }
     }
   } else if (ResParam) {
-    // FIXME(distributed): implement checking return type for serialization requirement
     assert(ResParam && "Non void function, yet no Res generic parameter found");
     if (auto func = dyn_cast<FuncDecl>(this)) {
-      auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType());
+      auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
+                            ->getMetatypeInstanceType()
+                            ->getDesugaredType();
+      auto resultParamType = func->mapTypeIntoContext(
+          ResParam->getInterfaceType()->getMetatypeInstanceType());
       // The result of the function must be the `Res` generic argument.
-      if (!resultType->getMetatypeInstanceType()->getDesugaredType()->isEqual(
-              func->mapTypeIntoContext(ResParam->getInterfaceType()->getMetatypeInstanceType()))) {
-        fprintf(stderr, "[%s:%d] (%s) resultType->getMetatypeInstanceType()\n", __FILE__, __LINE__, __FUNCTION__);
-        resultType->getMetatypeInstanceType().dump();
-        fprintf(stderr, "[%s:%d] (%s) ResParam->getInterfaceType()->getMetatypeInstanceType()\n", __FILE__, __LINE__, __FUNCTION__);
-        ResParam->getInterfaceType()->getMetatypeInstanceType().dump();
-
-        fprintf(stderr, "[%s:%d] (%s) if (!resultType->getMetatypeInstanceType()->isEqual(ResParam->getInterfaceType()->getMetatypeInstanceType()))\n", __FILE__, __LINE__, __FUNCTION__);
+      if (!resultType->isEqual(resultParamType)) {
         return false;
       }
-
-      // FIXME: look at requirements
 
       for (auto requirementProto : requirementProtos) {
         auto conformance = module->lookupConformance(resultType, requirementProto);
         if (conformance.isInvalid()) {
-//          fprintf(stderr, "[%s:%d] (%s) %s missing conformance to %s\n", __FILE__, __LINE__, __FUNCTION__,
-//                  resultType->getAnyNominal()->getNameStr().str().c_str(),
-//                  requirementProto->getInterfaceType()->getAnyNominal()->getNameStr().str().c_str());
           return false;
         }
       }
@@ -505,18 +479,15 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // -- Check requirement: same_type Actor.ID Self.ActorID
   auto actorIdReq = requirements.back();
   if (actorIdReq.getKind() != RequirementKind::SameType) {
-    fprintf(stderr, "[%s:%d] (%s) if (actorIdReq.getKind() != RequirementKind::SameType){ \n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
   auto expectedActorIdTy =
       getDistributedActorSystemActorIDRequirementType(systemNominal);
   actorIdReq.dump();
   if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {
-    fprintf(stderr, "[%s:%d] (%s)   if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
-  fprintf(stderr, "[%s:%d] (%s)   OKEY!!!! %s.%s\n", __FILE__, __LINE__, __FUNCTION__, decl->getNameStr().str().c_str(), getNameStr().str().c_str());
   return true;
 }
 

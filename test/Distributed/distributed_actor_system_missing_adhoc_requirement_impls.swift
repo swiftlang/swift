@@ -481,6 +481,42 @@ public struct PublicFakeInvocationEncoder: DistributedTargetInvocationEncoder {
   public mutating func doneRecording() throws {}
 }
 
+struct FakeInvocationEncoder_missing_recordArgument: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{struct 'FakeInvocationEncoder_missing_recordArgument' is missing witness for protocol requirement 'recordArgument'}}
+  //expected-note@-2{{protocol 'FakeInvocationEncoder_missing_recordArgument' requires function 'recordArgument' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  // MISSING: mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
+struct FakeInvocationEncoder_missing_recordReturnType: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{struct 'FakeInvocationEncoder_missing_recordReturnType' is missing witness for protocol requirement 'recordReturnType'}}
+  //expected-note@-2{{protocol 'FakeInvocationEncoder_missing_recordReturnType' requires function 'recordReturnType' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  // MISSING: mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
+struct FakeInvocationEncoder_missing_recordErrorType: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{struct 'FakeInvocationEncoder_missing_recordErrorType' is missing witness for protocol requirement 'recordErrorType'}}
+  //expected-note@-2{{protocol 'FakeInvocationEncoder_missing_recordErrorType' requires function 'recordErrorType' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  // MISSING: mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
 class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
