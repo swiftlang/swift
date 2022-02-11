@@ -1245,21 +1245,22 @@ public:
     }
   }
 
-  /// We are given an instruction \p fInst that forwards ownership from \p
-  /// operand to one of \p fInst's results, make sure that if we have a
-  /// forwarding instruction that can only accept owned or guaranteed ownership
-  /// that we are following that invariant.
+  /// For an instruction \p i that forwards ownership from an operand to one
+  /// of its results, check forwarding invariants.
   void checkOwnershipForwardingInst(SILInstruction *i) {
+    ValueOwnershipKind ownership =
+        OwnershipForwardingMixin::get(i)->getForwardingOwnershipKind();
+
     if (auto *o = dyn_cast<OwnedFirstArgForwardingSingleValueInst>(i)) {
       ValueOwnershipKind kind = OwnershipKind::Owned;
-      require(kind.isCompatibleWith(o->getForwardingOwnershipKind()),
+      require(kind.isCompatibleWith(ownership),
               "OwnedFirstArgForwardingSingleValueInst's ownership kind must be "
               "compatible with owned");
     }
 
     if (auto *o = dyn_cast<GuaranteedFirstArgForwardingSingleValueInst>(i)) {
       ValueOwnershipKind kind = OwnershipKind::Guaranteed;
-      require(kind.isCompatibleWith(o->getForwardingOwnershipKind()),
+      require(kind.isCompatibleWith(ownership),
               "GuaranteedFirstArgForwardingSingleValueInst's ownership kind "
               "must be compatible with guaranteed");
     }

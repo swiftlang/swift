@@ -1176,6 +1176,18 @@ public:
       return isa(i);
     return false;
   }
+
+  /// Return true if the forwarded value has the same representation. If true,
+  /// then the result can be mapped to the same storage without a move or copy.
+  ///
+  /// \p inst is an OwnershipForwardingMixin
+  static bool hasSameRepresentation(SILInstruction *inst);
+
+  /// Return true if the forwarded value is address-only either before or after
+  /// forwarding.
+  ///
+  /// \p inst is an OwnershipForwardingMixin
+  static bool isAddressOnly(SILInstruction *inst);
 };
 
 /// A single value inst that forwards a static ownership from its first operand.
