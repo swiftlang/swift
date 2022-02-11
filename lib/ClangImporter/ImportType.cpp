@@ -1993,7 +1993,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         return nullptr;
     } else if (isa<clang::ReferenceType>(paramTy) &&
                isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
-      auto templateParamType = cast<clang::TemplateTypeParmType>(paramTy->getPointeeType());
+      auto templateParamType =
+          cast<clang::TemplateTypeParmType>(paramTy->getPointeeType());
       swiftParamTy =
           findGenericTypeInGenericDecls(templateParamType, genericParams);
       isInOut = true;

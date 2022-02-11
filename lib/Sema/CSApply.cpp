@@ -231,7 +231,9 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
     if (!newFn)
       return ConcreteDeclRef(decl);
 
-    auto newDecl = cast_or_null<ValueDecl>(decl->getASTContext().getClangModuleLoader()->importDeclDirectly(newFn));
+    auto newDecl = cast_or_null<ValueDecl>(
+        decl->getASTContext().getClangModuleLoader()->importDeclDirectly(
+            newFn));
 
     if (auto fn = dyn_cast<FuncDecl>(decl)) {
       if (newFn->getNumParams() != fn->getParameters()->size()) {
@@ -263,20 +265,26 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
           !triple.isWindowsCygwinEnvironment() &&
           // Make sure we're substituting in at least one Int or UInt
           // (technically not necessary).
-          llvm::any_of(subst.getReplacementTypes(),[](Type t) {
+          llvm::any_of(subst.getReplacementTypes(), [](Type t) {
             return t->isEqual(t->getASTContext().getIntType()) ||
                    t->isEqual(t->getASTContext().getUIntType());
           })) {
-        auto originalFnSubst = cast<AbstractFunctionDecl>(decl)->getInterfaceType()->getAs<GenericFunctionType>()->substGenericArgs(subst);
-        assert(fn->getParameters()->size() == originalFnSubst->getParams().size());
+        auto originalFnSubst = cast<AbstractFunctionDecl>(decl)
+                                   ->getInterfaceType()
+                                   ->getAs<GenericFunctionType>()
+                                   ->substGenericArgs(subst);
+        assert(fn->getParameters()->size() ==
+               originalFnSubst->getParams().size());
         SmallVector<ParamDecl *, 4> fixedParameters;
         unsigned parameterIndex = 0;
         for (auto *newFnParam : *fn->getParameters()) {
           // If the user substituted this param with an (U)Int, use (U)Int.
-          auto substParamType = originalFnSubst->getParams()[parameterIndex].getParameterType();
+          auto substParamType =
+              originalFnSubst->getParams()[parameterIndex].getParameterType();
           if (substParamType->isEqual(fn->getASTContext().getIntType()) ||
               substParamType->isEqual(fn->getASTContext().getUIntType())) {
-            auto intParam = ParamDecl::cloneWithoutType(fn->getASTContext(), newFnParam);
+            auto intParam =
+                ParamDecl::cloneWithoutType(fn->getASTContext(), newFnParam);
             intParam->setInterfaceType(substParamType);
             fixedParameters.push_back(intParam);
           } else {
@@ -287,17 +295,21 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
 
         assert(fn->getParameters()->size() == fixedParameters.size());
 
-        auto fixedParams = ParameterList::create(fn->getASTContext(), fixedParameters);
+        auto fixedParams =
+            ParameterList::create(fn->getASTContext(), fixedParameters);
         fn->setParameters(fixedParams);
 
         // Now fix the result type:
-        if (originalFnSubst->getResult()->isEqual(fn->getASTContext().getIntType()) ||
-            originalFnSubst->getResult()->isEqual(fn->getASTContext().getUIntType())) {
+        if (originalFnSubst->getResult()->isEqual(
+                fn->getASTContext().getIntType()) ||
+            originalFnSubst->getResult()->isEqual(
+                fn->getASTContext().getUIntType())) {
           // Constructors don't have a result.
           if (auto func = dyn_cast<FuncDecl>(fn)) {
             newDecl = FuncDecl::createImplicit(
-                func->getASTContext(), func->getStaticSpelling(), func->getName(),
-                func->getNameLoc(), func->hasAsync(), func->hasThrows(),
+                func->getASTContext(), func->getStaticSpelling(),
+                func->getName(), func->getNameLoc(), func->hasAsync(),
+                func->hasThrows(),
                 /*genericParams=*/nullptr, fixedParams,
                 originalFnSubst->getResult(), func->getDeclContext());
           }
