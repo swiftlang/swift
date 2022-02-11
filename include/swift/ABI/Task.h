@@ -317,8 +317,9 @@ public:
   /// Flag that this task is now suspended.
   void flagAsSuspended();
 
-  /// Flag that the task is to be enqueued on the provided executor
-  void flagAsEnqueuedOnExecutor(ExecutorRef newExecutor);
+  /// Flag that the task is to be enqueued on the provided executor and actually
+  /// enqueue it
+  void flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor);
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
