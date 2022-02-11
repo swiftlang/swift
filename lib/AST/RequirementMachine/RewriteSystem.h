@@ -140,6 +140,8 @@ public:
             RHS.containsUnresolvedSymbols());
   }
 
+  Optional<Identifier> isProtocolTypeAliasRule() const;
+
   void markLHSSimplified() {
     assert(!LHSSimplified);
     LHSSimplified = true;
