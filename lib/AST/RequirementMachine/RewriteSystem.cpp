@@ -754,10 +754,14 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(rhs)) {
       auto symbol = rhs[index];
 
-      // Permanent rules contain name symbols at the end, like
-      // [P].T => [P:T].
-      if (!rule.isRHSSimplified() &&
-          (!rule.isPermanent() || index == rhs.size() - 1)) {
+      // RHS-simplified rules might have unresolved name symbols on the
+      // right hand side. Also, completion can introduce rules of the
+      // form T.X.[concrete: C] => T.X, where T is some resolved term,
+      // and X is a name symbol for a protocol typealias.
+      if (!rule.isLHSSimplified() &&
+          !rule.isRHSSimplified() &&
+          !(rule.isPropertyRule() &&
+            index == rhs.size() - 1)) {
         // This is only true if the input requirements were valid.
         if (policy == DisallowInvalidRequirements) {
           ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
