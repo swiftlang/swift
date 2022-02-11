@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt  -enable-sil-verify-all %s -copy-forwarding -enable-copyforwarding -enable-destroyhoisting -allow-critical-edges=false | %FileCheck %s
+// RUN: %target-sil-opt  -enable-sil-verify-all %s -copy-forwarding -enable-copyforwarding -allow-critical-edges=false | %FileCheck %s
 
 // This is the ossa version of CopyForwarding tests
 sil_stage raw
@@ -58,45 +58,6 @@ bb3:                                              // Preds: bb1 bb2
   return %18 : $()                                // id: %20
 }
 
-// CHECK-LABEL: sil hidden [ossa] @forward_init :
-// CHECK-NOT: copy_addr
-// CHECK-NOT: destroy_addr
-// CHECK-LABEL: } // end sil function 'forward_init'
-sil hidden [ossa] @forward_init : $@convention(thin) <T> (@in T) -> () {
-bb0(%0 : $*T):
-  debug_value %0 : $*T, expr op_deref
-  %l1 = alloc_stack $T
-  copy_addr %0 to [initialization] %l1 : $*T
-  %f1 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  dealloc_stack %l1 : $*T
-  debug_value %0 : $*T, expr op_deref
-  destroy_addr %0 : $*T
-  %r1 = tuple ()
-  return %r1 : $()
-}
-
-// CHECK-LABEL: sil hidden [ossa] @forward_noinit :
-// CHECK-NOT: copy_addr
-// CHECK: destroy_addr
-// CHECK-LABEL: } // end sil function 'forward_noinit'
-sil hidden [ossa] @forward_noinit : $@convention(thin) <T> (@in T) -> () {
-bb0(%0 : $*T):
-  debug_value %0 : $*T, expr op_deref
-  %l1 = alloc_stack $T
-  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
-  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
-  copy_addr %0 to %l1 : $*T
-  debug_value %l1 : $*T, expr op_deref
-  debug_value %0 : $*T, expr op_deref
-  %f2 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  %c2 = apply %f2<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  dealloc_stack %l1 : $*T
-  destroy_addr %0 : $*T
-  %r1 = tuple ()
-  return %r1 : $()
-}
-
 // CHECK-LABEL: sil hidden [ossa] @forward_takeinit :
 // CHECK-NOT: copy_addr
 // CHECK-NOT: destroy_addr
@@ -129,25 +90,6 @@ bb0(%0 : $*T):
   dealloc_stack %l1 : $*T
   %r1 = tuple ()
   return %r1 : $()
-}
-
-// CHECK-LABEL: sil hidden [ossa] @backward_init :
-// CHECK-NOT: copy_addr
-// CHECK-NOT: destroy_addr
-// CHECK-LABEL: } // end sil function 'backward_init'
-sil hidden [ossa] @backward_init : $@convention(thin) <T> () -> @out T {
-bb0(%0 : $*T):
-  %l1 = alloc_stack $T
-  %f1 = function_ref @f_out : $@convention(thin) <τ_0_0> () -> @out τ_0_0
-  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
-  debug_value %l1 : $*T, expr op_deref
-  copy_addr %l1 to [initialization] %0 : $*T
-  debug_value %0 : $*T, expr op_deref
-  debug_value %l1 : $*T, expr op_deref
-  destroy_addr %l1 : $*T
-  dealloc_stack %l1 : $*T
-  %t = tuple ()
-  return %t : $()
 }
 
 // CHECK-LABEL: sil hidden [ossa] @backward_noinit :
@@ -199,61 +141,6 @@ bb0(%0 : $*T):
   dealloc_stack %l1 : $*T
   %t = tuple ()
   return %t : $()
-}
-
-// CHECK-LABEL: sil hidden [ossa] @branch :
-// CHECK-NOT: copy_addr
-// CHECK-LABEL: } // end sil function 'branch'
-sil hidden [ossa] @branch : $@convention(thin) <T> (@in T, Bool) -> () {
-bb0(%0 : $*T, %1 : $Bool):
-  %2 = struct_extract %1 : $Bool, #Bool._value     // user: %3
-  cond_br %2, bb1, bb2                            // id: %3
-
-bb1:                                              // Preds: bb0
-  %4 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %7
-  %5 = alloc_stack $T                             // users: %6, %7, %8
-  copy_addr %0 to [initialization] %5 : $*T     // id: %6
-  %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  dealloc_stack %5 : $*T         // id: %8
-  br bb3                                          // id: %9
-
-bb2:
-  br bb3
-
-bb3:                                              // Preds: bb0 bb1
-  destroy_addr %0 : $*T                           // id: %10
-  %11 = tuple ()                                  // user: %12
-  return %11 : $()                                // id: %12
-}
-
-enum A<T> {
-  case Val(T)
-  init(_ val: T)
-}
-
-sil [transparent] @_TFO8enuminit1A3ValU__fMGS0_Q__FQ_GS0_Q__ : $@convention(thin) <T> (@in T, @thin A<T>.Type) -> @out A<T>
-
-// CHECK-LABEL: sil [ossa] @enuminit :
-// CHECK-NOT: copy_addr
-// CHECK-LABEL: } // end sil function 'enuminit'
-sil [ossa] @enuminit : $@convention(thin) <T> (@in T, @thin A<T>.Type) -> @out A<T> {
-bb0(%0 : $*A<T>, %1 : $*T, %2 : $@thin A<T>.Type):
-  %3 = alloc_stack $A<T>, var, name "sf"             // users: %10, %14, %16
-  // function_ref enuminit.A.Val <A>(enuminit.A<A>.Type)(A) -> enuminit.A<A>
-  %4 = function_ref @_TFO8enuminit1A3ValU__fMGS0_Q__FQ_GS0_Q__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin A<τ_0_0>.Type) -> @out A<τ_0_0> // user: %9
-  %5 = metatype $@thin A<T>.Type                  // user: %9
-  %6 = alloc_stack $T                             // users: %7, %9, %12
-  copy_addr %1 to [initialization] %6 : $*T     // id: %7
-  %8 = alloc_stack $A<T>                          // users: %9, %10, %11
-  %9 = apply %4<T>(%8, %6, %5) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin A<τ_0_0>.Type) -> @out A<τ_0_0>
-  copy_addr [take] %8 to [initialization] %3 : $*A<T> // id: %10
-  dealloc_stack %8 : $*A<T>      // id: %11
-  dealloc_stack %6 : $*T         // id: %12
-  destroy_addr %1 : $*T                           // id: %13
-  copy_addr [take] %3 to [initialization] %0 : $*A<T> // id: %14
-  %15 = tuple ()                                  // user: %17
-  dealloc_stack %3 : $*A<T>      // id: %16
-  return %15 : $()                                // id: %17
 }
 
 // CHECK-LABEL: sil hidden [ossa] @make_addronly :
@@ -377,37 +264,6 @@ bb0:
   return %34 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @nil_comparison :
-// CHECK:  alloc_stack
-// CHECK-NOT: copy_addr
-// CHECK-NOT: destroy_addr
-// CHECK: switch_enum_addr %0
-// CHECK: [[D:%.*]] = unchecked_take_enum_data_addr %0
-// CHECK: destroy_addr [[D]]
-// CHECK-LABEL: } // end sil function 'nil_comparison'
-sil [ossa] @nil_comparison : $@convention(thin) <T> (@in Optional<T>) -> Bool {
-bb0(%0 : $*Optional<T>):
-  %2 = alloc_stack $Optional<T>
-  copy_addr %0 to [initialization] %2 : $*Optional<T>
-  destroy_addr %0 : $*Optional<T>
-  switch_enum_addr %2 : $*Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
-
-bb1:
-  %6 = unchecked_take_enum_data_addr %2 : $*Optional<T>, #Optional.some!enumelt
-  destroy_addr %6 : $*T
-  %8 = integer_literal $Builtin.Int1, -1
-  br bb3(%8 : $Builtin.Int1)
-
-bb2:
-  %10 = integer_literal $Builtin.Int1, 0
-  br bb3(%10 : $Builtin.Int1)
-
-bb3(%12 : $Builtin.Int1):
-  %13 = struct $Bool (%12 : $Builtin.Int1)
-  dealloc_stack %2 : $*Optional<T>
-  return %13 : $Bool
-}
-
 sil @use: $@convention(thin) <T> (@inout T) -> ()
 
 // We currently don't handle reasoning about multiple copy_addr instructions at
@@ -456,24 +312,6 @@ bb3:
   return %13 : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @test_in_guaranteed :
-// CHECK: copy_addr %1 to [initialization]
-// CHECK-NOT: copy_addr
-// CHECK-LABEL: } // end sil function 'test_in_guaranteed'
-sil hidden [ossa] @test_in_guaranteed : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : $*T, %1 : $*T):
-  %l1 = alloc_stack $T
-  copy_addr %1 to [initialization] %l1 : $*T
-  %f1 = function_ref @f_in_guaranteed : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  %c2 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  copy_addr %l1 to [initialization] %0 : $*T
-  destroy_addr %l1 : $*T
-  dealloc_stack %l1 : $*T
-  destroy_addr %1 : $*T
-  %t = tuple ()
-  return %t : $()
-}
-
 // CHECK-LABEL: sil hidden [ossa] @forward_unchecked_ref_cast_addr :
 // CHECK: unchecked_ref_cast_addr
 // CHECK-NOT: copy_addr
@@ -490,48 +328,6 @@ bb0(%0 : $*AClass, %1 : $*AnyObject):
   dealloc_stack %3 : $*AnyObject // id: %10
   %11 = tuple ()                                  // user: %12
   return %11 : $()                                // id: %12
-}
-
-sil [ossa] @element_use : $@convention(thin)  (@inout P) -> ()
-
-// CHECK-LABEL: sil [ossa] @backward_propagate_enum_init :
-// CHECK-NOT: copy_addr
-// CHECK: %[[TMP:.*]] = init_enum_data_addr %0 : $*Optional<P>
-// CHECK: copy_addr %1 to [initialization] %[[TMP]]
-// CHECK-NOT: copy_addr
-// CHECK-LABEL: } // end sil function 'backward_propagate_enum_init'
-sil [ossa] @backward_propagate_enum_init : $@convention(thin) (@inout P) -> @out Optional<P> {
-bb0(%0 : $*Optional<P>, %1 : $*P):
-  %2 = alloc_stack $P
-  copy_addr %1 to [initialization] %2 : $*P
-  %3 = function_ref @element_use : $@convention(thin)  (@inout P) -> ()
-  %4 = apply %3(%1) : $@convention(thin)  (@inout P) -> ()
-  %5 = init_enum_data_addr %0 : $*Optional<P>, #Optional.some!enumelt
-  copy_addr %2 to [initialization] %5 : $*P
-  inject_enum_addr %0 : $*Optional<P>, #Optional.some!enumelt
-  destroy_addr %2 : $*P
-  dealloc_stack %2 : $*P
-  %27 = tuple ()
-  return %27 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @backward_propagate_exi_init :
-// CHECK-NOT: copy_addr
-// CHECK: %[[TMP:.*]] = init_existential_addr %0 : $*P, $T
-// CHECK: copy_addr %1 to [initialization] %[[TMP]] : $*T
-// CHECK-NOT: copy_addr
-// CHECK-LABEL: } // end sil function 'backward_propagate_exi_init'
-sil [ossa] @backward_propagate_exi_init : $@convention(thin) <T where T : P>(@inout T) -> @out P {
-bb0(%0 : $*P, %1 : $*T):
-  %2 = alloc_stack $T
-  copy_addr %1 to [initialization] %2 : $*T
-  %3 = witness_method $T, #P.poke : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
-  %4 = apply %3<T>(%1) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
-  %5 = init_existential_addr %0 : $*P, $T
-  copy_addr [take] %2 to [initialization] %5 : $*T
-  dealloc_stack %2 : $*T
-  %27 = tuple ()
-  return %27 : $()
 }
 
 public struct S<T> {
@@ -591,27 +387,6 @@ bb0(%0 : $*T, %1 : $*T):
   %2 = alloc_stack $T
   copy_addr [take] %1 to [initialization] %2 : $*T
   copy_addr [take] %2 to [initialization] %0 : $*T
-  dealloc_stack %2 : $*T
-  %7 = tuple ()
-  return %7 : $()
-}
-
-// Test a dead copy that initializes a stack local and destroy's it later.
-// CHECK-LABEL: sil [ossa] @deadtemp_destroy :
-// CHECK: %[[G:.*]] = struct_element_addr %0 : $*S<T>, #S.g
-// CHECK-NOT: copy_addr
-// CHECK: %[[F:.*]] = struct_element_addr %0 : $*S<T>, #S.f
-// CHECK: copy_addr %[[G]] to %[[F]] : $*T
-// CHECK-NOT: destroy_addr
-// CHECK-LABEL: } // end sil function 'deadtemp_destroy'
-sil [ossa] @deadtemp_destroy : $@convention(thin) <T> (@inout S<T>) -> () {
-bb0(%0 : $*S<T>):
-  %1 = struct_element_addr %0 : $*S<T>, #S.g
-  %2 = alloc_stack $T
-  copy_addr %1 to [initialization] %2 : $*T
-  %4 = struct_element_addr %0 : $*S<T>, #S.f
-  copy_addr %2 to %4 : $*T
-  destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   %7 = tuple ()
   return %7 : $()
@@ -707,85 +482,6 @@ bb0(%0 : $*T, %1 : $*T):
   return %r1 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @foo : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @out Builtin.NativeObject {
-// CHECK: bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
-// CHECK: [[COPY:%.*]] = copy_value %1 : $Builtin.NativeObject
-// CHECK: store [[COPY]] to [init] %0 : $*Builtin.NativeObject
-// CHECK-LABEL: } // end sil function 'foo'
-sil [ossa] @foo : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @out Builtin.NativeObject {
-bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
-  %2 = alloc_stack $Builtin.NativeObject
-  %copy = copy_value %1 : $Builtin.NativeObject
-  store %copy to [init] %2 : $*Builtin.NativeObject
-  copy_addr %2 to [initialization] %0 : $*Builtin.NativeObject
-  destroy_addr %2 : $*Builtin.NativeObject
-  dealloc_stack %2 : $*Builtin.NativeObject
-  %6 = tuple ()
-  return %6 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @testKnownStoredValueUser : $@convention(thin) (@guaranteed AClass) -> @out AClass {
-// CHECK: [[ALLOC:%.*]] = alloc_stack $AClass
-// CHECK: [[COPY:%.*]] = copy_value %1 : $AClass
-// CHECK: store [[COPY]] to [init] %0 : $*AClass
-// CHECK-LABEL: } // end sil function 'testKnownStoredValueUser'
-sil [ossa] @testKnownStoredValueUser : $@convention(thin) (@guaranteed AClass) -> (@out AClass) {
-bb0(%0 : $*AClass, %1 : @guaranteed $AClass):
-  %2 = alloc_stack $AClass
-  %copy = copy_value %1 : $AClass
-  store %copy to [init] %2 : $*AClass
-  copy_addr %2 to [initialization] %0 : $*AClass
-  destroy_addr %2 : $*AClass
-  dealloc_stack %2 : $*AClass
-  %999 = tuple ()
-  return %999 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @testExtractedStoredValueUser : $@convention(thin) (@guaranteed ObjWrapper) -> @out AnyObject {
-// CHECK: bb0(%0 : $*AnyObject, %1 : @guaranteed $ObjWrapper):
-// CHECK:   [[ALLOC:%.*]] = alloc_stack $AnyObject
-// CHECK:   [[EXTRACT:%.*]] = struct_extract %1 : $ObjWrapper, #ObjWrapper.obj
-// CHECK:   [[COPY:%.*]] = copy_value [[EXTRACT]] : $AnyObject
-// CHECK:   store [[COPY]] to [init] %0 : $*AnyObject
-// CHECK-LABEL: } // end sil function 'testExtractedStoredValueUser'
-sil [ossa] @testExtractedStoredValueUser : $@convention(thin) (@guaranteed ObjWrapper) -> (@out AnyObject) {
-bb0(%0 : $*AnyObject, %1 : @guaranteed $ObjWrapper):
-  %2 = alloc_stack $AnyObject
-  %3 = struct_extract %1 : $ObjWrapper, #ObjWrapper.obj
-  %copy = copy_value %3 : $AnyObject 
-  store %copy to [init] %2 : $*AnyObject
-  copy_addr %2 to [initialization] %0 : $*AnyObject
-  destroy_addr %2 : $*AnyObject
-  dealloc_stack %2 : $*AnyObject
-  %999 = tuple ()
-  return %999 : $()
-}
-
-struct AClassWrapper {
-  var a: AClass
-  var b: AClass
-}
-
-// CHECK-LABEL: sil [ossa] @testUnknownStoredValueUser : $@convention(thin) (@guaranteed AClass) -> @out AClass {
-// CHECK: bb0(%0 : $*AClass, %1 : @guaranteed $AClass):
-// CHECK:   [[ALLOC:%.*]] = alloc_stack $AClass
-// CHECK:   [[COPY:%.*]] = copy_value %1 : $AClass
-// CHECK:   store [[COPY]] to [init] %0 : $*AClass
-// CHECK:   [[STRUCT:%.*]] = struct $AClassWrapper (%1 : $AClass, %1 : $AClass)
-// CHECK-LABEL: } // end sil function 'testUnknownStoredValueUser'
-sil [ossa] @testUnknownStoredValueUser : $@convention(thin) (@guaranteed AClass) -> (@out AClass) {
-bb0(%0 : $*AClass, %1 : @guaranteed $AClass):
-  %2 = alloc_stack $AClass
-  %copy = copy_value %1 : $AClass 
-  store %copy to [init] %2 : $*AClass
-  %3 = struct $AClassWrapper (%1 : $AClass, %1 : $AClass)
-  copy_addr %2 to [initialization] %0 : $*AClass
-  destroy_addr %2 : $*AClass
-  dealloc_stack %2 : $*AClass
-  %999 = tuple ()
-  return %999 : $()
-}
-
 // <rdar://problem/43888666> [SR-8526]: Memory leak after switch in release configuration
 // CHECK-LABEL: sil [ossa] @testGlobalHoistToStoredValue : $@convention(thin) (@owned AClass, @inout AClass) -> () {
 // CHECK: bb0(%0 : @owned $AClass, %1 : $*AClass):
@@ -814,46 +510,6 @@ bb1:
   dealloc_stack %local : $*AClass
   %v = tuple ()
   return %v : $()
-}
-
-// Test an "illegal" reinitialization of a stack location. This
-// happens because lowering .int_fma_FPIEEE32 knows that the type is
-// trivial, so avoids deinitialization. rdar://64671864.
-//
-// Note: we have given up on enforcing known SIL-patterns in
-// CopyForwarding. Instead, we just remove restructions whenever we see
-// unexpected patterns. Eventually, we will replace it with an OSSA
-// pass and enforce all assumptions about SIL patterns in the verifier.
-
-// CHECK-LABEL: sil [ossa] @testCPF : $@convention(thin) (Float) -> @out Float {
-// CHECK: bb0(%0 : $*Float, %1 : $Float):
-// CHECK:   [[TMP1:%.*]] = alloc_stack $Float
-// CHECK:   store %1 to [trivial] [[TMP1]] : $*Float
-// CHECK:   [[TMP2:%.*]] = alloc_stack $Float
-// CHECK-NOT: copy_addr
-// CHECK:   [[FMA:%.*]] = builtin "int_fma_FPIEEE32"
-// CHECK:   [[RESULT:%.*]] = struct $Float ([[FMA]] : $Builtin.FPIEEE32)
-// CHECK:   store [[RESULT]] to [trivial] %0 : $*Float
-// CHECK-NOT: copy_addr
-// CHECK-NOT: destroy_addr
-// CHECK-LABEL: } // end sil function 'testCPF'
-sil [ossa] @testCPF : $@convention(thin) (Float) -> @out Float {
-bb0(%0 : $*Float, %1 : $Float):
-  %2 = alloc_stack $Float
-  store %1 to [trivial] %2 : $*Float
-  %4 = alloc_stack $Float
-  copy_addr  %2 to [initialization] %4 : $*Float
-  %6 = struct_extract %1 : $Float, #Float._value
-  %7 = builtin "int_fma_FPIEEE32"(%6 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-  %8 = struct $Float (%7 : $Builtin.FPIEEE32)
-  store %8 to [trivial] %4 : $*Float
-  copy_addr %4 to [initialization] %0 : $*Float
-  destroy_addr %4 : $*Float
-  dealloc_stack %4 : $*Float
-  destroy_addr %2 : $*Float
-  dealloc_stack %2 : $*Float
-  %15 = tuple ()
-  return %15 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @test_dynamic_lifetime : 
