@@ -280,7 +280,7 @@ func test_coercions_with_overloaded_operator(str: String, optStr: String?, veryO
 
 func id<T>(_ x: T) -> T { x }
 
-func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [String: Int], _ set: Set<Int>) {
+func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [String: Int], _ set: Set<Int>, _ i: Int, _ stringAnyDict: [String: Any]) {
   // Successful coercions don't raise a warning.
   _ = arr as [Any]?
   _ = dict as [String: Int]?
@@ -337,6 +337,24 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   // The array can also be inferred to be [Any].
   _ = ([] ?? []) as Array // expected-warning {{left side of nil coalescing operator '??' has non-optional type '[Any]', so the right side is never used}}
+
+  // rdar://88334481 – Don't apply the compatibility logic for collection literals.
+  typealias Magic<T> = T
+  _ = [i] as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = [i] as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = ([i]) as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _  = [i: i] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+  _  = ([i: i]) as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+  _  = [i: stringAnyDict] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+
+  // These are currently not peepholed.
+  _ = [i].self as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  _ = (try [i]) as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+
+  // These are wrong, but make sure we don't warn about the value cast always succeeding.
+  _  = [i: i] as! [String: Any]
+  _  = [i: stringAnyDict] as! [String: Any]
 }
 
 // SR-13088
