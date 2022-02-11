@@ -248,6 +248,12 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     if (!callee)
       return false;
 
+    // In conservative mode we don't want to turn non-public functions into
+    // public functions, because that can increase code size. E.g. if the
+    // function is completely inlined afterwards.
+    if (conservative && !hasPublicVisibility(callee->getLinkage()))
+      return false;
+
     // Recursivly walk down the call graph.
     if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1))
       return true;
@@ -260,12 +266,6 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
     if (!canUseFromInline(callee))
       return false;
   
-    // In conservative mode we don't want to turn non-public functions into
-    // public functions, because that can increase code size. E.g. if the
-    // function is completely inlined afterwards.
-    if (conservative && callee->getLinkage() != SILLinkage::Public)
-      return false;
-
     return true;
   }
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
