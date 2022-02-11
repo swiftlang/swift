@@ -127,6 +127,29 @@ void swift::extendLocalBorrow(BeginBorrowInst *beginBorrow,
   }
 }
 
+bool swift::computeGuaranteedBoundary(SILValue value,
+                                      PrunedLivenessBoundary &boundary) {
+  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+
+  // Place end_borrows that cover the load_borrow uses. It is not necessary to
+  // cover the outer borrow scope of the extract's operand. If a lexical
+  // borrow scope exists for the outer value, which is now in memory, then
+  // its alloc_stack will be marked lexical, and the in-memory values will be
+  // kept alive until the end of the outer scope.
+  SmallVector<Operand *, 4> usePoints;
+  bool noEscape = findInnerTransitiveGuaranteedUses(value, &usePoints);
+
+  SmallVector<SILBasicBlock *, 4> discoveredBlocks;
+  PrunedLiveness liveness(&discoveredBlocks);
+  for (auto *use : usePoints) {
+    assert(!use->isLifetimeEnding());
+    liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ false);
+  }
+  boundary.compute(liveness);
+
+  return noEscape;
+}
+
 //===----------------------------------------------------------------------===//
 //                        GuaranteedOwnershipExtension
 //===----------------------------------------------------------------------===//
