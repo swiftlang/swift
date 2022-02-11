@@ -4045,20 +4045,19 @@ namespace {
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
+      auto *coerced = visitCoerceExprImpl(expr);
+      if (!coerced)
+        return nullptr;
+
       // If we need to insert a force-unwrap for coercions of the form
       // 'as T!', do so now.
-      if (hasForcedOptionalResult(expr)) {
-        auto *coerced = visitCoerceExpr(expr, None);
-        if (!coerced)
-          return nullptr;
+      if (hasForcedOptionalResult(expr))
+        coerced = forceUnwrapIUO(coerced);
 
-        return forceUnwrapIUO(coerced);
-      }
-
-      return visitCoerceExpr(expr, None);
+      return coerced;
     }
 
-    Expr *visitCoerceExpr(CoerceExpr *expr, Optional<unsigned> choice) {
+    Expr *visitCoerceExprImpl(CoerceExpr *expr) {
       // Simplify and update the type we're coercing to.
       assert(expr->getCastTypeRepr());
       const auto toType = simplifyType(cs.getType(expr->getCastTypeRepr()));
@@ -4107,14 +4106,11 @@ namespace {
       // get it from the solution to determine whether we've picked a coercion
       // or a bridging conversion.
       auto *locator = cs.getConstraintLocator(expr);
-
-      if (!choice) {
-        choice = solution.getDisjunctionChoice(locator);
-      }
+      auto choice = solution.getDisjunctionChoice(locator);
 
       // Handle the coercion/bridging of the underlying subexpression, where
       // optionality has been removed.
-      if (*choice == 0) {
+      if (choice == 0) {
         // Convert the subexpression.
         Expr *sub = expr->getSubExpr();
 
@@ -4128,7 +4124,7 @@ namespace {
       }
 
       // Bridging conversion.
-      assert(*choice == 1 && "should be bridging");
+      assert(choice == 1 && "should be bridging");
 
       // Handle optional bindings.
       Expr *sub = handleOptionalBindings(expr->getSubExpr(), toType,
