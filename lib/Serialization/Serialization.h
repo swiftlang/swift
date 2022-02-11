@@ -21,6 +21,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
 #include <array>
@@ -538,6 +539,11 @@ public:
   /// Writes a set of generic requirements.
   void writeGenericRequirements(ArrayRef<Requirement> requirements,
                                 const std::array<unsigned, 256> &abbrCodes);
+
+  /// Writes a protocol's requirement signature, consisting of a list of
+  /// generic requirements and a list of protocol typealias records.
+  void writeRequirementSignature(const RequirementSignature &requirementSig,
+                                 const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a protocol's associated type table.
   void writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
