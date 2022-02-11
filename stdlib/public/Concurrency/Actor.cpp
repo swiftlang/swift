@@ -1616,7 +1616,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   SWIFT_TASK_DEBUG_LOG("switch failed, task %p enqueued on executor %p", task,
                        newExecutor.getIdentity());
 
-  task->flagAsEnqueuedOnExecutor(newExecutor);
+  task->flagAsAndEnqueueOnExecutor(newExecutor);
   _swift_task_clearCurrent();
 }
 
