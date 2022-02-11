@@ -25,6 +25,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Statistic.h"
@@ -231,11 +232,11 @@ RequirementMachine::buildRequirementsFromRules(
 
 /// Convert a list of protocol typealias rules to a list of name/underlying type
 /// pairs.
-std::vector<std::pair<Identifier, Type>>
+std::vector<ProtocolTypeAlias>
 RequirementMachine::buildProtocolTypeAliasesFromRules(
     ArrayRef<unsigned> rules,
     TypeArrayView<GenericTypeParamType> genericParams) const {
-  std::vector<std::pair<Identifier, Type>> aliases;
+  std::vector<ProtocolTypeAlias> aliases;
 
   if (getDebugOptions().contains(DebugFlags::Minimization)) {
     llvm::dbgs() << "\nMinimized type aliases:\n";
@@ -283,9 +284,9 @@ RequirementMachine::buildProtocolTypeAliasesFromRules(
 
   // Finally, sort the aliases in canonical order.
   llvm::array_pod_sort(aliases.begin(), aliases.end(),
-                       [](const std::pair<Identifier, Type> *lhs,
-                          const std::pair<Identifier, Type> *rhs) -> int {
-                         return lhs->first.compare(rhs->first);
+                       [](const ProtocolTypeAlias *lhs,
+                          const ProtocolTypeAlias *rhs) -> int {
+                         return lhs->getName().compare(rhs->getName());
                        });
 
   return aliases;
@@ -293,8 +294,7 @@ RequirementMachine::buildProtocolTypeAliasesFromRules(
 
 /// Builds the requirement signatures for each protocol in this strongly
 /// connected component.
-llvm::DenseMap<const ProtocolDecl *,
-               RequirementMachine::MinimalProtocolRequirements>
+llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
 RequirementMachine::computeMinimalProtocolRequirements() {
   auto protos = System.getProtocols();
 
@@ -317,24 +317,25 @@ RequirementMachine::computeMinimalProtocolRequirements() {
   // Note that we build 'result' by iterating over 'protos' rather than
   // 'rules'; this is intentional, so that even if a protocol has no
   // rules, we still end up creating an entry for it in 'result'.
-  llvm::DenseMap<const ProtocolDecl *, MinimalProtocolRequirements> result;
+  llvm::DenseMap<const ProtocolDecl *, RequirementSignature> result;
   for (const auto *proto : protos) {
     auto genericParams = proto->getGenericSignature().getGenericParams();
 
-    result[proto].Requirements =
-        ctx.AllocateCopy(
-            buildRequirementsFromRules(rules[proto].Requirements,
+    const auto &entry = rules[proto];
+    auto reqs = ctx.AllocateCopy(
+            buildRequirementsFromRules(entry.Requirements,
                                        genericParams));
-    result[proto].TypeAliases =
-        ctx.AllocateCopy(
-            buildProtocolTypeAliasesFromRules(rules[proto].TypeAliases,
+    auto aliases = ctx.AllocateCopy(
+            buildProtocolTypeAliasesFromRules(entry.TypeAliases,
                                               genericParams));
+
+    result[proto] = RequirementSignature(reqs, aliases);
   }
 
   return result;
 }
 
-ArrayRef<Requirement>
+RequirementSignature
 RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
                                          ProtocolDecl *proto) const {
   ASTContext &ctx = proto->getASTContext();
@@ -369,11 +370,11 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       if (otherProto != proto) {
         ctx.evaluator.cacheOutput(
           RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
-          ArrayRef<Requirement>());
+          RequirementSignature());
       }
     }
 
-    return ArrayRef<Requirement>();
+    return RequirementSignature();
   }
 
   auto minimalRequirements = machine->computeMinimalProtocolRequirements();
@@ -382,7 +383,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
   // The requirement signature for the actual protocol that the result
   // was kicked off with.
-  ArrayRef<Requirement> result;
+  Optional<RequirementSignature> result;
 
   if (debug) {
     llvm::dbgs() << "\nRequirement signatures:\n";
@@ -398,7 +399,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
       auto sig = GenericSignature::get(
           otherProto->getGenericSignature().getGenericParams(),
-          reqs.Requirements);
+          reqs.getRequirements());
 
       PrintOptions opts;
       opts.ProtocolQualifiedDependentMemberTypes = true;
@@ -409,9 +410,9 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
     // Don't call setRequirementSignature() on the original proto; the
     // request evaluator will do it for us.
     if (otherProto == proto)
-      result = reqs.Requirements;
+      result = reqs;
     else {
-      auto temp = reqs.Requirements;
+      auto temp = reqs;
       ctx.evaluator.cacheOutput(
         RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
         std::move(temp));
@@ -419,7 +420,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
   }
 
   // Return the result for the specific protocol this request was kicked off on.
-  return result;
+  return *result;
 }
 
 /// Builds the top-level generic signature requirements for this rewrite system.

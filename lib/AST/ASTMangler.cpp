@@ -3284,9 +3284,8 @@ void ASTMangler::appendDependentProtocolConformance(
 
     // Conformances are relative to the current protocol's requirement
     // signature.
-    auto index =
-      conformanceRequirementIndex(entry,
-                                  currentProtocol->getRequirementSignature());
+    auto reqs = currentProtocol->getRequirementSignature().getRequirements();
+    auto index = conformanceRequirementIndex(entry, reqs);
 
     // Inherited conformance.
     bool isInheritedConformance =

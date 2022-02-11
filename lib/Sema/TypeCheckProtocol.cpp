@@ -4863,7 +4863,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
       { proto->getSelfInterfaceType() },
-      proto->getRequirementSignature(),
+      proto->getRequirementSignature().getRequirements(),
       QuerySubstitutionMap{substitutions});
 
   switch (result) {
@@ -4893,7 +4893,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   if (where.isImplicit())
     return;
 
-  for (auto req : proto->getRequirementSignature()) {
+  for (auto req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() == RequirementKind::Conformance) {
       auto depTy = req.getFirstType();
       auto *proto = req.getProtocolDecl();
@@ -6862,7 +6862,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
   // Find defaults for any associated conformances rooted on defaulted
   // associated types.
-  for (const auto &req : proto->getRequirementSignature()) {
+  for (const auto &req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
     if (req.getFirstType()->isEqual(proto->getSelfInterfaceType()))
