@@ -2687,12 +2687,14 @@ namespace {
     /// \param refCxt the context in which the member reference happens.
     /// \param baseActor the actor referenced in the base of the member access.
     /// \param member the declaration corresponding to the accessed member.
+    /// \param memberLoc the source location of the reference to the member.
     ///
     /// \returns true iff the member access is permitted in Sema because it will
     /// be verified later by flow-isolation.
     bool checkedByFlowIsolation(DeclContext const *refCxt,
                                 ReferencedActor &baseActor,
-                                ValueDecl const *member) {
+                                ValueDecl const *member,
+                                SourceLoc memberLoc) {
 
       // base of member reference must be `self`
       if (!baseActor.isActorSelf())
@@ -2727,6 +2729,18 @@ namespace {
       if (auto *var = dyn_cast<VarDecl>(member))
         if (var->hasStorage() && var->isInstanceMember())
           return true;
+
+      // In Swift 5, we were allowing all members to be referenced from a
+      // deinit, but that will not be valid in Swift 6+, so warn about it.
+      if (!refCxt->getASTContext().isSwiftVersionAtLeast(6)) {
+        if (isa<DestructorDecl>(fnDecl) && member->isInstanceMember()) {
+          auto &diags = refCxt->getASTContext().Diags;
+          diags.diagnose(memberLoc, diag::actor_isolated_from_deinit,
+                         member->getDescriptiveKind(),
+                         member->getName()).warnUntilSwiftVersion(6);
+          return true;
+        }
+      }
 
       return false;
     }
@@ -2831,7 +2845,7 @@ namespace {
         // access an isolated member on `self`. If that case applies, then we
         // can skip checking.
         if (checkedByFlowIsolation(getDeclContext(), isolatedActor,
-                                          member))
+                                          member, memberLoc))
           return false;
 
         // An escaping partial application of something that is part of

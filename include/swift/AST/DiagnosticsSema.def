@@ -4486,7 +4486,9 @@ NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
       "explicitly defined", ())
-
+ERROR(actor_isolated_from_deinit,none,
+      "actor-isolated %0 %1 can not be referenced from a non-isolated deinit",
+      (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can not be "
         "%select{referenced|mutated|used 'inout'}2 "

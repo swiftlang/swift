@@ -116,6 +116,18 @@ static void desugarLayoutRequirement(Type subjectType,
   result.emplace_back(RequirementKind::Layout, subjectType, layout);
 }
 
+static Type lookupMemberType(Type subjectType, ProtocolDecl *protoDecl,
+                             AssociatedTypeDecl *assocType) {
+  if (subjectType->isTypeParameter())
+    return DependentMemberType::get(subjectType, assocType);
+
+  auto *M = protoDecl->getParentModule();
+  auto conformance = M->lookupConformance(
+      subjectType, protoDecl);
+  return conformance.getAssociatedType(subjectType,
+                                       assocType->getDeclaredInterfaceType());
+}
+
 /// Desugar a protocol conformance requirement by splitting up protocol
 /// compositions on the right hand side into conformance and superclass
 /// requirements.
@@ -124,7 +136,23 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
     if (!subjectType->isTypeParameter()) {
-      // FIXME: Check conformance, diagnose redundancy or conflict upstream
+      // Check if the subject type actually conforms.
+      auto *protoDecl = constraintType->castTo<ProtocolType>()->getDecl();
+      auto *module = protoDecl->getParentModule();
+      auto conformance = module->lookupConformance(subjectType, protoDecl);
+      if (conformance.isInvalid()) {
+        // FIXME: Diagnose a conflict.
+        return;
+      }
+
+      // FIXME: Diagnose a redundancy.
+      assert(conformance.isConcrete());
+      auto *concrete = conformance.getConcrete();
+
+      // Introduce conditional requirements if the subject type is concrete.
+      for (auto req : concrete->getConditionalRequirements()) {
+        desugarRequirement(req, result);
+      }
       return;
     }
 
@@ -141,16 +169,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
 
     auto *assocType = protoDecl->getPrimaryAssociatedType();
 
-    Type memberType;
-    if (!subjectType->isTypeParameter()) {
-      auto *M = protoDecl->getParentModule();
-      auto conformance = M->lookupConformance(
-          subjectType, protoDecl);
-      memberType = conformance.getConcrete()->getTypeWitness(assocType);
-    } else {
-      memberType = DependentMemberType::get(subjectType, assocType);
-    }
-
+    auto memberType = lookupMemberType(subjectType, protoDecl, assocType);
     desugarSameTypeRequirement(memberType, paramType->getArgumentType(),
                                result);
     return;
@@ -278,10 +297,7 @@ struct InferRequirementsWalker : public TypeWalker {
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
           auto *protocol = assocType->getProtocol();
-          auto *module = protocol->getParentModule();
-          auto conf = module->lookupConformance(firstType, protocol);
-          auto secondType = conf.getAssociatedType(
-              firstType, assocType->getDeclaredInterfaceType());
+          auto secondType = lookupMemberType(firstType, protocol, assocType);
           Requirement req(RequirementKind::SameType, firstType, secondType);
           desugarRequirement(req, reqs);
         };
