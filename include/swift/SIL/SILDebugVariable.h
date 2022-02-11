@@ -84,6 +84,8 @@ class SILDebugVariable {
                         Optional<SILType> type, Optional<SILLocation> declLoc,
                         const SILDebugScope *declScope,
                         ArrayRef<SILDIExprElement> exprElements);
+    LLVM_ATTRIBUTE_DEPRECATED(void dump() LLVM_ATTRIBUTE_USED,
+                              "Only for use in the debugger");
   };
 
   Storage *storage;
