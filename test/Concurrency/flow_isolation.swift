@@ -584,6 +584,7 @@ actor EscapeArtist {
 actor Ahmad {
   nonisolated func f() {}
   var prop: Int = 0
+  var computedProp: Int { 10 }
 
   init(v1: Void) {
     Task.detached { self.f() } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
@@ -595,6 +596,14 @@ actor Ahmad {
     Task.detached { self.f() } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
     f()
     prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
+  deinit {
+    // expected-warning@+2 {{actor-isolated property 'computedProp' can not be referenced from a non-isolated deinit; this is an error in Swift 6}}
+    // expected-note@+1 {{after accessing property 'computedProp', only non-isolated properties of 'self' can be accessed from a deinit}}
+    let x = computedProp
+
+    prop = x // expected-warning {{cannot access property 'prop' here in deinitializer; this is an error in Swift 6}}
   }
 }
 
@@ -621,5 +630,26 @@ actor Rain {
     defer { Task { self.f() } }
 
     defer { _ = hollerBack(self) }
+  }
+
+  deinit {
+    x = 1
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+actor DeinitExceptionForSwift5 {
+  var x: Int = 0
+
+  func cleanup() {
+    x = 0
+  }
+
+  deinit {
+    // expected-warning@+2 {{actor-isolated instance method 'cleanup()' can not be referenced from a non-isolated deinit; this is an error in Swift 6}}
+    // expected-note@+1 {{after calling instance method 'cleanup()', only non-isolated properties of 'self' can be accessed from a deinit}}
+    cleanup()
+
+    x = 1 // expected-warning {{cannot access property 'x' here in deinitializer; this is an error in Swift 6}}
   }
 }
