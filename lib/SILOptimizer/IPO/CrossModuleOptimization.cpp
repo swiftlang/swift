@@ -268,6 +268,12 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
 
     return true;
   }
+  if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
+    SILGlobalVariable *global = GAI->getReferencedGlobal();
+    if (conservative && !hasPublicVisibility(global->getLinkage()))
+      return false;
+    return true;
+  }
   if (auto *KPI = dyn_cast<KeyPathInst>(inst)) {
     bool canUse = true;
     KPI->getPattern()->visitReferencedFunctionsAndMethods(
@@ -457,7 +463,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
     if (canSerializeGlobal(global)) {
       serializeGlobal(global);
     }
-    if (global->getLinkage() != SILLinkage::Public) {
+    if (!hasPublicVisibility(global->getLinkage())) {
       global->setLinkage(SILLinkage::Public);
       M.addPublicCMOSymbol(global->getName());
     }
