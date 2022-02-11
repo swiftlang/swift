@@ -411,14 +411,14 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     if (!isRedundantRuleFn(ruleID))
       continue;
 
-    if (!found) {
-      found = pair;
-      continue;
-    }
-
     if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
       llvm::dbgs() << "** Candidate " << rule << " from loop #"
                    << pair.first << "\n";
+    }
+
+    if (!found) {
+      found = pair;
+      continue;
     }
 
     // 'rule' is the candidate rule; 'otherRule' is the best rule to eliminate
