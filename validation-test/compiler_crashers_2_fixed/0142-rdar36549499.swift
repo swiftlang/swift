@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -o /dev/null
+// RUN: %target-swift-frontend %s -emit-ir -o /dev/null -requirement-machine-inferred-signatures=verify
 protocol S {
   associatedtype I: IteratorProtocol
   typealias E = I.Element
