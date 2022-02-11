@@ -84,7 +84,7 @@ public struct Duration: Sendable {
 
   /// The composite components of the `Duration`.
   ///
-  /// This is intented for facilitating conversions to existing time types. The
+  /// This is intended for facilitating conversions to existing time types. The
   /// attoseconds value will not exceed 1e18 or be lower than -1e18.
   public var components: (seconds: Int64, attoseconds: Int64) {
     let seconds = _attoseconds / 1_000_000_000_000_000_000

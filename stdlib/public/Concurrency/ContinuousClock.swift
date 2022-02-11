@@ -11,8 +11,18 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
+/// A clock that measures time that always increments but does not stop 
+/// incrementing while the system is asleep. 
+///
+/// `ContinuousClock` can be considered as a stopwatch style time. The frame of
+/// reference of the `Instant` may be bound to process launch, machine boot or
+/// some other locally defined reference point. This means that the instants are
+/// only comparable locally during the execution of a program.
+///
+/// This clock is suitable for high resolution measurements of execution.
 @available(SwiftStdlib 5.7, *)
 public struct ContinuousClock {
+  /// A continuous point in time used for `ContinuousClock`.
   public struct Instant: Codable, Sendable {
     internal var _value: Swift.Duration
 
@@ -26,16 +36,23 @@ public struct ContinuousClock {
 
 @available(SwiftStdlib 5.7, *)
 extension Clock where Self == ContinuousClock {
+  /// A clock that measures time that always increments but does not stop 
+  /// incrementing while the system is asleep. 
+  ///
+  ///       try await Task.sleep(until: .now + .seconds(3), clock: .continuous)
+  ///
   @available(SwiftStdlib 5.7, *)
   public static var continuous: ContinuousClock { return ContinuousClock() }
 }
 
 @available(SwiftStdlib 5.7, *)
 extension ContinuousClock: Clock {
+  /// The current continuous instant.
   public var now: ContinuousClock.Instant {
     ContinuousClock.now
   }
 
+  /// The minimum non-zero resolution between any two calls to `now`.
   public var minimumResolution: Swift.Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
@@ -46,6 +63,7 @@ extension ContinuousClock: Clock {
     return .seconds(seconds) + .nanoseconds(nanoseconds)
   }
 
+  /// The current continuous instant.
   public static var now: ContinuousClock.Instant {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
@@ -57,6 +75,15 @@ extension ContinuousClock: Clock {
       .seconds(seconds) + .nanoseconds(nanoseconds))
   }
 
+  /// Suspend task execution until a given deadline within a tolerance.
+  /// If no tolerance is specified then the system may adjust the deadline
+  /// to coalesce CPU wake-ups to more efficiently process the wake-ups in
+  /// a more power efficient manner.
+  ///
+  /// If the task is canceled before the time ends, this function throws 
+  /// `CancellationError`.
+  ///
+  /// This function doesn't block the underlying thread.
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
