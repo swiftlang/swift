@@ -81,7 +81,7 @@ PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
   }
 
   // check associated conformances of associated types or inheritance
-  for (auto requirement : proto->getRequirementSignature()) {
+  for (auto requirement : proto->getRequirementSignature().getRequirements()) {
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;
 

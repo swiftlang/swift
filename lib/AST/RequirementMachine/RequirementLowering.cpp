@@ -810,7 +810,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
   if (proto->hasLazyRequirementSignature() ||
       (ctx.LangOpts.RequirementMachineProtocolSignatures
         == RequirementMachineMode::Disabled)) {
-    for (auto req : proto->getRequirementSignature()) {
+    for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
         result.push_back(req.getProtocolDecl());
       }
@@ -1074,7 +1074,8 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
       for (auto req : proto->getTypeAliasRequirements())
         addRequirement(req.getCanonical(), proto);
     } else {
-      for (auto req : proto->getRequirementSignature())
+      auto reqs = proto->getRequirementSignature();
+      for (auto req : reqs.getRequirements())
         addRequirement(req.getCanonical(), proto);
     }
 

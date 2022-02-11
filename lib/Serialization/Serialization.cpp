@@ -3633,7 +3633,7 @@ public:
         dependencyTypes.insert(elementType);
     }
 
-    for (Requirement req : proto->getRequirementSignature()) {
+    for (Requirement req : proto->getRequirementSignature().getRequirements()) {
       // Requirements can be cyclic, so for now filter out any requirements
       // from elsewhere in the module. This isn't perfect---something else in
       // the module could very well fail to compile for its own reasons---but
@@ -3661,7 +3661,7 @@ public:
 
     writeGenericParams(proto->getGenericParams());
     S.writeGenericRequirements(
-      proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
+      proto->getRequirementSignature().getRequirements(), S.DeclTypeAbbrCodes);
     S.writeAssociatedTypes(
       proto->getAssociatedTypeMembers(), S.DeclTypeAbbrCodes);
     writeMembers(id, proto->getAllMembers(), true);

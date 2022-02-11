@@ -6563,7 +6563,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       conformancesForProtocols[confProto] = nextConformance;
     }
 
-    for (const auto &req : proto->getRequirementSignature()) {
+    for (const auto &req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
       ProtocolDecl *proto = req.getProtocolDecl();
@@ -6585,8 +6585,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto isConformanceReq = [](const Requirement &req) {
       return req.getKind() == RequirementKind::Conformance;
     };
+    auto requirements = proto->getRequirementSignature().getRequirements();
     if (!allowCompilerErrors() &&
-        conformanceCount != llvm::count_if(proto->getRequirementSignature(),
+        conformanceCount != llvm::count_if(requirements,
                                            isConformanceReq)) {
       fatal(llvm::make_error<llvm::StringError>(
           "serialized conformances do not match requirement signature",
