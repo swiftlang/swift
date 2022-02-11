@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
@@ -1014,6 +1015,38 @@ void RuleBuilder::addRequirement(const StructuralRequirement &req,
   addRequirement(req.req.getCanonical(), proto);
 }
 
+/// Lowers a protocol typealias to a rewrite rule.
+void RuleBuilder::addTypeAlias(const ProtocolTypeAlias &alias,
+                               const ProtocolDecl *proto) {
+  // Build the term [P].T, where P is the protocol and T is a name symbol.
+  MutableTerm subjectTerm;
+  subjectTerm.add(Symbol::forProtocol(proto, Context));
+  subjectTerm.add(Symbol::forName(alias.getName(), Context));
+
+  auto constraintType = alias.getUnderlyingType()->getCanonicalType();
+  MutableTerm constraintTerm;
+
+  if (constraintType->isTypeParameter()) {
+    // If the underlying type of the typealias is a type parameter X, build
+    // a rule [P].T => X, where X,
+    constraintTerm = Context.getMutableTermForType(
+        constraintType, proto);
+  } else {
+    // If the underlying type of the typealias is a concrete type C, build
+    // a rule [P].T.[concrete: C] => [P].T.
+    constraintTerm = subjectTerm;
+
+    SmallVector<Term, 1> result;
+    auto concreteType =
+        Context.getSubstitutionSchemaFromType(
+            constraintType, proto, result);
+
+    constraintTerm.add(Symbol::forConcreteType(concreteType, result, Context));
+  }
+
+  RequirementRules.emplace_back(subjectTerm, constraintTerm);
+}
+
 /// Record information about a protocol if we have no seen it yet.
 void RuleBuilder::addProtocol(const ProtocolDecl *proto,
                               bool initialComponent) {
@@ -1077,6 +1110,8 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
       auto reqs = proto->getRequirementSignature();
       for (auto req : reqs.getRequirements())
         addRequirement(req.getCanonical(), proto);
+      for (auto alias : reqs.getTypeAliases())
+        addTypeAlias(alias, proto);
     }
 
     if (Dump) {
