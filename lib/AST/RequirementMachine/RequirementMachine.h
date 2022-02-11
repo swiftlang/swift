@@ -109,6 +109,10 @@ class RequirementMachine final {
     ArrayRef<unsigned> rules,
     TypeArrayView<GenericTypeParamType> genericParams) const;
 
+  std::vector<std::pair<Identifier, Type>> buildProtocolTypeAliasesFromRules(
+    ArrayRef<unsigned> rules,
+    TypeArrayView<GenericTypeParamType> genericParams) const;
+
   TypeArrayView<GenericTypeParamType> getGenericParams() const {
     return TypeArrayView<GenericTypeParamType>(
       ArrayRef<Type>(Params));
@@ -140,7 +144,12 @@ public:
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
-  llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
+  struct MinimalProtocolRequirements {
+    ArrayRef<Requirement> Requirements;
+    ArrayRef<std::pair<Identifier, Type>> TypeAliases;
+  };
+
+  llvm::DenseMap<const ProtocolDecl *, MinimalProtocolRequirements>
   computeMinimalProtocolRequirements();
 
   std::vector<Requirement> computeMinimalGenericSignatureRequirements();
