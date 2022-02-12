@@ -4672,8 +4672,7 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     ctx.Diags.diagnose(SourceLoc(),
                        diag::unable_to_convert_generic_swift_types.ID,
                        {func->getName(), StringRef(failedTypesStr)});
-    // Return a valid FunctionDecl but, we'll never use it.
-    return func->getAsFunction();
+    return nullptr;
   }
 
   // Instanciate a specialization of this template using the substitution map.

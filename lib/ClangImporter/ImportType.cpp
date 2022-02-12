@@ -1945,7 +1945,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     Type swiftParamTy;
     bool isParamTypeImplicitlyUnwrapped = false;
     bool isInOut = false;
-    if ((isa<clang::ReferenceType>(paramTy) || isa<clang::PointerType>(paramTy)) &&
+    if (isa<clang::PointerType>(paramTy) &&
         isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
       auto pointeeType = paramTy->getPointeeType();
       auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
@@ -1957,6 +1957,13 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       swiftParamTy = genericType->wrapInPointer(pointerKind);
       if (!swiftParamTy)
         return nullptr;
+    } else if (isa<clang::ReferenceType>(paramTy) &&
+               isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
+      auto templateParamType =
+          cast<clang::TemplateTypeParmType>(paramTy->getPointeeType());
+      swiftParamTy =
+          findGenericTypeInGenericDecls(templateParamType, genericParams);
+      isInOut = true;
     } else if (auto *templateParamType =
                    dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
       swiftParamTy =
