@@ -63,8 +63,9 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 6; // Add initkind for constructors
+const uint8_t DIGESTER_JSON_VERSION = 7; // push SDKNodeRoot to lower-level
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
+const StringRef ABIRootKey = "ABIRoot";
 
 class SDKNode;
 typedef SDKNode* NodePtr;
@@ -826,5 +827,14 @@ void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace
+
+namespace swift {
+namespace json {
+template <> struct ObjectTraits<ide::api::SDKNodeRoot> {
+  static void mapping(Output &out, ide::api::SDKNodeRoot &contents) {
+    contents.jsonize(out);
+  }
+};
+}}
 
 #endif
