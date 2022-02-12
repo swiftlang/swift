@@ -200,6 +200,7 @@ KNOWN_SETTINGS=(
     extra-swift-args                              ""                "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
+    sil-verify-all-macos-only                     "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process when building a macos stdlib"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
     swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Darwin platforms, 0 otherwise"
     swift-enable-dispatch                         "1"               "whether to enable use of libdispatch"
@@ -1698,6 +1699,7 @@ for host in "${ALL_HOSTS[@]}"; do
         "${swift_cmake_options[@]}"
         -DSWIFT_AST_VERIFIER:BOOL=$(true_false "${SWIFT_ENABLE_AST_VERIFIER}")
         -DSWIFT_SIL_VERIFY_ALL:BOOL=$(true_false "${SIL_VERIFY_ALL}")
+        -DSWIFT_SIL_VERIFY_ALL_MACOS_ONLY:BOOL=$(true_false "${SIL_VERIFY_ALL_MACOS_ONLY}")
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
     )
 

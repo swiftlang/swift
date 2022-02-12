@@ -195,22 +195,9 @@ class MinimalConformances {
       MutableTerm term, unsigned ruleID,
       SmallVectorImpl<unsigned> &result) const;
 
-  enum class ConcreteConformances : uint8_t {
-    /// Don't consider paths involving concrete conformances at all.
-    Disallowed,
-
-    /// Consider paths involving a concrete conformance only if it appears
-    /// at the end of the path.
-    AllowedAtEnd,
-
-    /// Consider paths involving concrete conformances anywhere.
-    AllowedAnywhere
-  };
-
   bool isValidConformancePath(
       llvm::SmallDenseSet<unsigned, 4> &visited,
-      const llvm::SmallVectorImpl<unsigned> &path,
-      ConcreteConformances allowConcrete) const;
+      const llvm::SmallVectorImpl<unsigned> &path) const;
 
   bool isValidRefinementPath(
       const llvm::SmallVectorImpl<unsigned> &path) const;
@@ -240,7 +227,7 @@ public:
 
   void verifyMinimalConformanceEquations() const;
 
-  void computeMinimalConformances(bool firstPass);
+  void computeMinimalConformances();
 
   void verifyMinimalConformances() const;
 
@@ -622,38 +609,11 @@ void MinimalConformances::computeCandidateConformancePaths() {
 /// rules.
 bool MinimalConformances::isValidConformancePath(
     llvm::SmallDenseSet<unsigned, 4> &visited,
-    const llvm::SmallVectorImpl<unsigned> &path,
-    ConcreteConformances allowConcrete) const {
+    const llvm::SmallVectorImpl<unsigned> &path) const {
 
-  unsigned lastIdx = path.size() - 1;
-
-  for (unsigned ruleIdx : indices(path)) {
-    unsigned ruleID = path[ruleIdx];
+  for (unsigned ruleID : path) {
     if (visited.count(ruleID) > 0)
       return false;
-
-    const auto &rule = System.getRule(ruleID);
-
-    bool isLastElement = (ruleIdx == lastIdx);
-    bool isConcreteConformance = rule.getLHS().back().getKind()
-          == Symbol::Kind::ConcreteConformance;
-
-    // Concrete conformances cannot appear in the middle of a conformance path.
-    if (isConcreteConformance) {
-      switch (allowConcrete) {
-      case ConcreteConformances::Disallowed:
-        return false;
-
-      case ConcreteConformances::AllowedAtEnd:
-        if (!isLastElement)
-          return false;
-
-        break;
-
-      case ConcreteConformances::AllowedAnywhere:
-        break;
-      }
-    }
 
     if (RedundantConformances.count(ruleID)) {
       SWIFT_DEFER {
@@ -665,29 +625,9 @@ bool MinimalConformances::isValidConformancePath(
       if (found == ConformancePaths.end())
         return false;
 
-      ConcreteConformances allowConcreteRec;
-      switch (allowConcrete) {
-      case ConcreteConformances::Disallowed:
-        allowConcreteRec = ConcreteConformances::Disallowed;
-        break;
-
-      case ConcreteConformances::AllowedAnywhere:
-        allowConcreteRec = ConcreteConformances::AllowedAnywhere;
-        break;
-
-      case ConcreteConformances::AllowedAtEnd:
-        if (isLastElement)
-          allowConcreteRec = ConcreteConformances::AllowedAtEnd;
-        else
-          allowConcreteRec = ConcreteConformances::Disallowed;
-
-        break;
-      }
-
       bool foundValidConformancePath = false;
       for (const auto &otherPath : found->second) {
-        if (isValidConformancePath(visited, otherPath,
-                                   allowConcreteRec)) {
+        if (isValidConformancePath(visited, otherPath)) {
           foundValidConformancePath = true;
           break;
         }
@@ -703,19 +643,11 @@ bool MinimalConformances::isValidConformancePath(
         };
         visited.insert(ruleID);
 
-        ConcreteConformances allowConcreteRec;
-        if (isConcreteConformance)
-          allowConcreteRec = ConcreteConformances::AllowedAnywhere;
-        else
-          allowConcreteRec = ConcreteConformances::AllowedAtEnd;
-
         // If 'req' is based on some other conformance requirement
         // `T.[P.]A : Q', we want to make sure that we have a
         // non-redundant derivation for 'T : P'.
-        if (!isValidConformancePath(visited, found->second,
-                                    allowConcreteRec)) {
+        if (!isValidConformancePath(visited, found->second))
           return false;
-        }
       }
     }
   }
@@ -857,47 +789,14 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
 ///
 /// In the first pass, we only consider conformance requirements that are
 /// made redundant by concrete conformances.
-void MinimalConformances::computeMinimalConformances(bool firstPass) {
+void MinimalConformances::computeMinimalConformances() {
   for (unsigned ruleID : ConformanceRules) {
     auto found = ConformancePaths.find(ruleID);
     if (found == ConformancePaths.end())
       continue;
 
+    const auto &rule = System.getRule(ruleID);
     const auto &paths = found->second;
-
-    if (firstPass) {
-      bool derivedViaConcrete = false;
-      for (const auto &path : paths) {
-        if (path.empty())
-          continue;
-
-        // If the rule is itself a concrete conformance, it is not
-        // derived-via-concrete via itself.
-        if (path.size() == 1 && path.front() == ruleID)
-          continue;
-
-        if (System.getRule(path.back()).getLHS().back().getKind() ==
-            Symbol::Kind::ConcreteConformance) {
-          derivedViaConcrete = true;
-          break;
-        }
-      }
-
-      // If this rule doesn't involve concrete conformances it will be
-      // considered in the second pass.
-      if (!derivedViaConcrete)
-        continue;
-
-      if (Debug.contains(DebugFlags::MinimalConformances)) {
-        llvm::dbgs() << "Derived-via-concrete: ";
-        dumpMinimalConformanceEquation(llvm::dbgs(), ruleID, paths);
-        llvm::dbgs() << "\n";
-      }
-    } else {
-      // Ignore rules already determined to be redundant by the first pass.
-      if (RedundantConformances.count(ruleID) > 0)
-        continue;
-    }
 
     bool isProtocolRefinement = ProtocolRefinements.count(ruleID) > 0;
 
@@ -910,13 +809,10 @@ void MinimalConformances::computeMinimalConformances(bool firstPass) {
       llvm::SmallDenseSet<unsigned, 4> visited;
       visited.insert(ruleID);
 
-      if (isValidConformancePath(visited, path,
-                                 ConcreteConformances::AllowedAtEnd)) {
+      if (isValidConformancePath(visited, path)) {
         if (Debug.contains(DebugFlags::MinimalConformances)) {
-          llvm::dbgs() << "Redundant rule in ";
-          llvm::dbgs() << (firstPass ? "first" : "second");
-          llvm::dbgs() << " pass: ";
-          llvm::dbgs() << System.getRule(ruleID).getLHS();
+          llvm::dbgs() << "Redundant rule: ";
+          llvm::dbgs() << rule.getLHS();
           llvm::dbgs() << "\n";
           llvm::dbgs() << "-- via valid path: ";
           dumpConformancePath(llvm::errs(), path);
@@ -945,19 +841,7 @@ void MinimalConformances::verifyMinimalConformances() const {
       llvm::SmallVector<unsigned, 1> path;
       path.push_back(ruleID);
 
-      ConcreteConformances allowConcrete;
-      if (rule.isProtocolConformanceRule()) {
-        // Protocol conformance rules are recoverable if the path
-        // has a concrete conformance at the end.
-        allowConcrete = ConcreteConformances::AllowedAtEnd;
-      } else {
-        // Concrete conformance rules are recoverable via paths
-        // containing other concrete conformances anywhere.
-        assert(rule.isAnyConformanceRule());
-        allowConcrete = ConcreteConformances::AllowedAnywhere;
-      }
-
-      if (!isValidConformancePath(visited, path, allowConcrete)) {
+      if (!isValidConformancePath(visited, path)) {
         llvm::errs() << "Redundant conformance is not recoverable:\n";
         llvm::errs() << rule << "\n\n";
         dumpMinimalConformanceEquations(llvm::errs());
@@ -1006,8 +890,7 @@ void RewriteSystem::computeMinimalConformances(
   }
 
   builder.verifyMinimalConformanceEquations();
-  builder.computeMinimalConformances(/*firstPass=*/true);
-  builder.computeMinimalConformances(/*firstPass=*/false);
+  builder.computeMinimalConformances();
   builder.verifyMinimalConformances();
 
   if (Debug.contains(DebugFlags::MinimalConformances)) {

@@ -433,21 +433,31 @@ public:
   RewritePath Path;
 
 private:
-  unsigned Deleted : 1;
-
   /// Cached value for findRulesAppearingOnceInEmptyContext().
   SmallVector<unsigned, 1> RulesInEmptyContext;
+
+  /// Cached value for getProjectionCount().
+  unsigned ProjectionCount : 30;
+
+  /// Loops are deleted once they no longer contain rules in empty context,
+  /// since at that point they don't participate in minimization and do not
+  /// need to be considered.
+  unsigned Deleted : 1;
 
   /// If true, RulesInEmptyContext should be recomputed.
   unsigned Dirty : 1;
 
+  void recompute(const RewriteSystem &system);
+
 public:
   RewriteLoop(MutableTerm basepoint, RewritePath path)
     : Basepoint(basepoint), Path(path) {
+    ProjectionCount = 0;
+
     Deleted = 0;
 
-    // Initially, the RulesInEmptyContext vector is not valid because
-    // it has not been computed yet.
+    // Initially, RulesInEmptyContext and ProjectionCount are not valid because
+    // they have not been computed yet.
     Dirty = 1;
   }
 
@@ -469,6 +479,8 @@ public:
 
   ArrayRef<unsigned>
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
+
+  unsigned getProjectionCount(const RewriteSystem &system) const;
 
   void findProtocolConformanceRules(
       llvm::SmallDenseMap<const ProtocolDecl *,

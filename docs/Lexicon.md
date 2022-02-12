@@ -594,6 +594,16 @@ of `Optional<Int>`.) Sugared types preserve information about the form
 and use of the type even though the behavior usually does not change
 (except for things like access control). Contrast with [canonical type](#canonical-type).
 
+## TBD
+
+Text-based dynamic library files (TBDs) are a textual representation of
+the information in a dynamic library / shared library that is required
+by the static linker.
+
+Apple’s SDKs originally used Mach-O Dynamic Library Stubs. Mach-O Dynamic
+Library Stubs are dynamic library files, but with all the text and data
+stripped out.
+
 ## thunk
 
 In the Swift compiler, a synthesized function whose only purpose is to

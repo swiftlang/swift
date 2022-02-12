@@ -2504,7 +2504,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto *theAttr = cast<NonSendableAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonSendableDeclAttrLayout::Code];
       NonSendableDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                        (unsigned)theAttr->getKind());
+                                            (unsigned)theAttr->Specificity);
       return;
     }
 

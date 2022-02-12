@@ -569,6 +569,10 @@ public:
   llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
                   std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
 
+  /// Keep track of cxx function names, params etc in order to
+  /// allow for de-duping functions that differ strictly on "constness".
+  llvm::DenseMap<llvm::StringRef, std::pair<llvm::DenseSet<clang::FunctionDecl *>, llvm::DenseSet<clang::FunctionDecl *>>> cxxMethods;
+
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;

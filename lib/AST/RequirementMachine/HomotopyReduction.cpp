@@ -63,18 +63,13 @@
 using namespace swift;
 using namespace rewriting;
 
-/// A rewrite rule is redundant if it appears exactly once in a loop
-/// without context.
-///
-/// This method will cache the result; markDirty() must be called after
-/// the underlying rewrite path is modified to invalidate the cached
-/// result.
-ArrayRef<unsigned>
-RewriteLoop::findRulesAppearingOnceInEmptyContext(
-    const RewriteSystem &system) const {
-  // If we're allowed to use the cached result, return that.
+/// Recompute RulesInEmptyContext and DecomposeCount if needed.
+void RewriteLoop::recompute(const RewriteSystem &system) {
   if (!Dirty)
-    return RulesInEmptyContext;
+    return;
+  Dirty = 0;
+
+  ProjectionCount = 0;
 
   // Rules appearing in empty context (possibly more than once).
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
@@ -94,12 +89,15 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
       break;
     }
 
+    case RewriteStep::LeftConcreteProjection:
+      ++ProjectionCount;
+      break;
+
     case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
     case RewriteStep::Relation:
     case RewriteStep::DecomposeConcrete:
-    case RewriteStep::LeftConcreteProjection:
     case RewriteStep::RightConcreteProjection:
       break;
     }
@@ -107,8 +105,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     evaluator.apply(step, system);
   }
 
-  auto *mutThis = const_cast<RewriteLoop *>(this);
-  mutThis->RulesInEmptyContext.clear();
+  RulesInEmptyContext.clear();
 
   // Collect all rules that we saw exactly once in empty context.
   for (auto rule : rulesInEmptyContext) {
@@ -116,12 +113,25 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     assert(found != ruleMultiplicity.end());
 
     if (found->second == 1)
-      mutThis->RulesInEmptyContext.push_back(rule);
+      RulesInEmptyContext.push_back(rule);
   }
+}
 
-  // Cache the result for later.
-  mutThis->Dirty = 0;
+/// A rewrite rule is redundant if it appears exactly once in a loop
+/// without context.
+ArrayRef<unsigned>
+RewriteLoop::findRulesAppearingOnceInEmptyContext(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
   return RulesInEmptyContext;
+}
+
+/// The number of LeftConcreteProjection steps, used by the elimination order to
+/// prioritize loops that are not concrete unification projections.
+unsigned RewriteLoop::getProjectionCount(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return ProjectionCount;
 }
 
 /// If a rewrite loop contains an explicit rule in empty context, propagate the
@@ -375,6 +385,10 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
 
   Optional<std::pair<unsigned, unsigned>> found;
 
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    llvm::dbgs() << "\n";
+  }
+
   for (const auto &pair : redundancyCandidates) {
     unsigned ruleID = pair.second;
     const auto &rule = getRule(ruleID);
@@ -402,7 +416,7 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
       continue;
     }
 
-    if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
       llvm::dbgs() << "** Candidate " << rule << " from loop #"
                    << pair.first << "\n";
     }
@@ -411,26 +425,42 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     // we've found so far.
     const auto &otherRule = getRule(found->second);
 
-    unsigned ruleNesting = rule.getNesting();
-    unsigned otherRuleNesting = otherRule.getNesting();
+    const auto &loop = Loops[pair.first];
+    const auto &otherLoop = Loops[found->first];
 
-    // If both rules are concrete type requirements, first compare nesting
-    // depth. This breaks the tie when we have two rules that each imply
-    // the other via an induced rule that comes from a protocol.
+    // If one of the rules was a concrete unification projection, prefer to
+    // eliminate the *other* rule.
     //
-    // For example,
+    // For example, if 'X.T == G<U, V>' is implied by the conformance on X,
+    // and the following three rules are defined in the current protocol:
     //
-    //    T == G<Int>
-    //    U == Int
+    //    X.T == G<Int, W>
+    //    X.U == Int
+    //    X.V == W
     //
-    // Where T == G<U> is implied elsewhere.
-    if (ruleNesting > 0 && otherRuleNesting > 0) {
-      if (ruleNesting > otherRuleNesting) {
+    // Then we can either eliminate a) alone, or b) and c). Since b) and c)
+    // are projections, they are "simpler", and we would rather keep both and
+    // eliminate a).
+    unsigned projectionCount = loop.getProjectionCount(*this);
+    unsigned otherProjectionCount = otherLoop.getProjectionCount(*this);
+
+    if (projectionCount != otherProjectionCount) {
+      if (projectionCount < otherProjectionCount)
         found = pair;
-        continue;
-      } else if (otherRuleNesting > ruleNesting) {
-        continue;
-      }
+
+      continue;
+    }
+
+    // If one of the rules is a concrete type requirement, prefer to
+    // eliminate the *other* rule.
+    bool ruleIsConcrete = rule.getLHS().back().hasSubstitutions();
+    bool otherRuleIsConcrete = otherRule.getRHS().back().hasSubstitutions();
+
+    if (ruleIsConcrete != otherRuleIsConcrete) {
+      if (otherRuleIsConcrete)
+        found = pair;
+
+      continue;
     }
 
     // Otherwise, perform a shortlex comparison on (LHS, RHS).
@@ -474,7 +504,8 @@ void RewriteSystem::deleteRule(unsigned ruleID,
                                const RewritePath &replacementPath) {
   // Replace all occurrences of the rule with the replacement path in
   // all remaining rewrite loops.
-  for (auto &loop : Loops) {
+  for (unsigned loopID : indices(Loops)) {
+    auto &loop = Loops[loopID];
     if (loop.isDeleted())
       continue;
 
@@ -486,8 +517,8 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     // result of findRulesAppearingOnceInEmptyContext().
     loop.markDirty();
 
-    if (Debug.contains(DebugFlags::HomotopyReduction)) {
-      llvm::dbgs() << "** Updated loop: ";
+    if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
+      llvm::dbgs() << "** Updated loop #" << loopID << ": ";
       loop.dump(llvm::dbgs(), *this);
       llvm::dbgs() << "\n";
     }
@@ -534,6 +565,12 @@ void RewriteSystem::performHomotopyReduction(
 ///
 /// Redundant rules are mutated to set their isRedundant() bit.
 void RewriteSystem::minimizeRewriteSystem() {
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    llvm::dbgs() << "-----------------------------\n";
+    llvm::dbgs() << "- Minimizing rewrite system -\n";
+    llvm::dbgs() << "-----------------------------\n";
+  }
+
   assert(Complete);
   assert(!Minimized);
   Minimized = 1;
@@ -545,7 +582,9 @@ void RewriteSystem::minimizeRewriteSystem() {
   // - Eliminate all RHS-simplified and substitution-simplified rules.
   // - Eliminate all rules with unresolved symbols.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "\nFirst pass: simplified and unresolved rules\n\n";
+    llvm::dbgs() << "---------------------------------------------\n";
+    llvm::dbgs() << "First pass: simplified and unresolved rules -\n";
+    llvm::dbgs() << "---------------------------------------------\n";
   }
 
   performHomotopyReduction([&](unsigned ruleID) -> bool {
@@ -577,7 +616,9 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   // Second pass: Eliminate all non-minimal conformance rules.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "\nSecond pass: non-minimal conformance rules\n\n";
+    llvm::dbgs() << "--------------------------------------------\n";
+    llvm::dbgs() << "Second pass: non-minimal conformance rules -\n";
+    llvm::dbgs() << "--------------------------------------------\n";
   }
 
   performHomotopyReduction([&](unsigned ruleID) -> bool {
@@ -592,7 +633,9 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   // Third pass: Eliminate all other redundant non-conformance rules.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "\nThird pass: all other redundant rules\n\n";
+    llvm::dbgs() << "---------------------------------------\n";
+    llvm::dbgs() << "Third pass: all other redundant rules -\n";
+    llvm::dbgs() << "---------------------------------------\n";
   }
 
   performHomotopyReduction([&](unsigned ruleID) -> bool {

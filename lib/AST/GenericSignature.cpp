@@ -729,7 +729,12 @@ int Requirement::compare(const Requirement &other) const {
     return compareKind;
 
   // We should only have multiple conformance requirements.
-  assert(getKind() == RequirementKind::Conformance);
+  if (getKind() != RequirementKind::Conformance) {
+    llvm::errs() << "Unordered generic requirements\n";
+    llvm::errs() << "LHS: "; dump(llvm::errs()); llvm::errs() << "\n";
+    llvm::errs() << "RHS: "; other.dump(llvm::errs()); llvm::errs() << "\n";
+    abort();
+  }
 
   int compareProtos =
     TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());

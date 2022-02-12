@@ -8391,9 +8391,16 @@ AbstractGenericSignatureRequest::evaluate(
       return rqmResult;
 
     if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
+
       llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
-      llvm::errs() << "RequirementMachine says:      " << rqmResult.getPointer() << "\n";
-      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult.getPointer() << "\n";
+      llvm::errs() << "RequirementMachine says:      ";
+      rqmResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
+      llvm::errs() << "GenericSignatureBuilder says: ";
+      gsbResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
 
       abort();
     }
@@ -8561,9 +8568,16 @@ InferredGenericSignatureRequest::evaluate(
       return rqmResult;
 
     if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
+
       llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
-      llvm::errs() << "RequirementMachine says:      " << rqmResult.getPointer() << "\n";
-      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult.getPointer() << "\n";
+      llvm::errs() << "RequirementMachine says:      ";
+      rqmResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
+      llvm::errs() << "GenericSignatureBuilder says: ";
+      gsbResult.getPointer()->print(llvm::errs(), opts);
+      llvm::errs() << "\n";
 
       abort();
     }
@@ -8663,16 +8677,23 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto gsbResult = buildViaGSB();
 
     if (!compare(rqmResult, gsbResult)) {
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
+
       llvm::errs() << "RequirementMachine protocol signature minimization is broken:\n";
       llvm::errs() << "Protocol: " << proto->getName() << "\n";
 
+      llvm::errs() << "RequirementMachine says:      ";
       auto rqmSig = GenericSignature::get(
           proto->getGenericSignature().getGenericParams(), rqmResult);
-      llvm::errs() << "RequirementMachine says:      " << rqmSig << "\n";
+      rqmSig.print(llvm::errs(), opts);
+      llvm::errs() << "\n";
 
+      llvm::errs() << "GenericSignatureBuilder says: ";
       auto gsbSig = GenericSignature::get(
           proto->getGenericSignature().getGenericParams(), gsbResult);
-      llvm::errs() << "GenericSignatureBuilder says: " << gsbSig << "\n";
+      gsbSig.print(llvm::errs(), opts);
+      llvm::errs() << "\n";
 
       abort();
     }

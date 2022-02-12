@@ -44,7 +44,7 @@ TEST_F(ScanTest, TestTargetInfoQuery) {
     llvm::errs() << "\nERROR:" << targetInfo.getError().message() << "\n";
   }
 
-  auto targetInfoStr = std::string(get_C_string(targetInfo.get()));
+  auto targetInfoStr = std::string(swift::c_string_utils::get_C_string(targetInfo.get()));
   EXPECT_NE(targetInfoStr.find("\"triple\": \"x86_64-apple-macosx12.0\""), std::string::npos);
   EXPECT_NE(targetInfoStr.find("\"librariesRequireRPath\": false"), std::string::npos);
 }

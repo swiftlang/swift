@@ -1468,10 +1468,9 @@ CanType TypeBase::computeCanonicalType() {
     // If we haven't set a depth for this generic parameter, try to do so.
     // FIXME: This is a dreadful hack.
     if (gpDecl->getDepth() == GenericTypeParamDecl::InvalidDepth) {
-      if (auto decl =
-            gpDecl->getDeclContext()->getInnermostDeclarationDeclContext())
-        if (auto valueDecl = decl->getAsGenericContext())
-          (void)valueDecl->getGenericSignature();
+      auto *dc = gpDecl->getDeclContext();
+      auto *gpList = dc->getAsDecl()->getAsGenericContext()->getGenericParams();
+      gpList->setDepth(dc->getGenericContextDepth());
     }
 
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
@@ -3502,7 +3501,8 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
 
 static Type substOpaqueTypesWithUnderlyingTypesRec(
     Type ty, const DeclContext *inContext, ResilienceExpansion contextExpansion,
-    bool isWholeModuleContext, SmallPtrSetImpl<OpaqueTypeDecl *> &decls) {
+    bool isWholeModuleContext,
+    llvm::DenseSet<ReplaceOpaqueTypesWithUnderlyingTypes::SeenDecl> &decls) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
                                                  isWholeModuleContext, decls);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
@@ -3566,7 +3566,7 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
 
 ReplaceOpaqueTypesWithUnderlyingTypes::ReplaceOpaqueTypesWithUnderlyingTypes(
     const DeclContext *inContext, ResilienceExpansion contextExpansion,
-    bool isWholeModuleContext, llvm::SmallPtrSetImpl<OpaqueTypeDecl *> &seen)
+    bool isWholeModuleContext, llvm::DenseSet<SeenDecl> &seen)
     : contextExpansion(contextExpansion),
       inContextAndIsWholeModule(inContext, isWholeModuleContext),
       seenDecls(&seen) {}
@@ -3618,24 +3618,25 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
   // If the type changed, but still contains opaque types, recur.
   if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
+    SeenDecl seenKey(opaqueRoot->getDecl(), opaqueRoot->getSubstitutions());
     if (auto *alreadySeen = this->seenDecls) {
       // Detect substitution loops. If we find one, just bounce the original
       // type back to the caller. This substitution will fail at runtime
       // instead.
-      if (!alreadySeen->insert(opaqueRoot->getDecl()).second) {
+      if (!alreadySeen->insert(seenKey).second) {
         return maybeOpaqueType;
       }
 
       auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
           substTy, inContext, contextExpansion, isContextWholeModule,
           *alreadySeen);
-      alreadySeen->erase(opaqueRoot->getDecl());
+      alreadySeen->erase(seenKey);
       return res;
     } else {
       // We're the top of the stack for the recursion check. Allocate a set of
       // opaque result type decls we've already seen for the rest of the check.
-      SmallPtrSet<OpaqueTypeDecl *, 8> seenDecls;
-      seenDecls.insert(opaqueRoot->getDecl());
+      llvm::DenseSet<SeenDecl> seenDecls;
+      seenDecls.insert(seenKey);
       return ::substOpaqueTypesWithUnderlyingTypesRec(
           substTy, inContext, contextExpansion, isContextWholeModule,
           seenDecls);
@@ -3648,7 +3649,7 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypesRec(
     ProtocolConformanceRef ref, Type origType, const DeclContext *inContext,
     ResilienceExpansion contextExpansion, bool isWholeModuleContext,
-    SmallPtrSetImpl<OpaqueTypeDecl *> &decls) {
+    llvm::DenseSet<ReplaceOpaqueTypesWithUnderlyingTypes::SeenDecl> &decls) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
                                                  isWholeModuleContext, decls);
   return ref.subst(origType, replacer, replacer,
@@ -3732,24 +3733,26 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
+    SeenDecl seenKey(opaqueRoot->getDecl(), opaqueRoot->getSubstitutions());
+    
     if (auto *alreadySeen = this->seenDecls) {
       // Detect substitution loops. If we find one, just bounce the original
       // type back to the caller. This substitution will fail at runtime
       // instead.
-      if (!alreadySeen->insert(opaqueRoot->getDecl()).second) {
+      if (!alreadySeen->insert(seenKey).second) {
         return abstractRef;
       }
 
       auto res = ::substOpaqueTypesWithUnderlyingTypesRec(
           substRef, substTy, inContext, contextExpansion, isContextWholeModule,
           *alreadySeen);
-      alreadySeen->erase(opaqueRoot->getDecl());
+      alreadySeen->erase(seenKey);
       return res;
     } else {
       // We're the top of the stack for the recursion check. Allocate a set of
       // opaque result type decls we've already seen for the rest of the check.
-      SmallPtrSet<OpaqueTypeDecl *, 8> seenDecls;
-      seenDecls.insert(opaqueRoot->getDecl());
+      llvm::DenseSet<SeenDecl> seenDecls;
+      seenDecls.insert(seenKey);
       return ::substOpaqueTypesWithUnderlyingTypesRec(
           substRef, substTy, inContext, contextExpansion, isContextWholeModule,
           seenDecls);

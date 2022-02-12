@@ -50,7 +50,7 @@
 #include <dispatch/dispatch.h>
 #endif
 
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
@@ -58,12 +58,6 @@
 
 #if defined(__ELF__)
 #include <unwind.h>
-#endif
-
-#if defined(__APPLE__)
-#include <asl.h>
-#elif defined(__ANDROID__)
-#include <android/log.h>
 #endif
 
 #if defined(__ELF__)
@@ -399,9 +393,10 @@ void swift::swift_task_reportUnexpectedExecutor(
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
 #else
-  write(STDERR_FILENO, message, strlen(message));
+  fputs(message, stderr);
+  fflush(stderr);
 #endif
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
@@ -1569,10 +1564,13 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
     asImpl(executor.getDefaultActor())->giveUpThread(runner);
 }
 
+// TODO (rokhinip): Workaround rdar://88700717. To be removed with
+// rdar://88711954
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,
-                                  ExecutorRef newExecutor) {
+                                  ExecutorRef newExecutor) SWIFT_OPTNONE {
+
   auto trackingInfo = ExecutorTrackingInfo::current();
   auto currentExecutor =
     (trackingInfo ? trackingInfo->getActiveExecutor()
@@ -1618,7 +1616,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   SWIFT_TASK_DEBUG_LOG("switch failed, task %p enqueued on executor %p", task,
                        newExecutor.getIdentity());
 
-  task->flagAsEnqueuedOnExecutor(newExecutor);
+  task->flagAsAndEnqueueOnExecutor(newExecutor);
   _swift_task_clearCurrent();
 }
 

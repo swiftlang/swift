@@ -814,7 +814,7 @@ AllowCompilerErrors("allow-compiler-errors",
                     llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
                     llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
+static llvm::cl::list<std::string>
   DefineAvailability("define-availability",
                      llvm::cl::desc("Define a macro for @available"),
                      llvm::cl::cat(Category));
@@ -4238,8 +4238,8 @@ int main(int argc, char *argv[]) {
 
   InitInvok.setSDKPath(options::SDK);
 
-  if (!options::DefineAvailability.empty()) {
-    InitInvok.getLangOptions().AvailabilityMacros.push_back(options::DefineAvailability);
+  for (auto macro : options::DefineAvailability) {
+    InitInvok.getLangOptions().AvailabilityMacros.push_back(macro);
   }
   for (auto map: options::SerializedPathObfuscate) {
     auto SplitMap = StringRef(map).split('=');

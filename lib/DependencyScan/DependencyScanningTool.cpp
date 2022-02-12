@@ -53,7 +53,7 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   std::string ResultStr;
   llvm::raw_string_ostream StrOS(ResultStr);
   swift::targetinfo::printTargetInfo(Invocation, StrOS);
-  return create_clone(ResultStr.c_str());
+  return c_string_utils::create_clone(ResultStr.c_str());
 }
 
 DependencyScanningTool::DependencyScanningTool()

@@ -36,6 +36,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
       .Case("conditional-requirements", DebugFlags::ConditionalRequirements)
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
+      .Case("homotopy-reduction-detail", DebugFlags::HomotopyReductionDetail)
       .Case("minimal-conformances", DebugFlags::MinimalConformances)
       .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
       .Case("minimization", DebugFlags::Minimization)

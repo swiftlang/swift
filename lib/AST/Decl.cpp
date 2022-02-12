@@ -2013,14 +2013,13 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
           return true;
 
         switch (getActorIsolation(type)) {
-          case swift::ActorIsolation::Unspecified:
-          case swift::ActorIsolation::GlobalActorUnsafe:
+          case ActorIsolation::Unspecified:
+          case ActorIsolation::GlobalActorUnsafe:
             break;
 
-          case swift::ActorIsolation::ActorInstance:
-          case swift::ActorIsolation::DistributedActorInstance:
-          case swift::ActorIsolation::Independent:
-          case swift::ActorIsolation::GlobalActor:
+          case ActorIsolation::ActorInstance:
+          case ActorIsolation::Independent:
+          case ActorIsolation::GlobalActor:
             return true;
         }
       }
@@ -4937,7 +4936,7 @@ void swift::simple_display(llvm::raw_ostream &out, AncestryFlags value) {
   out << " }";
 }
 
-bool ClassDecl::isSuperclassOf(ClassDecl *other) const {
+bool ClassDecl::isSuperclassOf(const ClassDecl *other) const {
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
 
   do {
@@ -5082,7 +5081,7 @@ bool ClassDecl::walkSuperclasses(
   return false;
 }
 
-bool ClassDecl::isForeignReferenceType() {
+bool ClassDecl::isForeignReferenceType() const {
   return getClangDecl() && isa<clang::RecordDecl>(getClangDecl());
 }
 

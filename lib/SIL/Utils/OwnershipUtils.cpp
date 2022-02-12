@@ -305,6 +305,25 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
   return true;
 }
 
+bool swift::findUsesOfSimpleValue(SILValue value,
+                                  SmallVectorImpl<Operand *> *usePoints) {
+  for (auto *use : value->getUses()) {
+    if (use->getOperandOwnership() == OperandOwnership::Borrow) {
+      if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
+            if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+              return false;
+            }
+            usePoints->push_back(use);
+            return true;
+          })) {
+        return false;
+      }
+    }
+    usePoints->push_back(use);
+  }
+  return true;
+}
+
 // Find all use points of \p guaranteedValue within its borrow scope. All use
 // points will be dominated by \p guaranteedValue.
 //

@@ -356,6 +356,9 @@ SourceLoc WhereClauseOwner::getLoc() const {
   if (auto attr = source.dyn_cast<SpecializeAttr *>())
     return attr->getLocation();
 
+  if (auto attr = source.dyn_cast<DifferentiableAttr *>())
+    return attr->getLocation();
+
   return source.get<GenericParamList *>()->getWhereLoc();
 }
 
@@ -365,6 +368,8 @@ void swift::simple_display(llvm::raw_ostream &out,
     simple_display(out, owner.dc->getAsDecl());
   } else if (owner.source.is<SpecializeAttr *>()) {
     out << "@_specialize";
+  } else if (owner.source.is<DifferentiableAttr *>()) {
+    out << "@_differentiable";
   } else {
     out << "(SIL generic parameter list)";
   }
@@ -813,6 +818,17 @@ void UnderlyingTypeRequest::cacheResult(Type value) const {
 }
 
 void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto aliasDecl = std::get<0>(getStorage());
+  diags.diagnose(aliasDecl, diag::recursive_decl_reference,
+                 aliasDecl->getDescriptiveKind(),
+                 aliasDecl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// StructuralTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   auto aliasDecl = std::get<0>(getStorage());
   diags.diagnose(aliasDecl, diag::recursive_decl_reference,
                  aliasDecl->getDescriptiveKind(),
@@ -1488,7 +1504,6 @@ void CustomAttrTypeRequest::cacheResult(Type value) const {
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
   case ActorInstance:
-  case DistributedActorInstance:
   case Independent:
   case Unspecified:
     return false;
@@ -1503,7 +1518,6 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
-  case DistributedActorInstance:
   case Independent:
   case Unspecified:
     return *this;
@@ -1521,10 +1535,6 @@ void swift::simple_display(
   switch (state) {
     case ActorIsolation::ActorInstance:
       out << "actor-isolated to instance of " << state.getActor()->getName();
-      break;
-
-    case ActorIsolation::DistributedActorInstance:
-      out << "distributed-actor-isolated to instance of " << state.getActor()->getName();
       break;
 
     case ActorIsolation::Independent:

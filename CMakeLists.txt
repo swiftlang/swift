@@ -363,6 +363,10 @@ option(SWIFT_SIL_VERIFY_ALL
     "Run SIL verification after each transform when building Swift files in the build process"
     FALSE)
 
+option(SWIFT_SIL_VERIFY_ALL_MACOS_ONLY
+    "Run SIL verification after each transform when building the macOS stdlib"
+    FALSE)
+
 option(SWIFT_EMIT_SORTED_SIL_OUTPUT
     "Sort SIL output by name to enable diffing of output"
     FALSE)

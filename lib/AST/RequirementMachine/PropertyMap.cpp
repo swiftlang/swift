@@ -115,11 +115,12 @@ void PropertyBag::dump(llvm::raw_ostream &out) const {
     out << " layout: " << Layout;
   }
 
-  if (Superclass) {
-    out << " superclass: " << *Superclass;
+  if (hasSuperclassBound()) {
+    const auto &superclassReq = getSuperclassRequirement();
+    out << " superclass: " << *superclassReq.SuperclassType;
   }
 
-  if (ConcreteType) {
+  if (isConcreteType()) {
     out << " concrete_type: " << *ConcreteType;
   }
 
@@ -154,8 +155,10 @@ Type PropertyBag::getSuperclassBound(
     const MutableTerm &lookupTerm,
     const PropertyMap &map) const {
   MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
-  return map.getTypeFromSubstitutionSchema(Superclass->getConcreteType(),
-                                           Superclass->getSubstitutions(),
+
+  const auto &req = getSuperclassRequirement();
+  return map.getTypeFromSubstitutionSchema(req.SuperclassType->getConcreteType(),
+                                           req.SuperclassType->getSubstitutions(),
                                            genericParams, prefix);
 }
 
@@ -199,16 +202,22 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   // T := UV should have substitutions {UX1, ..., UXn}.
   MutableTerm prefix(Key.begin(), Key.begin() + prefixLength);
 
-  if (next->Superclass) {
-    Superclass = next->Superclass->prependPrefixToConcreteSubstitutions(
-        prefix, ctx);
-    SuperclassRule = next->SuperclassRule;
-  }
-
   if (next->ConcreteType) {
     ConcreteType = next->ConcreteType->prependPrefixToConcreteSubstitutions(
         prefix, ctx);
     ConcreteTypeRule = next->ConcreteTypeRule;
+  }
+
+  // Copy over class hierarchy information.
+  SuperclassDecl = next->SuperclassDecl;
+  if (!next->Superclasses.empty()) {
+    Superclasses = next->Superclasses;
+
+    for (auto &pair : Superclasses) {
+      pair.second.SuperclassType =
+          pair.second.SuperclassType->prependPrefixToConcreteSubstitutions(
+              prefix, ctx);
+    }
   }
 }
 
@@ -221,11 +230,18 @@ void PropertyBag::verify(const RewriteSystem &system) const {
     assert(symbol.getProtocol() == ConformsTo[i]);
   }
 
-  // FIXME: Once unification introduces new rules, add asserts requiring
-  // that the layout, superclass and concrete type symbols match, as above
+  // FIXME: Add asserts requiring that the layout, superclass and
+  // concrete type symbols match, as above
   assert(!Layout.isNull() == LayoutRule.hasValue());
-  assert(Superclass.hasValue() == SuperclassRule.hasValue());
   assert(ConcreteType.hasValue() == ConcreteTypeRule.hasValue());
+
+  assert((SuperclassDecl == nullptr) == Superclasses.empty());
+  for (const auto &pair : Superclasses) {
+    const auto &req = pair.second;
+    assert(req.SuperclassType.hasValue());
+    assert(req.SuperclassRule.hasValue());
+  }
+
 #endif
 }
 
@@ -478,9 +494,11 @@ PropertyMap::concretelySimplifySubstitutions(Term baseTerm, Symbol symbol,
                                                 /*ruleID=*/*props->ConcreteTypeRule,
                                                 /*inverse=*/true));
 
-          path->add(RewriteStep::forPrefixSubstitutions(/*length=*/prefix.size(),
-                                                        /*endOffset=*/0,
-                                                        /*inverse=*/false));
+          if (!prefix.empty()) {
+            path->add(RewriteStep::forPrefixSubstitutions(/*length=*/prefix.size(),
+                                                          /*endOffset=*/0,
+                                                          /*inverse=*/false));
+          }
         }
       }
     }

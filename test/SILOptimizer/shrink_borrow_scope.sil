@@ -777,14 +777,13 @@ bad(%15 : @owned $Error):
 // CHECK:       [[LEFT]]:
 // CHECK:         [[REGISTER_3:%[^,]+]] = apply undef()
 // CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
 // CHECK:         [[REGISTER_6:%[^,]+]] = apply undef()
 // CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_up_to_two_barrier_applies'
 sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
