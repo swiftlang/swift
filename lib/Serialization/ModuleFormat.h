@@ -1923,7 +1923,7 @@ namespace decls_block {
 
   using NonSendableDeclAttrLayout = BCRecordLayout<
     NonSendable_DECL_ATTR,
-    BCFixed<2>  // non-sendable kind 
+    BCFixed<1>  // non-sendable kind
   >;
 
   using OptimizeDeclAttrLayout = BCRecordLayout<
