@@ -5352,14 +5352,16 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
     // Resolve the relative reference to the witness function.
     int32_t offset;
     memcpy(&offset, mangledName.data() + 1, 4);
-    auto ptr = detail::applyRelativeOffset(mangledName.data() + 1, offset);
+    uintptr_t ptr = detail::applyRelativeOffset(mangledName.data() + 1, offset);
 
     // Call the witness function.
-    auto witnessFn = (AssociatedWitnessTableAccessFunction *)ptr;
+    AssociatedWitnessTableAccessFunction *witnessFn;
 #if SWIFT_PTRAUTH
-    witnessFn = ptrauth_sign_unauthenticated(witnessFn,
-                                             ptrauth_key_function_pointer,
-                                             0);
+    witnessFn =
+        (AssociatedWitnessTableAccessFunction *)ptrauth_sign_unauthenticated(
+            (void *)ptr, ptrauth_key_function_pointer, 0);
+#else
+    witnessFn = (AssociatedWitnessTableAccessFunction *)ptr;
 #endif
 
     auto assocWitnessTable = witnessFn(assocType, conformingType, wtable);
