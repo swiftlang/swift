@@ -721,6 +721,67 @@ bb3(%20 : $Error):
   throw %20 : $Error
 }
 
+// -----------------------------------------------------------------------------
+// rdar://88664423 (SR-15791: Miscompile under -O with mutating protocol method)
+//
+// Basic outline (test case has more copies):
+//   %1 = alloc_stack $PPP
+//   %2 = init_existential %1
+//   %3 = open_existential_addr mutable_access %1
+//   apply mutatingFunc(%3)
+//   %5 = open_existential_addr %1
+//   %6 = alloc_stack $@opened P
+//   copy_addr %5 to [initialization] %6 : $*@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP
+//   apply callee3(%5)
+//
+// When ConcreteExistentialInfo identified the initialization of:
+//    %4 = alloc_stack [lexical] $PPP, var, name "mergedCommand"
+//
+// It checks for any mutation other than the initialization itself.
+// In this case, `open_existential_addr mutable_access` must be
+// considered a possible mutation of the on-stack value.
+
+sil @mutatingFunc : $@convention(method) (@inout S) -> ()
+
+sil @callee3 : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@in τ_0_0) -> ()
+
+// CHECK-LABEL: sil @testMutatingCopiedOpenExistential : $@convention(thin) (S) -> () {
+// CHECK: bb0(%0 : $S):
+// CHECK:   [[EXISCP:%.*]] = alloc_stack [lexical] $PPP, var, name "mergedCommand"
+// CHECK:   apply %{{.*}} : $@convention(method) (@inout S) -> ()
+// CHECK:   [[OPENED:%.*]] = open_existential_addr mutable_access [[EXISCP]] : $*PPP to $*@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP
+// CHECK:   [[OPENEDCP:%.*]] = alloc_stack $@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP
+// CHECK:   copy_addr [[OPENED]] to [initialization] [[OPENEDCP]] : $*@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP
+// CHECK:   [[CALLEE3:%.*]] = function_ref @callee3 : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@in τ_0_0) -> ()
+// CHECK:   apply [[CALLEE3]]<@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP>([[OPENEDCP]]) : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@in τ_0_0) -> ()
+// CHECK-LABEL: } // end sil function 'testMutatingCopiedOpenExistential'
+sil @testMutatingCopiedOpenExistential : $@convention(thin) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $PPP
+  %2 = init_existential_addr %1 : $*PPP, $S
+  store %0 to %2 : $*S
+  %4 = alloc_stack [lexical] $PPP, var, name "mergedCommand"
+  copy_addr %1 to [initialization] %4 : $*PPP
+  %6 = open_existential_addr mutable_access %4 : $*PPP to $*@opened("3818BC52-89A1-11EC-999A-D0817AD9985D") PPP
+  %7 = unchecked_addr_cast %6 : $*@opened("3818BC52-89A1-11EC-999A-D0817AD9985D") PPP to $*S
+
+  %8 = function_ref @mutatingFunc : $@convention(method) (@inout S) -> ()
+  %9 = apply %8(%7) : $@convention(method) (@inout S) -> ()
+  %10 = open_existential_addr mutable_access %4 : $*PPP to $*@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP
+  %11 = alloc_stack $@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP
+  copy_addr %10 to [initialization] %11 : $*@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP
+
+  %13 = function_ref @callee3 : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@in τ_0_0) -> ()
+  %14 = apply %13<@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP>(%11) : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@in τ_0_0) -> ()
+  dealloc_stack %11 : $*@opened("381F6B6A-89A1-11EC-999A-D0817AD9985D") PPP
+  destroy_addr %4 : $*PPP
+  dealloc_stack %4 : $*PPP
+  destroy_addr %1 : $*PPP
+  dealloc_stack %1 : $*PPP
+  %20 = tuple ()
+  return %20 : $()
+}
+
 sil_vtable SubscriptionViewControllerBuilder {}
 sil_vtable SubscriptionViewController {}
 sil_vtable ViewController  {}
