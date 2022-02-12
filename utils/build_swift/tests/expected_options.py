@@ -276,6 +276,7 @@ EXPECTED_DEFAULTS = {
     'watchos_all': False,
     'llvm_install_components': defaults.llvm_install_components(),
     'clean_install_destdir': False,
+    'swift_benchmark_macos_only': False,
 }
 
 
@@ -712,6 +713,7 @@ EXPECTED_OPTIONS = [
 
     IntOption('--benchmark-num-o-iterations'),
     IntOption('--benchmark-num-onone-iterations'),
+    EnableOption('--swift-benchmark-macos-only'),
     IntOption('--jobs', dest='build_jobs'),
     IntOption('--llvm-max-parallel-lto-link-jobs'),
     IntOption('--swift-tools-max-parallel-lto-link-jobs'),

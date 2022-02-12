@@ -137,6 +137,10 @@ option(SWIFT_BUILD_PERF_TESTSUITE
     "Create in-tree targets for building swift performance benchmarks."
     FALSE)
 
+option(SWIFT_BENCHMARK_MACOS_ONLY
+    "When SWIFT_BUILD_PERF_TESTSUITE is set, only build for macOS"
+    FALSE)
+
 option(SWIFT_INCLUDE_TESTS "Create targets for building/running tests." TRUE)
 
 option(SWIFT_INCLUDE_TEST_BINARIES

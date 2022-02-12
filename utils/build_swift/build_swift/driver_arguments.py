@@ -1051,6 +1051,11 @@ def create_argument_parser():
     option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
            help='skip building Swift Benchmark Suite')
 
+    option('--swift-benchmark-macos-only', toggle_true,
+           default=False,
+           help='Build the swift benchmark suite only for macOS to save '
+                'compile time')
+
     option('--build-external-benchmarks', toggle_true,
            help='skip building Swift Benchmark Suite')
 

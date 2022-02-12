@@ -19,6 +19,10 @@ if(SWIFT_BENCHMARK_SUBCMAKE_BUILD)
     MESSAGE "If we are a subcmake build, we must be built standalone")
 endif()
 
+if(SWIFT_BENCHMARK_MACOS_ONLY)
+  set(ONLY_PLATFORMS "macosx")
+endif()
+
 include(AddSwiftBenchmarkSuite)
 
 #===-----------------------------------------------------------------------===#
