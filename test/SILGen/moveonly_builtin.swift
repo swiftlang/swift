@@ -31,10 +31,9 @@ class Klass {}
 // CHECK-SIL-NEXT: debug_value
 // CHECK-SIL-NEXT: strong_retain
 // CHECK-SIL-NEXT: move_value
+// CHECK-SIL-NEXT: tuple
+// CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: strong_release
-// CHECK-SIL-NEXT: debug_value [poison]
-// CHECK-SIL-NEXT: tuple
-// CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: return
 // CHECK-SIL: } // end sil function '$s8moveonly7useMoveyAA5KlassCADnF'
 func useMove(_ k: __owned Klass) -> Klass {
@@ -65,10 +64,9 @@ func useMove(_ k: __owned Klass) -> Klass {
 // CHECK-SIL-NEXT: debug_value
 // CHECK-SIL-NEXT: strong_retain
 // CHECK-SIL-NEXT: move_value
+// CHECK-SIL-NEXT: tuple
+// CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: strong_release
-// CHECK-SIL-NEXT: debug_value [poison]
-// CHECK-SIL-NEXT: tuple
-// CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: return
 // CHECK-SIL: } // end sil function '$s8moveonly7useMoveyxxnRlzClF'
 func useMove<T : AnyObject>(_ k: __owned T) -> T {

@@ -99,10 +99,8 @@ ValueBase::getDefiningInstructionResult() {
 }
 
 bool ValueBase::isLexical() const {
-  // TODO: Eventually, rather than SILGen'ing a borrow scope for owned 
-  //       arguments, we will just have this check here.
-  // if (auto *argument = dyn_cast<SILArgument>(this))
-  //   return argument->getOwnershipKind() == OwnershipKind::Owned;
+  if (auto *argument = dyn_cast<SILFunctionArgument>(this))
+    return argument->getOwnershipKind() == OwnershipKind::Owned;
   if (auto *bbi = dyn_cast<BeginBorrowInst>(this))
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
