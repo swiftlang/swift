@@ -748,6 +748,7 @@ bool SendableCheckContext::isExplicitSendableConformance() const {
 
   case SendableCheck::ImpliedByStandardProtocol:
   case SendableCheck::Implicit:
+  case SendableCheck::ImplicitForExternallyVisible:
     return false;
   }
 }
@@ -861,7 +862,7 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   // enclosing inferred types non-Sendable.
   if (defaultBehavior == DiagnosticBehavior::Ignore &&
       nominal->getParentSourceFile() &&
-      conformanceCheck && *conformanceCheck == SendableCheck::Implicit)
+      conformanceCheck && isImplicitSendableCheck(*conformanceCheck))
     return DiagnosticBehavior::Warning;
 
   return defaultBehavior;
@@ -4053,7 +4054,7 @@ static bool checkSendableInstanceStorage(
     bool operator()(VarDecl *property, Type propertyType) {
       // Classes with mutable properties are not Sendable.
       if (property->supportsMutation() && isa<ClassDecl>(nominal)) {
-        if (check == SendableCheck::Implicit) {
+        if (isImplicitSendableCheck(check)) {
           invalid = true;
           return true;
         }
@@ -4074,8 +4075,14 @@ static bool checkSendableInstanceStorage(
       diagnoseNonSendableTypes(
           propertyType, SendableCheckContext(dc, check), property->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
-            if (check == SendableCheck::Implicit) {
-              // If we are to ignore this diagnose, just continue.
+            if (isImplicitSendableCheck(check)) {
+              // If this is for an externally-visible conformance, fail.
+              if (check == SendableCheck::ImplicitForExternallyVisible) {
+                invalid = true;
+                return true;
+              }
+
+              // If we are to ignore this diagnostic, just continue.
               if (behavior == DiagnosticBehavior::Ignore)
                 return false;
 
@@ -4093,7 +4100,7 @@ static bool checkSendableInstanceStorage(
 
       if (invalid) {
         // For implicit checks, bail out early if anything failed.
-        if (check == SendableCheck::Implicit)
+        if (isImplicitSendableCheck(check))
           return true;
       }
 
@@ -4105,8 +4112,14 @@ static bool checkSendableInstanceStorage(
       diagnoseNonSendableTypes(
           elementType, SendableCheckContext(dc, check), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
-            if (check == SendableCheck::Implicit) {
-              // If we are to ignore this diagnose, just continue.
+            if (isImplicitSendableCheck(check)) {
+              // If this is for an externally-visible conformance, fail.
+              if (check == SendableCheck::ImplicitForExternallyVisible) {
+                invalid = true;
+                return true;
+              }
+
+              // If we are to ignore this diagnostic, just continue.
               if (behavior == DiagnosticBehavior::Ignore)
                 return false;
 
@@ -4124,7 +4137,7 @@ static bool checkSendableInstanceStorage(
 
       if (invalid) {
         // For implicit checks, bail out early if anything failed.
-        if (check == SendableCheck::Implicit)
+        if (isImplicitSendableCheck(check))
           return true;
       }
 
@@ -4352,21 +4365,27 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
   if (!isa<StructDecl>(nominal) && !isa<EnumDecl>(nominal))
     return nullptr;
 
-  // Public, non-frozen structs and enums defined in Swift don't get implicit
-  // Sendable conformances.
-  if (!nominal->getASTContext().LangOpts.EnableInferPublicSendable &&
-      nominal->getFormalAccessScope(
-          /*useDC=*/nullptr,
-          /*treatUsableFromInlineAsPublic=*/true).isPublic() &&
-      !(nominal->hasClangNode() ||
-        nominal->getAttrs().hasAttribute<FixedLayoutAttr>() ||
-        nominal->getAttrs().hasAttribute<FrozenAttr>())) {
+  SendableCheck check;
+
+  // Okay to infer Sendable conformance for non-public types or when
+  // specifically requested.
+  if (nominal->getASTContext().LangOpts.EnableInferPublicSendable ||
+      !nominal->getFormalAccessScope(
+          /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true)
+            .isPublic()) {
+    check = SendableCheck::Implicit;
+  } else if (nominal->hasClangNode() ||
+             nominal->getAttrs().hasAttribute<FixedLayoutAttr>() ||
+             nominal->getAttrs().hasAttribute<FrozenAttr>()) {
+    // @_frozen public types can also infer Sendable, but be more careful here.
+    check = SendableCheck::ImplicitForExternallyVisible;
+  } else {
+    // No inference.
     return nullptr;
   }
 
   // Check the instance storage for Sendable conformance.
-  if (checkSendableInstanceStorage(
-          nominal, nominal, SendableCheck::Implicit))
+  if (checkSendableInstanceStorage(nominal, nominal, check))
     return nullptr;
 
   return formConformance(nullptr);
