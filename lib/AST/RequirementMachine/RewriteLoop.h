@@ -361,6 +361,11 @@ struct RewriteStep {
             RewritePathEvaluator &evaluator,
             const RewriteSystem &system) const;
 
+  bool isInverseOf(const RewriteStep &other) const;
+
+  bool maybeSwapRewriteSteps(RewriteStep &other,
+                             const RewriteSystem &system);
+
 private:
   static unsigned getConcreteProjectionArg(unsigned differenceID,
                                            unsigned substitutionIndex) {
@@ -415,6 +420,14 @@ public:
   void dump(llvm::raw_ostream &out,
             MutableTerm term,
             const RewriteSystem &system) const;
+
+  bool computeFreelyReducedPath();
+
+  bool computeCyclicallyReducedLoop(MutableTerm &basepoint,
+                                    const RewriteSystem &system);
+
+  bool computeLeftCanonicalForm(const RewriteSystem &system);
+
 };
 
 /// Information about protocol conformance rules appearing in a rewrite loop.
@@ -488,6 +501,8 @@ public:
       const RewriteSystem &system) const;
 
   void verify(const RewriteSystem &system) const;
+
+  void normalize(const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
 };
