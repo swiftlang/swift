@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/SILFunction.h"
@@ -607,7 +608,7 @@ class LinkEntity {
                                                 CanType associatedType,
                                                 ProtocolDecl *requirement) {
     unsigned index = 0;
-    for (const auto &reqt : proto->getRequirementSignature()) {
+    for (const auto &reqt : proto->getRequirementSignature().getRequirements()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
           reqt.getProtocolDecl() == requirement) {
@@ -631,7 +632,7 @@ class LinkEntity {
   static std::pair<CanType, ProtocolDecl*>
   getAssociatedConformanceByIndex(const ProtocolDecl *proto,
                                   unsigned index) {
-    auto &reqt = proto->getRequirementSignature()[index];
+    auto &reqt = proto->getRequirementSignature().getRequirements()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
              reqt.getProtocolDecl() };

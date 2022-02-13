@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
@@ -491,8 +492,12 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     return ctx.AllocateCopy(result);
   }
 
-  // Add requirements for each of the associated types.
-  for (auto assocTypeDecl : proto->getAssociatedTypeMembers()) {
+  // Add requirements for each associated type.
+  llvm::SmallDenseSet<Identifier, 2> assocTypes;
+
+  for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
+    assocTypes.insert(assocTypeDecl->getName());
+
     // Add requirements placed directly on this associated type.
     auto assocType = assocTypeDecl->getDeclaredInterfaceType();
     realizeInheritedRequirements(assocTypeDecl, assocType,
@@ -508,6 +513,33 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                              result);
           return false;
         });
+  }
+
+  // Add requirements for each typealias.
+  for (auto *decl : proto->getMembers()) {
+    // Protocol typealiases are modeled as same-type requirements
+    // where the left hand side is 'Self.X' for some unresolved
+    // DependentMemberType X, and the right hand side is the
+    // underlying type of the typealias.
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+      if (!typeAliasDecl->isGeneric()) {
+        // Ignore the typealias if we have an associated type with the same anme
+        // in the same protocol. This is invalid anyway, but it's just here to
+        // ensure that we produce the same requirement signature on some tests
+        // with -requirement-machine-protocol-signatures=verify.
+        if (assocTypes.contains(typeAliasDecl->getName()))
+          continue;
+
+        auto underlyingType = typeAliasDecl->getStructuralType();
+
+        auto subjectType = DependentMemberType::get(
+            selfTy, typeAliasDecl->getName());
+        Requirement req(RequirementKind::SameType, subjectType,
+                        underlyingType);
+        result.push_back({req, typeAliasDecl->getLoc(),
+                          /*inferred=*/false});
+      }
+    }
   }
 
   return ctx.AllocateCopy(result);
@@ -779,7 +811,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
   if (proto->hasLazyRequirementSignature() ||
       (ctx.LangOpts.RequirementMachineProtocolSignatures
         == RequirementMachineMode::Disabled)) {
-    for (auto req : proto->getRequirementSignature()) {
+    for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
         result.push_back(req.getProtocolDecl());
       }
@@ -983,6 +1015,38 @@ void RuleBuilder::addRequirement(const StructuralRequirement &req,
   addRequirement(req.req.getCanonical(), proto);
 }
 
+/// Lowers a protocol typealias to a rewrite rule.
+void RuleBuilder::addTypeAlias(const ProtocolTypeAlias &alias,
+                               const ProtocolDecl *proto) {
+  // Build the term [P].T, where P is the protocol and T is a name symbol.
+  MutableTerm subjectTerm;
+  subjectTerm.add(Symbol::forProtocol(proto, Context));
+  subjectTerm.add(Symbol::forName(alias.getName(), Context));
+
+  auto constraintType = alias.getUnderlyingType()->getCanonicalType();
+  MutableTerm constraintTerm;
+
+  if (constraintType->isTypeParameter()) {
+    // If the underlying type of the typealias is a type parameter X, build
+    // a rule [P].T => X, where X,
+    constraintTerm = Context.getMutableTermForType(
+        constraintType, proto);
+  } else {
+    // If the underlying type of the typealias is a concrete type C, build
+    // a rule [P].T.[concrete: C] => [P].T.
+    constraintTerm = subjectTerm;
+
+    SmallVector<Term, 1> result;
+    auto concreteType =
+        Context.getSubstitutionSchemaFromType(
+            constraintType, proto, result);
+
+    constraintTerm.add(Symbol::forConcreteType(concreteType, result, Context));
+  }
+
+  RequirementRules.emplace_back(subjectTerm, constraintTerm);
+}
+
 /// Record information about a protocol if we have no seen it yet.
 void RuleBuilder::addProtocol(const ProtocolDecl *proto,
                               bool initialComponent) {
@@ -1043,8 +1107,11 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
       for (auto req : proto->getTypeAliasRequirements())
         addRequirement(req.getCanonical(), proto);
     } else {
-      for (auto req : proto->getRequirementSignature())
+      auto reqs = proto->getRequirementSignature();
+      for (auto req : reqs.getRequirements())
         addRequirement(req.getCanonical(), proto);
+      for (auto alias : reqs.getTypeAliases())
+        addTypeAlias(alias, proto);
     }
 
     if (Dump) {

@@ -6868,7 +6868,7 @@ static CanType parseAssociatedTypePath(Parser &P, SILParser &SP,
   // This is only used for parsing associated conformances, so we can
   // go ahead and just search the requirement signature for something that
   // matches the path.
-  for (auto &reqt : proto->getRequirementSignature()) {
+  for (auto &reqt : proto->getRequirementSignature().getRequirements()) {
     if (reqt.getKind() != RequirementKind::Conformance)
       continue;
     CanType assocType = reqt.getFirstType()->getCanonicalType();

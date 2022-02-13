@@ -852,7 +852,7 @@ void MinimalConformances::verifyMinimalConformances() const {
       continue;
     }
 
-    if (rule.getLHS().containsUnresolvedSymbols()) {
+    if (rule.containsUnresolvedSymbols()) {
       llvm::errs() << "Minimal conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
       dumpMinimalConformanceEquations(llvm::errs());

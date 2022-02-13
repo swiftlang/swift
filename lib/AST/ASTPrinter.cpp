@@ -1487,7 +1487,7 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
                                                       Decl *attachingTo) {
   printGenericSignature(
       GenericSignature::get({proto->getProtocolSelfType()} ,
-                            proto->getRequirementSignature()),
+                            proto->getRequirementSignature().getRequirements()),
       PrintInherited,
       [&](const Requirement &req) {
         // Skip the inferred 'Self : AnyObject' constraint if this is an
@@ -1511,7 +1511,7 @@ void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
     flags |= SwapSelfAndDependentMemberType;
   printGenericSignature(
       GenericSignature::get({proto->getProtocolSelfType()} ,
-                            proto->getRequirementSignature()),
+                            proto->getRequirementSignature().getRequirements()),
       flags,
       [&](const Requirement &req) {
         auto location = bestRequirementPrintLocation(proto, req);
@@ -6307,10 +6307,14 @@ void Requirement::dump(raw_ostream &out) const {
     break;
   }
 
-  if (getFirstType())
-    out << getFirstType() << " ";
+  PrintOptions opts;
+  opts.ProtocolQualifiedDependentMemberTypes = true;
+
+  getFirstType().print(out, opts);
+  out << " ";
+
   if (getKind() != RequirementKind::Layout && getSecondType())
-    out << getSecondType();
+    getSecondType().print(out, opts);
   else if (getLayoutConstraint())
     out << getLayoutConstraint();
 }

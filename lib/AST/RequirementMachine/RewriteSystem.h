@@ -140,6 +140,8 @@ public:
             RHS.containsUnresolvedSymbols());
   }
 
+  Optional<Identifier> isProtocolTypeAliasRule() const;
+
   void markLHSSimplified() {
     assert(!LHSSimplified);
     LHSSimplified = true;
@@ -462,7 +464,12 @@ public:
 
   bool hadError() const;
 
-  llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
+  struct MinimizedProtocolRules {
+    std::vector<unsigned> Requirements;
+    std::vector<unsigned> TypeAliases;
+  };
+
+  llvm::DenseMap<const ProtocolDecl *, MinimizedProtocolRules>
   getMinimizedProtocolRules() const;
 
   std::vector<unsigned> getMinimizedGenericSignatureRules() const;

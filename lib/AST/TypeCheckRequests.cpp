@@ -18,6 +18,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
@@ -321,15 +322,16 @@ void IsDynamicRequest::cacheResult(bool value) const {
 // RequirementSignatureRequest computation.
 //----------------------------------------------------------------------------//
 
-Optional<ArrayRef<Requirement>> RequirementSignatureRequest::getCachedResult() const {
+Optional<RequirementSignature>
+RequirementSignatureRequest::getCachedResult() const {
   auto proto = std::get<0>(getStorage());
   if (proto->isRequirementSignatureComputed())
-    return proto->getCachedRequirementSignature();
+    return *proto->RequirementSig;
 
   return None;
 }
 
-void RequirementSignatureRequest::cacheResult(ArrayRef<Requirement> value) const {
+void RequirementSignatureRequest::cacheResult(RequirementSignature value) const {
   auto proto = std::get<0>(getStorage());
   proto->setRequirementSignature(value);
 }

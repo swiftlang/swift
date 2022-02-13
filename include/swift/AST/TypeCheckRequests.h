@@ -476,7 +476,7 @@ public:
 /// be folded into RequirementSignatureRequest.
 class RequirementSignatureRequestRQM :
     public SimpleRequest<RequirementSignatureRequestRQM,
-                         ArrayRef<Requirement>(ProtocolDecl *),
+                         RequirementSignature(ProtocolDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -485,7 +485,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<Requirement>
+  RequirementSignature
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
@@ -495,7 +495,7 @@ public:
 /// Compute the requirements that describe a protocol.
 class RequirementSignatureRequest :
     public SimpleRequest<RequirementSignatureRequest,
-                         ArrayRef<Requirement>(ProtocolDecl *),
+                         RequirementSignature(ProtocolDecl *),
                          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -504,14 +504,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<Requirement>
+  RequirementSignature
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<ArrayRef<Requirement>> getCachedResult() const;
-  void cacheResult(ArrayRef<Requirement> value) const;
+  Optional<RequirementSignature> getCachedResult() const;
+  void cacheResult(RequirementSignature value) const;
 };
 
 /// Compute the default definition type of an associated type.

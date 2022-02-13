@@ -618,8 +618,8 @@ namespace {
 
       OS << " requirement signature=";
       if (PD->isRequirementSignatureComputed()) {
-        OS << GenericSignature::get({PD->getProtocolSelfType()} ,
-                                    PD->getRequirementSignature())
+        auto requirements = PD->getRequirementSignature().getRequirements();
+        OS << GenericSignature::get({PD->getProtocolSelfType()}, requirements)
                 ->getAsString();
       } else {
         OS << "<null>";

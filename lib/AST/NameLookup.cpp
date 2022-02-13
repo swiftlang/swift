@@ -2773,7 +2773,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // anything. Ask the requirement signature instead.
   if (protoDecl->wasDeserialized()) {
     auto protoSelfTy = protoDecl->getSelfInterfaceType();
-    for (auto &req : protoDecl->getRequirementSignature()) {
+    for (auto &req : protoDecl->getRequirementSignature().getRequirements()) {
       // Dig out a conformance requirement...
       if (req.getKind() != RequirementKind::Conformance)
         continue;
