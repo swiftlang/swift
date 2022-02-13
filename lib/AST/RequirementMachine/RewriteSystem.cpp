@@ -120,6 +120,48 @@ bool Rule::isProtocolRefinementRule() const {
   return false;
 }
 
+/// A protocol typealias rule takes one of the following two forms,
+/// where T is a name symbol:
+///
+/// 1) [P].T => X
+/// 2) [P].T.[concrete: C] => [P].T
+///
+/// The first case is where the protocol's underlying type is another
+/// type parameter. The second case is where the protocol's underlying
+/// type is a concrete type.
+///
+/// In the first case, X must be fully resolved, that is, it must not
+/// contain any name symbols.
+///
+/// If this rule is a protocol typealias rule, returns its name. Otherwise
+/// returns None.
+Optional<Identifier> Rule::isProtocolTypeAliasRule() const {
+  if (LHS.size() != 2 && LHS.size() != 3)
+    return None;
+
+  if (LHS[0].getKind() != Symbol::Kind::Protocol ||
+      LHS[1].getKind() != Symbol::Kind::Name)
+    return None;
+
+  if (LHS.size() == 2) {
+    // This is the case where the underlying type is a type parameter.
+    //
+    // We shouldn't have unresolved symbols on the right hand side;
+    // they should have been simplified away.
+    if (RHS.containsUnresolvedSymbols())
+      return None;
+  } else {
+    // This is the case where the underlying type is concrete.
+    assert(LHS.size() == 3);
+
+    auto prop = isPropertyRule();
+    if (!prop || prop->getKind() != Symbol::Kind::ConcreteType)
+      return None;
+  }
+
+  return LHS[1].getName();
+}
+
 /// Returns the length of the left hand side.
 unsigned Rule::getDepth() const {
   auto result = LHS.size();
@@ -712,10 +754,14 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(rhs)) {
       auto symbol = rhs[index];
 
-      // Permanent rules contain name symbols at the end, like
-      // [P].T => [P:T].
-      if (!rule.isRHSSimplified() &&
-          (!rule.isPermanent() || index == rhs.size() - 1)) {
+      // RHS-simplified rules might have unresolved name symbols on the
+      // right hand side. Also, completion can introduce rules of the
+      // form T.X.[concrete: C] => T.X, where T is some resolved term,
+      // and X is a name symbol for a protocol typealias.
+      if (!rule.isLHSSimplified() &&
+          !rule.isRHSSimplified() &&
+          !(rule.isPropertyRule() &&
+            index == rhs.size() - 1)) {
         // This is only true if the input requirements were valid.
         if (policy == DisallowInvalidRequirements) {
           ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);

@@ -30,6 +30,7 @@ namespace swift {
 
 class AssociatedTypeDecl;
 class ProtocolDecl;
+class ProtocolTypeAlias;
 class Requirement;
 
 namespace rewriting {
@@ -116,6 +117,8 @@ struct RuleBuilder {
                       const ProtocolDecl *proto);
   void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
+  void addTypeAlias(const ProtocolTypeAlias &alias,
+                    const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();
 };
 

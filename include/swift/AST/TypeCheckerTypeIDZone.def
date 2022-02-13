@@ -258,10 +258,10 @@ SWIFT_REQUEST(TypeChecker, ProtocolDependenciesRequest,
               ArrayRef<ProtocolDecl *>(ProtocolDecl *), Cached,
               HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, RequirementSignatureRequestRQM,
-              ArrayRef<Requirement>(ProtocolDecl *), Cached,
+              RequirementSignature(ProtocolDecl *), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RequirementSignatureRequest,
-              ArrayRef<Requirement>(ProtocolDecl *), SeparatelyCached,
+              RequirementSignature(ProtocolDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RequiresOpaqueAccessorsRequest, bool(VarDecl *),
               SeparatelyCached, NoLocationInfo)

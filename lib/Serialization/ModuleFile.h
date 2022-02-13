@@ -398,6 +398,12 @@ private:
   readGenericRequirementsChecked(SmallVectorImpl<Requirement> &requirements,
                                  llvm::BitstreamCursor &Cursor);
 
+  /// Read the requirement signature of a protocol, which consists of a list of
+  /// generic requirements and a list of protocol typealias records.
+  void readRequirementSignature(SmallVectorImpl<Requirement> &requirements,
+                                SmallVectorImpl<ProtocolTypeAlias> &typeAliases,
+                                llvm::BitstreamCursor &Cursor);
+
   /// Read a list of associated type declarations in a protocol.
   void readAssociatedTypes(SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
                            llvm::BitstreamCursor &Cursor);
@@ -728,7 +734,8 @@ public:
 
   void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
-                           SmallVectorImpl<Requirement> &requirements) override;
+                           SmallVectorImpl<Requirement> &requirements,
+                           SmallVectorImpl<ProtocolTypeAlias> &typeAliases) override;
 
   void
   loadAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,

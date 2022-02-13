@@ -411,14 +411,14 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     if (!isRedundantRuleFn(ruleID))
       continue;
 
-    if (!found) {
-      found = pair;
-      continue;
-    }
-
     if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
       llvm::dbgs() << "** Candidate " << rule << " from loop #"
                    << pair.first << "\n";
+    }
+
+    if (!found) {
+      found = pair;
+      continue;
     }
 
     // 'rule' is the candidate rule; 'otherRule' is the best rule to eliminate
@@ -454,7 +454,7 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     // If one of the rules is a concrete type requirement, prefer to
     // eliminate the *other* rule.
     bool ruleIsConcrete = rule.getLHS().back().hasSubstitutions();
-    bool otherRuleIsConcrete = otherRule.getRHS().back().hasSubstitutions();
+    bool otherRuleIsConcrete = otherRule.getLHS().back().hasSubstitutions();
 
     if (ruleIsConcrete != otherRuleIsConcrete) {
       if (otherRuleIsConcrete)
@@ -469,20 +469,6 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
       // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
       // C and C' are superclass, concrete type or concrete conformance
       // symbols.
-      //
-      // This should only arise in two limited situations:
-      // - The new rule was marked invalid due to a conflict.
-      // - The new rule was substitution-simplified.
-      //
-      // In both cases, the new rule becomes the new candidate for
-      // elimination.
-      if (!rule.isConflicting() && !rule.isSubstitutionSimplified()) {
-        llvm::errs() << "Incomparable rules in homotopy reduction:\n";
-        llvm::errs() << "- Candidate rule: " << rule << "\n";
-        llvm::errs() << "- Best rule so far: " << otherRule << "\n";
-        abort();
-      }
-
       found = pair;
       continue;
     }
@@ -598,7 +584,8 @@ void RewriteSystem::minimizeRewriteSystem() {
         rule.isSubstitutionSimplified())
       return true;
 
-    if (rule.getLHS().containsUnresolvedSymbols())
+    if (rule.containsUnresolvedSymbols() &&
+        !rule.isProtocolTypeAliasRule())
       return true;
 
     return false;
@@ -666,7 +653,9 @@ bool RewriteSystem::hadError() const {
     if (rule.isConflicting())
       return true;
 
-    if (!rule.isRedundant() && rule.containsUnresolvedSymbols())
+    if (!rule.isRedundant() &&
+        !rule.isProtocolTypeAliasRule() &&
+        rule.containsUnresolvedSymbols())
       return true;
   }
 
@@ -678,25 +667,28 @@ bool RewriteSystem::hadError() const {
 /// rewrite system.
 ///
 /// These rules form the requirement signatures of these protocols.
-llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
+llvm::DenseMap<const ProtocolDecl *, RewriteSystem::MinimizedProtocolRules>
 RewriteSystem::getMinimizedProtocolRules() const {
   assert(Minimized);
   assert(!Protos.empty());
 
-  llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>> rules;
+  llvm::DenseMap<const ProtocolDecl *, MinimizedProtocolRules> rules;
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
 
     if (rule.isPermanent() ||
         rule.isRedundant() ||
-        rule.isConflicting() ||
-        rule.containsUnresolvedSymbols()) {
+        rule.isConflicting())
       continue;
-    }
 
-    const auto *proto = rule.getLHS().begin()->getProtocol();
-    if (std::find(Protos.begin(), Protos.end(), proto) != Protos.end())
-      rules[proto].push_back(ruleID);
+    const auto *proto = rule.getLHS().getRootProtocol();
+    if (!isInMinimizationDomain(proto))
+      continue;
+
+    if (rule.isProtocolTypeAliasRule())
+      rules[proto].TypeAliases.push_back(ruleID);
+    else if (!rule.containsUnresolvedSymbols())
+      rules[proto].Requirements.push_back(ruleID);
   }
 
   return rules;
