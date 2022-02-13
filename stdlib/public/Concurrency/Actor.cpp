@@ -639,10 +639,13 @@ class alignas(sizeof(void *) * 2) ActiveActorStatus {
 
     // Bit 3
     DistributedRemote = 0x8,
+    // Bit 4
+    isPriorityEscalated = 0x10,
 
     // Bits 8 - 15. We only need 8 bits of the whole size_t to represent Job
     // Priority
     PriorityMask = 0xFF00,
+    PriorityAndOverrideMask = PriorityMask | isPriorityEscalated,
     PriorityShift = 0x8,
   };
 
@@ -752,11 +755,37 @@ public:
   JobPriority getMaxPriority() const {
     return (JobPriority) ((Flags & PriorityMask) >> PriorityShift);
   }
-  ActiveActorStatus withMaxPriority(JobPriority priority) const {
+  ActiveActorStatus withNewPriority(JobPriority priority) const {
+    uint32_t flags = Flags & ~PriorityAndOverrideMask;
+    flags |= (uint32_t(priority) << PriorityShift);
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveActorStatus((Flags & ~PriorityMask) | (uint32_t(priority) << PriorityShift), DrainLock, FirstJob);
+    return ActiveActorStatus(flags, DrainLock, FirstJob);
 #else
-    return ActiveActorStatus((Flags & ~PriorityMask) | (uint32_t(priority) << PriorityShift), FirstJob);
+    return ActiveActorStatus(flags, FirstJob);
+#endif
+  }
+  ActiveActorStatus resetPriority() const {
+    return withNewPriority(JobPriority::Unspecified);
+  }
+
+  bool isMaxPriorityEscalated() const { return Flags & isPriorityEscalated; }
+  ActiveActorStatus withEscalatedPriority(JobPriority priority) const {
+    JobPriority currentPriority = JobPriority((Flags & PriorityMask) >> PriorityShift);
+    assert(priority > currentPriority);
+
+    uint32_t flags = (Flags & ~PriorityMask) | (uint32_t(priority) << PriorityShift);
+    flags |= isPriorityEscalated;
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveActorStatus(flags, DrainLock, FirstJob);
+#else
+    return ActiveActorStatus(flags, FirstJob);
+#endif
+  }
+  ActiveActorStatus withoutEscalatedPriority() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveActorStatus(Flags & ~isPriorityEscalated, DrainLock, FirstJob);
+#else
+    return ActiveActorStatus(Flags & ~isPriorityEscalated, FirstJob);
 #endif
   }
 
@@ -774,6 +803,7 @@ public:
   uint32_t getOpaqueFlags() const {
     return Flags;
   }
+
   uint32_t currentDrainer() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     return dispatch_lock_owner(DrainLock);
@@ -781,6 +811,12 @@ public:
     return 0;
 #endif
   }
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  static size_t drainLockOffset() {
+    return offsetof(ActiveActorStatus, DrainLock);
+  }
+#endif
 };
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION && SWIFT_POINTER_IS_4_BYTES
@@ -911,6 +947,10 @@ public:
   }
 
 private:
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  dispatch_lock_t *drainLockAddr();
+#endif
+
   void deallocateUnconditional();
 
   /// Schedule an inline processing job.  This can generally only be
@@ -1121,6 +1161,13 @@ void DefaultActorImpl::deallocate() {
   deallocateUnconditional();
 }
 
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+dispatch_lock_t *DefaultActorImpl::drainLockAddr() {
+  ActiveActorStatus *actorStatus = (ActiveActorStatus *) &this->StatusStorage;
+  return (dispatch_lock_t *) (((char *) actorStatus) + ActiveActorStatus::drainLockOffset());
+}
+#endif
+
 void DefaultActorImpl::deallocateUnconditional() {
   concurrency::trace::actor_deallocate(this);
 
@@ -1149,17 +1196,41 @@ void DefaultActorImpl::scheduleActorProcessJob(JobPriority priority, bool useInl
 
 
 bool DefaultActorImpl::tryLock(bool asDrainer) {
-  SWIFT_TASK_DEBUG_LOG("Attempting to jump onto %p, as drainer = %d", this, asDrainer);
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  SWIFT_TASK_DEBUG_LOG("Thread %#x attempting to jump onto %p, as drainer = %d", dispatch_lock_value_for_self(), this, asDrainer);
+  dispatch_thread_override_info_s threadOverrideInfo;
+  threadOverrideInfo = swift_dispatch_thread_get_current_override_qos_floor();
+  qos_class_t overrideFloor = threadOverrideInfo.override_qos_floor;
+
+retry:;
+#else
+  SWIFT_TASK_DEBUG_LOG("Thread attempting to jump onto %p, as drainer = %d", this, asDrainer);
+#endif
 
   auto oldState = _status().load(std::memory_order_relaxed);
   while (true) {
 
-  while (true) {
     if (asDrainer) {
       // TODO (rokhinip): Once we have OOL process job support, this assert can
       // potentially fail due to a race with an actor stealer that might have
       // won the race and started running the actor
       assert(oldState.isScheduled());
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+      // We only want to self override a thread if we are taking the actor lock
+      // as a drainer because there might have been higher priority work
+      // enqueued that might have escalated the max priority of the actor to be
+      // higher than the original thread request.
+      qos_class_t maxActorPriority = (qos_class_t) oldState.getMaxPriority();
+
+      if (threadOverrideInfo.can_override && (maxActorPriority > overrideFloor)) {
+        SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match max actor %p's priority %#x", overrideFloor, this, maxActorPriority);
+
+        (void) swift_dispatch_thread_override_self(maxActorPriority);
+        overrideFloor = maxActorPriority;
+        goto retry;
+      }
+#endif
     } else {
       // We're trying to take the lock in an uncontended manner
       if (oldState.isRunning() || oldState.isScheduled()) {
@@ -1202,11 +1273,10 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
       // Someone gave up the actor lock after we failed fast path.
       // Schedule the actor
       newState = newState.withScheduled();
-      newState = newState.withMaxPriority(priority);
-
+      newState = newState.withNewPriority(priority);
     } else {
       if (priority > oldState.getMaxPriority()) {
-        newState = newState.withMaxPriority(priority);
+        newState = newState.withEscalatedPriority(priority);
       }
     }
 
@@ -1221,14 +1291,24 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
         return scheduleActorProcessJob(newState.getMaxPriority(), true);
       }
 
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
       if (oldState.getMaxPriority() != newState.getMaxPriority()) {
         if (newState.isRunning()) {
-          // TODO (rokhinip): Override the thread running the actor
-          return;
+          // Actor is running on a thread, escalate the thread running it
+          SWIFT_TASK_DEBUG_LOG("[Override] Escalating actor %p which is running on %#x to %#x priority", this, newState.currentDrainer(), priority);
+          dispatch_lock_t *lockAddr = this->drainLockAddr();
+          swift_dispatch_lock_override_start_with_debounce(lockAddr, newState.currentDrainer(),
+                         (qos_class_t) priority);
         } else {
-          // TODO (rokhinip): Schedule the stealer
+          // TODO (rokhinip): Actor is scheduled - we need to schedule a
+          // stealer at the higher priority
+          //
+          // TODO (rokhinip): Add a signpost to flag that this is a potential
+          // priority inversion
+          SWIFT_TASK_DEBUG_LOG("[Override] Escalating actor %p which is enqueued", this);
         }
       }
+#endif
       return;
     }
   }
@@ -1252,12 +1332,18 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
   _swift_tsan_release(this);
   while (true) {
     assert(oldState.isAnyRunning());
-    // TODO (rokhinip): Further assert that the current thread is the one
-    // running the actor
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    assert(dispatch_lock_is_locked_by_self(*(this->drainLockAddr())));
+#endif
 
     if (oldState.isZombie_ReadyForDeallocation()) {
-      // TODO (rokhinip): This is where we need to reset any override the thread
-      // might have as a result of this actor
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+      // Reset any override on this thread as a result of this thread running
+      // the actor
+      if (oldState.isMaxPriorityEscalated()) {
+        swift_dispatch_lock_override_end((qos_class_t)oldState.getMaxPriority());
+      }
+#endif
       deallocateUnconditional();
       SWIFT_TASK_DEBUG_LOG("Unlock-ing actor %p succeeded with full deallocation", this);
       return true;
@@ -1265,17 +1351,19 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 
     auto newState = oldState;
     if (oldState.getFirstJob() != NULL) {
-      // There is work left to do
+      // There is work left to do, don't unlock the actor
       if (!forceUnlock) {
         SWIFT_TASK_DEBUG_LOG("Unlock-ing actor %p failed", this);
         return false;
       }
-
+      // We need to schedule the actor - remove any escalation bits since we'll
+      // schedule the actor at the max priority currently on it
       newState = newState.withScheduled();
+      newState = newState.withoutEscalatedPriority();
     } else {
       // There is no work left to do - actor goes idle
       newState = newState.withIdle();
-      newState = newState.withMaxPriority(JobPriority::Unspecified);
+      newState = newState.resetPriority();
     }
 
     if (_status().compare_exchange_weak(oldState, newState,
@@ -1292,9 +1380,13 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
         SWIFT_TASK_DEBUG_LOG("Actor %p is idle now", this);
       }
 
-      // TODO (rokhinip): Reset any overrides the thread might have had as a
-      // result of the actor
-
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+      // Reset any override on this thread as a result of this thread running
+      // the actor. Only do this after we have reenqueued the actor
+      if (oldState.isMaxPriorityEscalated()) {
+        swift_dispatch_lock_override_end((qos_class_t) oldState.getMaxPriority());
+      }
+#endif
       return true;
     }
   }
