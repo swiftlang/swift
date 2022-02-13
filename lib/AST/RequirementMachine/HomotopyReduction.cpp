@@ -454,7 +454,7 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     // If one of the rules is a concrete type requirement, prefer to
     // eliminate the *other* rule.
     bool ruleIsConcrete = rule.getLHS().back().hasSubstitutions();
-    bool otherRuleIsConcrete = otherRule.getRHS().back().hasSubstitutions();
+    bool otherRuleIsConcrete = otherRule.getLHS().back().hasSubstitutions();
 
     if (ruleIsConcrete != otherRuleIsConcrete) {
       if (otherRuleIsConcrete)
@@ -469,20 +469,6 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
       // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
       // C and C' are superclass, concrete type or concrete conformance
       // symbols.
-      //
-      // This should only arise in two limited situations:
-      // - The new rule was marked invalid due to a conflict.
-      // - The new rule was substitution-simplified.
-      //
-      // In both cases, the new rule becomes the new candidate for
-      // elimination.
-      if (!rule.isConflicting() && !rule.isSubstitutionSimplified()) {
-        llvm::errs() << "Incomparable rules in homotopy reduction:\n";
-        llvm::errs() << "- Candidate rule: " << rule << "\n";
-        llvm::errs() << "- Best rule so far: " << otherRule << "\n";
-        abort();
-      }
-
       found = pair;
       continue;
     }
