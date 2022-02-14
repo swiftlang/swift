@@ -696,7 +696,7 @@ static AccessorDecl *makeStructRawValueGetter(
   assert(storedVar->hasStorage());
 
   ASTContext &C = Impl.SwiftContext;
-  
+
   auto *params = ParameterList::createEmpty(C);
 
   auto computedType = computedVar->getInterfaceType();
@@ -730,7 +730,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   auto &C = Impl.SwiftContext;
 
   auto *params = ParameterList::createEmpty(C);
-  
+
   auto getterType = importedFieldDecl->getInterfaceType();
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/importedFieldDecl->getLoc(),
@@ -1156,7 +1156,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                          cSetterParamTypes,
                                          clang::FunctionProtoType::ExtProtoInfo());
   auto cSetterTypeInfo = Ctx.getTrivialTypeSourceInfo(cSetterType);
-  
+
   auto cSetterDecl = clang::FunctionDecl::Create(Ctx,
                                                  structDecl->getDeclContext(),
                                                  clang::SourceLocation(),
@@ -1188,7 +1188,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                   clang::SC_None,
                                                   nullptr);
     cGetterDecl->setParams(cGetterSelf);
-    
+
     auto cGetterSelfExpr = new (Ctx) clang::DeclRefExpr(Ctx, cGetterSelf, false,
                                                         recordType,
                                                         clang::VK_PRValue,
@@ -1201,7 +1201,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                          clang::VK_PRValue,
                                                          clang::OK_BitField);
 
-    
+
     auto cGetterBody = clang::ReturnStmt::Create(Ctx, clang::SourceLocation(),
                                                    cGetterExpr,
                                                    nullptr);
@@ -1232,12 +1232,12 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                   nullptr);
     cSetterParams.push_back(cSetterSelf);
     cSetterDecl->setParams(cSetterParams);
-    
+
     auto cSetterSelfExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterSelf, false,
                                                         recordPointerType,
                                                         clang::VK_PRValue,
                                                         clang::SourceLocation());
-    
+
     auto cSetterMemberExpr = clang::MemberExpr::CreateImplicit(Ctx,
                                                                cSetterSelfExpr,
                                                                /*isarrow=*/true,
@@ -1245,7 +1245,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                                fieldType,
                                                                clang::VK_LValue,
                                                                clang::OK_BitField);
-    
+
     auto cSetterValueExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterValue, false,
                                                          fieldType,
                                                          clang::VK_PRValue,
@@ -1260,7 +1260,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                      clang::OK_Ordinary,
                                                      clang::SourceLocation(),
                                                      clang::FPOptionsOverride());
-    
+
     cSetterDecl->setBody(cSetterExpr);
   }
 
@@ -2423,7 +2423,7 @@ namespace {
         if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
           return importFullName(typedefForAnon);
       }
-      
+
       return {ImportedName(), None};
     }
 
@@ -2810,7 +2810,7 @@ namespace {
         });
 
       Result->setUnderlyingType(SwiftType);
-      
+
       // Make Objective-C's 'id' unavailable.
       if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
         auto attr = AvailableAttr::createPlatformAgnostic(
@@ -2886,7 +2886,7 @@ namespace {
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
-      
+
       auto name = importedName.getDeclName().getBaseIdentifier();
 
       // Create the enum declaration and record it.
@@ -2952,7 +2952,7 @@ namespace {
         ProtocolDecl *bridgedNSError = nullptr;
         ClassDecl *nsErrorDecl = nullptr;
         ProtocolDecl *errorCodeProto = nullptr;
-        if (enumInfo.isErrorEnum() && 
+        if (enumInfo.isErrorEnum() &&
             (bridgedNSError =
                C.getProtocol(KnownProtocolKind::BridgedStoredNSError)) &&
             (nsErrorDecl = C.getNSErrorDecl()) &&
@@ -3128,7 +3128,7 @@ namespace {
       Impl.ImportedDecls[{canonicalClangDecl, getVersion()}] = result;
 
       // Import each of the enumerators.
-      
+
       bool addEnumeratorsAsMembers;
       switch (enumKind) {
       case EnumKind::Constants:
@@ -3286,7 +3286,7 @@ namespace {
           addDecl(result, enumeratorDecl);
           for (auto *variant : variantDecls)
             addDecl(result, variant);
-          
+
           // If there is an error wrapper, add an alias within the
           // wrapper to the corresponding value within the enumerator
           // context.
@@ -3338,7 +3338,7 @@ namespace {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
       bool hasUnreferenceableStorage = false;
-      
+
       // Track whether this record contains fields that can't be zero-
       // initialized.
       bool hasZeroInitializableStorage = true;
@@ -3529,7 +3529,7 @@ namespace {
           methods.push_back(MD);
           continue;
         }
-        
+
         if (isa<VarDecl>(member) && isa<clang::CXXMethodDecl>(nd)) {
           result->addMember(member);
           continue;
@@ -3575,7 +3575,7 @@ namespace {
                                                   /*wantBody=*/true);
           ctors.push_back(valueCtor);
         }
-        
+
         // TODO: we have a problem lazily looking up members of an unnamed
         // record, so we add them here. To fix this `translateContext` needs to
         // somehow translate unnamed contexts so that `SwiftLookupTable::lookup`
@@ -4230,10 +4230,10 @@ namespace {
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
-            clangNode, AccessLevel::Public, ctorName, loc, 
+            clangNode, AccessLevel::Public, ctorName, loc,
             /*failable=*/false, /*FailabilityLoc=*/SourceLoc(),
             /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), 
+            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
             bodyParams, genericParams, dc);
       } else {
         auto resultTy = importedType.getType();
@@ -4345,7 +4345,7 @@ namespace {
 
     AccessorDecl *tryCreateGetterAccessor(const clang::CXXMethodDecl *clangMeth,
                                           VarDecl *swiftVar, FuncDecl *method) {
-     
+
       // If we have a constexpr var with an evaluated value, try to create an
       // accessor for it. If we can remove all references to the global (which
       // we should be able to do for constexprs) then we can remove the global
@@ -4777,25 +4777,25 @@ namespace {
       // Only import types for now.
       if (!isa<clang::TypeDecl>(decl->getUnderlyingDecl()))
         return nullptr;
-        
+
       ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
       std::tie(importedName, correctSwiftName) = importFullName(decl);
       auto Name = importedName.getDeclName().getBaseIdentifier();
       if (Name.empty())
         return nullptr;
-      
+
       // If we've been asked to produce a compatibility stub, handle it via a
       // typealias.
       if (correctSwiftName)
         return importCompatibilityTypeAlias(decl, importedName,
                                             *correctSwiftName);
-      
+
       auto DC =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!DC)
         return nullptr;
-      
+
       Decl *SwiftDecl = Impl.importDecl(decl->getUnderlyingDecl(), getActiveSwiftVersion());
       if (!SwiftDecl)
         return nullptr;
@@ -4803,7 +4803,7 @@ namespace {
       const TypeDecl *SwiftTypeDecl = dyn_cast<TypeDecl>(SwiftDecl);
       if (!SwiftTypeDecl)
         return nullptr;
-      
+
       auto Loc = Impl.importSourceLoc(decl->getLocation());
       auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
           decl,
@@ -5471,7 +5471,7 @@ namespace {
                                               objcClass->getDeclaredType());
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
                                               std::move(objcClass));
-      
+
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
         result->setGenericSignature(objcClass->getGenericSignature());
@@ -5490,7 +5490,7 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDeclImpl(const U *decl, Identifier name, 
+    T *resolveSwiftDeclImpl(const U *decl, Identifier name,
                             bool hasKnownSwiftName, ModuleDecl *overlay) {
       const auto &languageVersion =
           Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
@@ -6363,7 +6363,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   }
 
   alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
-  
+
   // Record that this is the official version of this declaration.
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = alias;
   markAsVariant(alias, correctSwiftName);
@@ -7993,27 +7993,6 @@ VarDecl *SwiftDeclConverter::makeProperty(Identifier identifier, FuncDecl *gette
 
 
   return result;
-//  VarDecl *getterResult = nullptr;
-//  if (It == Impl.GetterSetterMap.end()) {
-//    getterResult = Impl.createDeclWithClangNode<VarDecl>(
-//        decl, AccessLevel::Public,
-//        /*IsStatic*/ false, VarDecl::Introducer::Var, SourceLoc(), name, dc);
-//  } else {
-//    getterResult = get<0>(It->getSecond());
-//  }
-//  auto *getter = get<1>(It->getSecond());
-//  getterResult->setImplInfo(StorageImplInfo::getMutableComputed());
-//  getterResult->setAccessors(
-//      SourceLoc(),
-//      {getter,
-//       tryCreateSetterAccessor(decl, getterResult, cast<FuncDecl>(method))},
-//      SourceLoc());
-//  getterResult->dump();
-//  return method;
-//
-//  getterResult->setInterfaceType(type);
-//  StorageImplInfo info(ReadImplKind::Get);
-//  getterResult->setLazyStorageProperty(false);
 }
 
 SubscriptDecl *
@@ -9288,7 +9267,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
       const_cast<clang::NamedDecl *>(ClangDecl)->addAttr(
           clang::SwiftAttrAttr::CreateImplicit(ClangDecl->getASTContext(), "import_as_setter"));
     }
-    
+
   }
 
   if (!Result) {
@@ -9598,7 +9577,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
     auto updateMirroredDecl = [&](Decl *result) {
       result->setImplicit();
-    
+
       // Map the Clang attributes onto Swift attributes.
       importAttributes(decl, result);
 
