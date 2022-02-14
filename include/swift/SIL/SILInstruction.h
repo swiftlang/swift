@@ -1916,14 +1916,19 @@ class AllocStackInst final
   bool dynamicLifetime = false;
   bool lexical = false;
 
+  /// Set to true if this alloc_stack's memory location was passed to _move at
+  /// any point of the program.
+  bool wasMoved = false;
+
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                  Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
-                 bool isLexical);
+                 bool isLexical, bool wasMoved);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F, Optional<SILDebugVariable> Var,
-                                bool hasDynamicLifetime, bool isLexical);
+                                bool hasDynamicLifetime, bool isLexical,
+                                bool wasMoved);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -1939,6 +1944,10 @@ public:
       Operands[i].~Operand();
     }
   }
+
+  void markAsMoved() { wasMoved = true; }
+
+  bool getWasMoved() const { return wasMoved; }
 
   /// Set to true that this alloc_stack contains a value whose lifetime can not
   /// be ascertained from uses.
@@ -4696,22 +4705,34 @@ class DebugValueInst final
 
   TailAllocatedDebugVariable VarInfo;
 
+  /// Set to true if this debug_value is on an SSA value that was moved.
+  ///
+  /// IRGen uses this information to determine if we should use llvm.dbg.addr or
+  /// llvm.dbg.declare.
+  bool operandWasMoved = false;
+
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var, bool poisonRefs);
+                 SILDebugVariable Var, bool poisonRefs, bool operandWasMoved);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
-                                bool poisonRefs);
+                                bool poisonRefs, bool operandWasMoved);
   static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
-                                    SILModule &M, SILDebugVariable Var);
+                                    SILModule &M, SILDebugVariable Var,
+                                    bool operandWasMoved);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
   size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
 
 public:
+  void markAsMoved() { operandWasMoved = true; }
+
+  bool getWasMoved() const { return operandWasMoved; }
+
   /// Return the underlying variable declaration that this denotes,
   /// or null if we don't have one.
   VarDecl *getDecl() const;
+
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
     Optional<SILType> AuxVarType;
