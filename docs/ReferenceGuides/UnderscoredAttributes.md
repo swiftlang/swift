@@ -825,3 +825,8 @@ also locks.
 Marks a synchronous API as being unavailable from asynchronous contexts. Direct
 usage of annotated API from asynchronous contexts will result in a warning from
 the compiler.
+
+## `@_unsafeInheritExecutor`
+
+This `async` function uses the pre-SE-0338 semantics of unsafely inheriting the caller's executor.  This is an underscored feature because the right way of inheriting an executor is to pass in the required executor and switch to it.  Unfortunately, there are functions in the standard library which need to inherit their caller's executor but cannot change their ABI because they were not defined as `@_alwaysEmitIntoClient` in the initial release.
+

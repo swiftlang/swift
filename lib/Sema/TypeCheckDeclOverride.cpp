@@ -1569,6 +1569,8 @@ namespace  {
 
     UNINTERESTING_ATTR(BackDeploy)
 
+    UNINTERESTING_ATTR(UnsafeInheritExecutor)
+
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
