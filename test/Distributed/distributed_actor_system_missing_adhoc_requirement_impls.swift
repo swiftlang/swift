@@ -493,6 +493,18 @@ struct FakeInvocationEncoder_missing_recordArgument: DistributedTargetInvocation
   mutating func doneRecording() throws {}
 }
 
+struct FakeInvocationEncoder_missing_recordArgument2: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{struct 'FakeInvocationEncoder_missing_recordArgument2' is missing witness for protocol requirement 'recordArgument'}}
+  //expected-note@-2{{protocol 'FakeInvocationEncoder_missing_recordArgument2' requires function 'recordArgument' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument>(_ argument: Argument) throws {} // BAD
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
 struct FakeInvocationEncoder_missing_recordReturnType: DistributedTargetInvocationEncoder {
   //expected-error@-1{{struct 'FakeInvocationEncoder_missing_recordReturnType' is missing witness for protocol requirement 'recordReturnType'}}
   //expected-note@-2{{protocol 'FakeInvocationEncoder_missing_recordReturnType' requires function 'recordReturnType' with signature:}}

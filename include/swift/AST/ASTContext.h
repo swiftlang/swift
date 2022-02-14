@@ -693,15 +693,15 @@ public:
   // \param nominal optionally provide a 'NominalTypeDecl' from which the
   // function decl shall be extracted. This is useful to avoid witness calls
   // through the protocol which is looked up when nominal is null.
-  FuncDecl *getRecordArgumentOnDistributedInvocationEncoder(
-      NominalTypeDecl *nominal) const;
-
-  // Retrieve the declaration of DistributedInvocationEncoder.recordErrorType(_:).
-  FuncDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
+  AbstractFunctionDecl *getRecordArgumentOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
   // Retrieve the declaration of DistributedInvocationEncoder.recordReturnType(_:).
-  FuncDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
+  AbstractFunctionDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of DistributedInvocationEncoder.recordErrorType(_:).
+  AbstractFunctionDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
   // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
@@ -1351,14 +1351,15 @@ public:
   /// alternative specified via the -entry-point-function-name frontend flag.
   std::string getEntryPointFunctionName() const;
 
-  Type getAssociatedTypeOfDistributedSystem(NominalTypeDecl *actor,
+  Type getAssociatedTypeOfDistributedSystemOfActor(NominalTypeDecl *actor,
                                             Identifier member);
 
-  /// Find the type of SerializationRequirement on the passed nominal.
-  ///
-  /// This type exists as a typealias/associatedtype on all distributed actors,
-  /// actor systems, and related serialization types.
-  Type getDistributedSerializationRequirementType(NominalTypeDecl *);
+//  /// Find the type of SerializationRequirement on the passed nominal.
+//  ///
+//  /// This type exists as a typealias/associatedtype on all distributed actors,
+//  /// actor systems, and related serialization types.
+//  Type getDistributedSerializationRequirementType(
+//      NominalTypeDecl *, ProtocolDecl *protocolDecl);
 
   /// Find the concrete invocation decoder associated with the given actor.
   NominalTypeDecl *

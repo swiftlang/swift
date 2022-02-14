@@ -1055,6 +1055,60 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Obtain the 'recordArgument' function of a 'DistributedTargetInvocationEncoder'.
+class GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'recordReturnType' function of a 'DistributedTargetInvocationEncoder'.
+class GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'recordErrorType' function of a 'DistributedTargetInvocationEncoder'.
+class GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
 /// Obtain the 'actorSystem' property of a 'distributed actor'.
 class GetDistributedActorSystemPropertyRequest :
     public SimpleRequest<GetDistributedActorSystemPropertyRequest,

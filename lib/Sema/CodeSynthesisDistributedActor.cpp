@@ -81,40 +81,6 @@ static VarDecl *addImplicitDistributedActorIDProperty(
 }
 
 /******************************************************************************/
-/************ LOCATING AD-HOC PROTOCOL REQUIREMENT IMPLS **********************/
-/******************************************************************************/
-
-AbstractFunctionDecl*
-GetDistributedActorSystemRemoteCallFunctionRequest::evaluate(
-    Evaluator &evaluator, NominalTypeDecl *decl, bool isVoidReturn) const {
-  auto &C = decl->getASTContext();
-
-  // It would be nice to check if this is a DistributedActorSystem
-  // "conforming" type, but we can't do this as we invoke this function WHILE
-  // deciding if the type conforms or not;
-
-  // Not via `ensureDistributedModuleLoaded` to avoid generating a warning,
-  // we won't be emitting the offending decl after all.
-  if (!C.getLoadedModule(C.Id_Distributed)) {
-    return nullptr;
-  }
-
-  auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
-
-  AbstractFunctionDecl *remoteCallFunc = nullptr;
-  for (auto value : decl->lookupDirect(callId)) {
-    auto func = dyn_cast<AbstractFunctionDecl>(value);
-    if (func && func->isDistributedActorSystemRemoteCall(isVoidReturn)) {
-      remoteCallFunc = func;
-      break;
-    }
-  }
-
-  return remoteCallFunc;
-}
-
-
-/******************************************************************************/
 /************************ SYNTHESIS ENTRY POINT *******************************/
 /******************************************************************************/
 

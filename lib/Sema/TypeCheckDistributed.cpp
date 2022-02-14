@@ -52,6 +52,78 @@ DistributedModuleIsAvailableRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
+/******************************************************************************/
+/************ LOCATING AD-HOC PROTOCOL REQUIREMENT IMPLS **********************/
+/******************************************************************************/
+
+static AbstractFunctionDecl *findDistributedAdHocRequirement(
+    NominalTypeDecl *decl, Identifier identifier,
+    std::function<bool(AbstractFunctionDecl *)> matchFn) {
+  auto &C = decl->getASTContext();
+
+  // It would be nice to check if this is a DistributedActorSystem
+  // "conforming" type, but we can't do this as we invoke this function WHILE
+  // deciding if the type conforms or not;
+
+  // Not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed)) {
+    return nullptr;
+  }
+
+  for (auto value : decl->lookupDirect(identifier)) {
+    auto func = dyn_cast<AbstractFunctionDecl>(value);
+    if (func && matchFn(func))
+      return func;
+  }
+
+  return nullptr;
+}
+
+AbstractFunctionDecl *
+GetDistributedActorSystemRemoteCallFunctionRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *decl, bool isVoidReturn) const {
+  auto &C = decl->getASTContext();
+  auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
+
+  return findDistributedAdHocRequirement(
+      decl, callId, [isVoidReturn](AbstractFunctionDecl *func) {
+        return func->isDistributedActorSystemRemoteCall(isVoidReturn);
+      });
+}
+
+AbstractFunctionDecl *
+GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *decl) const {
+  auto &C = decl->getASTContext();
+
+  return findDistributedAdHocRequirement(
+      decl, C.Id_recordArgument, [](AbstractFunctionDecl *func) {
+        return func->isDistributedTargetInvocationEncoderRecordArgument();
+      });
+}
+
+AbstractFunctionDecl *
+GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *decl) const {
+  auto &C = decl->getASTContext();
+
+  return findDistributedAdHocRequirement(
+      decl, C.Id_recordReturnType, [](AbstractFunctionDecl *func) {
+        return func->isDistributedTargetInvocationEncoderRecordReturnType();
+      });
+}
+
+AbstractFunctionDecl *
+GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *decl) const {
+  auto &C = decl->getASTContext();
+  return findDistributedAdHocRequirement(
+      decl, C.Id_recordErrorType, [](AbstractFunctionDecl *func) {
+        return func->isDistributedTargetInvocationEncoderRecordErrorType();
+      });
+}
+
 // ==== ------------------------------------------------------------------------
 
 /// Add Fix-It text for the given protocol type to inherit DistributedActor.
@@ -213,7 +285,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), C.Id_recordArgument);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
                      decl->getName(), C.Id_recordArgument,
-                     "mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws");
+                     "mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws\n");
       anyMissingAdHocRequirements = true;
     }
 
@@ -224,7 +296,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), C.Id_recordErrorType);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
                      decl->getName(), C.Id_recordErrorType,
-                     "mutating func recordErrorType<Err: Error>(_ errorType: Err.Type) throws");
+                     "mutating func recordErrorType<Err: Error>(_ errorType: Err.Type) throws\n");
       anyMissingAdHocRequirements = true;
     }
 
@@ -235,7 +307,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
           decl->getDescriptiveKind(), decl->getName(), C.Id_recordReturnType);
       decl->diagnose(diag::note_distributed_actor_system_conformance_missing_adhoc_requirement,
                      decl->getName(), C.Id_recordReturnType,
-                     "mutating func recordReturnType<Res: SerializationRequirement>(_ resultType: Res.Type) throws");
+                     "mutating func recordReturnType<Res: SerializationRequirement>(_ resultType: Res.Type) throws\n");
       anyMissingAdHocRequirements = true;
     }
 
@@ -340,8 +412,8 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
     serializationRequirements = extractDistributedSerializationRequirements(
         C, extension->getGenericRequirements());
   } else if (auto actor = dyn_cast<ClassDecl>(declContext)) {
-    serializationRequirements =
-        getDistributedSerializationRequirementProtocols(actor);
+    serializationRequirements = getDistributedSerializationRequirementProtocols(
+        actor, C.getProtocol(KnownProtocolKind::DistributedActor));
   } // TODO(distributed): need to handle ProtocolDecl too?
 
   // If the requirement is exactly `Codable` we diagnose it ia bit nicer.
@@ -406,6 +478,8 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
 /// \returns \c true if there was a problem with adding the attribute, \c false
 /// otherwise.
 bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
+  auto &C = var->getASTContext();
+  auto DC = var->getDeclContext();
   /// === Check if the declaration is a valid combination of attributes
   if (var->isStatic()) {
     var->diagnose(diag::distributed_property_cannot_be_static,
@@ -431,7 +505,8 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   // === Check the type of the property
   auto serializationRequirements =
       getDistributedSerializationRequirementProtocols(
-          var->getDeclContext()->getSelfNominalTypeDecl());
+          DC->getSelfNominalTypeDecl(),
+          C.getProtocol(KnownProtocolKind::DistributedActor));
 
   auto module = var->getModuleContext();
   if (checkDistributedTargetResultType(module, var, serializationRequirements, diagnose)) {
@@ -531,10 +606,16 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
 }
 
 llvm::SmallPtrSet<ProtocolDecl *, 2>
-swift::getDistributedSerializationRequirementProtocols(NominalTypeDecl *nominal) {
-  auto &ctx = nominal->getASTContext();
+swift::getDistributedSerializationRequirementProtocols(
+    NominalTypeDecl *nominal, ProtocolDecl *protocol) {
+  if (!protocol)
+    return {};
 
-  auto ty = ctx.getDistributedSerializationRequirementType(nominal);
+//  auto ty = ctx.getDistributedSerializationRequirementType(nominal);
+//  if (ty->hasError())
+//    return {};
+  auto ty = getDistributedSerializationRequirementType(
+      nominal, protocol);
   if (ty->hasError())
     return {};
 
@@ -584,7 +665,7 @@ GetDistributedActorInvocationDecoderRequest::evaluate(Evaluator &evaluator,
                                                       NominalTypeDecl *actor) const {
   auto &ctx = actor->getASTContext();
   auto decoderTy =
-      ctx.getAssociatedTypeOfDistributedSystem(actor, ctx.Id_InvocationDecoder);
+      ctx.getAssociatedTypeOfDistributedSystemOfActor(actor, ctx.Id_InvocationDecoder);
   return decoderTy->hasError() ? nullptr : decoderTy->getAnyNominal();
 }
 
@@ -603,7 +684,8 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
 
   // typealias SerializationRequirement = any ...
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs =
-      getDistributedSerializationRequirementProtocols(actor);
+      getDistributedSerializationRequirementProtocols(
+          actor, ctx.getProtocol(KnownProtocolKind::DistributedActor));
 
   SmallVector<FuncDecl *, 2> candidates;
   // Looking for `decodeNextArgument<Arg: <SerializationReq>>() throws -> Arg`

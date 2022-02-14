@@ -37,15 +37,20 @@ Type getDistributedActorSystemType(NominalTypeDecl *actor);
 /// Determine the `ID` type for the given actor.
 Type getDistributedActorIDType(NominalTypeDecl *actor);
 
-Type getDistributedActorSystemSerializationRequirementType(
-    NominalTypeDecl *system);
+/// Get specific 'SerializationRequirement' as defined in 'nominal'
+/// type, which must conform to the passed 'protocol' which is expected
+/// to require the 'SerializationRequirement'.
+Type getDistributedSerializationRequirementType(
+    NominalTypeDecl *nominal, ProtocolDecl *protocol);
+
+///// Determine the serialization requirement for the given actor, actor system
+///// or other type that has the SerializationRequirement associated type.
+//Type getDistributedSerializationRequirementType(
+//    NominalTypeDecl *nominal, ProtocolDecl *protocol);
 
 Type getDistributedActorSystemActorIDRequirementType(
     NominalTypeDecl *system);
 
-/// Determine the serialization requirement for the given actor, actor system
-/// or other type that has the SerializationRequirement associated type.
-Type getDistributedSerializationRequirementType(NominalTypeDecl *actor);
 
 /// Get the specific protocols that the `SerializationRequirement` specifies,
 /// and all parameters / return types of distributed targets must conform to.
@@ -55,7 +60,8 @@ Type getDistributedSerializationRequirementType(NominalTypeDecl *actor);
 ///
 /// Returns an empty set if the requirement was `Any`.
 llvm::SmallPtrSet<ProtocolDecl *, 2>
-getDistributedSerializationRequirementProtocols(NominalTypeDecl *decl);
+getDistributedSerializationRequirementProtocols(
+    NominalTypeDecl *decl, ProtocolDecl* protocol);
 
 /// Desugar and flatten the `SerializationRequirement` type into a set of
 /// specific protocol declarations.
@@ -78,6 +84,7 @@ bool checkDistributedSerializationRequirementIsExactlyCodable(
 bool
 getDistributedActorSystemSerializationRequirements(
     NominalTypeDecl *systemDecl,
+    ProtocolDecl *protocol,
     llvm::SmallPtrSetImpl<ProtocolDecl *> &requirementProtos);
 
 /// Given any set of generic requirements, locate those which are about the
