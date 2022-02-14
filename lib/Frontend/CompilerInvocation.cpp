@@ -507,6 +507,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalBoundGenericExtensions |=
     Args.hasArg(OPT_enable_experimental_bound_generic_extensions);
 
+  Opts.StringLiteralsMustBeASCIIOnly |=
+      Args.hasArg(OPT_string_literals_must_be_ascii_only);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   Opts.CheckAPIAvailabilityOnly |=

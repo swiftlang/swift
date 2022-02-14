@@ -147,6 +147,9 @@ namespace swift {
     /// Enable experimental string processing
     bool EnableExperimentalStringProcessing = false;
 
+    /// Only ASCII string literals are allowed
+    bool StringLiteralsMustBeASCIIOnly = false;
+
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 

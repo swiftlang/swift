@@ -529,6 +529,10 @@ def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
 
+def string_literals_must_be_ascii_only :
+  Flag<["-"], "string-literals-must-be-ascii-only">,
+  HelpText<"Enforce string literals to only allow ASCII characters">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;

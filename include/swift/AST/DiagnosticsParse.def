@@ -147,6 +147,9 @@ ERROR(lex_invalid_unicode_scalar,none,
       "invalid unicode scalar", ())
 ERROR(lex_unicode_escape_braces,none,
       "expected hexadecimal code in braces after unicode escape", ())
+ERROR(non_ascii_character_found,none,
+      "non-ASCII character found when compiling with -string-literals-must-be-ascii-only", ())
+
 ERROR(lex_illegal_multiline_string_start,none,
       "multi-line string literal content must begin on a new line", ())
 ERROR(lex_illegal_multiline_string_end,none,

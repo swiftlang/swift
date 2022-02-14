@@ -322,6 +322,9 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
 
 static void validateMultilineIndents(const Token &Str, DiagnosticEngine *Diags);
 
+static void validateStringLiteralIsASCII(const Lexer &Lexer, const Token &Str,
+                                         DiagnosticEngine *Diags);
+
 void Lexer::formStringLiteralToken(const char *TokStart,
                                    bool IsMultilineString,
                                    unsigned CustomDelimiterLen) {
@@ -332,6 +335,9 @@ void Lexer::formStringLiteralToken(const char *TokStart,
 
   if (IsMultilineString && Diags)
     validateMultilineIndents(NextToken, Diags);
+
+  if (LangOpts.StringLiteralsMustBeASCIIOnly && Diags)
+    validateStringLiteralIsASCII(*this, NextToken, Diags);
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
@@ -1792,6 +1798,31 @@ static void validateMultilineIndents(const Token &Str,
   diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, Bytes, 
                                   linesWithLastMistakeOffset, lastMistakeOffset, 
                                   commonIndentation);
+}
+
+/// validateStringLiteralIsASCII:
+/// Diagnose contents of string literals that have non-ASCII characters when
+/// compiling with -string-literals-must-be-ascii-only.
+static void validateStringLiteralIsASCII(const Lexer &Lexer, const Token &Str,
+                                         DiagnosticEngine *Diags) {
+  SmallVector<Lexer::StringSegment, 4> Segments;
+  Lexer::getStringLiteralSegments(Str, Segments, Diags);
+  for (auto &Seg : Segments) {
+    llvm::SmallString<256> Buf;
+    // We need to look at the "encoded segment" to expand things like \u{xxxx}.
+    StringRef EncodedStr = Lexer.getEncodedStringSegment(Seg, Buf);
+
+    const char *BytesPtr = EncodedStr.begin();
+    while (BytesPtr < EncodedStr.end()) {
+      char CurChar = *BytesPtr++;
+
+      // ASCII characters
+      if (CurChar >= 0 && CurChar <= 0x7f) continue;
+
+      Diags->diagnose(Seg.Loc, diag::non_ascii_character_found);
+      return;
+    }
+  }
 }
 
 /// Emit diagnostics for single-quote string and suggest replacement
