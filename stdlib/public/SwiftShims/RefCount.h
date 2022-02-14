@@ -181,7 +181,7 @@ namespace swift {
 }
 
 // FIXME: HACK: copied from HeapObject.cpp
-extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED __attribute__((swiftcall)) void
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED SWIFT_CC(swift) void
 _swift_release_dealloc(SWIFT_CONTEXT swift::HeapObject *object);
 
 namespace swift {
