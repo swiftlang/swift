@@ -718,6 +718,10 @@ namespace swift {
     /// closures.
     bool EnableMultiStatementClosureInference = false;
 
+    /// Enable experimental support for generic parameter inference in
+    /// parameter positions from associated default expressions.
+    bool EnableTypeInferenceFromDefaultArguments = false;
+
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
   };
