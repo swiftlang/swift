@@ -10,8 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+
 import Foundation
 import SymbolicationShims
+
+enum Std {
+  struct File: TextOutputStream {
+    var underlying: UnsafeMutablePointer<FILE>
+
+    mutating func write(_ string: String) {
+      fputs(string, underlying)
+    }
+  }
+
+  static var err = File(underlying: stderr)
+}
 
 private let symbolicationPath =
   "/System/Library/PrivateFrameworks/Symbolication.framework/Symbolication"
@@ -216,3 +230,5 @@ func task_enumerate_malloc_blocks(
 ) {
   Sym.task_enumerate_malloc_blocks(task, context, type_mask, recorder)
 }
+
+#endif

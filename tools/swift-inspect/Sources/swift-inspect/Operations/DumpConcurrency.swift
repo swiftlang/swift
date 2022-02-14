@@ -1,18 +1,40 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+
 import SwiftRemoteMirror
 
-func dumpConcurrency(
-  context: SwiftReflectionContextRef,
-  inspector: Inspector
-) throws {
-  let dumper = ConcurrencyDumper(context: context, inspector: inspector)
-  dumper.dumpTasks()
-  dumper.dumpActors()
-  dumper.dumpThreads()
+struct DumpConcurrency: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Print information about the target's concurrency runtime.")
+
+  @OptionGroup()
+  var options: UniversalOptions
+
+  func run() throws {
+    try inspect(process: options.nameOrPid) { process in
+      let dumper = ConcurrencyDumper(context: process.context,
+                                     process: process as! DarwinRemoteProcess)
+      dumper.dumpTasks()
+      dumper.dumpActors()
+      dumper.dumpThreads()
+    }
+  }
 }
 
 fileprivate class ConcurrencyDumper {
   let context: SwiftReflectionContextRef
-  let inspector: Inspector
+  let process: DarwinRemoteProcess
   let jobMetadata: swift_reflection_ptr_t?
   let taskMetadata: swift_reflection_ptr_t?
 
@@ -38,7 +60,7 @@ fileprivate class ConcurrencyDumper {
 
   lazy var heapInfo: HeapInfo = gatherHeapInfo()
 
-  lazy var threadCurrentTasks = inspector.threadCurrentTasks().filter{ $0.currentTask != 0 }
+  lazy var threadCurrentTasks = process.threadCurrentTasks().filter{ $0.currentTask != 0 }
 
   lazy var tasks: [swift_reflection_ptr_t: TaskInfo] = gatherTasks()
 
@@ -49,13 +71,13 @@ fileprivate class ConcurrencyDumper {
   var metadataIsActorCache: [swift_reflection_ptr_t: Bool] = [:]
   var metadataNameCache: [swift_reflection_ptr_t: String?] = [:]
 
-  init(context: SwiftReflectionContextRef, inspector: Inspector) {
+  init(context: SwiftReflectionContextRef, process: DarwinRemoteProcess) {
     self.context = context
-    self.inspector = inspector
+    self.process = process
 
     func getMetadata(symbolName: String) -> swift_reflection_ptr_t? {
-      let addr = inspector.getAddr(symbolName: symbolName)
-      if let ptr = inspector.read(address: addr, size: MemoryLayout<UInt>.size) {
+      let addr = process.GetSymbolAddress(symbolName)
+      if let ptr = process.ReadBytes(addr, MemoryLayout<UInt>.size) {
         return swift_reflection_ptr_t(ptr.load(as: UInt.self))
       }
       return nil
@@ -67,7 +89,7 @@ fileprivate class ConcurrencyDumper {
   func gatherHeapInfo() -> HeapInfo {
     var result = HeapInfo()
     
-    inspector.enumerateMallocs { (pointer, size) in
+    process.iterateHeap { (pointer, size) in
       let metadata = swift_reflection_ptr_t(swift_reflection_metadataForObject(context, UInt(pointer)))
       if metadata == jobMetadata {
         result.jobs.append(swift_reflection_ptr_t(pointer))
@@ -205,7 +227,7 @@ fileprivate class ConcurrencyDumper {
   }
 
   func symbolicateBacktracePointer(ptr: swift_reflection_ptr_t) -> String {
-    guard let name = inspector.getSymbol(address: swift_addr_t(ptr)).name else {
+    guard let name = process.symbolicate(swift_addr_t(ptr)).symbol else {
       return "<\(hex: ptr)>"
     }
 
@@ -309,8 +331,8 @@ fileprivate class ConcurrencyDumper {
         firstLine = false
       }
 
-      let runJobSymbol = inspector.getSymbol(address: swift_addr_t(task.runJob))
-      let runJobLibrary = runJobSymbol.library ?? "<unknown>"
+      let runJobSymbol = process.symbolicate(swift_addr_t(task.runJob))
+      let runJobLibrary = runJobSymbol.module ?? "<unknown>"
 
       let symbolicatedBacktrace = task.asyncBacktrace.map(symbolicateBacktracePointer)
 
@@ -397,3 +419,5 @@ fileprivate class ConcurrencyDumper {
     }
   }
 }
+
+#endif

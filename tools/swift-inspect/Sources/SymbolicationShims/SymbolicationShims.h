@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__APPLE__)
+
 #include <stdint.h>
 #include <ptrauth.h>
 
@@ -28,3 +30,5 @@ static inline uintptr_t GetPtrauthMask(void) {
   return (uintptr_t)~0ull;
 #endif
 }
+
+#endif
