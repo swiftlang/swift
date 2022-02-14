@@ -12,7 +12,7 @@ actor A {
   func f() -> [StrictStruct: NonStrictClass] { [:] }
 }
 
-class NS { } // expected-note 2{{class 'NS' does not conform to the 'Sendable' protocol}}
+class NS { } // expected-note{{class 'NS' does not conform to the 'Sendable' protocol}}
 
 struct MyType {
   var nsc: NonStrictClass
@@ -25,7 +25,7 @@ struct MyType2: Sendable {
 
 func testA(ns: NS, mt: MyType, mt2: MyType2) async {
   Task {
-    print(ns) // expected-warning{{capture of 'ns' with non-sendable type 'NS' in a `@Sendable` closure}}
+    print(ns)
     print(mt) // no warning: MyType is Sendable because we suppressed NonStrictClass's warning
     print(mt2)
   }
