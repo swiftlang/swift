@@ -529,6 +529,47 @@ struct FakeInvocationEncoder_missing_recordErrorType: DistributedTargetInvocatio
   mutating func doneRecording() throws {}
 }
 
+struct FakeInvocationEncoder_recordArgument_wrongType: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{struct 'FakeInvocationEncoder_recordArgument_wrongType' is missing witness for protocol requirement 'recordArgument'}}
+  //expected-note@-2{{protocol 'FakeInvocationEncoder_recordArgument_wrongType' requires function 'recordArgument' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: String, other: Argument) throws {} // BAD
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument.Type) throws {} // BAD
+  mutating func recordArgument<Argument: SerializationRequirement>(badName: Argument) throws {} // BAD
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
+struct FakeInvocationEncoder_recordResultType_wrongType: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{struct 'FakeInvocationEncoder_recordResultType_wrongType' is missing witness for protocol requirement 'recordReturnType'}}
+  //expected-note@-2{{protocol 'FakeInvocationEncoder_recordResultType_wrongType' requires function 'recordReturnType' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(s: String, _ resultType: R.Type) throws {} // BAD
+  mutating func recordReturnType<R: SomeProtocol>(_ resultType: R.Type) throws {} // BAD
+  mutating func recordReturnType<R: SerializationRequirement>(badName: R.Type) throws {} // BAD
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
+struct FakeInvocationEncoder_recordErrorType_wrongType: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{struct 'FakeInvocationEncoder_recordErrorType_wrongType' is missing witness for protocol requirement 'recordErrorType'}}
+  //expected-note@-2{{protocol 'FakeInvocationEncoder_recordErrorType_wrongType' requires function 'recordErrorType' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(BadName type: E.Type) throws {} // BAD
+  mutating func recordErrorType<E: SerializationRequirement>(_ type: E.Type) throws {} // BAD
+  mutating func doneRecording() throws {}
+}
+
 class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 

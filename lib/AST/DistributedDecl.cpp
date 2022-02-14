@@ -102,7 +102,6 @@ Type swift::getDistributedActorSystemActorIDRequirementType(NominalTypeDecl *sys
 
 Type swift::getDistributedSerializationRequirementType(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
-  assert(!nominal->isDistributedActor());
   assert(protocol);
   auto &ctx = nominal->getASTContext();
 
@@ -181,28 +180,19 @@ swift::getDistributedActorSystemSerializationRequirements(
   auto existentialRequirementTy =
       getDistributedSerializationRequirementType(nominal, protocol);
   if (existentialRequirementTy->hasError()) {
-    fprintf(stderr, "[%s:%d] (%s) if (SerializationRequirementTy->hasError())\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
   if (existentialRequirementTy->isAny())
     return true; // we're done here, any means there are no requirements
 
-  fprintf(stderr, "[%s:%d] (%s) existentialRequirementTy\n", __FILE__, __LINE__, __FUNCTION__);
-  existentialRequirementTy.dump();
-
-  fprintf(stderr, "[%s:%d] (%s) ---------------------\n", __FILE__, __LINE__, __FUNCTION__);
-
   auto serialReqType = existentialRequirementTy->castTo<ExistentialType>()
                            ->getConstraintType()
                            ->getDesugaredType();
-  fprintf(stderr, "[%s:%d] (%s) serialReqType serialReqType serialReqType serialReqType serialReqType serialReqType\n", __FILE__, __LINE__, __FUNCTION__);
-  serialReqType->dump();
   auto flattenedRequirements =
       flattenDistributedSerializationTypeToRequiredProtocols(
           serialReqType);
   for (auto p : flattenedRequirements) {
-    fprintf(stderr, "[%s:%d] (%s) PROTO %s\n", __FILE__, __LINE__, __FUNCTION__, p->getNameStr().str().c_str());
     requirementProtos.insert(p);
   }
 
@@ -254,16 +244,9 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   auto &C = getASTContext();
   auto module = getParentModule();
 
-  fprintf(stderr, "[%s:%d] (%s) ====================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ====================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ====================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) ====================================================\n", __FILE__, __LINE__, __FUNCTION__);
-  fprintf(stderr, "[%s:%d] (%s) CHECK NAME: %s\n", __FILE__, __LINE__, __FUNCTION__, getNameStr().str().c_str());
-
   // === Check the name
   auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
   if (getBaseName() != callId) {
-    fprintf(stderr, "[%s:%d] (%s)   if (getBaseName() != callId)\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -276,26 +259,22 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
       systemNominal->getDeclaredInterfaceType(), systemProto);
 
   if (distSystemConformance.isInvalid()) {
-    fprintf(stderr, "[%s:%d] (%s) if (distSystemConformance.isInvalid())\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
   // === Structural Checks
   // -- Must be throwing
   if (!hasThrows()) {
-    fprintf(stderr, "[%s:%d] (%s) if (!hasThrows())\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
   // -- Must be async
   if (!hasAsync()) {
-    fprintf(stderr, "[%s:%d] (%s) if (!hasAsync())\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
   // === Check generics
   if (!isGeneric()) {
-    fprintf(stderr, "[%s:%d] (%s) if (!isGeneric())\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -304,7 +283,6 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   unsigned int expectedGenericParamNum = isVoidReturn ? 2 : 3;
 
   if (genericParams->size() != expectedGenericParamNum) {
-    fprintf(stderr, "[%s:%d] (%s) if (genericParams->size() != expectedGenericParamNum)\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -329,7 +307,6 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // --- Count of parameters depends on if we're void returning or not
   unsigned int expectedParamNum = isVoidReturn ? 4 : 5;
   if (!params || params->size() != expectedParamNum) {
-    fprintf(stderr, "[%s:%d] (%s) if (!params || params->size() != expectedParamNum) {\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -366,10 +343,6 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
     }
   }
 
-  fprintf(stderr, "[%s:%d] (%s) GENERIC PARAMS\n", __FILE__, __LINE__, __FUNCTION__);
-  for (auto param : genericParams->getParams()) {
-    param->dump();
-  }
   // === Check generic parameters in detail
   // --- Check: Act: DistributedActor,
   //            Act.ID == Self.ActorID
@@ -400,15 +373,6 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
 
   auto sig = getGenericSignature();
   auto requirements = sig.getRequirements();
-
-  fprintf(stderr, "[%s:%d] (%s) REQUIREMENTS requirements::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
-  for (auto r : requirements) {
-    r.dump();
-  }
-  fprintf(stderr, "[%s:%d] (%s) REQUIREMENT PROTOS ::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
-  for (auto r : requirementProtos) {
-    r->dump();
-  }
 
   if (requirements.size() != expectedRequirementsNum) {
     return false;
@@ -486,7 +450,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
   auto expectedActorIdTy =
       getDistributedActorSystemActorIDRequirementType(systemNominal);
-  actorIdReq.dump();
+//  actorIdReq.dump();
   if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {
     return false;
   }
@@ -500,8 +464,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
   auto module = getParentModule();
 
   // === Check base name
-  if (getBaseIdentifier() != C.Id_recordArgument)
+  if (getBaseIdentifier() != C.Id_recordArgument) {
     return false;
+  }
 
   // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
   ProtocolDecl *encoderProto =
@@ -518,19 +483,16 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
   // === Check modifiers
   // --- must not be async
     if (hasAsync()) {
-      fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
     // --- must be throwing
     if (!hasThrows()) {
-      fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
     // === Check generics
     if (!isGeneric()) {
-      fprintf(stderr, "[%s:%d] (%s) if (!isGeneric())\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
@@ -539,7 +501,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     unsigned int expectedGenericParamNum = 1;
 
     if (genericParams->size() != expectedGenericParamNum) {
-      fprintf(stderr, "[%s:%d] (%s) if (genericParams->size() != expectedGenericParamNum)\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
@@ -547,7 +508,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     SmallPtrSet<ProtocolDecl*, 2> requirementProtos;
     if (!getDistributedActorSystemSerializationRequirements(
             encoderNominal, encoderProto, requirementProtos)) {
-      fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
@@ -558,14 +518,12 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     // === Check all parameters
     auto params = getParameters();
     if (params->size() != 1) {
-      fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
     // --- Check parameter: _ argument
   auto argumentParam = params->get(0);
-  if (!argumentParam->getArgumentName().is("_")) {
-    fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
+  if (!argumentParam->getArgumentName().is("")) {
     return false;
   }
 
@@ -577,7 +535,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
   auto requirements = sig.getRequirements();
 
   if (requirements.size() != expectedRequirementsNum) {
-    fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -589,12 +546,10 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
 
   auto func = dyn_cast<FuncDecl>(this);
   if (!func) {
-    fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
-  auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
-                        ->getMetatypeInstanceType()
+  auto resultType = func->mapTypeIntoContext(argumentParam->getInterfaceType())
                         ->getDesugaredType();
   auto resultParamType = func->mapTypeIntoContext(
       ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
@@ -606,14 +561,12 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
   for (auto requirementProto : requirementProtos) {
     auto conformance = module->lookupConformance(resultType, requirementProto);
     if (conformance.isInvalid()) {
-      fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
   }
 
   // === Check result type: Void
   if (!func->getResultInterfaceType()->isVoid()) {
-    fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -626,8 +579,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   auto module = getParentModule();
 
   // === Check base name
-  if (getBaseIdentifier() != C.Id_recordReturnType)
+  if (getBaseIdentifier() != C.Id_recordReturnType) {
     return false;
+  }
 
   // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
   ProtocolDecl *encoderProto =
@@ -654,7 +608,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
 
   // === Check generics
   if (!isGeneric()) {
-    fprintf(stderr, "[%s:%d] (%s) if (!isGeneric())\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -663,7 +616,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   unsigned int expectedGenericParamNum = 1;
 
   if (genericParams->size() != expectedGenericParamNum) {
-    fprintf(stderr, "[%s:%d] (%s) if (genericParams->size() != expectedGenericParamNum)\n", __FILE__, __LINE__, __FUNCTION__);
     return false;
   }
 
@@ -686,7 +638,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
 
   // --- Check parameter: _ argument
   auto argumentParam = params->get(0);
-  if (!argumentParam->getArgumentName().is("_")) {
+  if (!argumentParam->getArgumentName().is("")) {
     return false;
   }
 
@@ -708,14 +660,17 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   // ...
 
   auto func = dyn_cast<FuncDecl>(this);
-  if (!func)
+  if (!func) {
     return false;
+  }
 
-  auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
+  auto resultType = func->mapTypeIntoContext(argumentParam->getInterfaceType())
                         ->getMetatypeInstanceType()
                         ->getDesugaredType();
+
   auto resultParamType = func->mapTypeIntoContext(
       ArgumentParam->getInterfaceType()->getMetatypeInstanceType());
+
   // The result of the function must be the `Res` generic argument.
   if (!resultType->isEqual(resultParamType)) {
     return false;
@@ -738,13 +693,13 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
 
 bool
 AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() const {
-
     auto &C = getASTContext();
     auto module = getParentModule();
 
     // === Check base name
-    if (getBaseIdentifier() != C.Id_recordReturnType)
+    if (getBaseIdentifier() != C.Id_recordErrorType) {
       return false;
+    }
 
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *encoderProto =
@@ -755,26 +710,22 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
         encoderNominal->getDeclaredInterfaceType(), encoderProto);
 
     if (protocolConformance.isInvalid()) {
-      fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
     // === Check modifiers
     // --- must not be async
     if (hasAsync()) {
-      fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
     // --- must be throwing
     if (!hasThrows()) {
-      fprintf(stderr, "[%s:%d] (%s) return false\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
     // === Check generics
     if (!isGeneric()) {
-      fprintf(stderr, "[%s:%d] (%s) if (!isGeneric())\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
@@ -783,7 +734,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     unsigned int expectedGenericParamNum = 1;
 
     if (genericParams->size() != expectedGenericParamNum) {
-      fprintf(stderr, "[%s:%d] (%s) if (genericParams->size() != expectedGenericParamNum)\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
     }
 
@@ -793,9 +743,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
       return false;
     }
 
-    // --- Check parameter: _ argument
+    // --- Check parameter: _ errorType
     auto argumentParam = params->get(0);
-    if (!argumentParam->getArgumentName().is("_")) {
+    if (!argumentParam->getArgumentName().is("")) {
       return false;
     }
 
@@ -807,7 +757,14 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     }
 
     // === Check generic parameters in detail
-    GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
+    // --- Check: Err: Error
+    GenericTypeParamDecl *ErrParam = genericParams->getParams()[0];
+    auto ErrConformance = module->lookupConformance(
+        mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
+        C.getProtocol(KnownProtocolKind::Error));
+    if (ErrConformance.isInvalid()) {
+      return false;
+    }
 
     // --- Check requirement: conforms_to: Err Error
     auto errorReq = requirements[0];
@@ -823,8 +780,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
 
     // === Check result type: Void
     auto func = dyn_cast<FuncDecl>(this);
-    if (!func)
+    if (!func) {
       return false;
+    }
 
     if (!func->getResultInterfaceType()->isVoid()) {
       return false;

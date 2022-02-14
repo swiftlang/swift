@@ -350,13 +350,6 @@ static bool checkDistributedTargetResultType(
   if (resultType->isVoid())
     return false;
 
-  // If the serialization requirement is specifically `Codable`
-  // we can issue slightly better warnings
-  llvm::SmallPtrSet<ProtocolDecl *, 2> codableRequirements = {
-      C.getProtocol(swift::KnownProtocolKind::Encodable),
-      C.getProtocol(swift::KnownProtocolKind::Decodable),
-  };
-
   auto isCodableRequirement =
       checkDistributedSerializationRequirementIsExactlyCodable(
           C, serializationRequirements);
@@ -405,6 +398,10 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   auto declContext = func->getDeclContext();
   auto module = func->getParentModule();
 
+  /// If no distributed module is available, then no reason to even try checks.
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return true;
+
   // === All parameters and the result type must conform
   // SerializationRequirement
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements;
@@ -412,9 +409,14 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
     serializationRequirements = extractDistributedSerializationRequirements(
         C, extension->getGenericRequirements());
   } else if (auto actor = dyn_cast<ClassDecl>(declContext)) {
+    auto systemProp = actor->getDistributedActorSystemProperty();
     serializationRequirements = getDistributedSerializationRequirementProtocols(
-        actor, C.getProtocol(KnownProtocolKind::DistributedActor));
-  } // TODO(distributed): need to handle ProtocolDecl too?
+        systemProp->getInterfaceType()->getAnyNominal(),
+        C.getProtocol(KnownProtocolKind::DistributedActorSystem));
+  } else {
+    llvm_unreachable("Cannot handle types other than extensions and actor "
+                     "declarations in distributed function checking.");
+  }
 
   // If the requirement is exactly `Codable` we diagnose it ia bit nicer.
   auto serializationRequirementIsCodable =
@@ -480,6 +482,11 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
 bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   auto &C = var->getASTContext();
   auto DC = var->getDeclContext();
+
+  // without the distributed module, we can't check any of these.
+  if (!ensureDistributedModuleLoaded(var))
+    return true;
+
   /// === Check if the declaration is a valid combination of attributes
   if (var->isStatic()) {
     var->diagnose(diag::distributed_property_cannot_be_static,
@@ -502,11 +509,14 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
     return true;
   }
 
-  // === Check the type of the property
+  auto systemVar =
+      DC->getSelfNominalTypeDecl()->getDistributedActorSystemProperty();
+  auto systemDecl = systemVar->getInterfaceType()->getAnyNominal();
+
   auto serializationRequirements =
       getDistributedSerializationRequirementProtocols(
-          DC->getSelfNominalTypeDecl(),
-          C.getProtocol(KnownProtocolKind::DistributedActor));
+          systemDecl,
+          C.getProtocol(KnownProtocolKind::DistributedActorSystem));
 
   auto module = var->getModuleContext();
   if (checkDistributedTargetResultType(module, var, serializationRequirements, diagnose)) {
@@ -608,16 +618,15 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
 llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::getDistributedSerializationRequirementProtocols(
     NominalTypeDecl *nominal, ProtocolDecl *protocol) {
-  if (!protocol)
+  if (!protocol) {
     return {};
+  }
 
-//  auto ty = ctx.getDistributedSerializationRequirementType(nominal);
-//  if (ty->hasError())
-//    return {};
-  auto ty = getDistributedSerializationRequirementType(
-      nominal, protocol);
-  if (ty->hasError())
+
+  auto ty = getDistributedSerializationRequirementType(nominal, protocol);
+  if (ty->hasError()) {
     return {};
+  }
 
   auto serialReqType =
       ty->castTo<ExistentialType>()->getConstraintType()->getDesugaredType();
