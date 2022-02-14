@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// This is a light-weight utility for hoisting destroy instructions for unique
-/// storage--typically alloc_stac or owned incoming arguments. Shrinking an
+/// storage--typically alloc_stack or owned incoming arguments. Shrinking an
 /// object's memory lifetime can allow removal of copy_addr and other
 /// optimization.
 ///
@@ -206,6 +206,9 @@ public:
   }
 
 private:
+  DeinitBarriers(DeinitBarriers const &) = delete;
+  DeinitBarriers &operator=(DeinitBarriers const &) = delete;
+
   // Conforms to BackwardReachability::BlockReachability
   class DestroyReachability {
     const KnownStorageUses &knownUses;
@@ -386,9 +389,13 @@ bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
 bool HoistDestroys::foldBarrier(SILInstruction *barrier) {
   if (auto *load = dyn_cast<LoadInst>(barrier)) {
     if (load->getOperand() == storageRoot) {
-      assert(load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy);
-      load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
-      return true;
+      if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+        load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
+        return true;
+      } else {
+        assert(load->getOperand()->getType().isTrivial(*load->getFunction()));
+        return false;
+      }
     }
   }
   if (auto *copy = dyn_cast<CopyAddrInst>(barrier)) {

@@ -1382,7 +1382,7 @@ bool SILInstruction::mayTrap() const {
 bool SILInstruction::maySynchronize() const {
   // TODO: We need side-effect analysis and library annotation for this to be
   //       a reasonable API.  For now, this is just a placeholder.
-  return isa<FullApplySite>(this);
+  return isa<FullApplySite>(this) || isa<EndApplyInst>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {

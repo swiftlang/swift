@@ -53,8 +53,8 @@ entry(%0 : $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
 
 // CHECK-LABEL: sil @call_generic_promotable_box_from_different_generic
 // CHECK:       bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*U, [[ARG2:%.*]] : $Builtin.Int32):
-// CHECK-NEXT:    destroy_addr [[ARG0]] : $*T
 // CHECK-NEXT:    destroy_addr [[ARG1]] : $*U
+// CHECK-NEXT:    destroy_addr [[ARG0]] : $*T
 // CHECK:         [[F:%.*]] = function_ref @$s22generic_promotable_boxTf2ni_n : $@convention(thin) <τ_0_0> (@in τ_0_0, Builtin.Int32) -> Builtin.Int32
 // CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[F]]<U>([[ARG2]])
 // CHECK-NEXT:    return [[CLOSURE]]

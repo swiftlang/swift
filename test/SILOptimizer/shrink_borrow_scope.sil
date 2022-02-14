@@ -11,6 +11,7 @@ class C {
     weak var d: D?
 }
 class D {}
+struct S {}
 class DBox {
   var d: D
 }
@@ -32,6 +33,7 @@ sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
 sil [ossa] @callee_optional_d_guaranteed: $@convention(thin) (@guaranteed Optional<D>) -> ()
 sil [ossa] @synchronization_point : $@convention(thin) () -> ()
+sil [ossa] @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
 
 // =============================================================================
 // = DECLARATIONS                                                             }}
@@ -805,6 +807,27 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+// Don't hoist over end_apply.  These are lowered to calls to continuations
+// which can have the same sorts of side-effects as function calls.
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_end_apply : {{.*}} {
+// CHECK:       end_apply
+// CHECK:       end_borrow
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_end_apply'
+sil [ossa] @dont_hoist_over_end_apply : $@convention(thin) (@owned C, S) -> () {
+entry(%instance : @owned $C, %input : $S):
+    %lifetime = begin_borrow [lexical] %instance : $C
+    %modify_s = function_ref @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
+    (%addr, %continuation) = begin_apply %modify_s() : $@yield_once @convention(thin) () -> @yields @inout S
+    store %input to [trivial] %addr : $*S
+    end_apply %continuation
+    end_borrow %lifetime : $C
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
 
 // =============================================================================
 // instruction tests                                                          }}
