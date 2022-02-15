@@ -454,6 +454,16 @@ public:
     return reinterpret_cast<PointerTy>(absolute);
   }
 
+  void *getWithoutCast() const & {
+    // Check for null.
+    if (Nullable && RelativeOffset == 0)
+      return nullptr;
+
+    // The value is addressed relative to `this`.
+    uintptr_t absolute = detail::applyRelativeOffset(this, RelativeOffset);
+    return reinterpret_cast<void *>(absolute);
+  }
+
   /// Apply the offset to a parameter, instead of `this`.
   PointerTy getRelative(void *base) const & {
     // Check for null.
@@ -523,13 +533,14 @@ public:
   }
 
   typename super::PointerTy get() const & {
-    auto ptr = this->super::get();
+    void *ptr = this->super::getWithoutCast();
 #if SWIFT_PTRAUTH
     if (Nullable && !ptr)
-      return ptr;
-    return ptrauth_sign_unauthenticated(ptr, ptrauth_key_function_pointer, 0);
+      return nullptr;
+    return reinterpret_cast<T *>(
+        ptrauth_sign_unauthenticated(ptr, ptrauth_key_function_pointer, 0));
 #else
-    return ptr;
+    return reinterpret_cast<T *>(ptr);
 #endif
   }
 
@@ -537,12 +548,12 @@ public:
     return this->get();
   }
 
-  template <typename...ArgTy>
-  typename std::result_of<T* (ArgTy...)>::type operator()(ArgTy...arg) const {
+  template <typename... ArgTy>
+  typename std::result_of<T *(ArgTy...)>::type operator()(ArgTy... arg) const {
 #if SWIFT_PTRAUTH
-    return ptrauth_sign_unauthenticated(this->super::get(),
-                                        ptrauth_key_function_pointer,
-                                        0)(std::forward<ArgTy>(arg)...);
+    void *ptr = this->super::getWithoutCast();
+    return reinterpret_cast<T *>(ptrauth_sign_unauthenticated(
+        ptr, ptrauth_key_function_pointer, 0))(std::forward<ArgTy>(arg)...);
 #else
     return this->super::get()(std::forward<ArgTy>(arg)...);
 #endif

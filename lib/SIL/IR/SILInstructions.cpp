@@ -190,13 +190,15 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F, Optional<SILDebugVariable> Var,
-                               bool hasDynamicLifetime, bool isLexical)
+                               bool hasDynamicLifetime, bool isLexical,
+                               bool wasMoved)
     : InstructionBase(Loc, elementType.getAddressType()),
       SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
                                  Var ? Var->Type.hasValue() : false,
                                  Var ? Var->Loc.hasValue() : false,
                                  Var ? Var->Scope != nullptr : false),
-      dynamicLifetime(hasDynamicLifetime), lexical(isLexical) {
+      dynamicLifetime(hasDynamicLifetime), lexical(isLexical),
+      wasMoved(wasMoved) {
   SILNode::Bits.AllocStackInst.NumOperands =
     TypeDependentOperands.size();
   assert(SILNode::Bits.AllocStackInst.NumOperands ==
@@ -221,15 +223,16 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
 AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
                                        SILType elementType, SILFunction &F,
                                        Optional<SILDebugVariable> Var,
-                                       bool hasDynamicLifetime,
-                                       bool isLexical) {
+                                       bool hasDynamicLifetime, bool isLexical,
+                                       bool wasMoved) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
                                elementType.getASTType());
   void *Buffer = allocateDebugVarCarryingInst<AllocStackInst>(
       F.getModule(), Var, TypeDependentOperands);
-  return ::new (Buffer) AllocStackInst(Loc, elementType, TypeDependentOperands,
-                                       F, Var, hasDynamicLifetime, isLexical);
+  return ::new (Buffer)
+      AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var,
+                     hasDynamicLifetime, isLexical, wasMoved);
 }
 
 VarDecl *AllocationInst::getDecl() const {
@@ -334,7 +337,8 @@ SILType AllocBoxInst::getAddressType() const {
 }
 
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                               SILDebugVariable Var, bool poisonRefs)
+                               SILDebugVariable Var, bool poisonRefs,
+                               bool wasMoved)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.hasValue(), Var.Loc.hasValue(),
@@ -346,18 +350,23 @@ DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
   if (auto *VD = DebugLoc.getLocation().getAsASTNode<VarDecl>())
     VarInfo.setImplicit(VD->isImplicit() || VarInfo.isImplicit());
   setPoisonRefs(poisonRefs);
+  if (wasMoved)
+    markAsMoved();
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
-                                       SILDebugVariable Var, bool poisonRefs) {
+                                       SILDebugVariable Var, bool poisonRefs,
+                                       bool wasMoved) {
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
-  return ::new (buf) DebugValueInst(DebugLoc, Operand, Var, poisonRefs);
+  return ::new (buf)
+      DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved);
 }
 
 DebugValueInst *DebugValueInst::createAddr(SILDebugLocation DebugLoc,
                                            SILValue Operand, SILModule &M,
-                                           SILDebugVariable Var) {
+                                           SILDebugVariable Var,
+                                           bool wasMoved) {
   // For alloc_stack, debug_value is used to annotate the associated
   // memory location, so we shouldn't attach op_deref.
   if (!isa<AllocStackInst>(Operand))
@@ -365,7 +374,7 @@ DebugValueInst *DebugValueInst::createAddr(SILDebugLocation DebugLoc,
       {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf) DebugValueInst(DebugLoc, Operand, Var,
-                                    /*poisonRefs=*/false);
+                                    /*poisonRefs=*/false, wasMoved);
 }
 
 bool DebugValueInst::exprStartsWithDeref() const {

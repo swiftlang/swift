@@ -796,9 +796,10 @@ namespace {
     }
 
     void addRequirementSignature() {
+      auto requirements = Proto->getRequirementSignature().getRequirements();
       auto metadata =
         irgen::addGenericRequirements(IGM, B, Proto->getGenericSignature(),
-                                      Proto->getRequirementSignature());
+                                      requirements);
 
       B.fillPlaceholderWithInt(*NumRequirementsInSignature, IGM.Int32Ty,
                                metadata.NumRequirements);

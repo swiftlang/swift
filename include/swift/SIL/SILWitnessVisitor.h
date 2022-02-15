@@ -53,7 +53,8 @@ public:
     // The protocol conformance descriptor gets added first.
     asDerived().addProtocolConformanceDescriptor();
 
-    for (const auto &reqt : protocol->getRequirementSignature()) {
+    auto requirements = protocol->getRequirementSignature().getRequirements();
+    for (const auto &reqt : requirements) {
       switch (reqt.getKind()) {
       // These requirements don't show up in the witness table.
       case RequirementKind::Superclass:

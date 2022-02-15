@@ -830,6 +830,35 @@ extension Unsafe${Mutable}RawBufferPointer {
     let n = c / MemoryLayout<T>.stride
     return .init(start: .init(s._rawValue), count: n)
   }
+
+%  if Mutable:
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    try withMemoryRebound(to: Element.self) { b in
+      var buffer = b
+      defer {
+        _debugPrecondition(
+          (b.baseAddress, b.count) == (buffer.baseAddress, buffer.count),
+          "UnsafeMutableRawBufferPointer.withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed"
+        )
+      }
+      return try body(&buffer)
+    }
+  }
+
+%  end
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    try withMemoryRebound(to: Element.self) {
+      try body(${ 'UnsafeBufferPointer<Element>($0)' if Mutable else '$0' })
+    }
+  }
 }
 
 extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {

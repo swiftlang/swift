@@ -320,6 +320,7 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
   case FragileFunctionKind::AlwaysEmitIntoClient:
   case FragileFunctionKind::DefaultArgument:
   case FragileFunctionKind::PropertyInitializer:
+  case FragileFunctionKind::BackDeploy:
     return ResilienceExpansion::Minimal;
   case FragileFunctionKind::None:
     return ResilienceExpansion::Maximal;
@@ -415,6 +416,11 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
 
       if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
         return {FragileFunctionKind::AlwaysEmitIntoClient,
+                /*allowUsableFromInline=*/true};
+      }
+
+      if (AFD->getAttrs().hasAttribute<BackDeployAttr>()) {
+        return {FragileFunctionKind::BackDeploy,
                 /*allowUsableFromInline=*/true};
       }
 

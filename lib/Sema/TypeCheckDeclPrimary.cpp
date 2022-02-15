@@ -2659,7 +2659,7 @@ public:
         TypeChecker::inferDefaultWitnesses(PD);
 
     // Explicity compute the requirement signature to detect errors.
-    auto reqSig = PD->getRequirementSignature();
+    auto reqSig = PD->getRequirementSignature().getRequirements();
 
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       auto requirementsSig =

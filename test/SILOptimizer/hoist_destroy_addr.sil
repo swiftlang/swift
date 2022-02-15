@@ -39,11 +39,16 @@ public enum E {
   case B
 }
 
+struct TrivialStruct {
+  var e: E
+}
+
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
 
 sil @f_out : $@convention(thin) <T> () -> @out T
 sil @f_bool : $@convention(thin) () -> Builtin.Int1
+sil [ossa] @take_trivial_struct : $@convention(thin) (TrivialStruct) -> ()
 
 // CHECK-LABEL: sil [ossa] @test_simple
 // CHECK:      bb0(%0 : $*S):
@@ -229,3 +234,23 @@ bb3:
   return %16 : $()
 }
 
+// Hoist a destroy_addr of a trivial value over a function_ref.  DO NOT fold
+// with the load [trivial].
+//
+// CHECK-LABEL: sil [ossa] @test_hoist_trivial : {{.*}} {
+// CHECK:         load [trivial]
+// CHECK:         function_ref
+// CHECK-LABEL: } // end sil function 'test_hoist_trivial'
+sil [ossa] @test_hoist_trivial : $@convention(thin) (TrivialStruct) -> () {
+entry(%instance : @none $TrivialStruct):
+    %addr = alloc_stack $TrivialStruct
+    store %instance to [trivial] %addr : $*TrivialStruct
+    %copy = load [trivial] %addr : $*TrivialStruct
+    %take_trivial_struct = function_ref @take_trivial_struct : $@convention(thin) (TrivialStruct) -> ()
+    destroy_addr %addr : $*TrivialStruct
+    apply %take_trivial_struct(%copy) : $@convention(thin) (TrivialStruct) -> ()
+    dealloc_stack %addr : $*TrivialStruct
+
+    %retval = tuple ()
+    return %retval : $()
+}

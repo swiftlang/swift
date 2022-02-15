@@ -864,6 +864,10 @@ public:
   /// inside an async actor-independent function. No hop-back is expected.
   void emitHopToActorValue(SILLocation loc, ManagedValue actor);
 
+  /// Return true if the function being emitted is an async function
+  /// that unsafely inherits its executor.
+  bool unsafelyInheritsExecutor();
+
   /// A version of `emitHopToTargetActor` that is specialized to the needs
   /// of various types of ConstructorDecls, like class or value initializers,
   /// because their prolog emission is not the same as for regular functions.

@@ -800,7 +800,7 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
   }
   auto *NewInst = getBuilder().createAllocStack(
       Loc, getOpType(Inst->getElementType()), VarInfo,
-      Inst->hasDynamicLifetime(), Inst->isLexical());
+      Inst->hasDynamicLifetime(), Inst->isLexical(), Inst->getWasMoved());
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }
@@ -1277,9 +1277,9 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   // Since we want the debug info to survive, we do not remap the location here.
   SILDebugVariable VarInfo = *Inst->getVarInfo();
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  auto *NewInst = getBuilder().createDebugValue(Inst->getLoc(),
-                                                getOpValue(Inst->getOperand()),
-                                                VarInfo, Inst->poisonRefs());
+  auto *NewInst = getBuilder().createDebugValue(
+      Inst->getLoc(), getOpValue(Inst->getOperand()), VarInfo,
+      Inst->poisonRefs(), Inst->getWasMoved());
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }

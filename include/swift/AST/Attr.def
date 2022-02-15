@@ -636,7 +636,11 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   112)
 
 // 113 was experimental _unsafeSendable and is now unused
-// 114 was experimental _unsafeMainActor and is now unused
+
+SIMPLE_DECL_ATTR(_unsafeInheritExecutor, UnsafeInheritExecutor,
+  OnFunc | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  114) // previously experimental _unsafeMainActor
 
 SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
   OnParam | UserInaccessible |

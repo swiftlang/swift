@@ -628,6 +628,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   NodeVector Children;
   NodeVector Conformances;
   NodeVector Accessors;
+  SDKNode *Result = nullptr;
 
   for (auto &Pair : *Node) {
     auto keyString = GetScalarString(Pair.getKey()); 
@@ -742,14 +743,18 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         break;
       }
       }
-    }
-    else {
+    } else if (keyString == ABIRootKey) {
+      Result = constructSDKNode(Ctx,
+        cast<llvm::yaml::MappingNode>(Pair.getValue()));
+    } else {
       Ctx.diagnose(Pair.getKey(), diag::sdk_node_unrecognized_key,
                               keyString);
       Pair.skip();
     }
   };
-  SDKNode *Result = Info.createSDKNode(Kind);
+  if (Result)
+    return Result;
+  Result = Info.createSDKNode(Kind);
   for (auto C : Children) {
     Result->addChild(C);
   }
@@ -1189,7 +1194,8 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
   if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
-    return printGenericSignature(Ctx, PD->getRequirementSignature(), Canonical);
+    return printGenericSignature(Ctx, PD->getRequirementSignature().getRequirements(),
+                                 Canonical);
   }
   PrintOptions Opts = getTypePrintOpts(Ctx.getOpts());
   if (auto *GC = D->getAsGenericContext()) {
@@ -2224,7 +2230,11 @@ void SwiftDeclCollector::serialize(StringRef Filename, SDKNode *Root) {
   std::error_code EC;
   llvm::raw_fd_ostream fs(Filename, EC, llvm::sys::fs::OF_None);
   json::Output yout(fs);
-  yout << Root;
+  assert(Root->getKind() == SDKNodeKind::Root);
+  SDKNodeRoot &root = *static_cast<SDKNodeRoot*>(Root);
+  yout.beginObject();
+  yout.mapRequired(ABIRootKey, root);
+  yout.endObject();
 }
 
 // Serialize the content of all roots to a given file using JSON format.

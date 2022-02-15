@@ -1098,7 +1098,8 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                     ProtocolConformanceRef(conformance));
 
   SmallVector<Requirement, 4> sanitizedRequirements;
-  sanitizeProtocolRequirements(proto, proto->getRequirementSignature(),
+  auto requirements = proto->getRequirementSignature().getRequirements();
+  sanitizeProtocolRequirements(proto, requirements,
                                sanitizedRequirements);
   auto result =
     TypeChecker::checkGenericArguments(dc->getParentModule(), SourceLoc(),
