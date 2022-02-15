@@ -4,10 +4,7 @@
 //
 // Enable this everywhere once we have a solution for modularizing libstdc++: rdar://87654514
 // REQUIRES: OS=macosx
-<<<<<<< HEAD
 
-=======
->>>>>>> 1505e92b3e3 ([cxx-interop] fix  std::string::push_back by fixing mapping between clang/swift self/this type for cxx methods)
 import StdlibUnittest
 import StdString
 import std.string
