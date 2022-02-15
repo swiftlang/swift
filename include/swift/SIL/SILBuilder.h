@@ -382,15 +382,16 @@ public:
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
                                    Optional<SILDebugVariable> Var = None,
                                    bool hasDynamicLifetime = false,
-                                   bool isLexical = false) {
+                                   bool isLexical = false,
+                                   bool wasMoved = false) {
     llvm::SmallString<4> Name;
     Loc.markAsPrologue();
     assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocStackInst::create(
         getSILDebugLocation(Loc), elementType, getFunction(),
-        substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime,
-        isLexical));
+        substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, isLexical,
+        wasMoved));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
@@ -941,9 +942,11 @@ public:
 
   DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
                                    SILDebugVariable Var,
-                                   bool poisonRefs = false);
+                                   bool poisonRefs = false,
+                                   bool wasMoved = false);
   DebugValueInst *createDebugValueAddr(SILLocation Loc, SILValue src,
-                                       SILDebugVariable Var);
+                                       SILDebugVariable Var,
+                                       bool wasMoved = false);
 
   /// Create a debug_value according to the type of \p src
   SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,

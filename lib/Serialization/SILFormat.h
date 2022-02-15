@@ -407,7 +407,7 @@ namespace sil_block {
   using SILOneTypeLayout = BCRecordLayout<
     SIL_ONE_TYPE,
     SILInstOpCodeField,
-    BCFixed<2>,          // Optional attributes
+    BCFixed<3>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField
   >;
