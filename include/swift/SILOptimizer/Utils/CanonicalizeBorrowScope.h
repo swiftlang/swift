@@ -155,6 +155,10 @@ MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
                                                  DominanceInfo &dominanceTree,
                                                  InstructionDeleter &deleter);
 
+bool hoistDestroysOfOwnedLexicalValue(SILValue const value,
+                                      SILFunction &function,
+                                      InstructionDeleter &deleter);
+
 } // namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEBORROWSCOPES_H
