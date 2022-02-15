@@ -334,34 +334,23 @@ void RewriteSystem::simplifyLeftHandSideSubstitutions(const PropertyMap *map) {
 
     auto symbol = *optSymbol;
 
-    RewritePath path;
-
-    auto differenceID = simplifySubstitutions(rule.getRHS(), symbol, map, &path);
+    auto differenceID = simplifySubstitutions(rule.getRHS(), symbol, map);
     if (!differenceID)
       continue;
 
-    rule.markSubstitutionSimplified();
-
     auto difference = getTypeDifference(*differenceID);
     assert(difference.LHS == symbol);
+    assert(difference.RHS != symbol);
 
-    // If the original rule is (T.[concrete: C] => T) and [concrete: C'] is
-    // the simplified symbol, then difference.LHS == [concrete: C] and
-    // difference.RHS == [concrete: C'], and the rewrite path we just
-    // built takes T.[concrete: C] to T.[concrete: C'].
-    //
-    // We want a path from T.[concrete: C'] to T, so invert the path to get
-    // a path from T.[concrete: C'] to T.[concrete: C], and add a final step
-    // applying the original rule (T.[concrete: C] => T).
-    path.invert();
-    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
-                                         /*endOffset=*/0,
-                                         /*ruleID=*/ruleID,
-                                         /*inverted=*/false));
     MutableTerm rhs(rule.getRHS());
     MutableTerm lhs(rhs);
     lhs.add(difference.RHS);
 
-    addRule(lhs, rhs, &path);
+    addRule(lhs, rhs);
+
+    RewritePath path;
+    buildRewritePathForJoiningTerms(rhs, lhs, &path);
+
+    processTypeDifference(difference, *differenceID, ruleID, path);
   }
 }

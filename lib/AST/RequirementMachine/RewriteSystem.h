@@ -318,7 +318,7 @@ public:
 
   Optional<unsigned>
   simplifySubstitutions(Term baseTerm, Symbol symbol, const PropertyMap *map,
-                        RewritePath *path);
+                        RewritePath *path=nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
