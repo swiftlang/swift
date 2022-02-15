@@ -6535,6 +6535,9 @@ bool SILParserState::parseDeclSILStage(Parser &P) {
   }
   
   M.setStage(stage);
+  if (M.getOptions().EnableSILOpaqueValues) {
+    M.setLoweredAddresses(stage != SILStage::Raw);
+  }
   DidParseSILStage = true;
   return false;
 }

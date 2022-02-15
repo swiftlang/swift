@@ -245,6 +245,8 @@ public:
   /// The SILModuleConventions for this SIL module.
   SILModuleConventions silConv;
 
+  bool useLoweredAddresses() const { return silConv.useLoweredAddresses(); }
+
   /// The DeclContext corresponding to the function currently being emitted.
   DeclContext * const FunctionDC;
 

@@ -87,12 +87,14 @@ static void addModulePrinterPipeline(SILPassPipelinePlan &plan,
 
 static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Debug Serialization");
+  P.addAddressLowering();
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
 }
 
 static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Ownership Model Eliminator");
+  P.addAddressLowering();
   P.addOwnershipModelEliminator();
 }
 
@@ -113,6 +115,7 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
   P.addSILGenCleanup();
+  P.addAddressLowering();
   P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
   P.addNestedSemanticFunctionCheck();
@@ -796,11 +799,10 @@ static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
 SILPassPipelinePlan
 SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
-  P.startPipeline("Address Lowering");
+  P.startPipeline("Lowering");
   P.addLowerHopToActor(); // FIXME: earlier for more opportunities?
   P.addOwnershipModelEliminator();
   P.addIRGenPrepare();
-  P.addAddressLowering();
 
   return P;
 }
@@ -913,7 +915,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // depend on other passes needed for diagnostics). Thus we can run them later
   // and avoid having SourceKit run these passes when just emitting diagnostics
   // in the editor.
-  P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
+  P.startPipeline("Non-Diagnostic Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
 
