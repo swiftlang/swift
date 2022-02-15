@@ -122,12 +122,13 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       bool isForeign, bool isDistributed,
+                       bool isForeign, bool isDistributed, bool isBackDeployed,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
-      defaultArgIndex(0), pointer(derivativeId) {}
+      isBackDeployed(isBackDeployed), defaultArgIndex(0), pointer(derivativeId) {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign, bool asDistributed)
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
+                       bool asDistributed, bool asBackDeployed)
     : defaultArgIndex(0),
       pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
@@ -167,6 +168,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign, bool asDistribut
 
   isForeign = asForeign;
   isDistributed = asDistributed;
+  isBackDeployed = asBackDeployed;
 }
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
@@ -202,7 +204,8 @@ ASTContext &SILDeclRef::getASTContext() const {
 }
 
 bool SILDeclRef::isThunk() const {
-  return isForeignToNativeThunk() || isNativeToForeignThunk() || isDistributedThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk() ||
+         isDistributedThunk() || isBackDeployedThunk();
 }
 
 bool SILDeclRef::isClangImported() const {
@@ -730,7 +733,8 @@ bool SILDeclRef::isAlwaysInline() const {
 bool SILDeclRef::isAnyThunk() const {
   return isForeignToNativeThunk() ||
     isNativeToForeignThunk() ||
-    isDistributedThunk();
+    isDistributedThunk() ||
+    isBackDeployedThunk();
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -780,6 +784,12 @@ bool SILDeclRef::isNativeToForeignThunk() const {
 
 bool SILDeclRef::isDistributedThunk() const {
   if (!isDistributed)
+    return false;
+  return kind == Kind::Func;
+}
+
+bool SILDeclRef::isBackDeployedThunk() const {
+  if (!isBackDeployed)
     return false;
   return kind == Kind::Func;
 }
@@ -995,6 +1005,8 @@ bool SILDeclRef::requiresNewVTableEntry() const {
     return false;
   if (isDistributedThunk())
     return false;
+  if (isBackDeployedThunk())
+    return false;
   auto fnDecl = dyn_cast<AbstractFunctionDecl>(getDecl());
   if (!fnDecl)
     return false;
@@ -1031,7 +1043,11 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // Distributed thunks are not in the vtable.
     if (isDistributedThunk())
       return SILDeclRef();
-    
+
+    // Back deployed thunks are not in the vtable.
+    if (isBackDeployedThunk())
+      return SILDeclRef();
+
     // An @objc convenience initializer can be "overridden" in the sense that
     // its selector is reclaimed by a subclass's convenience init with the
     // same name. The AST models this as an override for the purposes of
@@ -1313,6 +1329,8 @@ bool SILDeclRef::canBeDynamicReplacement() const {
     return false;
   if (isDistributedThunk())
     return false;
+  if (isBackDeployedThunk())
+    return false;
   if (kind == SILDeclRef::Kind::Destroyer ||
       kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
@@ -1330,6 +1348,9 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
     return false;
 
   if (isDistributedThunk())
+    return false;
+
+  if (isBackDeployedThunk())
     return false;
 
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)

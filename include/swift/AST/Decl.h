@@ -6268,6 +6268,9 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
+  /// Returns 'true' if the function can be back deployed.
+  bool isBackDeployed() const;
+
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
