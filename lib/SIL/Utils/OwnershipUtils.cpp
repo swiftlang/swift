@@ -313,7 +313,7 @@ bool swift::findUsesOfSimpleValue(SILValue value,
             if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
               return false;
             }
-            usePoints->push_back(use);
+            usePoints->push_back(end);
             return true;
           })) {
         return false;
