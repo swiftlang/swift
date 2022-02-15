@@ -66,6 +66,7 @@ namespace api {
 const uint8_t DIGESTER_JSON_VERSION = 7; // push SDKNodeRoot to lower-level
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
 const StringRef ABIRootKey = "ABIRoot";
+const StringRef ConstValuesKey = "ConstValues";
 
 class SDKNode;
 typedef SDKNode* NodePtr;
@@ -737,6 +738,8 @@ struct TypeInitInfo {
   StringRef ValueOwnership;
 };
 
+struct PayLoad;
+
 class SwiftDeclCollector: public VisibleDeclConsumer {
   SDKContext &Ctx;
   SDKNode *RootNode;
@@ -757,7 +760,7 @@ public:
 
   // Serialize the content of all roots to a given file using JSON format.
   void serialize(StringRef Filename);
-  static void serialize(StringRef Filename, SDKNode *Root);
+  static void serialize(StringRef Filename, SDKNode *Root, PayLoad otherInfo);
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
@@ -806,6 +809,7 @@ SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
 
 SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
 
+void dumpSDKRoot(SDKNodeRoot *Root, PayLoad load, StringRef OutputFile);
 void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
