@@ -1527,13 +1527,15 @@ void AddressLowering::runOnFunction(SILFunction *F) {
 
 /// The entry point to this function transformation.
 void AddressLowering::run() {
-  if (getModule()->getOptions().EnableSILOpaqueValues) {
-    for (auto &F : *getModule())
-      runOnFunction(&F);
+  if (getModule()->useLoweredAddresses())
+    return;
+
+  for (auto &F : *getModule()) {
+    runOnFunction(&F);
   }
-  // Set the SIL state before the PassManager has a chance to run
+  // Update the SILModule before the PassManager has a chance to run
   // verification.
-  getModule()->setStage(SILStage::Lowered);
+  getModule()->setLoweredAddresses(true);
 }
 
 SILTransform *swift::createAddressLowering() { return new AddressLowering(); }

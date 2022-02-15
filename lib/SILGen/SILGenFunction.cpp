@@ -290,13 +290,12 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     // Get an address value for a SILValue if it is address only in an type
     // expansion context without opaque archetype substitution.
     auto getAddressValue = [&](SILValue entryValue) -> SILValue {
-      if (SGM.Types
-              .getTypeLowering(
-                  valueType,
-                  TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
-                      expansion.getResilienceExpansion()))
-              .isAddressOnly() &&
-          !entryValue->getType().isAddress()) {
+      if (SGM.Types.getTypeLowering(
+            valueType,
+            TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+              expansion.getResilienceExpansion()))
+          .isAddressOnly()
+          && !entryValue->getType().isAddress()) {
 
         auto addr = emitTemporaryAllocation(vd, entryValue->getType());
         auto val = B.emitCopyValueOperation(vd, entryValue);
