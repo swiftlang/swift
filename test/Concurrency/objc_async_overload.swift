@@ -29,3 +29,15 @@ func asyncWithAwait() async {
   await d.makeRequest2(r)
   await d.makeRequest3(r)
 }
+
+// rdar://88703266 - Swift 5 mode should warn, not error, if an imported
+// completion handler's implicit `@Sendable` isn't respected.
+extension Delegate {
+  nonisolated func makeRequest(_ req: Request??, completionHandler: (() -> Void)? = nil) {
+    // expected-note@-1 {{parameter 'completionHandler' is implicitly non-sendable}}
+    if let req = (req ?? nil) {
+      makeRequest1(req, completionHandler: completionHandler)
+      // expected-warning@-1 {{passing non-sendable parameter 'completionHandler' to function expecting a @Sendable closure}}
+    }
+  }
+}

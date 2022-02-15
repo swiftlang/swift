@@ -2259,6 +2259,20 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
       /*impact=*/numExtraneous * 2);
 }
 
+bool hasPreconcurrencyCallee(ConstraintSystem *cs,
+                             ConstraintLocatorBuilder locator) {
+  if (cs->getASTContext().isSwiftVersionAtLeast(6))
+    // Swift 6 mode does not reduce errors to warnings.
+    return false;
+
+  auto calleeLocator = cs->getCalleeLocator(cs->getConstraintLocator(locator));
+  auto calleeOverload = cs->findSelectedOverloadFor(calleeLocator);
+  if (!calleeOverload || !calleeOverload->choice.isDecl())
+    return false;
+
+  return calleeOverload->choice.getDecl()->preconcurrency();
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
@@ -2308,7 +2322,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   /// Whether to downgrade to a concurrency warning.
   auto isConcurrencyWarning = [&] {
-    if (contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this}))
+    if (contextRequiresStrictConcurrencyChecking(DC, GetClosureType{*this})
+        && !hasPreconcurrencyCallee(this, locator))
       return false;
 
     switch (kind) {
