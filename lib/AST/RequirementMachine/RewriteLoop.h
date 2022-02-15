@@ -82,20 +82,15 @@ struct RewriteStep {
     ///
     ///    T.[concrete: C<...> with <X1, X2...>] X1 X2...
     ///
-    /// If inverted: pop concrete substitutions Xn' from the primary stack,
+    /// If inverted: pop concrete substitutions Xn from the primary stack,
     /// which must follow a term ending with a superclass or concrete type
     /// symbol:
     ///
-    ///    T.[concrete: C<...> with <X1, X2...>] X1' X2'...
-    ///
-    /// The new substitutions replace the substitutions in that symbol:
-    ///
-    ///    T.[concrete: C<...> with <X1', X2'...>]
+    ///    T.[concrete: C<...> with <X1, X2...>] X1 X2...
     ///
     /// The Arg field encodes the number of substitutions.
     ///
-    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions() and
-    /// PropertyMap::concretelySimplifyLeftHandSideSubstitutions().
+    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions().
     Decompose,
 
     ///
@@ -155,8 +150,7 @@ struct RewriteStep {
     ///
     ///    T.[concrete: C'<...> with <X1', X2'...>]
     ///
-    /// Used by PropertyMap::concretelySimplifyLeftHandSideSubstitutions() and
-    /// PropertyMap::processTypeDifference().
+    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions().
     DecomposeConcrete,
 
     /// For decomposing the left hand side of an induced rule in concrete type
