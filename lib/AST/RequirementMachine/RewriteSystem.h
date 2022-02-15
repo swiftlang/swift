@@ -339,8 +339,6 @@ public:
 
   void simplifyRightHandSides();
 
-  void simplifyLeftHandSideSubstitutions();
-
   void simplifyLeftHandSideSubstitutions(const PropertyMap *map);
 
   enum ValidityPolicy {

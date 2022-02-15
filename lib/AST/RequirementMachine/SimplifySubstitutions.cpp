@@ -91,43 +91,6 @@ bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
   return true;
 }
 
-/// Simplify substitution terms in superclass, concrete type and concrete
-/// conformance symbols.
-void RewriteSystem::simplifyLeftHandSideSubstitutions() {
-  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
-    auto &rule = getRule(ruleID);
-    if (rule.isSubstitutionSimplified())
-      continue;
-
-    auto lhs = rule.getLHS();
-    auto symbol = lhs.back();
-    if (!symbol.hasSubstitutions())
-      continue;
-
-    RewritePath path;
-
-    // (1) First, apply the original rule to produce the original lhs.
-    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
-                                         ruleID, /*inverse=*/true));
-
-    // (2) Now, simplify the substitutions to get the new lhs.
-    if (!simplifySubstitutions(symbol, &path))
-      continue;
-
-    // We're either going to add a new rule or record an identity, so
-    // mark the old rule as simplified.
-    rule.markSubstitutionSimplified();
-
-    MutableTerm newLHS(lhs.begin(), lhs.end() - 1);
-    newLHS.add(symbol);
-
-    // Invert the path to get a path from the new lhs to the old rhs.
-    path.invert();
-
-    addRule(newLHS, MutableTerm(rule.getRHS()), &path);
-  }
-}
-
 /// Simplify terms appearing in the substitutions of the last symbol of \p term,
 /// which must be a superclass or concrete type symbol.
 ///
@@ -245,9 +208,7 @@ RewriteSystem::simplifySubstitutions(Term baseTerm, Symbol symbol,
 void RewriteSystem::simplifyLeftHandSideSubstitutions(const PropertyMap *map) {
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
-    if (rule.isLHSSimplified() ||
-        rule.isRHSSimplified() ||
-        rule.isSubstitutionSimplified())
+    if (rule.isSubstitutionSimplified())
       continue;
 
     auto optSymbol = rule.isPropertyRule();
