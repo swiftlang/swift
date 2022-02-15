@@ -151,9 +151,9 @@ bool shrinkBorrowScope(
     BeginBorrowInst const &bbi, InstructionDeleter &deleter,
     SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts);
 
-bool foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
-                                       DominanceInfo &dominanceTree,
-                                       InstructionDeleter &deleter);
+MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
+                                                 DominanceInfo &dominanceTree,
+                                                 InstructionDeleter &deleter);
 
 } // namespace swift
 
