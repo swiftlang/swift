@@ -431,7 +431,10 @@ private:
   SmallVector<unsigned, 1> RulesInEmptyContext;
 
   /// Cached value for getProjectionCount().
-  unsigned ProjectionCount : 30;
+  unsigned ProjectionCount : 15;
+
+  /// Cached value for getDecomposeCount().
+  unsigned DecomposeCount : 15;
 
   /// Loops are deleted once they no longer contain rules in empty context,
   /// since at that point they don't participate in minimization and do not
@@ -447,6 +450,7 @@ public:
   RewriteLoop(MutableTerm basepoint, RewritePath path)
     : Basepoint(basepoint), Path(path) {
     ProjectionCount = 0;
+    DecomposeCount = 0;
 
     Deleted = 0;
 
@@ -475,6 +479,8 @@ public:
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
 
   unsigned getProjectionCount(const RewriteSystem &system) const;
+
+  unsigned getDecomposeCount(const RewriteSystem &system) const;
 
   void findProtocolConformanceRules(
       llvm::SmallDenseMap<const ProtocolDecl *,
