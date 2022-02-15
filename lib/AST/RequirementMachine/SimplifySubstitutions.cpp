@@ -128,17 +128,21 @@ void RewriteSystem::simplifyLeftHandSideSubstitutions() {
   }
 }
 
-/// Similar to RewriteSystem::simplifySubstitutions(), but also replaces type
-/// parameters with concrete types and builds a type difference describing
-/// the transformation.
+/// Simplify terms appearing in the substitutions of the last symbol of \p term,
+/// which must be a superclass or concrete type symbol.
+///
+/// Additionally, if \p map is non-null, any terms which become concrete types
+/// will cause the corresponding generic parameter in the concrete type symbol
+/// to be replaced.
 ///
 /// Returns None if the concrete type symbol cannot be simplified further.
 ///
 /// Otherwise returns an index which can be passed to
 /// RewriteSystem::getTypeDifference().
 Optional<unsigned>
-PropertyMap::concretelySimplifySubstitutions(Term baseTerm, Symbol symbol,
-                                             RewritePath *path) const {
+RewriteSystem::simplifySubstitutions(Term baseTerm, Symbol symbol,
+                                     const PropertyMap *map,
+                                     RewritePath *path) {
   assert(symbol.hasSubstitutions());
 
   // Fast path if the type is fully concrete.
@@ -181,39 +185,19 @@ PropertyMap::concretelySimplifySubstitutions(Term baseTerm, Symbol symbol,
     // has to iterate until fixed point anyway.
     //
     // This should be rare in practice.
-    if (System.simplify(mutTerm, path)) {
+    if (simplify(mutTerm, path)) {
       // Record a mapping from this substitution to the simplified term.
       sameTypes.emplace_back(index, Term::get(mutTerm, Context));
-    } else {
-      auto *props = lookUpProperties(mutTerm);
 
-      if (props && props->ConcreteType) {
-        // The property map entry might apply to a suffix of the substitution
-        // term, so prepend the appropriate prefix to its own substitutions.
-        auto prefix = props->getPrefixAfterStrippingKey(mutTerm);
-        auto concreteSymbol =
-          props->ConcreteType->prependPrefixToConcreteSubstitutions(
-              prefix, Context);
+    } else if (map) {
+      auto *props = map->lookUpProperties(mutTerm);
+
+      if (props && props->isConcreteType()) {
+        auto concreteSymbol = props->concretelySimplifySubstitution(
+            mutTerm, Context, path);
 
         // Record a mapping from this substitution to the concrete type.
         concreteTypes.emplace_back(index, concreteSymbol);
-
-        // If U.V is the substitution term and V is the property map key,
-        // apply the rewrite step U.(V => V.[concrete: C]) followed by
-        // prepending the prefix U to each substitution in the concrete type
-        // symbol if |U| > 0.
-        if (path) {
-          path->add(RewriteStep::forRewriteRule(/*startOffset=*/prefix.size(),
-                                                /*endOffset=*/0,
-                                                /*ruleID=*/*props->ConcreteTypeRule,
-                                                /*inverse=*/true));
-
-          if (!prefix.empty()) {
-            path->add(RewriteStep::forPrefixSubstitutions(/*length=*/prefix.size(),
-                                                          /*endOffset=*/0,
-                                                          /*inverse=*/false));
-          }
-        }
       }
     }
   }
@@ -240,7 +224,7 @@ PropertyMap::concretelySimplifySubstitutions(Term baseTerm, Symbol symbol,
                                         Context);
   assert(difference.LHS != difference.RHS);
 
-  unsigned differenceID = System.recordTypeDifference(difference);
+  unsigned differenceID = recordTypeDifference(difference);
 
   // All simplified substitutions are now on the primary stack. Collect them to
   // produce the new term.
@@ -252,9 +236,15 @@ PropertyMap::concretelySimplifySubstitutions(Term baseTerm, Symbol symbol,
   return differenceID;
 }
 
-void PropertyMap::concretelySimplifyLeftHandSideSubstitutions() const {
-  for (unsigned ruleID = 0, e = System.getRules().size(); ruleID < e; ++ruleID) {
-    auto &rule = System.getRule(ruleID);
+/// Simplify substitution terms in superclass, concrete type and concrete
+/// conformance symbols.
+///
+/// During completion, \p map will be null. After completion, the property map
+/// is built, and a final simplification pass is performed with \p map set to
+/// the new property map.
+void RewriteSystem::simplifyLeftHandSideSubstitutions(const PropertyMap *map) {
+  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+    auto &rule = getRule(ruleID);
     if (rule.isLHSSimplified() ||
         rule.isRHSSimplified() ||
         rule.isSubstitutionSimplified())
@@ -268,14 +258,13 @@ void PropertyMap::concretelySimplifyLeftHandSideSubstitutions() const {
 
     RewritePath path;
 
-    auto differenceID = concretelySimplifySubstitutions(
-        rule.getRHS(), symbol, &path);
+    auto differenceID = simplifySubstitutions(rule.getRHS(), symbol, map, &path);
     if (!differenceID)
       continue;
 
     rule.markSubstitutionSimplified();
 
-    auto difference = System.getTypeDifference(*differenceID);
+    auto difference = getTypeDifference(*differenceID);
     assert(difference.LHS == symbol);
 
     // If the original rule is (T.[concrete: C] => T) and [concrete: C'] is
@@ -295,6 +284,6 @@ void PropertyMap::concretelySimplifyLeftHandSideSubstitutions() const {
     MutableTerm lhs(rhs);
     lhs.add(difference.RHS);
 
-    System.addRule(lhs, rhs, &path);
+    addRule(lhs, rhs, &path);
   }
 }

@@ -116,6 +116,8 @@ class PropertyBag {
     return found->second;
   }
 
+  MutableTerm getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const;
+
 public:
   Term getKey() const { return Key; }
   void dump(llvm::raw_ostream &out) const;
@@ -157,9 +159,11 @@ public:
   llvm::TinyPtrVector<const ProtocolDecl *>
   getConformsToExcludingSuperclassConformances() const;
 
-  MutableTerm getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const;
-
   AssociatedTypeDecl *getAssociatedType(Identifier name);
+
+  Symbol concretelySimplifySubstitution(const MutableTerm &mutTerm,
+                                        RewriteContext &ctx,
+                                        RewritePath *path) const;
 
   void verify(const RewriteSystem &system) const;
 };
@@ -319,12 +323,6 @@ private:
     unsigned conformanceRuleID,
     RequirementKind requirementKind,
     Symbol concreteConformanceSymbol) const;
-
-  Optional<unsigned> concretelySimplifySubstitutions(Term baseTerm,
-                                                     Symbol symbol,
-                                                     RewritePath *path) const;
-
-  void concretelySimplifyLeftHandSideSubstitutions() const;
 
   void verify() const;
 };

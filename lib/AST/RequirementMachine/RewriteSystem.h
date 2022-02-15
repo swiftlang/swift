@@ -318,6 +318,10 @@ public:
 
   bool simplifySubstitutions(Symbol &symbol, RewritePath *path=nullptr) const;
 
+  Optional<unsigned>
+  simplifySubstitutions(Term baseTerm, Symbol symbol, const PropertyMap *map,
+                        RewritePath *path);
+
   //////////////////////////////////////////////////////////////////////////////
   ///
   /// Completion
@@ -336,6 +340,8 @@ public:
   void simplifyRightHandSides();
 
   void simplifyLeftHandSideSubstitutions();
+
+  void simplifyLeftHandSideSubstitutions(const PropertyMap *map);
 
   enum ValidityPolicy {
     AllowInvalidRequirements,

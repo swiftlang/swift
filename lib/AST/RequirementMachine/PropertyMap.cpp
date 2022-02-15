@@ -221,6 +221,36 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   }
 }
 
+Symbol PropertyBag::concretelySimplifySubstitution(const MutableTerm &mutTerm,
+                                                   RewriteContext &ctx,
+                                                   RewritePath *path) const {
+  // The property map entry might apply to a suffix of the substitution
+  // term, so prepend the appropriate prefix to its own substitutions.
+  auto prefix = getPrefixAfterStrippingKey(mutTerm);
+  auto concreteSymbol =
+    ConcreteType->prependPrefixToConcreteSubstitutions(
+        prefix, ctx);
+
+  // If U.V is the substitution term and V is the property map key,
+  // apply the rewrite step U.(V => V.[concrete: C]) followed by
+  // prepending the prefix U to each substitution in the concrete type
+  // symbol if |U| > 0.
+  if (path) {
+    path->add(RewriteStep::forRewriteRule(/*startOffset=*/prefix.size(),
+                                          /*endOffset=*/0,
+                                          /*ruleID=*/*ConcreteTypeRule,
+                                          /*inverse=*/true));
+
+    if (!prefix.empty()) {
+      path->add(RewriteStep::forPrefixSubstitutions(/*length=*/prefix.size(),
+                                                    /*endOffset=*/0,
+                                                    /*inverse=*/false));
+    }
+  }
+
+  return concreteSymbol;
+}
+
 void PropertyBag::verify(const RewriteSystem &system) const {
 #ifndef NDEBUG
   assert(ConformsTo.size() == ConformsToRules.size());
@@ -408,7 +438,7 @@ void PropertyMap::buildPropertyMap() {
 
   // Finally, a post-processing pass to reduce substitutions down to
   // concrete types.
-  concretelySimplifyLeftHandSideSubstitutions();
+  System.simplifyLeftHandSideSubstitutions(this);
 
   // Check invariants of the constructed property map.
   verify();
