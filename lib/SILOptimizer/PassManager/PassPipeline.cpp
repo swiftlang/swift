@@ -346,6 +346,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
 
+  P.addSSADestroyHoisting();
+
   // Propagate copies through stack locations.  Should run after
   // box-to-stack promotion since it is limited to propagating through
   // stack locations. Should run before aggregate lowering since that
