@@ -426,6 +426,12 @@ public:
   /// the debug scope for newly created instructions.
   const SILDebugScope *getScopeOfFirstNonMetaInstruction();
 
+  /// Whether the block has any phi arguments.
+  ///
+  /// Note that a block could have an argument and still return false.  The
+  /// argument must also satisfy SILPhiArgument::isPhiArgument.
+  bool hasPhi() const;
+
   //===--------------------------------------------------------------------===//
   // Debugging
   //===--------------------------------------------------------------------===//
