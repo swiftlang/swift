@@ -350,9 +350,7 @@ bool ide::initCompilerInvocation(
   FrontendOpts.IndexStorePath.clear();
   ImporterOpts.IndexStorePath.clear();
 
-  // Force the action type to be -typecheck. This affects importing the
-  // SwiftONoneSupport module.
-  FrontendOpts.RequestedAction = FrontendOptions::ActionType::Typecheck;
+  FrontendOpts.RequestedAction = Action;
 
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
