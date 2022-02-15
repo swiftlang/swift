@@ -361,8 +361,7 @@ void PropertyMap::buildPropertyMap() {
 
   for (const auto &rule : System.getRules()) {
     if (rule.isLHSSimplified() ||
-        rule.isRHSSimplified() ||
-        rule.isSubstitutionSimplified())
+        rule.isRHSSimplified())
       continue;
 
     // Identity conformances ([P].[P] => [P]) are permanent rules, but we

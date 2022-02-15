@@ -406,6 +406,10 @@ private:
   llvm::DenseMap<std::tuple<Term, Symbol, Symbol>, unsigned> DifferenceMap;
   std::vector<TypeDifference> Differences;
 
+  /// Avoid duplicate work when simplifying substitutions or rebuilding
+  /// the property map.
+  llvm::DenseSet<unsigned> CheckedDifferences;
+
 public:
   unsigned recordTypeDifference(const TypeDifference &difference);
 
