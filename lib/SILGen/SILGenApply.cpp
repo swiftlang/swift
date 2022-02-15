@@ -4552,7 +4552,7 @@ RValue SILGenFunction::emitApply(
     // any sort of async function, we'll want to make sure to hop back to our
     // own executor afterward, since the callee could have made arbitrary hops
     // out of our isolation domain.
-    breadcrumb = ExecutorBreadcrumb(ExpectedExecutor);
+    breadcrumb = ExecutorBreadcrumb(true);
   }
 
   SILValue rawDirectResult;
