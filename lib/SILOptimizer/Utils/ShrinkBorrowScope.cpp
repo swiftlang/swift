@@ -74,13 +74,8 @@ struct Usage final {
   /// i.e. copied lifetime of the introducer.
   SmallPtrSet<SILInstruction *, 16> users;
   // The instructions from which the shrinking starts, the scope ending
-  // instructions, keyed off the block in which they appear.
-  llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *> ends;
-
-  bool containsEnd(SILInstruction *end) const {
-    auto iterator = ends.find(end->getParent());
-    return iterator != ends.end() && iterator->second == end;
-  };
+  // instructions.
+  llvm::SmallSetVector<SILInstruction *, 4> ends;
 
   Usage(){};
   Usage(Usage const &) = delete;
@@ -95,13 +90,12 @@ bool findUsage(Context const &context, Usage &usage) {
   llvm::SmallVector<SILInstruction *, 16> scopeEndingInsts;
   context.borrowedValue.getLocalScopeEndingInstructions(scopeEndingInsts);
 
-  // Form a map of the scopeEndingInsts, keyed off the block they occur in.
+  // Add all the end_borrows to the collection of ends.
   for (auto *instruction : scopeEndingInsts) {
     // If a scope ending instruction is not an end_borrow, bail out.
     if (!isa<EndBorrowInst>(instruction))
       return false;
-    auto *block = instruction->getParent();
-    usage.ends[block] = instruction;
+    usage.ends.insert(instruction);
   }
 
   SmallVector<Operand *, 16> uses;
@@ -163,8 +157,8 @@ public:
         reachability(&context.function, *this) {
     // Seed reachability with the scope ending uses from which the backwards
     // data flow will begin.
-    for (auto pair : uses.ends) {
-      reachability.initLastUse(pair.second);
+    for (auto *end : uses.ends) {
+      reachability.initLastUse(end);
     }
   }
   DataFlow(DataFlow const &) = delete;
@@ -394,11 +388,11 @@ bool Rewriter::run() {
 
   if (madeChange) {
     // Remove all the original end_borrow instructions.
-    for (auto pair : uses.ends) {
-      if (reusedEndBorrowInsts.contains(pair.second)) {
+    for (auto *end : uses.ends) {
+      if (reusedEndBorrowInsts.contains(end)) {
         continue;
       }
-      context.deleter.forceDelete(pair.getSecond());
+      context.deleter.forceDelete(end);
     }
   }
 
@@ -407,7 +401,7 @@ bool Rewriter::run() {
 
 bool Rewriter::createEndBorrow(SILInstruction *insertionPoint) {
   if (auto *ebi = dyn_cast<EndBorrowInst>(insertionPoint)) {
-    if (uses.containsEnd(insertionPoint)) {
+    if (uses.ends.contains(insertionPoint)) {
       reusedEndBorrowInsts.insert(insertionPoint);
       return false;
     }
