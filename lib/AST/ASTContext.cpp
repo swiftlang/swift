@@ -1382,6 +1382,22 @@ AbstractFunctionDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncod
       nullptr);
 }
 
+AbstractFunctionDecl *ASTContext::getDecodeNextArgumentOnDistributedInvocationDecoder(
+    NominalTypeDecl *nominal) const {
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest{nominal},
+      nullptr);
+}
+
+AbstractFunctionDecl *ASTContext::getOnReturnOnDistributedTargetInvocationResultHandler(
+    NominalTypeDecl *nominal) const {
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest{nominal},
+      nullptr);
+}
+
 FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
   for (auto result : nominal->lookupDirect(Id_doneRecording)) {

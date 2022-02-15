@@ -289,7 +289,7 @@ public struct FakeInvocationEncoder : DistributedTargetInvocationEncoder {
 
 // === decoding --------------------------------------------------------------
 public class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
-    public typealias SerializationRequirement = Codable
+  public typealias SerializationRequirement = Codable
 
   var genericSubs: [Any.Type] = []
   var arguments: [Any] = []
@@ -352,10 +352,14 @@ public struct FakeRoundtripResultHandler: DistributedTargetInvocationResultHandl
     self.storeError = storeError
   }
 
-  // FIXME(distributed): can we return void here?
   public func onReturn<Res>(value: Res) async throws {
     print(" << onReturn: \(value)")
     storeReturn(value)
+  }
+
+  public func onReturnVoid() async throws {
+    print(" << onReturnVoid:()")
+    storeReturn(())
   }
 
   public func onThrow<Err: Error>(error: Err) async throws {

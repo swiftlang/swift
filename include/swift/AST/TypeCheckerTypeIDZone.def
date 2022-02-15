@@ -117,6 +117,12 @@ SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationEncoderRecordReturnType
 SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest,
               AbstractFunctionDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest,
+              AbstractFunctionDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest,
+              AbstractFunctionDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetDistributedActorIDPropertyRequest,
               VarDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)

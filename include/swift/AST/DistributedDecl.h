@@ -80,10 +80,15 @@ bool checkDistributedSerializationRequirementIsExactlyCodable(
 /// Get the `SerializationRequirement`, explode it into the specific
 /// protocol requirements and insert them into `requirements`.
 ///
+/// The passed `protocol` must be conformed to by the `decl`, e.g. a specific
+/// actor system implementation and the `DistributedActorSystem` protocol,
+/// or any of the specific encoder/decoder and the respective
+/// Distributed...Encoder/Decoder protocol etc.
+///
 /// Returns false if failed to get the protocol decls.
 bool
-getDistributedActorSystemSerializationRequirements(
-    NominalTypeDecl *systemDecl,
+getDistributedSerializationRequirements(
+    NominalTypeDecl *decl,
     ProtocolDecl *protocol,
     llvm::SmallPtrSetImpl<ProtocolDecl *> &requirementProtos);
 

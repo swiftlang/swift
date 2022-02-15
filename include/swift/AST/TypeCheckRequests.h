@@ -1109,6 +1109,42 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Obtain the 'decodeNextArgument' function of a 'DistributedTargetInvocationDecoder'.
+class GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'onReturn' function of a 'DistributedTargetInvocationResultHandler'.
+class GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
 /// Obtain the 'actorSystem' property of a 'distributed actor'.
 class GetDistributedActorSystemPropertyRequest :
     public SimpleRequest<GetDistributedActorSystemPropertyRequest,

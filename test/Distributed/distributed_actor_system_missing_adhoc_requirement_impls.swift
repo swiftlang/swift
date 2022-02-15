@@ -606,11 +606,39 @@ public final class PublicFakeInvocationDecoder : DistributedTargetInvocationDeco
   public func decodeErrorType() throws -> Any.Type? { nil }
 }
 
+public final class PublicFakeInvocationDecoder_badNotPublic: DistributedTargetInvocationDecoder {
+  public typealias SerializationRequirement = Codable
+
+  public func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
+  // expected-error@-1{{method 'decodeNextArgument()' must be as accessible as its enclosing type because it matches a requirement in protocol 'DistributedTargetInvocationDecoder'}}
+  func decodeReturnType() throws -> Any.Type? { nil }
+  // expected-error@-1{{method 'decodeReturnType()' must be declared public because it matches a requirement in public protocol 'DistributedTargetInvocationDecoder'}}
+  // expected-note@-2{{mark the instance method as 'public' to satisfy the requirement}}
+  func decodeErrorType() throws -> Any.Type? { nil }
+  // expected-error@-1{{method 'decodeErrorType()' must be declared public because it matches a requirement in public protocol 'DistributedTargetInvocationDecoder'}}
+  // expected-note@-2{{mark the instance method as 'public' to satisfy the requirement}}
+}
+
+final class PublicFakeInvocationDecoder_badBadProtoRequirement: DistributedTargetInvocationDecoder {
+  // expected-error@-1{{class 'PublicFakeInvocationDecoder_badBadProtoRequirement' is missing witness for protocol requirement 'decodeNextArgument'}}
+  // expected-note@-2{{protocol 'PublicFakeInvocationDecoder_badBadProtoRequirement' requires function 'decodeNextArgument' with signature:}}
+  typealias SerializationRequirement = Codable
+
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  func decodeNextArgument<Argument: SomeProtocol>() throws -> Argument { fatalError() }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
+}
+
 struct FakeResultHandler: DistributedTargetInvocationResultHandler {
   typealias SerializationRequirement = Codable
 
   func onReturn<Res>(value: Res) async throws {
     print("RETURN: \(value)")
+  }
+  func onReturnVoid() async throws {
+    print("RETURN VOID")
   }
   func onThrow<Err: Error>(error: Err) async throws {
     print("ERROR: \(error)")
@@ -622,6 +650,9 @@ public struct PublicFakeResultHandler: DistributedTargetInvocationResultHandler 
 
   public func onReturn<Res>(value: Res) async throws {
     print("RETURN: \(value)")
+  }
+  public func onReturnVoid() async throws {
+    print("RETURN VOID")
   }
   public func onThrow<Err: Error>(error: Err) async throws {
     print("ERROR: \(error)")

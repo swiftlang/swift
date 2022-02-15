@@ -270,6 +270,9 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
   func onReturn<Res>(value: Res) async throws {
     print("RETURN: \(value)")
   }
+  func onReturnVoid() async throws {
+    print("RETURN VOID:()")
+  }
   func onThrow<Err: Error>(error: Err) async throws {
     print("ERROR: \(error)")
   }

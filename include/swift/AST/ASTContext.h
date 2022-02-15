@@ -688,7 +688,7 @@ public:
   FuncDecl *getRecordGenericSubstitutionOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.recordArgument(_:).
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordArgument(_:).
   //
   // \param nominal optionally provide a 'NominalTypeDecl' from which the
   // function decl shall be extracted. This is useful to avoid witness calls
@@ -696,12 +696,22 @@ public:
   AbstractFunctionDecl *getRecordArgumentOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.recordReturnType(_:).
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordReturnType(_:).
   AbstractFunctionDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.recordErrorType(_:).
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordErrorType(_:).
   AbstractFunctionDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of
+  // DistributedTargetInvocationDecoder.getDecodeNextArgumentOnDistributedInvocationDecoder(_:).
+  AbstractFunctionDecl *getDecodeNextArgumentOnDistributedInvocationDecoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of
+  // getOnReturnOnDistributedTargetInvocationResultHandler.onReturn(_:).
+  AbstractFunctionDecl *getOnReturnOnDistributedTargetInvocationResultHandler(
       NominalTypeDecl *nominal) const;
 
   // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
