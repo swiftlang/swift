@@ -874,6 +874,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
       } else if (isDistributedThunk()) {
         SKind = ASTMangler::SymbolKind::DistributedThunk;
+      } else if (isBackDeployedThunk()) {
+        SKind = ASTMangler::SymbolKind::BackDeployedThunk;
       }
       break;
     case SILDeclRef::ManglingKind::DynamicThunk:

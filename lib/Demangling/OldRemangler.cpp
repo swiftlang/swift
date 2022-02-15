@@ -2800,3 +2800,8 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
   Buffer << "HF";
   return ManglingError::Success;
 }
+
+ManglingError Remangler::mangleBackDeployed(Node *node, unsigned depth) {
+  Buffer << "Tw";
+  return ManglingError::Success;
+}

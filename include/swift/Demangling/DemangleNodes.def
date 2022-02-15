@@ -332,6 +332,7 @@ NODE(CompileTimeConst)
 
 // Added in Swift 5.7
 NODE(OpaqueReturnTypeIndexed)
+NODE(BackDeployed)
 
 #undef CONTEXT_NODE
 #undef NODE

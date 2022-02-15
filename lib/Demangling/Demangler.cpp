@@ -2395,6 +2395,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'X': return createNode(Node::Kind::DynamicallyReplaceableFunctionVar);
     case 'x': return createNode(Node::Kind::DynamicallyReplaceableFunctionKey);
     case 'I': return createNode(Node::Kind::DynamicallyReplaceableFunctionImpl);
+    case 'w': return createNode(Node::Kind::BackDeployed);
     case 'Y':
     case 'Q': {
       NodePointer discriminator = demangleIndexAsNode();

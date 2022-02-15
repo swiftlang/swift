@@ -3407,6 +3407,11 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleBackDeployed(Node *node, unsigned depth) {
+  Buffer << "Tw";
+  return ManglingError::Success;
+}
+
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
