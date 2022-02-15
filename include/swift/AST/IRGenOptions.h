@@ -377,6 +377,9 @@ public:
 
   unsigned InternalizeAtLink : 1;
 
+  /// Internalize symbols (static library) - do not export any public symbols.
+  unsigned InternalizeSymbols : 1;
+
   /// Whether to avoid emitting zerofill globals as preallocated type metadata
   /// and prototol conformance caches.
   unsigned NoPreallocatedInstantiationCaches : 1;
@@ -443,7 +446,7 @@ public:
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
-        InternalizeAtLink(false),
+        InternalizeAtLink(false), InternalizeSymbols(false),
         NoPreallocatedInstantiationCaches(false),
         CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),

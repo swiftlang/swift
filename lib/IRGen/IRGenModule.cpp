@@ -1574,7 +1574,9 @@ static llvm::GlobalObject *createForceImportThunk(IRGenModule &IGM) {
                                llvm::GlobalValue::LinkOnceODRLinkage, buf,
                                &IGM.Module);
     ForceImportThunk->setAttributes(IGM.constructInitialAttributes());
-    ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
+    ApplyIRLinkage(IGM.IRGen.Opts.InternalizeSymbols
+                      ? IRLinkage::Internal
+                      : IRLinkage::ExternalExport).to(ForceImportThunk);
     if (IGM.Triple.supportsCOMDAT())
       if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))
         GO->setComdat(IGM.Module.getOrInsertComdat(ForceImportThunk->getName()));
