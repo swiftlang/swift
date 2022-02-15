@@ -84,8 +84,22 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
   // without worrying about running out of space, and the compiler would emit
   // such allocations on the stack anyway when they represent structures or
   // stack-promoted objects.
-  if byteCount <= 1024 {
+  if byteCount <= 1024 /* 1KiB */ {
     return true
+  }
+
+  // Allocations larger than this limit are never candidates for stack promotion
+  // and will always be placed on the heap. If you're working on a platform with
+  // a particularly constrained stack limit, you might want to special-case this
+  // test and use a different upper bound.
+  // TODO: Determine if there's a clean way to ensure newly-added platforms have reasonable values for this limit.
+#if os(watchOS)
+  let upperBound = 128 * 1024 /* 128KiB */
+#else
+  let upperBound = 1024 * 1024 /* 1MiB */
+#endif
+  if byteCount >= upperBound {
+    return false
   }
 
   // Finally, take a slow path through the standard library to see if the
