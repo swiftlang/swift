@@ -1956,7 +1956,8 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     emitAsyncFunctionEntry(IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
                            LinkEntity::forSILFunction(IGF.CurSILFn),
                            Signature::forAsyncEntry(
-                               IGF.IGM, funcTy, /*useSpecialConvention*/ false)
+                               IGF.IGM, funcTy,
+                               FunctionPointerKind::defaultAsync())
                                .getAsyncContextIndex());
     if (IGF.CurSILFn->isDynamicallyReplaceable()) {
       IGF.IGM.createReplaceableProlog(IGF, IGF.CurSILFn);
@@ -2590,19 +2591,30 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
 
   auto fpKind = irgen::classifyFunctionPointerKind(fn);
 
-  auto sig = IGM.getSignature(fnType, fpKind.useSpecialConvention());
+  auto sig = IGM.getSignature(fnType, fpKind);
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
+  // FIXME: should we also be using this for dynamic async functions?
+  // We seem to completely ignore this in the standard async FP path below.
   auto *fnPtr = IGM.getAddrOfSILFunction(
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
+
+  // For ordinary async functions, produce both the async FP and the
+  // direct address of the function.  In the common case where we
+  // directly call the function, we'll want to call the latter rather
+  // than indirecting through the async FP.
   llvm::Constant *value;
   llvm::Constant *secondaryValue;
   if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
     secondaryValue = IGM.getAddrOfSILFunction(fn, NotForDefinition);
+
+  // For ordinary sync functions and special async functions, produce
+  // only the direct address of the function.  The runtime does not
+  // define async FP symbols for the special async functions it defines.
   } else {
     value = fnPtr;
     secondaryValue = nullptr;
@@ -3255,14 +3267,17 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
                       llArgs);
   }
 
+  auto &calleeFP = emission->getCallee().getFunctionPointer();
+
   // Pass the generic arguments.
-  auto useSpecialConvention =
-      emission->getCallee().getFunctionPointer().useSpecialConvention();
-  if (hasPolymorphicParameters(origCalleeType) && !useSpecialConvention) {
+  if (hasPolymorphicParameters(origCalleeType) &&
+      !calleeFP.shouldSuppressPolymorphicArguments()) {
     SubstitutionMap subMap = site.getSubstitutionMap();
     emitPolymorphicArguments(*this, origCalleeType,
                              subMap, &witnessMetadata, llArgs);
-  } else if (useSpecialConvention) {
+  }
+
+  if (calleeFP.shouldPassContinuationDirectly()) {
     llArgs.add(emission->getResumeFunctionPointer());
     llArgs.add(emission->getAsyncContext());
   }

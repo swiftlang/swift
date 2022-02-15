@@ -274,10 +274,7 @@ DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
                                          CanSILFunctionType accessorTy)
     : IGM(IGF.IGM), IGF(IGF), Target(target), AccessorType(accessorTy),
       AsyncLayout(getAsyncContextLayout(
-          IGM, AccessorType, AccessorType, SubstitutionMap(),
-          /*suppress generics*/ true,
-          FunctionPointer::Kind(
-              FunctionPointer::BasicKind::AsyncFunctionPointer))) {
+          IGM, AccessorType, AccessorType, SubstitutionMap())) {
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
 }
@@ -582,9 +579,9 @@ void DistributedAccessor::emit() {
 
   // Preliminary: Setup async context for this accessor.
   {
+    auto fpKind = FunctionPointerKind::defaultAsync();
     auto asyncContextIdx =
-        Signature::forAsyncEntry(IGM, AccessorType,
-                                 /*useSpecialConvention*/ false)
+        Signature::forAsyncEntry(IGM, AccessorType, fpKind)
             .getAsyncContextIndex();
 
     auto entity = LinkEntity::forDistributedTargetAccessor(Target);
@@ -685,7 +682,7 @@ void DistributedAccessor::emit() {
 FunctionPointer DistributedAccessor::getPointerToTarget() const {
   auto fnType = Target->getLoweredFunctionType();
   auto fpKind = classifyFunctionPointerKind(Target);
-  auto signature = IGM.getSignature(fnType, fpKind.useSpecialConvention());
+  auto signature = IGM.getSignature(fnType, fpKind);
 
   auto *fnPtr =
     llvm::ConstantExpr::getBitCast(IGM.getAddrOfAsyncFunctionPointer(Target),
@@ -715,7 +712,8 @@ DistributedAccessor::findArgumentDecoder(llvm::Value *decoder) {
   auto methodTy = IGM.getSILTypes().getConstantFunctionType(
       expansionContext, SILDeclRef(decodeFn));
 
-  auto signature = IGM.getSignature(methodTy, /*useSpecialConvention=*/false);
+  auto fpKind = FunctionPointerKind::defaultAsync();
+  auto signature = IGM.getSignature(methodTy, fpKind);
 
   // If the decoder class is `final`, let's emit a direct reference.
   if (decoderDecl->isFinal()) {
