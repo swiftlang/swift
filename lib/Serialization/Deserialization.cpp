@@ -3197,13 +3197,15 @@ public:
     bool isIsolated;
     bool isCompileTimeConst;
     uint8_t rawDefaultArg;
+    TypeID defaultExprType;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
                                          isCompileTimeConst,
-                                         rawDefaultArg);
+                                         rawDefaultArg,
+                                         defaultExprType);
 
     auto argName = MF.getIdentifier(argNameID);
     auto paramName = MF.getIdentifier(paramNameID);
@@ -3246,6 +3248,7 @@ public:
       param->setDefaultArgumentKind(*defaultArg);
       if (!blobData.empty())
         param->setDefaultValueStringRepresentation(blobData);
+      // TODO: Set default expression type.
     }
     return param;
   }

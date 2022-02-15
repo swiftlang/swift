@@ -3770,11 +3770,20 @@ public:
     // any of the special ones.
     StringRef defaultArgumentText;
     SmallString<128> scratch;
+    // Type of the default expression.
+    Type defaultExprType;
+
     swift::DefaultArgumentKind argKind = param->getDefaultArgumentKind();
     if (argKind == swift::DefaultArgumentKind::Normal ||
-        argKind == swift::DefaultArgumentKind::StoredProperty)
+        argKind == swift::DefaultArgumentKind::StoredProperty) {
       defaultArgumentText =
         param->getDefaultValueStringRepresentation(scratch);
+
+      if (argKind == swift::DefaultArgumentKind::Normal) {
+        if (auto *defaultExpr = param->getTypeCheckedDefaultExpr())
+          defaultExprType = defaultExpr->getType();
+      }
+    }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3789,6 +3798,7 @@ public:
         param->isIsolated(),
         param->isCompileTimeConst(),
         getRawStableDefaultArgumentKind(argKind),
+        S.addTypeRef(defaultExprType),
         defaultArgumentText);
 
     if (interfaceType->hasError() && !S.allowCompilerErrors()) {
