@@ -364,48 +364,29 @@ void PropertyMap::addSuperclassProperty(
   }
 }
 
-/// Given two rules (V.[LHS] => V) and (V'.[RHS] => V'), build a rewrite
-/// path from T.[RHS] to T.[LHS], where T is the longer of the two terms
-/// V and V'.
-static void buildRewritePathForUnifier(unsigned lhsRuleID,
-                                       unsigned rhsRuleID,
+/// Given a rule (V.[LHS] => V) and a rewrite path (T.[RHS] => T) where
+/// T == U.V, build a rewrite path from T.[RHS] to T.[LHS].
+static void buildRewritePathForUnifier(Term key,
+                                       unsigned lhsRuleID,
+                                       const RewritePath &rhsPath,
                                        const RewriteSystem &system,
-                                       RewritePath &path) {
+                                       RewritePath *path) {
   unsigned lhsLength = system.getRule(lhsRuleID).getRHS().size();
-  unsigned rhsLength = system.getRule(rhsRuleID).getRHS().size();
+  unsigned lhsPrefix = key.size() - lhsLength;
 
-  unsigned lhsPrefix = 0, rhsPrefix = 0;
-  if (lhsLength < rhsLength)
-    lhsPrefix = rhsLength - lhsLength;
-  if (rhsLength < lhsLength)
-    rhsPrefix = lhsLength - rhsLength;
+  path->append(rhsPath);
 
-  assert(lhsPrefix == 0 || rhsPrefix == 0);
-
-  // If the rule was actually (V.[RHS] => V) with T == U.V for some
-  // |U| > 0, strip U from the prefix of each substitution of [RHS].
-  if (rhsPrefix > 0) {
-    path.add(RewriteStep::forPrefixSubstitutions(/*prefix=*/rhsPrefix,
-                                                 /*endOffset=*/0,
-                                                 /*inverse=*/true));
-  }
-
-  // Apply the rule (V.[RHS] => V).
-  path.add(RewriteStep::forRewriteRule(
-      /*startOffset=*/rhsPrefix, /*endOffset=*/0,
-      /*ruleID=*/rhsRuleID, /*inverse=*/false));
-
-  // Apply the inverted rule (V' => V'.[LHS]).
-  path.add(RewriteStep::forRewriteRule(
+  // Apply the inverted rule U.(V => V.[LHS]).
+  path->add(RewriteStep::forRewriteRule(
       /*startOffset=*/lhsPrefix, /*endOffset=*/0,
       /*ruleID=*/lhsRuleID, /*inverse=*/true));
 
   // If the rule was actually (V.[LHS] => V) with T == U.V for some
   // |U| > 0, prefix each substitution of [LHS] with U.
   if (lhsPrefix > 0) {
-    path.add(RewriteStep::forPrefixSubstitutions(/*prefix=*/lhsPrefix,
-                                                 /*endOffset=*/0,
-                                                 /*inverse=*/false));
+    path->add(RewriteStep::forPrefixSubstitutions(/*prefix=*/lhsPrefix,
+                                                  /*endOffset=*/0,
+                                                  /*inverse=*/false));
   }
 }
 
@@ -460,21 +441,39 @@ static void buildRewritePathForUnifier(unsigned lhsRuleID,
 /// T, so T = U.V for some |U| > 0, (or vice versa). In this case we need
 /// an additional step in the middle to prefix the concrete substitutions
 /// of [LHS] (or [LHS]) with U.
-static void buildRewritePathForInducedRule(unsigned differenceID,
+static void buildRewritePathForInducedRule(Term key,
+                                           unsigned differenceID,
                                            unsigned lhsRuleID,
-                                           unsigned rhsRuleID,
+                                           const RewritePath &rhsPath,
                                            unsigned substitutionIndex,
                                            const RewriteSystem &system,
-                                           RewritePath &path) {
+                                           RewritePath *path) {
   // Replace f(Xn) with Xn and push T.[RHS] on the stack.
-  path.add(RewriteStep::forRightConcreteProjection(
+  path->add(RewriteStep::forRightConcreteProjection(
       differenceID, substitutionIndex, /*inverse=*/false));
 
-  buildRewritePathForUnifier(lhsRuleID, rhsRuleID, system, path);
+  buildRewritePathForUnifier(key, lhsRuleID, rhsPath, system, path);
 
   // Pop T.[LHS] from the stack, leaving behind Xn.
-  path.add(RewriteStep::forLeftConcreteProjection(
-           differenceID, substitutionIndex, /*inverse=*/true));
+  path->add(RewriteStep::forLeftConcreteProjection(
+      differenceID, substitutionIndex, /*inverse=*/true));
+}
+
+/// Given that LHS and RHS are known to simplify to the same term, build a
+/// rewrite path from RHS to LHS.
+static void buildPathJoiningTerms(MutableTerm lhsTerm,
+                                  MutableTerm rhsTerm,
+                                  RewriteSystem &system,
+                                  RewritePath *path) {
+  (void) system.simplify(rhsTerm, path);
+
+  RewritePath lhsPath;
+  (void) system.simplify(lhsTerm, &lhsPath);
+  lhsPath.invert();
+
+  path->append(lhsPath);
+
+  assert(lhsTerm == rhsTerm);
 }
 
 /// Given two concrete type rules (T.[LHS] => T) and (T.[RHS] => T) and
@@ -491,7 +490,7 @@ static void buildRewritePathForInducedRule(unsigned differenceID,
 void PropertyMap::processTypeDifference(const TypeDifference &difference,
                                         unsigned differenceID,
                                         unsigned lhsRuleID,
-                                        unsigned rhsRuleID) {
+                                        const RewritePath &rhsPath) {
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   if (debug) {
@@ -520,8 +519,9 @@ void PropertyMap::processTypeDifference(const TypeDifference &difference,
     auto rhsTerm = difference.getOriginalSubstitution(index);
 
     RewritePath inducedRulePath;
-    buildRewritePathForInducedRule(differenceID, lhsRuleID, rhsRuleID,
-                                   index, System, inducedRulePath);
+    buildRewritePathForInducedRule(difference.BaseTerm, differenceID,
+                                   lhsRuleID, rhsPath, index,
+                                   System, &inducedRulePath);
 
     if (debug) {
       llvm::dbgs() << "%% Induced rule " << lhsTerm
@@ -531,19 +531,7 @@ void PropertyMap::processTypeDifference(const TypeDifference &difference,
     }
 
     System.addRule(lhsTerm, rhsTerm, &inducedRulePath);
-
-    // Build a path from rhsTerm (the original substitution) to
-    // lhsTerm (the replacement substitution).
-    MutableTerm mutRhsTerm(rhsTerm);
-    (void) System.simplify(mutRhsTerm, &unificationPath);
-
-    RewritePath lhsPath;
-    MutableTerm mutLhsTerm(lhsTerm);
-    (void) System.simplify(mutLhsTerm, &lhsPath);
-
-    assert(mutLhsTerm == mutRhsTerm && "Terms should be joinable");
-    lhsPath.invert();
-    unificationPath.append(lhsPath);
+    buildPathJoiningTerms(lhsTerm, rhsTerm, System, &unificationPath);
   }
 
   // All simplified substitutions are now on the primary stack. Collect them to
@@ -554,7 +542,8 @@ void PropertyMap::processTypeDifference(const TypeDifference &difference,
   // We now have a unification path from T.[RHS] to T.[LHS] using the
   // newly-recorded induced rules. Close the loop with a path from
   // T.[RHS] to R.[LHS] via the concrete type rules being unified.
-  buildRewritePathForUnifier(lhsRuleID, rhsRuleID, System, unificationPath);
+  buildRewritePathForUnifier(difference.BaseTerm, lhsRuleID, rhsPath,
+                             System, &unificationPath);
 
   // Record a rewrite loop at T.[LHS].
   MutableTerm basepoint(difference.BaseTerm);
@@ -635,33 +624,21 @@ void PropertyMap::unifyConcreteTypes(
       }
 
       // This rule does not need a rewrite path because it will be related
-      // to the existing rule in concretelySimplifyLeftHandSideSubstitutions().
+      // to the two existing rules by the processTypeDifference() calls below.
       System.addRule(lhsTerm, rhsTerm);
-    }
 
-    // Recover the (LHS ∧ RHS) rule.
-    RewritePath path;
-    bool simplified = System.simplify(lhsTerm, &path);
-    assert(simplified);
-    (void) simplified;
+      // Recover a rewrite path from T to T.[LHS ∧ RHS].
+      RewritePath path;
+      buildPathJoiningTerms(rhsTerm, lhsTerm, System, &path);
 
-    // FIXME: This is unsound! While 'key' was canonical at the time we
-    // started property map construction, we might have added other rules
-    // since then that made it non-canonical.
-    assert(path.size() == 1);
-    assert(path.begin()->Kind == RewriteStep::Rule);
-
-    unsigned newRuleID = path.begin()->getRuleID();
-
-    // Process LHS -> (LHS ∧ RHS).
-    if (checkRulePairOnce(*existingRuleID, newRuleID))
+      // Process LHS -> (LHS ∧ RHS).
       processTypeDifference(lhsDifference, *lhsDifferenceID,
-                            *existingRuleID, newRuleID);
+                            *existingRuleID, path);
 
-    // Process RHS -> (LHS ∧ RHS).
-    if (checkRulePairOnce(ruleID, newRuleID))
+      // Process RHS -> (LHS ∧ RHS).
       processTypeDifference(rhsDifference, *rhsDifferenceID,
-                            ruleID, newRuleID);
+                            ruleID, path);
+    }
 
     // The new property is more specific, so update ConcreteType and
     // ConcreteTypeRule.
@@ -679,9 +656,16 @@ void PropertyMap::unifyConcreteTypes(
     assert(*existingProperty == lhsDifference.LHS);
     assert(property == lhsDifference.RHS);
 
-    if (checkRulePairOnce(*existingRuleID, ruleID))
+    if (checkRulePairOnce(*existingRuleID, ruleID)) {
+      // Build a rewrite path (T.[RHS] => T).
+      RewritePath path;
+      path.add(RewriteStep::forRewriteRule(
+          /*startOffset=*/0, /*endOffset=*/0,
+          /*ruleID=*/ruleID, /*inverse=*/false));
+
       processTypeDifference(lhsDifference, *lhsDifferenceID,
-                            *existingRuleID, ruleID);
+                            *existingRuleID, path);
+    }
 
     // The new property is more specific, so update existingProperty and
     // existingRuleID.
@@ -691,7 +675,7 @@ void PropertyMap::unifyConcreteTypes(
     return;
   }
 
-  // Handle the case where LHS == (LHS ∧ RHS) by processing LHS -> (LHS ∧ RHS).
+  // Handle the case where LHS == (LHS ∧ RHS) by processing RHS -> (LHS ∧ RHS).
   if (rhsDifferenceID) {
     assert(!lhsDifferenceID);
 
@@ -699,9 +683,24 @@ void PropertyMap::unifyConcreteTypes(
     assert(property == rhsDifference.LHS);
     assert(*existingProperty == rhsDifference.RHS);
 
-    if (checkRulePairOnce(*existingRuleID, ruleID))
+    if (checkRulePairOnce(*existingRuleID, ruleID)) {
+      // Build a rewrite path (T.[LHS] => T).
+      RewritePath path;
+      unsigned lhsLength = System.getRule(*existingRuleID).getRHS().size();
+      unsigned prefix = key.size() - lhsLength;
+
+      if (prefix > 0) {
+        path.add(RewriteStep::forPrefixSubstitutions(
+            prefix, /*endOffset=*/0, /*inverse=*/true));
+      }
+
+      path.add(RewriteStep::forRewriteRule(
+          /*startOffset=*/prefix, /*endOffset=*/0,
+          /*ruleID=*/*existingRuleID, /*inverse=*/false));
+
       processTypeDifference(rhsDifference, *rhsDifferenceID,
-                            ruleID, *existingRuleID);
+                            ruleID, path);
+    }
 
     // The new property is less specific, so existingProperty and existingRuleID
     // remain unchanged.
@@ -725,8 +724,13 @@ void PropertyMap::unifyConcreteTypes(
     //
     // Since the new rule appears without context, it becomes redundant.
     if (checkRulePairOnce(*existingRuleID, ruleID)) {
+      RewritePath rhsPath;
+      rhsPath.add(RewriteStep::forRewriteRule(
+          /*startOffset=*/0, /*endOffset=*/0,
+          /*ruleID=*/ruleID, /*inverse=*/false));
+
       RewritePath path;
-      buildRewritePathForUnifier(*existingRuleID, ruleID, System, path);
+      buildRewritePathForUnifier(key, *existingRuleID, rhsPath, System, &path);
       System.recordRewriteLoop(MutableTerm(rule.getLHS()), path);
 
       rule.markSubstitutionSimplified();

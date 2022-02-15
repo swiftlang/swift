@@ -269,7 +269,7 @@ private:
   void processTypeDifference(const TypeDifference &difference,
                              unsigned differenceID,
                              unsigned lhsRuleID,
-                             unsigned rhsRuleID);
+                             const RewritePath &rhsPath);
 
   void addConformanceProperty(Term key, Symbol property, unsigned ruleID);
   void addLayoutProperty(Term key, Symbol property, unsigned ruleID);
