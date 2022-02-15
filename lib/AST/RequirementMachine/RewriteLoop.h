@@ -409,6 +409,10 @@ public:
   void dump(llvm::raw_ostream &out,
             MutableTerm term,
             const RewriteSystem &system) const;
+
+  void dumpLong(llvm::raw_ostream &out,
+                MutableTerm term,
+                const RewriteSystem &system) const;
 };
 
 /// Information about protocol conformance rules appearing in a rewrite loop.
