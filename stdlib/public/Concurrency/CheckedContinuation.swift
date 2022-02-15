@@ -265,6 +265,8 @@ extension CheckedContinuation {
 ///   - body: A closure that takes a `CheckedContinuation` parameter.
 ///     You must resume the continuation exactly once.
 @available(SwiftStdlib 5.1, *)
+@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
+@inlinable
 public func withCheckedContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Never>) -> Void
@@ -287,6 +289,8 @@ public func withCheckedContinuation<T>(
 /// If `resume(throwing:)` is called on the continuation,
 /// this function throws that error.
 @available(SwiftStdlib 5.1, *)
+@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
+@inlinable
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Error>) -> Void
