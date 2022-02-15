@@ -2333,6 +2333,13 @@ if #available(SwiftStdlib 5.6, *) {
     let test10 = "\u{003F}\u{094D}\u{0924}" // 2
     expectEqual(2, test10.count)
     expectBidirectionalCount(2, test10)
+
+#if _runtime(_ObjC)
+    let test11Foreign = NSString(string: "\u{930}\u{93e}\u{91c}\u{94d}") // 2
+    let test11 = test11Foreign as String
+    expectEqual(2, test11.count)
+    expectBidirectionalCount(2, test11)
+#endif
   }
 }
 
