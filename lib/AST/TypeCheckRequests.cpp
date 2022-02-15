@@ -562,6 +562,9 @@ void swift::simple_display(llvm::raw_ostream &out,
   case FragileFunctionKind::PropertyInitializer:
     out << "propertyInitializer";
     break;
+  case FragileFunctionKind::BackDeploy:
+    out << "backDeploy";
+    break;
   case FragileFunctionKind::None:
     out << "none";
     break;
