@@ -1267,27 +1267,20 @@ namespace {
                            ctx.Id_Regex.str());
         return Type();
       }
-      SmallVector<Type, 4> matchTypes {ctx.getSubstringType()};
+      SmallVector<TupleTypeElt, 4> matchElements {ctx.getSubstringType()};
       if (decodeRegexCaptureTypes(ctx,
                                   E->getSerializedCaptureStructure(),
                                   /*atomType*/ ctx.getSubstringType(),
-                                  matchTypes)) {
+                                  matchElements)) {
         ctx.Diags.diagnose(E->getLoc(),
                            diag::regex_capture_types_failed_to_decode);
         return Type();
       }
-      if (matchTypes.size() == 1)
+      if (matchElements.size() == 1)
         return BoundGenericStructType::get(
-            regexDecl, Type(), matchTypes.front());
-      // Form a `_StringProcessing.Tuple{n}<...>`.
-      auto *tupleDecl = ctx.getStringProcessingTupleDecl(matchTypes.size());
-      if (!tupleDecl) {
-        ctx.Diags.diagnose(E->getLoc(), diag::regex_too_many_captures,
-                           ctx.getStringProcessingTupleDeclMaxArity() - 1);
-        return Type();
-      }
-      auto matchType = BoundGenericStructType::get(
-          tupleDecl, Type(), matchTypes);
+            regexDecl, Type(), matchElements.front().getType());
+      // Form a tuple.
+      auto matchType = TupleType::get(matchElements, ctx);
       return BoundGenericStructType::get(regexDecl, Type(), {matchType});
     }
 
