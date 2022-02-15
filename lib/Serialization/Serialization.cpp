@@ -3779,10 +3779,8 @@ public:
       defaultArgumentText =
         param->getDefaultValueStringRepresentation(scratch);
 
-      if (argKind == swift::DefaultArgumentKind::Normal) {
-        if (auto *defaultExpr = param->getTypeCheckedDefaultExpr())
-          defaultExprType = defaultExpr->getType();
-      }
+      // Serialize the type of the default expression (if any).
+      defaultExprType = param->getTypeOfDefaultExpr();
     }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ParamLayout::Code];

@@ -3246,9 +3246,12 @@ public:
     // FIXME: Default argument expression, if available.
     if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg)) {
       param->setDefaultArgumentKind(*defaultArg);
+
+      if (auto exprType = MF.getType(defaultExprType))
+        param->setDefaultExprType(exprType);
+
       if (!blobData.empty())
         param->setDefaultValueStringRepresentation(blobData);
-      // TODO: Set default expression type.
     }
     return param;
   }

@@ -6992,6 +6992,18 @@ Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
   return new (ctx) ErrorExpr(getSourceRange(), ErrorType::get(ctx));
 }
 
+Type ParamDecl::getTypeOfDefaultExpr() const {
+  auto &ctx = getASTContext();
+
+  if (Type type = evaluateOrDefault(
+          ctx.evaluator,
+          DefaultArgumentTypeRequest{const_cast<ParamDecl *>(this)}, nullptr)) {
+    return type;
+  }
+
+  return Type();
+}
+
 void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
   if (!DefaultValueAndFlags.getPointer()) {
     if (!E) return;
@@ -7009,7 +7021,18 @@ void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
            "Can't overwrite type-checked default with un-type-checked default");
   }
   defaultInfo->DefaultArg = E;
+  defaultInfo->ExprType = E->getType();
   defaultInfo->InitContextAndIsTypeChecked.setInt(isTypeChecked);
+}
+
+void ParamDecl::setDefaultExprType(Type type) {
+  if (!DefaultValueAndFlags.getPointer()) {
+    DefaultValueAndFlags.setPointer(
+        getASTContext().Allocate<StoredDefaultArgument>());
+  }
+
+  auto *defaultInfo = DefaultValueAndFlags.getPointer();
+  defaultInfo->ExprType = type;
 }
 
 void ParamDecl::setStoredProperty(VarDecl *var) {
