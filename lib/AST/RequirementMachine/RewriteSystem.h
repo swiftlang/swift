@@ -316,8 +316,6 @@ public:
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  bool simplifySubstitutions(Symbol &symbol, RewritePath *path=nullptr) const;
-
   Optional<unsigned>
   simplifySubstitutions(Term baseTerm, Symbol symbol, const PropertyMap *map,
                         RewritePath *path);
