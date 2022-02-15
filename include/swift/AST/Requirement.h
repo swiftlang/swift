@@ -133,6 +133,7 @@ struct RequirementError {
   enum class Kind {
     InvalidConformance,
     ConcreteTypeMismatch,
+    NonTypeParameter,
   } kind;
 
   union {
@@ -145,6 +146,8 @@ struct RequirementError {
       Type type1;
       Type type2;
     } concreteTypeMismatch;
+
+    Type nonTypeParameter;
   };
 
   SourceLoc loc;
@@ -169,6 +172,13 @@ public:
     RequirementError error(Kind::ConcreteTypeMismatch, loc);
     error.concreteTypeMismatch.type1 = type1;
     error.concreteTypeMismatch.type2 = type2;
+    return error;
+  }
+
+  static RequirementError forNonTypeParameter(Type subject,
+                                              SourceLoc loc) {
+    RequirementError error(Kind::NonTypeParameter, loc);
+    error.nonTypeParameter = subject;
     return error;
   }
 };

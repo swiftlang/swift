@@ -105,10 +105,12 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
 
 static void desugarSuperclassRequirement(Type subjectType,
                                          Type constraintType,
+                                         SourceLoc loc,
                                          SmallVectorImpl<Requirement> &result,
                                          SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
-    // FIXME: Perform unification, diagnose redundancy or conflict upstream
+    errors.push_back(
+        RequirementError::forNonTypeParameter(subjectType, loc));
     return;
   }
 
@@ -117,10 +119,12 @@ static void desugarSuperclassRequirement(Type subjectType,
 
 static void desugarLayoutRequirement(Type subjectType,
                                      LayoutConstraint layout,
+                                     SourceLoc loc,
                                      SmallVectorImpl<Requirement> &result,
                                      SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
-    // FIXME: Diagnose redundancy or conflict upstream
+    errors.push_back(
+        RequirementError::forNonTypeParameter(subjectType, loc));
     return;
   }
 
@@ -143,6 +147,7 @@ static Type lookupMemberType(Type subjectType, ProtocolDecl *protoDecl,
 /// compositions on the right hand side into conformance and superclass
 /// requirements.
 static void desugarConformanceRequirement(Type subjectType, Type constraintType,
+                                          SourceLoc loc,
                                           SmallVectorImpl<Requirement> &result,
                                           SmallVectorImpl<RequirementError> &errors) {
   // Fast path.
@@ -153,7 +158,8 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
       auto *module = protoDecl->getParentModule();
       auto conformance = module->lookupConformance(subjectType, protoDecl);
       if (conformance.isInvalid()) {
-        // FIXME: Diagnose a conflict.
+        errors.push_back(
+            RequirementError::forNonTypeParameter(subjectType, loc));
         return;
       }
 
@@ -177,13 +183,13 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
     auto *protoDecl = paramType->getBaseType()->getDecl();
 
     desugarConformanceRequirement(subjectType, paramType->getBaseType(),
-                                  result, errors);
+                                  loc, result, errors);
 
     auto *assocType = protoDecl->getPrimaryAssociatedType();
 
     auto memberType = lookupMemberType(subjectType, protoDecl, assocType);
     desugarSameTypeRequirement(memberType, paramType->getArgumentType(),
-                               SourceLoc(), result, errors);
+                               loc, result, errors);
     return;
   }
 
@@ -192,14 +198,16 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
     desugarLayoutRequirement(subjectType,
                              LayoutConstraint::getLayoutConstraint(
                                  LayoutConstraintKind::Class),
-                             result, errors);
+                             loc, result, errors);
   }
 
   for (auto memberType : compositionType->getMembers()) {
     if (memberType->isExistentialType())
-      desugarConformanceRequirement(subjectType, memberType, result, errors);
+      desugarConformanceRequirement(subjectType, memberType,
+                                    loc, result, errors);
     else
-      desugarSuperclassRequirement(subjectType, memberType, result, errors);
+      desugarSuperclassRequirement(subjectType, memberType,
+                                   loc, result, errors);
   }
 }
 
@@ -216,17 +224,17 @@ swift::rewriting::desugarRequirement(Requirement req,
   switch (req.getKind()) {
   case RequirementKind::Conformance:
     desugarConformanceRequirement(firstType, req.getSecondType(),
-                                  result, errors);
+                                  SourceLoc(), result, errors);
     break;
 
   case RequirementKind::Superclass:
     desugarSuperclassRequirement(firstType, req.getSecondType(),
-                                 result, errors);
+                                 SourceLoc(), result, errors);
     break;
 
   case RequirementKind::Layout:
     desugarLayoutRequirement(firstType, req.getLayoutConstraint(),
-                             result, errors);
+                             SourceLoc(), result, errors);
     break;
 
   case RequirementKind::SameType:
@@ -252,10 +260,10 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
 
   if (constraintType->isConstraintType()) {
     // Handle conformance requirements.
-    desugarConformanceRequirement(subjectType, constraintType, reqs, errors);
+    desugarConformanceRequirement(subjectType, constraintType, loc, reqs, errors);
   } else if (constraintType->getClassOrBoundGenericClass()) {
     // Handle superclass requirements.
-    desugarSuperclassRequirement(subjectType, constraintType, reqs, errors);
+    desugarSuperclassRequirement(subjectType, constraintType, loc, reqs, errors);
   } else {
     errors.push_back(
         RequirementError::forInvalidConformance(subjectType,
@@ -427,7 +435,7 @@ void swift::rewriting::realizeRequirement(
 
     SmallVector<Requirement, 2> reqs;
     desugarLayoutRequirement(firstType, req.getLayoutConstraint(),
-                             reqs, errors);
+                             loc, reqs, errors);
 
     for (auto req : reqs)
       result.push_back({req, loc, /*wasInferred=*/false});
@@ -543,6 +551,12 @@ void swift::rewriting::diagnoseRequirementErrors(
                            type1, type2);
       }
 
+      break;
+    }
+
+    case RequirementError::Kind::NonTypeParameter: {
+      ctx.Diags.diagnose(loc, diag::requires_not_suitable_archetype,
+                         error.nonTypeParameter);
       break;
     }
     }
