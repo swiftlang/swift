@@ -31,6 +31,13 @@ OperatorsTestSuite.test("LoadableIntWrapper.call (inline)") {
   expectEqual(57, resultTwoArgs)
 }
 
+OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
+  var wrapper = LoadableBoolWrapper(value: true)
+
+  let resultExclaim = !wrapper
+  expectEqual(false, resultExclaim.value)
+}
+
 OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   var wrapper = AddressOnlyIntWrapper(42)
 

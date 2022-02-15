@@ -13,6 +13,16 @@ public func sub(_ lhs: inout LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> L
 
 // CHECK: sil [clang LoadableIntWrapper."-"] [[NAME]] : $@convention(c) (@inout LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper
 
+public func exclaim(_ wrapper: inout LoadableBoolWrapper) -> LoadableBoolWrapper { !wrapper }
+
+// CHECK: bb0([[SELF:%.*]] : $*LoadableBoolWrapper):
+// CHECK:   [[SELFACCESS:%.*]] = begin_access [modify] [static] [[SELF]] : $*LoadableBoolWrapper
+// CHECK:   [[OP:%.*]] = function_ref [[NAME:@(_ZN19LoadableBoolWrapperntEv|\?\?7LoadableBoolWrapper@@QEAA\?AU0@XZ)]] : $@convention(c) (@inout LoadableBoolWrapper) -> LoadableBoolWrapper
+// CHECK:   apply [[OP]]([[SELFACCESS]]) : $@convention(c) (@inout LoadableBoolWrapper) -> LoadableBoolWrapper
+// CHECK:   end_access [[SELFACCESS]]
+
+// CHECK: sil [clang LoadableBoolWrapper."!"] [[NAME]] : $@convention(c) (@inout LoadableBoolWrapper) -> LoadableBoolWrapper
+
 public func call(_ wrapper: inout LoadableIntWrapper, _ arg: Int32) -> Int32 { wrapper(arg) }
 
 // CHECK: bb0([[SELF:%.*]] : $*LoadableIntWrapper, [[RHS:%.*]] : $Int32):
