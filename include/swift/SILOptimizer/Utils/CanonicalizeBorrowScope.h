@@ -148,7 +148,7 @@ protected:
 };
 
 bool shrinkBorrowScope(
-    BeginBorrowInst *bbi, InstructionDeleter &deleter,
+    BeginBorrowInst const &bbi, InstructionDeleter &deleter,
     SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts);
 
 bool foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
