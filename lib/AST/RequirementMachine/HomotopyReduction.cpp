@@ -507,7 +507,6 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
         // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
         // C and C' are superclass, concrete type or concrete conformance
         // symbols.
-        found = pair;
         continue;
       }
 
