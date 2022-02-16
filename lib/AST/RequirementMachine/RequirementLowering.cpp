@@ -530,6 +530,19 @@ void swift::rewriting::realizeInheritedRequirements(
   }
 }
 
+/// Emit diagnostics for the given \c RequirementErrors.
+///
+/// \param ctx The AST context, which is used to determine whether
+/// requirement machine protocol signatures are enabled. If not,
+/// diagnostics will not be emitted.
+/// \param errors The set of requirement diagnostics to be emitted.
+/// \param allowConcreteGenericParams Whether concrete type parameters
+/// are permitted in the generic signature. If true, diagnostics will
+/// offer fix-its to turn invalid type requirements, e.g. T: Int, into
+/// same-type requirements.
+///
+/// \returns true if any errors were emitted, and false otherwise (including
+/// when only warnings were emitted).
 bool swift::rewriting::diagnoseRequirementErrors(
     ASTContext &ctx, SmallVectorImpl<RequirementError> &errors,
     bool allowConcreteGenericParams) {
