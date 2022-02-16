@@ -336,25 +336,19 @@ bool Rewriter::run() {
   // Insert end_borrows after every non-terminator barrier.
   //
   // For terminator barriers, add end_borrows at the beginning of the successor
-  // blocks.  But only if all of its parent block P's successors S in succ(P)
-  // had reachable beginnings.  If any one of them didn't, then this isn't a
-  // barrier boundary but actually a control flow boundary, and will be handled
-  // below.  We witness that all of its successors had reachable beginnings by
-  // way of parent block P having a reachable end.
-  //
-  // terminator-boundary(B) := isBarrier(P->getTerminator()) && end-reachable(P)
-  //                           where P := pred(B)
+  // blocks.  In order to reach a terminator and classify it as a barrier, all
+  // of a block P's successors B had reachable beginnings.  If any of them
+  // didn't, then BackwardReachability::meetOverSuccessors would never have
+  // returned true for P, so none of its instructions would ever have been
+  // classified (except for via checkReachablePhiBarrier, which doesn't record
+  // terminator barriers).
   for (auto instruction : barriers.barriers) {
     if (auto *terminator = dyn_cast<TermInst>(instruction)) {
       auto successors = terminator->getParentBlock()->getSuccessorBlocks();
-      if (!barriers.hoistingReachesEndBlocks.contains(
-              terminator->getParentBlock())) {
-        // If reachability didn't make it to the begin of any one of this
-        // block's successors, then this isn't a terminator boundary, and will
-        // be handled below.
-        assert(successors.size() > 1);
-        continue;
-      }
+      // In order for the instruction to have been classified as a barrier,
+      // reachability would have had to reach the block containing it.
+      assert(barriers.hoistingReachesEndBlocks.contains(
+                terminator->getParentBlock()));
       for (auto *successor : successors) {
         madeChange |= createEndBorrow(&successor->front());
       }
