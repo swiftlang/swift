@@ -247,8 +247,9 @@ namespace irgen {
       case SpecialKind::AsyncLetGetThrowing:
       case SpecialKind::AsyncLetFinish:
       case SpecialKind::TaskGroupWaitNext:
-      case SpecialKind::DistributedExecuteTarget:
         return true;
+      case SpecialKind::DistributedExecuteTarget:
+        return false;
       }
       llvm_unreachable("covered switch");
     }
@@ -276,8 +277,9 @@ namespace irgen {
       case SpecialKind::AsyncLetGetThrowing:
       case SpecialKind::AsyncLetFinish:
       case SpecialKind::TaskGroupWaitNext:
-      case SpecialKind::DistributedExecuteTarget:
         return true;
+      case SpecialKind::DistributedExecuteTarget:
+        return false;
       }
       llvm_unreachable("covered switch");
     }
