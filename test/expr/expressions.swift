@@ -263,7 +263,7 @@ func test_lambda2() {
   { () -> protocol<Int> in
     // expected-error @-1 {{'protocol<...>' composition syntax has been removed and is not needed here}} {{11-24=Int}}
     // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
-    // expected-warning @-3 {{result of call to closure returning 'Any' is unused}}
+    // expected-warning @-3 {{result of call to closure returning 'Int' is unused}}
     return 1
   }()
 }

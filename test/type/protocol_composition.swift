@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
 
 func canonical_empty_protocol() -> Any {
   return 1
@@ -158,7 +158,7 @@ struct S01: P5 & P6 {}
 struct S02: P5? & P6 {} // expected-error {{non-protocol, non-class type 'P5?' cannot be used within a protocol-constrained type}}
 struct S03: Optional<P5> & P6 {} // expected-error {{non-protocol, non-class type 'Optional<P5>' cannot be used within a protocol-constrained type}}
 struct S04<T : P5 & (P6)> {}
-struct S05<T> where T : P5? & P6 {} // expected-error 2{{non-protocol, non-class type 'P5?' cannot be used within a protocol-constrained type}}
+struct S05<T> where T : P5? & P6 {} // expected-error {{non-protocol, non-class type 'P5?' cannot be used within a protocol-constrained type}}
 
 // SR-3124 - Protocol Composition Often Migrated Incorrectly
 struct S3124<T: protocol<P1, P3>> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{17-34=P1 & P3>}}

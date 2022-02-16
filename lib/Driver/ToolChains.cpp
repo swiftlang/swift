@@ -306,6 +306,12 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map);
   inputArgs.AddAllArgs(arguments, options::OPT_coverage_prefix_map);
 
+  std::string globalRemapping = getGlobalDebugPathRemapping();
+  if (!globalRemapping.empty()) {
+    arguments.push_back("-debug-prefix-map");
+    arguments.push_back(inputArgs.MakeArgString(globalRemapping));
+  }
+
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
