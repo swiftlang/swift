@@ -679,7 +679,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
       generic->setInvalid();
     }
-    return type;
+    return ErrorType::get(ctx);
   }
 
   auto *unboundType = type->castTo<UnboundGenericType>();

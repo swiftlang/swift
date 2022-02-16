@@ -15,6 +15,18 @@ protocol Sequence {
 extension Array : Sequence {}
 
 struct EquatableSequenceBox<T : Sequence> where T.Element : Equatable {
-  // CHECK: Generic signature: <T, U where T == Array<Array<U>>, U : Equatable>
+  // CHECK-LABEL: EquatableSequenceBox.withArrayArray@
+  // CHECK-NEXT: Generic signature: <T, U where T == Array<Array<U>>, U : Equatable>
   func withArrayArray<U>(_: U) where T == Array<Array<U>> {}
 }
+
+// Make sure requirement desugaring handles conditional conformances.
+protocol Hashable : Equatable {}
+
+struct Set<Element : Hashable> {}
+
+extension Array : Hashable where Element : Hashable {}
+
+// CHECK-LABEL: doStuff@
+// CHECK-NEXT: Generic signature: <U where U : Hashable>
+func doStuff<U>(_: Set<Array<U>>) {}

@@ -356,6 +356,9 @@ SourceLoc WhereClauseOwner::getLoc() const {
   if (auto attr = source.dyn_cast<SpecializeAttr *>())
     return attr->getLocation();
 
+  if (auto attr = source.dyn_cast<DifferentiableAttr *>())
+    return attr->getLocation();
+
   return source.get<GenericParamList *>()->getWhereLoc();
 }
 
@@ -365,6 +368,8 @@ void swift::simple_display(llvm::raw_ostream &out,
     simple_display(out, owner.dc->getAsDecl());
   } else if (owner.source.is<SpecializeAttr *>()) {
     out << "@_specialize";
+  } else if (owner.source.is<DifferentiableAttr *>()) {
+    out << "@_differentiable";
   } else {
     out << "(SIL generic parameter list)";
   }

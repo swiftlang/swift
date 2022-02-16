@@ -45,7 +45,7 @@
 #ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
     __has_include(<dispatch/swift_concurrency_private.h>) && __APPLE__ && \
-    SWIFT_POINTER_IS_8_BYTES
+    (defined(__arm64__) || defined(__x86_64__))
 #define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 1
 #else
 #define SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION 0

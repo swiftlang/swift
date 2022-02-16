@@ -96,7 +96,7 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
 
     bool waited = waiter.tryReloadAndWait([&]() -> StatusRecordLockRecord* {
       // Check that oldStatus is still correct.
-      oldStatus = task->_private().Status.load(std::memory_order_acquire);
+      oldStatus = task->_private()._status().load(std::memory_order_acquire);
       if (!oldStatus.isStatusRecordLocked())
         return nullptr;
 
@@ -109,7 +109,7 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
       return;
 
     // Reload the status before trying to relock.
-    oldStatus = task->_private().Status.load(std::memory_order_acquire);
+    oldStatus = task->_private()._status().load(std::memory_order_acquire);
     if (!oldStatus.isStatusRecordLocked())
       return;
   }
@@ -162,7 +162,7 @@ static bool withStatusRecordLock(AsyncTask *task,
 
     // Install the lock record as the top of the queue.
     ActiveTaskStatus newStatus = status.withLockingRecord(lockingRecord);
-    if (task->_private().Status.compare_exchange_weak(status, newStatus,
+    if (task->_private()._status().compare_exchange_weak(status, newStatus,
             /*success*/ std::memory_order_release,
             /*failure*/ loadOrdering)) {
       status = newStatus;
@@ -187,7 +187,7 @@ static bool withStatusRecordLock(AsyncTask *task,
     assert(status.isStatusRecordLocked());
     auto newStatus = status.withoutLockingRecord();
 
-    if (task->_private().Status.compare_exchange_weak(status, newStatus,
+    if (task->_private()._status().compare_exchange_weak(status, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
       status.traceStatusChanged(task);
@@ -208,7 +208,7 @@ static bool withStatusRecordLock(AsyncTask *task,
                                  LockContext lockContext,
                                  Fn &&fn) {
   ActiveTaskStatus status =
-    task->_private().Status.load(getLoadOrdering(lockContext));
+    task->_private()._status().load(getLoadOrdering(lockContext));
   return withStatusRecordLock(task, lockContext, status, [&] {
     fn(status);
   });
@@ -226,7 +226,7 @@ bool swift::addStatusRecord(
   auto task = swift_task_getCurrent();
   // Load the current state. We can use a relaxed load because we're
   // synchronous with the task.
-  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
 
   while (true) {
     // Wait for any active lock to be released.
@@ -243,7 +243,7 @@ bool swift::addStatusRecord(
       // We have to use a release on success to make the initialization of
       // the new record visible to an asynchronous thread trying to modify the
       // status records
-      if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
+      if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
         return true;
@@ -263,7 +263,7 @@ bool swift::removeStatusRecord(TaskStatusRecord *record) {
                        record, task);
 
   // Load the current state.
-  auto &status = task->_private().Status;
+  auto &status = task->_private()._status();
   auto oldStatus = status.load(std::memory_order_relaxed);
 
   while (true) {
@@ -358,7 +358,7 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
   // cannot be accessed by anyone else since it hasn't been linked in yet.
   // Avoids the extra logic in `swift_task_cancel` and `swift_task_escalate`
   auto oldChildTaskStatus =
-      child->_private().Status.load(std::memory_order_relaxed);
+      child->_private()._status().load(std::memory_order_relaxed);
   assert(oldChildTaskStatus.getInnermostRecord() == NULL);
 
   auto newChildTaskStatus = oldChildTaskStatus;
@@ -372,7 +372,7 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
   newChildTaskStatus =
       newChildTaskStatus.withNewPriority(withUserInteractivePriorityDowngrade(pri));
 
-  child->_private().Status.store(newChildTaskStatus, std::memory_order_relaxed);
+  child->_private()._status().store(newChildTaskStatus, std::memory_order_relaxed);
 }
 
 SWIFT_CC(swift)
@@ -451,7 +451,7 @@ SWIFT_CC(swift)
 static void swift_task_cancelImpl(AsyncTask *task) {
   SWIFT_TASK_DEBUG_LOG("cancel task = %p", task);
 
-  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
   while (true) {
     if (oldStatus.isCancelled()) {
@@ -461,7 +461,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     // Set cancelled bit even if oldStatus.isStatusRecordLocked()
     newStatus = oldStatus.withCancelled();
 
-    if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
+    if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
       break;
@@ -550,7 +550,7 @@ JobPriority
 static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
 
   SWIFT_TASK_DEBUG_LOG("Escalating %p to %#x priority", task, newPriority);
-  auto oldStatus = task->_private().Status.load(std::memory_order_relaxed);
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
 
   while (true) {
@@ -569,7 +569,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
       newStatus = oldStatus.withNewPriority(newPriority);
     }
 
-    if (task->_private().Status.compare_exchange_weak(oldStatus, newStatus,
+    if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
             /* success */ std::memory_order_relaxed,
             /* failure */ std::memory_order_relaxed)) {
       break;
@@ -582,7 +582,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     ActiveTaskStatus *taskStatus;
     dispatch_lock_t *executionLock;
 
-    taskStatus = (ActiveTaskStatus *) &task->_private().Status;
+    taskStatus = (ActiveTaskStatus *) &task->_private()._status();
     executionLock = (dispatch_lock_t *) ((char*)taskStatus + ActiveTaskStatus::executionLockOffset());
 
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x to %#x", task, newStatus.currentExecutionLockOwner(), newPriority);
@@ -631,7 +631,7 @@ static NearestTaskDeadline swift_task_getNearestDeadlineImpl(AsyncTask *task) {
   // ignoring the possibility of a concurrent cancelling task.
 
   // Load the current state.
-  auto &status = task->_private().Status;
+  auto &status = task->_private()._status();
   auto oldStatus = status.load(std::memory_order_relaxed);
 
   NearestTaskDeadline result;

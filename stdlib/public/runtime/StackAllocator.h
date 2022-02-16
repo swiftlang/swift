@@ -71,15 +71,15 @@ private:
   /// The first slab.
   Slab *firstSlab;
 
+  uint32_t firstSlabIsPreallocated:1;
   /// Used for unit testing.
-  int32_t numAllocatedSlabs = 0;
+  uint32_t numAllocatedSlabs:31 = 0;
 
   /// True if the first slab is pre-allocated.
-  bool firstSlabIsPreallocated;
 
   /// The minimal alignment of allocated memory.
   static constexpr size_t alignment = MaximumAlignment;
-  
+
   /// If set to true, memory allocations are checked for buffer overflows and
   /// use-after-free, similar to guard-malloc.
   static constexpr bool guardAllocations =
@@ -128,14 +128,12 @@ private:
     /// Clear the fake metadata pointer. Call before freeing so that leftover
     /// heap garbage doesn't have slab metadata pointers in it.
     void clearMetadata() {
-      // Use memset_s or explicit_bzero where available. Fall back to a plain
-      // assignment on unknown platforms. This is not necessary for correctness,
-      // just as an aid to analysis tools, so it's OK if the fallback gets
-      // optimized out.
+      // Use memset_s on Apple platforms. Fall back to a plain
+      // assignment on other platforms. This is not necessary for
+      // correctness, just as an aid to analysis tools, so it's OK if
+      // the fallback gets optimized out.
 #if defined(__APPLE__)
       memset_s(&metadata, sizeof(metadata), 0, sizeof(metadata));
-#elif defined(__linux__)
-      explicit_bzero(&metadata, sizeof(metadata));
 #else
       metadata = 0;
 #endif

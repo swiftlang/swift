@@ -108,11 +108,12 @@ struct ActiveTaskStatusWithoutEscalation {
 
 template <typename Runtime, typename ActiveTaskStatus>
 struct AsyncTaskPrivateStorage {
+  typename Runtime::StoredPointer ExclusivityAccessSet[2];
   ActiveTaskStatus Status;
   StackAllocator<Runtime> Allocator;
   typename Runtime::StoredPointer Local;
-  typename Runtime::StoredPointer ExclusivityAccessSet[2];
   uint32_t Id;
+  uint32_t BasePriority;
 };
 
 template <typename Runtime, typename ActiveTaskStatus>

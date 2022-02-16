@@ -667,10 +667,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       if (auto selfType = instTy->getAs<DynamicSelfType>())
         instTy = selfType->getSelfType();
       auto *cl = instTy->getClassOrBoundGenericClass();
-      bool isForeign =
-          cl->getObjectModel() == ReferenceCounting::ObjC ||
-          cl->isForeign();
-      if ((cl && isForeign) || instTy->isAnyObject())
+      bool isForeign = cl && (cl->getObjectModel() == ReferenceCounting::ObjC ||
+                              cl->isForeign());
+      if (isForeign || instTy->isAnyObject())
         return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
       return RuntimeEffect::MetaData;
     }

@@ -457,6 +457,14 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
+  if(SWIFT_SIL_VERIFY_ALL_MACOS_ONLY)
+    # Only add if we have a macOS build triple
+    if (STREQUAL "${SWIFTFILE_SDK}" "OSX" AND
+        STREQUAL "${SWIFTFILE_ARCHITECTURE}" "x86_64")
+      list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
+    endif()
+  endif()
+
   # The standard library and overlays are built with -requirement-machine-protocol-signatures=verify.
   if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-requirement-machine-protocol-signatures=verify")
