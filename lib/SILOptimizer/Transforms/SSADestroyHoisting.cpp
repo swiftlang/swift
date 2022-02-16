@@ -142,6 +142,14 @@ protected:
     return true;
   }
 
+  bool visitBeginAccess(Operand *use) override {
+    auto *bai = cast<BeginAccessInst>(use->getUser());
+    for (auto *eai : bai->getEndAccesses()) {
+      storageUsers.insert(eai);
+    }
+    return true;
+  }
+
   bool visitLoad(Operand *use) override { return recordUser(use->getUser()); }
 
   bool visitStore(Operand *use) override { return recordUser(use->getUser()); }
