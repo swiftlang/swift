@@ -303,7 +303,33 @@ class TypeMatcher {
     TRIVIAL_CASE(SILFunctionType)
     TRIVIAL_CASE(SILBlockStorageType)
     TRIVIAL_CASE(SILBoxType)
-    TRIVIAL_CASE(ProtocolCompositionType)
+
+    bool visitProtocolCompositionType(CanProtocolCompositionType firstProtocolComposition,
+                                      Type secondType,
+                                      Type sugaredFirstType) {
+      if (auto secondProtocolComposition = secondType->getAs<ProtocolCompositionType>()) {
+        auto firstMembers = firstProtocolComposition->getMembers();
+        auto secondMembers = secondProtocolComposition->getMembers();
+
+        if (firstMembers.size() == secondMembers.size()) {
+          for (unsigned i : indices(firstMembers)) {
+            auto firstMember = firstMembers[i];
+            auto secondMember = secondMembers[i];
+
+            // FIXME: We lose sugar here, because the sugared type might have a different
+            // number of members, or the members might appear in a different order.
+            if (!this->visit(CanType(firstMember), secondMember, firstMember)) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      }
+
+      return mismatch(firstProtocolComposition.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitParameterizedProtocolType(CanParameterizedProtocolType firstParametrizedProto,
                                         Type secondType,
