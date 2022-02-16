@@ -52,12 +52,16 @@ namespace swift {
   /// Determine the part of speech for the given word.
   PartOfSpeech getPartOfSpeech(StringRef word);
 
+  /// Copy \p string to \p Allocator and return it as a null terminated C
+  /// string.
+  const char *copyCString(StringRef string, llvm::BumpPtrAllocator &Allocator);
+
   /// Scratch space used for returning a set of StringRefs.
   class StringScratchSpace {
     llvm::BumpPtrAllocator Allocator;
 
   public:
-    StringRef copyString(StringRef string);
+    StringRef copyString(StringRef string) { return string.copy(Allocator); }
 
     llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
   };

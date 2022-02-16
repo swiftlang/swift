@@ -126,7 +126,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
 
   auto addCompletion = [&](CustomCompletionInfo customCompletion) {
     using Chunk = CodeCompletionString::Chunk;
-    auto nameCopy = copyString(sink.allocator, customCompletion.Name);
+    auto nameCopy = StringRef(customCompletion.Name).copy(sink.allocator);
     auto chunk = Chunk::createWithText(Chunk::ChunkKind::Text, 0, nameCopy);
     auto *completionString =
         CodeCompletionString::create(sink.allocator, chunk);
@@ -1187,7 +1187,7 @@ Completion *CompletionBuilder::finish() {
   }
 
   auto *result = new (sink.allocator)
-      Completion(*newBase, copyString(sink.allocator, description));
+      Completion(*newBase, description.str().copy(sink.allocator));
   result->moduleImportDepth = moduleImportDepth;
   result->popularityFactor = popularityFactor;
   result->opaqueCustomKind = customKind;

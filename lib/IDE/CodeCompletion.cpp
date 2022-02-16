@@ -111,21 +111,6 @@ std::string swift::ide::removeCodeCompletionTokens(
   return CleanFile;
 }
 
-llvm::StringRef swift::ide::copyString(llvm::BumpPtrAllocator &Allocator,
-                                       llvm::StringRef Str) {
-  char *Buffer = Allocator.Allocate<char>(Str.size());
-  std::copy(Str.begin(), Str.end(), Buffer);
-  return llvm::StringRef(Buffer, Str.size());
-}
-
-const char *swift::ide::copyCString(llvm::BumpPtrAllocator &Allocator,
-                                    llvm::StringRef Str) {
-  char *Buffer = Allocator.Allocate<char>(Str.size() + 1);
-  std::copy(Str.begin(), Str.end(), Buffer);
-  Buffer[Str.size()] = '\0';
-  return Buffer;
-}
-
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   std::uninitialized_copy(Chunks.begin(), Chunks.end(),
                           getTrailingObjects<Chunk>());
@@ -729,7 +714,7 @@ void CodeCompletionResultBuilder::withNestedGroup(
 
 void CodeCompletionResultBuilder::addChunkWithText(
     CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
-  addChunkWithTextNoCopy(Kind, copyString(*Sink.Allocator, Text));
+  addChunkWithTextNoCopy(Kind, Text.copy(*Sink.Allocator));
 }
 
 void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
@@ -1172,7 +1157,7 @@ void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
 }
 
 StringRef CodeCompletionContext::copyString(StringRef Str) {
-  return ::copyString(*CurrentResults.Allocator, Str);
+  return Str.copy(*CurrentResults.Allocator);
 }
 
 bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
@@ -1214,7 +1199,7 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
     }
 
     if (!Ignored)
-      USRs.push_back(copyString(Allocator, SS));
+      USRs.push_back(SS.str().copy(Allocator));
   });
 
   if (!USRs.empty())
@@ -1314,7 +1299,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       if (!getContextFreeCompletionDiagnostics(ContextFreeNotRecReason, VD,
                                                severity, messageOS)) {
         ContextFreeDiagnosticSeverity = severity;
-        ContextFreeDiagnosticMessage = copyString(*Sink.Allocator, message);
+        ContextFreeDiagnosticMessage = message.str().copy(*Sink.Allocator);
       }
     }
   }
@@ -1330,11 +1315,12 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         ModuleName = Sink.LastModule.second;
       } else {
         if (auto *C = CurrentModule.dyn_cast<const clang::Module *>()) {
-          ModuleName = copyString(*Sink.Allocator, C->getFullModuleName());
+          ModuleName = StringRef(C->getFullModuleName()).copy(*Sink.Allocator);
         } else {
-          ModuleName = copyString(
-              *Sink.Allocator,
-              CurrentModule.get<const swift::ModuleDecl *>()->getName().str());
+          ModuleName = CurrentModule.get<const swift::ModuleDecl *>()
+                           ->getName()
+                           .str()
+                           .copy(*Sink.Allocator);
         }
         Sink.LastModule.first = CurrentModule.getOpaqueValue();
         Sink.LastModule.second = ModuleName;
@@ -1343,7 +1329,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
         *Sink.Allocator, CCS, AssociatedDecl, ModuleName,
-        copyString(*Sink.Allocator, BriefDocComment),
+        BriefDocComment.copy(*Sink.Allocator),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
         ContextFreeDiagnosticMessage);
@@ -1353,14 +1339,14 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Keyword:
     ContextFreeResult = ContextFreeCodeCompletionResult::createKeywordResult(
         *Sink.Allocator, KeywordKind, CCS,
-        copyString(*Sink.Allocator, BriefDocComment), ResultType);
+        BriefDocComment.copy(*Sink.Allocator), ResultType);
     break;
   case CodeCompletionResultKind::BuiltinOperator:
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             *Sink.Allocator, Kind, CCS, CodeCompletionOperatorKind::None,
-            copyString(*Sink.Allocator, BriefDocComment), ResultType,
+            BriefDocComment.copy(*Sink.Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
     break;
@@ -1383,7 +1369,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       if (!getContextualCompletionDiagnostics(ContextualNotRecReason, VD,
                                               severity, messageOS)) {
         ContextualDiagnosticSeverity = severity;
-        ContextualDiagnosticMessage = copyString(*Sink.Allocator, message);
+        ContextualDiagnosticMessage = message.str().copy(*Sink.Allocator);
       }
     }
   }

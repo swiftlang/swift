@@ -13,6 +13,7 @@
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Markup/XMLUtils.h"
 #include "llvm/Support/raw_ostream.h"
@@ -541,9 +542,7 @@ StringRef swift::ide::getCodeCompletionResultFilterName(
   SmallString<32> buf;
   llvm::raw_svector_ostream OS(buf);
   printCodeCompletionResultFilterName(Str, OS);
-  size_t size = buf.size();
-  char *storage = Allocator.Allocate<char>(size + 1);
-  memcpy(storage, buf.data(), size);
-  storage[size] = '\0';
-  return {storage, size};
+  // Use 'copyCString' to get a null terminated StringRef just in case clients
+  // need it.
+  return {copyCString(buf, Allocator), buf.size()};
 }

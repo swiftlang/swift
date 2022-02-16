@@ -64,12 +64,6 @@ std::string removeCodeCompletionTokens(StringRef Input,
                                        StringRef TokenName,
                                        unsigned *CompletionOffset);
 
-StringRef copyString(llvm::BumpPtrAllocator &Allocator,
-                     StringRef Str);
-
-const char *copyCString(llvm::BumpPtrAllocator &Allocator,
-                        StringRef Str);
-
 template <typename T>
 ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
                             ArrayRef<T> Arr) {

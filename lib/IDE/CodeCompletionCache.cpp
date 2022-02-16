@@ -12,6 +12,7 @@
 
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/Basic/Cache.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -165,8 +166,11 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     }
 
     const char *p = strings + index;
-    auto size = read32le(p);
-    auto str = copyString(*V.Allocator, StringRef(p, size));
+    size_t size = read32le(p);
+    StringRef str = StringRef(p, size);
+    // Import the string to the allocator. Use null-terminated string to avoid
+    // potential copies in clients.
+    str = StringRef(copyCString(str, *V.Allocator), size);
     knownStrings[index] = str;
     return str;
   };
