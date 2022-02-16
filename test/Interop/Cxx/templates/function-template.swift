@@ -28,15 +28,6 @@ FunctionTemplateTestSuite.test("lvalueReference<T> where T == Int") {
   expectEqual(value, 42)
 }
 
-// TODO: currently "Any" is imported as an Objective-C "id".
-// This doesn't work without the Objective-C runtime. 
-#if _runtime(_ObjC)
-FunctionTemplateTestSuite.test("passThrough<T> where T == Any") {
-  let result = passThrough(42 as Any)
-  expectEqual(42, result as! Int)
-}
-#endif
-
 // TODO: Generics, Any, and Protocols should be tested here but need to be
 // better supported in ClangTypeConverter first.
 
