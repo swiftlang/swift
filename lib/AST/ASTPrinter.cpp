@@ -41,6 +41,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
@@ -534,7 +535,6 @@ static bool willUseTypeReprPrinting(TypeLoc tyLoc,
           (tyLoc.getType().isNull() && tyLoc.getTypeRepr()));
 }
 
-static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl);
 namespace {
 /// AST pretty-printer.
 class PrintAST : public ASTVisitor<PrintAST> {
@@ -928,6 +928,7 @@ private:
 #include "swift/AST/ExprNodes.def"
 
   void printSynthesizedExtension(Type ExtendedType, ExtensionDecl *ExtDecl);
+  void printSynthesizedExtensionImpl(Type ExtendedType, ExtensionDecl *ExtDecl);
 
   void printExtension(ExtensionDecl* ExtDecl);
   void printExtendedTypeName(TypeLoc ExtendedTypeLoc);
@@ -1014,28 +1015,12 @@ public:
 
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
-    bool haveFeatureChecks = Options.PrintCompatibilityFeatureChecks &&
-      printCompatibilityFeatureChecksPre(Printer, D);
-
-    ASTVisitor::visit(D);
-
-    if (haveFeatureChecks) {
-
-      printCompatibilityFeatureChecksPost(Printer, [&]() -> void {
-        auto features = getUniqueFeaturesUsed(D);
-        assert(!features.empty());
-        if (std::find_if(features.begin(), features.end(),
-                         [](Feature feature) -> bool {
-                           return getFeatureName(feature).equals(
-                               "SpecializeAttributeWithAvailability");
-                         }) != features.end()) {
-          Printer << "#else\n";
-          Options.PrintSpecializeAttributeWithAvailability = false;
-          ASTVisitor::visit(D);
-          Options.PrintSpecializeAttributeWithAvailability = true;
-          Printer.printNewline();
-        }
+    if (Options.PrintCompatibilityFeatureChecks) {
+      printWithCompatibilityFeatureChecks(Printer, Options, D, [&]{
+        ASTVisitor::visit(D);
       });
+    } else {
+      ASTVisitor::visit(D);
     }
 
     if (Synthesize) {
@@ -2530,12 +2515,19 @@ void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
 
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
                                          ExtensionDecl *ExtDecl) {
-    // Print compatibility features checks first, if we need them.
-    bool haveFeatureChecks = Options.PrintCompatibilityFeatureChecks &&
+  if (Options.PrintCompatibilityFeatureChecks &&
       Options.BracketOptions.shouldOpenExtension(ExtDecl) &&
-      Options.BracketOptions.shouldCloseExtension(ExtDecl) &&
-      printCompatibilityFeatureChecksPre(Printer, ExtDecl);
+      Options.BracketOptions.shouldCloseExtension(ExtDecl)) {
+    printWithCompatibilityFeatureChecks(Printer, Options, ExtDecl, [&]{
+      printSynthesizedExtensionImpl(ExtendedType, ExtDecl);
+    });
+  } else {
+    printSynthesizedExtensionImpl(ExtendedType, ExtDecl);
+  }
+}
 
+void PrintAST::printSynthesizedExtensionImpl(Type ExtendedType,
+                                             ExtensionDecl *ExtDecl) {
   auto printRequirementsFrom = [&](ExtensionDecl *ED, bool &IsFirst) {
     auto Sig = ED->getGenericSignature();
     printSingleDepthOfGenericSignature(Sig.getGenericParams(),
@@ -2609,9 +2601,6 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
                        Options.BracketOptions.shouldOpenExtension(ExtDecl),
                        Options.BracketOptions.shouldCloseExtension(ExtDecl));
   }
-
-  if (haveFeatureChecks)
-    printCompatibilityFeatureChecksPost(Printer);
 }
 
 void PrintAST::printExtension(ExtensionDecl *decl) {
@@ -2930,6 +2919,14 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   return false;
 }
 
+static void suppressingFeatureSpecializeAttributeWithAvailability(
+                                        PrintOptions &options,
+                                        llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(
+    options.PrintSpecializeAttributeWithAvailability, false);
+  action();
+}
+
 static bool usesFeatureInheritActorContext(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto param : *func->getParameters()) {
@@ -2964,34 +2961,115 @@ static bool usesFeatureUnsafeInheritExecutor(Decl *decl) {
   return decl->getAttrs().hasAttribute<UnsafeInheritExecutorAttr>();
 }
 
-/// Determine the set of "new" features used on a given declaration.
-///
-/// Note: right now, all features we check for are "new". At some point, we'll
-/// want a baseline version.
-static std::vector<Feature> getFeaturesUsed(Decl *decl) {
-  std::vector<Feature> features;
-
-  // Go through each of the features, checking whether the declaration uses that
-  // feature. This also ensures that the resulting set is in sorted order.
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-  if (usesFeature##FeatureName(decl))                                 \
-    features.push_back(Feature::FeatureName);
-#include "swift/Basic/Features.def"
-
-  return features;
+static void suppressingFeatureUnsafeInheritExecutor(PrintOptions &options,
+                                        llvm::function_ref<void()> action) {
+  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
+  options.ExcludeAttrList.push_back(DAK_UnsafeInheritExecutor);
+  action();
+  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
+
+
+/// Suppress the printing of a particular feature.
+static void suppressingFeature(PrintOptions &options, Feature feature,
+                               llvm::function_ref<void()> action) {
+  switch (feature) {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
+  case Feature::FeatureName:                                          \
+    llvm_unreachable("not a suppressible feature");
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
+  case Feature::FeatureName:                                          \
+    suppressingFeature##FeatureName(options, action);                 \
+    return;
+#include "swift/Basic/Features.def"
+  }
+  llvm_unreachable("exhaustive switch");
+}
+
+using BasicFeatureSet = FixedBitSet<numFeatures(), Feature>;
+
+class FeatureSet {
+  BasicFeatureSet required;
+
+  // Stored inverted: index i actually represents
+  // Feature(numFeatures() - i)
+  //
+  // This is the easiest way of letting us iterate from largest to
+  // smallest, i.e. from the newest to the oldest feature, which is
+  // the order in which we need to emit #if clauses.
+  using SuppressibleFeatureSet = FixedBitSet<numFeatures(), size_t>;
+  SuppressibleFeatureSet suppressible;
+
+public:
+  class SuppressibleGenerator {
+    SuppressibleFeatureSet::iterator i, e;
+    friend class FeatureSet;
+    SuppressibleGenerator(const SuppressibleFeatureSet &set)
+      : i(set.begin()), e(set.end()) {}
+
+  public:
+    bool empty() const { return i == e; }
+    Feature next() { return Feature(numFeatures() - *i++); }
+  };
+
+  bool empty() const {
+    return required.empty() && suppressible.empty();
+  }
+
+  bool hasAnyRequired() const {
+    return !required.empty();
+  }
+  const BasicFeatureSet &requiredFeatures() const {
+    return required;
+  }
+
+  bool hasAnySuppressible() const {
+    return !suppressible.empty();
+  }
+  SuppressibleGenerator generateSuppressibleFeatures() const {
+    return SuppressibleGenerator(suppressible);
+  }
+
+  enum InsertOrRemove: bool {
+    Insert = true, Remove = false
+  };
+
+  void collectRequiredFeature(Feature feature, InsertOrRemove operation) {
+    assert(!isSuppressibleFeature(feature));
+    required.insertOrRemove(feature, operation == Insert);
+  }
+
+  void collectSuppressibleFeature(Feature feature, InsertOrRemove operation) {
+    assert(isSuppressibleFeature(feature));
+    suppressible.insertOrRemove(numFeatures() - size_t(feature),
+                                operation == Insert);
+  }
+
+  /// Go through all the features used by the given declaration and
+  /// either add or remove them to this set.
+  void collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
+    // Go through each of the features, checking whether the
+    // declaration uses that feature.
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
+    if (usesFeature##FeatureName(decl))                               \
+      collectRequiredFeature(Feature::FeatureName, operation);
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
+    if (usesFeature##FeatureName(decl))                               \
+      collectSuppressibleFeature(Feature::FeatureName, operation);
+#include "swift/Basic/Features.def"
+  }
+};
 
 /// Get the set of features that are uniquely used by this declaration, and are
 /// not part of the enclosing context.
-static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
-  auto features = getFeaturesUsed(decl);
-  if (features.empty())
-    return features;
+static FeatureSet getUniqueFeaturesUsed(Decl *decl) {
+  // Add all the features used by this declaration.
+  FeatureSet features;
+  features.collectFeaturesUsed(decl, FeatureSet::Insert);
 
-  // Gather the features used by all enclosing declarations.
+  // Remove all the features used by all enclosing declarations.
   Decl *enclosingDecl = decl;
-  std::vector<Feature> enclosingFeatures;
-  while (true) {
+  while (!features.empty()) {
     // Find the next outermost enclosing declaration.
     if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
       enclosingDecl = accessor->getStorage();
@@ -3000,61 +3078,138 @@ static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
     if (!enclosingDecl)
       break;
 
-    auto outerEnclosingFeatures = getFeaturesUsed(enclosingDecl);
-    if (outerEnclosingFeatures.empty())
-      continue;
-
-    auto currentEnclosingFeatures = std::move(enclosingFeatures);
-    enclosingFeatures.clear();
-    std::merge(outerEnclosingFeatures.begin(), outerEnclosingFeatures.end(),
-               currentEnclosingFeatures.begin(), currentEnclosingFeatures.end(),
-               std::back_inserter(enclosingFeatures));
+    features.collectFeaturesUsed(enclosingDecl, FeatureSet::Remove);
   }
 
-  // If there were no enclosing features, we're done.
-  if (enclosingFeatures.empty())
-    return features;
-
-  // Remove any features from the enclosing context from this set of features so
-  // that we are left with a unique set.
-  std::vector<Feature> uniqueFeatures;
-  std::set_difference(
-      features.begin(), features.end(),
-      enclosingFeatures.begin(), enclosingFeatures.end(),
-      std::back_inserter(uniqueFeatures));
-  return uniqueFeatures;
+  return features;
 }
 
+static void printCompatibilityCheckIf(ASTPrinter &printer,
+                                      bool isElsif,
+                                      bool includeCompilerCheck,
+                                      const BasicFeatureSet &features) {
+  assert(!features.empty());
 
-bool swift::printCompatibilityFeatureChecksPre(
-    ASTPrinter &printer, Decl *decl) {
+  printer << (isElsif ? "#elsif " : "#if ");
+  if (includeCompilerCheck)
+    printer << "compiler(>=5.3) && ";
 
+  bool first = true;
+  for (auto feature : features) {
+    if (!first) {
+      printer << " && ";
+    } else {
+      first = false;
+    }
+    printer << "$" << getFeatureName(feature);
+  }
+  printer.printNewline();
+}
+
+/// Generate a #if ... #elsif ... #endif chain for the given
+/// suppressible feature checks.
+static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
+                                               PrintOptions &options,
+                                               bool firstInChain,
+                                               bool includeCompilerCheck,
+                            FeatureSet::SuppressibleGenerator &generator,
+                            llvm::function_ref<void()> printBody) {
+  // If we've run out of features to check for, enter an `#else`,
+  // print the body one last time, and close the chain with `#endif`.
+  // Note that, if we didn't have any suppressible features at all,
+  // we shouldn't have started this recursion.
+  if (generator.empty()) {
+    printer << "#else";
+    printer.printNewline();
+    printBody();
+    printer.printNewline();
+    printer << "#endif";
+    return;
+  }
+
+  // Otherwise, enter a `#if` or `#elsif` for the next feature.
+  Feature feature = generator.next();
+  printCompatibilityCheckIf(printer, /*elsif*/ !firstInChain,
+                            includeCompilerCheck,
+                            {feature});
+
+  // Print the body.
+  printBody();
+  printer.printNewline();
+
+  // Start suppressing the feature and recurse to either generate
+  // more `#elsif` clauses or finish off with `#endif`.
+  suppressingFeature(options, feature, [&] {
+    printWithSuppressibleFeatureChecks(printer, options, /*first*/ false,
+                                       includeCompilerCheck, generator,
+                                       printBody);
+  });
+}
+
+/// Generate the appropriate #if block(s) necessary to protect the use
+/// of compiler-version-dependent features in the given function.
+///
+/// In the most general form, with both required features and multiple
+/// suppressible features in play, the generated code pattern looks like
+/// the following (assuming that feaature $bar implies feature $baz):
+///
+/// ```
+///   #if compiler(>=5.3) && $foo
+///   #if $bar
+///   @foo @bar @baz func @test() {}
+///   #elsif $baz
+///   @foo @baz func @test() {}
+///   #else
+///   @foo func @test() {}
+///   #endif
+///   #endif
+/// ```
+bool swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
+                                                PrintOptions &options,
+                                                Decl *decl,
+                                 llvm::function_ref<void()> printBody) {
   // A single accessor does not get a feature check,
   // it should go around the whole decl.
-  if (isa<AccessorDecl>(decl))
+  if (isa<AccessorDecl>(decl)) {
+    printBody();
     return false;
+  }
 
-  auto features = getUniqueFeaturesUsed(decl);
-  if (features.empty())
+  FeatureSet features = getUniqueFeaturesUsed(decl);
+  if (features.empty()) {
+    printBody();
     return false;
+  }
 
-  printer.printNewline();
-  printer << "#if compiler(>=5.3) && ";
-  llvm::interleave(features.begin(), features.end(),
-    [&](Feature feature) {
-      printer << "$" << getFeatureName(feature);
-    },
-    [&] { printer << " && "; });
-  printer.printNewline();
+  // Enter a `#if` for the required features, if any.
+  bool hasRequiredFeatures = features.hasAnyRequired();
+  if (hasRequiredFeatures) {
+    printCompatibilityCheckIf(printer,
+                              /*elsif*/ false,
+                              /*compiler check*/ true,
+                              features.requiredFeatures());
+  }
+
+  // Do the recursive suppression logic if we have suppressible
+  // features, or else just print the body.
+  if (features.hasAnySuppressible()) {
+    auto generator = features.generateSuppressibleFeatures();
+    printWithSuppressibleFeatureChecks(printer, options,
+                             /*first*/ true,
+                    /*compiler check*/ !hasRequiredFeatures,
+                                       generator,
+                                       printBody);
+  } else {
+    printBody();
+  }
+
+  // Close the `#if` for the required features.
+  if (hasRequiredFeatures) {
+    printer.printNewline();
+    printer << "#endif";
+  }
 
   return true;
-}
-
-void swift::printCompatibilityFeatureChecksPost(
-    ASTPrinter &printer, llvm::function_ref<void()> printElse) {
-  printer.printNewline();
-  printElse();
-  printer << "#endif\n";
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
