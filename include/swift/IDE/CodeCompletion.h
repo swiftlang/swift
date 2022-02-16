@@ -492,6 +492,7 @@ using CodeCompletionFlair = OptionSet<CodeCompletionFlairBit>;
 enum class CodeCompletionDeclKind : uint8_t {
   Module,
   Class,
+  Actor,
   Struct,
   Enum,
   EnumElement,

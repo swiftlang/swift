@@ -349,7 +349,11 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::Struct:
     return CodeCompletionDeclKind::Struct;
   case DeclKind::Class:
-    return CodeCompletionDeclKind::Class;
+    if (cast<ClassDecl>(D)->isActor()) {
+      return CodeCompletionDeclKind::Actor;
+    } else {
+      return CodeCompletionDeclKind::Class;
+    }
   case DeclKind::Protocol:
     return CodeCompletionDeclKind::Protocol;
   case DeclKind::Var:
@@ -424,6 +428,9 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     switch (getAssociatedDeclKind()) {
     case CodeCompletionDeclKind::Class:
       Prefix.append("[Class]");
+      break;
+    case CodeCompletionDeclKind::Actor:
+      Prefix.append("[Actor]");
       break;
     case CodeCompletionDeclKind::Struct:
       Prefix.append("[Struct]");
@@ -7400,6 +7407,7 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       switch (R->getAssociatedDeclKind()) {
       case CodeCompletionDeclKind::Module:
       case CodeCompletionDeclKind::Class:
+      case CodeCompletionDeclKind::Actor:
       case CodeCompletionDeclKind::Struct:
       case CodeCompletionDeclKind::Enum:
       case CodeCompletionDeclKind::Protocol:

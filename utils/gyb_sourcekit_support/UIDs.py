@@ -346,6 +346,8 @@ UID_KINDS = [
     KIND('DeclModule', 'source.lang.swift.decl.module'),
     KIND('DeclClass', 'source.lang.swift.decl.class'),
     KIND('RefClass', 'source.lang.swift.ref.class'),
+    KIND('DeclActor', 'source.lang.swift.decl.actor'),
+    KIND('RefActor', 'source.lang.swift.ref.actor'),
     KIND('DeclStruct', 'source.lang.swift.decl.struct'),
     KIND('RefStruct', 'source.lang.swift.ref.struct'),
     KIND('DeclEnum', 'source.lang.swift.decl.enum'),
