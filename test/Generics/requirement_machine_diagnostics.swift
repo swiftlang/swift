@@ -59,9 +59,16 @@ class C {}
 func concreteLayoutRedundancy<T>(_: T) where C : AnyObject {}
 // expected-warning@-1{{redundant constraint 'C' : 'AnyObject'}}
 
+func concreteLayoutConflict<T>(_: T) where Int : AnyObject {}
+// expected-error@-1{{type 'Int' in conformance requirement does not refer to a generic parameter or associated type}}
+
 class C2: C {}
 func concreteSubclassRedundancy<T>(_: T) where C2 : C {}
 // expected-warning@-1{{redundant superclass constraint 'C2' : 'C'}}
+
+class D {}
+func concreteSubclassConflict<T>(_: T) where D : C {}
+// expected-error@-1{{type 'D' in conformance requirement does not refer to a generic parameter or associated type}}
 
 protocol UselessProtocolWhereClause where Int == Int {}
 // expected-warning@-1 {{redundant same-type constraint 'Int' == 'Int'}}

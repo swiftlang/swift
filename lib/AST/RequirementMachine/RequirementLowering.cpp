@@ -152,7 +152,7 @@ static void desugarLayoutRequirement(Type subjectType,
   if (!subjectType->isTypeParameter()) {
     Requirement requirement(RequirementKind::Layout,
                             subjectType, layout);
-    if (subjectType->isAnyClassReferenceType()) {
+    if (layout->isClass() && subjectType->isAnyClassReferenceType()) {
       errors.push_back(
           RequirementError::forRedundantRequirement(requirement, loc));
     } else {
