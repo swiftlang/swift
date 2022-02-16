@@ -4176,6 +4176,14 @@ public:
                                ConstraintLocatorBuilder locator,
                                llvm::function_ref<Type(Type)> subst);
 
+  // Record the given requirement in the constraint system.
+  void openGenericRequirement(DeclContext *outerDC,
+                              unsigned index,
+                              const Requirement &requirement,
+                              bool skipProtocolSelfConstraint,
+                              ConstraintLocatorBuilder locator,
+                              llvm::function_ref<Type(Type)> subst);
+
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
