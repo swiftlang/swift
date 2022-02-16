@@ -47,10 +47,10 @@ func test_remote() async {
       try! SomeSpecificDistributedActor.resolve(id: address, using: system)
   // Check the id and system are the right values, and not trash memory
   print("remote.id = \(remote!.id)") // CHECK: remote.id = ActorAddress(address: "sact://127.0.0.1/example#1234")
-  print("remote.system = \(remote!.actorSystem)") // CHECK: remote.system = FakeActorSystem()
+  print("remote.system = \(remote!.actorSystem)")
 
   remote = nil // CHECK: deinit ActorAddress(address: "sact://127.0.0.1/example#1234")
-  print("done") // CHECK: done
+  print("done")
 }
 
 @main struct Main {
