@@ -268,7 +268,6 @@ DeinitBarriers::DestroyReachability::classifyInstruction(SILInstruction *inst) {
     return Classification::DeadUser;
   }
   if (inst == storageDefInst) {
-    result.barriers.push_back(inst);
     return Classification::Barrier;
   }
   if (knownUses.storageUsers.contains(inst)) {
