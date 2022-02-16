@@ -140,8 +140,8 @@ ERROR(could_not_use_instance_member_on_type,none,
       "%select{| instance of nested}3 type %0",
       (Type, DeclNameRef, Type, bool))
 ERROR(could_not_use_member_on_existential,none,
-      "member %1 cannot be used on value of protocol type %0; use a generic"
-      " constraint instead",
+      "member %1 cannot be used on value of protocol type %0; consider using a"
+      " generic constraint instead",
       (Type, DeclNameRef))
 FIXIT(replace_with_type,"%0",(Type))
 FIXIT(insert_type_qualification,"%0.",(Type))
