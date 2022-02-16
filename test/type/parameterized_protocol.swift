@@ -148,6 +148,4 @@ protocol SomeProto {}
 
 func protocolCompositionNotSupported(_: SomeProto & Sequence<Int>) {}
 // expected-error@-1 {{non-protocol, non-class type 'Sequence<Int>' cannot be used within a protocol-constrained type}}
-// expected-warning@-2 {{protocol 'Sequence' as a type must be explicitly marked as 'any'}}
 
-// FIXME: The second diagnostic is bogus.

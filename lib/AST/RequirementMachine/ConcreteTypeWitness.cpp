@@ -374,8 +374,15 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
   // Simplify the substitution terms in the type witness symbol.
   RewritePath substPath;
-  System.simplifySubstitutions(typeWitnessSymbol, &substPath);
-  substPath.invert();
+  auto differenceID = System.simplifySubstitutions(
+      key, typeWitnessSymbol, /*map=*/this,
+      &substPath);
+  if (differenceID) {
+    const auto &difference = System.getTypeDifference(*differenceID);
+    assert(difference.LHS == typeWitnessSymbol);
+    typeWitnessSymbol = difference.RHS;
+    substPath.invert();
+  }
 
   // If it is equal to the parent type, introduce a same-type requirement
   // between the two parameters.

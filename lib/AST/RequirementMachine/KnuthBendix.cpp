@@ -361,7 +361,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxRuleCount,
     resolvedLoops.clear();
 
     simplifyRightHandSides();
-    simplifyLeftHandSideSubstitutions();
+    simplifyLeftHandSideSubstitutions(/*map=*/nullptr);
   } while (again);
 
   return std::make_pair(CompletionResult::Success, 0);

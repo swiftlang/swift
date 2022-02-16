@@ -333,81 +333,6 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
   return changed;
 }
 
-/// Simplify terms appearing in the substitutions of the last symbol of \p term,
-/// which must be a superclass or concrete type symbol.
-bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
-                                          RewritePath *path) const {
-  assert(symbol.hasSubstitutions());
-
-  // Fast path if the type is fully concrete.
-  auto substitutions = symbol.getSubstitutions();
-  if (substitutions.empty())
-    return false;
-
-  // Save the original rewrite path length so that we can reset if if we don't
-  // find anything to simplify.
-  unsigned oldSize = (path ? path->size() : 0);
-
-  if (path) {
-    // The term is at the top of the primary stack. Push all substitutions onto
-    // the primary stack.
-    path->add(RewriteStep::forDecompose(substitutions.size(),
-                                        /*inverse=*/false));
-
-    // Move all substitutions but the first one to the secondary stack.
-    for (unsigned i = 1; i < substitutions.size(); ++i)
-      path->add(RewriteStep::forShift(/*inverse=*/false));
-  }
-
-  // Simplify and collect substitutions.
-  SmallVector<Term, 2> newSubstitutions;
-  newSubstitutions.reserve(substitutions.size());
-
-  bool first = true;
-  bool anyChanged = false;
-  for (auto substitution : substitutions) {
-    // Move the next substitution from the secondary stack to the primary stack.
-    if (!first && path)
-      path->add(RewriteStep::forShift(/*inverse=*/true));
-    first = false;
-
-    // The current substitution is at the top of the primary stack; simplify it.
-    MutableTerm mutTerm(substitution);
-    anyChanged |= simplify(mutTerm, path);
-
-    // Record the new substitution.
-    newSubstitutions.push_back(Term::get(mutTerm, Context));
-  }
-
-  // All simplified substitutions are now on the primary stack. Collect them to
-  // produce the new term.
-  if (path) {
-    path->add(RewriteStep::forDecompose(substitutions.size(),
-                                        /*inverse=*/true));
-  }
-
-  // If nothing changed, we don't have to rebuild the symbol.
-  if (!anyChanged) {
-    if (path) {
-      // The rewrite path should consist of a Decompose, followed by a number
-      // of Shifts, followed by a Compose.
-  #ifndef NDEBUG
-      for (auto iter = path->begin() + oldSize; iter < path->end(); ++iter) {
-        assert(iter->Kind == RewriteStep::Shift ||
-               iter->Kind == RewriteStep::Decompose);
-      }
-  #endif
-
-      path->resize(oldSize);
-    }
-    return false;
-  }
-
-  // Build the new symbol with simplified substitutions.
-  symbol = symbol.withConcreteSubstitutions(newSubstitutions, Context);
-  return true;
-}
-
 /// Adds a rewrite rule, returning true if the new rule was non-trivial.
 ///
 /// If both sides simplify to the same term, the rule is trivial and discarded,
@@ -640,43 +565,6 @@ void RewriteSystem::simplifyRightHandSides() {
     }
 
     recordRewriteLoop(MutableTerm(lhs), loop);
-  }
-}
-
-/// Simplify substitution terms in superclass, concrete type and concrete
-/// conformance symbols.
-void RewriteSystem::simplifyLeftHandSideSubstitutions() {
-  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
-    auto &rule = getRule(ruleID);
-    if (rule.isSubstitutionSimplified())
-      continue;
-
-    auto lhs = rule.getLHS();
-    auto symbol = lhs.back();
-    if (!symbol.hasSubstitutions())
-      continue;
-
-    RewritePath path;
-
-    // (1) First, apply the original rule to produce the original lhs.
-    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
-                                         ruleID, /*inverse=*/true));
-
-    // (2) Now, simplify the substitutions to get the new lhs.
-    if (!simplifySubstitutions(symbol, &path))
-      continue;
-
-    // We're either going to add a new rule or record an identity, so
-    // mark the old rule as simplified.
-    rule.markSubstitutionSimplified();
-
-    MutableTerm newLHS(lhs.begin(), lhs.end() - 1);
-    newLHS.add(symbol);
-
-    // Invert the path to get a path from the new lhs to the old rhs.
-    path.invert();
-
-    addRule(newLHS, MutableTerm(rule.getRHS()), &path);
   }
 }
 

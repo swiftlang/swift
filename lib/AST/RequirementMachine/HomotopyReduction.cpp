@@ -70,6 +70,7 @@ void RewriteLoop::recompute(const RewriteSystem &system) {
   Dirty = 0;
 
   ProjectionCount = 0;
+  DecomposeCount = 0;
 
   // Rules appearing in empty context (possibly more than once).
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
@@ -93,9 +94,12 @@ void RewriteLoop::recompute(const RewriteSystem &system) {
       ++ProjectionCount;
       break;
 
+    case RewriteStep::Decompose:
+      ++DecomposeCount;
+      break;
+
     case RewriteStep::PrefixSubstitutions:
     case RewriteStep::Shift:
-    case RewriteStep::Decompose:
     case RewriteStep::Relation:
     case RewriteStep::DecomposeConcrete:
     case RewriteStep::RightConcreteProjection:
@@ -132,6 +136,14 @@ unsigned RewriteLoop::getProjectionCount(
     const RewriteSystem &system) const {
   const_cast<RewriteLoop *>(this)->recompute(system);
   return ProjectionCount;
+}
+
+/// The number of Decompose steps, used by the elimination order to prioritize
+/// loops that are not concrete simplifications.
+unsigned RewriteLoop::getDecomposeCount(
+    const RewriteSystem &system) const {
+  const_cast<RewriteLoop *>(this)->recompute(system);
+  return DecomposeCount;
 }
 
 /// If a rewrite loop contains an explicit rule in empty context, propagate the
@@ -428,56 +440,108 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     const auto &loop = Loops[pair.first];
     const auto &otherLoop = Loops[found->first];
 
-    // If one of the rules was a concrete unification projection, prefer to
-    // eliminate the *other* rule.
-    //
-    // For example, if 'X.T == G<U, V>' is implied by the conformance on X,
-    // and the following three rules are defined in the current protocol:
-    //
-    //    X.T == G<Int, W>
-    //    X.U == Int
-    //    X.V == W
-    //
-    // Then we can either eliminate a) alone, or b) and c). Since b) and c)
-    // are projections, they are "simpler", and we would rather keep both and
-    // eliminate a).
-    unsigned projectionCount = loop.getProjectionCount(*this);
-    unsigned otherProjectionCount = otherLoop.getProjectionCount(*this);
+    {
+      // If one of the rules was a concrete unification projection, prefer to
+      // eliminate the *other* rule.
+      //
+      // For example, if 'X.T == G<U, V>' is implied by the conformance on X,
+      // and the following three rules are defined in the current protocol:
+      //
+      //    a) X.T == G<Int, W>
+      //    b) X.U == Int
+      //    c) X.V == W
+      //
+      // Then we can either eliminate a) alone, or b) and c). Since b) and c)
+      // are projections, they are "simpler", and we would rather keep both and
+      // eliminate a).
+      unsigned projectionCount = loop.getProjectionCount(*this);
+      unsigned otherProjectionCount = otherLoop.getProjectionCount(*this);
 
-    if (projectionCount != otherProjectionCount) {
-      if (projectionCount < otherProjectionCount)
+      if (projectionCount != otherProjectionCount) {
+        if (projectionCount < otherProjectionCount)
+          found = pair;
+
+        continue;
+      }
+    }
+
+    {
+      // If one of the rules is a concrete type requirement, prefer to
+      // eliminate the *other* rule.
+      bool ruleIsConcrete = rule.getLHS().back().hasSubstitutions();
+      bool otherRuleIsConcrete = otherRule.getLHS().back().hasSubstitutions();
+
+      if (ruleIsConcrete != otherRuleIsConcrete) {
+        if (otherRuleIsConcrete)
+          found = pair;
+
+        continue;
+      }
+    }
+
+    {
+      // If both are concrete type requirements, prefer to eliminate the
+      // one with the more deeply nested type.
+      unsigned ruleNesting = rule.getNesting();
+      unsigned otherRuleNesting = otherRule.getNesting();
+
+      if (ruleNesting != otherRuleNesting) {
+        if (ruleNesting > otherRuleNesting)
+          found = pair;
+
+        continue;
+      }
+    }
+
+    {
+      // Otherwise, perform a shortlex comparison on (LHS, RHS).
+      Optional<int> comparison = rule.compare(otherRule, Context);
+
+      if (!comparison.hasValue()) {
+        // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
+        // C and C' are superclass, concrete type or concrete conformance
+        // symbols.
         found = pair;
+        continue;
+      }
 
-      continue;
-    }
+      if (*comparison == 0) {
+        // Given two rewrite loops that both eliminate the same rule, prefer
+        // the one that was not recorded by substitution simplification;
+        // substitution simplification rules contain the projections in
+        // context, which then prevents the projections from being eliminated.
+        //
+        // An example is if you have two rules implied by conformances on X,
+        //
+        //     a) X.T == G<Y>
+        //     b) X.T == G<Z>
+        //
+        // then the induced rule Y == Z is a projection.
+        //
+        // The rule X.T == G<Z> can be eliminated with a loop that begins at
+        // X.T.[concrete: G<Y>] followed by a decomposition and rewrite of
+        // Y into Z, finally followed by an inverse decomposition back to
+        // X.T.[concrete: G<Z>].
+        //
+        // However, if we can eliminate G<Y> via some other loop, we prefer
+        // to do that, since that might *also* allow us to eliminate Y == Z.
+        unsigned decomposeCount = loop.getDecomposeCount(*this);
+        unsigned otherDecomposeCount = otherLoop.getDecomposeCount(*this);
 
-    // If one of the rules is a concrete type requirement, prefer to
-    // eliminate the *other* rule.
-    bool ruleIsConcrete = rule.getLHS().back().hasSubstitutions();
-    bool otherRuleIsConcrete = otherRule.getLHS().back().hasSubstitutions();
+        if (decomposeCount != otherDecomposeCount) {
+          if (decomposeCount < otherDecomposeCount)
+            found = pair;
 
-    if (ruleIsConcrete != otherRuleIsConcrete) {
-      if (otherRuleIsConcrete)
+          continue;
+        }
+      }
+
+      if (*comparison > 0) {
+        // Otherwise, if the new rule is less canonical than the best one so
+        // far, it becomes the new candidate for elimination.
         found = pair;
-
-      continue;
-    }
-
-    // Otherwise, perform a shortlex comparison on (LHS, RHS).
-    Optional<int> comparison = rule.compare(otherRule, Context);
-    if (!comparison.hasValue()) {
-      // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
-      // C and C' are superclass, concrete type or concrete conformance
-      // symbols.
-      found = pair;
-      continue;
-    }
-
-    if (*comparison > 0) {
-      // Otherwise, if the new rule is less canonical than the best one so
-      // far, it becomes the new candidate for elimination.
-      found = pair;
-      continue;
+        continue;
+      }
     }
   }
 

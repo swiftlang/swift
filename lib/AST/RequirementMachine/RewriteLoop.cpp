@@ -367,7 +367,6 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
                                           const RewriteSystem &system) {
   assert(step.Kind == RewriteStep::Decompose);
 
-  auto &ctx = system.getRewriteContext();
   unsigned numSubstitutions = step.Arg;
 
   if (!step.Inverse) {
@@ -405,15 +404,8 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
 
     // The term immediately underneath the substitutions is the one we're
     // updating with new substitutions.
-    auto &term = *(Primary.end() - numSubstitutions - 1);
-
-    auto &symbol = *(term.end() - step.EndOffset - 1);
-    if (!symbol.hasSubstitutions()) {
-      llvm::errs() << "Expected term with superclass or concrete type symbol"
-                   << " on primary stack\n";
-      dump(llvm::errs());
-      abort();
-    }
+    const auto &term = *(Primary.end() - numSubstitutions - 1);
+    auto symbol = *(term.end() - step.EndOffset - 1);
 
     // The symbol at the end of this term must have the expected number of
     // substitutions.
@@ -423,16 +415,15 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
       abort();
     }
 
-    // Collect the substitutions from the primary stack.
-    SmallVector<Term, 2> substitutions;
-    substitutions.reserve(numSubstitutions);
     for (unsigned i = 0; i < numSubstitutions; ++i) {
       const auto &substitution = *(Primary.end() - numSubstitutions + i);
-      substitutions.push_back(Term::get(substitution, ctx));
+      if (MutableTerm(symbol.getSubstitutions()[i]) != substitution) {
+        llvm::errs() << "Expected " << symbol.getSubstitutions()[i] << "\n";
+        llvm::errs() << "Got " << substitution << "\n";
+        dump(llvm::errs());
+        abort();
+      }
     }
-
-    // Build the new symbol with the new substitutions.
-    symbol = symbol.withConcreteSubstitutions(substitutions, ctx);
 
     // Pop the substitutions from the primary stack.
     Primary.resize(Primary.size() - numSubstitutions);
