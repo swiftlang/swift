@@ -6050,8 +6050,8 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
     return S->getStartLoc();
   } else if (auto *P = anchor.dyn_cast<Pattern *>()) {
     return P->getLoc();
-  } else if (auto *C = anchor.dyn_cast<StmtCondition *>()) {
-    return C->front().getStartLoc();
+  } else if (auto *C = anchor.dyn_cast<StmtConditionElement *>()) {
+    return C->getStartLoc();
   } else {
     auto *I = anchor.get<CaseLabelItem *>();
     return I->getStartLoc();

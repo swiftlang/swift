@@ -43,11 +43,9 @@ namespace swift {
   enum class PatternKind : uint8_t;
   enum class StmtKind;
 
-  using StmtCondition = llvm::MutableArrayRef<StmtConditionElement>;
-
   struct ASTNode
       : public llvm::PointerUnion<Expr *, Stmt *, Decl *, Pattern *, TypeRepr *,
-                                  StmtCondition *, CaseLabelItem *> {
+                                  StmtConditionElement *, CaseLabelItem *> {
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 
