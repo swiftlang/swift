@@ -3743,7 +3743,8 @@ namespace {
     }
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "opened_archetype_type", label);
-      printRec("opened_existential", T->getOpenedExistentialType());
+      printRec("opened_existential",
+               T->getGenericEnvironment()->getOpenedExistentialType());
       printField("opened_existential_id", T->getOpenedExistentialID());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

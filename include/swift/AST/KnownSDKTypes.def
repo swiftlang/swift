@@ -49,6 +49,5 @@ KNOWN_SDK_TYPE_DECL(Distributed, RemoteCallTarget, StructDecl, 0)
 
 // String processing
 KNOWN_SDK_TYPE_DECL(StringProcessing, Regex, StructDecl, 1)
-KNOWN_SDK_TYPE_DECL(StringProcessing, DynamicCaptures, EnumDecl, 0)
 
 #undef KNOWN_SDK_TYPE_DECL

@@ -398,6 +398,13 @@ module WinSDK [system] {
     link "WinSpool.Lib"
   }
 
+  module PSAPI {
+    header "Psapi.h"
+    export *
+
+    link "psapi.lib"
+  }
+
   module RichEdit {
     header "Richedit.h"
     export *

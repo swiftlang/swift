@@ -59,9 +59,7 @@ using TargetExecutorSignature =
                         /*resultBuffer=*/void *,
                         /*substitutions=*/void *,
                         /*witnessTables=*/void **,
-                        /*numWitnessTables=*/size_t,
-                        /*resumeFunc=*/TaskContinuationFunction *,
-                        /*callContext=*/AsyncContext *),
+                        /*numWitnessTables=*/size_t),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -102,7 +100,7 @@ static void ::swift_distributed_execute_target_resume(
   swift_task_dealloc(context);
   // See `swift_distributed_execute_target` - `parentCtx` in this case
   // is `callContext` which should be completely transparent on resume.
-  return resumeInParent(parentCtx->Parent, error);
+  return resumeInParent(parentCtx, error);
 }
 
 SWIFT_CC(swiftasync)
@@ -115,9 +113,7 @@ void ::swift_distributed_execute_target(
     void *resultBuffer,
     void *substitutions,
     void **witnessTables,
-    size_t numWitnessTables,
-    TaskContinuationFunction *resumeFunc,
-    AsyncContext *callContext) {
+    size_t numWitnessTables) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     assert(false && "no distributed accessor");
@@ -135,17 +131,7 @@ void ::swift_distributed_execute_target(
   AsyncContext *calleeContext = reinterpret_cast<AsyncContext *>(
       swift_task_alloc(asyncFnPtr->ExpectedContextSize));
 
-  // TODO(concurrency): Special functions like this one are currently set-up
-  // to pass "caller" context and resume function as extra parameters due to
-  // how they are declared in C. But this particular function behaves exactly
-  // like a regular `async throws`, which means that we need to initialize
-  // intermediate `callContext` using parent `callerContext`. A better fix for
-  // this situation would be to adjust IRGen and handle function like this
-  // like regular `async` functions even though they are classified as special.
-  callContext->Parent = callerContext;
-  callContext->ResumeParent = resumeFunc;
-
-  calleeContext->Parent = callContext;
+  calleeContext->Parent = callerContext;
   calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       swift_distributed_execute_target_resume);
 

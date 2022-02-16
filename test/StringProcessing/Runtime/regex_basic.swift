@@ -47,7 +47,7 @@ RegexBasicTests.test("Captures") {
     """
   let regex = '/([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s+;\s+(\w+).*/'
   // Test inferred type.
-  let _: Regex<Tuple4<Substring, Substring, Substring?, Substring>>.Type
+  let _: Regex<(Substring, Substring, Substring?, Substring)>.Type
     = type(of: regex)
   let match1 = input.expectMatch(regex)
   expectEqual(input[...], input[match1.range])

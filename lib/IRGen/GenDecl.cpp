@@ -2756,27 +2756,27 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     auto *realReplFn = Builder.CreateBitCast(ReplFn, fnType);
     auto asyncFnPtr =
         FunctionPointer(silFunctionType, realReplFn, authInfo, signature);
+    // We never emit a function that uses special conventions, so we
+    // can just use the default async kind.
+    FunctionPointerKind fpKind =
+        FunctionPointerKind::AsyncFunctionPointer;
     PointerAuthInfo codeAuthInfo =
         asyncFnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
     auto newFnPtr = FunctionPointer(
         FunctionPointer::Kind::Function, asyncFnPtr.getPointer(IGF),
         codeAuthInfo,
-        Signature::forAsyncAwait(IGM, silFunctionType,
-                                 /*useSpecialConvention*/ false));
+        Signature::forAsyncAwait(IGM, silFunctionType, fpKind));
     SmallVector<llvm::Value *, 16> forwardedArgs;
     for (auto &arg : IGF.CurFn->args())
       forwardedArgs.push_back(&arg);
     auto layout = getAsyncContextLayout(
         IGM, silFunctionType, silFunctionType,
-        f->getForwardingSubstitutionMap(), false,
-        FunctionPointer::Kind(
-            FunctionPointer::BasicKind::AsyncFunctionPointer));
+        f->getForwardingSubstitutionMap());
     llvm::Value *dynamicContextSize32;
     llvm::Value *calleeFunction;
-    auto initialContextSize = Size(0);
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
         IGF, silFunctionType->getRepresentation(), asyncFnPtr, nullptr,
-        std::make_pair(false, true), initialContextSize);
+        std::make_pair(false, true));
     auto *dynamicContextSize =
         Builder.CreateZExt(dynamicContextSize32, IGM.SizeTy);
     auto calleeContextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
@@ -3225,7 +3225,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   }
   auto fpKind = irgen::classifyFunctionPointerKind(f);
   Signature signature =
-      getSignature(f->getLoweredFunctionType(), fpKind.useSpecialConvention());
+      getSignature(f->getLoweredFunctionType(), fpKind);
   addLLVMFunctionAttributes(f, signature);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
