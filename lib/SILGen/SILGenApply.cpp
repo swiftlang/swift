@@ -1030,6 +1030,11 @@ public:
   }
 
   void processClassMethod(DeclRefExpr *e, AbstractFunctionDecl *afd) {
+    // FIXME(backDeploy): Investigate support for back deployed class method
+    // calls
+    assert(!afd->isBackDeployed() &&
+           "back deployed method calls are unsupported");
+
     ArgumentSource selfArgSource(selfApply->getBase());
     setSelfParam(std::move(selfArgSource));
 
@@ -1119,6 +1124,10 @@ public:
     auto constant = SILDeclRef(e->getDecl());
     if (callSite && callSite->shouldApplyDistributedThunk()) {
       constant = constant.asDistributed(true);
+    } else if (e->getDecl()->getAttrs().hasAttribute<BackDeployAttr>()) {
+      // If we're calling a back deployed function we need to call through
+      // a thunk instead that handles availability.
+      constant = constant.asBackDeployed(true);
     } else {
       constant = constant.asForeign(
                    !isConstructorWithGeneratedAllocatorThunk(e->getDecl())
@@ -5137,6 +5146,8 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
 
   if (call->isDistributed()) {
     callRef = callRef.asDistributed(true);
+  } else if (call->isBackDeployed()) {
+    callRef = callRef.asBackDeployed(true);
   }
 
   auto declRefConstant = getConstantInfo(getTypeExpansionContext(), callRef);

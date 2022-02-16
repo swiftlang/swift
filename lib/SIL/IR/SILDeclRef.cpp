@@ -317,6 +317,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return maybeAddExternal(SILLinkage::PublicNonABI);
   }
 
+  // Back deployment thunks are emitted into the client and therefore have
+  // PublicNonABI linkage.
+  if (isBackDeployedThunk())
+    return maybeAddExternal(SILLinkage::PublicNonABI);
+
   enum class Limit {
     /// No limit.
     None,
