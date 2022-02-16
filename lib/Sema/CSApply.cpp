@@ -109,6 +109,76 @@ Solution::computeSubstitutions(GenericSignature sig,
                               lookupConformanceFn);
 }
 
+// On Windows and 32-bit platforms we need to force "Int" to actually be
+// re-imported as "Int." This is needed because otherwise, we cannot round-trip
+// "Int" and "UInt". For example, on Windows, "Int" will be imported into C++ as
+// "long long" and then back into Swift as "Int64" not "Int." 
+static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
+                                      AbstractFunctionDecl *newDecl) {
+  auto originalFnSubst = cast<AbstractFunctionDecl>(oldDecl)
+                             ->getInterfaceType()
+                             ->getAs<GenericFunctionType>()
+                             ->substGenericArgs(subst);
+  // The constructor type is a function type as follows:
+  //   (CType.Type) -> (Generic) -> CType
+  // And a method's function type is as follows:
+  //   (inout CType) -> (Generic) -> Void
+  // In either case, we only want the result of that function type because that
+  // is the function type with the generic params that need to be substituted:
+  //   (Generic) -> CType
+  if (isa<ConstructorDecl>(oldDecl) || oldDecl->isInstanceMember() ||
+      oldDecl->isStatic())
+    originalFnSubst = cast<FunctionType>(originalFnSubst->getResult().getPointer());
+
+  SmallVector<ParamDecl *, 4> fixedParameters;
+  unsigned parameterIndex = 0;
+  for (auto *newFnParam : *newDecl->getParameters()) {
+    // If the user substituted this param with an (U)Int, use (U)Int.
+    auto substParamType =
+        originalFnSubst->getParams()[parameterIndex].getParameterType();
+    if (substParamType->isEqual(newDecl->getASTContext().getIntType()) ||
+        substParamType->isEqual(newDecl->getASTContext().getUIntType())) {
+      auto intParam =
+          ParamDecl::cloneWithoutType(newDecl->getASTContext(), newFnParam);
+      intParam->setInterfaceType(substParamType);
+      fixedParameters.push_back(intParam);
+    } else {
+      fixedParameters.push_back(newFnParam);
+    }
+    parameterIndex++;
+  }
+
+  auto fixedParams =
+      ParameterList::create(newDecl->getASTContext(), fixedParameters);
+  newDecl->setParameters(fixedParams);
+
+  // Now fix the result type:
+  if (originalFnSubst->getResult()->isEqual(
+          newDecl->getASTContext().getIntType()) ||
+      originalFnSubst->getResult()->isEqual(
+          newDecl->getASTContext().getUIntType())) {
+    // Constructors don't have a result.
+    if (auto func = dyn_cast<FuncDecl>(newDecl)) {
+      // We have to rebuild the whole function.
+      auto newFnDecl = FuncDecl::createImported(
+          func->getASTContext(), func->getNameLoc(),
+          func->getName(), func->getNameLoc(),
+          func->hasAsync(), func->hasThrows(),
+          fixedParams, originalFnSubst->getResult(),
+          /*genericParams=*/nullptr, func->getDeclContext(), newDecl->getClangDecl());
+      if (func->isStatic()) newFnDecl->setStatic();
+      if (func->isImportAsStaticMember()) newFnDecl->setImportAsStaticMember();
+      if (func->getImportAsMemberStatus().isInstance()) {
+        newFnDecl->setSelfAccessKind(func->getSelfAccessKind());
+        newFnDecl->setSelfIndex(func->getSelfIndex());
+      }
+      return newFnDecl;
+    }
+  }
+
+  return newDecl;
+}
+
 // Derive a concrete function type for fdecl by substituting the generic args
 // and use that to derive the corresponding function type and parameter list.
 static std::pair<FunctionType *, ParameterList *>
@@ -147,65 +217,6 @@ substituteFunctionTypeAndParamList(ASTContext &ctx, AbstractFunctionDecl *fdecl,
       ParameterList::create(ctx, SourceLoc(), newParams, SourceLoc());
 
   return {newFnType, newParamList};
-}
-
-static ValueDecl *generateSpecializedCXXFunctionTemplate(
-    ASTContext &ctx, AbstractFunctionDecl *oldDecl, SubstitutionMap subst,
-    clang::FunctionDecl *specialized) {
-  auto newFnTypeAndParams = substituteFunctionTypeAndParamList(ctx, oldDecl, subst);
-  auto newFnType = newFnTypeAndParams.first;
-  auto paramList = newFnTypeAndParams.second;
-
-  SmallVector<ParamDecl *, 4> newParamsWithoutMetatypes;
-  for (auto param : *paramList ) {
-    if (isa<FuncDecl>(oldDecl) &&
-        isa<MetatypeType>(param->getType().getPointer())) {
-      // Metatype parameters are added synthetically to account for template
-      // params that don't make it to the function signature. These shouldn't
-      // exist in the resulting specialized FuncDecl. Note that this doesn't
-      // affect constructors because all template params for a constructor
-      // must be in the function signature by design.
-      continue;
-    }
-    newParamsWithoutMetatypes.push_back(param);
-  }
-  auto *newParamList =
-      ParameterList::create(ctx, SourceLoc(), newParamsWithoutMetatypes, SourceLoc());
-
-  if (isa<ConstructorDecl>(oldDecl)) {
-    DeclName ctorName(ctx, DeclBaseName::createConstructor(), newParamList);
-    auto newCtorDecl = ConstructorDecl::createImported(
-        ctx, specialized, ctorName, oldDecl->getLoc(), 
-        /*failable=*/false, /*failabilityLoc=*/SourceLoc(),
-        /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-        /*throws=*/false, /*throwsLoc=*/SourceLoc(), 
-        newParamList, /*genericParams=*/nullptr,
-        oldDecl->getDeclContext());
-    return newCtorDecl;
-  }
-
-  // Generate a name for the specialized function.
-  std::string newNameStr;
-  llvm::raw_string_ostream buffer(newNameStr);
-  std::unique_ptr<clang::MangleContext> mangler(
-      specialized->getASTContext().createMangleContext());
-  mangler->mangleName(specialized, buffer);
-  buffer.flush();
-  // Add all parameters as empty parameters.
-  auto newName = DeclName(
-      ctx, DeclName(ctx.getIdentifier(newNameStr)).getBaseName(), newParamList);
-
-  auto newFnDecl = FuncDecl::createImported(
-      ctx, oldDecl->getLoc(), newName, oldDecl->getNameLoc(),
-      /*Async=*/false, oldDecl->hasThrows(), newParamList,
-      newFnType->getResult(), /*GenericParams=*/nullptr,
-      oldDecl->getDeclContext(), specialized);
-  if (oldDecl->isStatic()) {
-    newFnDecl->setStatic();
-    newFnDecl->setImportAsStaticMember();
-  }
-  newFnDecl->setSelfAccessKind(cast<FuncDecl>(oldDecl)->getSelfAccessKind());
-  return newFnDecl;
 }
 
 // Synthesizes the body of a thunk that takes extra metatype arguments and
@@ -249,20 +260,32 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked=*/true};
 }
 
-ConcreteDeclRef
-Solution::resolveConcreteDeclRef(ValueDecl *decl,
-                                 ConstraintLocator *locator) const {
-  if (!decl)
-    return ConcreteDeclRef();
+static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
+                                                 FuncDecl *oldDecl,
+                                                 FuncDecl *newDecl) {
+  // We added additional metatype parameters to aid template
+  // specialization, which are no longer now that we've specialized
+  // this function. Create a thunk that only forwards the original
+  // parameters along to the clang function.
+  auto thunkTypeAndParamList = substituteFunctionTypeAndParamList(oldDecl->getASTContext(),
+                                                                  oldDecl, subst);
+  auto thunk = FuncDecl::createImplicit(
+      oldDecl->getASTContext(), oldDecl->getStaticSpelling(), oldDecl->getName(),
+      oldDecl->getNameLoc(), oldDecl->hasAsync(), oldDecl->hasThrows(),
+      /*genericParams=*/nullptr, thunkTypeAndParamList.second,
+      thunkTypeAndParamList.first->getResult(), oldDecl->getDeclContext());
+  thunk->copyFormalAccessFrom(oldDecl);
+  thunk->setBodySynthesizer(synthesizeForwardingThunkBody, newDecl);
+  thunk->setSelfAccessKind(oldDecl->getSelfAccessKind());
 
-  // Get the generic signatue of the decl and compute the substitutions.
-  auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
-  auto subst = computeSubstitutions(sig, locator);
+  return thunk;
+}
 
-  // Lazily instantiate function definitions for class template specializations.
-  // Members of a class template specialization will be instantiated here (not
-  // when imported). If this method has already be instantiated, then this is a
-  // no-op.
+// Lazily instantiate function definitions for class template specializations.
+// Members of a class template specialization will be instantiated here (not
+// when imported). If this method has already be instantiated, then this is a
+// no-op.
+static void maybeInstantiateCXXMethodDefinition(ValueDecl *decl) {
   if (const auto *constMethod =
           dyn_cast_or_null<clang::CXXMethodDecl>(decl->getClangDecl())) {
     auto method = const_cast<clang::CXXMethodDecl *>(constMethod);
@@ -273,41 +296,62 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
           ->getClangSema()
           .InstantiateFunctionDefinition(method->getLocation(), method);
   }
+}
+
+static ConcreteDeclRef getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
+                                                            ValueDecl *decl) {
+  assert(isa<clang::FunctionTemplateDecl>(decl->getClangDecl()) &&
+      "This API should only be used with function templates.");
+
+  auto *newFn =
+      decl->getASTContext()
+          .getClangModuleLoader()
+          ->instantiateCXXFunctionTemplate(
+              decl->getASTContext(),
+              const_cast<clang::FunctionTemplateDecl *>(
+                  cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
+              subst);
+  // We failed to specialize this function template. The compiler is going to
+  // exit soon. Return something valid in the meantime.
+  if (!newFn)
+    return ConcreteDeclRef(decl);
+
+  auto newDecl = cast_or_null<ValueDecl>(
+      decl->getASTContext().getClangModuleLoader()->importDeclDirectly(
+          newFn));
+
+  if (auto fn = dyn_cast<AbstractFunctionDecl>(newDecl)) {
+    if (!subst.empty()) {
+      newDecl = rewriteIntegerTypes(subst, decl, fn);
+    }
+  }
+
+  if (auto fn = dyn_cast<FuncDecl>(decl)) {
+    if (newFn->getNumParams() != fn->getParameters()->size()) {
+      newDecl = generateThunkForExtraMetatypes(subst, fn,
+                                               cast<FuncDecl>(newDecl));
+    }
+  }
+
+  return ConcreteDeclRef(newDecl);
+}
+
+ConcreteDeclRef
+Solution::resolveConcreteDeclRef(ValueDecl *decl,
+                                 ConstraintLocator *locator) const {
+  if (!decl)
+    return ConcreteDeclRef();
+
+  // Get the generic signatue of the decl and compute the substitutions.
+  auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
+  auto subst = computeSubstitutions(sig, locator);
+
+  maybeInstantiateCXXMethodDefinition(decl);
 
   // If this is a C++ function template, get it's specialization for the given
   // substitution map and update the decl accordingly.
   if (isa_and_nonnull<clang::FunctionTemplateDecl>(decl->getClangDecl())) {
-    auto *newFn =
-        decl->getASTContext()
-            .getClangModuleLoader()
-            ->instantiateCXXFunctionTemplate(
-                decl->getASTContext(),
-                const_cast<clang::FunctionTemplateDecl *>(
-                    cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
-                subst);
-    auto newDecl = generateSpecializedCXXFunctionTemplate(
-        decl->getASTContext(), cast<AbstractFunctionDecl>(decl), subst, newFn);
-    if (auto fn = dyn_cast<FuncDecl>(decl)) {
-      if (newFn->getNumParams() != fn->getParameters()->size()) {
-        // We added additional metatype parameters to aid template
-        // specialization, which are no longer now that we've specialized
-        // this function. Create a thunk that only forwards the original
-        // parameters along to the clang function.
-        auto thunkTypeAndParamList = substituteFunctionTypeAndParamList(decl->getASTContext(),
-                                                                        fn, subst);
-        auto thunk = FuncDecl::createImplicit(
-                 fn->getASTContext(), fn->getStaticSpelling(), fn->getName(),
-                 fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
-                 /*genericParams=*/nullptr, thunkTypeAndParamList.second,
-                 thunkTypeAndParamList.first->getResult(), fn->getDeclContext());
-        thunk->copyFormalAccessFrom(fn);
-        thunk->setBodySynthesizer(synthesizeForwardingThunkBody, cast<FuncDecl>(newDecl));
-        thunk->setSelfAccessKind(fn->getSelfAccessKind());
-
-        return ConcreteDeclRef(thunk);
-      }
-    }
-    return ConcreteDeclRef(newDecl);
+    return getCXXFunctionTemplateSpecialization(subst, decl);
   }
 
   return ConcreteDeclRef(decl, subst);

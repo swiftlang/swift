@@ -5,7 +5,7 @@
 // CHECK: func multiTemplateTypeParamOneUsedInSignature<T, U>(_ u: U, T: T.Type) -> U
 // CHECK: func multiTemplateTypeParamNotUsedInSignatureWithUnrelatedParams<T, U>(_ x: Int32, _ y: Int32, T: T.Type, U: U.Type)
 // CHECK: func templateTypeParamUsedInReturnType<T>(_ x: Int32) -> T
-// CHECK: func templateTypeParamUsedInReferenceParam<T>(_ t: UnsafeMutablePointer<T>) -> T
+// CHECK: func templateTypeParamUsedInReferenceParam<T>(_ t: inout T) -> T
 // CHECK: @available(*, unavailable, message: "Variadic function is unavailable")
 // CHECK: func templateTypeParamNotUsedInSignatureWithVarargs<T, U>(T: T.Type, U: U.Type, _ varargs: Any...)
 // CHECK: @available(*, unavailable, message: "Variadic function is unavailable")
