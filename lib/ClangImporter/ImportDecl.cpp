@@ -441,7 +441,6 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     M = Impl.getStdlibModule();
   else
     M = Impl.getNamedModule(SwiftModuleName);
-
   if (!M) {
     // User did not import the library module that contains the type we want to
     // substitute.
@@ -3442,29 +3441,9 @@ namespace {
       SmallVector<FuncDecl *, 4> methods;
       SmallVector<ConstructorDecl *, 4> ctors;
 
-      // Cxx methods may have the same name but differ in "constness".
-      // In such a case we must differentiate in swift (See VisitFunction).
-      // Before importing the different CXXMethodDecl's we track functions
-      // that differ this way so we can disambiguate later
-      for (auto m : decl->decls()) {
-        if (auto method = dyn_cast<clang::CXXMethodDecl>(m)) {
-          if(method->getDeclName().isIdentifier()) {
-            if(Impl.cxxMethods.find(method->getName()) == Impl.cxxMethods.end()) {
-              Impl.cxxMethods[method->getName()] = {};
-            }
-            if(method->isConst()) {
-              // Add to const set
-              Impl.cxxMethods[method->getName()].first.insert(method);
-            } else {
-              // Add to mutable set
-              Impl.cxxMethods[method->getName()].second.insert(method);
-            }
-          }
-        }
-      }
-
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
+
       for (auto m : decl->decls()) {
         if (isa<clang::AccessSpecDecl>(m)) {
           // The presence of AccessSpecDecls themselves does not influence
@@ -3637,9 +3616,14 @@ namespace {
         for (auto &getterAndSetter : Impl.GetterSetterMap) {
             auto getter = getterAndSetter.second.first;
             auto setter = getterAndSetter.second.second;
-            if (!getter) continue;
+            if (!getter || getter->getResultInterfaceType()->isVoid()) continue;
 
-            result->addMember(makeProperty(getterAndSetter.first,getter, setter));
+            auto p = makeProperty(getterAndSetter.first,getter, setter);
+            p->getDeclContext()->dumpContext();
+            if (p->getDeclContext()!=result ){
+                continue;
+            }
+            result->addMember(p);
         }
         for (auto &subscriptInfo : Impl.cxxSubscripts) {
           auto declAndParameterType = subscriptInfo.first;
@@ -3656,7 +3640,6 @@ namespace {
       }
 
       result->setMemberLoader(&Impl, 0);
-      result->dump();
       return result;
     }
 
@@ -4410,7 +4393,6 @@ namespace {
       }
 
       Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
-        decl->dump();
         // Find if we have a getter.
         auto pred = [](auto attr) {
           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {

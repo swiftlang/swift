@@ -33,11 +33,13 @@
 
 //CHECK: struct LongNameAllLower {
 //CHECK-NEXT: init()
+//CHECK-NEXT: var foo: Int32
 //CHECK-NEXT: mutating func getfoo() -> Int32
 //CHECK-NEXT: }
 
 //CHECK: struct LongNameAllUpper {
 //CHECK-NEXT: init()
+//CHECK-NEXT: var foo: Int32
 //CHECK-NEXT: mutating func getFOO() -> Int32
 //CHECK-NEXT: }
 
@@ -58,6 +60,7 @@
 
 //CHECK: struct IntGetterSetter {
 //CHECK-NEXT: init()
+//CHECK-NEXT: var x: Int32
 //CHECK-NEXT: func getX() -> Int32
 //CHECK-NEXT: mutating func setX(_: Int32)
 //CHECK-NEXT: }
