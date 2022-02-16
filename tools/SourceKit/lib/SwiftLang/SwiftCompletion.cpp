@@ -920,9 +920,9 @@ static void transformAndForwardResults(
     auto *completionString =
         CodeCompletionString::create(innerSink.allocator, chunks);
     ContextFreeCodeCompletionResult *contextFreeResult =
-        new (innerSink.allocator) ContextFreeCodeCompletionResult(
-            CodeCompletionResultKind::BuiltinOperator, completionString,
-            CodeCompletionOperatorKind::None,
+        ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
+            innerSink.allocator, CodeCompletionResultKind::BuiltinOperator,
+            completionString, CodeCompletionOperatorKind::None,
             /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None,

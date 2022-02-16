@@ -777,78 +777,54 @@ public:
                "isOperator implies operator kind != None");
   }
 
-  /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
+  /// Constructs a \c Pattern or \c BuiltinOperator result.
   ///
   /// \note The caller must ensure that the \p CompletionString and \c
   /// StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
-  ContextFreeCodeCompletionResult(
-      CodeCompletionResultKind Kind, CodeCompletionString *CompletionString,
+  static ContextFreeCodeCompletionResult *createPatternOrBuiltInOperatorResult(
+      llvm::BumpPtrAllocator &Allocator, CodeCompletionResultKind Kind,
+      CodeCompletionString *CompletionString,
       CodeCompletionOperatorKind KnownOperatorKind, StringRef BriefDocComment,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-      StringRef DiagnosticMessage)
-      : ContextFreeCodeCompletionResult(
-            Kind, /*AssociatedKind=*/0, KnownOperatorKind,
-            /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
-            BriefDocComment, /*AssociatedUSRs=*/{}, ResultType, NotRecommended,
-            DiagnosticSeverity, DiagnosticMessage) {}
+      StringRef DiagnosticMessage);
 
   /// Constructs a \c Keyword result.
   ///
   /// \note The caller must ensure that the \p CompletionString and
-  /// \p BriefDocComment outlive this result, typically by storing them in the
-  /// same \c CodeCompletionResultSink as the result itself.
-  ContextFreeCodeCompletionResult(CodeCompletionKeywordKind Kind,
-                                  CodeCompletionString *CompletionString,
-                                  StringRef BriefDocComment,
-                                  CodeCompletionResultType ResultType)
-      : ContextFreeCodeCompletionResult(
-            CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
-            CodeCompletionOperatorKind::None, /*IsSystem=*/false,
-            CompletionString, /*ModuleName=*/"", BriefDocComment,
-            /*AssociatedUSRs=*/{}, ResultType,
-            ContextFreeNotRecommendedReason::None,
-            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
+  /// \p BriefDocComment outlive this result, typically by storing them in
+  /// the same \c CodeCompletionResultSink as the result itself.
+  static ContextFreeCodeCompletionResult *createKeywordResult(
+      llvm::BumpPtrAllocator &Allocator, CodeCompletionKeywordKind Kind,
+      CodeCompletionString *CompletionString, StringRef BriefDocComment,
+      CodeCompletionResultType ResultType);
 
   /// Constructs a \c Literal result.
   ///
   /// \note The caller must ensure that the \p CompletionString outlives this
   /// result, typically by storing them in the same \c CodeCompletionResultSink
   /// as the result itself.
-  ContextFreeCodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
-                                  CodeCompletionString *CompletionString,
-                                  CodeCompletionResultType ResultType)
-      : ContextFreeCodeCompletionResult(
-            CodeCompletionResultKind::Literal,
-            static_cast<uint8_t>(LiteralKind), CodeCompletionOperatorKind::None,
-            /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
-            /*BriefDocComment=*/"",
-            /*AssociatedUSRs=*/{}, ResultType,
-            ContextFreeNotRecommendedReason::None,
-            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
+  static ContextFreeCodeCompletionResult *
+  createLiteralResult(llvm::BumpPtrAllocator &Allocator,
+                      CodeCompletionLiteralKind LiteralKind,
+                      CodeCompletionString *CompletionString,
+                      CodeCompletionResultType ResultType);
 
   /// Constructs a \c Declaration result.
   ///
   /// \note The caller must ensure that the \p CompletionString and all
   /// \c StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
-  ContextFreeCodeCompletionResult(
-      CodeCompletionString *CompletionString, const Decl *AssociatedDecl,
-      StringRef ModuleName, StringRef BriefDocComment,
-      ArrayRef<StringRef> AssociatedUSRs, CodeCompletionResultType ResultType,
+  static ContextFreeCodeCompletionResult *createDeclResult(
+      llvm::BumpPtrAllocator &Allocator, CodeCompletionString *CompletionString,
+      const Decl *AssociatedDecl, StringRef ModuleName,
+      StringRef BriefDocComment, ArrayRef<StringRef> AssociatedUSRs,
+      CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-      StringRef DiagnosticMessage)
-      : ContextFreeCodeCompletionResult(
-            CodeCompletionResultKind::Declaration,
-            static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
-            CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
-            CompletionString, ModuleName, BriefDocComment, AssociatedUSRs,
-            ResultType, NotRecommended, DiagnosticSeverity, DiagnosticMessage) {
-    assert(AssociatedDecl && "should have a decl");
-  }
+      StringRef DiagnosticMessage);
 
   CodeCompletionResultKind getKind() const { return Kind; }
 

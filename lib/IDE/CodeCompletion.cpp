@@ -323,6 +323,67 @@ void CodeCompletionString::dump() const {
   }
 }
 
+ContextFreeCodeCompletionResult *
+ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionResultKind Kind,
+    CodeCompletionString *CompletionString,
+    CodeCompletionOperatorKind KnownOperatorKind, StringRef BriefDocComment,
+    CodeCompletionResultType ResultType,
+    ContextFreeNotRecommendedReason NotRecommended,
+    CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+    StringRef DiagnosticMessage) {
+  return new (Allocator) ContextFreeCodeCompletionResult(
+      Kind, /*AssociatedKind=*/0, KnownOperatorKind,
+      /*IsSystem=*/false, CompletionString, /*ModuleName=*/"", BriefDocComment,
+      /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
+      DiagnosticMessage);
+}
+
+ContextFreeCodeCompletionResult *
+ContextFreeCodeCompletionResult::createKeywordResult(
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionKeywordKind Kind,
+    CodeCompletionString *CompletionString, StringRef BriefDocComment,
+    CodeCompletionResultType ResultType) {
+  return new (Allocator) ContextFreeCodeCompletionResult(
+      CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
+      CodeCompletionOperatorKind::None, /*IsSystem=*/false, CompletionString,
+
+      /*ModuleName=*/"", BriefDocComment,
+      /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
+      CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+}
+
+ContextFreeCodeCompletionResult *
+ContextFreeCodeCompletionResult::createLiteralResult(
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionLiteralKind LiteralKind,
+    CodeCompletionString *CompletionString,
+    CodeCompletionResultType ResultType) {
+  return new (Allocator) ContextFreeCodeCompletionResult(
+      CodeCompletionResultKind::Literal, static_cast<uint8_t>(LiteralKind),
+      CodeCompletionOperatorKind::None,
+      /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
+      /*BriefDocComment=*/"",
+      /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
+      CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+}
+
+ContextFreeCodeCompletionResult *
+ContextFreeCodeCompletionResult::createDeclResult(
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionString *CompletionString,
+    const Decl *AssociatedDecl, StringRef ModuleName, StringRef BriefDocComment,
+    ArrayRef<StringRef> AssociatedUSRs, CodeCompletionResultType ResultType,
+    ContextFreeNotRecommendedReason NotRecommended,
+    CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+    StringRef DiagnosticMessage) {
+  assert(AssociatedDecl && "should have a decl");
+  return new (Allocator) ContextFreeCodeCompletionResult(
+      CodeCompletionResultKind::Declaration,
+      static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
+      CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
+      CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
+      NotRecommended, DiagnosticSeverity, DiagnosticMessage);
+}
+
 CodeCompletionDeclKind
 ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   switch (D->getKind()) {
@@ -1276,8 +1337,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       }
     }
 
-    ContextFreeResult = new (*Sink.Allocator) ContextFreeCodeCompletionResult(
-        CCS, AssociatedDecl, ModuleName,
+    ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
+        *Sink.Allocator, CCS, AssociatedDecl, ModuleName,
         copyString(*Sink.Allocator, BriefDocComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
@@ -1286,22 +1347,23 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   }
 
   case CodeCompletionResultKind::Keyword:
-    ContextFreeResult = new (*Sink.Allocator) ContextFreeCodeCompletionResult(
-        KeywordKind, CCS, copyString(*Sink.Allocator, BriefDocComment),
-        ResultType);
+    ContextFreeResult = ContextFreeCodeCompletionResult::createKeywordResult(
+        *Sink.Allocator, KeywordKind, CCS,
+        copyString(*Sink.Allocator, BriefDocComment), ResultType);
     break;
   case CodeCompletionResultKind::BuiltinOperator:
   case CodeCompletionResultKind::Pattern:
-    ContextFreeResult = new (*Sink.Allocator) ContextFreeCodeCompletionResult(
-        Kind, CCS, CodeCompletionOperatorKind::None,
-        copyString(*Sink.Allocator, BriefDocComment), ResultType,
-        ContextFreeNotRecReason,
-          ContextFreeDiagnosticSeverity, ContextFreeDiagnosticMessage);
+    ContextFreeResult =
+        ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
+            *Sink.Allocator, Kind, CCS, CodeCompletionOperatorKind::None,
+            copyString(*Sink.Allocator, BriefDocComment), ResultType,
+            ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
+            ContextFreeDiagnosticMessage);
     break;
   case CodeCompletionResultKind::Literal:
     assert(LiteralKind.hasValue());
-    ContextFreeResult = new (*Sink.Allocator)
-        ContextFreeCodeCompletionResult(*LiteralKind, CCS, ResultType);
+    ContextFreeResult = ContextFreeCodeCompletionResult::createLiteralResult(
+        *Sink.Allocator, *LiteralKind, CCS, ResultType);
     break;
   }
 

@@ -131,8 +131,8 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     auto *completionString =
         CodeCompletionString::create(sink.allocator, chunk);
     auto *contextFreeResult =
-        new (sink.allocator) ContextFreeCodeCompletionResult(
-            CodeCompletionResultKind::Pattern, completionString,
+        ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
+            sink.allocator, CodeCompletionResultKind::Pattern, completionString,
             CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
             CodeCompletionResultType::unknown(),
             ContextFreeNotRecommendedReason::None,
