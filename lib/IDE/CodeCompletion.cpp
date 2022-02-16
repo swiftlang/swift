@@ -336,7 +336,8 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
       Kind, /*AssociatedKind=*/0, KnownOperatorKind,
       /*IsSystem=*/false, CompletionString, /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
-      DiagnosticMessage);
+      DiagnosticMessage,
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
 }
 
 ContextFreeCodeCompletionResult *
@@ -350,7 +351,8 @@ ContextFreeCodeCompletionResult::createKeywordResult(
 
       /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
-      CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+      CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
 }
 
 ContextFreeCodeCompletionResult *
@@ -364,7 +366,8 @@ ContextFreeCodeCompletionResult::createLiteralResult(
       /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
       /*BriefDocComment=*/"",
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
-      CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+      CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
 }
 
 ContextFreeCodeCompletionResult *
@@ -381,7 +384,8 @@ ContextFreeCodeCompletionResult::createDeclResult(
       static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
       CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
       CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
-      NotRecommended, DiagnosticSeverity, DiagnosticMessage);
+      NotRecommended, DiagnosticSeverity, DiagnosticMessage,
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
 }
 
 CodeCompletionDeclKind
@@ -1488,36 +1492,18 @@ CodeCompletionContext::sortCompletionResults(
     ArrayRef<CodeCompletionResult *> Results) {
   std::vector<CodeCompletionResult *> SortedResults(Results.begin(),
                                                     Results.end());
-  struct ResultAndName {
-    CodeCompletionResult *result;
-    std::string name;
-  };
 
-  // Caching the name of each field is important to avoid unnecessary calls to
-  // CodeCompletionString::getName().
-  std::vector<ResultAndName> nameCache(SortedResults.size());
-  for (unsigned i = 0, n = SortedResults.size(); i < n; ++i) {
-    auto *result = SortedResults[i];
-    nameCache[i].result = result;
-    llvm::raw_string_ostream OS(nameCache[i].name);
-    printCodeCompletionResultFilterName(*result, OS);
-    OS.flush();
-  }
-
-  // Sort nameCache, and then transform SortedResults to return the pointers in
-  // order.
-  std::sort(nameCache.begin(), nameCache.end(),
-            [](const ResultAndName &LHS, const ResultAndName &RHS) {
-              int Result = StringRef(LHS.name).compare_insensitive(RHS.name);
+  std::sort(SortedResults.begin(), SortedResults.end(),
+            [](const auto &LHS, const auto &RHS) {
+              int Result = StringRef(LHS->getFilterName())
+                               .compare_insensitive(RHS->getFilterName());
               // If the case insensitive comparison is equal, then secondary
               // sort order should be case sensitive.
               if (Result == 0)
-                Result = LHS.name.compare(RHS.name);
+                Result = LHS->getFilterName().compare(RHS->getFilterName());
               return Result < 0;
             });
 
-  llvm::transform(nameCache, SortedResults.begin(),
-                  [](const ResultAndName &entry) { return entry.result; });
   return SortedResults;
 }
 

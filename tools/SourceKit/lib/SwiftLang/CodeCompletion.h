@@ -95,14 +95,13 @@ public:
   /// should outlive the result, generally by being stored in the same
   /// \c CompletionSink or in a sink that was adopted by the sink that this
   /// \c Compleiton is being stored in.
-  Completion(const SwiftResult &base, StringRef name, StringRef description)
-      : base(base), name(name), description(description) {}
+  Completion(const SwiftResult &base, StringRef description)
+      : base(base), description(description) {}
 
   const SwiftResult &getSwiftResult() const { return base; }
 
   bool hasCustomKind() const { return opaqueCustomKind; }
   void *getCustomKind() const { return opaqueCustomKind; }
-  StringRef getName() const { return name; }
   StringRef getDescription() const { return description; }
   Optional<uint8_t> getModuleImportDepth() const { return moduleImportDepth; }
 
@@ -166,6 +165,10 @@ public:
     return getSwiftResult().getAssociatedUSRs();
   }
 
+  StringRef getFilterName() const {
+    return getSwiftResult().getFilterName();
+  }
+
   /// Allow "upcasting" the completion result to a SwiftResult.
   operator const SwiftResult &() const { return getSwiftResult(); }
 };
@@ -194,7 +197,6 @@ class CompletionBuilder {
   SemanticContextKind semanticContext;
   CodeCompletionFlair flair;
   CodeCompletionString *completionString;
-  llvm::SmallVector<char, 64> originalName;
   void *customKind = nullptr;
   Optional<uint8_t> moduleImportDepth;
   PopularityFactor popularityFactor;
@@ -223,7 +225,7 @@ public:
   void setPrefix(CodeCompletionString *prefix);
 
   StringRef getOriginalName() const {
-    return StringRef(originalName.begin(), originalName.size());
+    return base.getFilterName();
   }
 
   Completion *finish();

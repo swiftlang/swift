@@ -102,7 +102,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 4; // Store ContextFreeCodeCompletionResults in cache
+static constexpr uint32_t onDiskCompletionCacheVersion = 5; // Store FilterName in cache
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -209,6 +209,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
     auto diagMessageIndex = read32le(cursor);
+    auto filterNameIndex = read32le(cursor);
 
     auto assocUSRCount = read32le(cursor);
     SmallVector<StringRef, 4> assocUSRs;
@@ -220,6 +221,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto moduleName = getString(moduleIndex);
     auto briefDocComment = getString(briefDocIndex);
     auto diagMessage = getString(diagMessageIndex);
+    auto filterName = getString(filterNameIndex);
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
@@ -227,7 +229,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
             briefDocComment,
             copyArray(*V.Allocator, ArrayRef<StringRef>(assocUSRs)),
             CodeCompletionResultType::unknown(), notRecommended, diagSeverity,
-            diagMessage);
+            diagMessage, filterName);
 
     V.Results.push_back(result);
   }
@@ -352,6 +354,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(addString(R->getModuleName()));      // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
       LE.write(addString(R->getDiagnosticMessage())); // index into strings
+      LE.write(addString(R->getFilterName())); // index into strings
 
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {

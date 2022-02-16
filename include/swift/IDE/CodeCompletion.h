@@ -735,6 +735,7 @@ class ContextFreeCodeCompletionResult {
   static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
 
   StringRef DiagnosticMessage;
+  StringRef FilterName;
 
 public:
   /// Memberwise initializer. \p AssociatedKInd is opaque and will be
@@ -753,13 +754,13 @@ public:
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-      StringRef DiagnosticMessage)
+      StringRef DiagnosticMessage, StringRef FilterName)
       : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         ResultType(ResultType), NotRecommended(NotRecommended),
         DiagnosticSeverity(DiagnosticSeverity),
-        DiagnosticMessage(DiagnosticMessage) {
+        DiagnosticMessage(DiagnosticMessage), FilterName(FilterName) {
     this->AssociatedKind.Opaque = AssociatedKind;
     assert((NotRecommended == ContextFreeNotRecommendedReason::None) ==
                (DiagnosticSeverity == CodeCompletionDiagnosticSeverity::None) &&
@@ -869,7 +870,9 @@ public:
   CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
     return DiagnosticSeverity;
   }
-  StringRef getDiagnosticMessage() const { return DiagnosticMessage; };
+  StringRef getDiagnosticMessage() const { return DiagnosticMessage; }
+
+  StringRef getFilterName() const { return FilterName; }
 
   bool isOperator() const {
     if (getKind() == CodeCompletionResultKind::Declaration) {
@@ -1108,6 +1111,10 @@ public:
     } else {
       return getContextFreeResult().getDiagnosticMessage();
     }
+  }
+
+  StringRef getFilterName() const {
+    return getContextFreeResult().getFilterName();
   }
 
   /// Print a debug representation of the code completion result to \p OS.

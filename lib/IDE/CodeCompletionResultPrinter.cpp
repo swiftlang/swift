@@ -450,9 +450,8 @@ void swift::ide::printCodeCompletionResultSourceText(
   }
 }
 
-void swift::ide::printCodeCompletionResultFilterName(
-    const CodeCompletionResult &Result, llvm::raw_ostream &OS) {
-  auto str = Result.getCompletionString();
+static void printCodeCompletionResultFilterName(
+    const CodeCompletionString *str, llvm::raw_ostream &OS) {
   // FIXME: we need a more uniform way to handle operator completions.
   if (str->getChunks().size() == 1 && str->getChunks()[0].is(ChunkKind::Dot)) {
     OS << ".";
@@ -535,4 +534,16 @@ void swift::ide::printCodeCompletionResultFilterName(
       ++i;
     }
   }
+}
+
+StringRef swift::ide::getCodeCompletionResultFilterName(
+    const CodeCompletionString *Str, llvm::BumpPtrAllocator &Allocator) {
+  SmallString<32> buf;
+  llvm::raw_svector_ostream OS(buf);
+  printCodeCompletionResultFilterName(Str, OS);
+  size_t size = buf.size();
+  char *storage = Allocator.Allocate<char>(size + 1);
+  memcpy(storage, buf.data(), size);
+  storage[size] = '\0';
+  return {storage, size};
 }
