@@ -1036,7 +1036,7 @@ public:
     if (auto *repr = node.dyn_cast<TypeRepr *>())
       return repr;
 
-    if (auto *cond = node.dyn_cast<StmtCondition *>())
+    if (auto *cond = node.dyn_cast<StmtConditionElement *>())
       return cond;
 
     if (auto *caseItem = node.dyn_cast<CaseLabelItem *>())
