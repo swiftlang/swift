@@ -633,7 +633,10 @@ InferredGenericSignatureRequestRQM::evaluate(
   auto result = GenericSignature::get(genericParams, minimalRequirements);
   bool hadError = machine->hadError();
 
-  hadError |= diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
+  if (ctx.LangOpts.RequirementMachineInferredSignatures ==
+      RequirementMachineMode::Enabled) {
+    hadError |= diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
+  }
 
   // FIXME: Handle allowConcreteGenericParams
 

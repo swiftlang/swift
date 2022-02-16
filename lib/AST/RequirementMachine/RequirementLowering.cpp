@@ -532,9 +532,7 @@ void swift::rewriting::realizeInheritedRequirements(
 
 /// Emit diagnostics for the given \c RequirementErrors.
 ///
-/// \param ctx The AST context, which is used to determine whether
-/// requirement machine protocol signatures are enabled. If not,
-/// diagnostics will not be emitted.
+/// \param ctx The AST context in which to emit diagnostics.
 /// \param errors The set of requirement diagnostics to be emitted.
 /// \param allowConcreteGenericParams Whether concrete type parameters
 /// are permitted in the generic signature. If true, diagnostics will
@@ -547,9 +545,6 @@ bool swift::rewriting::diagnoseRequirementErrors(
     ASTContext &ctx, SmallVectorImpl<RequirementError> &errors,
     bool allowConcreteGenericParams) {
   bool diagnosedError = false;
-  if (ctx.LangOpts.RequirementMachineProtocolSignatures !=
-      RequirementMachineMode::Enabled)
-    return diagnosedError;
 
   for (auto error : errors) {
     SourceLoc loc = error.loc;
@@ -740,7 +735,10 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
+  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
+      RequirementMachineMode::Enabled) {
+    diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
+  }
 
   return ctx.AllocateCopy(result);
 }
@@ -996,7 +994,10 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
+  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
+      RequirementMachineMode::Enabled) {
+    diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
+  }
 
   return ctx.AllocateCopy(result);
 }
