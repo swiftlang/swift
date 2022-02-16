@@ -81,24 +81,24 @@ import Swift
 /// 5. Calls `startMonitoring` on the `QuakeMonitor`.
 ///
 /// ```
-///     extension QuakeMonitor {
+/// extension QuakeMonitor {
 ///
-///         static var throwingQuakes: AsyncThrowingStream<Quake, Error> {
-///             AsyncThrowingStream { continuation in
-///                 let monitor = QuakeMonitor()
-///                 monitor.quakeHandler = { quake in
-///                     continuation.yield(quake)
-///                 }
-///                 monitor.errorHandler = { error in
-///                     continuation.finish(throwing: error)
-///                 }
-///                 continuation.onTermination = { @Sendable _ in
-///                     monitor.stopMonitoring()
-///                 }
-///                 monitor.startMonitoring()
+///     static var throwingQuakes: AsyncThrowingStream<Quake, Error> {
+///         AsyncThrowingStream { continuation in
+///             let monitor = QuakeMonitor()
+///             monitor.quakeHandler = { quake in
+///                  continuation.yield(quake)
 ///             }
+///             monitor.errorHandler = { error in
+///                 continuation.finish(throwing: error)
+///             }
+///             continuation.onTermination = { @Sendable _ in
+///                 monitor.stopMonitoring()
+///             }
+///             monitor.startMonitoring()
 ///         }
 ///     }
+/// }
 /// ```
 ///
 ///

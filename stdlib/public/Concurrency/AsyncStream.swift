@@ -69,21 +69,21 @@ import Swift
 /// 4. Calls `startMonitoring` on the `QuakeMonitor`.
 ///
 /// ```
-///     extension QuakeMonitor {
+/// extension QuakeMonitor {
 ///
-///         static var quakes: AsyncStream<Quake> {
-///             AsyncStream { continuation in
-///                 let monitor = QuakeMonitor()
-///                 monitor.quakeHandler = { quake in
-///                     continuation.yield(quake)
-///                 }
-///                 continuation.onTermination = { @Sendable _ in
-///                     monitor.stopMonitoring()
-///                 }
-///                 monitor.startMonitoring()
+///     static var quakes: AsyncStream<Quake> {
+///         AsyncStream { continuation in
+///             let monitor = QuakeMonitor()
+///             monitor.quakeHandler = { quake in
+///                 continuation.yield(quake)
 ///             }
+///             continuation.onTermination = { @Sendable _ in
+///                  monitor.stopMonitoring()
+///             }
+///             monitor.startMonitoring()
 ///         }
 ///     }
+/// }
 /// ```
 ///
 /// Because the stream is an `AsyncSequence`, the call point can use the
