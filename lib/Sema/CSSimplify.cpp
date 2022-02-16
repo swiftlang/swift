@@ -1626,10 +1626,35 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       continue;
     }
 
-    // Skip unfulfilled parameters. There's nothing to do for them.
-    if (parameterBindings[paramIdx].empty())
+    // If type inference from default arguments is enabled, let's
+    // add a constraint from the parameter if necessary, otherwise
+    // there is nothing to do but move to the next parameter.
+    if (parameterBindings[paramIdx].empty()) {
+      auto &ctx = cs.getASTContext();
+
+      if (paramTy->isTypeVariableOrMember() &&
+          ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments) {
+        auto *paramList = getParameterList(callee);
+        auto defaultExprType = paramList->get(paramIdx)->getTypeOfDefaultExpr();
+
+        // A caller side default.
+        if (!defaultExprType)
+          continue;
+
+        // If this is just a regular default type that works
+        // for any generic parameter type, let's continue.
+        if (defaultExprType->hasArchetype())
+          continue;
+
+        cs.addConstraint(
+            ConstraintKind::ArgumentConversion, paramTy, defaultExprType,
+            locator.withPathElement(LocatorPathElt::ApplyArgToParam(
+                paramIdx, paramIdx, param.getParameterFlags())));
+      }
+
       continue;
-    
+    }
+
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::ApplyArgToParam(

@@ -6238,5 +6238,24 @@ ERROR(type_sequence_on_non_generic_param, none,
       "'@_typeSequence' must appear on a generic parameter",
       ())
 
+//------------------------------------------------------------------------------
+// MARK: Type inference from default expressions
+//------------------------------------------------------------------------------
+
+ERROR(cannot_default_generic_parameter_inferrable_from_result, none,
+      "cannot use default expression for inference of %0 because it "
+      "is inferrable from result type",
+      (Type))
+
+ERROR(cannot_default_generic_parameter_inferrable_from_another_parameter, none,
+      "cannot use default expression for inference of %0 because it "
+      "is inferrable from parameters %1",
+      (Type, StringRef))
+
+ERROR(cannot_default_generic_parameter_inferrable_through_same_type, none,
+      "cannot use default expression for inference of %0 because it "
+      "is inferrable through same-type requirement: %1",
+      (Type, StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
