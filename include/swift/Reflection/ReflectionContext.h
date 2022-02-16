@@ -1504,21 +1504,25 @@ public:
 
   std::pair<llvm::Optional<std::string>, ActorInfo>
   actorInfo(StoredPointer ActorPtr) {
-    using DefaultActorImpl = DefaultActorImpl<Runtime>;
+    if (supportsPriorityEscalation) {
+      return {std::string("Failure reading actor with escalation support"), {}};
+    }
+
+    using DefaultActorImpl = DefaultActorImpl<Runtime, ActiveActorStatusWithoutEscalation<Runtime>>;
 
     auto ActorObj = readObj<DefaultActorImpl>(ActorPtr);
     if (!ActorObj)
       return {std::string("failure reading actor"), {}};
 
     ActorInfo Info{};
-    Info.Flags = ActorObj->Flags;
+    Info.Flags = ActorObj->Status.Flags[0];
 
     // Status is the low 3 bits of Flags. Status of 0 is Idle. Don't read
     // FirstJob when idle.
     auto Status = Info.Flags & 0x7;
     if (Status != 0) {
       // This is a JobRef which stores flags in the low bits.
-      Info.FirstJob = ActorObj->FirstJob & ~StoredPointer(0x3);
+      Info.FirstJob = ActorObj->Status.FirstJob & ~StoredPointer(0x3);
     }
     return {llvm::None, Info};
   }
