@@ -68,8 +68,8 @@ func testStaticMembers() {
   HasStaticMemberTemplates.removeReference(&x)
 }
 
-// CHECK: sil {{(hidden_external)?}} [clang HasStaticMemberTemplates.add] @_ZN24HasStaticMemberTemplates3addIlEET_S1_S1_ : $@convention(c) (Int, Int) -> Int
+// CHECK: sil hidden_external [clang HasStaticMemberTemplates.add] @_ZN24HasStaticMemberTemplates3addIlEET_S1_S1_ : $@convention(c) (Int, Int) -> Int
 
-// CHECK: sil {{(hidden_external)?}} [clang HasStaticMemberTemplates.addTwoTemplates] @_ZN24HasStaticMemberTemplates15addTwoTemplatesIlcEET_S1_T0_ : $@convention(c) (Int, Int8) -> Int
+// CHECK: sil hidden_external [clang HasStaticMemberTemplates.addTwoTemplates] @_ZN24HasStaticMemberTemplates15addTwoTemplatesIlcEET_S1_T0_ : $@convention(c) (Int, Int8) -> Int
 
-// CHECK: sil {{(hidden_external)?}} [clang HasStaticMemberTemplates.removeReference] @_ZN24HasStaticMemberTemplates15removeReferenceIlEET_RS1_ : $@convention(c) (@inout Int) -> Int
+// CHECK: sil hidden_external [clang HasStaticMemberTemplates.removeReference] @_ZN24HasStaticMemberTemplates15removeReferenceIlEET_RS1_ : $@convention(c) (@inout Int) -> Int
