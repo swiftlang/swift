@@ -236,18 +236,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
             newFn));
 
     if (auto fn = dyn_cast<AbstractFunctionDecl>(newDecl)) {
-      // On Windows x86-64 we have to hack around the fact that
-      // Int -> long long -> Int64. So we re-write the parameters mapping
-      // Int64 -> Int.
-      auto triple = decl->getASTContext().LangOpts.Target;
-      if (triple.isOSWindows() && triple.isArch64Bit() &&
-          !triple.isWindowsCygwinEnvironment() &&
-          // Make sure we're substituting in at least one Int or UInt
-          // (technically not necessary).
-          llvm::any_of(subst.getReplacementTypes(), [](Type t) {
-            return t->isEqual(t->getASTContext().getIntType()) ||
-                   t->isEqual(t->getASTContext().getUIntType());
-          })) {
+      if (!subst.empty()) {
         auto originalFnSubst = cast<AbstractFunctionDecl>(decl)
                                    ->getInterfaceType()
                                    ->getAs<GenericFunctionType>()
@@ -301,7 +290,7 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
                 /*genericParams=*/nullptr, func->getDeclContext(), newFn);
             if (func->isStatic()) newFnDecl->setStatic();
             if (func->isImportAsStaticMember()) newFnDecl->setImportAsStaticMember();
-            if (!func->getDeclContext()->isModuleScopeContext()) {
+            if (func->getImportAsMemberStatus().isInstance()) {
               newFnDecl->setSelfAccessKind(func->getSelfAccessKind());
               newFnDecl->setSelfIndex(func->getSelfIndex());
             }
