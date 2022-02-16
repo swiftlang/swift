@@ -425,10 +425,10 @@ right:
     br trampoline(%copy : $C)
 
 trampoline(%copy_1 : @owned $C):
-    end_borrow %lifetime : $C
     br exit
 
 exit:
+    end_borrow %lifetime : $C
     %retval = tuple ()
     destroy_value %copy_1 : $C
     destroy_value %instance : $C
