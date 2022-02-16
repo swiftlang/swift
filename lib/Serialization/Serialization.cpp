@@ -1528,6 +1528,7 @@ void Serializer::writeASTBlockEntity(const SILLayout *layout) {
   SILLayoutLayout::emitRecord(
                         Out, ScratchRecord, abbrCode,
                         addGenericSignatureRef(layout->getGenericSignature()),
+                        layout->capturesGenericEnvironment(),
                         layout->getFields().size(),
                         data);
 }

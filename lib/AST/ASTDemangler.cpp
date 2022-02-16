@@ -706,7 +706,8 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
     silFields.emplace_back(field.getPointer()->getCanonicalType(),
                            field.getInt());
   SILLayout *layout =
-      SILLayout::get(Ctx, signature.getCanonicalSignature(), silFields);
+      SILLayout::get(Ctx, signature.getCanonicalSignature(), silFields,
+                     /*captures generics*/ false);
 
   SubstitutionMap substs;
   if (signature)

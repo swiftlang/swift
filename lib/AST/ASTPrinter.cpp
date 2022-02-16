@@ -6085,6 +6085,11 @@ public:
   }
 
   void visitSILBoxType(SILBoxType *T) {
+    // Print attributes.
+    if (T->getLayout()->capturesGenericEnvironment()) {
+      Printer << "@captures_generics ";
+    }
+    
     {
       // A box layout has its own independent generic environment. Don't try
       // to print it with the environment's generic params.

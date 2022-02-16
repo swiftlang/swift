@@ -298,14 +298,10 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
       return;
     }
     
-    if (origTy->getInvocationGenericSignature()) {
-      LLVM_DEBUG(llvm::dbgs() << "TODO: Generic partial_apply not yet implemented\n");
-      return;
-    }
-    
     auto newBoxLayout = SILLayout::get(C,
-                                       origTy->getInvocationGenericSignature(),
-                                       boxFields);
+       origTy->getInvocationGenericSignature(),
+       boxFields,
+       /*capturesGenerics*/ !origTy->getInvocationGenericSignature().isNull());
     SubstitutionMap identitySubstitutionMap;
     if (auto origSig = origTy->getInvocationGenericSignature()) {
       identitySubstitutionMap = origSig->getIdentitySubstitutionMap();

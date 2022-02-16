@@ -409,9 +409,11 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
   switch (kind) {
   case decls_block::SIL_LAYOUT: {
     GenericSignatureID rawGenericSig;
+    bool capturesGenerics;
     unsigned numFields;
     ArrayRef<uint64_t> types;
     decls_block::SILLayoutLayout::readRecord(scratch, rawGenericSig,
+                                             capturesGenerics,
                                              numFields, types);
     
     SmallVector<SILField, 4> fields;
@@ -426,7 +428,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
     CanGenericSignature canSig;
     if (auto sig = getGenericSignature(rawGenericSig))
       canSig = sig.getCanonicalSignature();
-    return SILLayout::get(getContext(), canSig, fields);
+    return SILLayout::get(getContext(), canSig, fields, capturesGenerics);
   }
   default:
     fatal();

@@ -1002,7 +1002,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
-    writeOneTypeLayout(ABI->getKind(), ABI->hasDynamicLifetime() ? 1 : 0,
+    unsigned flags
+      = (ABI->hasDynamicLifetime() ? 1 : 0)
+      | (ABI->emitReflectionMetadata() ? 2 : 0);
+    writeOneTypeLayout(ABI->getKind(),
+                       flags,
                        ABI->getType());
     break;
   }

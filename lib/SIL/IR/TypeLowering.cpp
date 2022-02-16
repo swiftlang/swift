@@ -3516,7 +3516,8 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   // We don't need to capture the generic environment.
   if (!loweredInterfaceType->hasTypeParameter()) {
     auto layout = SILLayout::get(C, nullptr,
-                                 SILField(loweredInterfaceType, isMutable));
+                                 SILField(loweredInterfaceType, isMutable),
+                                 /*captures generics*/ false);
     return SILBoxType::get(C, layout, {});
   }
   
@@ -3526,7 +3527,8 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   // only the parts used by the captured variable.
   
   auto layout = SILLayout::get(C, signature,
-                               SILField(loweredInterfaceType, isMutable));
+                               SILField(loweredInterfaceType, isMutable),
+                               /*captures generics*/ false);
   
   // Instantiate the layout with identity substitutions.
   auto subMap = SubstitutionMap::get(
@@ -3597,7 +3599,8 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
   if (boxSignature == CanGenericSignature()) {
     auto eltIntfTy = elt->getArgumentInterfaceType();
     auto boxVarTy = getLoweredRValueType(context, eltIntfTy);
-    auto layout = SILLayout::get(C, nullptr, SILField(boxVarTy, true));
+    auto layout = SILLayout::get(C, nullptr, SILField(boxVarTy, true),
+                                 /*captures generics*/ false);
     return SILBoxType::get(C, layout, {});
   }
 
@@ -3609,7 +3612,8 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
 
   auto boxVarTy = getLoweredRValueType(context,
                                        getAbstractionPattern(elt), eltIntfTy);
-  auto layout = SILLayout::get(C, boxSignature, SILField(boxVarTy, true));
+  auto layout = SILLayout::get(C, boxSignature, SILField(boxVarTy, true),
+                               /*captures generics*/ false);
 
   // Instantiate the layout with enum's substitution list.
   auto subMap = boundEnum->getContextSubstitutionMap(

@@ -1257,7 +1257,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), None,
-        /*bool hasDynamicLifetime*/ Attr != 0);
+        /*bool hasDynamicLifetime*/ Attr & 1,
+        /*bool reflection*/ Attr & 2);
     break;
   case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");

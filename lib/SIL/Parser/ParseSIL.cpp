@@ -2772,7 +2772,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   switch (Opcode) {
   case SILInstructionKind::AllocBoxInst: {
     bool hasDynamicLifetime = false;
+    bool hasReflection = false;
     if (parseSILOptional(hasDynamicLifetime, *this, "dynamic_lifetime"))
+      return true;
+    if (parseSILOptional(hasReflection, *this, "reflection"))
       return true;
 
     SILType Ty;
