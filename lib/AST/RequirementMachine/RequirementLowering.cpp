@@ -135,7 +135,7 @@ static void desugarSuperclassRequirement(Type subjectType,
           RequirementError::forRedundantRequirement(requirement, loc));
     } else {
       errors.push_back(
-          RequirementError::forNonTypeParameter(requirement, loc));
+          RequirementError::forConflictingRequirement(requirement, loc));
     }
 
     return;
@@ -157,7 +157,7 @@ static void desugarLayoutRequirement(Type subjectType,
           RequirementError::forRedundantRequirement(requirement, loc));
     } else {
       errors.push_back(
-          RequirementError::forNonTypeParameter(requirement, loc));
+          RequirementError::forConflictingRequirement(requirement, loc));
     }
 
     return;
@@ -193,7 +193,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
       auto *module = protoDecl->getParentModule();
       auto conformance = module->lookupConformance(subjectType, protoDecl);
       if (conformance.isInvalid()) {
-        errors.push_back(RequirementError::forNonTypeParameter(
+        errors.push_back(RequirementError::forConflictingRequirement(
             {RequirementKind::Conformance, subjectType, constraintType}, loc));
         return;
       }
@@ -303,9 +303,9 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
     desugarSuperclassRequirement(subjectType, constraintType, loc, reqs, errors);
   } else {
     errors.push_back(
-        RequirementError::forInvalidConformance(subjectType,
-                                                constraintType,
-                                                loc));
+        RequirementError::forInvalidTypeRequirement(subjectType,
+                                                    constraintType,
+                                                    loc));
     return;
   }
 
@@ -557,7 +557,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
       continue;
 
     switch (error.kind) {
-    case RequirementError::Kind::InvalidConformance: {
+    case RequirementError::Kind::InvalidTypeRequirement: {
       Type subjectType = error.requirement.getFirstType();
       Type constraint = error.requirement.getSecondType();
 
@@ -607,7 +607,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
-    case RequirementError::Kind::NonTypeParameter: {
+    case RequirementError::Kind::ConflictingRequirement: {
       ctx.Diags.diagnose(loc, diag::requires_not_suitable_archetype,
                          error.requirement.getFirstType());
       diagnosedError = true;

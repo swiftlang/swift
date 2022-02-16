@@ -124,55 +124,6 @@ struct StructuralRequirement {
   bool inferred = false;
 };
 
-/// Represents an invalid requirement, such as `T: Int`.
-///
-/// Invalid requirements are recorded while computing the
-/// generic signature of a declaration, and diagnosed via
-/// \c diagnoseRequirementErrors .
-struct RequirementError {
-  /// The kind of requirement error.
-  enum class Kind {
-    InvalidConformance,
-    ConcreteTypeMismatch,
-    NonTypeParameter,
-    RedundantRequirement,
-  } kind;
-
-  /// The invalid requirement.
-  Requirement requirement;
-
-  SourceLoc loc;
-
-private:
-  RequirementError(Kind kind, Requirement requirement, SourceLoc loc)
-    : kind(kind), requirement(requirement), loc(loc) {}
-
-public:
-  static RequirementError forInvalidConformance(Type subjectType,
-                                                Type constraint,
-                                                SourceLoc loc) {
-    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
-    return {Kind::InvalidConformance, requirement, loc};
-  }
-
-  static RequirementError forConcreteTypeMismatch(Type type1,
-                                                  Type type2,
-                                                  SourceLoc loc) {
-    Requirement requirement(RequirementKind::SameType, type1, type2);
-    return {Kind::ConcreteTypeMismatch, requirement, loc};
-  }
-
-  static RequirementError forNonTypeParameter(Requirement req,
-                                              SourceLoc loc) {
-    return {Kind::NonTypeParameter, req, loc};
-  }
-
-  static RequirementError forRedundantRequirement(Requirement req,
-                                                  SourceLoc loc) {
-    return {Kind::RedundantRequirement, req, loc};
-  }
-};
-
 } // end namespace swift
 
 #endif

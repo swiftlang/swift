@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
+#include "Diagnostics.h"
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
