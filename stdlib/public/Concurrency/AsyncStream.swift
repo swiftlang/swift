@@ -68,6 +68,7 @@ import Swift
 /// calls `stopMonitoring()` on the monitor.
 /// 4. Calls `startMonitoring` on the `QuakeMonitor`.
 ///
+/// ```
 ///     extension QuakeMonitor {
 ///
 ///         static var quakes: AsyncStream<Quake> {
@@ -83,6 +84,7 @@ import Swift
 ///             }
 ///         }
 ///     }
+/// ```
 ///
 /// Because the stream is an `AsyncSequence`, the call point can use the
 /// `for`-`await`-`in` syntax to process each `Quake` instance as the stream
@@ -265,7 +267,7 @@ public struct AsyncStream<Element> {
   /// The following example shows an `AsyncStream` created with this
   /// initializer that produces 100 random numbers on a one-second interval,
   /// calling `yield(_:)` to deliver each element to the awaiting call point.
-  /// When the `for` loop exits and the stream finishes by calling the
+  /// When the `for` loop exits, the stream finishes by calling the
   /// continuation's `finish()` method.
   ///
   ///     let stream = AsyncStream<Int>(Int.self,

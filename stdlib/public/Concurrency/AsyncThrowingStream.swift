@@ -80,6 +80,7 @@ import Swift
 /// calls `stopMonitoring()` on the monitor.
 /// 5. Calls `startMonitoring` on the `QuakeMonitor`.
 ///
+/// ```
 ///     extension QuakeMonitor {
 ///
 ///         static var throwingQuakes: AsyncThrowingStream<Quake, Error> {
@@ -98,6 +99,7 @@ import Swift
 ///             }
 ///         }
 ///     }
+/// ```
 ///
 ///
 /// Because the stream is an `AsyncSequence`, the call point uses the
@@ -289,7 +291,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   /// The following example shows an `AsyncStream` created with this
   /// initializer that produces 100 random numbers on a one-second interval,
   /// calling `yield(_:)` to deliver each element to the awaiting call point.
-  /// When the `for` loop exits and the stream finishes by calling the
+  /// When the `for` loop exits, the stream finishes by calling the
   /// continuation's `finish()` method. If the random number is divisble by 5
   /// with no remainder, the stream throws a `MyRandomNumberError`.
   ///
