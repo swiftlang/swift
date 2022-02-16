@@ -40,11 +40,11 @@ void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
   return accessor ? accessor->GenericEnvironment.get() : nullptr;
 }
 
-/// func _executeDistributedTarget(
+/// func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 ///    on: AnyObject,
 ///    _ targetName: UnsafePointer<UInt8>,
 ///    _ targetNameLength: UInt,
-///    argumentDecoder: AnyObject,
+///    argumentDecoder: inout D,
 ///    argumentTypes: UnsafeBufferPointer<Any.Type>,
 ///    resultBuffer: Builtin.RawPointer,
 ///    substitutions: UnsafeRawPointer?,
@@ -59,7 +59,9 @@ using TargetExecutorSignature =
                         /*resultBuffer=*/void *,
                         /*substitutions=*/void *,
                         /*witnessTables=*/void **,
-                        /*numWitnessTables=*/size_t),
+                        /*numWitnessTables=*/size_t,
+                        /*decoderType=*/Metadata *,
+                        /*decoderWitnessTable=*/void **),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -75,6 +77,8 @@ TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 ///   - a list of witness tables
 ///   - a number of witness tables in the buffer
 ///   - a reference to an actor to execute method on.
+///   - a type of the argument decoder
+///   - a witness table associated with argument decoder value
 using DistributedAccessorSignature =
     AsyncSignature<void(/*argumentDecoder=*/HeapObject *,
                         /*argumentTypes=*/const Metadata *const *,
@@ -82,7 +86,9 @@ using DistributedAccessorSignature =
                         /*substitutions=*/void *,
                         /*witnessTables=*/void **,
                         /*numWitnessTables=*/size_t,
-                        /*actor=*/HeapObject *),
+                        /*actor=*/HeapObject *,
+                        /*decoderType=*/Metadata *,
+                        /*decoderWitnessTable=*/void **),
                    /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
@@ -113,7 +119,9 @@ void ::swift_distributed_execute_target(
     void *resultBuffer,
     void *substitutions,
     void **witnessTables,
-    size_t numWitnessTables) {
+    size_t numWitnessTables,
+    Metadata *decoderType,
+    void **decoderWitnessTable) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   if (!accessor) {
     assert(false && "no distributed accessor");
@@ -136,10 +144,13 @@ void ::swift_distributed_execute_target(
       swift_distributed_execute_target_resume);
 
   accessorEntry(calleeContext,
-                argumentDecoder, argumentTypes,
+                argumentDecoder,
+                argumentTypes,
                 resultBuffer,
                 substitutions,
                 witnessTables,
                 numWitnessTables,
-                actor);
+                actor,
+                decoderType,
+                decoderWitnessTable);
 }
