@@ -720,6 +720,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
+  diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
+
   return ctx.AllocateCopy(result);
 }
 
@@ -973,6 +975,8 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
       recordInheritedTypeRequirement(firstDecl, otherDecl);
     }
   }
+
+  diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
 
   return ctx.AllocateCopy(result);
 }

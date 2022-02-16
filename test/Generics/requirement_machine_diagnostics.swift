@@ -62,3 +62,12 @@ func concreteLayoutRedundancy<T>(_: T) where C : AnyObject {}
 class C2: C {}
 func concreteSubclassRedundancy<T>(_: T) where C2 : C {}
 // expected-warning@-1{{redundant superclass constraint 'C2' : 'C'}}
+
+protocol UselessProtocolWhereClause where Int == Int {}
+// expected-warning@-1 {{redundant same-type constraint 'Int' == 'Int'}}
+
+protocol InvalidProtocolWhereClause where Self: Int {}
+// expected-error@-1 {{type 'Self' constrained to non-protocol, non-class type 'Int'}}
+
+typealias Alias<T> = T where Int == Int
+// expected-warning@-1 {{redundant same-type constraint 'Int' == 'Int'}}
