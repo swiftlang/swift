@@ -451,8 +451,15 @@ extension timeval {
   @available(SwiftStdlib 5.7, *)
   public init(_ duration: Duration) {
     let comps = duration.components
+#if os(Linux)
+  // Linux platforms define timeval as Int/Int
+  self.init(tv_sec: Int(comps.seconds),
+              tv_usec: Int(comps.attoseconds / 1_000_000_000_000))
+#else
+    // Darwin platforms define timeval as Int/Int32
     self.init(tv_sec: Int(comps.seconds),
               tv_usec: Int32(comps.attoseconds / 1_000_000_000_000))
+#endif
   }
 }
 
