@@ -87,3 +87,8 @@ module InvalidNestedStruct {
   header "invalid-nested-struct.h"
   requires cplusplus
 }
+
+module ClassProtocolNameClash {
+  header "class-protocol-name-clash.h"
+  requires cplusplus
+}
