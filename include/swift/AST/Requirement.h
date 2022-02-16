@@ -130,6 +130,7 @@ struct StructuralRequirement {
 /// generic signature of a declaration, and diagnosed via
 /// \c diagnoseRequirementErrors .
 struct RequirementError {
+  /// The kind of requirement error.
   enum class Kind {
     InvalidConformance,
     ConcreteTypeMismatch,
@@ -137,59 +138,38 @@ struct RequirementError {
     RedundantRequirement,
   } kind;
 
-  union {
-    struct {
-      Type subjectType;
-      Type constraint;
-    } invalidConformance;
-
-    struct {
-      Type type1;
-      Type type2;
-    } concreteTypeMismatch;
-
-    Type nonTypeParameter;
-
-    Requirement redundantRequirement;
-  };
+  /// The invalid requirement.
+  Requirement requirement;
 
   SourceLoc loc;
 
 private:
-  RequirementError(Kind kind, SourceLoc loc)
-  : kind(kind), loc(loc) {}
+  RequirementError(Kind kind, Requirement requirement, SourceLoc loc)
+    : kind(kind), requirement(requirement), loc(loc) {}
 
 public:
   static RequirementError forInvalidConformance(Type subjectType,
                                                 Type constraint,
                                                 SourceLoc loc) {
-    RequirementError error(Kind::InvalidConformance, loc);
-    error.invalidConformance.subjectType = subjectType;
-    error.invalidConformance.constraint = constraint;
-    return error;
+    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
+    return {Kind::InvalidConformance, requirement, loc};
   }
 
   static RequirementError forConcreteTypeMismatch(Type type1,
                                                   Type type2,
                                                   SourceLoc loc) {
-    RequirementError error(Kind::ConcreteTypeMismatch, loc);
-    error.concreteTypeMismatch.type1 = type1;
-    error.concreteTypeMismatch.type2 = type2;
-    return error;
+    Requirement requirement(RequirementKind::SameType, type1, type2);
+    return {Kind::ConcreteTypeMismatch, requirement, loc};
   }
 
-  static RequirementError forNonTypeParameter(Type subject,
+  static RequirementError forNonTypeParameter(Requirement req,
                                               SourceLoc loc) {
-    RequirementError error(Kind::NonTypeParameter, loc);
-    error.nonTypeParameter = subject;
-    return error;
+    return {Kind::NonTypeParameter, req, loc};
   }
 
   static RequirementError forRedundantRequirement(Requirement req,
                                                   SourceLoc loc) {
-    RequirementError error(Kind::RedundantRequirement, loc);
-    error.redundantRequirement = req;
-    return error;
+    return {Kind::RedundantRequirement, req, loc};
   }
 };
 

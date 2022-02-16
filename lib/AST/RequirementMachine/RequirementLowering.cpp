@@ -128,12 +128,14 @@ static void desugarSuperclassRequirement(Type subjectType,
                                          SmallVectorImpl<Requirement> &result,
                                          SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
+    Requirement requirement(RequirementKind::Superclass,
+                            subjectType, constraintType);
     if (constraintType->isExactSuperclassOf(subjectType)) {
-      errors.push_back(RequirementError::forRedundantRequirement(
-          {RequirementKind::Superclass, subjectType, constraintType}, loc));
+      errors.push_back(
+          RequirementError::forRedundantRequirement(requirement, loc));
     } else {
       errors.push_back(
-          RequirementError::forNonTypeParameter(subjectType, loc));
+          RequirementError::forNonTypeParameter(requirement, loc));
     }
 
     return;
@@ -148,12 +150,14 @@ static void desugarLayoutRequirement(Type subjectType,
                                      SmallVectorImpl<Requirement> &result,
                                      SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
+    Requirement requirement(RequirementKind::Layout,
+                            subjectType, layout);
     if (subjectType->isAnyClassReferenceType()) {
-      errors.push_back(RequirementError::forRedundantRequirement(
-          {RequirementKind::Layout, subjectType, layout}, loc));
+      errors.push_back(
+          RequirementError::forRedundantRequirement(requirement, loc));
     } else {
       errors.push_back(
-          RequirementError::forNonTypeParameter(subjectType, loc));
+          RequirementError::forNonTypeParameter(requirement, loc));
     }
 
     return;
@@ -189,8 +193,8 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
       auto *module = protoDecl->getParentModule();
       auto conformance = module->lookupConformance(subjectType, protoDecl);
       if (conformance.isInvalid()) {
-        errors.push_back(
-            RequirementError::forNonTypeParameter(subjectType, loc));
+        errors.push_back(RequirementError::forNonTypeParameter(
+            {RequirementKind::Conformance, subjectType, constraintType}, loc));
         return;
       }
 
@@ -541,8 +545,8 @@ bool swift::rewriting::diagnoseRequirementErrors(
 
     switch (error.kind) {
     case RequirementError::Kind::InvalidConformance: {
-      Type subjectType = error.invalidConformance.subjectType;
-      Type constraint = error.invalidConformance.constraint;
+      Type subjectType = error.requirement.getFirstType();
+      Type constraint = error.requirement.getSecondType();
 
       // FIXME: The constraint string is printed directly here because
       // the current default is to not print `any` for existential
@@ -578,8 +582,8 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::ConcreteTypeMismatch: {
-      auto type1 = error.concreteTypeMismatch.type1;
-      auto type2 = error.concreteTypeMismatch.type2;
+      auto type1 = error.requirement.getFirstType();
+      auto type2 = error.requirement.getSecondType();
 
       if (!type1->hasError() && !type2->hasError()) {
         ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
@@ -592,13 +596,13 @@ bool swift::rewriting::diagnoseRequirementErrors(
 
     case RequirementError::Kind::NonTypeParameter: {
       ctx.Diags.diagnose(loc, diag::requires_not_suitable_archetype,
-                         error.nonTypeParameter);
+                         error.requirement.getFirstType());
       diagnosedError = true;
       break;
     }
 
     case RequirementError::Kind::RedundantRequirement: {
-      auto requirement = error.redundantRequirement;
+      auto requirement = error.requirement;
       switch (requirement.getKind()) {
       case RequirementKind::SameType:
         ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
