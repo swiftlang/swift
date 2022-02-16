@@ -226,7 +226,8 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
             kind, associatedKind, opKind, isSystem, string, moduleName,
             briefDocComment,
             copyArray(*V.Allocator, ArrayRef<StringRef>(assocUSRs)),
-            notRecommended, diagSeverity, diagMessage);
+            CodeCompletionResultType::unknown(), notRecommended, diagSeverity,
+            diagMessage);
 
     V.Results.push_back(result);
   }
