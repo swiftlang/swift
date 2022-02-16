@@ -112,7 +112,7 @@ Solution::computeSubstitutions(GenericSignature sig,
 // On Windows and 32-bit platforms we need to force "Int" to actually be
 // re-imported as "Int." This is needed because otherwise, we cannot round-trip
 // "Int" and "UInt". For example, on Windows, "Int" will be imported into C++ as
-// "long long" and then back into Swift as "Int64" not "Int." 
+// "long long" and then back into Swift as "Int64" not "Int."
 static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
                                       AbstractFunctionDecl *newDecl) {
   auto originalFnSubst = cast<AbstractFunctionDecl>(oldDecl)
@@ -172,6 +172,7 @@ static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
         newFnDecl->setSelfAccessKind(func->getSelfAccessKind());
         newFnDecl->setSelfIndex(func->getSelfIndex());
       }
+
       return newFnDecl;
     }
   }
