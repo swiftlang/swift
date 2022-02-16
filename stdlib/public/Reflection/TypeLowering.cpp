@@ -2026,8 +2026,9 @@ public:
                                   PayloadSpareBitMaskByteCount, PayloadSpareBitMaskByteOffset);
 
             if (!spareBitsMask.isZero()) {
-#if !defined(NDEBUG) && 0
-              // DEBUGGING: compare the locally-computed spare bit mask to the
+
+#if !defined(NDEBUG)
+              // DEBUG ASSERTION: compare the locally-computed spare bit mask to the
               // one we got from the compiler.  If they're different, then
               // either the compiler is emitting the wrong thing or the
               // local runtime computation isn't quite right.
