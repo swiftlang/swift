@@ -134,6 +134,7 @@ struct RequirementError {
     InvalidConformance,
     ConcreteTypeMismatch,
     NonTypeParameter,
+    RedundantRequirement,
   } kind;
 
   union {
@@ -148,6 +149,8 @@ struct RequirementError {
     } concreteTypeMismatch;
 
     Type nonTypeParameter;
+
+    Requirement redundantRequirement;
   };
 
   SourceLoc loc;
@@ -179,6 +182,13 @@ public:
                                               SourceLoc loc) {
     RequirementError error(Kind::NonTypeParameter, loc);
     error.nonTypeParameter = subject;
+    return error;
+  }
+
+  static RequirementError forRedundantRequirement(Requirement req,
+                                                  SourceLoc loc) {
+    RequirementError error(Kind::RedundantRequirement, loc);
+    error.redundantRequirement = req;
     return error;
   }
 };

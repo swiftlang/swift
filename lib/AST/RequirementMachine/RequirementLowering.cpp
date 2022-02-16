@@ -63,28 +63,36 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
     SmallVectorImpl<RequirementError> &errors;
 
   public:
+    bool recordedErrors = false;
+    bool recordedRequirements = false;
+
     explicit Matcher(SourceLoc loc,
                      SmallVectorImpl<Requirement> &result,
                      SmallVectorImpl<RequirementError> &errors)
       : loc(loc), result(result), errors(errors) {}
+
+    bool alwaysMismatchTypeParameters() const { return true; }
 
     bool mismatch(TypeBase *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             firstType, secondType);
+        recordedRequirements = true;
         return true;
       }
 
       if (firstType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             firstType, secondType);
+        recordedRequirements = true;
         return true;
       }
 
       if (secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             secondType, firstType);
+        recordedRequirements = true;
         return true;
       }
 
@@ -92,6 +100,7 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
           RequirementError::forConcreteTypeMismatch(firstType,
                                                     secondType,
                                                     loc));
+      recordedErrors = true;
       return true;
     }
   } matcher(loc, result, errors);
@@ -99,8 +108,18 @@ static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
   if (lhs->hasError() || rhs->hasError())
     return;
 
-  // FIXME: Record redundancy and diagnose upstream
   (void) matcher.match(lhs, rhs);
+
+  // If neither side is directly a type parameter, the type parameter
+  // must be in structural position where the enclosing type is redundant.
+  if (!lhs->isTypeParameter() && !rhs->isTypeParameter() &&
+      !matcher.recordedErrors) {
+    // FIXME: Add a tailored error message when requirements were
+    // recorded, e.g. Array<Int> == Array<T>. The outer type is
+    // redundant, but the inner requirement T == Int is not.
+    errors.push_back(RequirementError::forRedundantRequirement(
+        {RequirementKind::SameType, lhs, rhs}, loc));
+  }
 }
 
 static void desugarSuperclassRequirement(Type subjectType,
@@ -109,8 +128,14 @@ static void desugarSuperclassRequirement(Type subjectType,
                                          SmallVectorImpl<Requirement> &result,
                                          SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
-    errors.push_back(
-        RequirementError::forNonTypeParameter(subjectType, loc));
+    if (constraintType->isExactSuperclassOf(subjectType)) {
+      errors.push_back(RequirementError::forRedundantRequirement(
+          {RequirementKind::Superclass, subjectType, constraintType}, loc));
+    } else {
+      errors.push_back(
+          RequirementError::forNonTypeParameter(subjectType, loc));
+    }
+
     return;
   }
 
@@ -123,8 +148,14 @@ static void desugarLayoutRequirement(Type subjectType,
                                      SmallVectorImpl<Requirement> &result,
                                      SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
-    errors.push_back(
-        RequirementError::forNonTypeParameter(subjectType, loc));
+    if (subjectType->isAnyClassReferenceType()) {
+      errors.push_back(RequirementError::forRedundantRequirement(
+          {RequirementKind::Layout, subjectType, layout}, loc));
+    } else {
+      errors.push_back(
+          RequirementError::forNonTypeParameter(subjectType, loc));
+    }
+
     return;
   }
 
@@ -163,7 +194,9 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
         return;
       }
 
-      // FIXME: Diagnose a redundancy.
+      errors.push_back(RequirementError::forRedundantRequirement(
+          {RequirementKind::Conformance, subjectType, constraintType}, loc));
+
       assert(conformance.isConcrete());
       auto *concrete = conformance.getConcrete();
 
@@ -493,12 +526,13 @@ void swift::rewriting::realizeInheritedRequirements(
   }
 }
 
-void swift::rewriting::diagnoseRequirementErrors(
+bool swift::rewriting::diagnoseRequirementErrors(
     ASTContext &ctx, SmallVectorImpl<RequirementError> &errors,
     bool allowConcreteGenericParams) {
+  bool diagnosedError = false;
   if (ctx.LangOpts.RequirementMachineProtocolSignatures !=
       RequirementMachineMode::Enabled)
-    return;
+    return diagnosedError;
 
   for (auto error : errors) {
     SourceLoc loc = error.loc;
@@ -520,6 +554,7 @@ void swift::rewriting::diagnoseRequirementErrors(
 
       ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
                          subjectType, constraintString);
+      diagnosedError = true;
 
       auto getNameWithoutSelf = [&](std::string subjectTypeName) {
         std::string selfSubstring = "Self.";
@@ -549,6 +584,7 @@ void swift::rewriting::diagnoseRequirementErrors(
       if (!type1->hasError() && !type2->hasError()) {
         ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
                            type1, type2);
+        diagnosedError = true;
       }
 
       break;
@@ -557,10 +593,41 @@ void swift::rewriting::diagnoseRequirementErrors(
     case RequirementError::Kind::NonTypeParameter: {
       ctx.Diags.diagnose(loc, diag::requires_not_suitable_archetype,
                          error.nonTypeParameter);
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::RedundantRequirement: {
+      auto requirement = error.redundantRequirement;
+      switch (requirement.getKind()) {
+      case RequirementKind::SameType:
+        ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
+                           requirement.getFirstType(),
+                           requirement.getSecondType());
+        break;
+      case RequirementKind::Conformance:
+        ctx.Diags.diagnose(loc, diag::redundant_conformance_constraint,
+                           requirement.getFirstType(),
+                           requirement.getProtocolDecl());
+        break;
+      case RequirementKind::Superclass:
+        ctx.Diags.diagnose(loc, diag::redundant_superclass_constraint,
+                           requirement.getFirstType(),
+                           requirement.getSecondType());
+        break;
+      case RequirementKind::Layout:
+        ctx.Diags.diagnose(loc, diag::redundant_layout_constraint,
+                           requirement.getFirstType(),
+                           requirement.getLayoutConstraint());
+        break;
+      }
+
       break;
     }
     }
   }
+
+  return diagnosedError;
 }
 
 ArrayRef<StructuralRequirement>

@@ -40,3 +40,25 @@ func badTypeConformance4<T>(_: T) where @escaping (inout T) throws -> () : Equal
 func badTypeConformance5<T>(_: T) where T & Sequence : EqualComparable { }
 // expected-error@-1 2 {{non-protocol, non-class type 'T' cannot be used within a protocol-constrained type}}
 // expected-error@-2{{type 'Sequence' in conformance requirement does not refer to a generic parameter or associated type}}
+
+func badTypeConformance6<T>(_: T) where [T] : Collection { }
+// expected-warning@-1{{redundant conformance constraint '[T]' : 'Collection'}}
+
+func concreteSameTypeRedundancy<T>(_: T) where Int == Int {}
+// expected-warning@-1{{redundant same-type constraint 'Int' == 'Int'}}
+
+func concreteSameTypeRedundancy<T>(_: T) where Array<Int> == Array<T> {}
+// expected-warning@-1{{redundant same-type constraint 'Array<Int>' == 'Array<T>'}}
+
+protocol P {}
+struct S: P {}
+func concreteConformanceRedundancy<T>(_: T) where S : P {}
+// expected-warning@-1{{redundant conformance constraint 'S' : 'P'}}
+
+class C {}
+func concreteLayoutRedundancy<T>(_: T) where C : AnyObject {}
+// expected-warning@-1{{redundant constraint 'C' : 'AnyObject'}}
+
+class C2: C {}
+func concreteSubclassRedundancy<T>(_: T) where C2 : C {}
+// expected-warning@-1{{redundant superclass constraint 'C2' : 'C'}}

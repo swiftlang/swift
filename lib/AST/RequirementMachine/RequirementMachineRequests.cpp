@@ -631,9 +631,9 @@ InferredGenericSignatureRequestRQM::evaluate(
     machine->computeMinimalGenericSignatureRequirements();
 
   auto result = GenericSignature::get(genericParams, minimalRequirements);
-  bool hadError = machine->hadError() || !errors.empty();
+  bool hadError = machine->hadError();
 
-  diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
+  hadError |= diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
 
   // FIXME: Handle allowConcreteGenericParams
 

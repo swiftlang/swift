@@ -57,7 +57,7 @@ void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   SmallVectorImpl<StructuralRequirement> &result,
                                   SmallVectorImpl<RequirementError> &errors);
 
-void diagnoseRequirementErrors(ASTContext &ctx,
+bool diagnoseRequirementErrors(ASTContext &ctx,
                                SmallVectorImpl<RequirementError> &errors,
                                bool allowConcreteGenericParams);
 
