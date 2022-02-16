@@ -33,13 +33,11 @@ func badTypeConformance2<T>(_: T) where T.Blarg : EqualComparable { } // expecte
 func badTypeConformance3<T>(_: T) where (T) -> () : EqualComparable { }
 // expected-error@-1{{type '(T) -> ()' in conformance requirement does not refer to a generic parameter or associated type}}
 
-func badTypeConformance4<T>(_: T) where @escaping (inout T) throws -> () : EqualComparable { }
+func badTypeConformance4<T>(_: T) where (inout T) throws -> () : EqualComparable { }
 // expected-error@-1{{type '(inout T) throws -> ()' in conformance requirement does not refer to a generic parameter or associated type}}
-// expected-error@-2 2 {{@escaping attribute may only be used in function parameter position}}
 
 func badTypeConformance5<T>(_: T) where T & Sequence : EqualComparable { }
-// expected-error@-1 2 {{non-protocol, non-class type 'T' cannot be used within a protocol-constrained type}}
-// expected-error@-2{{type 'Sequence' in conformance requirement does not refer to a generic parameter or associated type}}
+// expected-error@-1 {{non-protocol, non-class type 'T' cannot be used within a protocol-constrained type}}
 
 func badTypeConformance6<T>(_: T) where [T] : Collection { }
 // expected-warning@-1{{redundant conformance constraint '[T]' : 'Collection'}}
