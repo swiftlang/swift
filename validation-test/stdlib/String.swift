@@ -2340,6 +2340,10 @@ if #available(SwiftStdlib 5.6, *) {
     expectEqual(2, test11.count)
     expectBidirectionalCount(2, test11)
 #endif
+
+    let test12 = "a\u{0915}\u{093C}\u{200D}\u{094D}\u{0924}a" // 3
+    expectEqual(3, test12.count)
+    expectBidirectionalCount(3, test12)
   }
 }
 

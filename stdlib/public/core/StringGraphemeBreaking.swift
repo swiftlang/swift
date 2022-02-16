@@ -441,7 +441,8 @@ extension _StringGuts {
     // GB999
     default:
       // GB9c
-      if state.isInIndicSequence, state.hasSeenVirama, scalar2._isLinkingConsonant {
+      if !isBackwards, state.isInIndicSequence, state.hasSeenVirama,
+         scalar2._isLinkingConsonant {
         state.hasSeenVirama = false
         return false
       }
