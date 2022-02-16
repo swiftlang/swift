@@ -19,11 +19,11 @@ TemplatesTestSuite.test("Templated Add") {
   expectEqual(h.addMixedTypeParams(2, 1), 3)
 }
 
-TemplatesTestSuite.test("Returns other specialization") {
-  let t = TemplateClassWithMemberTemplates<CInt>(42)
-  var _5 = 5
-  let o = t.toOtherSpec(&_5)
-  // TODO: why is "o" Void here? rdar://88443730
-}
+// TODO: support this rdar://88443730
+// TemplatesTestSuite.test("Returns other specialization") {
+//   let t = TemplateClassWithMemberTemplates<CInt>(42)
+//   var _5 = 5
+//   let o = t.toOtherSpec(&_5)
+// }
 
 runAllTests()
