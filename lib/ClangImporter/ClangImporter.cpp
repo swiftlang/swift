@@ -2705,9 +2705,12 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
     // For enums, structs, and unions, only count definitions when looking to
     // see what other modules they appear in.
-    if (IsTagDecl)
-      if (!cast<clang::TagDecl>(Redeclaration)->isCompleteDefinition())
+    if (IsTagDecl) {
+      auto TD = cast<clang::TagDecl>(Redeclaration);
+      if (!TD->isCompleteDefinition() &&
+          !TD->isThisDeclarationADemotedDefinition())
         continue;
+    }
 
     auto OwningClangModule = getClangTopLevelOwningModule(Redeclaration,
                                                           ClangASTContext);
