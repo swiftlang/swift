@@ -4481,10 +4481,10 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
     auto found = openedExistentialEnvironments.find(*knownID);
     
     if (found != openedExistentialEnvironments.end()) {
+      assert(found->second->getOpenedExistentialType()->isEqual(existential) &&
+             "Retrieved the wrong generic environment?");
       auto result = found->second->mapTypeIntoContext(interfaceType)
           ->castTo<OpenedArchetypeType>();
-      assert(result->getOpenedExistentialType()->isEqual(existential) &&
-             "Retrieved the wrong opened existential type?");
       return CanOpenedArchetypeType(result);
     }
   } else {
