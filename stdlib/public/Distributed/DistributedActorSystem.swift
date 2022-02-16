@@ -154,7 +154,7 @@ extension DistributedActorSystem {
   public func executeDistributedTarget<Act, ResultHandler>(
     on actor: Act,
     mangledTargetName: String,
-    invocationDecoder: InvocationDecoder,
+    invocationDecoder: inout InvocationDecoder,
     handler: ResultHandler
   ) async throws where Act: DistributedActor,
                        // Act.ID == ActorID, // FIXME(distributed): can we bring this back?
@@ -289,7 +289,7 @@ extension DistributedActorSystem {
       try await _executeDistributedTarget(
         on: actor,
         mangledTargetName, UInt(mangledTargetName.count),
-        argumentDecoder: invocationDecoder,
+        argumentDecoder: &invocationDecoder,
         argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
         resultBuffer: resultBuffer._rawValue,
         substitutions: UnsafeRawPointer(substitutionsBuffer),
@@ -309,10 +309,10 @@ extension DistributedActorSystem {
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_execute_target")
-func _executeDistributedTarget(
+func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
   on actor: AnyObject, // DistributedActor
   _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
-  argumentDecoder: AnyObject, // concrete type for `InvocationDecoder`
+  argumentDecoder: inout D,
   argumentTypes: Builtin.RawPointer,
   resultBuffer: Builtin.RawPointer,
   substitutions: UnsafeRawPointer?,
@@ -400,10 +400,10 @@ public protocol DistributedTargetInvocationEncoder {
 
 /// Decoder that must be provided to `executeDistributedTarget` and is used
 /// by the Swift runtime to decode arguments of the invocation.
-public protocol DistributedTargetInvocationDecoder : AnyObject {
+public protocol DistributedTargetInvocationDecoder {
   associatedtype SerializationRequirement
 
-  func decodeGenericSubstitutions() throws -> [Any.Type]
+  mutating func decodeGenericSubstitutions() throws -> [Any.Type]
 
 //  /// Ad-hoc protocol requirement
 //  ///
@@ -420,9 +420,9 @@ public protocol DistributedTargetInvocationDecoder : AnyObject {
 //  /// performs the actual distributed (local) instance method invocation.
 //  mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
 
-  func decodeErrorType() throws -> Any.Type?
+  mutating func decodeErrorType() throws -> Any.Type?
 
-  func decodeReturnType() throws -> Any.Type?
+  mutating func decodeReturnType() throws -> Any.Type?
 }
 
 @available(SwiftStdlib 5.7, *)
