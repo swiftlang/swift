@@ -1299,8 +1299,10 @@ void swift::ide::getReceiverType(Expr *Base,
     ReceiverTy = SelfT->getSelfType();
 
   // TODO: Handle generics and composed protocols
-  if (auto OpenedTy = ReceiverTy->getAs<OpenedArchetypeType>())
-    ReceiverTy = OpenedTy->getOpenedExistentialType();
+  if (auto OpenedTy = ReceiverTy->getAs<OpenedArchetypeType>()) {
+    assert(OpenedTy->isRoot());
+    ReceiverTy = OpenedTy->getExistentialType();
+  }
 
   if (auto TyD = ReceiverTy->getAnyNominal()) {
     Types.push_back(TyD);

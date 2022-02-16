@@ -67,7 +67,8 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
   auto *newGenericParam =
       GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
 
-  auto constraint = openedExistential->getOpenedExistentialType();
+  assert(openedExistential->isRoot());
+  auto constraint = openedExistential->getExistentialType();
   if (auto existential = constraint->getAs<ExistentialType>())
     constraint = existential->getConstraintType();
 
