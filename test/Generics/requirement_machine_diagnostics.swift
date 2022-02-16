@@ -78,3 +78,9 @@ protocol InvalidProtocolWhereClause where Self: Int {}
 
 typealias Alias<T> = T where Int == Int
 // expected-warning@-1 {{redundant same-type constraint 'Int' == 'Int'}}
+
+func cascadingConflictingRequirement<T>(_: T) where DoesNotExist : EqualComparable { }
+// expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}
+
+func cascadingInvalidConformance<T>(_: T) where T : DoesNotExist { }
+// expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}

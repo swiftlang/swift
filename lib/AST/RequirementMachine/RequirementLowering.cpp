@@ -561,6 +561,9 @@ bool swift::rewriting::diagnoseRequirementErrors(
       Type subjectType = error.requirement.getFirstType();
       Type constraint = error.requirement.getSecondType();
 
+      if (subjectType->hasError() || constraint->hasError())
+        break;
+
       // FIXME: The constraint string is printed directly here because
       // the current default is to not print `any` for existential
       // types, but this error message is super confusing without `any`
@@ -608,8 +611,12 @@ bool swift::rewriting::diagnoseRequirementErrors(
     }
 
     case RequirementError::Kind::ConflictingRequirement: {
+      auto subjectType = error.requirement.getFirstType();
+      if (subjectType->hasError())
+        break;
+
       ctx.Diags.diagnose(loc, diag::requires_not_suitable_archetype,
-                         error.requirement.getFirstType());
+                         subjectType);
       diagnosedError = true;
       break;
     }
