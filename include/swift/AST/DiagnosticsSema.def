@@ -5026,7 +5026,7 @@ ERROR(differentiable_function_type_no_differentiability_parameters, none,
       "'Differentiable'%select{| with its 'TangentVector' equal to itself}0",
       (/*isLinear*/ bool))
 ERROR(differentiable_function_type_no_differentiable_result, none,
-      "'@differentiable' function type requires one differentiable result, "
+      "'@differentiable' function type requires a differentiable result, "
       "i.e. a non-'Void' type that conforms to 'Differentiable'%select{| with "
       "its 'TangentVector' equal to itself}0",
       (/*isLinear*/ bool))

@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 import _Differentiation
 
-// expected-error @+1 {{@differentiable' function type requires one differentiable result, i.e. a non-'Void' type that conforms to 'Differentiable}}
+// expected-error @+1 {{@differentiable' function type requires a differentiable result, i.e. a non-'Void' type that conforms to 'Differentiable}}
 typealias MyType = @differentiable(reverse) (inout @noDerivative Float, Float) -> Void
 
 @differentiable(reverse)

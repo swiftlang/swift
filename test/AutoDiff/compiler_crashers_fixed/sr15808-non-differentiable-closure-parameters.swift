@@ -5,12 +5,12 @@
 // result, the compiler crashes during Sema.
 import _Differentiation
 
-// expected-error @+1 {{'@differentiable' function type requires one differentiable result, i.e. a non-'Void' type that conforms to 'Differentiable'}}
+// expected-error @+1 {{'@differentiable' function type requires a differentiable result, i.e. a non-'Void' type that conforms to 'Differentiable'}}
 func helloWorld(_ x: @differentiable(reverse) (()) -> Void) {}
 
 func helloWorld(_ x: @differentiable(reverse) (()) -> Float) {}
 
-// expected-error @+1 {{'@differentiable' function type requires one differentiable result, i.e. a non-'Void' type that conforms to 'Differentiable'}}
+// expected-error @+1 {{'@differentiable' function type requires a differentiable result, i.e. a non-'Void' type that conforms to 'Differentiable'}}
 func helloWorld(_ x: @differentiable(reverse) (Float) -> Void) {}
 
 func helloWorld(_ x: @differentiable(reverse) (@noDerivative Float, Void) -> Float) {}
