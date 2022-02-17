@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-inferred-signatures=verify %s 2>&1 | %FileCheck %s
 
 public protocol P {
   associatedtype A : Q where A.B == Self
@@ -23,13 +23,13 @@ public class D : Q {
 // - Since T.A == D, T.A.B == D.B, therefore Self == D.B.
 // - D.B is a typealias for C, so really Self == C.
 
-// CHECK-LABEL: Generic signature: <T where T == D.B>
+// CHECK-LABEL: Generic signature: <T where T == C>
 public func takesBoth1<T : P & C>(_: T) {}
 // expected-warning@-1 {{redundant conformance constraint 'T' : 'P'}}
 // expected-note@-2 {{conformance constraint 'T' : 'P' implied here}}
 // expected-error@-3 {{same-type requirement makes generic parameter 'T' non-generic}}
 
-// CHECK-LABEL: Generic signature: <U where U == D.B>
+// CHECK-LABEL: Generic signature: <U where U == C>
 public func takesBoth2<U : C & P>(_: U) {}
 // expected-warning@-1 {{redundant conformance constraint 'U' : 'P'}}
 // expected-note@-2 {{conformance constraint 'U' : 'P' implied here}}
