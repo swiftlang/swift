@@ -8,6 +8,18 @@ struct M {
   using U = T;
 
   T getValue() const { return value; }
+
+  template<class U>
+  M<U> memberDependentReturnType(U a) const { return {a}; }
+
+  template<class U>
+  M<U> memberDependentReturnTypeMutable(U a) { return {a}; }
+
+  template<class U>
+  static M<U> memberDependentReturnTypeStatic(U a) { return {a}; }
+
+  template<class U>
+  U memberDependentParamType(M<U> a) const { return a.value; }
 };
 
 template<class T, class U>
