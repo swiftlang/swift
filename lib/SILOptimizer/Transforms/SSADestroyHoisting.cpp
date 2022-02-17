@@ -217,6 +217,11 @@ public:
 
   void compute() { DestroyReachability(*this).solveBackward(); }
 
+  bool isBarrier(SILInstruction *instruction) const {
+    return classificationIsBarrier(classifyInstruction(
+        instruction, ignoreDeinitBarriers, storageDefInst, knownUses));
+  };
+
 private:
   DeinitBarriers(DeinitBarriers const &) = delete;
   DeinitBarriers &operator=(DeinitBarriers const &) = delete;
@@ -367,7 +372,10 @@ public:
 protected:
   SILFunction *getFunction() const { return storageRoot->getFunction(); }
 
-  bool foldBarrier(SILInstruction *barrier);
+  bool foldBarrier(SILInstruction *barrier, SILValue accessScope);
+
+  bool foldBarrier(SILInstruction *barrier, const KnownStorageUses &knownUses,
+                   const DeinitBarriers &deinitBarriers);
 
   void insertDestroy(SILInstruction *barrier, SILInstruction *insertBefore,
                      const KnownStorageUses &knownUses);
@@ -408,7 +416,7 @@ bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
   for (SILInstruction *barrier : deinitBarriers.barriers) {
     auto *barrierBlock = barrier->getParent();
     if (barrier != barrierBlock->getTerminator()) {
-      if (!foldBarrier(barrier))
+      if (!foldBarrier(barrier, knownUses, deinitBarriers))
         insertDestroy(barrier, barrier->getNextInstruction(), knownUses);
       continue;
     }
@@ -455,9 +463,10 @@ bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
   return deleter.hadCallbackInvocation();
 }
 
-bool HoistDestroys::foldBarrier(SILInstruction *barrier) {
+bool HoistDestroys::foldBarrier(SILInstruction *barrier, SILValue storageRoot) {
   if (auto *load = dyn_cast<LoadInst>(barrier)) {
-    if (load->getOperand() == storageRoot) {
+    if (stripAccessMarkers(load->getOperand()) ==
+        stripAccessMarkers(storageRoot)) {
       if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
         load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
         return true;
@@ -468,13 +477,30 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier) {
     }
   }
   if (auto *copy = dyn_cast<CopyAddrInst>(barrier)) {
-    if (copy->getSrc() == storageRoot) {
+    if (stripAccessMarkers(copy->getSrc()) == stripAccessMarkers(storageRoot)) {
       assert(!copy->isTakeOfSrc());
       copy->setIsTakeOfSrc(IsTake);
       return true;
     }
   }
   return false;
+}
+
+bool HoistDestroys::foldBarrier(SILInstruction *barrier,
+                                const KnownStorageUses &knownUses,
+                                const DeinitBarriers &deinitBarriers) {
+  if (auto *eai = dyn_cast<EndAccessInst>(barrier)) {
+    SILInstruction *instruction = eai;
+    while ((instruction = instruction->getPreviousInstruction())) {
+      if (instruction == eai->getBeginAccess())
+        return false;
+      if (foldBarrier(instruction, storageRoot))
+        return true;
+      if (deinitBarriers.isBarrier(instruction))
+        return false;
+    }
+  }
+  return foldBarrier(barrier, storageRoot);
 }
 
 // \p barrier may be null if the destroy is at function entry.
