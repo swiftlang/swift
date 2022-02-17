@@ -66,6 +66,10 @@ llvm::cl::opt<bool> SILDisableLateOMEByDefault(
     llvm::cl::desc(
         "Disable late OME for non-transparent functions by default"));
 
+llvm::cl::opt<bool>
+    EnableDestroyHoisting("enable-destroy-hoisting", llvm::cl::init(true),
+                          llvm::cl::desc("Enable the DestroyHoisting pass."));
+
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -145,7 +149,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addSILSkippingChecker();
 #endif
 
-  if (Options.shouldOptimize()) {
+  if (Options.shouldOptimize() && EnableDestroyHoisting) {
     P.addDestroyHoisting();
   }
   P.addMandatoryInlining();
