@@ -16,7 +16,7 @@ import DependentTypes
 // CHECK:   [[SPEC_TEMP:%.*]] = alloc_stack $__CxxTemplateInst1MIlE
 // CHECK:   store [[SPEC_VAL]] to [trivial] [[SPEC_TEMP]] : $*__CxxTemplateInst1MIlE
 
-// CHECK:   [[GET_VAL_FN:%.*]] = function_ref @_ZNK1MIlE8getValueEv : $@convention(cxx_method) (@in_guaranteed __CxxTemplateInst1MIlE) -> Int
+// CHECK:   [[GET_VAL_FN:%.*]] = function_ref @{{_ZNK1MIlE8getValueEv|\?getValue@\?\$M@_J@@QEBA_JXZ}} : $@convention(cxx_method) (@in_guaranteed __CxxTemplateInst1MIlE) -> Int
 // CHECK:   [[OUT_VAL:%.*]] = apply [[GET_VAL_FN]]([[SPEC_TEMP]]) : $@convention(cxx_method) (@in_guaranteed __CxxTemplateInst1MIlE) -> Int
 
 // CHECK:   return [[OUT_VAL]] : $Int
@@ -33,7 +33,7 @@ import DependentTypes
 // CHECK:   unconditional_checked_cast_addr Int in [[TMP_INT]] : $*Int to Int in [[TMP_INT_CASTED]] : $*Int
 
 // CHECK:  [[ARG:%.*]] = load [trivial] [[TMP_INT_CASTED]] : $*Int
-// CHECK:   [[FN:%.*]] = function_ref @_Z27dependantReturnTypeInfferedIlE1MIT_ES1_ : $@convention(c) (Int) -> __CxxTemplateInst1MIlE
+// CHECK:   [[FN:%.*]] = function_ref  @{{_Z27dependantReturnTypeInfferedIlE1MIT_ES1_|\?\?\$dependantReturnTypeInffered@_J@@YA?AU\?\$M@_J@@_J@Z}} : $@convention(c) (Int) -> __CxxTemplateInst1MIlE
 // CHECK:   [[OUT:%.*]] = apply [[FN]]([[ARG]]) : $@convention(c) (Int) -> __CxxTemplateInst1MIlE
 
 // CHECK:   store [[OUT]] to [trivial] [[SPEC_OUT]] : $*__CxxTemplateInst1MIlE
@@ -45,5 +45,5 @@ public func test() -> Int {
   return m.getValue()
 }
 
-// CHECK-LABEL: sil [clang __CxxTemplateInst1MIlE.getValue] @_ZNK1MIlE8getValueEv : $@convention(cxx_method) (@in_guaranteed __CxxTemplateInst1MIlE) -> Int
-// CHECK-LABEL: sil [serializable] [clang dependantReturnTypeInffered] @_Z27dependantReturnTypeInfferedIlE1MIT_ES1_ : $@convention(c) (Int) -> __CxxTemplateInst1MIlE
+// CHECK-LABEL: sil [clang __CxxTemplateInst1MIlE.getValue] @{{_ZNK1MIlE8getValueEv|\?getValue@\?\$M@_J@@QEBA_JXZ}} : $@convention(cxx_method) (@in_guaranteed __CxxTemplateInst1MIlE) -> Int
+// CHECK-LABEL: sil [serializable] [clang dependantReturnTypeInffered]  @{{_Z27dependantReturnTypeInfferedIlE1MIT_ES1_|\?\?\$dependantReturnTypeInffered@_J@@YA?AU\?\$M@_J@@_J@Z}} : $@convention(c) (Int) -> __CxxTemplateInst1MIlE
