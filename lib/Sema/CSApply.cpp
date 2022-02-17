@@ -112,7 +112,7 @@ Solution::computeSubstitutions(GenericSignature sig,
 // On Windows and 32-bit platforms we need to force "Int" to actually be
 // re-imported as "Int." This is needed because otherwise, we cannot round-trip
 // "Int" and "UInt". For example, on Windows, "Int" will be imported into C++ as
-// "long long" and then back into Swift as "Int64" not "Int."
+// "long long" and then back into Swift as "Int64" not "Int." 
 static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
                                       AbstractFunctionDecl *newDecl) {
   auto originalFnSubst = cast<AbstractFunctionDecl>(oldDecl)
@@ -172,7 +172,6 @@ static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
         newFnDecl->setSelfAccessKind(func->getSelfAccessKind());
         newFnDecl->setSelfIndex(func->getSelfIndex());
       }
-
       return newFnDecl;
     }
   }
@@ -180,108 +179,44 @@ static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
   return newDecl;
 }
 
-// Synthesize a thunk body for the function created in
-// "addThunkForDependentTypes". This will just cast all params and forward them
-// along to the specialized function. It will also cast the result before
-// returning it.
-static std::pair<BraceStmt *, bool>
-synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *context) {
-  ASTContext &ctx = afd->getASTContext();
-
-  auto thunkDecl = cast<FuncDecl>(afd);
-  auto specializedFuncDecl = static_cast<FuncDecl *>(context);
-
-  SmallVector<Argument, 8> forwardingParams;
-  unsigned paramIndex = 0;
-  for (auto param : *thunkDecl->getParameters()) {
-    if (isa<MetatypeType>(param->getType().getPointer())) {
-      paramIndex++;
-      continue;
-    }
-
-    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
-                                              /*Implicit=*/true);
-    paramRefExpr->setType(param->getType());
-
-    auto specParamTy = specializedFuncDecl->getParameters()->get(paramIndex)->getType();
-    auto cast = ForcedCheckedCastExpr::createImplicit(
-        ctx, paramRefExpr, specParamTy);
-
-    forwardingParams.push_back(Argument(SourceLoc(), Identifier(), cast));
-    paramIndex++;
+// Derive a concrete function type for fdecl by substituting the generic args
+// and use that to derive the corresponding function type and parameter list.
+static std::pair<FunctionType *, ParameterList *>
+substituteFunctionTypeAndParamList(ASTContext &ctx, AbstractFunctionDecl *fdecl,
+                                   SubstitutionMap subst) {
+  FunctionType *newFnType = nullptr;
+  // Create a new ParameterList with the substituted type.
+  if (auto oldFnType = dyn_cast<GenericFunctionType>(
+          fdecl->getInterfaceType().getPointer())) {
+    newFnType = oldFnType->substGenericArgs(subst);
+  } else {
+    newFnType = cast<FunctionType>(fdecl->getInterfaceType().getPointer());
   }
+  // The constructor type is a function type as follows:
+  //   (CType.Type) -> (Generic) -> CType
+  // And a method's function type is as follows:
+  //   (inout CType) -> (Generic) -> Void
+  // In either case, we only want the result of that function type because that
+  // is the function type with the generic params that need to be substituted:
+  //   (Generic) -> CType
+  if (isa<ConstructorDecl>(fdecl) || fdecl->isInstanceMember() ||
+      fdecl->isStatic())
+    newFnType = cast<FunctionType>(newFnType->getResult().getPointer());
+  SmallVector<ParamDecl *, 4> newParams;
+  unsigned i = 0;
 
-  auto *specializedFuncDeclRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),
-                                                       DeclNameLoc(), true);
-  specializedFuncDeclRef->setType(specializedFuncDecl->getInterfaceType());
-
-  auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
-  auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
-  specializedFuncCallExpr->setType(specializedFuncDecl->getResultInterfaceType());
-  specializedFuncCallExpr->setThrows(false);
-
-  auto cast = ForcedCheckedCastExpr::createImplicit(
-      ctx, specializedFuncCallExpr, thunkDecl->getResultInterfaceType());
-
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), cast, /*implicit=*/true);
-  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
-                                /*implicit=*/true);
-  return {body, /*isTypeChecked=*/true};
-}
-
-// Create a thunk to map functions with dependent types to their specialized
-// version. For example, create a thunk with type (Any) -> Any to wrap a
-// specialized function template with type (Dependent<T>) -> Dependent<T>.
-static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
-                                            FuncDecl *newDecl) {
-  bool updatedAnyParams = false;
-
-  SmallVector<ParamDecl *, 4> fixedParameters;
-  unsigned parameterIndex = 0;
-  for (auto *newFnParam : *newDecl->getParameters()) {
-    // If the un-specialized function had a parameter with type "Any" preserve
-    // that parameter. Otherwise, use the new function parameter.
-    auto oldParamType = oldDecl->getParameters()->get(parameterIndex)->getType();
-    if (oldParamType->isEqual(newDecl->getASTContext().TheAnyType)) {
-      updatedAnyParams = true;
-      auto newParam =
-          ParamDecl::cloneWithoutType(newDecl->getASTContext(), newFnParam);
-      newParam->setInterfaceType(oldParamType);
-      fixedParameters.push_back(newParam);
-    } else {
-      fixedParameters.push_back(newFnParam);
-    }
-    parameterIndex++;
+  for (auto paramTy : newFnType->getParams()) {
+    auto *oldParamDecl = fdecl->getParameters()->get(i);
+    auto *newParamDecl =
+        ParamDecl::cloneWithoutType(fdecl->getASTContext(), oldParamDecl);
+    newParamDecl->setInterfaceType(paramTy.getParameterType());
+    newParams.push_back(newParamDecl);
+    (void)++i;
   }
+  auto *newParamList =
+      ParameterList::create(ctx, SourceLoc(), newParams, SourceLoc());
 
-  // If we don't need this thunk, bail out.
-  if (!updatedAnyParams &&
-      !oldDecl->getResultInterfaceType()->isEqual(
-          oldDecl->getASTContext().TheAnyType))
-    return newDecl;
-
-  auto fixedParams =
-      ParameterList::create(newDecl->getASTContext(), fixedParameters);
-
-  Type fixedResultType;
-  if (oldDecl->getResultInterfaceType()->isEqual(
-          oldDecl->getASTContext().TheAnyType))
-      fixedResultType = oldDecl->getASTContext().TheAnyType;
-  else
-    fixedResultType = newDecl->getResultInterfaceType();
-
-  // We have to rebuild the whole function.
-  auto newFnDecl = FuncDecl::createImplicit(
-      newDecl->getASTContext(), newDecl->getStaticSpelling(),
-      newDecl->getName(), newDecl->getNameLoc(), newDecl->hasAsync(),
-      newDecl->hasThrows(), /*genericParams=*/nullptr, fixedParams,
-      fixedResultType, newDecl->getDeclContext());
-  newFnDecl->copyFormalAccessFrom(newDecl);
-  newFnDecl->setBodySynthesizer(synthesizeDependentTypeThunkParamForwarding, newDecl);
-  newFnDecl->setSelfAccessKind(newDecl->getSelfAccessKind());
-  newFnDecl->getAttrs().add(
-      new (newDecl->getASTContext()) TransparentAttr(/*IsImplicit=*/true));
-  return newFnDecl;
+  return {newFnType, newParamList};
 }
 
 // Synthesizes the body of a thunk that takes extra metatype arguments and
@@ -332,55 +267,16 @@ static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
   // specialization, which are no longer now that we've specialized
   // this function. Create a thunk that only forwards the original
   // parameters along to the clang function.
-  SmallVector<ParamDecl *, 4> newParams;
-
-  for (auto param : *newDecl->getParameters()) {
-    auto *newParamDecl = ParamDecl::clone(newDecl->getASTContext(), param);
-    newParams.push_back(newParamDecl);
-  }
-
-  auto originalFnSubst = cast<AbstractFunctionDecl>(oldDecl)
-                             ->getInterfaceType()
-                             ->getAs<GenericFunctionType>()
-                             ->substGenericArgs(subst);
-  // The constructor type is a function type as follows:
-  //   (CType.Type) -> (Generic) -> CType
-  // And a method's function type is as follows:
-  //   (inout CType) -> (Generic) -> Void
-  // In either case, we only want the result of that function type because that
-  // is the function type with the generic params that need to be substituted:
-  //   (Generic) -> CType
-  if (isa<ConstructorDecl>(oldDecl) || oldDecl->isInstanceMember() ||
-      oldDecl->isStatic())
-    originalFnSubst = cast<FunctionType>(originalFnSubst->getResult().getPointer());
-
-  for (auto paramTy : originalFnSubst->getParams()) {
-    if (!paramTy.getPlainType()->is<MetatypeType>())
-      continue;
-
-    auto dc = newDecl->getDeclContext();
-    auto paramVarDecl =
-        new (newDecl->getASTContext()) ParamDecl(
-            SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-            newDecl->getASTContext().getIdentifier("_"), dc);
-    paramVarDecl->setInterfaceType(paramTy.getPlainType());
-    paramVarDecl->setSpecifier(ParamSpecifier::Default);
-    newParams.push_back(paramVarDecl);
-  }
-
-  auto *newParamList =
-      ParameterList::create(newDecl->getASTContext(), SourceLoc(), newParams, SourceLoc());
-
+  auto thunkTypeAndParamList = substituteFunctionTypeAndParamList(oldDecl->getASTContext(),
+                                                                  oldDecl, subst);
   auto thunk = FuncDecl::createImplicit(
-      newDecl->getASTContext(), newDecl->getStaticSpelling(), oldDecl->getName(),
-      newDecl->getNameLoc(), newDecl->hasAsync(), newDecl->hasThrows(),
-      /*genericParams=*/nullptr, newParamList,
-      newDecl->getResultInterfaceType(), newDecl->getDeclContext());
-  thunk->copyFormalAccessFrom(newDecl);
+      oldDecl->getASTContext(), oldDecl->getStaticSpelling(), oldDecl->getName(),
+      oldDecl->getNameLoc(), oldDecl->hasAsync(), oldDecl->hasThrows(),
+      /*genericParams=*/nullptr, thunkTypeAndParamList.second,
+      thunkTypeAndParamList.first->getResult(), oldDecl->getDeclContext());
+  thunk->copyFormalAccessFrom(oldDecl);
   thunk->setBodySynthesizer(synthesizeForwardingThunkBody, newDecl);
-  thunk->setSelfAccessKind(newDecl->getSelfAccessKind());
-  thunk->getAttrs().add(
-      new (newDecl->getASTContext()) TransparentAttr(/*IsImplicit=*/true));
+  thunk->setSelfAccessKind(oldDecl->getSelfAccessKind());
 
   return thunk;
 }
@@ -428,10 +324,6 @@ static ConcreteDeclRef getCXXFunctionTemplateSpecialization(SubstitutionMap subs
     if (!subst.empty()) {
       newDecl = rewriteIntegerTypes(subst, decl, fn);
     }
-  }
-
-  if (auto fn = dyn_cast<FuncDecl>(decl)) {
-    newDecl = addThunkForDependentTypes(fn, cast<FuncDecl>(newDecl));
   }
 
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
