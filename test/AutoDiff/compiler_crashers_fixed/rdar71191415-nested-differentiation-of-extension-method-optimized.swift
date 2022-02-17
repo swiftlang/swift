@@ -1,5 +1,8 @@
 // RUN: %target-build-swift -O %s
 
+// FIXME(rdar://89055298)
+// UNSUPPORTED: linux
+
 // rdar://71191415
 
 import _Differentiation
