@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -9,6 +12,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 import _Distributed
+import FakeDistributedActorSystems
 
 distributed actor SomeSpecificDistributedActor {
 
@@ -19,103 +23,6 @@ distributed actor SomeSpecificDistributedActor {
   distributed func echo(int: Int) async throws -> Int {
     int
   }
-}
-
-// ==== Execute ----------------------------------------------------------------
-
-@_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
-
-func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
-}
-
-// ==== Fake Transport ---------------------------------------------------------
-
-struct ActorAddress: Sendable, Hashable, Codable {
-  let address: String
-  init(parse address : String) {
-    self.address = address
-  }
-}
-
-struct FakeActorSystem: DistributedActorSystem {
-  typealias ActorID = ActorAddress
-  typealias InvocationDecoder = FakeInvocationDecoder
-  typealias InvocationEncoder = FakeInvocationEncoder
-  typealias SerializationRequirement = Codable
-
-  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor,
-            Act.ID == ActorID {
-    return nil
-  }
-
-  func assignID<Act>(_ actorType: Act.Type) -> ActorID
-      where Act: DistributedActor,
-            Act.ID == ActorID {
-    ActorAddress(parse: "")
-  }
-
-  func actorReady<Act>(_ actor: Act)
-      where Act: DistributedActor,
-            Act.ID == ActorID {
-    print("\(#function):\(actor)")
-  }
-
-  func resignID(_ id: ActorID) {}
-
-  func makeInvocationEncoder() -> InvocationEncoder {
-    .init()
-  }
-
-  func remoteCall<Act, Err, Res>(
-    on actor: Act,
-    target: RemoteCallTarget,
-    invocation invocationEncoder: inout InvocationEncoder,
-    throwing: Err.Type,
-    returning: Res.Type
-  ) async throws -> Res
-    where Act: DistributedActor,
-//          Act.ID == ActorID,
-    Err: Error,
-    Res: SerializationRequirement {
-    return "remoteCall: \(target.mangledName)" as! Res
-  }
-
-  func remoteCallVoid<Act, Err>(
-    on actor: Act,
-    target: RemoteCallTarget,
-    invocation invocationEncoder: inout InvocationEncoder,
-    throwing: Err.Type
-  ) async throws
-    where Act: DistributedActor,
-//          Act.ID == ActorID,
-    Err: Error {
-    fatalError("not implemented \(#function)")
-  }
-
-}
-
-// === Sending / encoding -------------------------------------------------
-struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
-  typealias SerializationRequirement = Codable
-
-  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
-  mutating func doneRecording() throws {}
-}
-
-// === Receiving / decoding -------------------------------------------------
-class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
-  typealias SerializationRequirement = Codable
-
-  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
-  func decodeReturnType() throws -> Any.Type? { nil }
-  func decodeErrorType() throws -> Any.Type? { nil }
 }
 
 typealias DefaultDistributedActorSystem = FakeActorSystem

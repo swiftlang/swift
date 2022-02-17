@@ -166,9 +166,8 @@ struct FakeActorSystem: DistributedActorSystem {
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-//          Act.ID == ActorID,
-          Err: Error
-  {
+          Act.ID == ActorID,
+          Err: Error {
     fatalError("not implemented: \(#function)")
   }
 }
@@ -267,6 +266,9 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
 
   func onReturn<Res>(value: Res) async throws {
     print("RETURN: \(value)")
+  }
+  func onReturnVoid() async throws {
+    print("RETURN VOID:()")
   }
   func onThrow<Err: Error>(error: Err) async throws {
     print("ERROR: \(error)")

@@ -674,20 +674,30 @@ public:
   FuncDecl *getRecordGenericSubstitutionOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.recordArgument(_:).
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordArgument(_:).
   //
   // \param nominal optionally provide a 'NominalTypeDecl' from which the
   // function decl shall be extracted. This is useful to avoid witness calls
   // through the protocol which is looked up when nominal is null.
-  FuncDecl *getRecordArgumentOnDistributedInvocationEncoder(
+  AbstractFunctionDecl *getRecordArgumentOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.recordErrorType(_:).
-  FuncDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordReturnType(_:).
+  AbstractFunctionDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
-  // Retrieve the declaration of DistributedInvocationEncoder.recordReturnType(_:).
-  FuncDecl *getRecordReturnTypeOnDistributedInvocationEncoder(
+  // Retrieve the declaration of DistributedTargetInvocationEncoder.recordErrorType(_:).
+  AbstractFunctionDecl *getRecordErrorTypeOnDistributedInvocationEncoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of
+  // DistributedTargetInvocationDecoder.getDecodeNextArgumentOnDistributedInvocationDecoder(_:).
+  AbstractFunctionDecl *getDecodeNextArgumentOnDistributedInvocationDecoder(
+      NominalTypeDecl *nominal) const;
+
+  // Retrieve the declaration of
+  // getOnReturnOnDistributedTargetInvocationResultHandler.onReturn(_:).
+  AbstractFunctionDecl *getOnReturnOnDistributedTargetInvocationResultHandler(
       NominalTypeDecl *nominal) const;
 
   // Retrieve the declaration of DistributedInvocationEncoder.doneRecording().
@@ -1337,11 +1347,8 @@ public:
   /// alternative specified via the -entry-point-function-name frontend flag.
   std::string getEntryPointFunctionName() const;
 
-  /// Find the type of SerializationRequirement on the passed nominal.
-  ///
-  /// This type exists as a typealias/associatedtype on all distributed actors,
-  /// actor systems, and related serialization types.
-  Type getDistributedSerializationRequirementType(NominalTypeDecl *);
+  Type getAssociatedTypeOfDistributedSystemOfActor(NominalTypeDecl *actor,
+                                            Identifier member);
 
   /// Find the concrete invocation decoder associated with the given actor.
   NominalTypeDecl *

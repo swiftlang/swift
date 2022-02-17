@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -20,90 +23,6 @@ distributed actor Capybara {
   }
 }
 
-
-// ==== Fake Transport ---------------------------------------------------------
-struct ActorAddress: Sendable, Hashable, Codable {
-  let address: String
-  init(parse address: String) {
-    self.address = address
-  }
-}
-
-struct FakeActorSystem: DistributedActorSystem {
-  typealias ActorID = ActorAddress
-  typealias InvocationDecoder = FakeInvocation
-  typealias InvocationEncoder = FakeInvocation
-  typealias SerializationRequirement = Codable
-
-  func resolve<Act>(id: ActorID, as actorType: Act.Type)
-  throws -> Act? where Act: DistributedActor {
-    return nil
-  }
-
-  func assignID<Act>(_ actorType: Act.Type) -> ActorID
-          where Act: DistributedActor {
-    let id = ActorAddress(parse: "xxx")
-    return id
-  }
-
-  func actorReady<Act>(_ actor: Act)
-      where Act: DistributedActor,
-      Act.ID == ActorID {
-  }
-
-  func resignID(_ id: ActorID) {
-  }
-
-  func makeInvocationEncoder() -> InvocationEncoder {
-    .init()
-  }
-
-  func remoteCall<Act, Err, Res>(
-    on actor: Act,
-    target: RemoteCallTarget,
-    invocation invocationEncoder: inout InvocationEncoder,
-    throwing: Err.Type,
-    returning: Res.Type
-  ) async throws -> Res
-    where Act: DistributedActor,
-    Err: Error,
-//          Act.ID == ActorID,
-    Res: SerializationRequirement {
-    fatalError("Not implemented")
-  }
-
-  func remoteCallVoid<Act, Err>(
-    on actor: Act,
-    target: RemoteCallTarget,
-    invocation invocationEncoder: inout InvocationEncoder,
-    throwing: Err.Type
-  ) async throws
-    where Act: DistributedActor,
-    Err: Error
-//          Act.ID == ActorID
-  {
-    fatalError("Not implemented")
-  }
-}
-
-class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
-  typealias SerializationRequirement = Codable
-
-  func recordGenericSubstitution<T>(_ type: T.Type) throws {}
-  func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
-  func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
-  func recordErrorType<E: Error>(_ type: E.Type) throws {}
-  func doneRecording() throws {}
-
-  // === Receiving / decoding -------------------------------------------------
-
-  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
-  func decodeReturnType() throws -> Any.Type? { nil }
-  func decodeErrorType() throws -> Any.Type? { nil }
-}
-
-@available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test() async throws {
