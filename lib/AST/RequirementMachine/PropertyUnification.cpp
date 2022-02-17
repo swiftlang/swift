@@ -269,14 +269,14 @@ void PropertyMap::addSuperclassProperty(
     recordRelation(key, ruleID, layoutSymbol, System, debug);
   }
 
-  if (debug) {
-    llvm::dbgs() << "% New superclass " << superclassDecl->getName()
-                 << " for " << key << " is ";
-  }
-
   // If this is the first superclass requirement we've seen for this term,
   // just record it and we're done.
   if (!props->SuperclassDecl) {
+    if (debug) {
+      llvm::dbgs() << "% New superclass " << superclassDecl->getName()
+                   << " for " << key << "\n";
+    }
+
     props->SuperclassDecl = superclassDecl;
 
     assert(props->Superclasses.empty());
@@ -288,6 +288,11 @@ void PropertyMap::addSuperclassProperty(
     req.SuperclassType = property;
     req.SuperclassRule = ruleID;
     return;
+  }
+
+  if (debug) {
+    llvm::dbgs() << "% New superclass " << superclassDecl->getName()
+                 << " for " << key << " is ";
   }
 
   // Otherwise, we compare it against the existing superclass requirement.

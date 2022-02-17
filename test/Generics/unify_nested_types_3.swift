@@ -28,11 +28,11 @@ struct G<T : P2a & P3a> {}
 
 // CHECK-LABEL: Requirement machine for <τ_0_0 where τ_0_0 : P2a, τ_0_0 : P3a>
 // CHECK-LABEL: Rewrite system: {
-// CHECK: - τ_0_0.[P2a:T].[concrete: X<τ_0_0> with <τ_0_0.[P3a:U]>] => τ_0_0.[P2a:T]
-// CHECK: - τ_0_0.[P2a:T].[P2:T].[concrete: X<τ_0_0> with <τ_0_0.[P3a:U].[P1:T]>] => τ_0_0.[P2a:T].[P2:T]
+// CHECK: - τ_0_0.[P2a:T].[concrete: X<τ_0_0.[P3a:U]>] => τ_0_0.[P2a:T]
+// CHECK: - τ_0_0.[P2a:T].[P2:T].[concrete: X<τ_0_0.[P3a:U].[P1:T]>] => τ_0_0.[P2a:T].[P2:T]
 // CHECK: }
 // CHECK-LABEL: Property map: {
-// CHECK: τ_0_0.[P2a:T] => { conforms_to: [P2] concrete_type: [concrete: X<τ_0_0> with <τ_0_0.[P3a:U]>] }
-// CHECK: τ_0_0.[P2a:T].[P2:T] => { concrete_type: [concrete: X<τ_0_0> with <τ_0_0.[P3a:U].[P1:T]>] }
+// CHECK: τ_0_0.[P2a:T] => { conforms_to: [P2] concrete_type: [concrete: X<τ_0_0.[P3a:U]>] }
+// CHECK: τ_0_0.[P2a:T].[P2:T] => { concrete_type: [concrete: X<τ_0_0.[P3a:U].[P1:T]>] }
 // CHECK: }
 // CHECK: }
