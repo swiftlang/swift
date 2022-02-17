@@ -216,6 +216,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   Diffing.swift
   FloatingPointRandom.swift
+  Indexed.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
