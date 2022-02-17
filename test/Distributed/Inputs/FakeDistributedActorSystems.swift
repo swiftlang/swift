@@ -179,10 +179,13 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         self.remoteCallResult = nil
         self.remoteCallError = error
       }
+
+      var decoder = invocation.makeDecoder()
+
       try await executeDistributedTarget(
         on: active,
         mangledTargetName: target.mangledName,
-        invocationDecoder: invocation.makeDecoder(),
+        invocationDecoder: &decoder,
         handler: resultHandler
       )
 
@@ -226,10 +229,13 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         self.remoteCallResult = nil
         self.remoteCallError = error
       }
+
+      var decoder = invocation.makeDecoder()
+
       try await executeDistributedTarget(
         on: active,
         mangledTargetName: target.mangledName,
-        invocationDecoder: invocation.makeDecoder(),
+        invocationDecoder: &decoder,
         handler: resultHandler
       )
 
