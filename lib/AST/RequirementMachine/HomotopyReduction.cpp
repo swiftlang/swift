@@ -867,8 +867,16 @@ void RewriteSystem::verifyMinimizedRules(
     const auto &rule = getRule(ruleID);
 
     // Ignore the rewrite rule if it is not part of our minimization domain.
-    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
+    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol())) {
+      if (rule.isRedundant()) {
+        llvm::errs() << "Redundant rule outside minimization domain: "
+                     << rule << "\n\n";
+        dump(llvm::errs());
+        abort();
+      }
+
       continue;
+    }
 
     // Note that sometimes permanent rules can be simplified, but they can never
     // be redundant.
