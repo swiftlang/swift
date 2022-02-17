@@ -623,3 +623,16 @@ actor Rain {
     defer { _ = hollerBack(self) }
   }
 }
+
+@available(SwiftStdlib 5.5, *)
+actor OhBrother {
+  private var giver: () -> Int?
+
+  static var DefaultResult: Int { 10 }
+
+  init() {
+    // expected-note@+2 {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+    // expected-warning@+1 {{cannot access property 'giver' here in non-isolated initializer; this is an error in Swift 6}}
+    self.giver = { Self.DefaultResult }
+  }
+}
