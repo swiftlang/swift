@@ -22,7 +22,7 @@ public final class FakeEncoder {
   }
 
   private func dotStringsFormat(from strings: [String: String]) -> String {
-    var dotStrings = strings.map { k, v -> String in
+    let dotStrings = strings.map { k, v -> String in
       if k.isEmpty {
         return "\(v);"
       } else {
