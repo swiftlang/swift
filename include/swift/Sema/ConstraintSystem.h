@@ -80,6 +80,8 @@ Optional<constraints::SolutionApplicationTarget>
 typeCheckExpression(constraints::SolutionApplicationTarget &target,
                     OptionSet<TypeCheckExprFlags> options);
 
+Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool);
+
 } // end namespace TypeChecker
 
 } // end namespace swift
@@ -3044,6 +3046,10 @@ private:
   friend Optional<SolutionApplicationTarget>
   swift::TypeChecker::typeCheckExpression(
       SolutionApplicationTarget &target, OptionSet<TypeCheckExprFlags> options);
+
+  friend Type swift::TypeChecker::typeCheckParameterDefault(Expr *&,
+                                                            DeclContext *, Type,
+                                                            bool);
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
