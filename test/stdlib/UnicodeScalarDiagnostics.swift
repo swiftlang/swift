@@ -19,12 +19,15 @@ func test_UnicodeScalarDoesNotImplementArithmetic(_ us: UnicodeScalar, i: Int) {
   let b1 = us + us // expected-error {{binary operator '+' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}
   let b2 = us - us // expected-error {{binary operator '-' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}
   let b3 = us * us // expected-error {{binary operator '*' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}
-  let b4 = us / us // expected-error {{binary operator '/' cannot be applied to two 'UnicodeScalar' (aka 'Unicode.Scalar') operands}}
+  // DurationProtocol is a near miss here
+  let b4 = us / us // expected-error {{referencing operator function '/' on 'DurationProtocol' requires that 'UnicodeScalar' (aka 'Unicode.Scalar') conform to 'DurationProtocol'}}
 
   let c1 = us + i // expected-error {{cannot convert value of type 'UnicodeScalar' (aka 'Unicode.Scalar') to expected argument type 'Int'}}
   let c2 = us - i // expected-error {{cannot convert value of type 'UnicodeScalar' (aka 'Unicode.Scalar') to expected argument type 'Int'}}
-  let c3 = us * i // expected-error {{cannot convert value of type 'UnicodeScalar' (aka 'Unicode.Scalar') to expected argument type 'Int'}}
-  let c4 = us / i // expected-error {{cannot convert value of type 'UnicodeScalar' (aka 'Unicode.Scalar') to expected argument type 'Int'}}
+  let c3 = us * i // expected-note {{overloads for '*' exist with these partially matching parameter lists: (Int, Int)}}
+  // expected-error@-1 {{binary operator '*' cannot be applied to operands of type 'UnicodeScalar' (aka 'Unicode.Scalar') and 'Int'}}
+  let c4 = us / i // expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int)}}
+  // expected-error@-1 {{binary operator '/' cannot be applied to operands of type 'UnicodeScalar' (aka 'Unicode.Scalar') and 'Int'}}
 
   let d1 = i + us // expected-error {{cannot convert value of type 'UnicodeScalar' (aka 'Unicode.Scalar') to expected argument type 'Int'}}
   let d2 = i - us // expected-error {{cannot convert value of type 'UnicodeScalar' (aka 'Unicode.Scalar') to expected argument type 'Int'}}
