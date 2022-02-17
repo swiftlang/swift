@@ -204,10 +204,16 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
     paramRefExpr->setType(param->getType());
 
     auto specParamTy = specializedFuncDecl->getParameters()->get(paramIndex)->getType();
-    auto cast = ForcedCheckedCastExpr::createImplicit(
-        ctx, paramRefExpr, specParamTy);
 
-    forwardingParams.push_back(Argument(SourceLoc(), Identifier(), cast));
+    Expr *argExpr = nullptr;
+    if (specParamTy->isEqual(paramRefExpr->getType())) {
+      argExpr = paramRefExpr;
+    } else {
+      argExpr = ForcedCheckedCastExpr::createImplicit(ctx, paramRefExpr,
+                                                      specParamTy);
+    }
+
+    forwardingParams.push_back(Argument(SourceLoc(), Identifier(), argExpr));
     paramIndex++;
   }
 
@@ -220,10 +226,16 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
   specializedFuncCallExpr->setType(specializedFuncDecl->getResultInterfaceType());
   specializedFuncCallExpr->setThrows(false);
 
-  auto cast = ForcedCheckedCastExpr::createImplicit(
-      ctx, specializedFuncCallExpr, thunkDecl->getResultInterfaceType());
+  Expr *resultExpr = nullptr;
+  if (specializedFuncCallExpr->getType()->isEqual(thunkDecl->getResultInterfaceType())) {
+    resultExpr = specializedFuncCallExpr;
+  } else {
+    resultExpr = ForcedCheckedCastExpr::createImplicit(
+        ctx, specializedFuncCallExpr, thunkDecl->getResultInterfaceType());
+  }
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), cast, /*implicit=*/true);
+  auto returnStmt = new (ctx)
+      ReturnStmt(SourceLoc(), resultExpr, /*implicit=*/true);
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
   return {body, /*isTypeChecked=*/true};
