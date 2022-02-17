@@ -140,7 +140,7 @@ public:
 };
 
 /// Fold within the specified context.
-bool run(Context &);
+MoveValueInst *run(Context &);
 
 /// The consuming use pattern we are trying to match and transform.
 struct Match final {
@@ -358,6 +358,11 @@ class Rewriter final {
   Context &context;
   Candidates const &candidates;
 
+  // The move_value [lexical] instruction that was added during the run.
+  //
+  // Defined during createMove.
+  MoveValueInst *mvi = nullptr;
+
 public:
   Rewriter(Context &context, Candidates const &candidates)
       : context(context), candidates(candidates){};
@@ -379,7 +384,7 @@ public:
   ///       ...
   /// - update SSA now that a second def has been introduced for
   ///   %borrowee
-  void run();
+  MoveValueInst *run();
 
 private:
   /// Add the new move_value [lexical] above the begin_borrow [lexical].
@@ -407,11 +412,6 @@ private:
   /// (2) hoist the end_borrow
   /// (3) delete the destroy_value
   void fold(Match, ArrayRef<int> rewritableArgumentIndices);
-
-  // The move_value [lexical] instruction that was added during the run.
-  //
-  // Defined during createMove.
-  MoveValueInst *mvi = nullptr;
 };
 
 //===----------------------------------------------------------------------===//
@@ -421,45 +421,43 @@ private:
 /// Perform any possible folding.
 ///
 /// Returns whether any change was made.
-bool run(Context &context) {
+MoveValueInst *run(Context &context) {
   Candidates candidates;
 
   // Do a cheap search for scope ending instructions that could potentially be
   // candidates for folding.
   if (!FindCandidates(context).run(candidates))
-    return false;
+    return nullptr;
 
   // At least one full match was found and more expensive checks on the matches
   // are in order.
 
   BorroweeUsage borroweeUsage;
   if (!findBorroweeUsage(context, borroweeUsage))
-    return false;
+    return nullptr;
   IntroducerUsage introducerUsage;
   if (!findIntroducerUsage(context, introducerUsage))
-    return false;
+    return nullptr;
 
   // Now, filter the candidates using those values.
   if (!FilterCandidates(context, introducerUsage, borroweeUsage)
            .run(candidates))
-    return false;
+    return nullptr;
 
   // Finally, check that %borrowee has no uses within %lifetime's
   // borrow scope.
   if (borroweeHasUsesWithinBorrowScope(context, borroweeUsage))
-    return false;
+    return nullptr;
 
   // It is safe to rewrite the viable candidates.  Do so.
-  Rewriter(context, candidates).run();
-
-  return true;
+  return Rewriter(context, candidates).run();
 }
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Rewriting
 //===----------------------------------------------------------------------===//
 
-void Rewriter::run() {
+MoveValueInst *Rewriter::run() {
   bool foldedAny = false;
   (void)foldedAny;
   auto size = candidates.vector.size();
@@ -487,6 +485,7 @@ void Rewriter::run() {
 #endif
   }
   assert(foldedAny && "rewriting without anything to rewrite!?");
+  return mvi;
 }
 
 bool Rewriter::createMove() {
@@ -779,15 +778,16 @@ bool FilterCandidates::rewritableArgumentIndicesForApply(
 //===----------------------------------------------------------------------===//
 
 /// The entry point.
-bool swift::foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
-                                              DominanceInfo &dominanceTree,
-                                              InstructionDeleter &deleter) {
+MoveValueInst *
+swift::foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
+                                         DominanceInfo &dominanceTree,
+                                         InstructionDeleter &deleter) {
   if (!bbi->isLexical())
-    return false;
+    return nullptr;
   if (bbi->getOperand()->getOwnershipKind() != OwnershipKind::Owned)
-    return false;
+    return nullptr;
   if (!dominanceTree.isReachableFromEntry(bbi->getParentBlock()))
-    return false;
+    return nullptr;
 
   auto context = LexicalDestroyFolding::Context(bbi, dominanceTree, deleter);
   return LexicalDestroyFolding::run(context);
