@@ -226,6 +226,11 @@ struct SymbolGraph {
   bool isImplicitlyPrivate(const Decl *D,
                            bool IgnoreContext = false) const;
 
+  /// Returns `true` if the declaration has an availability attribute
+  /// that marks it as unconditionally unavailable on all platforms (i.e., where
+  /// the platform is marked '*').
+  bool isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const;
+
   /// Returns `true` if the declaration should be included as a node
   /// in the graph.
   bool canIncludeDeclAsNode(const Decl *D) const;
