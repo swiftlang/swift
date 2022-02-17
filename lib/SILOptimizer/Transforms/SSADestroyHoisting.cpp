@@ -204,6 +204,14 @@ public:
   // Debug instructions that are no longer within this lifetime after shrinking.
   SmallVector<SILInstruction *, 4> deadUsers;
 
+  // The access scopes which are hoisting barriers.
+  //
+  // They are hoisting barriers if they include any barriers.  We need to be
+  // sure not to hoist a destroy_addr into an access scope and by doing so cause
+  // a deinit which had previously executed outside an access scope to start
+  // executing within it--that could violate exclusivity.
+  llvm::SmallPtrSet<BeginAccessInst *, 8> barrierAccessScopes;
+
   explicit DeinitBarriers(bool ignoreDeinitBarriers,
                           const KnownStorageUses &knownUses,
                           SILFunction *function)
@@ -215,11 +223,15 @@ public:
     storageDefInst = rootValue->getDefiningInstruction();
   }
 
-  void compute() { DestroyReachability(*this).solveBackward(); }
+  void compute() {
+    FindBarrierAccessScopes(*this).solveBackward();
+    DestroyReachability(*this).solveBackward();
+  }
 
   bool isBarrier(SILInstruction *instruction) const {
-    return classificationIsBarrier(classifyInstruction(
-        instruction, ignoreDeinitBarriers, storageDefInst, knownUses));
+    return classificationIsBarrier(
+        classifyInstruction(instruction, ignoreDeinitBarriers, storageDefInst,
+                            barrierAccessScopes, knownUses));
   };
 
 private:
@@ -234,13 +246,14 @@ private:
 
   Classification classifyInstruction(SILInstruction *inst) {
     return classifyInstruction(inst, ignoreDeinitBarriers, storageDefInst,
-                               knownUses);
+                               barrierAccessScopes, knownUses);
   }
 
-  static Classification classifyInstruction(SILInstruction *inst,
-                                            bool ignoreDeinitBarriers,
-                                            SILInstruction *storageDefInst,
-                                            const KnownStorageUses &knownUses);
+  static Classification classifyInstruction(
+      SILInstruction *inst, bool ignoreDeinitBarriers,
+      SILInstruction *storageDefInst,
+      const llvm::SmallPtrSetImpl<BeginAccessInst *> &barrierAccessScopes,
+      const KnownStorageUses &knownUses);
 
   void visitedInstruction(SILInstruction *instruction,
                           Classification classification);
@@ -248,6 +261,121 @@ private:
   static bool classificationIsBarrier(Classification classification);
 
   // Implements BackwardReachability::BlockReachability
+  //
+  // Determine which end_access instructions must be treated as barriers.
+  //
+  // An end_access is a barrier if the access scope it ends contains any deinit
+  // barriers.  Suppose that it weren't treated as a barrier.  Then the
+  // destroy_addr would be hoisted up to the in-scope deinit barrier.  That
+  // could result in a deinit being executed within the scope which was
+  // previously executed outside it.  Executing a deinit in the scope could
+  // violate exclusivity.
+  //
+  // So before determining what ALL the barriers are, we need to determine which
+  // end_access instructions are barriers.  Do that by observing which access
+  // scopes are open when encountering a barrier.  The access scopes which are
+  // open are those for which we've seen an end_access instruction when walking
+  // backwards from the destroy_addrs.  Add these access scopes to
+  // DeinitBarriers::barrierAccessScopes.
+  //
+  // Tracking which access scopes are open consists of two parts:
+  // (1) in-block analysis
+  // (2) cross-block analysis
+  // For (1), maintain a set of access scopes which are currently open.  Insert
+  // and erase scopes when seeing begin_access and end_access instructions when
+  // they're visited in checkReachableBarrier.  A stack can't be used here
+  // because access scopes are not necessarily nested.
+  // For (2), when entering a block, the access scope is the union of all the
+  // open access scopes in the block's predecessors.
+  class FindBarrierAccessScopes {
+    DeinitBarriers &result;
+    BasicBlockSetVector destroyReachesBeginBlocks;
+    llvm::DenseMap<SILBasicBlock *, llvm::SmallPtrSet<BeginAccessInst *, 2>>
+        liveInAccessScopes;
+    llvm::SmallPtrSet<BeginAccessInst *, 2> runningLiveAccessScopes;
+
+    BackwardReachability<FindBarrierAccessScopes> reachability;
+
+  public:
+    FindBarrierAccessScopes(DeinitBarriers &result)
+        : result(result),
+          destroyReachesBeginBlocks(result.knownUses.getFunction()),
+          reachability(result.knownUses.getFunction(), *this) {
+      // Seed backward reachability with destroy points.
+      for (SILInstruction *destroy : result.knownUses.originalDestroys) {
+        reachability.initLastUse(destroy);
+      }
+    }
+
+    void markLiveAccessScopesAsBarriers() {
+      for (auto *scope : runningLiveAccessScopes) {
+        result.barrierAccessScopes.insert(scope);
+      }
+    }
+
+    bool hasReachableBegin(SILBasicBlock *block) {
+      return destroyReachesBeginBlocks.contains(block);
+    }
+
+    void markReachableBegin(SILBasicBlock *block) {
+      destroyReachesBeginBlocks.insert(block);
+      if (!runningLiveAccessScopes.empty()) {
+        liveInAccessScopes[block] = runningLiveAccessScopes;
+      }
+    }
+
+    void markReachableEnd(SILBasicBlock *block) {
+      runningLiveAccessScopes.clear();
+      for (auto *predecessor : block->getPredecessorBlocks()) {
+        auto iterator = liveInAccessScopes.find(predecessor);
+        if (iterator != liveInAccessScopes.end()) {
+          for (auto *bai : iterator->getSecond()) {
+            runningLiveAccessScopes.insert(bai);
+          }
+        }
+      }
+    }
+
+    bool checkReachableBarrier(SILInstruction *inst) {
+      // For correctness, it is required that
+      // FindBarrierAccessScopes::checkReachableBarrier return true whenever
+      // DestroyReachability::checkReachableBarrier does, with one exception:
+      // DestryReachability::checkReachableBarrier will also return true for any
+      // end_access barrier that FindBarrierAccessScopes finds.
+      if (auto *eai = dyn_cast<EndAccessInst>(inst)) {
+        runningLiveAccessScopes.insert(eai->getBeginAccess());
+      } else if (auto *bai = dyn_cast<BeginAccessInst>(inst)) {
+        runningLiveAccessScopes.erase(bai);
+      }
+      bool isBarrier = result.isBarrier(inst);
+      if (isBarrier) {
+        markLiveAccessScopesAsBarriers();
+      }
+      // If we've seen a barrier, then we can stop looking for access scopes.
+      // Any that were open already have now been marked as barriers.  And if
+      // none are open, the second data flow won't get beyond this barrier to
+      // face subsequent end_access instructions.
+      return isBarrier;
+    }
+
+    bool checkReachablePhiBarrier(SILBasicBlock *block) {
+      bool isBarrier =
+          llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
+            return result.isBarrier(block->getTerminator());
+          });
+      if (isBarrier) {
+        // If there's a barrier preventing us from hoisting out of this block,
+        // then every open access scope contains a barrier, so all the
+        // corresponding end_access instructions are barriers too.
+        markLiveAccessScopesAsBarriers();
+      }
+      return isBarrier;
+    }
+
+    void solveBackward() { reachability.solveBackward(); }
+  };
+
+  // Conforms to BackwardReachability::BlockReachability
   class DestroyReachability {
     DeinitBarriers &result;
 
@@ -284,7 +412,9 @@ private:
 
 DeinitBarriers::Classification DeinitBarriers::classifyInstruction(
     SILInstruction *inst, bool ignoreDeinitBarriers,
-    SILInstruction *storageDefInst, const KnownStorageUses &knownUses) {
+    SILInstruction *storageDefInst,
+    const llvm::SmallPtrSetImpl<BeginAccessInst *> &barrierAccessScopes,
+    const KnownStorageUses &knownUses) {
   if (knownUses.debugInsts.contains(inst)) {
     return Classification::DeadUser;
   }
@@ -296,6 +426,11 @@ DeinitBarriers::Classification DeinitBarriers::classifyInstruction(
   }
   if (!ignoreDeinitBarriers && isDeinitBarrier(inst)) {
     return Classification::Barrier;
+  }
+  if (auto *eai = dyn_cast<EndAccessInst>(inst)) {
+    return barrierAccessScopes.contains(eai->getBeginAccess())
+               ? Classification::Barrier
+               : Classification::Other;
   }
   return Classification::Other;
 }
@@ -334,6 +469,11 @@ void DeinitBarriers::visitedInstruction(SILInstruction *instruction,
 /// which is a storageUser and therefore a barrier.
 bool DeinitBarriers::DestroyReachability::checkReachableBarrier(
     SILInstruction *instruction) {
+  // For correctness, it is required that
+  // DestroyReachability::checkReachableBarrier return true whenever
+  // FindBarrierAccessScopes::checkReachableBarrier does.  It must additionally
+  // return true when encountering an end_access barrier that
+  // FindBarrierAccessScope determined is a barrier.
   auto classification = result.classifyInstruction(instruction);
   result.visitedInstruction(instruction, classification);
   return result.classificationIsBarrier(classification);
