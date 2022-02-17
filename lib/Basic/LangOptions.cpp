@@ -394,6 +394,17 @@ llvm::StringRef swift::getFeatureName(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
+bool swift::isSuppressibleFeature(Feature feature) {
+  switch (feature) {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
+  case Feature::FeatureName: return false;
+#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
+  case Feature::FeatureName: return true;
+#include "swift/Basic/Features.def"
+  }
+  llvm_unreachable("covered switch");
+}
+
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
   switch (AccessNoteBehavior) {
   case AccessNoteDiagnosticBehavior::Ignore:
