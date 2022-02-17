@@ -170,7 +170,10 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   if (next->ConcreteType) {
     ConcreteType = next->ConcreteType->prependPrefixToConcreteSubstitutions(
         prefix, ctx);
-    ConcreteTypeRule = next->ConcreteTypeRule;
+    ConcreteTypeRules = next->ConcreteTypeRules;
+    for (auto &pair : ConcreteTypeRules) {
+      pair.first = pair.first.prependPrefixToConcreteSubstitutions(prefix, ctx);
+    }
   }
 
   // Copy over class hierarchy information.
@@ -189,11 +192,14 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
 Symbol PropertyBag::concretelySimplifySubstitution(const MutableTerm &mutTerm,
                                                    RewriteContext &ctx,
                                                    RewritePath *path) const {
+  assert(!ConcreteTypeRules.empty());
+  auto &pair = ConcreteTypeRules.front();
+
   // The property map entry might apply to a suffix of the substitution
   // term, so prepend the appropriate prefix to its own substitutions.
   auto prefix = getPrefixAfterStrippingKey(mutTerm);
   auto concreteSymbol =
-    ConcreteType->prependPrefixToConcreteSubstitutions(
+    pair.first.prependPrefixToConcreteSubstitutions(
         prefix, ctx);
 
   // If U.V is the substitution term and V is the property map key,
@@ -203,7 +209,7 @@ Symbol PropertyBag::concretelySimplifySubstitution(const MutableTerm &mutTerm,
   if (path) {
     path->add(RewriteStep::forRewriteRule(/*startOffset=*/prefix.size(),
                                           /*endOffset=*/0,
-                                          /*ruleID=*/*ConcreteTypeRule,
+                                          /*ruleID=*/pair.second,
                                           /*inverse=*/true));
 
     if (!prefix.empty()) {
@@ -228,7 +234,7 @@ void PropertyBag::verify(const RewriteSystem &system) const {
   // FIXME: Add asserts requiring that the layout, superclass and
   // concrete type symbols match, as above
   assert(!Layout.isNull() == LayoutRule.hasValue());
-  assert(ConcreteType.hasValue() == ConcreteTypeRule.hasValue());
+  assert(ConcreteType.hasValue() == !ConcreteTypeRules.empty());
 
   assert((SuperclassDecl == nullptr) == Superclasses.empty());
   for (const auto &pair : Superclasses) {

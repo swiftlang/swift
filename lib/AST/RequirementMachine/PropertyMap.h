@@ -86,8 +86,8 @@ class PropertyBag {
   /// The most specific concrete type constraint this type satisfies.
   Optional<Symbol> ConcreteType;
 
-  /// The corresponding layout rule for the above.
-  Optional<unsigned> ConcreteTypeRule;
+  /// Concrete type rules that apply to this key.
+  llvm::SmallVector<std::pair<Symbol, unsigned>, 1> ConcreteTypeRules;
 
   /// Cache of associated type declarations.
   llvm::SmallDenseMap<Identifier, AssociatedTypeDecl *, 2> AssocTypes;
@@ -257,6 +257,16 @@ private:
 
   void addConformanceProperty(Term key, Symbol property, unsigned ruleID);
   void addLayoutProperty(Term key, Symbol property, unsigned ruleID);
+
+  void unifyConcreteTypes(Term key,
+                          Symbol lhsProperty, unsigned lhsRuleID,
+                          Symbol rhsProperty, unsigned rhsRuleID);
+
+  void unifyConcreteTypes(Term key,
+                          Optional<Symbol> &bestProperty,
+                          llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &
+                              existingRules,
+                          Symbol property, unsigned ruleID);
 
   void unifyConcreteTypes(Term key,
                           Optional<Symbol> &existingProperty,

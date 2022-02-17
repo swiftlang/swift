@@ -47,14 +47,16 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents() {
         llvm::dbgs() << "- via concrete type requirement\n";
       }
 
-      concretizeNestedTypesFromConcreteParent(
-          props->getKey(),
-          RequirementKind::SameType,
-          *props->ConcreteTypeRule,
-          props->ConcreteType->getConcreteType(),
-          props->ConcreteType->getSubstitutions(),
-          props->ConformsToRules,
-          props->ConformsTo);
+      for (auto pair : props->ConcreteTypeRules) {
+        concretizeNestedTypesFromConcreteParent(
+            props->getKey(),
+            RequirementKind::SameType,
+            pair.second,
+            pair.first.getConcreteType(),
+            pair.first.getSubstitutions(),
+            props->ConformsToRules,
+            props->ConformsTo);
+      }
     }
 
     if (props->hasSuperclassBound()) {
