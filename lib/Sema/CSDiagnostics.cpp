@@ -257,6 +257,11 @@ ValueDecl *RequirementFailure::getDeclRef() const {
       return cast<ValueDecl>(getDC()->getAsDecl());
     }
 
+    if (contextualPurpose == CTP_DefaultParameter ||
+        contextualPurpose == CTP_AutoclosureDefaultParameter) {
+      return cast<ValueDecl>(getDC()->getParent()->getAsDecl());
+    }
+
     return getAffectedDeclFromType(contextualTy);
   }
 
