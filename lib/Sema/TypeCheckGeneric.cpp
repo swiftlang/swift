@@ -274,7 +274,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
 
         ctx.Diags.diagnose(repr->getLoc(),
                            diag::opaque_type_in_parameter,
-                           interfaceType);
+                           false, interfaceType);
         return true;
       }
     }
