@@ -64,7 +64,7 @@ import Module
 // Check if the array literal can be stack promoted.
 
 // CHECK-LABEL: sil @$s4main6testit6Module3FooVyF
-// CHECK:   alloc_ref [stack] [tail_elems $Foo.FooElement 
+// CHECK:   alloc_ref{{.*}} [stack] [tail_elems $Foo.FooElement
 // CHECK: } // end sil function '$s4main6testit6Module3FooVyF'
 
 public func testit() -> Foo {

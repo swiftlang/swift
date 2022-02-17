@@ -2145,6 +2145,26 @@ public:
   bool isObjC() const {
     return SILNode::Bits.AllocRefInstBase.ObjC;
   }
+
+  static bool classof(SILNodePointer node) {
+    if (auto *i = dyn_cast<SILInstruction>(node.get()))
+      return classof(i);
+    return false;
+  }
+
+  static bool classof(const SILInstruction *inst) {
+    return classof(inst->getKind());
+  }
+
+  static bool classof(SILInstructionKind kind) {
+    switch (kind) {
+    case SILInstructionKind::AllocRefInst:
+    case SILInstructionKind::AllocRefDynamicInst:
+      return true;
+    default:
+      return false;
+    }
+  }
 };
 
 /// AllocRefInst - This represents the primitive allocation of an instance
@@ -2205,10 +2225,11 @@ class AllocRefDynamicInst final
   AllocRefDynamicInst(SILDebugLocation DebugLoc,
                       SILType ty,
                       bool objc,
+                      bool canBeOnStack,
                       ArrayRef<SILType> ElementTypes,
                       ArrayRef<SILValue> AllOperands)
       : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc, ty, objc,
-                                            false, ElementTypes) {
+                                            canBeOnStack, ElementTypes) {
     assert(AllOperands.size() >= ElementTypes.size() + 1);
     std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
                             getTrailingObjects<SILType>());
@@ -2217,6 +2238,7 @@ class AllocRefDynamicInst final
   static AllocRefDynamicInst *
   create(SILDebugLocation DebugLoc, SILFunction &F,
          SILValue metatypeOperand, SILType ty, bool objc,
+         bool canBeOnStack,
          ArrayRef<SILType> ElementTypes,
          ArrayRef<SILValue> ElementCountOperands);
 
@@ -2232,6 +2254,9 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands().slice(getNumTailTypes() + 1);
   }
+  // Is the deinit and the size of the dynamic type known to be equivalent to
+  // the the base type (i.e `this->getType()`).
+  bool isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const;
 };
 
 /// This represents the allocation of a heap box for a Swift value of some type.
@@ -7692,7 +7717,9 @@ class DeallocStackRefInst
   DeallocStackRefInst(SILDebugLocation DebugLoc, SILValue Operand)
       : UnaryInstructionBase(DebugLoc, Operand) {}
 public:
-  AllocRefInst *getAllocRef() { return cast<AllocRefInst>(getOperand()); }
+  AllocRefInstBase *getAllocRef() {
+    return cast<AllocRefInstBase>(getOperand());
+  }
 };
 
 /// Deallocate memory for a reference type instance from a destructor or

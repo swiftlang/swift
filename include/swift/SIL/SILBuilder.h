@@ -408,14 +408,15 @@ public:
 
   AllocRefDynamicInst *createAllocRefDynamic(SILLocation Loc, SILValue operand,
                                              SILType type, bool objc,
+                                             bool canAllocOnStack,
                                     ArrayRef<SILType> ElementTypes,
                                     ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefDynamicInsts expand to function calls and can therefore
     // not be counted towards the function prologue.
     assert(!Loc.isInPrologue());
     return insert(AllocRefDynamicInst::create(
-        getSILDebugLocation(Loc), *F, operand, type, objc, ElementTypes,
-        ElementCountOperands));
+        getSILDebugLocation(Loc), *F, operand, type, objc, canAllocOnStack,
+        ElementTypes, ElementCountOperands));
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
