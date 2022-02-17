@@ -78,6 +78,16 @@ makeGuaranteedValueAvailable(SILValue value, SILInstruction *user,
                              DeadEndBlocks &deBlocks,
                              InstModCallbacks callbacks = InstModCallbacks());
 
+/// Compute the liveness boundary for a guaranteed value. Returns true if no
+/// uses are pointer escapes. If pointer escapes are present, the liveness
+/// boundary is still valid for all known uses.
+///
+/// Precondition: \p value has guaranteed ownership and no reborrows. It is
+/// either an "inner" guaranteed value or a simple borrow introducer whose
+/// end_borrows have not yet been inserted.
+bool computeGuaranteedBoundary(SILValue value,
+                               PrunedLivenessBoundary &boundary);
+
 //===----------------------------------------------------------------------===//
 //                        GuaranteedOwnershipExtension
 //===----------------------------------------------------------------------===//

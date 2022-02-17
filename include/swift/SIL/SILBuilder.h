@@ -896,19 +896,18 @@ public:
   ///   [trivial].
   ///
   /// * Otherwise, emit an actual store_borrow.
-  void emitStoreBorrowOperation(SILLocation loc, SILValue src,
-                                SILValue destAddr) {
+  SILInstruction *emitStoreBorrowOperation(SILLocation loc, SILValue src,
+                                           SILValue destAddr) {
     if (!hasOwnership()) {
-      return emitStoreValueOperation(loc, src, destAddr,
-                                     StoreOwnershipQualifier::Unqualified);
+      emitStoreValueOperation(loc, src, destAddr,
+                              StoreOwnershipQualifier::Unqualified);
+    } else if (src->getType().isTrivial(getFunction())) {
+      emitStoreValueOperation(loc, src, destAddr,
+                              StoreOwnershipQualifier::Trivial);
+    } else {
+      createStoreBorrow(loc, src, destAddr);
     }
-
-    if (src->getType().isTrivial(getFunction())) {
-      return emitStoreValueOperation(loc, src, destAddr,
-                                     StoreOwnershipQualifier::Trivial);
-    }
-
-    createStoreBorrow(loc, src, destAddr);
+    return &*std::prev(getInsertionPoint());
   }
 
   MarkUninitializedInst *
@@ -2691,7 +2690,7 @@ private:
     // sync. We don't care if an instruction is used in global_addr.
     if (F)
       TheInst->verifyDebugInfo();
-    TheInst->verifyOperandOwnership();
+    TheInst->verifyOperandOwnership(&C.silConv);
 #endif
   }
 

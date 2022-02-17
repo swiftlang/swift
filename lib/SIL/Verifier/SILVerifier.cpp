@@ -1003,7 +1003,7 @@ public:
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
     // - Non-phi arguments have a single predecessor.
-    assert(arg->isPhiArgument() && "precondition");
+    assert(arg->isPhi() && "precondition");
     for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
       auto *TI = predBB->getTerminator();
       if (F.hasOwnership()) {
@@ -1015,7 +1015,7 @@ public:
                 "All phi argument inputs must be from branches.");
       }
     }
-    if (arg->isPhiArgument() && prohibitAddressPhis()) {
+    if (arg->isPhi() && prohibitAddressPhis()) {
       // As a property of well-formed SIL, we disallow address-type
       // phis. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
@@ -1033,7 +1033,7 @@ public:
     checkLegalType(arg->getFunction(), arg, nullptr);
     checkValueBaseOwnership(arg);
     if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
-      if (phiArg->isPhiArgument())
+      if (phiArg->isPhi())
         visitSILPhiArgument(phiArg);
       else {
         // A non-phi BlockArgument must have a single predecessor unless it is
@@ -1245,27 +1245,39 @@ public:
     }
   }
 
-  /// We are given an instruction \p fInst that forwards ownership from \p
-  /// operand to one of \p fInst's results, make sure that if we have a
-  /// forwarding instruction that can only accept owned or guaranteed ownership
-  /// that we are following that invariant.
+  /// For an instruction \p i that forwards ownership from an operand to one
+  /// of its results, check forwarding invariants.
   void checkOwnershipForwardingInst(SILInstruction *i) {
+    ValueOwnershipKind ownership =
+        OwnershipForwardingMixin::get(i)->getForwardingOwnershipKind();
+
     if (auto *o = dyn_cast<OwnedFirstArgForwardingSingleValueInst>(i)) {
       ValueOwnershipKind kind = OwnershipKind::Owned;
-      require(kind.isCompatibleWith(o->getForwardingOwnershipKind()),
+      require(kind.isCompatibleWith(ownership),
               "OwnedFirstArgForwardingSingleValueInst's ownership kind must be "
               "compatible with owned");
     }
 
     if (auto *o = dyn_cast<GuaranteedFirstArgForwardingSingleValueInst>(i)) {
       ValueOwnershipKind kind = OwnershipKind::Guaranteed;
-      require(kind.isCompatibleWith(o->getForwardingOwnershipKind()),
+      require(kind.isCompatibleWith(ownership),
               "GuaranteedFirstArgForwardingSingleValueInst's ownership kind "
               "must be compatible with guaranteed");
     }
 
     if (auto *term = dyn_cast<OwnershipForwardingTermInst>(i)) {
       checkOwnershipForwardingTermInst(term);
+    }
+
+    // Address-only values are potentially move-only, and unmovable if they are
+    // borrowed. Ensure that guaranteed address-only values are forwarded with
+    // the same representation. Non-destructive projection is
+    // allowed. Aggregation and destructive disaggregation is not allowed.
+    if (ownership == OwnershipKind::Guaranteed
+        && OwnershipForwardingMixin::isAddressOnly(i)) {
+      require(OwnershipForwardingMixin::hasSameRepresentation(i),
+              "Forwarding a guaranteed address-only value requires the same "
+              "representation since no move or copy is allowed.");
     }
   }
 
