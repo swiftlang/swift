@@ -881,8 +881,6 @@ namespace {
     ImportResult Visit##KIND##Type(const clang::KIND##Type *type) {            \
       if (type->isSugared())                                                   \
         return Visit(type->desugar());                                         \
-      if (type->isDependentType())                                             \
-        return Impl.SwiftContext.TheAnyType;                                   \
       return Type();                                                           \
     }
     MAYBE_SUGAR_TYPE(TypeOfExpr)
@@ -1861,9 +1859,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
                isa<clang::TemplateSpecializationType>(clangDecl->getReturnType())) ||
              // TODO: we currently don't lazily load operator return types, but
              // this should be trivial to add.
-             clangDecl->isOverloadedOperator() ||
-             // Dependant types are trivially mapped as Any.
-             clangDecl->getReturnType()->isDependentType()) {
+             clangDecl->isOverloadedOperator()) {
     importedType =
         importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
     if (!importedType) {
