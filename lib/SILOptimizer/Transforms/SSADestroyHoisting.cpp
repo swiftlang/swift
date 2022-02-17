@@ -377,8 +377,9 @@ protected:
 } // namespace
 
 bool HoistDestroys::perform() {
-  auto storage = AccessStorage::compute(storageRoot);
-  if (!storage.isUniquelyIdentified())
+  auto storage = AccessStorage::computeInScope(storageRoot);
+  if (!storage.isUniquelyIdentified() &&
+      storage.getKind() != AccessStorage::Kind::Nested)
     return false;
 
   KnownStorageUses knownUses(storage, getFunction());
@@ -561,16 +562,38 @@ void SSADestroyHoisting::run() {
 
   InstructionDeleter deleter;
   bool changed = false;
+
+  llvm::SmallVector<AllocStackInst *, 4> asis;
+  llvm::SmallVector<BeginAccessInst *, 4> bais;
+
+  // Collect the instructions that we'll be transforming.
+  for (auto &block : *getFunction()) {
+    for (auto &inst : block) {
+      if (auto *asi = dyn_cast<AllocStackInst>(&inst)) {
+        asis.push_back(asi);
+      } else if (auto *bai = dyn_cast<BeginAccessInst>(&inst)) {
+        if (bai->getAccessKind() == SILAccessKind::Modify) {
+          bais.push_back(bai);
+        }
+      }
+    }
+  }
+
+  // We assume that the function is in reverse post order so visiting the
+  // blocks and pushing begin_access as we see them and then popping them off
+  // the end will result in hoisting inner begin_access' destroy_addrs first.
+  while (!bais.empty()) {
+    auto *bai = bais.pop_back_val();
+    changed |= hoistDestroys(bai, deleter);
+  }
+  // Alloc stacks always enclose their accesses.
+  for (auto *asi : asis) {
+    changed |= hoistDestroys(asi, deleter);
+  }
+  // Arguments enclose everything.
   for (auto *arg : getFunction()->getArguments()) {
     if (arg->getType().isAddress()) {
       changed |= hoistDestroys(arg, deleter);
-    }
-  }
-  for (auto &block : *getFunction()) {
-    for (auto &inst : block) {
-      if (auto *alloc = dyn_cast<AllocStackInst>(&inst)) {
-        changed |= hoistDestroys(alloc, deleter);
-      }
     }
   }
   if (changed) {
