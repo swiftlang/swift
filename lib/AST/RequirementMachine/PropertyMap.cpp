@@ -60,41 +60,6 @@
 using namespace swift;
 using namespace rewriting;
 
-/// This papers over a behavioral difference between
-/// GenericSignature::getRequiredProtocols() and ArchetypeType::getConformsTo();
-/// the latter drops any protocols to which the superclass requirement
-/// conforms to concretely.
-llvm::TinyPtrVector<const ProtocolDecl *>
-PropertyBag::getConformsToExcludingSuperclassConformances() const {
-  llvm::TinyPtrVector<const ProtocolDecl *> result;
-
-  if (SuperclassConformances.empty()) {
-    result = ConformsTo;
-    return result;
-  }
-
-  // The conformances in SuperclassConformances should appear in the same order
-  // as the protocols in ConformsTo.
-  auto conformanceIter = SuperclassConformances.begin();
-
-  for (const auto *proto : ConformsTo) {
-    if (conformanceIter == SuperclassConformances.end()) {
-      result.push_back(proto);
-      continue;
-    }
-
-    if (proto == (*conformanceIter)->getProtocol()) {
-      ++conformanceIter;
-      continue;
-    }
-
-    result.push_back(proto);
-  }
-
-  assert(conformanceIter == SuperclassConformances.end());
-  return result;
-}
-
 void PropertyBag::dump(llvm::raw_ostream &out) const {
   out << Key << " => {";
 

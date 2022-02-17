@@ -83,19 +83,11 @@ class PropertyBag {
   /// for the most specific substituted type.
   llvm::SmallDenseMap<const ClassDecl *, SuperclassRequirement, 2> Superclasses;
 
-  /// All concrete conformances of Superclass to the protocols in the
-  /// ConformsTo list.
-  llvm::TinyPtrVector<ProtocolConformance *> SuperclassConformances;
-
   /// The most specific concrete type constraint this type satisfies.
   Optional<Symbol> ConcreteType;
 
   /// The corresponding layout rule for the above.
   Optional<unsigned> ConcreteTypeRule;
-
-  /// All concrete conformances of ConcreteType to the protocols in the
-  /// ConformsTo list.
-  llvm::TinyPtrVector<ProtocolConformance *> ConcreteConformances;
 
   /// Cache of associated type declarations.
   llvm::SmallDenseMap<Identifier, AssociatedTypeDecl *, 2> AssocTypes;
@@ -155,9 +147,6 @@ public:
   ArrayRef<const ProtocolDecl *> getConformsTo() const {
     return ConformsTo;
   }
-
-  llvm::TinyPtrVector<const ProtocolDecl *>
-  getConformsToExcludingSuperclassConformances() const;
 
   AssociatedTypeDecl *getAssociatedType(Identifier name);
 
@@ -293,8 +282,7 @@ private:
                    CanType concreteType,
                    ArrayRef<Term> substitutions,
                    ArrayRef<unsigned> conformsToRules,
-                   ArrayRef<const ProtocolDecl *> conformsTo,
-                   llvm::TinyPtrVector<ProtocolConformance *> &conformances);
+                   ArrayRef<const ProtocolDecl *> conformsTo);
 
   void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
