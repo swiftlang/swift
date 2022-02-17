@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-opaque-parameters -enable-parameterized-protocol-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-parameterized-protocol-types -disable-availability-checking
 
 protocol P { }
 
