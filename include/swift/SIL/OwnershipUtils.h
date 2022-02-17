@@ -79,8 +79,7 @@ inline bool isForwardingConsume(SILValue value) {
 }
 
 /// Find leaf "use points" of \p guaranteedValue that determine its lifetime
-/// requirement. If \p usePoints is nullptr, then the simply returns true if no
-/// PointerEscape use was found.
+/// requirement. Return true if no PointerEscape use was found.
 ///
 /// Precondition: \p guaranteedValue is not a BorrowedValue.
 ///

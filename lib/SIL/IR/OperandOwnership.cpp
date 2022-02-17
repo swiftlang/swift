@@ -20,8 +20,9 @@
 using namespace swift;
 
 /// Return true if all OperandOwnership invariants hold.
-bool swift::checkOperandOwnershipInvariants(const Operand *operand) {
-  OperandOwnership opOwnership = operand->getOperandOwnership();
+bool swift::checkOperandOwnershipInvariants(const Operand *operand,
+                                            SILModuleConventions *silConv) {
+  OperandOwnership opOwnership = operand->getOperandOwnership(silConv);
   if (opOwnership == OperandOwnership::Borrow) {
     // Must be a valid BorrowingOperand.
     return bool(BorrowingOperand(const_cast<Operand *>(operand)));
@@ -38,6 +39,9 @@ namespace {
 class OperandOwnershipClassifier
   : public SILInstructionVisitor<OperandOwnershipClassifier, OperandOwnership> {
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
+  // Allow module conventions to be overriden while lowering between canonical
+  // and lowered SIL stages.
+  SILModuleConventions silConv;
 
   const Operand &op;
 
@@ -49,8 +53,8 @@ public:
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OperandOwnershipClassifier(SILModule &mod, const Operand &op)
-      : mod(mod), op(op) {}
+  OperandOwnershipClassifier(SILModuleConventions silConv, const Operand &op)
+      : mod(silConv.getModule()), silConv(silConv), op(op) {}
 
   SILValue getValue() const { return op.get(); }
 
@@ -474,9 +478,17 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
   if (getValue()->getType().isAddress()) {
     return OperandOwnership::TrivialUse;
   }
-  SILArgumentConvention argConv = apply.isCalleeOperand(op)
-    ? SILArgumentConvention(apply.getSubstCalleeType()->getCalleeConvention())
-    : apply.getArgumentConvention(op);
+  auto calleeTy = apply.getSubstCalleeType();
+  SILArgumentConvention argConv = [&]() {
+    if (apply.isCalleeOperand(op)) {
+      return SILArgumentConvention(calleeTy->getCalleeConvention());
+    } else {
+      unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg()
+                              + apply.getAppliedArgIndex(op);
+      return silConv.getFunctionConventions(calleeTy).getSILArgumentConvention(
+          calleeArgIdx);
+    }
+  }();
 
   auto argOwnership = getFunctionArgOwnership(
     argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
@@ -904,8 +916,9 @@ OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-OperandOwnership Operand::getOperandOwnership() const {
-  // A type-dependent operant is a NonUse (as opposed to say an
+OperandOwnership
+Operand::getOperandOwnership(SILModuleConventions *silConv) const {
+  // A type-dependent operand is a NonUse (as opposed to say an
   // InstantaneousUse) because it does not require liveness.
   if (isTypeDependent())
     return OperandOwnership::NonUse;
@@ -925,7 +938,8 @@ OperandOwnership Operand::getOperandOwnership() const {
       return OperandOwnership(OperandOwnership::InstantaneousUse);
     }
   }
-
-  OperandOwnershipClassifier classifier(getUser()->getModule(), *this);
+  SILModuleConventions overrideConv =
+      silConv ? *silConv : SILModuleConventions(getUser()->getModule());
+  OperandOwnershipClassifier classifier(overrideConv, *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }

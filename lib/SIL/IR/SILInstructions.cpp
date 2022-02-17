@@ -2904,6 +2904,42 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
          "result info?!");
 }
 
+bool OwnershipForwardingMixin::hasSameRepresentation(SILInstruction *inst) {
+  switch (inst->getKind()) {
+  default:
+    // Conservatively assume that a conversion changes representation.
+    // Operations can be added as needed to participate in SIL opaque values.
+    assert(OwnershipForwardingMixin::isa(inst));
+    return false;
+
+  case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::DestructureTupleInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::InitExistentialRefInst:
+  case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::OpenExistentialBoxValueInst:
+  case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenExistentialValueInst:
+  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::SelectEnumInst:
+  case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::TupleExtractInst:
+    return true;
+  }
+}
+
+bool OwnershipForwardingMixin::isAddressOnly(SILInstruction *inst) {
+  if (auto *aggregate =
+      dyn_cast<AllArgOwnershipForwardingSingleValueInst>(inst)) {
+    // If any of the operands are address-only, then the aggregate must be.
+    return aggregate->getType().isAddressOnly(*inst->getFunction());
+  }
+  // All other forwarding instructions must forward their first operand.
+  assert(OwnershipForwardingMixin::isa(inst));
+  return inst->getOperand(0)->getType().isAddressOnly(*inst->getFunction());
+}
+
 // This may be called in an invalid SIL state. SILCombine creates new
 // terminators in non-terminator position and defers deleting the original
 // terminator until after all modification.
