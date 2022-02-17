@@ -471,9 +471,15 @@ void CopyPropagation::run() {
       auto folded = foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
       if (!folded)
         break;
-      // We don't add the produced move_value instruction to the worklist
-      // because it can't handle propagation.
+      auto hoisted = hoistDestroysOfOwnedLexicalValue(folded, *f, deleter);
+      // Keep running even if the new move's destroys can't be hoisted.
+      (void)hoisted;
       firstRun = false;
+    }
+  }
+  for (auto *argument : f->getArguments()) {
+    if (argument->getOwnershipKind() == OwnershipKind::Owned) {
+      hoistDestroysOfOwnedLexicalValue(argument, *f, deleter);
     }
   }
   deleter.cleanupDeadInstructions();

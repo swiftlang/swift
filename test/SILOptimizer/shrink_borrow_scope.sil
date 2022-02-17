@@ -425,10 +425,10 @@ right:
     br trampoline(%copy : $C)
 
 trampoline(%copy_1 : @owned $C):
-    end_borrow %lifetime : $C
     br exit
 
 exit:
+    end_borrow %lifetime : $C
     %retval = tuple ()
     destroy_value %copy_1 : $C
     destroy_value %instance : $C
@@ -856,13 +856,14 @@ bad(%15 : @owned $Error):
 // CHECK:       [[LEFT]]:
 // CHECK:         apply undef()
 // CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
 // CHECK:         apply undef()
 // CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_up_to_two_barrier_applies'
 sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
