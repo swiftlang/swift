@@ -537,12 +537,10 @@ static void printCodeCompletionResultFilterName(
   }
 }
 
-StringRef swift::ide::getCodeCompletionResultFilterName(
+NullTerminatedStringRef swift::ide::getCodeCompletionResultFilterName(
     const CodeCompletionString *Str, llvm::BumpPtrAllocator &Allocator) {
   SmallString<32> buf;
   llvm::raw_svector_ostream OS(buf);
   printCodeCompletionResultFilterName(Str, OS);
-  // Use 'copyCString' to get a null terminated StringRef just in case clients
-  // need it.
-  return {copyCString(buf, Allocator), buf.size()};
+  return NullTerminatedStringRef(buf, Allocator);
 }

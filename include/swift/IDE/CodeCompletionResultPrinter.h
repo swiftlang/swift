@@ -18,6 +18,9 @@
 #include "llvm/Support/Allocator.h"
 
 namespace swift {
+
+class NullTerminatedStringRef;
+
 namespace ide {
 
 class CodeCompletionResult;
@@ -41,9 +44,10 @@ void printCodeCompletionResultSourceText(
     const CodeCompletionResult &Result, llvm::raw_ostream &OS);
 
 /// Print 'FilterName' from \p str into memory managed by \p Allocator and
-/// return it.
-llvm::StringRef getCodeCompletionResultFilterName(
-    const CodeCompletionString *Str, llvm::BumpPtrAllocator &Allocator);
+/// return it as \c NullTerminatedStringRef .
+NullTerminatedStringRef
+getCodeCompletionResultFilterName(const CodeCompletionString *Str,
+                                  llvm::BumpPtrAllocator &Allocator);
 
 } // namespace ide
 } // namespace swift

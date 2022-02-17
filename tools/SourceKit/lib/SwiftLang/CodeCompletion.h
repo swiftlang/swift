@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_CODECOMPLETION_H
 
 #include "SourceKit/Core/LLVM.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
@@ -22,6 +23,7 @@
 namespace SourceKit {
 namespace CodeCompletion {
 
+using swift::NullTerminatedStringRef;
 using swift::ide::CodeCompletionDeclKind;
 using swift::ide::CodeCompletionFlair;
 using swift::ide::CodeCompletionKeywordKind;
@@ -161,7 +163,7 @@ public:
     return getSwiftResult().getBriefDocComment();
   }
 
-  ArrayRef<StringRef> getAssociatedUSRs() const {
+  ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return getSwiftResult().getAssociatedUSRs();
   }
 

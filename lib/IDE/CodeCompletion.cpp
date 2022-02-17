@@ -312,11 +312,12 @@ ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
     llvm::BumpPtrAllocator &Allocator, CodeCompletionResultKind Kind,
     CodeCompletionString *CompletionString,
-    CodeCompletionOperatorKind KnownOperatorKind, StringRef BriefDocComment,
+    CodeCompletionOperatorKind KnownOperatorKind,
+    NullTerminatedStringRef BriefDocComment,
     CodeCompletionResultType ResultType,
     ContextFreeNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-    StringRef DiagnosticMessage) {
+    NullTerminatedStringRef DiagnosticMessage) {
   return new (Allocator) ContextFreeCodeCompletionResult(
       Kind, /*AssociatedKind=*/0, KnownOperatorKind,
       /*IsSystem=*/false, CompletionString, /*ModuleName=*/"", BriefDocComment,
@@ -328,12 +329,12 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
 ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createKeywordResult(
     llvm::BumpPtrAllocator &Allocator, CodeCompletionKeywordKind Kind,
-    CodeCompletionString *CompletionString, StringRef BriefDocComment,
+    CodeCompletionString *CompletionString,
+    NullTerminatedStringRef BriefDocComment,
     CodeCompletionResultType ResultType) {
   return new (Allocator) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
       CodeCompletionOperatorKind::None, /*IsSystem=*/false, CompletionString,
-
       /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
@@ -358,11 +359,13 @@ ContextFreeCodeCompletionResult::createLiteralResult(
 ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createDeclResult(
     llvm::BumpPtrAllocator &Allocator, CodeCompletionString *CompletionString,
-    const Decl *AssociatedDecl, StringRef ModuleName, StringRef BriefDocComment,
-    ArrayRef<StringRef> AssociatedUSRs, CodeCompletionResultType ResultType,
+    const Decl *AssociatedDecl, NullTerminatedStringRef ModuleName,
+    NullTerminatedStringRef BriefDocComment,
+    ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+    CodeCompletionResultType ResultType,
     ContextFreeNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-    StringRef DiagnosticMessage) {
+    NullTerminatedStringRef DiagnosticMessage) {
   assert(AssociatedDecl && "should have a decl");
   return new (Allocator) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Declaration,
@@ -626,7 +629,7 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
   case SemanticContextKind::OtherModule:
     Prefix.append("OtherModule");
     if (!getModuleName().empty())
-      Prefix.append((Twine("[") + getModuleName() + "]").str());
+      Prefix.append((Twine("[") + StringRef(getModuleName()) + "]").str());
     break;
   }
   if (getFlair().toRaw()) {
@@ -1182,9 +1185,9 @@ static void walkValueDeclAndOverriddenDecls(const Decl *D, const FnTy &Fn) {
   }
 }
 
-ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
-                                       const Decl *D) {
-  llvm::SmallVector<StringRef, 4> USRs;
+ArrayRef<NullTerminatedStringRef>
+copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
+  llvm::SmallVector<NullTerminatedStringRef, 4> USRs;
   walkValueDeclAndOverriddenDecls(D, [&](llvm::PointerUnion<const ValueDecl*,
                                                   const clang::NamedDecl*> OD) {
     llvm::SmallString<128> SS;
@@ -1199,13 +1202,13 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
     }
 
     if (!Ignored)
-      USRs.push_back(SS.str().copy(Allocator));
+      USRs.emplace_back(SS, Allocator);
   });
 
   if (!USRs.empty())
-    return copyArray(Allocator, ArrayRef<StringRef>(USRs));
+    return makeArrayRef(USRs).copy(Allocator);
 
-  return ArrayRef<StringRef>();
+  return {};
 }
 
 CodeCompletionResult::CodeCompletionResult(
@@ -1214,7 +1217,7 @@ CodeCompletionResult::CodeCompletionResult(
     uint8_t NumBytesToErase, const ExpectedTypeContext *TypeContext,
     const DeclContext *DC, ContextualNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-    StringRef DiagnosticMessage)
+    NullTerminatedStringRef DiagnosticMessage)
     : ContextFree(ContextFree), SemanticContext(SemanticContext),
       Flair(Flair.toRaw()), NotRecommended(NotRecommended),
       DiagnosticSeverity(DiagnosticSeverity),
@@ -1285,11 +1288,12 @@ ContextFreeCodeCompletionResult::getCodeCompletionOperatorKind(
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
-  auto *CCS = CodeCompletionString::create(*Sink.Allocator, Chunks);
+  auto &Allocator = *Sink.Allocator;
+  auto *CCS = CodeCompletionString::create(Allocator, Chunks);
 
   CodeCompletionDiagnosticSeverity ContextFreeDiagnosticSeverity =
       CodeCompletionDiagnosticSeverity::None;
-  StringRef ContextFreeDiagnosticMessage;
+  NullTerminatedStringRef ContextFreeDiagnosticMessage;
   if (ContextFreeNotRecReason != ContextFreeNotRecommendedReason::None) {
     // FIXME: We should generate the message lazily.
     if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
@@ -1299,7 +1303,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       if (!getContextFreeCompletionDiagnostics(ContextFreeNotRecReason, VD,
                                                severity, messageOS)) {
         ContextFreeDiagnosticSeverity = severity;
-        ContextFreeDiagnosticMessage = message.str().copy(*Sink.Allocator);
+        ContextFreeDiagnosticMessage =
+            NullTerminatedStringRef(message, Allocator);
       }
     }
   }
@@ -1309,18 +1314,18 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
   switch (Kind) {
   case CodeCompletionResultKind::Declaration: {
-    StringRef ModuleName;
+    NullTerminatedStringRef ModuleName;
     if (CurrentModule) {
       if (Sink.LastModule.first == CurrentModule.getOpaqueValue()) {
         ModuleName = Sink.LastModule.second;
       } else {
         if (auto *C = CurrentModule.dyn_cast<const clang::Module *>()) {
-          ModuleName = StringRef(C->getFullModuleName()).copy(*Sink.Allocator);
+          ModuleName =
+              NullTerminatedStringRef(C->getFullModuleName(), Allocator);
         } else {
-          ModuleName = CurrentModule.get<const swift::ModuleDecl *>()
-                           ->getName()
-                           .str()
-                           .copy(*Sink.Allocator);
+          ModuleName = NullTerminatedStringRef(
+              CurrentModule.get<const swift::ModuleDecl *>()->getName().str(),
+              Allocator);
         }
         Sink.LastModule.first = CurrentModule.getOpaqueValue();
         Sink.LastModule.second = ModuleName;
@@ -1328,9 +1333,9 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
-        *Sink.Allocator, CCS, AssociatedDecl, ModuleName,
-        BriefDocComment.copy(*Sink.Allocator),
-        copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl), ResultType,
+        Allocator, CCS, AssociatedDecl, ModuleName,
+        NullTerminatedStringRef(BriefDocComment, Allocator),
+        copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
         ContextFreeDiagnosticMessage);
     break;
@@ -1338,28 +1343,28 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
   case CodeCompletionResultKind::Keyword:
     ContextFreeResult = ContextFreeCodeCompletionResult::createKeywordResult(
-        *Sink.Allocator, KeywordKind, CCS,
-        BriefDocComment.copy(*Sink.Allocator), ResultType);
+        Allocator, KeywordKind, CCS,
+        NullTerminatedStringRef(BriefDocComment, Allocator), ResultType);
     break;
   case CodeCompletionResultKind::BuiltinOperator:
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            *Sink.Allocator, Kind, CCS, CodeCompletionOperatorKind::None,
-            BriefDocComment.copy(*Sink.Allocator), ResultType,
+            Allocator, Kind, CCS, CodeCompletionOperatorKind::None,
+            NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
     break;
   case CodeCompletionResultKind::Literal:
     assert(LiteralKind.hasValue());
     ContextFreeResult = ContextFreeCodeCompletionResult::createLiteralResult(
-        *Sink.Allocator, *LiteralKind, CCS, ResultType);
+        Allocator, *LiteralKind, CCS, ResultType);
     break;
   }
 
   CodeCompletionDiagnosticSeverity ContextualDiagnosticSeverity =
       CodeCompletionDiagnosticSeverity::None;
-  StringRef ContextualDiagnosticMessage;
+  NullTerminatedStringRef ContextualDiagnosticMessage;
   if (ContextualNotRecReason != ContextualNotRecommendedReason::None) {
     // FIXME: We should generate the message lazily.
     if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
@@ -1369,14 +1374,15 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       if (!getContextualCompletionDiagnostics(ContextualNotRecReason, VD,
                                               severity, messageOS)) {
         ContextualDiagnosticSeverity = severity;
-        ContextualDiagnosticMessage = message.str().copy(*Sink.Allocator);
+        ContextualDiagnosticMessage =
+            NullTerminatedStringRef(message, Allocator);
       }
     }
   }
 
   assert(ContextFreeResult != nullptr &&
          "ContextFreeResult should have been constructed by the switch above");
-  CodeCompletionResult *result = new (*Sink.Allocator) CodeCompletionResult(
+  CodeCompletionResult *result = new (Allocator) CodeCompletionResult(
       *ContextFreeResult, SemanticContext, Flair, NumBytesToErase, TypeContext,
       DC, ContextualNotRecReason, ContextualDiagnosticSeverity,
       ContextualDiagnosticMessage);

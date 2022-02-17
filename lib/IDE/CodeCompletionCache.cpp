@@ -154,10 +154,10 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
   auto stringCount = read32le(strings);
   assert(strings + stringCount == end && "incorrect file size");
   (void)stringCount; // so it is not seen as "unused" in release builds.
-  llvm::DenseMap<uint32_t, StringRef> knownStrings;
-  
+  llvm::DenseMap<uint32_t, NullTerminatedStringRef> knownStrings;
+
   // STRINGS
-  auto getString = [&](uint32_t index) -> StringRef {
+  auto getString = [&](uint32_t index) -> NullTerminatedStringRef {
     if (index == ~0u)
       return "";
     auto found = knownStrings.find(index);
@@ -167,10 +167,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 
     const char *p = strings + index;
     size_t size = read32le(p);
-    StringRef str = StringRef(p, size);
-    // Import the string to the allocator. Use null-terminated string to avoid
-    // potential copies in clients.
-    str = StringRef(copyCString(str, *V.Allocator), size);
+    auto str = NullTerminatedStringRef(StringRef(p, size), *V.Allocator);
     knownStrings[index] = str;
     return str;
   };
@@ -216,7 +213,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto filterNameIndex = read32le(cursor);
 
     auto assocUSRCount = read32le(cursor);
-    SmallVector<StringRef, 4> assocUSRs;
+    SmallVector<NullTerminatedStringRef, 4> assocUSRs;
     for (unsigned i = 0; i < assocUSRCount; ++i) {
       assocUSRs.push_back(getString(read32le(cursor)));
     }
@@ -230,8 +227,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
             kind, associatedKind, opKind, isSystem, string, moduleName,
-            briefDocComment,
-            copyArray(*V.Allocator, ArrayRef<StringRef>(assocUSRs)),
+            briefDocComment, makeArrayRef(assocUSRs).copy(*V.Allocator),
             CodeCompletionResultType::unknown(), notRecommended, diagSeverity,
             diagMessage, filterName);
 

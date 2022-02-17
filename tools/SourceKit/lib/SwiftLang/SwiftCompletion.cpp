@@ -68,8 +68,9 @@ struct SwiftToSourceKitCompletionAdapter {
                            bool legacyLiteralToKeyword,
                            bool annotatedDescription);
 
-  static void getResultAssociatedUSRs(ArrayRef<StringRef> AssocUSRs,
-                                      raw_ostream &OS);
+  static void
+  getResultAssociatedUSRs(ArrayRef<NullTerminatedStringRef> AssocUSRs,
+                          raw_ostream &OS);
 };
 
 } // anonymous namespace
@@ -594,7 +595,7 @@ getCodeCompletionKeywordKindForUID(UIdent uid) {
 }
 
 void SwiftToSourceKitCompletionAdapter::getResultAssociatedUSRs(
-    ArrayRef<StringRef> AssocUSRs, raw_ostream &OS) {
+    ArrayRef<NullTerminatedStringRef> AssocUSRs, raw_ostream &OS) {
   bool First = true;
   for (auto USR : AssocUSRs) {
     if (!First)
