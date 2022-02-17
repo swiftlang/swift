@@ -124,9 +124,6 @@ struct DeinitBarriers final {
   /// Blocks to "after the end" of which hoisting was able to proceed.
   BasicBlockSet hoistingReachesEndBlocks;
 
-  /// Borrows to be rewritten as borrows of %borrowee.
-  SmallVector<BeginBorrowInst *, 4> borrows;
-
   /// Copies to be rewritten as copies of %borrowee.
   SmallVector<CopyValueInst *, 4> copies;
 
@@ -153,7 +150,7 @@ class DataFlow final {
   Usage const &uses;
   DeinitBarriers &result;
 
-  enum class Classification { Barrier, Borrow, Copy, Other };
+  enum class Classification { Barrier, Copy, Other };
 
   BackwardReachability<DataFlow> reachability;
 
@@ -221,12 +218,7 @@ DataFlow::classifyInstruction(SILInstruction *instruction) {
   if (instruction == &context.introducer) {
     return Classification::Barrier;
   }
-  if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
-    if (bbi->isLexical() &&
-        isSimpleExtendedIntroducerDef(context, bbi->getOperand())) {
-      return Classification::Borrow;
-    }
-  } else if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+  if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
     if (isSimpleExtendedIntroducerDef(context, cvi->getOperand())) {
       return Classification::Copy;
     }
@@ -244,7 +236,6 @@ bool DataFlow::classificationIsBarrier(Classification classification) {
   switch (classification) {
   case Classification::Barrier:
     return true;
-  case Classification::Borrow:
   case Classification::Copy:
   case Classification::Other:
     return false;
@@ -258,9 +249,6 @@ void DataFlow::visitedInstruction(SILInstruction *instruction,
   switch (classification) {
   case Classification::Barrier:
     result.barriers.push_back(instruction);
-    return;
-  case Classification::Borrow:
-    result.borrows.push_back(cast<BeginBorrowInst>(instruction));
     return;
   case Classification::Copy:
     result.copies.push_back(cast<CopyValueInst>(instruction));
@@ -318,10 +306,6 @@ private:
 bool Rewriter::run() {
   bool madeChange = false;
 
-  for (auto *bbi : barriers.borrows) {
-    bbi->setOperand(context.borrowee);
-    madeChange = true;
-  }
   for (auto *cvi : barriers.copies) {
     cvi->setOperand(context.borrowee);
     context.modifiedCopyValueInsts.push_back(cvi);
