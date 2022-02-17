@@ -385,10 +385,14 @@ void getInheritedForPrinting(
 
 StringRef getAccessorKindString(AccessorKind value);
 
-bool printCompatibilityFeatureChecksPre(ASTPrinter &printer, Decl *decl);
-void printCompatibilityFeatureChecksPost(
-    ASTPrinter &printer,
-    llvm::function_ref<void()> printElse = []() -> void {});
+/// Call the given function nested appropriately within #if checks
+/// for the compiler features that it uses.  Note that printBody
+/// may be called multiple times if the declaration uses suppressible
+/// features.
+bool printWithCompatibilityFeatureChecks(ASTPrinter &printer,
+                                         PrintOptions &options,
+                                         Decl *decl,
+                                         llvm::function_ref<void()> printBody);
 
 } // namespace swift
 
