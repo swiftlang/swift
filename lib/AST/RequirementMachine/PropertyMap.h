@@ -268,12 +268,6 @@ private:
                               existingRules,
                           Symbol property, unsigned ruleID);
 
-  void unifyConcreteTypes(Term key,
-                          Optional<Symbol> &existingProperty,
-                          Optional<unsigned> &existingRuleID,
-                          Symbol property,
-                          unsigned ruleID);
-
   void recordSuperclassRelation(Term key,
                                 Symbol superclassType,
                                 unsigned superclassRuleID,
