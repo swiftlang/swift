@@ -54,14 +54,14 @@ extension ${Self}: Differentiable {
 /// Derivatives of standard unary operators.
 ${Availability(bits)}
 extension ${Self} {
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: -)
   static func _vjpNegate(x: ${Self})
     -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
     return (-x, { v in -v })
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: -)
   static func _jvpNegate(x: ${Self})
   -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
@@ -73,7 +73,7 @@ extension ${Self} {
 ${Availability(bits)}
 extension ${Self} {
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: +)
   static func _vjpAdd(
     lhs: ${Self}, rhs: ${Self}
@@ -82,7 +82,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: +)
   static func _jvpAdd(
     lhs: ${Self}, rhs: ${Self}
@@ -91,7 +91,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: +=)
   static func _vjpAddAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, pullback: (inout ${Self}) -> ${Self}
@@ -101,8 +101,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @inlinable @inline(__always)
   @derivative(of: +=)
   static func _jvpAddAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, differential: (inout ${Self}, ${Self}) -> Void
@@ -112,7 +111,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: -)
   static func _vjpSubtract(
     lhs: ${Self}, rhs: ${Self}
@@ -130,7 +129,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: -=)
   static func _vjpSubtractAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, pullback: (inout ${Self}) -> ${Self}
@@ -140,7 +139,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: -=)
   static func _jvpSubtractAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, differential: (inout ${Self}, ${Self}) -> Void
@@ -150,7 +149,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: *)
   static func _vjpMultiply(
     lhs: ${Self}, rhs: ${Self}
@@ -168,7 +167,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: *=)
   static func _vjpMultiplyAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, pullback: (inout ${Self}) -> ${Self}
@@ -182,7 +181,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: *=)
   static func _jvpMultiplyAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, differential: (inout ${Self}, ${Self}) -> Void
@@ -202,7 +201,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: /)
   static func _jvpDivide(
     lhs: ${Self}, rhs: ${Self}
@@ -211,7 +210,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: /=)
   static func _vjpDivideAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, pullback: (inout ${Self}) -> ${Self}
@@ -225,7 +224,7 @@ extension ${Self} {
   }
 
   ${Availability(bits)}
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: /=)
   static func _jvpDivideAssign(_ lhs: inout ${Self}, _ rhs: ${Self}) -> (
     value: Void, differential: (inout ${Self}, ${Self}) -> Void
@@ -246,7 +245,7 @@ where
   Self: Differentiable,
   Self == Self.TangentVector
 {
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: addingProduct)
   func _vjpAddingProduct(
     _ lhs: Self, _ rhs: Self
@@ -254,14 +253,14 @@ where
     return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: squareRoot)
   func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
     let y = squareRoot()
     return (y, { v in v / (2 * y) })
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: minimum)
   static func _vjpMinimum(_ x: Self, _ y: Self) -> (
     value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
@@ -270,7 +269,7 @@ where
     return (y, { v in (.zero, v) })
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   @derivative(of: maximum)
   static func _vjpMaximum(_ x: Self, _ y: Self) -> (
     value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)
