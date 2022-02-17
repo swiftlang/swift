@@ -26,8 +26,6 @@
 
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILSuccessor.h"
-#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
 
@@ -46,19 +44,16 @@ namespace swift {
 ///   // Mark the beginning of a block reachable. Only called once per block.
 ///   // Typically a BasicBlockSet wrapper.
 ///   void markReachableBegin(SILBasicBlock *block);
-///
+/// 
 ///   // Mark the end of a block reachable. Only called once per block.
 ///   // Typically a BasicBlockSet wrapper.
 ///   void markReachableEnd(SILBasicBlock *block);
 ///
 ///   // Return true if \p inst is a barrier. Called once for each reachable
-///   // instruction, assuming that each lastUsePoint is itself a barrier.
+///   // instruction, assuming that each lastUse is itself a barrier.
 ///   // Used by the data flow client to perform additional book-keeping,
 ///   // such as recording debug_value instructions.
 ///   bool checkReachableBarrier(SILInstruction *inst);
-///
-///   // Return true if any of \p block's phis are barriers.
-///   bool checkReachablePhiBarrier(SILBasicBlock *block);
 /// };
 template <typename BlockReachability>
 class BackwardReachability {
@@ -75,8 +70,7 @@ public:
   // Initialize data flow starting points before running solveBackward.
   void initLastUse(SILInstruction *lastUsePoint) {
     auto *lastUseBlock = lastUsePoint->getParent();
-    auto *previous = lastUsePoint->getPreviousInstruction();
-    if (!previous || canReachBlockBegin(previous)) {
+    if (canReachBlockBegin(lastUsePoint)) {
       pushPreds(lastUseBlock);
     }
   }
@@ -122,10 +116,6 @@ protected:
 
   // Propagate global data flow from \p succBB to its predecessors.
   void pushPreds(SILBasicBlock *succBB) {
-    if (succBB->hasPhi())
-      if (reachableBlocks.checkReachablePhiBarrier(succBB))
-        return;
-
     reachableBlocks.markReachableBegin(succBB);
 
     for (SILBasicBlock *predBB : succBB->getPredecessorBlocks()) {

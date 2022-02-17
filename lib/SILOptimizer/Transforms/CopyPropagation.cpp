@@ -451,7 +451,7 @@ void CopyPropagation::run() {
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
-      auto shrunk = shrinkBorrowScope(*bbi, deleter, modifiedCopyValueInsts);
+      auto shrunk = shrinkBorrowScope(bbi, deleter, modifiedCopyValueInsts);
       for (auto *cvi : modifiedCopyValueInsts)
         defWorklist.updateForCopy(cvi);
       changed |= shrunk;

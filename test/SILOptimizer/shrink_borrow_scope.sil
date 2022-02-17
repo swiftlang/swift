@@ -30,13 +30,10 @@ class PointerWrapper {
 enum OneOfThree { case one, two, three }
 
 sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
-sil [ossa] @get_owned_c : $@convention(thin) () -> (@owned C)
 sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
 sil [ossa] @callee_optional_d_guaranteed: $@convention(thin) (@guaranteed Optional<D>) -> ()
 sil [ossa] @synchronization_point : $@convention(thin) () -> ()
 sil [ossa] @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
-sil [ossa] @barrier : $@convention(thin) () -> ()
-
 
 // =============================================================================
 // = DECLARATIONS                                                             }}
@@ -235,11 +232,11 @@ exit:
 // CHECK:         switch_enum [[MAYBE]] : $Optional<C>, case #Optional.some!enumelt: [[SOME_DEST:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_DEST:bb[0-9]+]] 
 // CHECK:       [[SOME_DEST]]([[LIFETIME_2:%[^,]+]] : @guaranteed $C):
 // CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:         br [[BASIC_BLOCK3:bb[0-9]+]]
 // CHECK:       [[NONE_DEST]]:
 // CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         br [[EXIT]]
-// CHECK:       [[EXIT]]:
+// CHECK:         br [[BASIC_BLOCK3]]
+// CHECK:       [[BASIC_BLOCK3]]:
 // CHECK:         return [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_over_terminator_2'
 sil [ossa] @hoist_over_terminator_2 : $@convention(thin) (@owned C) -> @owned C {
@@ -259,10 +256,9 @@ exit:
     return %instance_c : $C
 }
 
-// Don't hoist over transformation terminator which forwards ownership of
-// guaranteed value which itself had forwarding ownership of the original
-// borrow.
-// CHECK-LABEL: sil [ossa] @dont_hoist_over_terminator_3 : {{.*}} {
+// Hoist over transformation terminator which forwards ownership of guaranteed
+// value which itself had forwarding ownership of the original borrow.
+// CHECK-LABEL: sil [ossa] @hoist_over_terminator_3 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[MAYBE:%[^,]+]] = enum $Optional<C>, #Optional.some!enumelt, [[LIFETIME]]
@@ -275,8 +271,8 @@ exit:
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[INSTANCE]]
-// CHECK-LABEL: } // end sil function 'dont_hoist_over_terminator_3'
-sil [ossa] @dont_hoist_over_terminator_3 : $@convention(thin) (@owned C) -> @owned C {
+// CHECK-LABEL: } // end sil function 'hoist_over_terminator_3'
+sil [ossa] @hoist_over_terminator_3 : $@convention(thin) (@owned C) -> @owned C {
 entry(%instance_c : @owned $C):
     %lifetime_c = begin_borrow %instance_c : $C
     %maybe_c = enum $Optional<C>, #Optional.some!enumelt, %lifetime_c : $C
@@ -287,45 +283,6 @@ some_dest(%lifetime_c_2 : @guaranteed $C):
     br exit
 
 none_dest:
-    end_borrow %lifetime_c : $C
-    br exit
-
-exit:
-    return %instance_c : $C
-}
-
-// CHECK-LABEL: sil [ossa] @dont_hoist_over_terminator_3__barrier : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
-// CHECK:         [[MAYBE_C:%[^,]+]] = enum $Optional<C>, #Optional.some!enumelt, [[LIFETIME]]
-// CHECK:         switch_enum [[MAYBE_C]] : $Optional<C>, case #Optional.some!enumelt: [[SOME_DEST:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_DEST:bb[0-9]+]]
-// CHECK:       [[SOME_DEST]]({{%[^,]+}} :
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         tuple ()
-// CHECK:         br [[EXIT:bb[0-9]+]]
-// CHECK:       [[NONE_DEST]]:
-// CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
-// CHECK:         apply [[BARRIER]]()
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         tuple ()
-// CHECK:         br [[EXIT]]
-// CHECK:       [[EXIT]]:
-// CHECK-LABEL: } // end sil function 'dont_hoist_over_terminator_3__barrier'
-sil [ossa] @dont_hoist_over_terminator_3__barrier : $@convention(thin) (@owned C) -> @owned C {
-entry(%instance_c : @owned $C):
-    %lifetime_c = begin_borrow %instance_c : $C
-    %maybe_c = enum $Optional<C>, #Optional.some!enumelt, %lifetime_c : $C
-    switch_enum %maybe_c : $Optional<C>, case #Optional.some!enumelt: some_dest, case #Optional.none!enumelt: none_dest
-
-some_dest(%lifetime_c_2 : @guaranteed $C):
-    %tuple = tuple ()
-    end_borrow %lifetime_c : $C
-    br exit
-
-none_dest:
-    %barrier = function_ref @barrier : $@convention(thin) () -> ()
-    apply %barrier() : $@convention(thin) () -> ()
-    %tuple_2 = tuple ()
     end_borrow %lifetime_c : $C
     br exit
 
@@ -398,40 +355,6 @@ exit(%thing : @owned $C):
     destroy_value %thing : $C
     destroy_value %instance : $C
     %retval = tuple ()
-    return %retval : $()
-}
-
-// CHECK-LABEL: sil [ossa] @dont_hoist_over_some_barred_blocks__2 : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] : $C
-// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
-// CHECK:       [[LEFT]]:
-// CHECK:         br [[TRAMPOLINE:bb[0-9]+]](undef : $C)
-// CHECK:       [[RIGHT]]:
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]] : $C
-// CHECK:         br [[TRAMPOLINE]]([[COPY]] : $C)
-// CHECK:       [[TRAMPOLINE]]
-// CHECK-LABEL: } // end sil function 'dont_hoist_over_some_barred_blocks__2'
-sil [ossa] @dont_hoist_over_some_barred_blocks__2 : $@convention(thin) (@owned C) -> () {
-entry(%instance: @owned $C):
-    %lifetime = begin_borrow [lexical] %instance : $C
-    cond_br undef, left, right
-
-left:
-    br trampoline(undef : $C)
-
-right:
-    %copy = copy_value %lifetime : $C
-    br trampoline(%copy : $C)
-
-trampoline(%copy_1 : @owned $C):
-    end_borrow %lifetime : $C
-    br exit
-
-exit:
-    %retval = tuple ()
-    destroy_value %copy_1 : $C
-    destroy_value %instance : $C
     return %retval : $()
 }
 
@@ -534,7 +457,7 @@ exit:
 // CHECK:         [[LIFETIME_C:%[^,]+]] = begin_borrow [[INSTANCE_C]]
 // CHECK:         [[COPY_C:%[^,]+]] = copy_value [[LIFETIME_C]]
 // CHECK:         [[LIFETIME_D:%[^,]+]] = begin_borrow [[INSTANCE_D]]
-// CHECK:         struct $CDCase ([[LIFETIME_C]] : $C, [[LIFETIME_D]] : $D)
+// CHECK:         [[REGISTER_4:%[^,]+]] = struct $CDCase ([[LIFETIME_C]] : $C, [[LIFETIME_D]] : $D)
 // CHECK:         end_borrow [[LIFETIME_C]]
 // CHECK:         end_borrow [[LIFETIME_D]]
 // CHECK:         destroy_value [[INSTANCE_D]]
@@ -821,7 +744,7 @@ bad(%15 : @owned $Error):
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         try_apply undef() : {{.*}}, normal [[GOOD:bb[0-9]+]], error [[BAD:bb[0-9]+]]
-// CHECK:       [[GOOD]]({{%[^,]+}} : $()):
+// CHECK:       [[GOOD]]([[REGISTER_3:%[^,]+]] : $()):
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK:       [[BAD]]([[ERROR:%[^,]+]] : @owned $Error):
@@ -854,11 +777,11 @@ bad(%15 : @owned $Error):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
-// CHECK:         apply undef()
+// CHECK:         [[REGISTER_3:%[^,]+]] = apply undef()
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
-// CHECK:         apply undef()
+// CHECK:         [[REGISTER_6:%[^,]+]] = apply undef()
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
@@ -905,53 +828,6 @@ entry(%instance : @owned $C, %input : $S):
     return %retval : $()
 }
 
-// Don't hoist out of a block when one of its predecessors has a terminator that
-// is a use of the end_borrow.
-//
-// CHECK-LABEL: sil [ossa] @dont_hoist_over_user_br__other_br_multiple_preds : {{.*}} {
-// CHECK: {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
-// CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:   cond_br undef, {{bb[0-9]+}}, [[RIGHT:bb[0-9]+]]
-// CHECK: [[RIGHT]]:
-// CHECK:   [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:   br [[EXIT:bb[0-9]+]]([[COPY]] :
-// CHECK: [[EXIT]]({{%[^,]+}} :
-// CHECK:   end_borrow [[LIFETIME]]
-// CHECK-LABEL: } // end sil function 'dont_hoist_over_user_br__other_br_multiple_preds'
-sil [ossa] @dont_hoist_over_user_br__other_br_multiple_preds : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
-    %lifetime = begin_borrow [lexical] %instance : $C
-    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
-    apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
-    cond_br undef, left1, right
-
-left1:
-    cond_br undef, left2, left3
-
-left2:
-    br left4
-
-left3:
-    br left4
-
-left4:
-    %get_owned_c = function_ref @get_owned_c : $@convention(thin) () -> (@owned C)
-    %owned_c = apply %get_owned_c() : $@convention(thin) () -> (@owned C)
-    br exit(%owned_c : $C)
-
-right:
-    %barrier = function_ref @barrier : $@convention(thin) () -> ()
-    apply %barrier() : $@convention(thin) () -> ()
-    %copy = copy_value %lifetime : $C
-    br exit(%copy : $C)
-
-exit(%value : @owned $C):
-    destroy_value %value : $C
-    end_borrow %lifetime : $C
-    destroy_value %instance : $C
-    %retval = tuple ()
-    return %retval : $()
-}
 
 // =============================================================================
 // instruction tests                                                          }}

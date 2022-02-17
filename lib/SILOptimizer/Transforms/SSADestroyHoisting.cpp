@@ -215,8 +215,6 @@ private:
     DeinitBarriers &result;
     SILInstruction *storageDefInst = nullptr; // null for function args
 
-    enum class Classification { DeadUser, Barrier, Other };
-
     BackwardReachability<DestroyReachability> reachability;
 
   public:
@@ -247,65 +245,11 @@ private:
       result.destroyReachesEndBlocks.insert(block);
     }
 
-    Classification classifyInstruction(SILInstruction *inst);
-
-    bool classificationIsBarrier(Classification classification);
-
-    void visitedInstruction(SILInstruction *instruction,
-                            Classification classification);
-
-    bool checkReachableBarrier(SILInstruction *);
-
-    bool checkReachablePhiBarrier(SILBasicBlock *);
+    bool checkReachableBarrier(SILInstruction *inst);
 
     void solveBackward() { reachability.solveBackward(); }
   };
 };
-
-DeinitBarriers::DestroyReachability::Classification
-DeinitBarriers::DestroyReachability::classifyInstruction(SILInstruction *inst) {
-  if (knownUses.debugInsts.contains(inst)) {
-    return Classification::DeadUser;
-  }
-  if (inst == storageDefInst) {
-    result.barriers.push_back(inst);
-    return Classification::Barrier;
-  }
-  if (knownUses.storageUsers.contains(inst)) {
-    return Classification::Barrier;
-  }
-  if (isDeinitBarrier(inst)) {
-    return Classification::Barrier;
-  }
-  return Classification::Other;
-}
-
-bool DeinitBarriers::DestroyReachability::classificationIsBarrier(
-    Classification classification) {
-  switch (classification) {
-  case Classification::DeadUser:
-  case Classification::Other:
-    return false;
-  case Classification::Barrier:
-    return true;
-  }
-  llvm_unreachable("exhaustive switch is not exhaustive?!");
-}
-
-void DeinitBarriers::DestroyReachability::visitedInstruction(
-    SILInstruction *instruction, Classification classification) {
-  assert(classifyInstruction(instruction) == classification);
-  switch (classification) {
-  case Classification::DeadUser:
-    result.deadUsers.push_back(instruction);
-    break;
-  case Classification::Barrier:
-    result.barriers.push_back(instruction);
-    break;
-  case Classification::Other:
-    break;
-  }
-}
 
 /// Return true if \p inst is a barrier.
 ///
@@ -314,20 +258,24 @@ void DeinitBarriers::DestroyReachability::visitedInstruction(
 /// from each. Any path reaching multiple destroys requires initialization,
 /// which is a storageUser and therefore a barrier.
 bool DeinitBarriers::DestroyReachability::checkReachableBarrier(
-    SILInstruction *instruction) {
-  auto classification = classifyInstruction(instruction);
-  visitedInstruction(instruction, classification);
-  return classificationIsBarrier(classification);
-}
-
-bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
-    SILBasicBlock *block) {
-  assert(llvm::all_of(block->getArguments(),
-                      [&](auto argument) { return PhiValue(argument); }));
-  return llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-    return classificationIsBarrier(
-        classifyInstruction(predecessor->getTerminator()));
-  });
+    SILInstruction *inst) {
+  if (knownUses.debugInsts.contains(inst)) {
+    result.deadUsers.push_back(inst);
+    return false;
+  }
+  if (inst == storageDefInst) {
+    result.barriers.push_back(inst);
+    return true;
+  }
+  if (knownUses.storageUsers.contains(inst)) {
+    result.barriers.push_back(inst);
+    return true;
+  }
+  if (isDeinitBarrier(inst)) {
+    result.barriers.push_back(inst);
+    return true;
+  }
+  return false;
 }
 
 /// Algorithm for hoisting the destroys of a single uniquely identified storage
