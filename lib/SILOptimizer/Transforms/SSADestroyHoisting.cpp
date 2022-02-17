@@ -225,11 +225,26 @@ private:
   const KnownStorageUses &knownUses;
   SILInstruction *storageDefInst = nullptr;
 
+  enum class Classification { DeadUser, Barrier, Other };
+
+  Classification classifyInstruction(SILInstruction *inst) {
+    return classifyInstruction(inst, ignoreDeinitBarriers, storageDefInst,
+                               knownUses);
+  }
+
+  static Classification classifyInstruction(SILInstruction *inst,
+                                            bool ignoreDeinitBarriers,
+                                            SILInstruction *storageDefInst,
+                                            const KnownStorageUses &knownUses);
+
+  void visitedInstruction(SILInstruction *instruction,
+                          Classification classification);
+
+  static bool classificationIsBarrier(Classification classification);
+
   // Implements BackwardReachability::BlockReachability
   class DestroyReachability {
     DeinitBarriers &result;
-
-    enum class Classification { DeadUser, Barrier, Other };
 
     BackwardReachability<DestroyReachability> reachability;
 
@@ -254,13 +269,6 @@ private:
       result.destroyReachesEndBlocks.insert(block);
     }
 
-    Classification classifyInstruction(SILInstruction *inst);
-
-    bool classificationIsBarrier(Classification classification);
-
-    void visitedInstruction(SILInstruction *instruction,
-                            Classification classification);
-
     bool checkReachableBarrier(SILInstruction *);
 
     bool checkReachablePhiBarrier(SILBasicBlock *);
@@ -269,25 +277,25 @@ private:
   };
 };
 
-DeinitBarriers::DestroyReachability::Classification
-DeinitBarriers::DestroyReachability::classifyInstruction(SILInstruction *inst) {
-  if (result.knownUses.debugInsts.contains(inst)) {
+DeinitBarriers::Classification DeinitBarriers::classifyInstruction(
+    SILInstruction *inst, bool ignoreDeinitBarriers,
+    SILInstruction *storageDefInst, const KnownStorageUses &knownUses) {
+  if (knownUses.debugInsts.contains(inst)) {
     return Classification::DeadUser;
   }
-  if (inst == result.storageDefInst) {
+  if (inst == storageDefInst) {
     return Classification::Barrier;
   }
-  if (result.knownUses.storageUsers.contains(inst)) {
+  if (knownUses.storageUsers.contains(inst)) {
     return Classification::Barrier;
   }
-  if (!result.ignoreDeinitBarriers && isDeinitBarrier(inst)) {
+  if (!ignoreDeinitBarriers && isDeinitBarrier(inst)) {
     return Classification::Barrier;
   }
   return Classification::Other;
 }
 
-bool DeinitBarriers::DestroyReachability::classificationIsBarrier(
-    Classification classification) {
+bool DeinitBarriers::classificationIsBarrier(Classification classification) {
   switch (classification) {
   case Classification::DeadUser:
   case Classification::Other:
@@ -298,15 +306,15 @@ bool DeinitBarriers::DestroyReachability::classificationIsBarrier(
   llvm_unreachable("exhaustive switch is not exhaustive?!");
 }
 
-void DeinitBarriers::DestroyReachability::visitedInstruction(
-    SILInstruction *instruction, Classification classification) {
+void DeinitBarriers::visitedInstruction(SILInstruction *instruction,
+                                        Classification classification) {
   assert(classifyInstruction(instruction) == classification);
   switch (classification) {
   case Classification::DeadUser:
-    result.deadUsers.push_back(instruction);
+    deadUsers.push_back(instruction);
     break;
   case Classification::Barrier:
-    result.barriers.push_back(instruction);
+    barriers.push_back(instruction);
     break;
   case Classification::Other:
     break;
@@ -321,9 +329,9 @@ void DeinitBarriers::DestroyReachability::visitedInstruction(
 /// which is a storageUser and therefore a barrier.
 bool DeinitBarriers::DestroyReachability::checkReachableBarrier(
     SILInstruction *instruction) {
-  auto classification = classifyInstruction(instruction);
-  visitedInstruction(instruction, classification);
-  return classificationIsBarrier(classification);
+  auto classification = result.classifyInstruction(instruction);
+  result.visitedInstruction(instruction, classification);
+  return result.classificationIsBarrier(classification);
 }
 
 bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
@@ -331,8 +339,8 @@ bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
   assert(llvm::all_of(block->getArguments(),
                       [&](auto argument) { return PhiValue(argument); }));
   return llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-    return classificationIsBarrier(
-        classifyInstruction(predecessor->getTerminator()));
+    return result.classificationIsBarrier(
+        result.classifyInstruction(predecessor->getTerminator()));
   });
 }
 
