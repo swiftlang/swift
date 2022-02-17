@@ -332,6 +332,7 @@ CodeCompletionOrganizer::Impl::Impl(CompletionKind kind, TypeContextKind typeCon
 static bool matchesExpectedStyle(Completion *completion, NameStyle style) {
   switch (completion->getAssociatedDeclKind()) {
   case CodeCompletionDeclKind::Class:
+  case CodeCompletionDeclKind::Actor:
   case CodeCompletionDeclKind::Struct:
   case CodeCompletionDeclKind::Enum:
   case CodeCompletionDeclKind::Protocol:
