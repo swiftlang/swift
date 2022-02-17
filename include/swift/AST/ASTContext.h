@@ -886,6 +886,10 @@ public:
   /// compiler for the target platform.
   AvailabilityContext getSwift56Availability();
 
+  /// Get the runtime availability of features introduced in the Swift 5.7
+  /// compiler for the target platform.
+  AvailabilityContext getSwift57Availability();
+
   // Note: Update this function if you add a new getSwiftXYAvailability above.
   /// Get the runtime availability for a particular version of Swift (5.0+).
   AvailabilityContext
