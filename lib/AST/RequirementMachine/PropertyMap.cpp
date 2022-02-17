@@ -172,7 +172,8 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
         prefix, ctx);
     ConcreteTypeRules = next->ConcreteTypeRules;
     for (auto &pair : ConcreteTypeRules) {
-      pair.first = pair.first.prependPrefixToConcreteSubstitutions(prefix, ctx);
+      pair.first = pair.first.prependPrefixToConcreteSubstitutions(
+          prefix, ctx);
     }
   }
 
@@ -181,10 +182,14 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   if (!next->Superclasses.empty()) {
     Superclasses = next->Superclasses;
 
-    for (auto &pair : Superclasses) {
-      pair.second.SuperclassType =
-          pair.second.SuperclassType->prependPrefixToConcreteSubstitutions(
+    for (auto &req : Superclasses) {
+      req.second.SuperclassType =
+          req.second.SuperclassType->prependPrefixToConcreteSubstitutions(
               prefix, ctx);
+      for (auto &pair : req.second.SuperclassRules) {
+        pair.first = pair.first.prependPrefixToConcreteSubstitutions(
+            prefix, ctx);
+      }
     }
   }
 }
@@ -240,7 +245,7 @@ void PropertyBag::verify(const RewriteSystem &system) const {
   for (const auto &pair : Superclasses) {
     const auto &req = pair.second;
     assert(req.SuperclassType.hasValue());
-    assert(req.SuperclassRule.hasValue());
+    assert(!req.SuperclassRules.empty());
   }
 
 #endif

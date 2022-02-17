@@ -65,14 +65,16 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents() {
       }
 
       const auto &superclassReq = props->getSuperclassRequirement();
-      concretizeNestedTypesFromConcreteParent(
-          props->getKey(),
-          RequirementKind::Superclass,
-          *superclassReq.SuperclassRule,
-          superclassReq.SuperclassType->getConcreteType(),
-          superclassReq.SuperclassType->getSubstitutions(),
-          props->ConformsToRules,
-          props->ConformsTo);
+      for (auto pair : superclassReq.SuperclassRules) {
+        concretizeNestedTypesFromConcreteParent(
+            props->getKey(),
+            RequirementKind::Superclass,
+            pair.second,
+            pair.first.getConcreteType(),
+            pair.first.getSubstitutions(),
+            props->ConformsToRules,
+            props->ConformsTo);
+      }
     }
   }
 }

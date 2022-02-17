@@ -285,10 +285,10 @@ void PropertyMap::addSuperclassProperty(
     auto &req = props->Superclasses[superclassDecl];
 
     assert(!req.SuperclassType.hasValue());
-    assert(!req.SuperclassRule.hasValue());
+    assert(req.SuperclassRules.empty());
 
     req.SuperclassType = property;
-    req.SuperclassRule = ruleID;
+    req.SuperclassRules.emplace_back(property, ruleID);
     return;
   }
 
@@ -309,9 +309,9 @@ void PropertyMap::addSuperclassProperty(
     // hierarchy.
     auto &req = props->Superclasses[superclassDecl];
     assert(req.SuperclassType.hasValue());
-    assert(req.SuperclassRule.hasValue());
+    assert(!req.SuperclassRules.empty());
 
-    unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRule,
+    unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRules,
                        property, ruleID);
 
   } else if (superclassDecl->isSuperclassOf(props->SuperclassDecl)) {
@@ -322,11 +322,11 @@ void PropertyMap::addSuperclassProperty(
 
     // Record a relation where existing superclass implies the new superclass.
     const auto &existingReq = props->Superclasses[props->SuperclassDecl];
-    if (checkRulePairOnce(*existingReq.SuperclassRule, ruleID)) {
-      recordSuperclassRelation(key,
-                               *existingReq.SuperclassType,
-                               *existingReq.SuperclassRule,
-                               superclassDecl);
+    for (auto pair : existingReq.SuperclassRules) {
+      if (checkRulePairOnce(pair.second, ruleID)) {
+        recordSuperclassRelation(key, pair.first, pair.second,
+                                 superclassDecl);
+      }
     }
 
     // Record the new rule at the less specific level of the class
@@ -334,7 +334,7 @@ void PropertyMap::addSuperclassProperty(
     // already seen another rule at that level.
     auto &req = props->Superclasses[superclassDecl];
 
-    unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRule,
+    unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRules,
                        property, ruleID);
 
   } else if (props->SuperclassDecl->isSuperclassOf(superclassDecl)) {
@@ -345,19 +345,21 @@ void PropertyMap::addSuperclassProperty(
 
     // Record a relation where new superclass implies the existing superclass.
     const auto &existingReq = props->Superclasses[props->SuperclassDecl];
-    if (checkRulePairOnce(*existingReq.SuperclassRule, ruleID)) {
-      recordSuperclassRelation(key, property, ruleID,
-                               props->SuperclassDecl);
+    for (auto pair : existingReq.SuperclassRules) {
+      if (checkRulePairOnce(pair.second, ruleID)) {
+        recordSuperclassRelation(key, property, ruleID,
+                                 props->SuperclassDecl);
+      }
     }
 
     // Record the new rule at the more specific level of the class
     // hierarchy.
     auto &req = props->Superclasses[superclassDecl];
     assert(!req.SuperclassType.hasValue());
-    assert(!req.SuperclassRule.hasValue());
+    assert(req.SuperclassRules.empty());
 
     req.SuperclassType = property;
-    req.SuperclassRule = ruleID;
+    req.SuperclassRules.emplace_back(property, ruleID);
 
     props->SuperclassDecl = superclassDecl;
 
@@ -847,8 +849,10 @@ void PropertyMap::checkConcreteTypeRequirements() {
       // requirement, we have a conflict.
       } else if (props->hasSuperclassBound()) {
         const auto &req = props->getSuperclassRequirement();
-        recordConflict(props->getKey(), concreteTypeRule,
-                       *req.SuperclassRule, System);
+        for (auto pair : req.SuperclassRules) {
+          recordConflict(props->getKey(), concreteTypeRule,
+                         pair.second, System);
+        }
       }
 
       // A rule (T.[concrete: C] => T) where C is a class type induces a rule

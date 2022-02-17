@@ -44,14 +44,14 @@ namespace rewriting {
 class MutableTerm;
 class Term;
 
-/// Records a superclass constraint at a given level in the class hierarchy.
+/// Records superclass requirements at a given level in the class hierarchy.
 struct SuperclassRequirement {
   /// The most specific superclass constraint (in type difference order) for
   /// this level in the class hierarchy.
   Optional<Symbol> SuperclassType;
 
-  /// The corresponding superclass rule for the above.
-  Optional<unsigned> SuperclassRule;
+  /// Superclass rules that apply to this key.
+  llvm::SmallVector<std::pair<Symbol, unsigned>, 1> SuperclassRules;
 };
 
 /// Stores a convenient representation of all "property-like" rewrite rules of
