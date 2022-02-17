@@ -420,11 +420,17 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
     // Homotopy reduction runs multiple passes with different filters to
     // prioritize the deletion of certain rules ahead of others. Apply
     // the filter now.
-    if (!isRedundantRuleFn(ruleID))
+    if (!isRedundantRuleFn(ruleID)) {
+      if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
+        llvm::dbgs() << "** Skipping rule " << rule << " from loop #"
+                     << pair.first << "\n";
+      }
+
       continue;
+    }
 
     if (Debug.contains(DebugFlags::HomotopyReductionDetail)) {
-      llvm::dbgs() << "** Candidate " << rule << " from loop #"
+      llvm::dbgs() << "** Candidate rule " << rule << " from loop #"
                    << pair.first << "\n";
     }
 
@@ -553,6 +559,12 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
 void RewriteSystem::deleteRule(unsigned ruleID,
                                const RewritePath &replacementPath) {
   // Replace all occurrences of the rule with the replacement path in
+  // all redundant rule paths recorded so far.
+  for (auto &pair : RedundantRules) {
+    (void) pair.second.replaceRuleWithPath(ruleID, replacementPath);
+  }
+
+  // Replace all occurrences of the rule with the replacement path in
   // all remaining rewrite loops.
   for (unsigned loopID : indices(Loops)) {
     auto &loop = Loops[loopID];
@@ -573,6 +585,9 @@ void RewriteSystem::deleteRule(unsigned ruleID,
       llvm::dbgs() << "\n";
     }
   }
+
+  // Record the redundant rule along with its replacement path.
+  RedundantRules.emplace_back(ruleID, replacementPath);
 }
 
 void RewriteSystem::performHomotopyReduction(
@@ -702,6 +717,26 @@ void RewriteSystem::minimizeRewriteSystem() {
   verifyRewriteLoops();
   verifyRedundantConformances(redundantConformances);
   verifyMinimizedRules(redundantConformances);
+
+  if (Debug.contains(DebugFlags::RedundantRules)) {
+    llvm::dbgs() << "\nRedundant rules:\n";
+    for (const auto &pair : RedundantRules) {
+      const auto &rule = getRule(pair.first);
+      llvm::dbgs() << "- " << rule << " ::== ";
+
+      MutableTerm lhs(rule.getLHS());
+      pair.second.dump(llvm::dbgs(), lhs, *this);
+
+      llvm::dbgs() << "\n";
+
+      if (Debug.contains(DebugFlags::RedundantRulesDetail)) {
+        llvm::dbgs() << "\n";
+        pair.second.dumpLong(llvm::dbgs(), lhs, *this);
+
+        llvm::dbgs() << "\n\n";
+      }
+    }
+  }
 }
 
 /// In a conformance-valid rewrite system, any rule with unresolved symbols on
@@ -826,6 +861,8 @@ void RewriteSystem::verifyRedundantConformances(
 void RewriteSystem::verifyMinimizedRules(
     const llvm::DenseSet<unsigned> &redundantConformances) const {
 #ifndef NDEBUG
+  unsigned redundantRuleCount = 0;
+
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
 
@@ -845,8 +882,11 @@ void RewriteSystem::verifyMinimizedRules(
       continue;
     }
 
+    if (rule.isRedundant())
+      ++redundantRuleCount;
+
     // LHS-simplified rules should be redundant, unless they're protocol
-    // conformance rules, which unfortunately might no be redundant, because
+    // conformance rules, which unfortunately might not be redundant, because
     // we try to keep them in the original protocol definition for
     // compatibility with the GenericSignatureBuilder's minimization algorithm.
     if (rule.isLHSSimplified() &&
@@ -873,6 +913,23 @@ void RewriteSystem::verifyMinimizedRules(
         !rule.containsUnresolvedSymbols() &&
         !redundantConformances.count(ruleID)) {
       llvm::errs() << "Minimal conformance is redundant: " << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
+
+  if (RedundantRules.size() != redundantRuleCount) {
+    llvm::errs() << "Expected " << RedundantRules.size() << " redundant rules "
+                 << "but counted " << redundantRuleCount << "\n";
+    dump(llvm::errs());
+    abort();
+  }
+
+  for (const auto &pair : RedundantRules) {
+    const auto &rule = getRule(pair.first);
+    if (!rule.isRedundant()) {
+      llvm::errs() << "Recorded replacement path for non-redundant rule "
+                   << rule << "\n";
       dump(llvm::errs());
       abort();
     }

@@ -188,6 +188,20 @@ void RewritePath::dump(llvm::raw_ostream &out,
   }
 }
 
+void RewritePath::dumpLong(llvm::raw_ostream &out,
+                           MutableTerm term,
+                           const RewriteSystem &system) const {
+  RewritePathEvaluator evaluator(term);
+
+  for (const auto &step : Steps) {
+    evaluator.dump(out);
+    evaluator.apply(step, system);
+    out << "\n";
+  }
+
+  evaluator.dump(out);
+}
+
 void RewriteLoop::verify(const RewriteSystem &system) const {
 #ifndef NDEBUG
   RewritePathEvaluator evaluator(Basepoint);
@@ -220,13 +234,17 @@ void RewriteLoop::dump(llvm::raw_ostream &out,
 }
 
 void RewritePathEvaluator::dump(llvm::raw_ostream &out) const {
-  out << "Primary stack:\n";
-  for (const auto &term : Primary) {
-    out << term << "\n";
+  for (unsigned i = 0, e = Primary.size(); i < e; ++i) {
+    if (i == Primary.size() - 1)
+      out << "-> ";
+    else
+      out << "   ";
+
+    out << Primary[i] << "\n";
   }
-  out << "\nSecondary stack:\n";
-  for (const auto &term : Secondary) {
-    out << term << "\n";
+
+  for (unsigned i = 0, e = Secondary.size(); i < e; ++i) {
+    out << "   " << Secondary[Secondary.size() - i - 1] << "\n";
   }
 }
 

@@ -453,6 +453,10 @@ private:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
+  /// A list of pairs where the first element is a rule number and the second
+  /// element is an equivalent rewrite path in terms of non-redundant rules.
+  std::vector<std::pair<unsigned, RewritePath>> RedundantRules;
+
   void propagateExplicitBits();
 
   Optional<std::pair<unsigned, unsigned>>

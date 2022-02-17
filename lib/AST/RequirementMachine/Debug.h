@@ -59,6 +59,12 @@ enum class DebugFlags : unsigned {
 
   /// Print debug output from generic signature minimization.
   Minimization = (1<<12),
+
+  /// Print redundant rules and their replacement paths.
+  RedundantRules = (1<<13),
+
+  /// Print more detail about redundant rules.
+  RedundantRulesDetail = (1<<14)
 };
 
 using DebugOptions = OptionSet<DebugFlags>;
