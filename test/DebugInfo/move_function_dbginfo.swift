@@ -13,7 +13,7 @@
 // We only run this on macOS right now since we would need to pattern match
 // slightly differently on other platforms.
 // REQUIRES: OS=macosx
-
+// REQUIRES: CPU=x86_64
 
 //////////////////
 // Declarations //
