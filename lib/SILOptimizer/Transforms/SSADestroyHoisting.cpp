@@ -204,41 +204,40 @@ public:
   // Debug instructions that are no longer within this lifetime after shrinking.
   SmallVector<SILInstruction *, 4> deadUsers;
 
-  explicit DeinitBarriers(SILFunction *function)
-    : destroyReachesBeginBlocks(function),
-      destroyReachesEndBlocks(function)
-  {}
-
-  void compute(const KnownStorageUses &knownUses) {
-    DestroyReachability(knownUses, *this).solveBackward();
+  explicit DeinitBarriers(bool ignoreDeinitBarriers,
+                          const KnownStorageUses &knownUses,
+                          SILFunction *function)
+      : destroyReachesBeginBlocks(function), destroyReachesEndBlocks(function),
+        ignoreDeinitBarriers(ignoreDeinitBarriers), knownUses(knownUses) {
+    auto rootValue = knownUses.getStorage().getRoot();
+    assert(rootValue && "HoistDestroys requires a single storage root");
+    // null for function args
+    storageDefInst = rootValue->getDefiningInstruction();
   }
+
+  void compute() { DestroyReachability(*this).solveBackward(); }
 
 private:
   DeinitBarriers(DeinitBarriers const &) = delete;
   DeinitBarriers &operator=(DeinitBarriers const &) = delete;
 
-  // Conforms to BackwardReachability::BlockReachability
+  bool ignoreDeinitBarriers;
+  const KnownStorageUses &knownUses;
+  SILInstruction *storageDefInst = nullptr;
+
+  // Implements BackwardReachability::BlockReachability
   class DestroyReachability {
-    const KnownStorageUses &knownUses;
     DeinitBarriers &result;
-    SILInstruction *storageDefInst = nullptr; // null for function args
 
     enum class Classification { DeadUser, Barrier, Other };
 
     BackwardReachability<DestroyReachability> reachability;
 
   public:
-    DestroyReachability(const KnownStorageUses &knownUses,
-                        DeinitBarriers &result)
-        : knownUses(knownUses), result(result),
-          reachability(knownUses.getFunction(), *this) {
-
-      auto rootValue = knownUses.getStorage().getRoot();
-      assert(rootValue && "HoistDestroys requires a single storage root");
-      storageDefInst = rootValue->getDefiningInstruction();
-
+    DestroyReachability(DeinitBarriers &result)
+        : result(result), reachability(result.knownUses.getFunction(), *this) {
       // Seed backward reachability with destroy points.
-      for (SILInstruction *destroy : knownUses.originalDestroys) {
+      for (SILInstruction *destroy : result.knownUses.originalDestroys) {
         reachability.initLastUse(destroy);
       }
     }
@@ -272,16 +271,16 @@ private:
 
 DeinitBarriers::DestroyReachability::Classification
 DeinitBarriers::DestroyReachability::classifyInstruction(SILInstruction *inst) {
-  if (knownUses.debugInsts.contains(inst)) {
+  if (result.knownUses.debugInsts.contains(inst)) {
     return Classification::DeadUser;
   }
-  if (inst == storageDefInst) {
+  if (inst == result.storageDefInst) {
     return Classification::Barrier;
   }
-  if (knownUses.storageUsers.contains(inst)) {
+  if (result.knownUses.storageUsers.contains(inst)) {
     return Classification::Barrier;
   }
-  if (isDeinitBarrier(inst)) {
+  if (!result.ignoreDeinitBarriers && isDeinitBarrier(inst)) {
     return Classification::Barrier;
   }
   return Classification::Other;
@@ -341,6 +340,7 @@ bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
 /// object.
 class HoistDestroys {
   SILValue storageRoot;
+  bool ignoreDeinitBarriers;
   InstructionDeleter &deleter;
 
   // Book-keeping for the rewriting stage.
@@ -349,9 +349,10 @@ class HoistDestroys {
   BasicBlockSetVector destroyMergeBlocks;
 
 public:
-  HoistDestroys(SILValue storageRoot, InstructionDeleter &deleter)
-    : storageRoot(storageRoot), deleter(deleter),
-      destroyMergeBlocks(getFunction()) {}
+  HoistDestroys(SILValue storageRoot, bool ignoreDeinitBarriers,
+                InstructionDeleter &deleter)
+      : storageRoot(storageRoot), ignoreDeinitBarriers(ignoreDeinitBarriers),
+        deleter(deleter), destroyMergeBlocks(getFunction()) {}
 
   bool perform();
 
@@ -386,8 +387,8 @@ bool HoistDestroys::perform() {
   if (!knownUses.findUses())
     return false;
 
-  DeinitBarriers deinitBarriers(getFunction());
-  deinitBarriers.compute(knownUses);
+  DeinitBarriers deinitBarriers(ignoreDeinitBarriers, knownUses, getFunction());
+  deinitBarriers.compute();
 
   // No SIL changes happen before rewriting.
   return rewriteDestroys(knownUses, deinitBarriers);
@@ -530,7 +531,8 @@ void HoistDestroys::mergeDestroys(SILBasicBlock *mergeBlock) {
 // Top-Level API
 // =============================================================================
 
-bool hoistDestroys(SILValue root, InstructionDeleter &deleter) {
+bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
+                   InstructionDeleter &deleter) {
   LLVM_DEBUG(llvm::dbgs() << "Performing destroy hoisting on " << root);
 
   SILFunction *function = root->getFunction();
@@ -540,7 +542,7 @@ bool hoistDestroys(SILValue root, InstructionDeleter &deleter) {
   // The algorithm assumes no critical edges.
   assert(function->hasOwnership() && "requires OSSA");
 
-  return HoistDestroys(root, deleter).perform();
+  return HoistDestroys(root, ignoreDeinitBarriers, deleter).perform();
 }
 
 // =============================================================================
@@ -607,18 +609,23 @@ void SSADestroyHoisting::run() {
   // the end will result in hoisting inner begin_access' destroy_addrs first.
   while (!bais.empty()) {
     auto *bai = bais.pop_back_val();
-    changed |= hoistDestroys(bai, deleter);
+    changed |= hoistDestroys(bai, /*ignoreDeinitBarriers=*/true, deleter);
   }
   // Alloc stacks always enclose their accesses.
   for (auto *asi : asis) {
-    changed |= hoistDestroys(asi, deleter);
+    changed |= hoistDestroys(asi, /*ignoreDeinitBarriers=*/false, deleter);
   }
   // Arguments enclose everything.
   for (auto *arg : getFunction()->getArguments()) {
     if (arg->getType().isAddress()) {
-      changed |= hoistDestroys(arg, deleter);
+      bool isInout = cast<SILFunctionArgument>(arg)
+                         ->getArgumentConvention()
+                         .isInoutConvention();
+      changed |= hoistDestroys(arg, /*ignoreDeinitBarriers=*/
+                               isInout, deleter);
     }
   }
+
   if (changed) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
