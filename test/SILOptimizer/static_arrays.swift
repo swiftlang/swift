@@ -237,7 +237,7 @@ func takeUnsafePointer(ptr : UnsafePointer<SwiftClass>, len: Int) {
 // CHECK-LABEL: sil @{{.*}}passArrayOfClasses
 // CHECK: bb0(%0 : $SwiftClass, %1 : $SwiftClass, %2 : $SwiftClass):
 // CHECK-NOT: bb1(
-// CHECK: alloc_ref_dynamic {{.*}}[tail_elems $SwiftClass *
+// CHECK: alloc_ref{{(_dynamic)?}} {{.*}}[tail_elems $SwiftClass *
 // CHECK-NOT: bb1(
 // CHECK:   return
 public func passArrayOfClasses(a: SwiftClass, b: SwiftClass, c: SwiftClass) {
