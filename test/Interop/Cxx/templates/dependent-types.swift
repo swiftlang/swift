@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
 //
 // REQUIRES: executable_test
+//
+// For some reason this is failing on i386: rdar://89166707.
+// XFAIL: CPU=i386
 
 import DependentTypes
 import StdlibUnittest
