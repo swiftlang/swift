@@ -120,6 +120,32 @@ bool Rule::isProtocolRefinementRule() const {
   return false;
 }
 
+/// If this is a rule of the form [P].[concrete: C : Q] => [P] where
+/// [P] is a protocol symbol, return true.
+///
+/// This means that P constrains 'Self' to a concrete type that conforms
+/// to some Q with P : Q. We don't consider this to be a valid conformance
+/// path element, to ensure compatibility with the GSB in an odd edge
+/// case:
+///
+///    protocol P : C {}
+///    class C : P {}
+///
+/// The GSB minimizes the signature <T where T : P> to <T where T : P>,
+/// whereas the minimal conformances algorithm would otherwise minimize
+/// it down to <T where T : C> on account of the (T.[P] => T) conformance
+/// rule being redundantly expressed via [P].[concrete: C : P].
+bool Rule::isCircularConformanceRule() const {
+  if (LHS.size() != 2 || RHS.size() != 1 || LHS[0] != RHS[0])
+    return false;
+
+  if (LHS[0].getKind() != Symbol::Kind::Protocol ||
+      LHS[1].getKind() != Symbol::Kind::ConcreteConformance)
+    return false;
+
+  return true;
+}
+
 /// A protocol typealias rule takes one of the following two forms,
 /// where T is a name symbol:
 ///

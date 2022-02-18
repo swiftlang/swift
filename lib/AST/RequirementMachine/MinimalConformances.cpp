@@ -195,6 +195,13 @@ class MinimalConformances {
       MutableTerm term, unsigned ruleID,
       SmallVectorImpl<unsigned> &result) const;
 
+  bool isConformanceRuleRecoverable(
+    llvm::SmallDenseSet<unsigned, 4> &visited,
+    unsigned ruleID) const;
+
+  bool isDerivedViaCircularConformanceRule(
+      const std::vector<SmallVector<unsigned, 2>> &paths) const;
+
   bool isValidConformancePath(
       llvm::SmallDenseSet<unsigned, 4> &visited,
       const llvm::SmallVectorImpl<unsigned> &path) const;
@@ -601,12 +608,59 @@ void MinimalConformances::computeCandidateConformancePaths() {
   }
 }
 
-/// Determines if \p path can be expressed without any of the conformance
-/// rules appearing in \p redundantConformances, by possibly substituting
-/// any occurrences of the redundant rules with alternate definitions
-/// appearing in \p conformancePaths.
+/// If \p ruleID is redundant, determines if it can be expressed without
+/// without any of the conformance rules determined to be redundant so far.
 ///
-/// The \p conformancePaths map sends conformance rules to a list of
+/// If the rule is not redundant, determines if its parent path can
+/// also be recovered.
+bool MinimalConformances::isConformanceRuleRecoverable(
+    llvm::SmallDenseSet<unsigned, 4> &visited,
+    unsigned ruleID) const {
+  if (RedundantConformances.count(ruleID)) {
+    SWIFT_DEFER {
+      visited.erase(ruleID);
+    };
+    visited.insert(ruleID);
+
+    auto found = ConformancePaths.find(ruleID);
+    if (found == ConformancePaths.end())
+      return false;
+
+    bool foundValidConformancePath = false;
+    for (const auto &otherPath : found->second) {
+      if (isValidConformancePath(visited, otherPath)) {
+        foundValidConformancePath = true;
+        break;
+      }
+    }
+
+    if (!foundValidConformancePath)
+      return false;
+  } else {
+    auto found = ParentPaths.find(ruleID);
+    if (found != ParentPaths.end()) {
+      SWIFT_DEFER {
+        visited.erase(ruleID);
+      };
+      visited.insert(ruleID);
+
+      // If 'req' is based on some other conformance requirement
+      // `T.[P.]A : Q', we want to make sure that we have a
+      // non-redundant derivation for 'T : P'.
+      if (!isValidConformancePath(visited, found->second))
+        return false;
+    }
+  }
+
+  return true;
+}
+
+/// Determines if \p path can be expressed without any of the conformance
+/// rules determined to be redundant so far, by possibly substituting
+/// any occurrences of the redundant rules with alternate definitions
+/// appearing in the set of known conformancePaths.
+///
+/// The conformance path map sends conformance rules to a list of
 /// disjunctions, where each disjunction is a product of other conformance
 /// rules.
 bool MinimalConformances::isValidConformancePath(
@@ -617,41 +671,8 @@ bool MinimalConformances::isValidConformancePath(
     if (visited.count(ruleID) > 0)
       return false;
 
-    if (RedundantConformances.count(ruleID)) {
-      SWIFT_DEFER {
-        visited.erase(ruleID);
-      };
-      visited.insert(ruleID);
-
-      auto found = ConformancePaths.find(ruleID);
-      if (found == ConformancePaths.end())
-        return false;
-
-      bool foundValidConformancePath = false;
-      for (const auto &otherPath : found->second) {
-        if (isValidConformancePath(visited, otherPath)) {
-          foundValidConformancePath = true;
-          break;
-        }
-      }
-
-      if (!foundValidConformancePath)
-        return false;
-    } else {
-      auto found = ParentPaths.find(ruleID);
-      if (found != ParentPaths.end()) {
-        SWIFT_DEFER {
-          visited.erase(ruleID);
-        };
-        visited.insert(ruleID);
-
-        // If 'req' is based on some other conformance requirement
-        // `T.[P.]A : Q', we want to make sure that we have a
-        // non-redundant derivation for 'T : P'.
-        if (!isValidConformancePath(visited, found->second))
-          return false;
-      }
-    }
+    if (!isConformanceRuleRecoverable(visited, ruleID))
+      return false;
   }
 
   return true;
@@ -786,12 +807,45 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
 #endif
 }
 
+bool MinimalConformances::isDerivedViaCircularConformanceRule(
+    const std::vector<SmallVector<unsigned, 2>> &paths) const {
+  for (const auto &path : paths) {
+    if (!path.empty() &&
+        System.getRule(path.back()).isCircularConformanceRule())
+      return true;
+  }
+
+  return false;
+}
+
 /// Find a set of minimal conformances by marking all non-minimal
 /// conformances redundant.
 ///
 /// In the first pass, we only consider conformance requirements that are
 /// made redundant by concrete conformances.
 void MinimalConformances::computeMinimalConformances() {
+  // First, mark any concrete conformances derived via a circular
+  // conformance as redundant upfront. See the comment at the top of
+  // Rule::isCircularConformanceRule() for an explanation of this.
+  for (unsigned ruleID : ConformanceRules) {
+    auto found = ConformancePaths.find(ruleID);
+    if (found == ConformancePaths.end())
+      continue;
+
+    const auto &paths = found->second;
+
+    if (System.getRule(ruleID).isProtocolConformanceRule())
+      continue;
+
+    if (isDerivedViaCircularConformanceRule(paths))
+      RedundantConformances.insert(ruleID);
+  }
+
+  // Now, visit each conformance rule, trying to make it redundant by
+  // deriving a path in terms of other non-redundant conformance rules.
+  //
+  // Note that the ConformanceRules vector is sorted in descending
+  // canonical term order, so less canonical rules are eliminated first.
   for (unsigned ruleID : ConformanceRules) {
     auto found = ConformancePaths.find(ruleID);
     if (found == ConformancePaths.end())
@@ -840,10 +894,7 @@ void MinimalConformances::verifyMinimalConformances() const {
       // minimal conformances.
       llvm::SmallDenseSet<unsigned, 4> visited;
 
-      llvm::SmallVector<unsigned, 1> path;
-      path.push_back(ruleID);
-
-      if (!isValidConformancePath(visited, path)) {
+      if (!isConformanceRuleRecoverable(visited, ruleID)) {
         llvm::errs() << "Redundant conformance is not recoverable:\n";
         llvm::errs() << rule << "\n\n";
         dumpMinimalConformanceEquations(llvm::errs());
