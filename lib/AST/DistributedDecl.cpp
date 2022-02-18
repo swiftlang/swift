@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -65,19 +65,50 @@ using namespace swift;
 /************** Distributed Actor System Associated Types *********************/
 /******************************************************************************/
 
-Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
-  assert(actor->isDistributedActor());
-  auto &ctx = actor->getASTContext();
+Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) {
+  auto &C = member->getASTContext();
+  auto *DC = member->getDeclContext();
+  auto DA = C.getDistributedActorDecl();
 
-  auto protocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-  if (!protocol)
-    return ErrorType::get(ctx);
+  if (auto *protocol = DC->getSelfProtocolDecl()) {
+    GenericSignature signature;
+    if (auto *genericContext = member->getAsGenericContext()) {
+      signature = genericContext->getGenericSignature();
+    } else {
+      signature = DC->getGenericSignatureOfContext();
+    }
+
+    auto ActorSystemAssocType =
+        DA->getAssociatedType(C.Id_ActorSystem)->getDeclaredInterfaceType();
+
+    auto systemTy = signature->getConcreteType(ActorSystemAssocType);
+    assert(systemTy && "couldn't find concrete type for actor system");
+    return systemTy;
+  } else if (auto classDecl = dyn_cast<ClassDecl>(DC)) {
+      if (!classDecl)
+        return Type();
+
+      return getDistributedActorSystemType(classDecl);
+  }
+
+  llvm_unreachable("Unable to fetch ActorSystem type!");
+}
+
+Type swift::getDistributedActorSystemType(NominalTypeDecl *nominal) {
+  assert(!isa<ProtocolDecl>(nominal) && "FIXME: we should deal with it here too or collapse the two impls");
+  assert(nominal->isDistributedActor());
+  auto &C = nominal->getASTContext();
+  auto *DC = nominal->getDeclContext();
+
+  auto DAP = C.getDistributedActorDecl();
+  if (!DAP)
+    return ErrorType::get(C);
 
   // Dig out the actor system type.
-  auto module = actor->getParentModule();
-  Type selfType = actor->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, protocol);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_ActorSystem);
+  auto module = nominal->getParentModule();
+  Type selfType = nominal->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, DAP);
+  return conformance.getTypeWitnessByName(selfType, C.Id_ActorSystem);
 }
 
 Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
