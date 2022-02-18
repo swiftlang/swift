@@ -163,7 +163,7 @@ extension AsyncFlatMapSequence: Sendable
         SegmentOfResult.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncFlatMapSequence: Sendable.Iterator 
+extension AsyncFlatMapSequence.Iterator: Sendable 
   where Base.AsyncIterator: Sendable, 
         Base.Element: Sendable, 
         SegmentOfResult: Sendable, 
