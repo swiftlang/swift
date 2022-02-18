@@ -47,15 +47,16 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents() {
         llvm::dbgs() << "- via concrete type requirement\n";
       }
 
-      concretizeNestedTypesFromConcreteParent(
-          props->getKey(),
-          RequirementKind::SameType,
-          *props->ConcreteTypeRule,
-          props->ConcreteType->getConcreteType(),
-          props->ConcreteType->getSubstitutions(),
-          props->ConformsToRules,
-          props->ConformsTo,
-          props->ConcreteConformances);
+      for (auto pair : props->ConcreteTypeRules) {
+        concretizeNestedTypesFromConcreteParent(
+            props->getKey(),
+            RequirementKind::SameType,
+            pair.second,
+            pair.first.getConcreteType(),
+            pair.first.getSubstitutions(),
+            props->ConformsToRules,
+            props->ConformsTo);
+      }
     }
 
     if (props->hasSuperclassBound()) {
@@ -64,15 +65,16 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents() {
       }
 
       const auto &superclassReq = props->getSuperclassRequirement();
-      concretizeNestedTypesFromConcreteParent(
-          props->getKey(),
-          RequirementKind::Superclass,
-          *superclassReq.SuperclassRule,
-          superclassReq.SuperclassType->getConcreteType(),
-          superclassReq.SuperclassType->getSubstitutions(),
-          props->ConformsToRules,
-          props->ConformsTo,
-          props->SuperclassConformances);
+      for (auto pair : superclassReq.SuperclassRules) {
+        concretizeNestedTypesFromConcreteParent(
+            props->getKey(),
+            RequirementKind::Superclass,
+            pair.second,
+            pair.first.getConcreteType(),
+            pair.first.getSubstitutions(),
+            props->ConformsToRules,
+            props->ConformsTo);
+      }
     }
   }
 }
@@ -115,8 +117,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     CanType concreteType,
     ArrayRef<Term> substitutions,
     ArrayRef<unsigned> conformsToRules,
-    ArrayRef<const ProtocolDecl *> conformsTo,
-    llvm::TinyPtrVector<ProtocolConformance *> &conformances) {
+    ArrayRef<const ProtocolDecl *> conformsTo) {
   assert(requirementKind == RequirementKind::SameType ||
          requirementKind == RequirementKind::Superclass);
   assert(conformsTo.size() == conformsToRules.size());
@@ -132,10 +133,8 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // entry for this key's suffix.
     auto pair = std::make_pair(concreteRuleID, conformanceRuleID);
     auto found = ConcreteConformances.find(pair);
-    if (found != ConcreteConformances.end()) {
-      conformances.push_back(found->second);
+    if (found != ConcreteConformances.end())
       continue;
-    }
 
     // FIXME: Either remove the ModuleDecl entirely from conformance lookup,
     // or pass the correct one down in here.
@@ -182,10 +181,6 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
         std::make_pair(pair, concrete));
     assert(inserted.second);
     (void) inserted;
-
-    // Record the conformance for use by
-    // PropertyBag::getConformsToExcludingSuperclassConformances().
-    conformances.push_back(concrete);
 
     auto concreteConformanceSymbol = Symbol::forConcreteConformance(
         concreteType, substitutions, proto, Context);

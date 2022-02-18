@@ -11,7 +11,7 @@ class C<I, J : Sequence, K> : B<String, I, [J.Element], K> {}
 // Unifying two requirements in the same protocol //
 // ---------------------------------------------- //
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pab@
+// CHECK-LABEL: .Pab@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pab]A1 == Self.[Pab]B1,
@@ -33,7 +33,7 @@ protocol Pab {
   associatedtype B4
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pba@
+// CHECK-LABEL: .Pba@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pba]A1 == Self.[Pba]B1,
@@ -55,7 +55,7 @@ protocol Pba {
   associatedtype B4
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pac@
+// CHECK-LABEL: .Pac@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pac]A1 == String,
@@ -78,7 +78,7 @@ protocol Pac {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pca@
+// CHECK-LABEL: .Pca@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pca]A1 == String,
@@ -101,7 +101,7 @@ protocol Pca {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pbc@
+// CHECK-LABEL: .Pbc@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pbc]B1 == String,
@@ -126,7 +126,7 @@ protocol Pbc {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pcb@
+// CHECK-LABEL: .Pcb@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pcb]B1 == String,
@@ -156,7 +156,7 @@ protocol Pcb {
 // Unifying three requirements in the same protocol //
 // ------------------------------------------------ //
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pabc@
+// CHECK-LABEL: .Pabc@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pabc]A1 == String,
@@ -189,7 +189,7 @@ protocol Pabc {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pacb@
+// CHECK-LABEL: .Pacb@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pacb]A1 == String,
@@ -222,7 +222,7 @@ protocol Pacb {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pbac@
+// CHECK-LABEL: .Pbac@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pbac]A1 == String,
@@ -255,7 +255,7 @@ protocol Pbac {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pbca@
+// CHECK-LABEL: .Pbca@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pbca]A1 == String,
@@ -288,7 +288,7 @@ protocol Pbca {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pcab@
+// CHECK-LABEL: .Pcab@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pcab]A1 == String,
@@ -321,7 +321,7 @@ protocol Pcab {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).Pcba@
+// CHECK-LABEL: .Pcba@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[Pcba]A1 == String,
@@ -384,7 +384,7 @@ protocol Pc {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).PaQb@
+// CHECK-LABEL: .PaQb@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[PaQb]T : Pa,
@@ -400,7 +400,7 @@ protocol PaQb {
   associatedtype B4
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).PbQa@
+// CHECK-LABEL: .PbQa@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[PbQa]A1 == Self.[PbQa]T.[Pb]B1,
@@ -417,7 +417,7 @@ protocol PbQa {
   associatedtype A3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).PaQc@
+// CHECK-LABEL: .PaQc@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[PaQc]C2 : Sequence,
@@ -434,7 +434,7 @@ protocol PaQc {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).PcQa@
+// CHECK-LABEL: .PcQa@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[PcQa]A1 == String,
@@ -451,7 +451,7 @@ protocol PcQa {
   associatedtype A3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).PbQc@
+// CHECK-LABEL: .PbQc@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[PbQc]C2 : Sequence,
@@ -468,7 +468,7 @@ protocol PbQc {
   associatedtype C3
 }
 
-// CHECK-LABEL: minimize_superclass_unification_generic.(file).PcQb@
+// CHECK-LABEL: .PcQb@
 // CHECK-NEXT: Requirement signature: <Self where
 
 // CHECK-SAME: Self.[PcQb]B1 == String,

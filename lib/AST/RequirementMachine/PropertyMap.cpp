@@ -60,41 +60,6 @@
 using namespace swift;
 using namespace rewriting;
 
-/// This papers over a behavioral difference between
-/// GenericSignature::getRequiredProtocols() and ArchetypeType::getConformsTo();
-/// the latter drops any protocols to which the superclass requirement
-/// conforms to concretely.
-llvm::TinyPtrVector<const ProtocolDecl *>
-PropertyBag::getConformsToExcludingSuperclassConformances() const {
-  llvm::TinyPtrVector<const ProtocolDecl *> result;
-
-  if (SuperclassConformances.empty()) {
-    result = ConformsTo;
-    return result;
-  }
-
-  // The conformances in SuperclassConformances should appear in the same order
-  // as the protocols in ConformsTo.
-  auto conformanceIter = SuperclassConformances.begin();
-
-  for (const auto *proto : ConformsTo) {
-    if (conformanceIter == SuperclassConformances.end()) {
-      result.push_back(proto);
-      continue;
-    }
-
-    if (proto == (*conformanceIter)->getProtocol()) {
-      ++conformanceIter;
-      continue;
-    }
-
-    result.push_back(proto);
-  }
-
-  assert(conformanceIter == SuperclassConformances.end());
-  return result;
-}
-
 void PropertyBag::dump(llvm::raw_ostream &out) const {
   out << Key << " => {";
 
@@ -205,7 +170,11 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   if (next->ConcreteType) {
     ConcreteType = next->ConcreteType->prependPrefixToConcreteSubstitutions(
         prefix, ctx);
-    ConcreteTypeRule = next->ConcreteTypeRule;
+    ConcreteTypeRules = next->ConcreteTypeRules;
+    for (auto &pair : ConcreteTypeRules) {
+      pair.first = pair.first.prependPrefixToConcreteSubstitutions(
+          prefix, ctx);
+    }
   }
 
   // Copy over class hierarchy information.
@@ -213,10 +182,14 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   if (!next->Superclasses.empty()) {
     Superclasses = next->Superclasses;
 
-    for (auto &pair : Superclasses) {
-      pair.second.SuperclassType =
-          pair.second.SuperclassType->prependPrefixToConcreteSubstitutions(
+    for (auto &req : Superclasses) {
+      req.second.SuperclassType =
+          req.second.SuperclassType->prependPrefixToConcreteSubstitutions(
               prefix, ctx);
+      for (auto &pair : req.second.SuperclassRules) {
+        pair.first = pair.first.prependPrefixToConcreteSubstitutions(
+            prefix, ctx);
+      }
     }
   }
 }
@@ -224,11 +197,14 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
 Symbol PropertyBag::concretelySimplifySubstitution(const MutableTerm &mutTerm,
                                                    RewriteContext &ctx,
                                                    RewritePath *path) const {
+  assert(!ConcreteTypeRules.empty());
+  auto &pair = ConcreteTypeRules.front();
+
   // The property map entry might apply to a suffix of the substitution
   // term, so prepend the appropriate prefix to its own substitutions.
   auto prefix = getPrefixAfterStrippingKey(mutTerm);
   auto concreteSymbol =
-    ConcreteType->prependPrefixToConcreteSubstitutions(
+    pair.first.prependPrefixToConcreteSubstitutions(
         prefix, ctx);
 
   // If U.V is the substitution term and V is the property map key,
@@ -238,7 +214,7 @@ Symbol PropertyBag::concretelySimplifySubstitution(const MutableTerm &mutTerm,
   if (path) {
     path->add(RewriteStep::forRewriteRule(/*startOffset=*/prefix.size(),
                                           /*endOffset=*/0,
-                                          /*ruleID=*/*ConcreteTypeRule,
+                                          /*ruleID=*/pair.second,
                                           /*inverse=*/true));
 
     if (!prefix.empty()) {
@@ -263,13 +239,13 @@ void PropertyBag::verify(const RewriteSystem &system) const {
   // FIXME: Add asserts requiring that the layout, superclass and
   // concrete type symbols match, as above
   assert(!Layout.isNull() == LayoutRule.hasValue());
-  assert(ConcreteType.hasValue() == ConcreteTypeRule.hasValue());
+  assert(ConcreteType.hasValue() == !ConcreteTypeRules.empty());
 
   assert((SuperclassDecl == nullptr) == Superclasses.empty());
   for (const auto &pair : Superclasses) {
     const auto &req = pair.second;
     assert(req.SuperclassType.hasValue());
-    assert(req.SuperclassRule.hasValue());
+    assert(!req.SuperclassRules.empty());
   }
 
 #endif
@@ -396,8 +372,7 @@ void PropertyMap::buildPropertyMap() {
 
   for (const auto &rule : System.getRules()) {
     if (rule.isLHSSimplified() ||
-        rule.isRHSSimplified() ||
-        rule.isSubstitutionSimplified())
+        rule.isRHSSimplified())
       continue;
 
     // Identity conformances ([P].[P] => [P]) are permanent rules, but we

@@ -141,6 +141,9 @@ void RewriteSystem::processTypeDifference(const TypeDifference &difference,
                                           unsigned differenceID,
                                           unsigned lhsRuleID,
                                           const RewritePath &rhsPath) {
+  if (!CheckedDifferences.insert(differenceID).second)
+    return;
+
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   if (debug) {
@@ -204,7 +207,8 @@ void RewriteSystem::processTypeDifference(const TypeDifference &difference,
   // a suffix, mark it substitution-simplified so that we can skip recording
   // the same rewrite loop in concretelySimplifyLeftHandSideSubstitutions().
   auto &lhsRule = getRule(lhsRuleID);
-  if (lhsRule.getRHS() == difference.BaseTerm)
+  if (lhsRule.getRHS() == difference.BaseTerm &&
+      !lhsRule.isSubstitutionSimplified())
     lhsRule.markSubstitutionSimplified();
 }
 

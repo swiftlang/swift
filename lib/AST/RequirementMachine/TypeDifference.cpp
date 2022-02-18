@@ -220,6 +220,9 @@ namespace {
         VERIFY(*first.compare(pair.second, Context) > 0, "Order violation");
 
         VERIFY(rhsVisited.insert(pair.first).second, "Duplicate substitution");
+
+        VERIFY(first.getRootProtocol() == pair.second.getRootProtocol(),
+               "Transformation does not preserve domain");
       }
 
       for (const auto &pair : SameTypesOnRHS) {
@@ -227,6 +230,9 @@ namespace {
         VERIFY(*first.compare(pair.second, Context) > 0, "Order violation");
 
         VERIFY(lhsVisited.insert(pair.first).second, "Duplicate substitution");
+
+        VERIFY(first.getRootProtocol() == pair.second.getRootProtocol(),
+               "Transformation does not preserve domain");
       }
 
       for (const auto &pair : ConcreteTypesOnLHS) {
