@@ -1086,9 +1086,14 @@ static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask, uint64_t mp
   }
   case TypeInfoKind::Enum: {
     auto EnumTI = reinterpret_cast<const EnumTypeInfo *>(TI);
+    // Remove bits used by the payloads
     if (!populateSpareBitsMask(EnumTI->getCases(), mask, mpePointerSpareBits)) {
       return false;
     }
+    // TODO: Remove bits needed to discriminate payloads.
+    // Until then, return false for any type with an enum in it so we
+    // won't claim to support something we don't.
+    return false;
     break;
   }
   case TypeInfoKind::Record: {
@@ -2036,8 +2041,11 @@ public:
               auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
               auto locallyComputedSpareBitsMaskIsValid
                 = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask, mpePointerSpareBits);
-              assert(locallyComputedSpareBitsMaskIsValid);
-              assert(locallyComputedSpareBitsMask == spareBitsMask);
+              // assert(locallyComputedSpareBitsMaskIsValid); // Until we expect local computation to always succeed
+              if (locallyComputedSpareBitsMaskIsValid) {
+                // If we can compute a mask locally, it should match the compiler one
+                assert(locallyComputedSpareBitsMask == spareBitsMask);
+              }
 #endif
 
               // Use compiler-provided spare bit information
