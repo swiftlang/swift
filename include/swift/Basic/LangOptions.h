@@ -313,10 +313,6 @@ namespace swift {
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;
 
-    /// Enable support for explicit existential types via the \c any
-    /// keyword.
-    bool EnableExplicitExistentialTypes = true;
-
     /// Enable support for protocol types parameterized by primary
     /// associated type.
     bool EnableParameterizedProtocolTypes = false;

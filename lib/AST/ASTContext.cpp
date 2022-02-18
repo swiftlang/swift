@@ -4256,9 +4256,6 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
 
 Type ExistentialType::get(Type constraint) {
   auto &C = constraint->getASTContext();
-  if (!C.LangOpts.EnableExplicitExistentialTypes)
-    return constraint;
-
   // FIXME: Any and AnyObject don't yet use ExistentialType.
   if (constraint->isAny() || constraint->isAnyObject())
     return constraint;
