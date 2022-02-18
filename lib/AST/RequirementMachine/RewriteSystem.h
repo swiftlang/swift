@@ -406,6 +406,10 @@ private:
   llvm::DenseMap<std::tuple<Term, Symbol, Symbol>, unsigned> DifferenceMap;
   std::vector<TypeDifference> Differences;
 
+  /// Avoid duplicate work when simplifying substitutions or rebuilding
+  /// the property map.
+  llvm::DenseSet<unsigned> CheckedDifferences;
+
 public:
   unsigned recordTypeDifference(const TypeDifference &difference);
 
@@ -457,7 +461,17 @@ private:
   /// element is an equivalent rewrite path in terms of non-redundant rules.
   std::vector<std::pair<unsigned, RewritePath>> RedundantRules;
 
+  /// Pairs of rules which together preclude a concrete type from satisfying the
+  /// requirements of the generic signature.
+  ///
+  /// Conflicts are detected in property map construction. Conflicts are
+  /// diagnosed and one of the rules in each pair is dropped during
+  /// minimization.
+  std::vector<std::pair<unsigned, unsigned>> ConflictingRules;
+
   void propagateExplicitBits();
+
+  void processConflicts();
 
   Optional<std::pair<unsigned, unsigned>>
   findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn);
@@ -473,6 +487,8 @@ private:
 public:
   void recordRewriteLoop(MutableTerm basepoint,
                          RewritePath path);
+
+  void recordConflict(unsigned existingRuleID, unsigned newRuleID);
 
   bool isInMinimizationDomain(const ProtocolDecl *proto) const;
 

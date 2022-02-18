@@ -319,15 +319,6 @@ extension Substring: _CustomPlaygroundQuickLookable {
 #endif
 
 extension Collection {
-  // FIXME: <rdar://problem/34142121>
-  // This typealias should be removed as it predates the source compatibility
-  // guarantees of Swift 3, but it cannot due to a bug.
-  @available(*, unavailable, renamed: "Iterator")
-  public typealias Generator = Iterator
-
-  @available(swift, deprecated: 3.2, obsoleted: 5.0, renamed: "Element")
-  public typealias _Element = Element
-
   @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
   public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T) -> Index {
     return index(i, offsetBy: Int(n))

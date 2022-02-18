@@ -198,6 +198,41 @@ void RewriteSystem::propagateExplicitBits() {
   }
 }
 
+/// After propagating the 'explicit' bit on rules, process pairs of
+/// conflicting rules, marking one or both of the rules as conflicting,
+/// which instructs minimization to drop them.
+void RewriteSystem::processConflicts() {
+  for (auto pair : ConflictingRules) {
+    auto existingRuleID = pair.first;
+    auto newRuleID = pair.second;
+
+    auto *existingRule = &getRule(existingRuleID);
+    auto *newRule = &getRule(newRuleID);
+
+    auto existingKind = existingRule->isPropertyRule()->getKind();
+    auto newKind = newRule->isPropertyRule()->getKind();
+
+    // The GSB preferred to drop an explicit rule in a conflict, but
+    // only if the kinds were the same.
+    if (existingRule->isExplicit() && !newRule->isExplicit() &&
+        existingKind == newKind) {
+      std::swap(existingRule, newRule);
+    }
+
+    if (newRule->getRHS().size() >= existingRule->getRHS().size()) {
+      newRule->markConflicting();
+    } else if (existingKind != Symbol::Kind::Superclass &&
+               existingKind == newKind) {
+      // The GSB only dropped the new rule in the case of a conflicting
+      // superclass requirement, so maintain that behavior here.
+      if (existingRule->getRHS().size() >= newRule->getRHS().size())
+        existingRule->markConflicting();
+    }
+
+    // FIXME: Diagnose the conflict later.
+  }
+}
+
 /// Given a rewrite rule which appears exactly once in a loop
 /// without context, return a new definition for this rewrite rule.
 /// The new definition is the path obtained by deleting the
@@ -507,7 +542,6 @@ findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn) {
         // Two rules (T.[C] => T) and (T.[C'] => T) are incomparable if
         // C and C' are superclass, concrete type or concrete conformance
         // symbols.
-        found = pair;
         continue;
       }
 
@@ -641,6 +675,7 @@ void RewriteSystem::minimizeRewriteSystem() {
   Minimized = 1;
 
   propagateExplicitBits();
+  processConflicts();
 
   // First pass:
   // - Eliminate all LHS-simplified non-conformance rules.
@@ -867,8 +902,16 @@ void RewriteSystem::verifyMinimizedRules(
     const auto &rule = getRule(ruleID);
 
     // Ignore the rewrite rule if it is not part of our minimization domain.
-    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
+    if (!isInMinimizationDomain(rule.getLHS().getRootProtocol())) {
+      if (rule.isRedundant()) {
+        llvm::errs() << "Redundant rule outside minimization domain: "
+                     << rule << "\n\n";
+        dump(llvm::errs());
+        abort();
+      }
+
       continue;
+    }
 
     // Note that sometimes permanent rules can be simplified, but they can never
     // be redundant.

@@ -114,31 +114,9 @@ static void recordRelation(Term key,
   (void) system.addRule(lhs, rhs, &path);
 }
 
-/// Given a term T == U.V, an existing rule (V.[C] => V) and a new rule
-/// (U.V.[D] => U.V) where [C] and [D] are understood to be two property
-/// symbols in conflict with each other, mark the new rule as conflicting,
-/// and if the existing rule applies to the entire term T (that is, if
-/// |U| == 0) also mark the existing rule as conflicting.
-static void recordConflict(Term key,
-                           unsigned existingRuleID,
-                           unsigned newRuleID,
-                           RewriteSystem &system) {
-  auto &existingRule = system.getRule(existingRuleID);
-  auto &newRule = system.getRule(newRuleID);
-
-  auto existingKind = existingRule.isPropertyRule()->getKind();
-  auto newKind = newRule.isPropertyRule()->getKind();
-
-  // The GSB only dropped the new rule in the case of a conflicting
-  // superclass requirement, so maintain that behavior here.
-  if (existingKind != Symbol::Kind::Superclass &&
-      existingKind == newKind) {
-    if (existingRule.getRHS().size() == key.size())
-      existingRule.markConflicting();
-  }
-
-  assert(newRule.getRHS().size() == key.size());
-  newRule.markConflicting();
+void RewriteSystem::recordConflict(unsigned existingRuleID,
+                                   unsigned newRuleID) {
+  ConflictingRules.emplace_back(existingRuleID, newRuleID);
 }
 
 void PropertyMap::addConformanceProperty(
@@ -168,7 +146,7 @@ void PropertyMap::addLayoutProperty(
 
   // If the intersection is invalid, we have a conflict.
   if (!mergedLayout->isKnownLayout()) {
-    recordConflict(key, *props->LayoutRule, ruleID, System);
+    System.recordConflict(*props->LayoutRule, ruleID);
     return;
   }
 
@@ -283,10 +261,10 @@ void PropertyMap::addSuperclassProperty(
     auto &req = props->Superclasses[superclassDecl];
 
     assert(!req.SuperclassType.hasValue());
-    assert(!req.SuperclassRule.hasValue());
+    assert(req.SuperclassRules.empty());
 
     req.SuperclassType = property;
-    req.SuperclassRule = ruleID;
+    req.SuperclassRules.emplace_back(property, ruleID);
     return;
   }
 
@@ -307,9 +285,9 @@ void PropertyMap::addSuperclassProperty(
     // hierarchy.
     auto &req = props->Superclasses[superclassDecl];
     assert(req.SuperclassType.hasValue());
-    assert(req.SuperclassRule.hasValue());
+    assert(!req.SuperclassRules.empty());
 
-    unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRule,
+    unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRules,
                        property, ruleID);
 
   } else if (superclassDecl->isSuperclassOf(props->SuperclassDecl)) {
@@ -320,11 +298,11 @@ void PropertyMap::addSuperclassProperty(
 
     // Record a relation where existing superclass implies the new superclass.
     const auto &existingReq = props->Superclasses[props->SuperclassDecl];
-    if (checkRulePairOnce(*existingReq.SuperclassRule, ruleID)) {
-      recordSuperclassRelation(key,
-                               *existingReq.SuperclassType,
-                               *existingReq.SuperclassRule,
-                               superclassDecl);
+    for (auto pair : existingReq.SuperclassRules) {
+      if (checkRulePairOnce(pair.second, ruleID)) {
+        recordSuperclassRelation(key, pair.first, pair.second,
+                                 superclassDecl);
+      }
     }
 
     // Record the new rule at the less specific level of the class
@@ -332,7 +310,7 @@ void PropertyMap::addSuperclassProperty(
     // already seen another rule at that level.
     auto &req = props->Superclasses[superclassDecl];
 
-    unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRule,
+    unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRules,
                        property, ruleID);
 
   } else if (props->SuperclassDecl->isSuperclassOf(superclassDecl)) {
@@ -343,19 +321,21 @@ void PropertyMap::addSuperclassProperty(
 
     // Record a relation where new superclass implies the existing superclass.
     const auto &existingReq = props->Superclasses[props->SuperclassDecl];
-    if (checkRulePairOnce(*existingReq.SuperclassRule, ruleID)) {
-      recordSuperclassRelation(key, property, ruleID,
-                               props->SuperclassDecl);
+    for (auto pair : existingReq.SuperclassRules) {
+      if (checkRulePairOnce(pair.second, ruleID)) {
+        recordSuperclassRelation(key, property, ruleID,
+                                 props->SuperclassDecl);
+      }
     }
 
     // Record the new rule at the more specific level of the class
     // hierarchy.
     auto &req = props->Superclasses[superclassDecl];
     assert(!req.SuperclassType.hasValue());
-    assert(!req.SuperclassRule.hasValue());
+    assert(req.SuperclassRules.empty());
 
     req.SuperclassType = property;
-    req.SuperclassRule = ruleID;
+    req.SuperclassRules.emplace_back(property, ruleID);
 
     props->SuperclassDecl = superclassDecl;
 
@@ -365,41 +345,38 @@ void PropertyMap::addSuperclassProperty(
                    << props->SuperclassDecl->getName() << "\n";
     }
 
+    // FIXME: Record the conflict better
     newRule.markConflicting();
   }
 }
 
+/// Given two concrete type rules, record a rewrite loop relating them,
+/// record induced rules, and relate the induced rules to the concrete
+/// type rules.
+void PropertyMap::unifyConcreteTypes(Term key,
+                                     Symbol lhsProperty, unsigned lhsRuleID,
+                                     Symbol rhsProperty, unsigned rhsRuleID) {
+  if (!checkRulePairOnce(lhsRuleID, rhsRuleID))
+    return;
 
-/// Utility used by addSuperclassProperty() and addConcreteTypeProperty().
-void PropertyMap::unifyConcreteTypes(
-    Term key,
-    Optional<Symbol> &existingProperty,
-    Optional<unsigned> &existingRuleID,
-    Symbol property,
-    unsigned ruleID) {
-  auto &rule = System.getRule(ruleID);
-  assert(rule.getRHS() == key);
+  auto &lhsRule = System.getRule(lhsRuleID);
+  auto &rhsRule = System.getRule(rhsRuleID);
+
+  assert(rhsRule.getRHS() == key);
 
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
-  if (!existingProperty.hasValue()) {
-    existingProperty = property;
-    existingRuleID = ruleID;
-    return;
-  }
-
-  assert(existingRuleID.hasValue());
-
   if (debug) {
-    llvm::dbgs() << "% Unifying " << *existingProperty
-                 << " with " << property << "\n";
+    llvm::dbgs() << "% Unifying " << lhsProperty
+                 << " with " << rhsProperty << "\n";
   }
 
   Optional<unsigned> lhsDifferenceID;
   Optional<unsigned> rhsDifferenceID;
 
   bool conflict = System.computeTypeDifference(key,
-                                               *existingProperty, property,
+                                               lhsProperty,
+                                               rhsProperty,
                                                lhsDifferenceID,
                                                rhsDifferenceID);
 
@@ -408,7 +385,7 @@ void PropertyMap::unifyConcreteTypes(
     if (debug) {
       llvm::dbgs() << "%% Concrete type conflict\n";
     }
-    recordConflict(key, *existingRuleID, ruleID, System);
+    System.recordConflict(lhsRuleID, rhsRuleID);
     return;
   }
 
@@ -419,6 +396,7 @@ void PropertyMap::unifyConcreteTypes(
   if (lhsDifferenceID && rhsDifferenceID) {
     const auto &lhsDifference = System.getTypeDifference(*lhsDifferenceID);
     const auto &rhsDifference = System.getTypeDifference(*rhsDifferenceID);
+    assert(lhsDifference.RHS == rhsDifference.RHS);
 
     auto newProperty = lhsDifference.RHS;
     assert(newProperty == rhsDifference.RHS);
@@ -427,35 +405,26 @@ void PropertyMap::unifyConcreteTypes(
     MutableTerm lhsTerm(key);
     lhsTerm.add(newProperty);
 
-    if (checkRulePairOnce(*existingRuleID, ruleID)) {
-      assert(lhsDifference.RHS == rhsDifference.RHS);
+    // This rule does not need a rewrite path because it will be related
+    // to the two existing rules by the processTypeDifference() calls below.
+    System.addRule(lhsTerm, rhsTerm);
 
-      if (debug) {
-        llvm::dbgs() << "%% Induced rule " << lhsTerm
-                     << " == " << rhsTerm << "\n";
-      }
+    // Recover a rewrite path from T to T.[LHS ∧ RHS].
+    RewritePath path;
+    System.buildRewritePathForJoiningTerms(rhsTerm, lhsTerm, &path);
 
-      // This rule does not need a rewrite path because it will be related
-      // to the two existing rules by the processTypeDifference() calls below.
-      System.addRule(lhsTerm, rhsTerm);
-
-      // Recover a rewrite path from T to T.[LHS ∧ RHS].
-      RewritePath path;
-      System.buildRewritePathForJoiningTerms(rhsTerm, lhsTerm, &path);
-
-      // Process LHS -> (LHS ∧ RHS).
-      System.processTypeDifference(lhsDifference, *lhsDifferenceID,
-                                   *existingRuleID, path);
-
-      // Process RHS -> (LHS ∧ RHS).
-      System.processTypeDifference(rhsDifference, *rhsDifferenceID,
-                                   ruleID, path);
+    if (debug) {
+      llvm::dbgs() << "%% Induced rule " << lhsTerm
+                   << " == " << rhsTerm << "\n";
     }
 
-    // The new property is more specific, so update ConcreteType and
-    // ConcreteTypeRule.
-    existingProperty = newProperty;
-    existingRuleID = ruleID;
+    // Process LHS -> (LHS ∧ RHS).
+    System.processTypeDifference(lhsDifference, *lhsDifferenceID,
+                                 lhsRuleID, path);
+
+    // Process RHS -> (LHS ∧ RHS).
+    System.processTypeDifference(rhsDifference, *rhsDifferenceID,
+                                 rhsRuleID, path);
 
     return;
   }
@@ -465,24 +434,18 @@ void PropertyMap::unifyConcreteTypes(
     assert(!rhsDifferenceID);
 
     const auto &lhsDifference = System.getTypeDifference(*lhsDifferenceID);
-    assert(*existingProperty == lhsDifference.LHS);
-    assert(property == lhsDifference.RHS);
+    assert(lhsProperty == lhsDifference.LHS);
+    assert(rhsProperty == lhsDifference.RHS);
 
-    if (checkRulePairOnce(*existingRuleID, ruleID)) {
-      // Build a rewrite path (T.[RHS] => T).
-      RewritePath path;
-      path.add(RewriteStep::forRewriteRule(
-          /*startOffset=*/0, /*endOffset=*/0,
-          /*ruleID=*/ruleID, /*inverse=*/false));
+    // Build a rewrite path (T.[RHS] => T).
+    RewritePath path;
 
-      System.processTypeDifference(lhsDifference, *lhsDifferenceID,
-                                   *existingRuleID, path);
-    }
+    path.add(RewriteStep::forRewriteRule(
+        /*startOffset=*/0, /*endOffset=*/0,
+        /*ruleID=*/rhsRuleID, /*inverse=*/false));
 
-    // The new property is more specific, so update existingProperty and
-    // existingRuleID.
-    existingProperty = property;
-    existingRuleID = ruleID;
+    System.processTypeDifference(lhsDifference, *lhsDifferenceID,
+                                 lhsRuleID, path);
 
     return;
   }
@@ -492,36 +455,31 @@ void PropertyMap::unifyConcreteTypes(
     assert(!lhsDifferenceID);
 
     const auto &rhsDifference = System.getTypeDifference(*rhsDifferenceID);
-    assert(property == rhsDifference.LHS);
-    assert(*existingProperty == rhsDifference.RHS);
+    assert(rhsProperty == rhsDifference.LHS);
+    assert(lhsProperty == rhsDifference.RHS);
 
-    if (checkRulePairOnce(*existingRuleID, ruleID)) {
-      // Build a rewrite path (T.[LHS] => T).
-      RewritePath path;
-      unsigned lhsLength = System.getRule(*existingRuleID).getRHS().size();
-      unsigned prefix = key.size() - lhsLength;
+    // Build a rewrite path (T.[LHS] => T).
+    RewritePath path;
 
-      if (prefix > 0) {
-        path.add(RewriteStep::forPrefixSubstitutions(
-            prefix, /*endOffset=*/0, /*inverse=*/true));
-      }
-
-      path.add(RewriteStep::forRewriteRule(
-          /*startOffset=*/prefix, /*endOffset=*/0,
-          /*ruleID=*/*existingRuleID, /*inverse=*/false));
-
-      System.processTypeDifference(rhsDifference, *rhsDifferenceID,
-                                   ruleID, path);
+    unsigned lhsPrefix = key.size() - lhsRule.getRHS().size();
+    if (lhsPrefix > 0) {
+      path.add(RewriteStep::forPrefixSubstitutions(
+          lhsPrefix, /*endOffset=*/0, /*inverse=*/true));
     }
 
-    // The new property is less specific, so existingProperty and existingRuleID
-    // remain unchanged.
+    path.add(RewriteStep::forRewriteRule(
+        /*startOffset=*/lhsPrefix, /*endOffset=*/0,
+        /*ruleID=*/lhsRuleID, /*inverse=*/false));
+
+    System.processTypeDifference(rhsDifference, *rhsDifferenceID,
+                                 rhsRuleID, path);
+
     return;
   }
 
-  assert(property == *existingProperty);
+  assert(lhsProperty == rhsProperty);
 
-  if (*existingRuleID != ruleID) {
+  if (lhsRuleID != rhsRuleID) {
     // If the rules are different but the concrete types are identical, then
     // the key is some term U.V, the existing rule is a rule of the form:
     //
@@ -535,18 +493,59 @@ void PropertyMap::unifyConcreteTypes(
     // the symbol's substitutions.
     //
     // Since the new rule appears without context, it becomes redundant.
-    if (checkRulePairOnce(*existingRuleID, ruleID)) {
-      RewritePath rhsPath;
-      rhsPath.add(RewriteStep::forRewriteRule(
-          /*startOffset=*/0, /*endOffset=*/0,
-          /*ruleID=*/ruleID, /*inverse=*/false));
+    RewritePath path;
+    path.add(RewriteStep::forRewriteRule(
+        /*startOffset=*/0, /*endOffset=*/0,
+        /*ruleID=*/rhsRuleID, /*inverse=*/false));
 
-      RewritePath path;
-      System.buildRewritePathForUnifier(key, *existingRuleID, rhsPath, &path);
-      System.recordRewriteLoop(MutableTerm(rule.getLHS()), path);
+    RewritePath unificationPath;
+    System.buildRewritePathForUnifier(key, lhsRuleID, path, &unificationPath);
+    System.recordRewriteLoop(MutableTerm(rhsRule.getLHS()), unificationPath);
+  }
+}
 
-      rule.markSubstitutionSimplified();
-    }
+/// Relate a concrete type rule to all existing concrete type rules for this
+/// key, and recompute the best concrete type property and rule seen so far.
+///
+/// Used by addSuperclassProperty() and addConcreteTypeProperty().
+void PropertyMap::unifyConcreteTypes(
+    Term key,
+    Optional<Symbol> &bestProperty,
+    llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &existingRules,
+    Symbol property, unsigned ruleID) {
+  // Unify this rule with all other concrete type rules we've seen so far,
+  // to record rewrite loops relating the rules and their projections.
+  for (auto pair : existingRules) {
+    unifyConcreteTypes(key, pair.first, pair.second, property, ruleID);
+  }
+
+  // Record the new rule.
+  existingRules.emplace_back(property, ruleID);
+
+  // Now, figure out the best concrete type seen so far. If this is the
+  // first rule, it's the best one.
+  if (!bestProperty) {
+    bestProperty = property;
+    return;
+  }
+
+  // Otherwise, compute the meet with the existing best property.
+  Optional<unsigned> lhsDifferenceID;
+  Optional<unsigned> rhsDifferenceID;
+
+  bool conflict = System.computeTypeDifference(key,
+                                               *bestProperty, property,
+                                               lhsDifferenceID,
+                                               rhsDifferenceID);
+  if (conflict)
+    return;
+
+  if (lhsDifferenceID) {
+    bestProperty = System.getTypeDifference(*lhsDifferenceID).RHS;
+  } else if (rhsDifferenceID) {
+    bestProperty = System.getTypeDifference(*rhsDifferenceID).RHS;
+  } else {
+    assert(*bestProperty == property);
   }
 }
 
@@ -574,7 +573,9 @@ void PropertyMap::addConcreteTypeProperty(
     Term key, Symbol property, unsigned ruleID) {
   auto *props = getOrCreateProperties(key);
 
-  unifyConcreteTypes(key, props->ConcreteType, props->ConcreteTypeRule,
+  unifyConcreteTypes(key,
+                     props->ConcreteType,
+                     props->ConcreteTypeRules,
                      property, ruleID);
 }
 
@@ -626,34 +627,36 @@ void PropertyMap::checkConcreteTypeRequirements() {
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
   for (auto *props : Entries) {
-    if (props->isConcreteType()) {
-      auto concreteType = props->ConcreteType->getConcreteType();
+    for (auto pair : props->ConcreteTypeRules) {
+      auto concreteType = pair.first;
+      unsigned concreteTypeRule = pair.second;
 
       // A rule (T.[concrete: C] => T) where C is a class type induces a rule
       // (T.[superclass: C] => T).
-      if (concreteType->getClassOrBoundGenericClass()) {
+      if (concreteType.getConcreteType()->getClassOrBoundGenericClass()) {
         auto superclassSymbol = Symbol::forSuperclass(
-            concreteType, props->ConcreteType->getSubstitutions(),
+            concreteType.getConcreteType(),
+            concreteType.getSubstitutions(),
             Context);
 
-        recordRelation(props->getKey(), *props->ConcreteTypeRule,
+        recordRelation(props->getKey(), concreteTypeRule,
                        superclassSymbol, System, debug);
 
       // If the concrete type is not a class and we have a superclass
       // requirement, we have a conflict.
       } else if (props->hasSuperclassBound()) {
         const auto &req = props->getSuperclassRequirement();
-        recordConflict(props->getKey(),
-                       *props->ConcreteTypeRule,
-                       *req.SuperclassRule, System);
+        for (auto pair : req.SuperclassRules) {
+          System.recordConflict(concreteTypeRule, pair.second);
+        }
       }
 
       // A rule (T.[concrete: C] => T) where C is a class type induces a rule
       // (T.[layout: L] => T), where L is either AnyObject or _NativeObject.
-      if (concreteType->satisfiesClassConstraint()) {
-        Type superclassType = concreteType;
-        if (!concreteType->getClassOrBoundGenericClass())
-          superclassType = concreteType->getSuperclass();
+      if (concreteType.getConcreteType()->satisfiesClassConstraint()) {
+        Type superclassType = concreteType.getConcreteType();
+        if (!superclassType->getClassOrBoundGenericClass())
+          superclassType = superclassType->getSuperclass();
 
         auto layoutConstraint = LayoutConstraintKind::Class;
         if (superclassType)
@@ -665,16 +668,14 @@ void PropertyMap::checkConcreteTypeRequirements() {
               layoutConstraint, Context.getASTContext());
         auto layoutSymbol = Symbol::forLayout(layout, Context);
 
-        recordRelation(props->getKey(), *props->ConcreteTypeRule,
+        recordRelation(props->getKey(), concreteTypeRule,
                        layoutSymbol, System, debug);
 
       // If the concrete type does not satisfy a class layout constraint and
       // we have such a layout requirement, we have a conflict.
       } else if (props->LayoutRule &&
                  props->Layout->isClass()) {
-        recordConflict(props->getKey(),
-                       *props->ConcreteTypeRule,
-                       *props->LayoutRule, System);
+        System.recordConflict(concreteTypeRule, *props->LayoutRule);
       }
     }
   }

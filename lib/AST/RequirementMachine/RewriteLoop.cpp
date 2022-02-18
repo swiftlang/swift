@@ -639,8 +639,6 @@ RewritePathEvaluator::applyRightConcreteProjection(const RewriteStep &step,
     llvm::errs() << "- DifferenceID: " << step.getTypeDifferenceID() << "\n";
     llvm::errs() << "\nType difference:\n";
     difference.dump(llvm::errs());
-    llvm::errs() << ":\n";
-    difference.dump(llvm::errs());
     llvm::errs() << "\nEvaluator state:\n";
     dump(llvm::errs());
     abort();

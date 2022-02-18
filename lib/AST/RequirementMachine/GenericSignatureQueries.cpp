@@ -53,7 +53,7 @@ RequirementMachine::getLocalRequirements(
     result.superclass = props->getSuperclassBound({}, term, Map);
   }
 
-  for (const auto *proto : props->getConformsToExcludingSuperclassConformances())
+  for (const auto *proto : props->getConformsTo())
     result.protos.push_back(const_cast<ProtocolDecl *>(proto));
 
   result.layout = props->getLayoutConstraint();
