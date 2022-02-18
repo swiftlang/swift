@@ -33,6 +33,11 @@ public:
   virtual llvm::Optional<llvm::StringRef> getSegmentName() {
     return {};
   }
+  /// Get the name of the segment in the symbol rich binary that may contain
+  /// Swift meteadata.
+  virtual llvm::Optional<llvm::StringRef> getSymbolRichSegmentName() {
+    return {};
+  }
   /// Predicate to identify if the named section can contain reflection data.
   virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) = 0;
 };
@@ -61,8 +66,13 @@ public:
     }
     llvm_unreachable("Section type not found.");
   }
+
   llvm::Optional<llvm::StringRef> getSegmentName() override {
     return {"__TEXT"};
+  }
+
+  llvm::Optional<llvm::StringRef> getSymbolRichSegmentName() override {
+    return {"__DWARF"};
   }
 
   bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
