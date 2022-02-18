@@ -1484,6 +1484,9 @@ public:
 
     verifyOpenedArchetype(AI, AI->getElementType().getASTType());
 
+    require(!AI->isVarInfoInvalidated() || !bool(AI->getVarInfo()),
+            "AllocStack Var Info should be None if invalidated");
+
     // There used to be a check if all uses of ASI are inside the alloc-dealloc
     // range. But apparently it can be the case that ASI has uses after the
     // dealloc_stack. This can come up if the source contains a
