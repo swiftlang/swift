@@ -166,18 +166,6 @@ static void desugarLayoutRequirement(Type subjectType,
   result.emplace_back(RequirementKind::Layout, subjectType, layout);
 }
 
-static Type lookupMemberType(Type subjectType, ProtocolDecl *protoDecl,
-                             AssociatedTypeDecl *assocType) {
-  if (subjectType->isTypeParameter())
-    return DependentMemberType::get(subjectType, assocType);
-
-  auto *M = protoDecl->getParentModule();
-  auto conformance = M->lookupConformance(
-      subjectType, protoDecl);
-  return conformance.getAssociatedType(subjectType,
-                                       assocType->getDeclaredInterfaceType());
-}
-
 /// Desugar a protocol conformance requirement by splitting up protocol
 /// compositions on the right hand side into conformance and superclass
 /// requirements.
@@ -363,8 +351,9 @@ struct InferRequirementsWalker : public TypeWalker {
         };
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
-          auto *protocol = assocType->getProtocol();
-          auto secondType = lookupMemberType(firstType, protocol, assocType);
+          auto secondType = assocType->getDeclaredInterfaceType()
+              ->castTo<DependentMemberType>()
+              ->substBaseType(module, firstType);
           Requirement req(RequirementKind::SameType, firstType, secondType);
           desugarRequirement(req, reqs, errors);
         };
