@@ -18,6 +18,27 @@
 using namespace swift;
 using namespace Lowering;
 
+/// Given a value, extracts all elements to `result` from this value if it's a
+/// tuple. Otherwise, add this value directly to `result`.
+static void extractAllElements(SILValue val, SILLocation loc,
+                               SILBuilder &builder,
+                               SmallVectorImpl<SILValue> &result) {
+  auto &fn = builder.getFunction();
+  auto tupleType = val->getType().getAs<TupleType>();
+  if (!tupleType) {
+    result.push_back(val);
+    return;
+  }
+  if (!fn.hasOwnership()) {
+    for (auto i : range(tupleType->getNumElements()))
+      result.push_back(builder.createTupleExtract(loc, val, i));
+    return;
+  }
+  if (tupleType->getNumElements() == 0)
+    return;
+  builder.emitDestructureValueOperation(loc, val, result);
+}
+
 /// Emit the following branch SIL instruction:
 /// \verbatim
 /// if #available(OSVersion) {
@@ -52,100 +73,91 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
 }
 
 /// Emits a function or method application, forwarding parameters.
-SILValue emitBackDeployForwardApply(SILGenFunction &SGF,
-                                    AbstractFunctionDecl *AFD, SILLocation loc,
-                                    SILDeclRef function,
-                                    SmallVector<SILValue, 8> &params,
-                                    SILBasicBlock *rethrowBB) {
+static void emitBackDeployForwardApplyAndReturnOrThrow(
+    SILGenFunction &SGF, AbstractFunctionDecl *AFD, SILLocation loc,
+    SILDeclRef function, SmallVector<SILValue, 8> &params) {
+  // Only statically dispatched class methods are supported.
+  if (auto classDecl = dyn_cast<ClassDecl>(AFD->getDeclContext())) {
+    assert(classDecl->isFinal() || AFD->isFinal() ||
+           AFD->hasForcedStaticDispatch());
+  }
+
   TypeExpansionContext TEC = SGF.getTypeExpansionContext();
   auto fnType = SGF.SGM.Types.getConstantOverrideType(TEC, function);
   auto silFnType =
       SILType::getPrimitiveObjectType(fnType).castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGF.SGM.M);
 
-  if (silFnType->hasErrorResult())
-    assert(rethrowBB && "must provide rethrow basic block");
-
-  bool isClassMethod = false;
-  if (auto classDecl = dyn_cast<ClassDecl>(AFD->getDeclContext())) {
-    if (!classDecl->isFinal() && !AFD->isFinal() &&
-        !AFD->hasForcedStaticDispatch())
-      isClassMethod = true;
-  }
-
-  SILBasicBlock *normalBB = SGF.createBasicBlock();
-  SILBasicBlock *errorBB = rethrowBB ? SGF.createBasicBlock() : nullptr;
-
-  SILValue functionRef;
-  if (isClassMethod) {
-    auto selfValue = ManagedValue::forUnmanaged(SGF.F.getSelfArgument());
-    functionRef =
-        SGF.emitClassMethodRef(loc, selfValue.getValue(), function, fnType);
-  } else {
-    functionRef = SGF.emitGlobalFunctionRef(loc, function);
-  }
+  SILValue functionRef = SGF.emitGlobalFunctionRef(loc, function);
   auto subs = SGF.F.getForwardingSubstitutionMap();
+  SmallVector<SILValue, 4> directResults;
 
-  if (errorBB) {
+  if (silFnType->hasErrorResult()) {
+    // Apply a throwing function and forward the results and the error to the
+    // return/throw blocks via intermediate basic blocks. The intermediates
+    // are needed to avoid forming critical edges.
+    SILBasicBlock *normalBB = SGF.createBasicBlock();
+    SILBasicBlock *errorBB = SGF.createBasicBlock();
+
     SGF.B.createTryApply(loc, functionRef, subs, params, normalBB, errorBB);
-  } else {
-    auto result = SGF.B.createApply(loc, functionRef, subs, params);
-    SGF.B.createBranch(loc, normalBB, {result});
-  }
 
-  if (errorBB) {
+    // Emit error block.
     SGF.B.emitBlock(errorBB);
     SILValue error = errorBB->createPhiArgument(fnConv.getSILErrorType(TEC),
                                                 OwnershipKind::Owned);
-    SGF.B.createBranch(loc, rethrowBB, {error});
-  }
+    SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
 
-  SGF.B.emitBlock(normalBB);
-  return normalBB->createPhiArgument(fnConv.getSILResultType(TEC),
-                                     OwnershipKind::Owned);
+    // Emit normal block.
+    SGF.B.emitBlock(normalBB);
+    SILValue result = normalBB->createPhiArgument(fnConv.getSILResultType(TEC),
+                                                  OwnershipKind::Owned);
+    SmallVector<SILValue, 4> directResults;
+    extractAllElements(result, loc, SGF.B, directResults);
+
+    SGF.B.createBranch(loc, SGF.ReturnDest.getBlock(), directResults);
+  } else {
+    // Apply a non-throwing function and forward its results straight to the
+    // return block.
+    auto *apply = SGF.B.createApply(loc, functionRef, subs, params);
+    extractAllElements(apply, loc, SGF.B, directResults);
+
+    SGF.B.createBranch(loc, SGF.ReturnDest.getBlock(), directResults);
+  }
 }
 
-void SILGenFunction::emitBackDeployedThunk(SILDeclRef thunk) {
+void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
   // Generate code equivalent to:
   //
   //  func X_thunk(...) async throws -> ... {
   //    if #available(...) {
   //      return try await X(...)
   //    } else {
-  //      return try await X_clientCopy(...)
+  //      return try await X_fallback(...)
   //    }
   //  }
 
-  assert(thunk.isBackDeployed);
-
-  // Get a reference to the original declaration. We'll call the original
-  // declaration at runtime if it is available.
-  SILDeclRef original = thunk.asBackDeployed(false);
-  auto AFD = cast<AbstractFunctionDecl>(thunk.getDecl());
-
-  // Use the same generic environment as the original entry point.
-  F.setGenericEnvironment(SGM.Types.getConstantGenericEnvironment(original));
+  assert(thunk.isBackDeploymentThunk());
 
   auto loc = thunk.getAsRegularLocation();
   loc.markAutoGenerated();
   Scope scope(Cleanups, CleanupLocation(loc));
+  auto FD = cast<FuncDecl>(thunk.getDecl());
 
-  auto methodTy =
-      SGM.Types.getConstantOverrideType(getTypeExpansionContext(), thunk);
-  auto derivativeFnSILTy = SILType::getPrimitiveObjectType(methodTy);
-  auto silFnType = derivativeFnSILTy.castTo<SILFunctionType>();
-  SILFunctionConventions fnConv(silFnType, SGM.M);
-  auto resultType = fnConv.getSILResultType(getTypeExpansionContext());
+  F.setGenericEnvironment(SGM.Types.getConstantGenericEnvironment(thunk));
 
-  // Gather params for forwarding.
+  emitBasicProlog(FD->getParameters(), FD->getImplicitSelfDecl(),
+                  FD->getResultInterfaceType(), FD, FD->hasThrows(),
+                  FD->getThrowsLoc());
+  prepareEpilog(FD->getResultInterfaceType(), FD->hasThrows(),
+                CleanupLocation(FD));
+
+  // Gather the entry block's arguments up so that we can forward them.
   SmallVector<SILValue, 8> paramsForForwarding;
-  bindParametersForForwarding(AFD->getParameters(), paramsForForwarding);
-  if (auto *selfDecl = AFD->getImplicitSelfDecl())
-    bindParameterForForwarding(selfDecl, paramsForForwarding);
-
-  auto rethrowBB =
-      silFnType->hasErrorResult() ? createBasicBlock("rethrowBB") : nullptr;
-  auto returnBB = createBasicBlock("returnBB");
+  SILBasicBlock *entryBlock = getFunction().getEntryBlock();
+  for (SILArgument *arg :
+       make_range(entryBlock->args_begin(), entryBlock->args_end())) {
+    paramsForForwarding.emplace_back(arg);
+  }
 
   SILBasicBlock *availableBB = createBasicBlock("availableBB");
   SILBasicBlock *unavailableBB = createBasicBlock("unavailableBB");
@@ -155,44 +167,28 @@ void SILGenFunction::emitBackDeployedThunk(SILDeclRef thunk) {
   //  } else {
   //    <unavailableBB>
   //  }
-  emitBackDeployIfAvailableCondition(*this, AFD, loc, availableBB,
+  emitBackDeployIfAvailableCondition(*this, FD, loc, availableBB,
                                      unavailableBB);
 
   // <availableBB>:
   //   return (try)? (await)? (self.)?X(...)
   {
     B.emitBlock(availableBB);
-    SILValue result = emitBackDeployForwardApply(
-        *this, AFD, loc, original, paramsForForwarding, rethrowBB);
-    B.createBranch(loc, returnBB, {result});
+    SILDeclRef original =
+        thunk.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::None);
+    emitBackDeployForwardApplyAndReturnOrThrow(*this, FD, loc, original,
+                                               paramsForForwarding);
   }
 
   // <unavailableBB>:
-  //   return (try)? (await)? (self.)?X_clientCopy(...)
+  //   return (try)? (await)? (self.)?X_fallback(...)
   {
     B.emitBlock(unavailableBB);
-    // FIXME(backDeploy): Emit a forward apply of client copy of function
-    ManagedValue undef = emitUndef(resultType);
-    B.createBranch(loc, returnBB, {undef});
+    SILDeclRef fallback =
+        thunk.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Fallback);
+    emitBackDeployForwardApplyAndReturnOrThrow(*this, FD, loc, fallback,
+                                               paramsForForwarding);
   }
 
-  // Emit return logic.
-  {
-    B.emitBlock(returnBB);
-    SILValue result =
-        returnBB->createPhiArgument(resultType, OwnershipKind::Owned);
-
-    B.createReturn(loc, result);
-  }
-
-  // Emit the rethrow logic.
-  if (rethrowBB) {
-    B.emitBlock(rethrowBB);
-    SILValue error = rethrowBB->createPhiArgument(
-        fnConv.getSILErrorType(getTypeExpansionContext()),
-        OwnershipKind::Owned);
-
-    Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
-    B.createThrow(loc, error);
-  }
+  emitEpilog(FD);
 }

@@ -2038,10 +2038,9 @@ public:
   // Back Deployment thunks
   //===--------------------------------------------------------------------===//
 
-  /// Invokes the original, back deployed declaration if it is available at
-  /// runtime. Otherwise, invoke a copy of the original function emitted
-  /// locally.
-  void emitBackDeployedThunk(SILDeclRef thunk);
+  /// Invokes an original function if it is available at runtime. Otherwise,
+  /// invokes a fallback copy of the function emitted into the client.
+  void emitBackDeploymentThunk(SILDeclRef thunk);
 
   //===---------------------------------------------------------------------===//
   // Distributed Actors

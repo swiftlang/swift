@@ -1124,10 +1124,12 @@ public:
     auto constant = SILDeclRef(e->getDecl());
     if (callSite && callSite->shouldApplyDistributedThunk()) {
       constant = constant.asDistributed(true);
-    } else if (e->getDecl()->getAttrs().hasAttribute<BackDeployAttr>()) {
-      // If we're calling a back deployed function we need to call through
-      // a thunk instead that handles availability.
-      constant = constant.asBackDeployed(true);
+    } else if (afd->isBackDeployed()) {
+      // If we're calling a back deployed function then we need to call a
+      // thunk instead that will handle the fallback when the original
+      // function is unavailable at runtime.
+      constant =
+          constant.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
     } else {
       constant = constant.asForeign(
                    !isConstructorWithGeneratedAllocatorThunk(e->getDecl())
@@ -5147,7 +5149,8 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   if (call->isDistributed()) {
     callRef = callRef.asDistributed(true);
   } else if (call->isBackDeployed()) {
-    callRef = callRef.asBackDeployed(true);
+    callRef =
+        callRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
   }
 
   auto declRefConstant = getConstantInfo(getTypeExpansionContext(), callRef);

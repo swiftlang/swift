@@ -1519,7 +1519,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
     Result = SILDeclRef(VD, Kind, IsObjC, /*distributed=*/false,
-                        /*backDeployed=*/false, DerivativeId);
+                        SILDeclRef::BackDeploymentKind::None, DerivativeId);
     return false;
   }
 
@@ -1640,7 +1640,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
 
   // Construct SILDeclRef.
   Result = SILDeclRef(VD, Kind, IsObjC, /*distributed=*/false,
-                      /*backDeployed=*/false, DerivativeId);
+                      SILDeclRef::BackDeploymentKind::None, DerivativeId);
   return false;
 }
 

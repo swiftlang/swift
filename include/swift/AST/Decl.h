@@ -6268,7 +6268,7 @@ public:
   /// Returns 'true' if the function is distributed.
   bool isDistributed() const;
 
-  /// Returns 'true' if the function can be back deployed.
+  /// Returns 'true' if the function has the @c @_backDeploy attribute.
   bool isBackDeployed() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;

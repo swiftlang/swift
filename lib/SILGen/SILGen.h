@@ -337,9 +337,9 @@ public:
   void emitDistributedThunk(SILDeclRef thunk);
 
   /// Emits a thunk that calls either the original function if it is available
-  /// or otherwise calls a copy of the function that was emitted into the
-  /// calling module.
-  void emitBackDeployedThunk(SILDeclRef thunk);
+  /// or otherwise calls a fallback variant of the function that was emitted
+  /// into the client module.
+  void emitBackDeploymentThunk(SILDeclRef thunk);
 
   void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
