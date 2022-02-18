@@ -4221,9 +4221,6 @@ void ClangImporter::Implementation::diagnoseTargetDirectly(
   } else if (const clang::MacroInfo *macro =
                  target.dyn_cast<const clang::MacroInfo *>()) {
     Walker.VisitMacro(macro);
-  } else if (const clang::ModuleMacro *macro =
-                 target.dyn_cast<const clang::ModuleMacro *>()) {
-    Walker.VisitMacro(macro->getMacroInfo());
   }
 }
 
@@ -4237,7 +4234,7 @@ ClangImporter::Implementation::importDiagnosticTargetFromLookupTableEntry(
     return macro;
   } else if (const clang::ModuleMacro *macro =
                  entry.dyn_cast<clang::ModuleMacro *>()) {
-    return macro;
+    return macro->getMacroInfo();
   }
   llvm_unreachable("SwiftLookupTable::Single entry must be a NamedDecl, "
                    "MacroInfo or ModuleMacro pointer");
