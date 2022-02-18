@@ -1418,6 +1418,23 @@ void Serializer::writeAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes,
   }
 }
 
+void Serializer::writeRequirementSignature(
+    const RequirementSignature &requirementSig,
+    const std::array<unsigned, 256> &abbrCodes) {
+  writeGenericRequirements(requirementSig.getRequirements(), abbrCodes);
+
+  using namespace decls_block;
+
+  auto protocolTypeAliasAbbrCode = abbrCodes[ProtocolTypeAliasLayout::Code];
+
+  for (const auto &typeAlias : requirementSig.getTypeAliases()) {
+    ProtocolTypeAliasLayout::emitRecord(
+        Out, ScratchRecord, protocolTypeAliasAbbrCode,
+        addDeclBaseNameRef(typeAlias.getName()),
+        addTypeRef(typeAlias.getUnderlyingType()));
+  }
+}
+
 void Serializer::writeASTBlockEntity(GenericSignature sig) {
   using namespace decls_block;
 
@@ -2504,7 +2521,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto *theAttr = cast<NonSendableAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonSendableDeclAttrLayout::Code];
       NonSendableDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                        (unsigned)theAttr->getKind());
+                                            (unsigned)theAttr->Specificity);
       return;
     }
 
@@ -3633,13 +3650,19 @@ public:
         dependencyTypes.insert(elementType);
     }
 
-    for (Requirement req : proto->getRequirementSignature()) {
+    auto requirementSig = proto->getRequirementSignature();
+    for (Requirement req : requirementSig.getRequirements()) {
       // Requirements can be cyclic, so for now filter out any requirements
       // from elsewhere in the module. This isn't perfect---something else in
       // the module could very well fail to compile for its own reasons---but
       // it's better than nothing.
       collectDependenciesFromRequirement(dependencyTypes, req,
                                          /*excluding*/S.M);
+    }
+    for (ProtocolTypeAlias typeAlias : requirementSig.getTypeAliases()) {
+      collectDependenciesFromType(dependencyTypes,
+                                  typeAlias.getUnderlyingType(),
+                                  /*excluding*/S.M);
     }
 
     for (Type ty : dependencyTypes)
@@ -3660,7 +3683,7 @@ public:
                                inheritedAndDependencyTypes);
 
     writeGenericParams(proto->getGenericParams());
-    S.writeGenericRequirements(
+    S.writeRequirementSignature(
       proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
     S.writeAssociatedTypes(
       proto->getAssociatedTypeMembers(), S.DeclTypeAbbrCodes);
@@ -4958,6 +4981,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<OpaqueTypeLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
+  registerDeclTypeAbbr<ProtocolTypeAliasLayout>();
   registerDeclTypeAbbr<AssociatedTypeLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
   registerDeclTypeAbbr<PrefixOperatorLayout>();

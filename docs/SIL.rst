@@ -2364,6 +2364,69 @@ The current list of interior pointer SIL instructions are:
 (*) We still need to finish adding support for project_box, but all other
 interior pointers are guarded already.
 
+Variable Lifetimes
+~~~~~~~~~~~~~~~~~~
+
+In order for programmer intended lifetimes to be maintained under optimization,
+the lifetimes of SIL values which correspond to named source-level values can
+only be modified in limited ways.  Generally, the behavior is that the lifetime
+of a named source-level value cannot _observably_ end before the end of the
+lexical scope in which that value is defined.  Specifically, code motion may
+not move the ends of these lifetimes across a **deinit barrier**.
+
+A few sorts of SIL value have lifetimes that are constrained that way:
+
+1: `begin_borrow [lexical]`
+2: `move_value [lexical]`
+3: @owned function arguments
+4: `alloc_stack [lexical]`
+
+That these three have constrained lifetimes is encoded in ValueBase::isLexical,
+which should be checked before changing the lifetime of a value.
+
+The reason that only @owned function arguments are constrained is that a
+@guaranteed function argument is guaranteed by the function's caller to live for
+the full duration of the function already.  Optimization of the function alone
+can't shorten it.  When such a function is inlined into its caller, though, a
+lexical borrow scope is added for each of its @guaranteed arguments, ensuring
+that the lifetime of the corresponding source-level value is not shortened in a
+way that doesn't respect deinit barriers.
+
+Unlike the other sorts, `alloc_stack [lexical]` isn't a SILValue.  Instead, it
+constrains the lifetime of an addressable variable.  Since the constraint is
+applied to the in-memory representation, no additional lexical SILValue is
+required.
+
+Deinit Barriers
+```````````````
+
+Deinit barriers (see swift::isDeinitBarrier) are instructions which would be
+affected by the side effects of deinitializers.  To maintain the order of
+effects that is visible to the programmer, destroys of lexical values cannot be
+reordered with respect to them.  There are three kinds:
+
+1. synchronization points (locks, memory barriers, syscalls, etc.)
+2. loads of weak or unowned values
+3. accesses of pointers
+
+Examples:
+
+1. Given an instance of a class which owns a file handle and closes the file
+   handle on deinit, writing to the file handle and then deallocating the
+   instance would result in changes being written.  If the destroy of the
+   instance were hoisted above the call to write to the file handle, an error
+   would be raised instead.
+2. Given an instance `c` of a class `C` which weakly references an instance `d`
+   of a second class `D`, if `d` is referenced via a local variable `v`, then
+   loading that weak reference from `c` within the variable scope should return
+   a non-nil reference to `d`.  Hoisting the destroy of `v` above the weak load
+   from `c`, however, would result in the destruction of `d` before that load
+   and a nil weak reference to `D`.
+3. Given an instance of a class which owns a buffer and deallocates it on
+   deinitialization, accessing the pointer and then deallocating the instance
+   is defined behavior.  Hoisting the destroy of the instance above the access
+   to the memory would result in accessing a freed pointer.
+
 Memory Lifetime
 ~~~~~~~~~~~~~~~
 
@@ -3115,7 +3178,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? '[lexical]'? sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? '[lexical]'? '[moved]'? sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1 has type $*T
@@ -3140,6 +3203,12 @@ This is the case, e.g. for conditionally initialized objects.
 
 The optional ``lexical`` attribute specifies that the storage corresponds to a
 local variable in the Swift source.
+
+The optional ``moved`` attribute specifies that at the source level, the
+variable associated with this alloc_stack was moved and furthermore that at the
+SIL level it passed move operator checking. This means that one can not assume
+that the value in the alloc_stack can be semantically valid over the entire
+function frame when emitting debug info.
 
 The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.
@@ -3485,7 +3554,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value '[poison]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
+  sil-instruction ::= debug_value '[poison]'? '[moved]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
 
   debug_value %1 : $Int
 
@@ -3493,6 +3562,11 @@ This indicates that the value of a declaration has changed value to the
 specified operand.  The declaration in question is identified by either the
 SILLocation attached to the debug_value instruction or the SILLocation specified
 in the advanced debug variable attributes.
+
+If the '[moved]' flag is set, then one knows that the debug_value's operand is
+moved at some point of the program, so one can not model the debug_value using
+constructs that assume that the value is live for the entire function (e.x.:
+llvm.dbg.declare).
 
 ::
 

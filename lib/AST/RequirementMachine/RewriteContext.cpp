@@ -40,6 +40,8 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("minimal-conformances", DebugFlags::MinimalConformances)
       .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
       .Case("minimization", DebugFlags::Minimization)
+      .Case("redundant-rules", DebugFlags::RedundantRules)
+      .Case("redundant-rules-detail", DebugFlags::RedundantRulesDetail)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "

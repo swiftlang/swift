@@ -476,7 +476,7 @@ public:
 /// be folded into RequirementSignatureRequest.
 class RequirementSignatureRequestRQM :
     public SimpleRequest<RequirementSignatureRequestRQM,
-                         ArrayRef<Requirement>(ProtocolDecl *),
+                         RequirementSignature(ProtocolDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -485,7 +485,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<Requirement>
+  RequirementSignature
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
@@ -495,7 +495,7 @@ public:
 /// Compute the requirements that describe a protocol.
 class RequirementSignatureRequest :
     public SimpleRequest<RequirementSignatureRequest,
-                         ArrayRef<Requirement>(ProtocolDecl *),
+                         RequirementSignature(ProtocolDecl *),
                          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -504,14 +504,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<Requirement>
+  RequirementSignature
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<ArrayRef<Requirement>> getCachedResult() const;
-  void cacheResult(ArrayRef<Requirement> value) const;
+  Optional<RequirementSignature> getCachedResult() const;
+  void cacheResult(RequirementSignature value) const;
 };
 
 /// Compute the default definition type of an associated type.
@@ -874,6 +874,7 @@ private:
 public:
   // Caching.
   bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
 /// Request the fragile function kind for the context.
@@ -1055,6 +1056,96 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Obtain the 'recordArgument' function of a 'DistributedTargetInvocationEncoder'.
+class GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'recordReturnType' function of a 'DistributedTargetInvocationEncoder'.
+class GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'recordErrorType' function of a 'DistributedTargetInvocationEncoder'.
+class GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'decodeNextArgument' function of a 'DistributedTargetInvocationDecoder'.
+class GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the 'onReturn' function of a 'DistributedTargetInvocationResultHandler'.
+class GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest :
+    public SimpleRequest<GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest,
+                         AbstractFunctionDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *encoder) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
 /// Obtain the 'actorSystem' property of a 'distributed actor'.
 class GetDistributedActorSystemPropertyRequest :
     public SimpleRequest<GetDistributedActorSystemPropertyRequest,
@@ -1067,6 +1158,25 @@ private:
   friend SimpleRequest;
 
   VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Obtain the constructor of the RemoteCallTarget type.
+class GetDistributedRemoteCallTargetInitFunctionRequest :
+    public SimpleRequest<GetDistributedRemoteCallTargetInitFunctionRequest,
+                         ConstructorDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ConstructorDecl *evaluate(Evaluator &evaluator,
+                            NominalTypeDecl *nominal) const;
 
 public:
     // Caching

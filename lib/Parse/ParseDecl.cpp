@@ -2927,7 +2927,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     StringRef AttrName = "@_backDeploy";
     ParserStatus Status = parseList(tok::r_paren, LeftLoc, RightLoc, false,
                                     diag::attr_back_deploy_missing_rparen,
-                                    SyntaxKind::Unknown, [&]() -> ParserStatus {
+                                    SyntaxKind::AvailabilitySpecList,
+                                    [&]() -> ParserStatus {
       ParserStatus ListItemStatus =
           parsePlatformVersionInList(AttrName, PlatformAndVersions);
       if (ListItemStatus.isErrorOrHasCompletion())

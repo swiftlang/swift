@@ -110,9 +110,12 @@ public:
   virtual void anchor();
 };
 
+// ⚠️ DANGER ⚠️
+// Putting more than four types in this `PointerUnion` will break the build for
+// 32-bit hosts. If we need five or more types in the future, we'll need to
+// design a proper larger-than-word-sized type.
 typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
-                           const clang::ModuleMacro *, const clang::Type *,
-                           const clang::Token *>
+                           const clang::Type *, const clang::Token *>
     ImportDiagnosticTarget;
 
 /// Class that imports Clang modules into Swift, mapping directly

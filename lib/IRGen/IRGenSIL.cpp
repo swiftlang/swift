@@ -1057,7 +1057,8 @@ public:
                                     SILType SILTy, const SILDebugScope *DS,
                                     SILLocation VarLoc,
                                     SILDebugVariable VarInfo,
-                                    IndirectionKind Indirection) {
+                                    IndirectionKind Indirection,
+                                    AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
     // TODO: fix demangling for C++ types (SR-13223).
     if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
@@ -1072,10 +1073,12 @@ public:
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarLoc,
-                                             VarInfo, Indirection);
+                                             VarInfo, Indirection, ArtificialKind::RealValue,
+                                             DbgInstrKind);
     } else
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarLoc,
-                                             VarInfo, Indirection);
+                                             VarInfo, Indirection, ArtificialKind::RealValue,
+                                             DbgInstrKind);
   }
 
   void emitFailBB() {
@@ -1956,7 +1959,8 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     emitAsyncFunctionEntry(IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
                            LinkEntity::forSILFunction(IGF.CurSILFn),
                            Signature::forAsyncEntry(
-                               IGF.IGM, funcTy, /*useSpecialConvention*/ false)
+                               IGF.IGM, funcTy,
+                               FunctionPointerKind::defaultAsync())
                                .getAsyncContextIndex());
     if (IGF.CurSILFn->isDynamicallyReplaceable()) {
       IGF.IGM.createReplaceableProlog(IGF, IGF.CurSILFn);
@@ -2590,19 +2594,30 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
 
   auto fpKind = irgen::classifyFunctionPointerKind(fn);
 
-  auto sig = IGM.getSignature(fnType, fpKind.useSpecialConvention());
+  auto sig = IGM.getSignature(fnType, fpKind);
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
+  // FIXME: should we also be using this for dynamic async functions?
+  // We seem to completely ignore this in the standard async FP path below.
   auto *fnPtr = IGM.getAddrOfSILFunction(
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
+
+  // For ordinary async functions, produce both the async FP and the
+  // direct address of the function.  In the common case where we
+  // directly call the function, we'll want to call the latter rather
+  // than indirecting through the async FP.
   llvm::Constant *value;
   llvm::Constant *secondaryValue;
   if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
     secondaryValue = IGM.getAddrOfSILFunction(fn, NotForDefinition);
+
+  // For ordinary sync functions and special async functions, produce
+  // only the direct address of the function.  The runtime does not
+  // define async FP symbols for the special async functions it defines.
   } else {
     value = fnPtr;
     secondaryValue = nullptr;
@@ -3255,14 +3270,17 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
                       llArgs);
   }
 
+  auto &calleeFP = emission->getCallee().getFunctionPointer();
+
   // Pass the generic arguments.
-  auto useSpecialConvention =
-      emission->getCallee().getFunctionPointer().useSpecialConvention();
-  if (hasPolymorphicParameters(origCalleeType) && !useSpecialConvention) {
+  if (hasPolymorphicParameters(origCalleeType) &&
+      !calleeFP.shouldSuppressPolymorphicArguments()) {
     SubstitutionMap subMap = site.getSubstitutionMap();
     emitPolymorphicArguments(*this, origCalleeType,
                              subMap, &witnessMetadata, llArgs);
-  } else if (useSpecialConvention) {
+  }
+
+  if (calleeFP.shouldPassContinuationDirectly()) {
     llArgs.add(emission->getResumeFunctionPointer());
     llArgs.add(emission->getAsyncContext());
   }
@@ -4914,7 +4932,11 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }
-    return;
+
+    // If we were not moved return early. If this SILUndef was moved, then we
+    // need to let it through so we can ensure the debug info invalidated.
+    if (!i->getWasMoved())
+      return;
   }
   bool IsInCoro = InCoroContext(*CurSILFn, *i);
 
@@ -4974,7 +4996,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
-                               i->getLoc(), *VarInfo, Indirection);
+                               i->getLoc(), *VarInfo, Indirection,
+                               AddrDbgInstrKind(i->getWasMoved()));
 }
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
@@ -5410,6 +5433,14 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
+  int StackAllocSize = -1;
+  if (i->canAllocOnStack()) {
+    assert(i->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType());
+    estimateStackSize();
+    // Is there enough space for stack allocation?
+    StackAllocSize = IGM.IRGen.Opts.StackPromotionSizeLimit - EstimatedStackSize;
+  }
+
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
   buildTailArrays(*this, TailArrays, i);
 
@@ -5417,7 +5448,15 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
   auto metadataValue = metadata.claimNext();
   llvm::Value *alloced = emitClassAllocationDynamic(*this, metadataValue,
                                                     i->getType(), i->isObjC(),
+                                                    StackAllocSize,
                                                     TailArrays);
+
+  if (StackAllocSize >= 0) {
+    // Remember that this alloc_ref_dynamic allocates the object on the stack.
+    StackAllocs.insert(i);
+    EstimatedStackSize += StackAllocSize;
+  }
+
   Explosion e;
   e.add(alloced);
   setLoweredExplosion(i, e);
@@ -5461,7 +5500,7 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
   // Lower the operand.
   Explosion self = getLoweredExplosion(i->getOperand());
   auto selfValue = self.claimNext();
-  auto *ARI = dyn_cast<AllocRefInst>(i->getOperand());
+  auto *ARI = dyn_cast<AllocRefInstBase>(i->getOperand());
   if (ARI && StackAllocs.count(ARI)) {
     // We can ignore dealloc_refs for stack allocated objects.
     //

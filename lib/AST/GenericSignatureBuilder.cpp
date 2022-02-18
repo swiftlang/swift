@@ -3891,7 +3891,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     auto innerSource =
       FloatingRequirementSource::viaProtocolRequirement(source, proto,
                                                         /*inferred=*/false);
-    for (const auto &req : proto->getRequirementSignature()) {
+    for (const auto &req : proto->getRequirementSignature().getRequirements()) {
       // If we're only looking at same-type constraints, skip everything else.
       if (onlySameTypeConstraints && req.getKind() != RequirementKind::SameType)
         continue;
@@ -8587,7 +8587,7 @@ InferredGenericSignatureRequest::evaluate(
   }
 }
 
-ArrayRef<Requirement>
+RequirementSignature
 RequirementSignatureRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
   ASTContext &ctx = proto->getASTContext();
@@ -8602,12 +8602,13 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto contextData = static_cast<LazyProtocolData *>(
         ctx.getOrCreateLazyContextData(proto, nullptr));
 
-    SmallVector<Requirement, 8> requirements;
+    SmallVector<Requirement, 2> requirements;
+    SmallVector<ProtocolTypeAlias, 2> typeAliases;
     contextData->loader->loadRequirementSignature(
-        proto, contextData->requirementSignatureData, requirements);
-    if (requirements.empty())
-      return None;
-    return ctx.AllocateCopy(requirements);
+        proto, contextData->requirementSignatureData,
+        requirements, typeAliases);
+    return RequirementSignature(ctx.AllocateCopy(requirements),
+                                ctx.AllocateCopy(typeAliases));
   }
 
   auto buildViaGSB = [&]() {
@@ -8634,14 +8635,14 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto reqSignature = std::move(builder).computeGenericSignature(
                           /*allowConcreteGenericParams=*/false,
                           /*requirementSignatureSelfProto=*/proto);
-    return reqSignature.getRequirements();
+    return RequirementSignature(reqSignature.getRequirements(), None);
   };
 
   auto buildViaRQM = [&]() {
     return evaluateOrDefault(
         ctx.evaluator,
         RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(proto)},
-        ArrayRef<Requirement>());
+        RequirementSignature());
   };
 
   auto compare = [&](ArrayRef<Requirement> rqmResult,
@@ -8676,7 +8677,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
-    if (!compare(rqmResult, gsbResult)) {
+    if (!compare(rqmResult.getRequirements(), gsbResult.getRequirements())) {
       PrintOptions opts;
       opts.ProtocolQualifiedDependentMemberTypes = true;
 
@@ -8685,13 +8686,15 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
       llvm::errs() << "RequirementMachine says:      ";
       auto rqmSig = GenericSignature::get(
-          proto->getGenericSignature().getGenericParams(), rqmResult);
+          proto->getGenericSignature().getGenericParams(),
+          rqmResult.getRequirements());
       rqmSig.print(llvm::errs(), opts);
       llvm::errs() << "\n";
 
       llvm::errs() << "GenericSignatureBuilder says: ";
       auto gsbSig = GenericSignature::get(
-          proto->getGenericSignature().getGenericParams(), gsbResult);
+          proto->getGenericSignature().getGenericParams(),
+          gsbResult.getRequirements());
       gsbSig.print(llvm::errs(), opts);
       llvm::errs() << "\n";
 

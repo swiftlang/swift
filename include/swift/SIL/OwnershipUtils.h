@@ -79,8 +79,7 @@ inline bool isForwardingConsume(SILValue value) {
 }
 
 /// Find leaf "use points" of \p guaranteedValue that determine its lifetime
-/// requirement. If \p usePoints is nullptr, then the simply returns true if no
-/// PointerEscape use was found.
+/// requirement. Return true if no PointerEscape use was found.
 ///
 /// Precondition: \p guaranteedValue is not a BorrowedValue.
 ///
@@ -168,6 +167,14 @@ bool findTransitiveGuaranteedUses(SILValue guaranteedValue,
 bool findExtendedTransitiveGuaranteedUses(
   SILValue guaranteedValue,
   SmallVectorImpl<Operand *> &usePoints);
+
+/// Find non-transitive uses of a simple (i.e. without looking through
+/// reborrows) value.
+///
+/// The scope-ending use of borrows of the value are included.  If a borrow of
+/// the value is reborrowed, returns false.
+bool findUsesOfSimpleValue(SILValue value,
+                           SmallVectorImpl<Operand *> *usePoints = nullptr);
 
 /// An operand that forwards ownership to one or more results.
 class ForwardingOperand {

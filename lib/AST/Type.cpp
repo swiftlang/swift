@@ -483,7 +483,7 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
     return type;
 
   const auto sig = root->getASTContext().getOpenedArchetypeSignature(
-      root->getOpenedExistentialType());
+      root->getExistentialType());
 
   unsigned metatypeDepth = 0;
 
@@ -519,7 +519,7 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
 
       Type erasedTy;
       if (root->isEqual(archetype)) {
-        erasedTy = root->getOpenedExistentialType();
+        erasedTy = root->getExistentialType();
       } else {
         erasedTy =
             sig->getNonDependentUpperBounds(archetype->getInterfaceType());
@@ -1468,10 +1468,9 @@ CanType TypeBase::computeCanonicalType() {
     // If we haven't set a depth for this generic parameter, try to do so.
     // FIXME: This is a dreadful hack.
     if (gpDecl->getDepth() == GenericTypeParamDecl::InvalidDepth) {
-      if (auto decl =
-            gpDecl->getDeclContext()->getInnermostDeclarationDeclContext())
-        if (auto valueDecl = decl->getAsGenericContext())
-          (void)valueDecl->getGenericSignature();
+      auto *dc = gpDecl->getDeclContext();
+      auto *gpList = dc->getAsDecl()->getAsGenericContext()->getGenericParams();
+      gpList->setDepth(dc->getGenericContextDepth());
     }
 
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
@@ -3346,9 +3345,12 @@ bool ArchetypeType::isRoot() const {
 
 Type ArchetypeType::getExistentialType() const {
   // Opened types hold this directly.
-  if (auto opened = dyn_cast<OpenedArchetypeType>(this))
-    return opened->getOpenedExistentialType();
-  
+  if (auto *opened = dyn_cast<OpenedArchetypeType>(this)) {
+    if (opened->isRoot()) {
+      return getGenericEnvironment()->getOpenedExistentialType();
+    }
+  }
+
   // Otherwise, compute it from scratch.
   SmallVector<Type, 4> constraintTypes;
   
@@ -3397,10 +3399,6 @@ OpenedArchetypeType::OpenedArchetypeType(
 
 UUID OpenedArchetypeType::getOpenedExistentialID() const {
   return getGenericEnvironment()->getOpenedExistentialUUID();
-}
-
-Type OpenedArchetypeType::getOpenedExistentialType() const {
-  return getGenericEnvironment()->getOpenedExistentialType();
 }
 
 OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(

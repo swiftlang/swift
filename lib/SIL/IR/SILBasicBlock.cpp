@@ -395,6 +395,15 @@ bool SILBasicBlock::isLegalToHoistInto() const {
   return true;
 }
 
+bool SILBasicBlock::hasPhi() const {
+  if (getArguments().size() == 0)
+    return false;
+  // It is sufficient to check whether the first argument is a phi.  A block
+  // can't have both phis and terminator results.
+  auto *argument = getArguments()[0];
+  return argument->isPhi();
+}
+
 const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {
   for (auto &Inst : *this)
     if (Inst.isMetaInstruction())

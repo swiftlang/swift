@@ -275,6 +275,8 @@ public:
 
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
+  void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
+
   void visitPrimaryAssociatedTypeAttr(PrimaryAssociatedTypeAttr *attr);
 
   void checkBackDeployAttrs(Decl *D, ArrayRef<BackDeployAttr *> Attrs);
@@ -5813,6 +5815,14 @@ void AttributeChecker::visitUnavailableFromAsyncAttr(
             D->getDescriptiveKind());
       }
     }
+  }
+}
+
+void AttributeChecker::visitUnsafeInheritExecutorAttr(
+    UnsafeInheritExecutorAttr *attr) {
+  auto fn = cast<FuncDecl>(D);
+  if (!fn->isAsyncContext()) {
+    diagnose(attr->getLocation(), diag::inherits_executor_without_async);
   }
 }
 

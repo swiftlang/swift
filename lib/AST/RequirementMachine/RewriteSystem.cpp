@@ -120,6 +120,48 @@ bool Rule::isProtocolRefinementRule() const {
   return false;
 }
 
+/// A protocol typealias rule takes one of the following two forms,
+/// where T is a name symbol:
+///
+/// 1) [P].T => X
+/// 2) [P].T.[concrete: C] => [P].T
+///
+/// The first case is where the protocol's underlying type is another
+/// type parameter. The second case is where the protocol's underlying
+/// type is a concrete type.
+///
+/// In the first case, X must be fully resolved, that is, it must not
+/// contain any name symbols.
+///
+/// If this rule is a protocol typealias rule, returns its name. Otherwise
+/// returns None.
+Optional<Identifier> Rule::isProtocolTypeAliasRule() const {
+  if (LHS.size() != 2 && LHS.size() != 3)
+    return None;
+
+  if (LHS[0].getKind() != Symbol::Kind::Protocol ||
+      LHS[1].getKind() != Symbol::Kind::Name)
+    return None;
+
+  if (LHS.size() == 2) {
+    // This is the case where the underlying type is a type parameter.
+    //
+    // We shouldn't have unresolved symbols on the right hand side;
+    // they should have been simplified away.
+    if (RHS.containsUnresolvedSymbols())
+      return None;
+  } else {
+    // This is the case where the underlying type is concrete.
+    assert(LHS.size() == 3);
+
+    auto prop = isPropertyRule();
+    if (!prop || prop->getKind() != Symbol::Kind::ConcreteType)
+      return None;
+  }
+
+  return LHS[1].getName();
+}
+
 /// Returns the length of the left hand side.
 unsigned Rule::getDepth() const {
   auto result = LHS.size();
@@ -289,81 +331,6 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
   }
 
   return changed;
-}
-
-/// Simplify terms appearing in the substitutions of the last symbol of \p term,
-/// which must be a superclass or concrete type symbol.
-bool RewriteSystem::simplifySubstitutions(Symbol &symbol,
-                                          RewritePath *path) const {
-  assert(symbol.hasSubstitutions());
-
-  // Fast path if the type is fully concrete.
-  auto substitutions = symbol.getSubstitutions();
-  if (substitutions.empty())
-    return false;
-
-  // Save the original rewrite path length so that we can reset if if we don't
-  // find anything to simplify.
-  unsigned oldSize = (path ? path->size() : 0);
-
-  if (path) {
-    // The term is at the top of the primary stack. Push all substitutions onto
-    // the primary stack.
-    path->add(RewriteStep::forDecompose(substitutions.size(),
-                                        /*inverse=*/false));
-
-    // Move all substitutions but the first one to the secondary stack.
-    for (unsigned i = 1; i < substitutions.size(); ++i)
-      path->add(RewriteStep::forShift(/*inverse=*/false));
-  }
-
-  // Simplify and collect substitutions.
-  SmallVector<Term, 2> newSubstitutions;
-  newSubstitutions.reserve(substitutions.size());
-
-  bool first = true;
-  bool anyChanged = false;
-  for (auto substitution : substitutions) {
-    // Move the next substitution from the secondary stack to the primary stack.
-    if (!first && path)
-      path->add(RewriteStep::forShift(/*inverse=*/true));
-    first = false;
-
-    // The current substitution is at the top of the primary stack; simplify it.
-    MutableTerm mutTerm(substitution);
-    anyChanged |= simplify(mutTerm, path);
-
-    // Record the new substitution.
-    newSubstitutions.push_back(Term::get(mutTerm, Context));
-  }
-
-  // All simplified substitutions are now on the primary stack. Collect them to
-  // produce the new term.
-  if (path) {
-    path->add(RewriteStep::forDecompose(substitutions.size(),
-                                        /*inverse=*/true));
-  }
-
-  // If nothing changed, we don't have to rebuild the symbol.
-  if (!anyChanged) {
-    if (path) {
-      // The rewrite path should consist of a Decompose, followed by a number
-      // of Shifts, followed by a Compose.
-  #ifndef NDEBUG
-      for (auto iter = path->begin() + oldSize; iter < path->end(); ++iter) {
-        assert(iter->Kind == RewriteStep::Shift ||
-               iter->Kind == RewriteStep::Decompose);
-      }
-  #endif
-
-      path->resize(oldSize);
-    }
-    return false;
-  }
-
-  // Build the new symbol with simplified substitutions.
-  symbol = symbol.withConcreteSubstitutions(newSubstitutions, Context);
-  return true;
 }
 
 /// Adds a rewrite rule, returning true if the new rule was non-trivial.
@@ -601,43 +568,6 @@ void RewriteSystem::simplifyRightHandSides() {
   }
 }
 
-/// Simplify substitution terms in superclass, concrete type and concrete
-/// conformance symbols.
-void RewriteSystem::simplifyLeftHandSideSubstitutions() {
-  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
-    auto &rule = getRule(ruleID);
-    if (rule.isSubstitutionSimplified())
-      continue;
-
-    auto lhs = rule.getLHS();
-    auto symbol = lhs.back();
-    if (!symbol.hasSubstitutions())
-      continue;
-
-    RewritePath path;
-
-    // (1) First, apply the original rule to produce the original lhs.
-    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
-                                         ruleID, /*inverse=*/true));
-
-    // (2) Now, simplify the substitutions to get the new lhs.
-    if (!simplifySubstitutions(symbol, &path))
-      continue;
-
-    // We're either going to add a new rule or record an identity, so
-    // mark the old rule as simplified.
-    rule.markSubstitutionSimplified();
-
-    MutableTerm newLHS(lhs.begin(), lhs.end() - 1);
-    newLHS.add(symbol);
-
-    // Invert the path to get a path from the new lhs to the old rhs.
-    path.invert();
-
-    addRule(newLHS, MutableTerm(rule.getRHS()), &path);
-  }
-}
-
 /// When minimizing a generic signature, we only care about loops where the
 /// basepoint is a generic parameter symbol.
 ///
@@ -712,10 +642,14 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
     for (unsigned index : indices(rhs)) {
       auto symbol = rhs[index];
 
-      // Permanent rules contain name symbols at the end, like
-      // [P].T => [P:T].
-      if (!rule.isRHSSimplified() &&
-          (!rule.isPermanent() || index == rhs.size() - 1)) {
+      // RHS-simplified rules might have unresolved name symbols on the
+      // right hand side. Also, completion can introduce rules of the
+      // form T.X.[concrete: C] => T.X, where T is some resolved term,
+      // and X is a name symbol for a protocol typealias.
+      if (!rule.isLHSSimplified() &&
+          !rule.isRHSSimplified() &&
+          !(rule.isPropertyRule() &&
+            index == rhs.size() - 1)) {
         // This is only true if the input requirements were valid.
         if (policy == DisallowInvalidRequirements) {
           ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);

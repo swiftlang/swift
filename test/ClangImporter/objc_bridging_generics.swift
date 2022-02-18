@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -verify -swift-version 4 -I %S/Inputs/custom-modules %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -enable-explicit-existential-types -verify -swift-version 4 -I %S/Inputs/custom-modules %s
 
 // REQUIRES: objc_interop
 

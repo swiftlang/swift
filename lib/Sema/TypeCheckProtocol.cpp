@@ -4863,7 +4863,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
       { proto->getSelfInterfaceType() },
-      proto->getRequirementSignature(),
+      proto->getRequirementSignature().getRequirements(),
       QuerySubstitutionMap{substitutions});
 
   switch (result) {
@@ -4893,7 +4893,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   if (where.isImplicit())
     return;
 
-  for (auto req : proto->getRequirementSignature()) {
+  for (auto req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() == RequirementKind::Conformance) {
       auto depTy = req.getFirstType();
       auto *proto = req.getProtocolDecl();
@@ -5098,8 +5098,15 @@ void ConformanceChecker::resolveValueWitnesses() {
     }
   }
 
-  // Finally, check some ad-hoc protocol requirements
-  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem)) {
+  // Finally, check some ad-hoc protocol requirements.
+  //
+  // These protocol requirements are not expressible in Swift today, but as
+  // the type system gains the required abilities, we should strive to move
+  // them to plain-old protocol requirements.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::DistributedActorSystem) ||
+      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder) ||
+      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder) ||
+      Proto->isSpecificProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler)) {
     checkDistributedActorSystemAdHocProtocolRequirements(
         Context, Proto, Conformance, Adoptee, /*diagnose=*/true);
   }
@@ -6862,7 +6869,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
   // Find defaults for any associated conformances rooted on defaulted
   // associated types.
-  for (const auto &req : proto->getRequirementSignature()) {
+  for (const auto &req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
     if (req.getFirstType()->isEqual(proto->getSelfInterfaceType()))

@@ -140,7 +140,7 @@ public:
 };
 
 /// Fold within the specified context.
-bool run(Context &);
+MoveValueInst *run(Context &);
 
 /// The consuming use pattern we are trying to match and transform.
 struct Match final {
@@ -290,7 +290,7 @@ struct BorroweeUsage final {
 /// %lifetime.  In detail, PrunedLiveness::isWithinBoundary relies on
 /// clients to know that instructions are after the start of liveness.  We
 /// determine this via the dominance tree.
-bool findBorroweeUsage(Context &, BorroweeUsage &);
+bool findBorroweeUsage(Context const &, BorroweeUsage &);
 
 /// Sift scope ends of %lifetime for those that CAN be folded.
 class FilterCandidates final {
@@ -307,9 +307,6 @@ public:
         borroweeUsage(borroweeUsage){};
 
   /// Determines whether each candidate is viable for folding.
-  ///
-  /// Requiring findUsers to have been called, this uses the more expensive
-  /// isViableMatch.
   ///
   /// returns true if any candidates were viable
   ///         false otherwise
@@ -334,8 +331,7 @@ private:
 ///
 /// If there are, we can't fold the apply.  Specifically, we can't introduce
 /// a move_value [lexical] %borrowee because that value still needs to be used
-/// in those locations.  While updateSSA would happily rewrite those uses to
-/// be uses of the move, that is not a semantically valid transformation.
+/// in those locations.
 ///
 /// For example, given the following SIL
 ///     %borrowee : @owned
@@ -362,6 +358,11 @@ class Rewriter final {
   Context &context;
   Candidates const &candidates;
 
+  // The move_value [lexical] instruction that was added during the run.
+  //
+  // Defined during createMove.
+  MoveValueInst *mvi = nullptr;
+
 public:
   Rewriter(Context &context, Candidates const &candidates)
       : context(context), candidates(candidates){};
@@ -383,7 +384,7 @@ public:
   ///       ...
   /// - update SSA now that a second def has been introduced for
   ///   %borrowee
-  void run();
+  MoveValueInst *run();
 
 private:
   /// Add the new move_value [lexical] above the begin_borrow [lexical].
@@ -410,16 +411,7 @@ private:
   ///     possible)
   /// (2) hoist the end_borrow
   /// (3) delete the destroy_value
-  void fold(Match, SmallVectorImpl<int> const &rewritableArgumentIndices);
-
-  // Update SSA to reflect that fact that %move and %borrowee are two
-  // defs for the "same value".
-  void updateSSA();
-
-  // The move_value [lexical] instruction that was added during the run.
-  //
-  // Defined during createMove.
-  MoveValueInst *mvi = nullptr;
+  void fold(Match, ArrayRef<int> rewritableArgumentIndices);
 };
 
 //===----------------------------------------------------------------------===//
@@ -429,53 +421,63 @@ private:
 /// Perform any possible folding.
 ///
 /// Returns whether any change was made.
-bool run(Context &context) {
+MoveValueInst *run(Context &context) {
   Candidates candidates;
 
   // Do a cheap search for scope ending instructions that could potentially be
   // candidates for folding.
   if (!FindCandidates(context).run(candidates))
-    return false;
+    return nullptr;
 
   // At least one full match was found and more expensive checks on the matches
   // are in order.
 
   BorroweeUsage borroweeUsage;
   if (!findBorroweeUsage(context, borroweeUsage))
-    return false;
+    return nullptr;
   IntroducerUsage introducerUsage;
   if (!findIntroducerUsage(context, introducerUsage))
-    return false;
+    return nullptr;
 
   // Now, filter the candidates using those values.
   if (!FilterCandidates(context, introducerUsage, borroweeUsage)
            .run(candidates))
-    return false;
+    return nullptr;
 
   // Finally, check that %borrowee has no uses within %lifetime's
   // borrow scope.
   if (borroweeHasUsesWithinBorrowScope(context, borroweeUsage))
-    return false;
+    return nullptr;
 
   // It is safe to rewrite the viable candidates.  Do so.
-  Rewriter(context, candidates).run();
-
-  return true;
+  return Rewriter(context, candidates).run();
 }
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Rewriting
 //===----------------------------------------------------------------------===//
 
-void Rewriter::run() {
+MoveValueInst *Rewriter::run() {
   bool foldedAny = false;
   (void)foldedAny;
-  for (unsigned index = 0, count = candidates.vector.size(); index < count;
-       ++index) {
+  auto size = candidates.vector.size();
+  for (unsigned index = 0; index < size; ++index) {
     auto candidate = candidates.vector[index];
-    if (!candidate.viable)
-      continue;
     createMove();
+    if (!candidate.viable) {
+      // Nonviable candidates still end with the pattern
+      //
+      //     end_borrow %lifetime
+      //     ...
+      //     destroy_value %borrowee
+      //
+      // Now that the new move_value [lexical] dominates all candidates, the
+      // every candidate's destroy_value %borrowee is dominated by it, so every
+      // one is dominated by another consuming use which is illegal.  Rewrite
+      // each such destroy_value to be a destroy_value of the move.
+      candidate.match.dvi->setOperand(mvi);
+      continue;
+    }
 
     fold(candidate.match, candidate.argumentIndices);
 #ifndef NDEBUG
@@ -483,12 +485,7 @@ void Rewriter::run() {
 #endif
   }
   assert(foldedAny && "rewriting without anything to rewrite!?");
-
-  // There are now "two defs for %borrowee":
-  // - %borrowee
-  // - %move
-  // We need to update SSA.
-  updateSSA();
+  return mvi;
 }
 
 bool Rewriter::createMove() {
@@ -505,8 +502,7 @@ bool Rewriter::createMove() {
   return true;
 }
 
-void Rewriter::fold(Match candidate,
-                    SmallVectorImpl<int> const &rewritableArgumentIndices) {
+void Rewriter::fold(Match candidate, ArrayRef<int> rewritableArgumentIndices) {
   // First, rewrite the apply in terms of the move_value.
   unsigned argumentNumber = 0;
   for (auto index : rewritableArgumentIndices) {
@@ -549,26 +545,6 @@ void Rewriter::fold(Match candidate,
   // We have introduced a consuming use of %borrowee--the move_value-- and we
   // just rewrote the apply to consume it.  Delete the old destroy_value.
   context.deleter.forceDelete(candidate.dvi);
-}
-
-void Rewriter::updateSSA() {
-  SILSSAUpdater updater;
-  updater.initialize(context.borrowee->getType(),
-                     context.borrowee.getOwnershipKind());
-  updater.addAvailableValue(context.borrowee->getParentBlock(),
-                            context.borrowee);
-  updater.addAvailableValue(mvi->getParentBlock(), mvi);
-
-  SmallVector<Operand *, 16> uses;
-  for (auto use : context.borrowee->getUses()) {
-    if (use->getUser() == mvi)
-      continue;
-    uses.push_back(use);
-  }
-
-  for (auto use : uses) {
-    updater.rewriteUse(*use);
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -638,8 +614,10 @@ bool FilterCandidates::run(Candidates &candidates) {
   return anyViable;
 }
 
-bool findBorroweeUsage(Context &context, BorroweeUsage &usage) {
+bool findBorroweeUsage(Context const &context, BorroweeUsage &usage) {
   auto recordUse = [&](Operand *use) {
+    // Ignore uses that aren't dominated by the introducer.  PrunedLiveness
+    // relies on us doing this check.
     if (!context.dominanceTree.dominates(context.introducer, use->getUser()))
       return;
     usage.uses.push_back(use);
@@ -800,15 +778,16 @@ bool FilterCandidates::rewritableArgumentIndicesForApply(
 //===----------------------------------------------------------------------===//
 
 /// The entry point.
-bool swift::foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
-                                              DominanceInfo &dominanceTree,
-                                              InstructionDeleter &deleter) {
+MoveValueInst *
+swift::foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
+                                         DominanceInfo &dominanceTree,
+                                         InstructionDeleter &deleter) {
   if (!bbi->isLexical())
-    return false;
+    return nullptr;
   if (bbi->getOperand()->getOwnershipKind() != OwnershipKind::Owned)
-    return false;
+    return nullptr;
   if (!dominanceTree.isReachableFromEntry(bbi->getParentBlock()))
-    return false;
+    return nullptr;
 
   auto context = LexicalDestroyFolding::Context(bbi, dominanceTree, deleter);
   return LexicalDestroyFolding::run(context);

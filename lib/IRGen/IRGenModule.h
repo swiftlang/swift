@@ -135,6 +135,7 @@ namespace irgen {
   class ForeignClassMetadataLayout;
   class ForeignFunctionInfo;
   class FormalType;
+  class FunctionPointerKind;
   class HeapLayout;
   class StructLayout;
   class IRGenDebugInfo;
@@ -1423,8 +1424,9 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
+  Signature getSignature(CanSILFunctionType fnType);
   Signature getSignature(CanSILFunctionType fnType,
-                         bool useSpecialConvention = false);
+                         FunctionPointerKind kind);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);

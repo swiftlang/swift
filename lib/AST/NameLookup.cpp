@@ -2507,9 +2507,6 @@ static SmallVector<GenericTypeParamDecl *, 2>
 createOpaqueParameterGenericParams(
     GenericContext *genericContext, GenericParamList *parsedGenericParams) {
   ASTContext &ctx = genericContext->getASTContext();
-  if (!ctx.LangOpts.EnableExperimentalOpaqueParameters)
-    return { };
-
   auto value = dyn_cast_or_null<ValueDecl>(genericContext->getAsDecl());
   if (!value)
     return { };
@@ -2773,7 +2770,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // anything. Ask the requirement signature instead.
   if (protoDecl->wasDeserialized()) {
     auto protoSelfTy = protoDecl->getSelfInterfaceType();
-    for (auto &req : protoDecl->getRequirementSignature()) {
+    for (auto &req : protoDecl->getRequirementSignature().getRequirements()) {
       // Dig out a conformance requirement...
       if (req.getKind() != RequirementKind::Conformance)
         continue;

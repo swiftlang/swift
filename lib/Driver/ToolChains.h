@@ -73,7 +73,8 @@ protected:
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
   bool shouldStoreInvocationInDebugInfo() const override;
-
+  std::string getGlobalDebugPathRemapping() const override;
+  
   /// Retrieve the target SDK version for the given target triple.
   Optional<llvm::VersionTuple>
   getTargetSDKVersion(const llvm::Triple &triple) const ;

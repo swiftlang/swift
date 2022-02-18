@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// This is a light-weight utility for hoisting destroy instructions for unique
-/// storage--typically alloc_stac or owned incoming arguments. Shrinking an
+/// storage--typically alloc_stack or owned incoming arguments. Shrinking an
 /// object's memory lifetime can allow removal of copy_addr and other
 /// optimization.
 ///
@@ -206,11 +206,16 @@ public:
   }
 
 private:
+  DeinitBarriers(DeinitBarriers const &) = delete;
+  DeinitBarriers &operator=(DeinitBarriers const &) = delete;
+
   // Conforms to BackwardReachability::BlockReachability
   class DestroyReachability {
     const KnownStorageUses &knownUses;
     DeinitBarriers &result;
     SILInstruction *storageDefInst = nullptr; // null for function args
+
+    enum class Classification { DeadUser, Barrier, Other };
 
     BackwardReachability<DestroyReachability> reachability;
 
@@ -242,11 +247,65 @@ private:
       result.destroyReachesEndBlocks.insert(block);
     }
 
-    bool checkReachableBarrier(SILInstruction *inst);
+    Classification classifyInstruction(SILInstruction *inst);
+
+    bool classificationIsBarrier(Classification classification);
+
+    void visitedInstruction(SILInstruction *instruction,
+                            Classification classification);
+
+    bool checkReachableBarrier(SILInstruction *);
+
+    bool checkReachablePhiBarrier(SILBasicBlock *);
 
     void solveBackward() { reachability.solveBackward(); }
   };
 };
+
+DeinitBarriers::DestroyReachability::Classification
+DeinitBarriers::DestroyReachability::classifyInstruction(SILInstruction *inst) {
+  if (knownUses.debugInsts.contains(inst)) {
+    return Classification::DeadUser;
+  }
+  if (inst == storageDefInst) {
+    result.barriers.push_back(inst);
+    return Classification::Barrier;
+  }
+  if (knownUses.storageUsers.contains(inst)) {
+    return Classification::Barrier;
+  }
+  if (isDeinitBarrier(inst)) {
+    return Classification::Barrier;
+  }
+  return Classification::Other;
+}
+
+bool DeinitBarriers::DestroyReachability::classificationIsBarrier(
+    Classification classification) {
+  switch (classification) {
+  case Classification::DeadUser:
+  case Classification::Other:
+    return false;
+  case Classification::Barrier:
+    return true;
+  }
+  llvm_unreachable("exhaustive switch is not exhaustive?!");
+}
+
+void DeinitBarriers::DestroyReachability::visitedInstruction(
+    SILInstruction *instruction, Classification classification) {
+  assert(classifyInstruction(instruction) == classification);
+  switch (classification) {
+  case Classification::DeadUser:
+    result.deadUsers.push_back(instruction);
+    break;
+  case Classification::Barrier:
+    result.barriers.push_back(instruction);
+    break;
+  case Classification::Other:
+    break;
+  }
+}
 
 /// Return true if \p inst is a barrier.
 ///
@@ -255,24 +314,20 @@ private:
 /// from each. Any path reaching multiple destroys requires initialization,
 /// which is a storageUser and therefore a barrier.
 bool DeinitBarriers::DestroyReachability::checkReachableBarrier(
-    SILInstruction *inst) {
-  if (knownUses.debugInsts.contains(inst)) {
-    result.deadUsers.push_back(inst);
-    return false;
-  }
-  if (inst == storageDefInst) {
-    result.barriers.push_back(inst);
-    return true;
-  }
-  if (knownUses.storageUsers.contains(inst)) {
-    result.barriers.push_back(inst);
-    return true;
-  }
-  if (isDeinitBarrier(inst)) {
-    result.barriers.push_back(inst);
-    return true;
-  }
-  return false;
+    SILInstruction *instruction) {
+  auto classification = classifyInstruction(instruction);
+  visitedInstruction(instruction, classification);
+  return classificationIsBarrier(classification);
+}
+
+bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
+    SILBasicBlock *block) {
+  assert(llvm::all_of(block->getArguments(),
+                      [&](auto argument) { return PhiValue(argument); }));
+  return llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
+    return classificationIsBarrier(
+        classifyInstruction(predecessor->getTerminator()));
+  });
 }
 
 /// Algorithm for hoisting the destroys of a single uniquely identified storage
@@ -386,9 +441,13 @@ bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
 bool HoistDestroys::foldBarrier(SILInstruction *barrier) {
   if (auto *load = dyn_cast<LoadInst>(barrier)) {
     if (load->getOperand() == storageRoot) {
-      assert(load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy);
-      load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
-      return true;
+      if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+        load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
+        return true;
+      } else {
+        assert(load->getOperand()->getType().isTrivial(*load->getFunction()));
+        return false;
+      }
     }
   }
   if (auto *copy = dyn_cast<CopyAddrInst>(barrier)) {

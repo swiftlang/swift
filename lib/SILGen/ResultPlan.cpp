@@ -100,7 +100,7 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
     params.push_back(param);
 
     const auto constraintTy = openedTypes[i]
-                                  ->getOpenedExistentialType()
+                                  ->getExistentialType()
                                   ->castTo<ExistentialType>()
                                   ->getConstraintType();
     requirements.emplace_back(RequirementKind::Conformance, param,

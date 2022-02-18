@@ -2705,9 +2705,12 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
     // For enums, structs, and unions, only count definitions when looking to
     // see what other modules they appear in.
-    if (IsTagDecl)
-      if (!cast<clang::TagDecl>(Redeclaration)->isCompleteDefinition())
+    if (IsTagDecl) {
+      auto TD = cast<clang::TagDecl>(Redeclaration);
+      if (!TD->isCompleteDefinition() &&
+          !TD->isThisDeclarationADemotedDefinition())
         continue;
+    }
 
     auto OwningClangModule = getClangTopLevelOwningModule(Redeclaration,
                                                           ClangASTContext);
@@ -4218,9 +4221,6 @@ void ClangImporter::Implementation::diagnoseTargetDirectly(
   } else if (const clang::MacroInfo *macro =
                  target.dyn_cast<const clang::MacroInfo *>()) {
     Walker.VisitMacro(macro);
-  } else if (const clang::ModuleMacro *macro =
-                 target.dyn_cast<const clang::ModuleMacro *>()) {
-    Walker.VisitMacro(macro->getMacroInfo());
   }
 }
 
@@ -4234,7 +4234,7 @@ ClangImporter::Implementation::importDiagnosticTargetFromLookupTableEntry(
     return macro;
   } else if (const clang::ModuleMacro *macro =
                  entry.dyn_cast<clang::ModuleMacro *>()) {
-    return macro;
+    return macro->getMacroInfo();
   }
   llvm_unreachable("SwiftLookupTable::Single entry must be a NamedDecl, "
                    "MacroInfo or ModuleMacro pointer");
@@ -4672,8 +4672,7 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     ctx.Diags.diagnose(SourceLoc(),
                        diag::unable_to_convert_generic_swift_types.ID,
                        {func->getName(), StringRef(failedTypesStr)});
-    // Return a valid FunctionDecl but, we'll never use it.
-    return func->getAsFunction();
+    return nullptr;
   }
 
   // Instanciate a specialization of this template using the substitution map.

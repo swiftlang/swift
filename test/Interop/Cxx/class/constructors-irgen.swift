@@ -11,6 +11,9 @@ typealias Void = ()
 struct UnsafePointer<T> { }
 struct UnsafeMutablePointer<T> { }
 
+struct Int { }
+struct UInt { }
+
 public func createHasVirtualBase() -> HasVirtualBase {
   // ITANIUM_X64: define swiftcc void @"$ss20createHasVirtualBaseSo0bcD0VyF"(%TSo14HasVirtualBaseV* noalias nocapture sret({{.*}}) %0)
   // ITANIUM_X64-NOT: define

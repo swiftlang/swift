@@ -5222,7 +5222,6 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.ExistentialConformsToSelfValid = false;
   Bits.ProtocolDecl.ExistentialConformsToSelf = false;
   Bits.ProtocolDecl.InheritedProtocolsValid = 0;
-  Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
   Bits.ProtocolDecl.HasAssociatedTypes = 0;
@@ -5438,10 +5437,10 @@ ProtocolDecl::getProtocolDependencies() const {
                None);
 }
 
-ArrayRef<Requirement> ProtocolDecl::getRequirementSignature() const {
+RequirementSignature ProtocolDecl::getRequirementSignature() const {
   return evaluateOrDefault(getASTContext().evaluator,
                RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
-               None);
+               RequirementSignature());
 }
 
 bool ProtocolDecl::isComputingRequirementSignature() const {
@@ -5449,21 +5448,15 @@ bool ProtocolDecl::isComputingRequirementSignature() const {
                  RequirementSignatureRequest{const_cast<ProtocolDecl*>(this)});
 }
 
-void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
-  assert(!RequirementSignature && "requirement signature already set");
-  if (requirements.empty()) {
-    RequirementSignature = reinterpret_cast<Requirement *>(this + 1);
-    Bits.ProtocolDecl.NumRequirementsInSignature = 0;
-  } else {
-    RequirementSignature = requirements.data();
-    Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
-  }
+void ProtocolDecl::setRequirementSignature(RequirementSignature requirementSig) {
+  assert(!RequirementSig && "requirement signature already set");
+  RequirementSig = requirementSig;
 }
 
 void
 ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
                                           uint64_t requirementSignatureData) {
-  assert(!RequirementSignature && "requirement signature already set");
+  assert(!RequirementSig && "requirement signature already set");
 
   auto contextData = static_cast<LazyProtocolData *>(
       getASTContext().getOrCreateLazyContextData(this, lazyLoader));
@@ -5486,13 +5479,6 @@ ProtocolDecl::setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
       getASTContext().getOrCreateLazyContextData(this, lazyLoader));
   contextData->associatedTypesData = associatedTypesData;
   Bits.ProtocolDecl.HasLazyAssociatedTypes = true;
-}
-
-ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
-  assert(RequirementSignature &&
-         "getting requirement signature before computing it");
-  return llvm::makeArrayRef(RequirementSignature,
-                            Bits.ProtocolDecl.NumRequirementsInSignature);
 }
 
 void ProtocolDecl::computeKnownProtocolKind() const {
@@ -7543,118 +7529,6 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
 
 bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
-}
-
-bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn) const {
-  auto &C = this->getASTContext();
-
-  auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
-
-  // Check the name
-  if (getBaseName() != callId)
-    return false;
-
-  auto params = getParameters();
-  unsigned int expectedParamNum = isVoidReturn ? 4 : 5;
-
-  // Check the expected argument count:
-  if (!params || params->size() != expectedParamNum)
-    return false;
-
-  // Check API names of the arguments
-  auto actorParam = params->get(0);
-  auto targetParam = params->get(1);
-  auto invocationParam = params->get(2);
-  auto thrownTypeParam = params->get(3);
-  if (actorParam->getArgumentName() != C.Id_on ||
-      targetParam->getArgumentName() != C.Id_target ||
-      invocationParam->getArgumentName() != C.Id_invocation ||
-      thrownTypeParam->getArgumentName() != C.Id_throwing)
-    return false;
-
-  if (!isVoidReturn) {
-    auto returnedTypeParam = params->get(4);
-    if (returnedTypeParam->getArgumentName() != C.Id_returning)
-      return false;
-  }
-
-  if (!isGeneric())
-    return false;
-
-  auto genericParams = getGenericParams();
-  unsigned int expectedGenericParamNum = isVoidReturn ? 2 : 3;
-
-  // We expect: Act, Err, Res?
-  if (genericParams->size() != expectedGenericParamNum) {
-    return false;
-  }
-
-  // FIXME(distributed): check the exact generic requirements
-
-  // === check the return type
-  if (isVoidReturn) {
-    if (auto func = dyn_cast<FuncDecl>(this))
-      if (!func->getResultInterfaceType()->isVoid())
-        return false;
-  }
-
-  // FIXME(distributed): check the right types of the args and generics...
-  // FIXME(distributed): check access level actually is ok, i.e. not private etc
-
-  return true;
-}
-
-bool AbstractFunctionDecl::isDistributed() const {
-  return getAttrs().hasAttribute<DistributedActorAttr>();
-}
-
-ConstructorDecl*
-NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
-  auto &C = this->getASTContext();
-
-  // FIXME(distributed): implement more properly... do with caching etc
-  auto mutableThis = const_cast<NominalTypeDecl *>(this);
-  for (auto value : mutableThis->getMembers()) {
-    auto ctor = dyn_cast<ConstructorDecl>(value);
-    if (!ctor)
-      continue;
-
-    auto params = ctor->getParameters();
-    if (params->size() != 1)
-      return nullptr;
-
-    if (params->get(0)->getArgumentName() == C.getIdentifier("_mangledName"))
-      return ctor;
-
-    return nullptr;
-  }
-
-  // TODO(distributed): make a Request for it?
-  return nullptr;
-}
-
-VarDecl*
-NominalTypeDecl::getDistributedActorSystemProperty() const {
-  if (!this->isDistributedActor())
-    return nullptr;
-
-  auto mutableThis = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      GetDistributedActorSystemPropertyRequest{mutableThis},
-      nullptr);
-}
-
-VarDecl*
-NominalTypeDecl::getDistributedActorIDProperty() const {
-  if (!this->isDistributedActor())
-    return nullptr;
-
-  auto mutableThis = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      GetDistributedActorIDPropertyRequest{mutableThis},
-      nullptr);
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {

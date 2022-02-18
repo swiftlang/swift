@@ -2659,7 +2659,7 @@ public:
         TypeChecker::inferDefaultWitnesses(PD);
 
     // Explicity compute the requirement signature to detect errors.
-    auto reqSig = PD->getRequirementSignature();
+    auto reqSig = PD->getRequirementSignature().getRequirements();
 
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       auto requirementsSig =
@@ -3249,6 +3249,44 @@ void TypeChecker::checkParameterList(ParameterList *params,
             addAsyncNotes(func);
         }
       }
+    }
+
+    // Opaque types cannot occur in parameter position.
+    Type interfaceType = param->getInterfaceType();
+    if (interfaceType->hasTypeParameter()) {
+      interfaceType.findIf([&](Type type) {
+        if (auto fnType = type->getAs<FunctionType>()) {
+          for (auto innerParam : fnType->getParams()) {
+            auto paramType = innerParam.getPlainType();
+            if (!paramType->hasTypeParameter())
+              continue;
+
+            bool hadError = paramType.findIf([&](Type innerType) {
+              auto genericParam = innerType->getAs<GenericTypeParamType>();
+              if (!genericParam)
+                return false;
+
+              auto genericParamDecl = genericParam->getDecl();
+              if (!genericParamDecl)
+                return false;
+
+              if (!genericParamDecl->isOpaqueType())
+                return false;
+
+              param->diagnose(
+                 diag::opaque_type_in_parameter, true, interfaceType);
+              return true;
+            });
+
+            if (hadError)
+              return true;
+          }
+
+          return false;
+        }
+
+        return false;
+      });
     }
 
     if (param->hasAttachedPropertyWrapper())

@@ -1249,9 +1249,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     bool hasDynamicLifetime = Attr & 0x1;
     bool isLexical = (Attr >> 1) & 0x1;
+    bool wasMoved = (Attr >> 2) & 0x1;
     ResultInst = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        None, hasDynamicLifetime, isLexical);
+        None, hasDynamicLifetime, isLexical, wasMoved);
     break;
   }
   case SILInstructionKind::MetatypeInst:
@@ -1503,12 +1504,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
     if (OpCode == SILInstructionKind::AllocRefDynamicInst) {
       assert(i + 2 == NumVals);
-      assert(!canAllocOnStack);
       SILType MetadataType = getSILType(MF->getType(ListOfValues[i+1]),
                                         SILValueCategory::Object, Fn);
       SILValue MetadataOp = getLocalValue(ListOfValues[i], MetadataType);
       ResultInst = Builder.createAllocRefDynamic(Loc, MetadataOp, ClassTy,
-                                                 isObjC, TailTypes, Counts);
+                                                 isObjC, canAllocOnStack,
+                                                 TailTypes, Counts);
     } else {
       assert(i == NumVals);
       ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack,

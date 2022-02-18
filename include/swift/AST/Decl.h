@@ -29,6 +29,7 @@
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
@@ -525,7 +526,7 @@ protected:
     IsComputingSemanticMembers : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -564,10 +565,7 @@ protected:
 
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
     /// value, plus one. Otherwise, it will be 0.
-    KnownProtocol : 8, // '8' for speed. This only needs 6.
-
-    /// The number of requirements in the requirement signature.
-    NumRequirementsInSignature : 16
+    KnownProtocol : 8 // '8' for speed. This only needs 6.
   );
 
   SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+1+2+1+1+1+1+1+1,
@@ -4313,7 +4311,7 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
-  const Requirement *RequirementSignature = nullptr;
+  Optional<RequirementSignature> RequirementSig;
 
   /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
   /// been computed.
@@ -4574,33 +4572,25 @@ public:
   /// requirements. Computed from the structural requirements, above.
   ArrayRef<ProtocolDecl *> getProtocolDependencies() const;
 
-  /// Retrieve the requirements that describe this protocol.
-  ///
-  /// These are the requirements including any inherited protocols
-  /// and conformances for associated types that are introduced in this
-  /// protocol. Requirements implied via any other protocol (e.g., inherited
-  /// protocols of the inherited protocols) are not mentioned. The conformance
-  /// requirements listed here become entries in the witness table.
-  ArrayRef<Requirement> getRequirementSignature() const;
+  /// Retrieve the requirements that describe this protocol from the point of
+  /// view of the generic system; see RequirementSignature.h for details.
+  RequirementSignature getRequirementSignature() const;
 
   /// Is the requirement signature currently being computed?
   bool isComputingRequirementSignature() const;
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
-    return RequirementSignature != nullptr;
+    return RequirementSig.hasValue();
   }
 
-  void setRequirementSignature(ArrayRef<Requirement> requirements);
+  void setRequirementSignature(RequirementSignature requirementSig);
 
   void setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
                                    uint64_t requirementSignatureData);
 
   void setLazyAssociatedTypeMembers(LazyMemberLoader *lazyLoader,
                                     uint64_t associatedTypesData);
-
-private:
-  ArrayRef<Requirement> getCachedRequirementSignature() const;
 
 public:
   // Implement isa/cast/dyncast/etc.
@@ -6421,6 +6411,31 @@ public:
   /// which is used as ad-hoc protocol requirement by the
   /// 'DistributedActorSystem' protocol.
   bool isDistributedActorSystemRemoteCall(bool isVoidReturn) const;
+
+  /// Determines if this function is a 'recordArgument' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordArgument() const;
+
+  /// Determines if this function is a 'recordReturnType' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordReturnType() const;
+
+  /// Determines if this function is a 'recordErrorType' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordErrorType() const;
+
+  /// Determines if this function is a 'decodeNextArgument' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationDecoder' protocol.
+  bool isDistributedTargetInvocationDecoderDecodeNextArgument() const;
+
+  /// Determines if this function is a 'onReturn' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationResultHandler' protocol.
+  bool isDistributedTargetInvocationResultHandlerOnReturn() const;
 
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.

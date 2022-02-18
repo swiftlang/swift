@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -typecheck
+// RUN: not %target-swift-frontend %s -typecheck -requirement-machine-protocol-signatures=verify -requirement-machine-inferred-signatures=verify
 
 //===----------------------------------------------------------------------===//
 extension UnicodeScalar {

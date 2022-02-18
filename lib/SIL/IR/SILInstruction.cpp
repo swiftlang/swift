@@ -1271,7 +1271,7 @@ bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this))
     return true;
 
-  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
+  if (auto *ARI = dyn_cast<AllocRefInstBase>(this)) {
     if (ARI->canAllocOnStack())
       return true;
   }
@@ -1318,10 +1318,6 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isAllocatingStack())
     return false;
 
-  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
-    if (ARI->canAllocOnStack())
-      return false;
-  }
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
@@ -1382,7 +1378,7 @@ bool SILInstruction::mayTrap() const {
 bool SILInstruction::maySynchronize() const {
   // TODO: We need side-effect analysis and library annotation for this to be
   //       a reasonable API.  For now, this is just a placeholder.
-  return isa<FullApplySite>(this);
+  return isa<FullApplySite>(this) || isa<EndApplyInst>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {

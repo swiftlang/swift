@@ -43,6 +43,7 @@ add_swift_host_library(swiftAST STATIC
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
   DiagnosticList.cpp
+  DistributedDecl.cpp
   DocComment.cpp
   Effects.cpp
   Evaluator.cpp
@@ -89,6 +90,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/RewriteContext.cpp
   RequirementMachine/RewriteLoop.cpp
   RequirementMachine/RewriteSystem.cpp
+  RequirementMachine/SimplifySubstitutions.cpp
   RequirementMachine/Symbol.cpp
   RequirementMachine/Term.cpp
   RequirementMachine/TypeDifference.cpp

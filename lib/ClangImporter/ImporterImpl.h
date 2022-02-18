@@ -26,6 +26,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/StringExtras.h"
@@ -1516,7 +1517,8 @@ public:
   }
 
   void loadRequirementSignature(const ProtocolDecl *decl, uint64_t contextData,
-                                SmallVectorImpl<Requirement> &reqs) override {
+                                SmallVectorImpl<Requirement> &reqs,
+                                SmallVectorImpl<ProtocolTypeAlias> &typeAliases) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 

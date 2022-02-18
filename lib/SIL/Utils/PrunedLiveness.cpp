@@ -79,6 +79,11 @@ void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
   auto useBlockLive = liveBlocks.updateForUse(user);
   // Record all uses of blocks on the liveness boundary. For blocks marked
   // LiveWithin, the boundary is considered to be the last use in the block.
+  //
+  // FIXME: Why is nonLifetimeEndingUsesInLiveOut inside PrunedLiveness, and
+  // what does it mean? Blocks may transition to LiveOut later. Or they may
+  // already be LiveOut from a previous use. After computing liveness, clients
+  // should check uses that are in PrunedLivenessBoundary.
   if (!lifetimeEnding && useBlockLive == PrunedLiveBlocks::LiveOut) {
     if (nonLifetimeEndingUsesInLiveOut)
       nonLifetimeEndingUsesInLiveOut->insert(user);

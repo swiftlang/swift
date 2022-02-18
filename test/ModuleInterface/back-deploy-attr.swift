@@ -17,27 +17,24 @@
 
 public struct TopLevelStruct {
   // CHECK: @_backDeploy(macOS 11.0)
-  // CHECK: public func backDeployedFunc1_SinglePlatform() -> Swift.Int
+  // FROMSOURCE: public func backDeployedFunc1_SinglePlatform() -> Swift.Int { return 42 }
+  // FROMMODULE: public func backDeployedFunc1_SinglePlatform() -> Swift.Int
   @available(macOS 12.0, *)
   @_backDeploy(macOS 11.0)
-  public func backDeployedFunc1_SinglePlatform() -> Int {
-    return 42
-  }
+  public func backDeployedFunc1_SinglePlatform() -> Int { return 42 }
   
   // CHECK: @_backDeploy(macOS 11.0)
   // CHECK: @_backDeploy(iOS 14.0)
-  // CHECK: public func backDeployedFunc2_MultiPlatform() -> Swift.Int
+  // FROMSOURCE: public func backDeployedFunc2_MultiPlatform() -> Swift.Int { return 43 }
+  // FROMMODULE: public func backDeployedFunc2_MultiPlatform() -> Swift.Int
   @available(macOS 12.0, *)
   @_backDeploy(macOS 11.0, iOS 14.0)
-  public func backDeployedFunc2_MultiPlatform() -> Int {
-    return 43
-  }
+  public func backDeployedFunc2_MultiPlatform() -> Int { return 43 }
 }
 
 // CHECK: @_backDeploy(macOS 11.0)
-// CHECK: public func backDeployTopLevelFunc() -> Swift.Int
+// FROMSOURCE: public func backDeployTopLevelFunc() -> Swift.Int { return 44 }
+// FROMMODULE: public func backDeployTopLevelFunc() -> Swift.Int
 @available(macOS 12.0, *)
 @_backDeploy(macOS 11.0)
-public func backDeployTopLevelFunc() -> Int {
-  return 42
-}
+public func backDeployTopLevelFunc() -> Int { return 44 }

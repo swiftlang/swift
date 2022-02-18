@@ -714,7 +714,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
   for (auto &param : diffParams) {
     // Skip `inout` parameters, which semantically behave as original results
     // and always appear as pullback parameters.
-    if (param.isIndirectInOut())
+    if (param.isIndirectMutating())
       continue;
     auto paramTanType = getAutoDiffTangentTypeForLinearMap(
         param.getInterfaceType(), lookupConformance,

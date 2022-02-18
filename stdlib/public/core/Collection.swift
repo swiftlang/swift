@@ -344,6 +344,12 @@ public protocol Collection: Sequence {
   // FIXME: Associated type inference requires this.
   override associatedtype Element
 
+  // FIXME: <rdar://problem/34142121>
+  // This typealias should be removed as it predates the source compatibility
+  // guarantees of Swift 3, but it cannot due to a bug.
+  @available(swift, deprecated: 3.2, obsoleted: 5.0, renamed: "Element")
+  typealias _Element = Element
+
   /// A type that represents a position in the collection.
   ///
   /// Valid indices consist of the position of every element and a

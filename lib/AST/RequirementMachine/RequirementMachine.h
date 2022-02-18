@@ -14,6 +14,7 @@
 #define SWIFT_REQUIREMENTMACHINE_H
 
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/RequirementSignature.h"
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
@@ -109,6 +110,10 @@ class RequirementMachine final {
     ArrayRef<unsigned> rules,
     TypeArrayView<GenericTypeParamType> genericParams) const;
 
+  std::vector<ProtocolTypeAlias> buildProtocolTypeAliasesFromRules(
+    ArrayRef<unsigned> rules,
+    TypeArrayView<GenericTypeParamType> genericParams) const;
+
   TypeArrayView<GenericTypeParamType> getGenericParams() const {
     return TypeArrayView<GenericTypeParamType>(
       ArrayRef<Type>(Params));
@@ -140,7 +145,7 @@ public:
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
-  llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
+  llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
   computeMinimalProtocolRequirements();
 
   std::vector<Requirement> computeMinimalGenericSignatureRequirements();

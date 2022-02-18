@@ -32,7 +32,7 @@ class Klass {}
 // CHECK-SIL-NEXT: strong_retain
 // CHECK-SIL-NEXT: move_value
 // CHECK-SIL-NEXT: strong_release
-// CHECK-SIL-NEXT: debug_value [poison]
+// CHECK-SIL-NEXT: debug_value [moved] undef
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: return
@@ -66,7 +66,7 @@ func useMove(_ k: __owned Klass) -> Klass {
 // CHECK-SIL-NEXT: strong_retain
 // CHECK-SIL-NEXT: move_value
 // CHECK-SIL-NEXT: strong_release
-// CHECK-SIL-NEXT: debug_value [poison]
+// CHECK-SIL-NEXT: debug_value [moved] undef
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: return

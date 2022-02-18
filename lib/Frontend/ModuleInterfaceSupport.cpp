@@ -605,40 +605,46 @@ public:
       auto isUnchecked = std::get<2>(protoAndAvailability);
       auto otherAttrs = std::get<3>(protoAndAvailability);
 
-      bool haveFeatureChecks = printOptions.PrintCompatibilityFeatureChecks &&
-        printCompatibilityFeatureChecksPre(printer, proto);
+      PrintOptions curPrintOptions = printOptions;
+      auto printBody = [&] {
+        // FIXME: Shouldn't this be an implicit conversion?
+        TinyPtrVector<const DeclAttribute *> attrs;
+        attrs.insert(attrs.end(), availability.begin(), availability.end());
+        auto spiAttributes = proto->getAttrs().getAttributes<SPIAccessControlAttr>();
+        attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
+        attrs.insert(attrs.end(), otherAttrs.begin(), otherAttrs.end());
+        DeclAttributes::print(printer, curPrintOptions, attrs);
 
-      // FIXME: Shouldn't this be an implicit conversion?
-      TinyPtrVector<const DeclAttribute *> attrs;
-      attrs.insert(attrs.end(), availability.begin(), availability.end());
-      auto spiAttributes = proto->getAttrs().getAttributes<SPIAccessControlAttr>();
-      attrs.insert(attrs.end(), spiAttributes.begin(), spiAttributes.end());
-      attrs.insert(attrs.end(), otherAttrs.begin(), otherAttrs.end());
-      DeclAttributes::print(printer, printOptions, attrs);
+        printer << "extension ";
+        {
+          bool oldFullyQualifiedTypesIfAmbiguous =
+            curPrintOptions.FullyQualifiedTypesIfAmbiguous;
+          curPrintOptions.FullyQualifiedTypesIfAmbiguous =
+            curPrintOptions.FullyQualifiedExtendedTypesIfAmbiguous;
+          nominal->getDeclaredType().print(printer, curPrintOptions);
+          curPrintOptions.FullyQualifiedTypesIfAmbiguous =
+            oldFullyQualifiedTypesIfAmbiguous;
+        }
+        printer << " : ";
 
-      printer << "extension ";
-      {
-        PrintOptions typePrintOptions = printOptions;
-        bool oldFullyQualifiedTypesIfAmbiguous =
-          typePrintOptions.FullyQualifiedTypesIfAmbiguous;
-        typePrintOptions.FullyQualifiedTypesIfAmbiguous =
-          typePrintOptions.FullyQualifiedExtendedTypesIfAmbiguous;
-        nominal->getDeclaredType().print(printer, typePrintOptions);
-        typePrintOptions.FullyQualifiedTypesIfAmbiguous =
-          oldFullyQualifiedTypesIfAmbiguous;
+        if (isUnchecked)
+          printer << "@unchecked ";
+
+        proto->getDeclaredInterfaceType()->print(printer, curPrintOptions);
+
+        printer << " {}";
+      };
+
+      bool printedNewline = false;
+      if (printOptions.PrintCompatibilityFeatureChecks) {
+        printedNewline =
+          printWithCompatibilityFeatureChecks(printer, curPrintOptions,
+                                              proto, printBody);
+      } else {
+        printBody();
+        printedNewline = false;
       }
-      printer << " : ";
-
-      if (isUnchecked)
-        printer << "@unchecked ";
-
-      proto->getDeclaredInterfaceType()->print(printer, printOptions);
-
-      printer << " {}";
-
-      if (haveFeatureChecks)
-        printCompatibilityFeatureChecksPost(printer);
-      else
+      if (!printedNewline)
         printer << "\n";
     }
   }

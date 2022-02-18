@@ -82,20 +82,15 @@ struct RewriteStep {
     ///
     ///    T.[concrete: C<...> with <X1, X2...>] X1 X2...
     ///
-    /// If inverted: pop concrete substitutions Xn' from the primary stack,
+    /// If inverted: pop concrete substitutions Xn from the primary stack,
     /// which must follow a term ending with a superclass or concrete type
     /// symbol:
     ///
-    ///    T.[concrete: C<...> with <X1, X2...>] X1' X2'...
-    ///
-    /// The new substitutions replace the substitutions in that symbol:
-    ///
-    ///    T.[concrete: C<...> with <X1', X2'...>]
+    ///    T.[concrete: C<...> with <X1, X2...>] X1 X2...
     ///
     /// The Arg field encodes the number of substitutions.
     ///
-    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions() and
-    /// PropertyMap::concretelySimplifyLeftHandSideSubstitutions().
+    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions().
     Decompose,
 
     ///
@@ -155,8 +150,7 @@ struct RewriteStep {
     ///
     ///    T.[concrete: C'<...> with <X1', X2'...>]
     ///
-    /// Used by PropertyMap::concretelySimplifyLeftHandSideSubstitutions() and
-    /// PropertyMap::processTypeDifference().
+    /// Used by RewriteSystem::simplifyLeftHandSideSubstitutions().
     DecomposeConcrete,
 
     /// For decomposing the left hand side of an induced rule in concrete type
@@ -415,6 +409,10 @@ public:
   void dump(llvm::raw_ostream &out,
             MutableTerm term,
             const RewriteSystem &system) const;
+
+  void dumpLong(llvm::raw_ostream &out,
+                MutableTerm term,
+                const RewriteSystem &system) const;
 };
 
 /// Information about protocol conformance rules appearing in a rewrite loop.
@@ -437,7 +435,10 @@ private:
   SmallVector<unsigned, 1> RulesInEmptyContext;
 
   /// Cached value for getProjectionCount().
-  unsigned ProjectionCount : 30;
+  unsigned ProjectionCount : 15;
+
+  /// Cached value for getDecomposeCount().
+  unsigned DecomposeCount : 15;
 
   /// Loops are deleted once they no longer contain rules in empty context,
   /// since at that point they don't participate in minimization and do not
@@ -453,6 +454,7 @@ public:
   RewriteLoop(MutableTerm basepoint, RewritePath path)
     : Basepoint(basepoint), Path(path) {
     ProjectionCount = 0;
+    DecomposeCount = 0;
 
     Deleted = 0;
 
@@ -481,6 +483,8 @@ public:
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
 
   unsigned getProjectionCount(const RewriteSystem &system) const;
+
+  unsigned getDecomposeCount(const RewriteSystem &system) const;
 
   void findProtocolConformanceRules(
       llvm::SmallDenseMap<const ProtocolDecl *,

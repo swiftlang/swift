@@ -376,7 +376,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   auto localProtos = cast<IterableDeclContext>(derived.ConformanceDecl)
       ->getLocalProtocols();
   for (auto proto : localProtos) {
-    for (auto req : proto->getRequirementSignature()) {
+    for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
       auto *firstType = req.getFirstType()->getAs<DependentMemberType>();

@@ -25,6 +25,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Statistic.h"
@@ -229,9 +230,71 @@ RequirementMachine::buildRequirementsFromRules(
   return reqs;
 }
 
+/// Convert a list of protocol typealias rules to a list of name/underlying type
+/// pairs.
+std::vector<ProtocolTypeAlias>
+RequirementMachine::buildProtocolTypeAliasesFromRules(
+    ArrayRef<unsigned> rules,
+    TypeArrayView<GenericTypeParamType> genericParams) const {
+  std::vector<ProtocolTypeAlias> aliases;
+
+  if (getDebugOptions().contains(DebugFlags::Minimization)) {
+    llvm::dbgs() << "\nMinimized type aliases:\n";
+  }
+
+  for (unsigned ruleID : rules) {
+    const auto &rule = System.getRule(ruleID);
+    auto name = *rule.isProtocolTypeAliasRule();
+    Type underlyingType;
+
+    if (auto prop = rule.isPropertyRule()) {
+      assert(prop->getKind() == Symbol::Kind::ConcreteType);
+
+      // Requirements containing unresolved name symbols originate from
+      // invalid code and should not appear in the generic signature.
+      for (auto term : prop->getSubstitutions()) {
+        if (term.containsUnresolvedSymbols())
+          continue;
+      }
+
+      // Requirements containing error types originate from invalid code
+      // and should not appear in the generic signature.
+      if (prop->getConcreteType()->hasError())
+        continue;
+
+      underlyingType = Map.getTypeFromSubstitutionSchema(
+                           prop->getConcreteType(),
+                           prop->getSubstitutions(),
+                           genericParams, MutableTerm());
+    } else {
+      underlyingType = Map.getTypeForTerm(rule.getRHS(), genericParams);
+    }
+
+    aliases.emplace_back(name, underlyingType);
+
+    if (getDebugOptions().contains(DebugFlags::Minimization)) {
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
+
+      llvm::dbgs() << "- " << name << " == ";
+      underlyingType.print(llvm::dbgs(), opts);
+      llvm::dbgs() << "\n";
+    }
+  }
+
+  // Finally, sort the aliases in canonical order.
+  llvm::array_pod_sort(aliases.begin(), aliases.end(),
+                       [](const ProtocolTypeAlias *lhs,
+                          const ProtocolTypeAlias *rhs) -> int {
+                         return lhs->getName().compare(rhs->getName());
+                       });
+
+  return aliases;
+}
+
 /// Builds the requirement signatures for each protocol in this strongly
 /// connected component.
-llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
+llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
 RequirementMachine::computeMinimalProtocolRequirements() {
   auto protos = System.getProtocols();
 
@@ -249,19 +312,30 @@ RequirementMachine::computeMinimalProtocolRequirements() {
 
   auto rules = System.getMinimizedProtocolRules();
 
+  auto &ctx = Context.getASTContext();
+
   // Note that we build 'result' by iterating over 'protos' rather than
   // 'rules'; this is intentional, so that even if a protocol has no
   // rules, we still end up creating an entry for it in 'result'.
-  llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>> result;
+  llvm::DenseMap<const ProtocolDecl *, RequirementSignature> result;
   for (const auto *proto : protos) {
     auto genericParams = proto->getGenericSignature().getGenericParams();
-    result[proto] = buildRequirementsFromRules(rules[proto], genericParams);
+
+    const auto &entry = rules[proto];
+    auto reqs = ctx.AllocateCopy(
+            buildRequirementsFromRules(entry.Requirements,
+                                       genericParams));
+    auto aliases = ctx.AllocateCopy(
+            buildProtocolTypeAliasesFromRules(entry.TypeAliases,
+                                              genericParams));
+
+    result[proto] = RequirementSignature(reqs, aliases);
   }
 
   return result;
 }
 
-ArrayRef<Requirement>
+RequirementSignature
 RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
                                          ProtocolDecl *proto) const {
   ASTContext &ctx = proto->getASTContext();
@@ -296,11 +370,11 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
       if (otherProto != proto) {
         ctx.evaluator.cacheOutput(
           RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
-          ArrayRef<Requirement>());
+          RequirementSignature());
       }
     }
 
-    return ArrayRef<Requirement>();
+    return RequirementSignature();
   }
 
   auto minimalRequirements = machine->computeMinimalProtocolRequirements();
@@ -309,39 +383,44 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
   // The requirement signature for the actual protocol that the result
   // was kicked off with.
-  ArrayRef<Requirement> result;
+  Optional<RequirementSignature> result;
+
+  if (debug) {
+    llvm::dbgs() << "\nRequirement signatures:\n";
+  }
 
   for (const auto &pair : minimalRequirements) {
     auto *otherProto = pair.first;
     const auto &reqs = pair.second;
 
-    // setRequirementSignature() doesn't take ownership of the memory, so
-    // we have to make a copy of the std::vector temporary.
-    ArrayRef<Requirement> reqsCopy = ctx.AllocateCopy(reqs);
-
     // Dump the result if requested.
     if (debug) {
-      llvm::dbgs() << "Protocol " << otherProto->getName() << ": ";
+      llvm::dbgs() << "- Protocol " << otherProto->getName() << ": ";
 
       auto sig = GenericSignature::get(
           otherProto->getGenericSignature().getGenericParams(),
-          reqsCopy);
-      llvm::dbgs() << sig << "\n";
+          reqs.getRequirements());
+
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
+      sig.print(llvm::dbgs(), opts);
+      llvm::dbgs() << "\n";
     }
 
     // Don't call setRequirementSignature() on the original proto; the
     // request evaluator will do it for us.
     if (otherProto == proto)
-      result = reqsCopy;
+      result = reqs;
     else {
+      auto temp = reqs;
       ctx.evaluator.cacheOutput(
         RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
-        std::move(reqsCopy));
+        std::move(temp));
     }
   }
 
   // Return the result for the specific protocol this request was kicked off on.
-  return result;
+  return *result;
 }
 
 /// Builds the top-level generic signature requirements for this rewrite system.
@@ -398,6 +477,11 @@ AbstractGenericSignatureRequestRQM::evaluate(
       baseSignature.getRequirements().begin(),
       baseSignature.getRequirements().end());
 
+  // We need to create this errors vector to pass to
+  // desugarRequirement, but this request should never
+  // diagnose errors.
+  SmallVector<RequirementError, 4> errors;
+
   // The requirements passed to this request may have been substituted,
   // meaning the subject type might be a concrete type and not a type
   // parameter.
@@ -409,7 +493,7 @@ AbstractGenericSignatureRequestRQM::evaluate(
   // requirements where the subject type is always a type parameter,
   // which is what the RuleBuilder expects.
   for (auto req : addedRequirements)
-    desugarRequirement(req, requirements);
+    desugarRequirement(req, requirements, errors);
 
   // Heap-allocate the requirement machine to save stack space.
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
@@ -445,12 +529,13 @@ InferredGenericSignatureRequestRQM::evaluate(
       parentSig.getGenericParams().end());
 
   SmallVector<StructuralRequirement, 4> requirements;
+  SmallVector<RequirementError, 4> errors;
   for (const auto &req : parentSig.getRequirements())
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
 
   const auto visitRequirement = [&](const Requirement &req,
                                     RequirementRepr *reqRepr) {
-    realizeRequirement(req, reqRepr, parentModule, requirements);
+    realizeRequirement(req, reqRepr, parentModule, requirements, errors);
     return false;
   };
 
@@ -482,7 +567,7 @@ InferredGenericSignatureRequestRQM::evaluate(
         genericParams.push_back(gpType);
 
         realizeInheritedRequirements(gpDecl, gpType, parentModule,
-                                     requirements);
+                                     requirements, errors);
       }
 
       auto *lookupDC = (*gpList->begin())->getDeclContext();
@@ -547,6 +632,11 @@ InferredGenericSignatureRequestRQM::evaluate(
 
   auto result = GenericSignature::get(genericParams, minimalRequirements);
   bool hadError = machine->hadError();
+
+  if (ctx.LangOpts.RequirementMachineInferredSignatures ==
+      RequirementMachineMode::Enabled) {
+    hadError |= diagnoseRequirementErrors(ctx, errors, allowConcreteGenericParams);
+  }
 
   // FIXME: Handle allowConcreteGenericParams
 

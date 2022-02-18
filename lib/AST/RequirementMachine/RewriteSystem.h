@@ -140,6 +140,8 @@ public:
             RHS.containsUnresolvedSymbols());
   }
 
+  Optional<Identifier> isProtocolTypeAliasRule() const;
+
   void markLHSSimplified() {
     assert(!LHSSimplified);
     LHSSimplified = true;
@@ -314,7 +316,9 @@ public:
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  bool simplifySubstitutions(Symbol &symbol, RewritePath *path=nullptr) const;
+  Optional<unsigned>
+  simplifySubstitutions(Term baseTerm, Symbol symbol, const PropertyMap *map,
+                        RewritePath *path=nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -333,7 +337,7 @@ public:
 
   void simplifyRightHandSides();
 
-  void simplifyLeftHandSideSubstitutions();
+  void simplifyLeftHandSideSubstitutions(const PropertyMap *map);
 
   enum ValidityPolicy {
     AllowInvalidRequirements,
@@ -402,6 +406,10 @@ private:
   llvm::DenseMap<std::tuple<Term, Symbol, Symbol>, unsigned> DifferenceMap;
   std::vector<TypeDifference> Differences;
 
+  /// Avoid duplicate work when simplifying substitutions or rebuilding
+  /// the property map.
+  llvm::DenseSet<unsigned> CheckedDifferences;
+
 public:
   unsigned recordTypeDifference(const TypeDifference &difference);
 
@@ -411,6 +419,20 @@ public:
                         Optional<unsigned> &rhsDifferenceID);
 
   const TypeDifference &getTypeDifference(unsigned index) const;
+
+  void processTypeDifference(const TypeDifference &difference,
+                             unsigned differenceID,
+                             unsigned lhsRuleID,
+                             const RewritePath &rhsPath);
+
+  void buildRewritePathForJoiningTerms(MutableTerm lhsTerm,
+                                       MutableTerm rhsTerm,
+                                       RewritePath *path) const;
+
+  void buildRewritePathForUnifier(Term key,
+                                  unsigned lhsRuleID,
+                                  const RewritePath &rhsPath,
+                                  RewritePath *path) const;
 
 private:
   //////////////////////////////////////////////////////////////////////////////
@@ -435,7 +457,21 @@ private:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
+  /// A list of pairs where the first element is a rule number and the second
+  /// element is an equivalent rewrite path in terms of non-redundant rules.
+  std::vector<std::pair<unsigned, RewritePath>> RedundantRules;
+
+  /// Pairs of rules which together preclude a concrete type from satisfying the
+  /// requirements of the generic signature.
+  ///
+  /// Conflicts are detected in property map construction. Conflicts are
+  /// diagnosed and one of the rules in each pair is dropped during
+  /// minimization.
+  std::vector<std::pair<unsigned, unsigned>> ConflictingRules;
+
   void propagateExplicitBits();
+
+  void processConflicts();
 
   Optional<std::pair<unsigned, unsigned>>
   findRuleToDelete(llvm::function_ref<bool(unsigned)> isRedundantRuleFn);
@@ -452,6 +488,8 @@ public:
   void recordRewriteLoop(MutableTerm basepoint,
                          RewritePath path);
 
+  void recordConflict(unsigned existingRuleID, unsigned newRuleID);
+
   bool isInMinimizationDomain(const ProtocolDecl *proto) const;
 
   ArrayRef<RewriteLoop> getLoops() const {
@@ -462,7 +500,12 @@ public:
 
   bool hadError() const;
 
-  llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
+  struct MinimizedProtocolRules {
+    std::vector<unsigned> Requirements;
+    std::vector<unsigned> TypeAliases;
+  };
+
+  llvm::DenseMap<const ProtocolDecl *, MinimizedProtocolRules>
   getMinimizedProtocolRules() const;
 
   std::vector<unsigned> getMinimizedGenericSignatureRules() const;

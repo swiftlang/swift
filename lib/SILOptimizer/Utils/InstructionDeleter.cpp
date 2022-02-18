@@ -66,6 +66,12 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
     return true;
 
   switch (inst->getKind()) {
+  case SILInstructionKind::AllocStackInst: {
+    // An alloc_stack only used by dealloc_stack is dead.
+    return
+      fun->getEffectiveOptimizationMode() > OptimizationMode::NoOptimization
+      || !cast<AllocStackInst>(inst)->getVarInfo();
+  }
   case SILInstructionKind::LoadBorrowInst: {
     // A load_borrow only used in an end_borrow is dead.
     return true;
@@ -205,8 +211,8 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
       auto uses = llvm::to_vector<4>(result->getUses());
       for (Operand *use : uses) {
         SILInstruction *user = use->getUser();
-        assert(forceDeleteUsers || isIncidentalUse(user) ||
-               isa<DestroyValueInst>(user));
+        assert(forceDeleteUsers || isIncidentalUse(user)
+               || isa<DestroyValueInst>(user) || isa<DeallocStackInst>(user));
         assert(!isa<BranchInst>(user) && "can't delete phis");
 
         toDeleteInsts.push_back(user);
@@ -216,8 +222,12 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
     }
   }
   // Process the remaining operands. Insert destroys for consuming
-  // operands. Track newly dead operand values.
+  // operands. Track newly dead operand values. Instructions with multiple dead
+  // operands may occur in toDeleteInsts multiple times.
   for (auto *inst : toDeleteInsts) {
+    if (inst->isDeleted())
+      continue;
+
     for (Operand &operand : inst->getAllOperands()) {
       SILValue operandValue = operand.get();
       // Check for dead operands, which are dropped above.
@@ -249,6 +259,9 @@ void InstructionDeleter::cleanupDeadInstructions() {
     // append to deadInstructions. So we need to iterate until this it is empty.
     deadInstructions.clear();
     for (SILInstruction *deadInst : currentDeadInsts) {
+      if (deadInst->isDeleted())
+        continue;
+
       // deadInst will not have been deleted in the previous iterations,
       // because, by definition, deleteInstruction will only delete an earlier
       // instruction and its incidental/destroy uses. The former cannot be

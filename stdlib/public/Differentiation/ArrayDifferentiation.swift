@@ -110,6 +110,12 @@ where Element: Differentiable {
   }
 }
 
+extension Array.DifferentiableView: CustomReflectable {
+  public var customMirror: Mirror {
+    return base.customMirror
+  }
+}
+
 /// Makes `Array.DifferentiableView` additive as the product space.
 ///
 /// Note that `Array.DifferentiableView([])` is the zero in the product spaces

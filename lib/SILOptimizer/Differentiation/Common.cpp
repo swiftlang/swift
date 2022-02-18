@@ -452,6 +452,14 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
         config.parameterIndices,
         original->getInterfaceType()->castTo<AnyFunctionType>());
+
+    if (silParameterIndices->getCapacity() < parameterIndices->getCapacity()) {
+      assert(original->getCaptureInfo().hasLocalCaptures());
+      silParameterIndices =
+        silParameterIndices->extendingCapacity(original->getASTContext(),
+                                               parameterIndices->getCapacity());
+    }
+
     // If all indices in `parameterIndices` are in `daParameterIndices`, and
     // it has fewer indices than our current candidate and a primitive VJP,
     // then `attr` is our new candidate.

@@ -1225,29 +1225,6 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   return ConcreteDeclRef(foundDecl, subs);
 }
 
-unsigned ASTContext::getStringProcessingTupleDeclMaxArity() const {
-  return StringProcessingTupleDeclMaxArity;
-}
-
-StructDecl *ASTContext::getStringProcessingTupleDecl(unsigned arity) const {
-  assert(arity >= 2);
-  if (arity > StringProcessingTupleDeclMaxArity)
-    return nullptr;
-  if (StringProcessingTupleDecls.empty())
-    StringProcessingTupleDecls.append(
-      StringProcessingTupleDeclMaxArity - 1, nullptr);
-  auto &decl = StringProcessingTupleDecls[arity - 2];
-  if (decl)
-    return decl;
-  SmallVector<ValueDecl *, 1> results;
-  auto *spModule = getLoadedModule(Id_StringProcessing);
-  auto typeName = getIdentifier("Tuple" + llvm::utostr(arity));
-  spModule->lookupQualified(
-      spModule, DeclNameRef(typeName), NL_OnlyTypes, results);
-  assert(results.size() == 1);
-  return (decl = cast<StructDecl>(results[0]));
-}
-
 static
 FuncDecl *getBinaryComparisonOperatorIntDecl(const ASTContext &C, StringRef op,
                                              FuncDecl *&cached) {
@@ -1358,67 +1335,44 @@ ASTContext::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
   return nullptr;
 }
 
-FuncDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncoder(
+AbstractFunctionDecl *ASTContext::getRecordArgumentOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
-  for (auto result : nominal->lookupDirect(Id_recordArgument)) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-    if (fd->getParameters()->size() != 1)
-      continue;
-    if (fd->hasAsync())
-      continue;
-    if (!fd->hasThrows())
-      continue;
-    // TODO(distributed): more checks
-
-    if (fd->getResultInterfaceType()->isVoid())
-      return fd;
-  }
-
-  return nullptr;
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationEncoderRecordArgumentFunctionRequest{nominal},
+      nullptr);
 }
 
-FuncDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncoder(
+AbstractFunctionDecl *ASTContext::getRecordReturnTypeOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
-  for (auto result : nominal->lookupDirect(Id_recordErrorType)) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-    if (fd->getParameters()->size() != 1)
-      continue;
-    if (fd->hasAsync())
-      continue;
-    if (!fd->hasThrows())
-      continue;
-    // TODO(distributed): more checks
-
-    if (fd->getResultInterfaceType()->isVoid())
-      return fd;
-  }
-
-  return nullptr;
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationEncoderRecordReturnTypeFunctionRequest{nominal},
+      nullptr);
 }
 
-FuncDecl *ASTContext::getRecordReturnTypeOnDistributedInvocationEncoder(
+AbstractFunctionDecl *ASTContext::getRecordErrorTypeOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
-  for (auto result : nominal->lookupDirect(Id_recordReturnType)) {
-    auto *fd = dyn_cast<FuncDecl>(result);
-    if (!fd)
-      continue;
-    if (fd->getParameters()->size() != 1)
-      continue;
-    if (fd->hasAsync())
-      continue;
-    if (!fd->hasThrows())
-      continue;
-    // TODO(distributed): more checks
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationEncoderRecordErrorTypeFunctionRequest{nominal},
+      nullptr);
+}
 
-    if (fd->getResultInterfaceType()->isVoid())
-      return fd;
-  }
+AbstractFunctionDecl *ASTContext::getDecodeNextArgumentOnDistributedInvocationDecoder(
+    NominalTypeDecl *nominal) const {
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationDecoderDecodeNextArgumentFunctionRequest{nominal},
+      nullptr);
+}
 
-  return nullptr;
+AbstractFunctionDecl *ASTContext::getOnReturnOnDistributedTargetInvocationResultHandler(
+    NominalTypeDecl *nominal) const {
+  return evaluateOrDefault(
+      nominal->getASTContext().evaluator,
+      GetDistributedTargetInvocationResultHandlerOnReturnFunctionRequest{nominal},
+      nullptr);
 }
 
 FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
@@ -4302,9 +4256,6 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
 
 Type ExistentialType::get(Type constraint) {
   auto &C = constraint->getASTContext();
-  if (!C.LangOpts.EnableExplicitExistentialTypes)
-    return constraint;
-
   // FIXME: Any and AnyObject don't yet use ExistentialType.
   if (constraint->isAny() || constraint->isAnyObject())
     return constraint;
@@ -4504,10 +4455,10 @@ CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
     auto found = openedExistentialEnvironments.find(*knownID);
     
     if (found != openedExistentialEnvironments.end()) {
+      assert(found->second->getOpenedExistentialType()->isEqual(existential) &&
+             "Retrieved the wrong generic environment?");
       auto result = found->second->mapTypeIntoContext(interfaceType)
           ->castTo<OpenedArchetypeType>();
-      assert(result->getOpenedExistentialType()->isEqual(existential) &&
-             "Retrieved the wrong opened existential type?");
       return CanOpenedArchetypeType(result);
     }
   } else {
