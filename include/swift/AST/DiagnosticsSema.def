@@ -4988,7 +4988,7 @@ ERROR(unable_to_parse_c_function_type,none,
 
 // Opaque types
 ERROR(unsupported_opaque_type,none,
-      "'some' types are only implemented for the declared type of properties and subscripts and the return type of functions", ())
+      "'some' types are only permitted in properties, subscripts, and functions", ())
 
 ERROR(opaque_type_unsupported_pattern,none,
       "'some' type can only be declared on a single property declaration", ())
@@ -4997,9 +4997,9 @@ ERROR(opaque_type_in_protocol_requirement,none,
       "'some' type cannot be the return type of a protocol requirement; did you mean to add an associated type?",
       ())
 ERROR(opaque_type_in_parameter,none,
-      "'some' cannot appear in parameter position in result "
-      "type %0",
-      (Type))
+      "'some' cannot appear in parameter position in %select{result|parameter}0"
+      " type %1",
+      (bool, Type))
 
 // Function differentiability
 ERROR(attr_only_on_parameters_of_differentiable,none,
