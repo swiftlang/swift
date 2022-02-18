@@ -1504,12 +1504,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
     if (OpCode == SILInstructionKind::AllocRefDynamicInst) {
       assert(i + 2 == NumVals);
-      assert(!canAllocOnStack);
       SILType MetadataType = getSILType(MF->getType(ListOfValues[i+1]),
                                         SILValueCategory::Object, Fn);
       SILValue MetadataOp = getLocalValue(ListOfValues[i], MetadataType);
       ResultInst = Builder.createAllocRefDynamic(Loc, MetadataOp, ClassTy,
-                                                 isObjC, TailTypes, Counts);
+                                                 isObjC, canAllocOnStack,
+                                                 TailTypes, Counts);
     } else {
       assert(i == NumVals);
       ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack,

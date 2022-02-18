@@ -1571,6 +1571,40 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *fInverseApply,
   return true;
 }
 
+/// Should replace a call to `getContiguousArrayStorageType<A>(for:)` by the
+/// metadata constructor.
+/// We know that `getContiguousArrayStorageType` will not return the AnyObject
+/// type optimization for any non class or objc existential type instantiation.
+static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
+  auto metaTy = dyn_cast<MetatypeType>(storageMetaTy);
+  if (!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thick)
+    return false;
+
+  auto storageTy = metaTy.getInstanceType()->getCanonicalType();
+  if (!storageTy->is_ContiguousArrayStorage())
+    return false;
+
+  auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
+  if (!boundGenericTy)
+    return false;
+
+  for (auto TP : boundGenericTy->getGenericArgs()) {
+    auto ty = TP->getCanonicalType();
+    if (ty->getStructOrBoundGenericStruct() ||
+        ty->getEnumOrBoundGenericEnum() ||
+        isa<BuiltinVectorType>(ty) ||
+        isa<BuiltinIntegerType>(ty) ||
+        isa<BuiltinFloatType>(ty) ||
+        isa<TupleType>(ty) ||
+        isa<AnyFunctionType>(ty) ||
+        (ty->isAnyExistentialType() && !ty->isObjCExistentialType()))
+      return true;
+
+    return false;
+  }
+  return false;
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
@@ -1602,6 +1636,16 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       if (recursivelyCollectARCUsers(Users, AI)) {
         if (eraseApply(AI, Users))
           return nullptr;
+      }
+    }
+    if (SF->hasSemanticsAttr(semantics::ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE)) {
+      auto silTy = AI->getType();
+      auto storageTy = AI->getType().getASTType();
+      if (shouldReplaceCallByMetadataConstructor(storageTy)) {
+        auto metatype = Builder.createMetatype(AI->getLoc(), silTy);
+        AI->replaceAllUsesWith(metatype);
+        eraseInstFromFunction(*AI);
+        return nullptr;
       }
     }
   }

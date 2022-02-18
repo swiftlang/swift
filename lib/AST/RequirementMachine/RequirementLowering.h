@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
+#include "Diagnostics.h"
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -40,18 +41,26 @@ namespace rewriting {
 // documentation
 // comments.
 
-void desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
+void desugarRequirement(Requirement req,
+                        SmallVectorImpl<Requirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
 
 void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
                        SmallVectorImpl<StructuralRequirement> &result);
 
 void realizeRequirement(Requirement req, RequirementRepr *reqRepr,
                         ModuleDecl *moduleForInference,
-                        SmallVectorImpl<StructuralRequirement> &result);
+                        SmallVectorImpl<StructuralRequirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
 
 void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   ModuleDecl *moduleForInference,
-                                  SmallVectorImpl<StructuralRequirement> &result);
+                                  SmallVectorImpl<StructuralRequirement> &result,
+                                  SmallVectorImpl<RequirementError> &errors);
+
+bool diagnoseRequirementErrors(ASTContext &ctx,
+                               SmallVectorImpl<RequirementError> &errors,
+                               bool allowConcreteGenericParams);
 
 std::pair<MutableTerm, MutableTerm>
 getRuleForRequirement(const Requirement &req,

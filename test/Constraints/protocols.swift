@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -enable-explicit-existential-types
 
 protocol Fooable { func foo() }
 protocol Barable { func bar() }

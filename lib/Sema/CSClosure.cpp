@@ -531,6 +531,15 @@ private:
            "Unsupported statement: Fallthrough");
   }
 
+  void visitStmtCondition(LabeledConditionalStmt *S,
+                          SmallVectorImpl<ElementInfo> &elements,
+                          ConstraintLocator *locator) {
+    auto *condLocator =
+        cs.getConstraintLocator(locator, ConstraintLocator::Condition);
+    for (auto &condition : S->getCond())
+      elements.push_back(makeElement(&condition, condLocator));
+  }
+
   void visitIfStmt(IfStmt *ifStmt) {
     assert(isSupportedMultiStatementClosure() &&
            "Unsupported statement: If");
@@ -538,11 +547,7 @@ private:
     SmallVector<ElementInfo, 4> elements;
 
     // Condition
-    {
-      auto *condLoc =
-        cs.getConstraintLocator(locator, ConstraintLocator::Condition);
-      elements.push_back(makeElement(ifStmt->getCondPointer(), condLoc));
-    }
+    visitStmtCondition(ifStmt, elements, locator);
 
     // Then Branch
     {
@@ -565,24 +570,24 @@ private:
     assert(isSupportedMultiStatementClosure() &&
            "Unsupported statement: Guard");
 
-    createConjunction(cs,
-                      {makeElement(guardStmt->getCondPointer(),
-                                   cs.getConstraintLocator(
-                                       locator, ConstraintLocator::Condition)),
-                       makeElement(guardStmt->getBody(), locator)},
-                      locator);
+    SmallVector<ElementInfo, 4> elements;
+
+    visitStmtCondition(guardStmt, elements, locator);
+    elements.push_back(makeElement(guardStmt->getBody(), locator));
+
+    createConjunction(cs, elements, locator);
   }
 
   void visitWhileStmt(WhileStmt *whileStmt) {
     assert(isSupportedMultiStatementClosure() &&
            "Unsupported statement: While");
 
-    createConjunction(cs,
-                      {makeElement(whileStmt->getCondPointer(),
-                                   cs.getConstraintLocator(
-                                       locator, ConstraintLocator::Condition)),
-                       makeElement(whileStmt->getBody(), locator)},
-                      locator);
+    SmallVector<ElementInfo, 4> elements;
+
+    visitStmtCondition(whileStmt, elements, locator);
+    elements.push_back(makeElement(whileStmt->getBody(), locator));
+
+    createConjunction(cs, elements, locator);
   }
 
   void visitDoStmt(DoStmt *doStmt) {
@@ -970,8 +975,8 @@ ConstraintSystem::simplifyClosureBodyElementConstraint(
     return SolutionKind::Solved;
   } else if (auto *stmt = element.dyn_cast<Stmt *>()) {
     generator.visit(stmt);
-  } else if (auto *cond = element.dyn_cast<StmtCondition *>()) {
-    if (generateConstraints(*cond, closure))
+  } else if (auto *cond = element.dyn_cast<StmtConditionElement *>()) {
+    if (generateConstraints({*cond}, closure))
       return SolutionKind::Error;
   } else if (auto *pattern = element.dyn_cast<Pattern *>()) {
     generator.visitPattern(pattern, context);
@@ -1571,7 +1576,7 @@ void ConjunctionElement::findReferencedVariables(
 
   TypeVariableRefFinder refFinder(cs, locator->getAnchor(), typeVars);
 
-  if (element.is<Decl *>() || element.is<StmtCondition *>() ||
+  if (element.is<Decl *>() || element.is<StmtConditionElement *>() ||
       element.is<Expr *>() || element.isStmt(StmtKind::Return))
     element.walk(refFinder);
 }

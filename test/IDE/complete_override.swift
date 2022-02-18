@@ -442,7 +442,7 @@ class Deprecated2 : Deprecated1 {
 // DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};
 
 class EscapingBase {
-  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> (@escaping (@escaping ()->() )->()) { }
+  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> ((@escaping ()->() )->()) { }
   func autoclosure(arg: @autoclosure () -> Bool) {}
 }
 class Escaping : EscapingBase {

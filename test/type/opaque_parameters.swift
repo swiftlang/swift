@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-opaque-parameters -enable-parameterized-protocol-types -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-parameterized-protocol-types -disable-availability-checking
 
 protocol P { }
 
@@ -102,3 +102,10 @@ func testPrimaries(
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without more context}}
 }
+
+
+// Prohibit use of opaque parameters in consuming positions.
+typealias FnType<T> = (T) -> Void
+
+func consumingA(fn: (some P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}
+func consumingB(fn: FnType<some P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}

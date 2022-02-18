@@ -425,10 +425,10 @@ right:
     br trampoline(%copy : $C)
 
 trampoline(%copy_1 : @owned $C):
-    end_borrow %lifetime : $C
     br exit
 
 exit:
+    end_borrow %lifetime : $C
     %retval = tuple ()
     destroy_value %copy_1 : $C
     destroy_value %instance : $C
@@ -856,13 +856,14 @@ bad(%15 : @owned $Error):
 // CHECK:       [[LEFT]]:
 // CHECK:         apply undef()
 // CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
 // CHECK:         apply undef()
 // CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_up_to_two_barrier_applies'
 sil [ossa] @hoist_up_to_two_barrier_applies : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
@@ -951,6 +952,30 @@ exit(%value : @owned $C):
     destroy_value %instance : $C
     %retval = tuple ()
     return %retval : $()
+}
+
+// Don't hoist over begin_borrows of copies.
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_begin_borrow_copy : {{.*}} {
+// CHECK:         begin_borrow
+// CHECK:         copy_value
+// CHECK:         begin_borrow
+// CHECK:         end_borrow
+// CHECK-LABEL: } // end sil function 'dont_hoist_over_begin_borrow_copy'
+sil [ossa] @dont_hoist_over_begin_borrow_copy : $@convention(thin) (@owned C) -> (@owned C) {
+entry(%owned_in : @owned $C):
+  %borrow_1 = begin_borrow [lexical] %owned_in : $C
+  apply undef(%borrow_1) : $@convention(thin) (@guaranteed C) -> ()
+  %copy_1_1 = copy_value %borrow_1 : $C
+  %borrow_out = begin_borrow [lexical] %copy_1_1 : $C
+  %copy_2 = copy_value %borrow_out : $C
+  end_borrow %borrow_1 : $C
+  destroy_value %owned_in : $C
+  apply undef(%borrow_out) : $@convention(thin) (@guaranteed C) -> ()
+  br exit(%copy_1_1 : $C, %borrow_out : $C, %copy_2 : $C)
+exit(%copy_1_2 : @owned $C, %borrow_in : @guaranteed $C, %copy_2_2 : @owned $C):
+  end_borrow %borrow_in : $C
+  destroy_value %copy_1_2 : $C
+  return %copy_2_2 : $C
 }
 
 // =============================================================================

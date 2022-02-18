@@ -472,6 +472,23 @@ AvailabilityContext ASTContext::getSwift55Availability() {
 }
 
 AvailabilityContext ASTContext::getSwift56Availability() {
+  auto target = LangOpts.Target;
+
+  if (target.isMacOSX() ) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(12, 3, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(15, 4, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(8, 5, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
+AvailabilityContext ASTContext::getSwift57Availability() {
   return getSwiftFutureAvailability();
 }
 
@@ -503,6 +520,7 @@ ASTContext::getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) {
     case 4: return getSwift54Availability();
     case 5: return getSwift55Availability();
     case 6: return getSwift56Availability();
+    case 7: return getSwift57Availability();
     default: break;
     }
   }

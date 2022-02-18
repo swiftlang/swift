@@ -291,6 +291,7 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
 AllocRefDynamicInst *
 AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
                             SILValue metatypeOperand, SILType ty, bool objc,
+                            bool canBeOnStack,
                             ArrayRef<SILType> ElementTypes,
                             ArrayRef<SILValue> ElementCountOperands) {
   SmallVector<SILValue, 8> AllOperands(ElementCountOperands.begin(),
@@ -304,7 +305,18 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
                                                         ElementTypes.size());
   auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefDynamicInst));
   return ::new (Buffer)
-      AllocRefDynamicInst(DebugLoc, ty, objc, ElementTypes, AllOperands);
+      AllocRefDynamicInst(DebugLoc, ty, objc, canBeOnStack, ElementTypes,
+                          AllOperands);
+}
+
+bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const {
+  auto baseType = this->getType();
+  auto classType = baseType.getASTType();
+  // We know that the dynamic type for _ContiguousArrayStorage is compatible
+  // with the base type in size and deinit behavior.
+  if (classType->is_ContiguousArrayStorage())
+    return true;
+  return false;
 }
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
@@ -2902,6 +2914,42 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
   assert(ownershipKind &&
          "Conflicting ownership kinds when creating term inst from function "
          "result info?!");
+}
+
+bool OwnershipForwardingMixin::hasSameRepresentation(SILInstruction *inst) {
+  switch (inst->getKind()) {
+  default:
+    // Conservatively assume that a conversion changes representation.
+    // Operations can be added as needed to participate in SIL opaque values.
+    assert(OwnershipForwardingMixin::isa(inst));
+    return false;
+
+  case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::DestructureTupleInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::InitExistentialRefInst:
+  case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::OpenExistentialBoxValueInst:
+  case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenExistentialValueInst:
+  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::SelectEnumInst:
+  case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::TupleExtractInst:
+    return true;
+  }
+}
+
+bool OwnershipForwardingMixin::isAddressOnly(SILInstruction *inst) {
+  if (auto *aggregate =
+      dyn_cast<AllArgOwnershipForwardingSingleValueInst>(inst)) {
+    // If any of the operands are address-only, then the aggregate must be.
+    return aggregate->getType().isAddressOnly(*inst->getFunction());
+  }
+  // All other forwarding instructions must forward their first operand.
+  assert(OwnershipForwardingMixin::isa(inst));
+  return inst->getOperand(0)->getType().isAddressOnly(*inst->getFunction());
 }
 
 // This may be called in an invalid SIL state. SILCombine creates new

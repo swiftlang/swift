@@ -166,9 +166,8 @@ struct FakeActorSystem: DistributedActorSystem {
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-//          Act.ID == ActorID,
-          Err: Error
-  {
+          Act.ID == ActorID,
+          Err: Error {
     fatalError("not implemented: \(#function)")
   }
 }
@@ -268,6 +267,9 @@ struct FakeResultHandler: DistributedTargetInvocationResultHandler {
   func onReturn<Res>(value: Res) async throws {
     print("RETURN: \(value)")
   }
+  func onReturnVoid() async throws {
+    print("RETURN VOID:()")
+  }
   func onThrow<Err: Error>(error: Err) async throws {
     print("ERROR: \(error)")
   }
@@ -299,12 +301,12 @@ func test() async throws {
   let local = Greeter(system: system)
 
   // act as if we decoded an Invocation:
-  let emptyInvocation = FakeInvocationDecoder(args: [])
+  var emptyInvocation = FakeInvocationDecoder(args: [])
 
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: emptyName,
-      invocationDecoder: emptyInvocation,
+      invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: ()
@@ -312,7 +314,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: helloName,
-      invocationDecoder: emptyInvocation,
+      invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: Hello, World!
@@ -320,7 +322,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: answerName,
-      invocationDecoder: emptyInvocation,
+      invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: 42
@@ -328,7 +330,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: largeResultName,
-      invocationDecoder: emptyInvocation,
+      invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: LargeStruct(q: "question", a: 42, b: 1, c: 2.0, d: "Lorum ipsum")
@@ -336,7 +338,7 @@ func test() async throws {
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: enumResultName,
-      invocationDecoder: emptyInvocation,
+      invocationDecoder: &emptyInvocation,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: bar
@@ -346,11 +348,11 @@ func test() async throws {
   try echoInvocation.recordArgument(42)
   try echoInvocation.doneRecording()
 
-  let echoDecoder = echoInvocation.makeDecoder()
+  var echoDecoder = echoInvocation.makeDecoder()
   try await system.executeDistributedTarget(
       on: local,
       mangledTargetName: echoName,
-      invocationDecoder: echoDecoder,
+      invocationDecoder: &echoDecoder,
       handler: FakeResultHandler()
   )
   // CHECK: RETURN: Echo: name: Caplin, age: 42
@@ -361,11 +363,11 @@ func test() async throws {
   try generic1Invocation.recordArgument(42)
   try generic1Invocation.doneRecording()
 
-  let generic1Decoder = generic1Invocation.makeDecoder()
+  var generic1Decoder = generic1Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic1Name,
-    invocationDecoder: generic1Decoder,
+    invocationDecoder: &generic1Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
@@ -379,11 +381,11 @@ func test() async throws {
   try generic2Invocation.recordArgument("Ultimate Question!")
   try generic2Invocation.doneRecording()
 
-  let generic2Decoder = generic2Invocation.makeDecoder()
+  var generic2Decoder = generic2Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic2Name,
-    invocationDecoder: generic2Decoder,
+    invocationDecoder: &generic2Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
@@ -400,11 +402,11 @@ func test() async throws {
   try generic3Invocation.recordArgument(S(data: 42))
   try generic3Invocation.doneRecording()
 
-  let generic3Decoder = generic3Invocation.makeDecoder()
+  var generic3Decoder = generic3Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic3Name,
-    invocationDecoder: generic3Decoder,
+    invocationDecoder: &generic3Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
@@ -422,11 +424,11 @@ func test() async throws {
   try generic4Invocation.recordArgument(["a", "b", "c"])
   try generic4Invocation.doneRecording()
 
-  let generic4Decoder = generic4Invocation.makeDecoder()
+  var generic4Decoder = generic4Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic4Name,
-    invocationDecoder: generic4Decoder,
+    invocationDecoder: &generic4Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
@@ -446,11 +448,11 @@ func test() async throws {
   try generic5Invocation.recordArgument([0, 42])
   try generic5Invocation.doneRecording()
 
-  let generic5Decoder = generic5Invocation.makeDecoder()
+  var generic5Decoder = generic5Invocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: generic5Name,
-    invocationDecoder: generic5Decoder,
+    invocationDecoder: &generic5Decoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> A = 42, type(of:) = Int
@@ -469,11 +471,11 @@ func test() async throws {
   try genericOptInvocation.recordArgument([0, 42])
   try genericOptInvocation.doneRecording()
 
-  let genericOptDecoder = genericOptInvocation.makeDecoder()
+  var genericOptDecoder = genericOptInvocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: genericOptionalName,
-    invocationDecoder: genericOptDecoder,
+    invocationDecoder: &genericOptDecoder,
     handler: FakeResultHandler()
   )
   // CHECK: ---> T = [0, 42], type(of:) = Optional<Array<Int>>
@@ -484,11 +486,11 @@ func test() async throws {
   try decodeErrInvocation.recordArgument(42)
   try decodeErrInvocation.doneRecording()
 
-  let decodeErrDecoder = decodeErrInvocation.makeDecoder()
+  var decodeErrDecoder = decodeErrInvocation.makeDecoder()
   try await system.executeDistributedTarget(
     on: local,
     mangledTargetName: expectsDecodeErrorName,
-    invocationDecoder: decodeErrDecoder,
+    invocationDecoder: &decodeErrDecoder,
     handler: FakeResultHandler()
   )
   // CHECK: ERROR: ExecuteDistributedTargetError(message: "Failed to decode of Int??? (for a test)")

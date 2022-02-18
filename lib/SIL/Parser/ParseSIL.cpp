@@ -4359,10 +4359,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
     if (Opcode == SILInstructionKind::AllocRefDynamicInst) {
-      if (OnStack)
-        return true;
-
       ResultVal = B.createAllocRefDynamic(InstLoc, Metadata, ObjectType, IsObjC,
+                                          OnStack,
                                           ElementTypes, ElementCounts);
     } else {
       ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack,

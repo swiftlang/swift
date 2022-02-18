@@ -109,16 +109,16 @@ public protocol DistributedActorSystem: Sendable {
   @inlinable
   func makeInvocationEncoder() -> InvocationEncoder
 
-  /// Invoked by the Swift runtime when making a remote call.
-  ///
-  /// The `arguments` are the arguments container that was previously created
-  /// by `makeInvocationEncoder` and has been populated with all arguments.
-  ///
-  /// This method should perform the actual remote function call, and await for its response.
-  ///
-  /// ## Errors
-  /// This method is allowed to throw because of underlying transport or serialization errors,
-  /// as well as by re-throwing the error received from the remote callee (if able to).
+//  /// Invoked by the Swift runtime when making a remote call.
+//  ///
+//  /// The `arguments` are the arguments container that was previously created
+//  /// by `makeInvocationEncoder` and has been populated with all arguments.
+//  ///
+//  /// This method should perform the actual remote function call, and await for its response.
+//  ///
+//  /// ## Errors
+//  /// This method is allowed to throw because of underlying transport or serialization errors,
+//  /// as well as by re-throwing the error received from the remote callee (if able to).
 //  func remoteCall<Act, Err, Res>(
 //      on actor: Act,
 //      target: RemoteCallTarget,
@@ -130,6 +130,26 @@ public protocol DistributedActorSystem: Sendable {
 //            Act.ID == ActorID,
 //            Err: Error,
 //            Res: SerializationRequirement
+
+//  /// Invoked by the Swift runtime when making a remote call.
+//  ///
+//  /// The `arguments` are the arguments container that was previously created
+//  /// by `makeInvocationEncoder` and has been populated with all arguments.
+//  ///
+//  /// This method should perform the actual remote function call, and await for its response.
+//  ///
+//  /// ## Errors
+//  /// This method is allowed to throw because of underlying transport or serialization errors,
+//  /// as well as by re-throwing the error received from the remote callee (if able to).
+//  func remoteCallVoid<Act, Err>(
+//      on actor: Act,
+//      target: RemoteCallTarget,
+//      invocation: inout InvocationEncoder,
+//      throwing: Err.Type
+//  ) async throws -> Res
+//      where Act: DistributedActor,
+//            Act.ID == ActorID,
+//            Err: Error
 
 }
 
@@ -154,7 +174,7 @@ extension DistributedActorSystem {
   public func executeDistributedTarget<Act, ResultHandler>(
     on actor: Act,
     mangledTargetName: String,
-    invocationDecoder: InvocationDecoder,
+    invocationDecoder: inout InvocationDecoder,
     handler: ResultHandler
   ) async throws where Act: DistributedActor,
                        // Act.ID == ActorID, // FIXME(distributed): can we bring this back?
@@ -289,7 +309,7 @@ extension DistributedActorSystem {
       try await _executeDistributedTarget(
         on: actor,
         mangledTargetName, UInt(mangledTargetName.count),
-        argumentDecoder: invocationDecoder,
+        argumentDecoder: &invocationDecoder,
         argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
         resultBuffer: resultBuffer._rawValue,
         substitutions: UnsafeRawPointer(substitutionsBuffer),
@@ -309,10 +329,10 @@ extension DistributedActorSystem {
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_execute_target")
-func _executeDistributedTarget(
+func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
   on actor: AnyObject, // DistributedActor
   _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
-  argumentDecoder: AnyObject, // concrete type for `InvocationDecoder`
+  argumentDecoder: inout D,
   argumentTypes: Builtin.RawPointer,
   resultBuffer: Builtin.RawPointer,
   substitutions: UnsafeRawPointer?,
@@ -383,16 +403,21 @@ public protocol DistributedTargetInvocationEncoder {
 
 //  /// Ad-hoc requirement
 //  ///
-//  /// Record an argument of `Argument` type in this arguments storage.
+//  /// Record an argument of `Argument` type.
+//  /// This will be invoked for every argument of the target, in declaration order.
 //  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws
-  // TODO: offer recordArgument(label:type:)
+  // TODO(distributed): offer recordArgument(label:type:)
 
 //  /// Ad-hoc requirement
+//  ///
+//  /// Record the error type of the distributed method.
+//  /// This method will not be invoked if the target is not throwing.
 //  mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
 //  /// Ad-hoc requirement
 //  ///
 //  /// Record the return type of the distributed method.
+//  /// This method will not be invoked if the target is returning `Void`.
 //  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws
 
   mutating func doneRecording() throws
@@ -400,10 +425,10 @@ public protocol DistributedTargetInvocationEncoder {
 
 /// Decoder that must be provided to `executeDistributedTarget` and is used
 /// by the Swift runtime to decode arguments of the invocation.
-public protocol DistributedTargetInvocationDecoder : AnyObject {
+public protocol DistributedTargetInvocationDecoder {
   associatedtype SerializationRequirement
 
-  func decodeGenericSubstitutions() throws -> [Any.Type]
+  mutating func decodeGenericSubstitutions() throws -> [Any.Type]
 
 //  /// Ad-hoc protocol requirement
 //  ///
@@ -420,9 +445,9 @@ public protocol DistributedTargetInvocationDecoder : AnyObject {
 //  /// performs the actual distributed (local) instance method invocation.
 //  mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
 
-  func decodeErrorType() throws -> Any.Type?
+  mutating func decodeErrorType() throws -> Any.Type?
 
-  func decodeReturnType() throws -> Any.Type?
+  mutating func decodeReturnType() throws -> Any.Type?
 }
 
 @available(SwiftStdlib 5.7, *)
@@ -431,6 +456,8 @@ public protocol DistributedTargetInvocationResultHandler {
 
   // FIXME(distributed): these must be ad-hoc protocol requirements, because Res: SerializationRequirement !!!
   func onReturn<Res>(value: Res) async throws
+  func onReturnVoid() async throws
+
   func onThrow<Err: Error>(error: Err) async throws
 }
 

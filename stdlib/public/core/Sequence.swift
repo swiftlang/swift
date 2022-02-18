@@ -330,6 +330,12 @@ public protocol Sequence {
   /// encapsulates its iteration state.
   associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
 
+  // FIXME: <rdar://problem/34142121>
+  // This typealias should be removed as it predates the source compatibility
+  // guarantees of Swift 3, but it cannot due to a bug.
+  @available(*, unavailable, renamed: "Iterator")
+  typealias Generator = Iterator
+
   /// A type that represents a subsequence of some of the sequence's elements.
   // associatedtype SubSequence: Sequence = AnySequence<Element>
   //   where Element == SubSequence.Element,

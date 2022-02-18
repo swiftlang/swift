@@ -91,7 +91,9 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 // points. Transitively find all nested scope-ending instructions by looking
 // through nested reborrows. Nested reborrows are not use points.
 bool swift::findInnerTransitiveGuaranteedUses(
-    SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints) {
+  SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints) {
+
+  bool foundPointerEscape = false;
 
   auto leafUse = [&](Operand *use) {
     if (usePoints && use->getOperandOwnership() != OperandOwnership::NonUse) {
@@ -127,7 +129,9 @@ bool swift::findInnerTransitiveGuaranteedUses(
 
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
-      return false;
+      leafUse(use);
+      foundPointerEscape = true;
+      break;
 
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
@@ -143,17 +147,18 @@ bool swift::findInnerTransitiveGuaranteedUses(
       break;
 
     case OperandOwnership::InteriorPointer:
-      return false;
-
 #if 0 // FIXME!!! Enable in a following commit that fixes RAUW
-      // If our base guaranteed value does not have any consuming uses (consider
-      // function arguments), we need to be sure to include interior pointer
-      // operands since we may not get a use from a end_scope instruction.
+      // If our base guaranteed value does not have any consuming uses
+      // (consider function arguments), we need to be sure to include interior
+      // pointer operands since we may not get a use from a end_scope
+      // instruction.
       if (InteriorPointerOperand(use).findTransitiveUses(usePoints)
           != AddressUseKind::NonEscaping) {
-        return false;
+        foundPointerEscape = true;
       }
 #endif
+      leafUse(use);
+      foundPointerEscape = true;
       break;
 
     case OperandOwnership::ForwardingBorrow: {
@@ -192,7 +197,7 @@ bool swift::findInnerTransitiveGuaranteedUses(
       break;
     }
   }
-  return true;
+  return !foundPointerEscape;
 }
 
 /// Find all uses in the extended lifetime (i.e. including copies) of a simple
@@ -313,7 +318,7 @@ bool swift::findUsesOfSimpleValue(SILValue value,
             if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
               return false;
             }
-            usePoints->push_back(use);
+            usePoints->push_back(end);
             return true;
           })) {
         return false;
@@ -1055,7 +1060,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     // instruction
     if (isForwardingBorrow(value)) {
       if (auto *i = value->getDefiningInstruction()) {
-        llvm::copy(i->getOperandValues(true /*skip type dependent ops*/),
+        llvm::copy(i->getNonTypeDependentOperandValues(),
                    std::back_inserter(worklist));
         continue;
       }
@@ -1100,7 +1105,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
     // instruction
     if (isForwardingBorrow(currentValue)) {
       if (auto *i = currentValue->getDefiningInstruction()) {
-        auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
+        auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
         auto begin = instOps.begin();
@@ -1160,7 +1165,7 @@ bool swift::getAllOwnedValueIntroducers(
     // instruction
     if (isForwardingConsume(value)) {
       if (auto *i = value->getDefiningInstruction()) {
-        llvm::copy(i->getOperandValues(true /*skip type dependent ops*/),
+        llvm::copy(i->getNonTypeDependentOperandValues(),
                    std::back_inserter(worklist));
         continue;
       }
@@ -1201,7 +1206,7 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
     // instruction
     if (isForwardingConsume(currentValue)) {
       if (auto *i = currentValue->getDefiningInstruction()) {
-        auto instOps = i->getOperandValues(true /*ignore type dependent ops*/);
+        auto instOps = i->getNonTypeDependentOperandValues();
         // If we have multiple incoming values, return .None. We can't handle
         // this.
         auto begin = instOps.begin();

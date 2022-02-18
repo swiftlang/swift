@@ -46,6 +46,15 @@ enum IndirectionKind {
 };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
+/// Used to signal to emitDbgIntrinsic that we actually want to emit dbg.declare
+/// instead of dbg.addr. By default, we now emit llvm.dbg.addr instead of
+/// llvm.dbg.declare for normal variables. This is not true for metadata which
+/// truly are function wide and should be llvm.dbg.declare.
+enum class AddrDbgInstrKind : bool {
+  DbgDeclare,
+  DbgAddr,
+};
+
 /// Helper object that keeps track of the current CompileUnit, File,
 /// LexicalScope, and knows how to translate a \c SILLocation into an
 /// \c llvm::DebugLoc.
@@ -144,13 +153,19 @@ public:
                                Optional<SILLocation> VarLoc,
                                SILDebugVariable VarInfo,
                                IndirectionKind Indirection = DirectValue,
-                               ArtificialKind Artificial = RealValue);
+                               ArtificialKind Artificial = RealValue,
+                               AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
 
-  /// Emit a dbg.declare or dbg.value intrinsic, depending on Storage.
+  /// Emit a dbg.addr or dbg.value intrinsic, depending on Storage. If \p
+  /// ForceDbgDeclare is set to Yes, then instead of emitting a dbg.addr, we
+  /// will insert a dbg.declare. Please only use that if you know that the given
+  /// value can never be moved and have its lifetime ended early (e.x.: type
+  /// metadata).
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
-                        const SILDebugScope *DS, bool InCoroContext = false);
+                        const SILDebugScope *DS, bool InCoroContext = false,
+                        AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
 
   enum { NotHeapAllocated = false };
   

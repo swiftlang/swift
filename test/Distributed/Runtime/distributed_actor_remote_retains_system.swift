@@ -78,9 +78,9 @@ final class FakeActorSystem: DistributedActorSystem {
     returning: Res.Type
   ) async throws -> Res
     where Act: DistributedActor,
-    Err: Error,
-//          Act.ID == ActorID,
-    Res: SerializationRequirement {
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
     fatalError("Not implemented")
   }
 
@@ -91,9 +91,8 @@ final class FakeActorSystem: DistributedActorSystem {
     throwing: Err.Type
   ) async throws
     where Act: DistributedActor,
-    Err: Error
-//          Act.ID == ActorID
-  {
+          Act.ID == ActorID,
+          Err: Error {
     fatalError("Not implemented")
   }
 }

@@ -401,7 +401,7 @@ bool SILBasicBlock::hasPhi() const {
   // It is sufficient to check whether the first argument is a phi.  A block
   // can't have both phis and terminator results.
   auto *argument = getArguments()[0];
-  return argument->isPhiArgument();
+  return argument->isPhi();
 }
 
 const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {

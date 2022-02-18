@@ -5,6 +5,35 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0341][]:
+
+  Opaque types can now be used in the parameters of functions and subscripts, wher they provide a shorthand syntax for the introduction of a generic parameter. For example, the following:
+
+  ```swift
+  func horizontal(_ v1: some View, _ v2: some View) -> some View {
+    HStack {
+      v1
+      v2
+    }
+  }
+  ```
+
+  is equivalent to
+
+  ```swift
+  func horizontal<V1: View, V2: View>(_ v1: V1, _ v2: V2) -> some View {
+    HStack {
+      v1
+      v2
+    }
+  }
+  ```
+
+  With this, `some` in a parameter type provides a generalization where the
+  caller chooses the parameter's type as well as its value, whereas `some` in
+  the result type provides a generalization where the callee chooses the
+  resulting type and value.
+
 * The compiler now correctly emits warnings for more kinds of expressions where a protocol conformance is used and may be unavailable at runtime. Previously, member reference expressions and type erasing expressions that used potentially unavailable conformances were not diagnosed, leading to potential crashes at runtime.
 
   ```swift
@@ -8962,6 +8991,7 @@ Swift 1.0
 [SE-0331]: <https://github.com/apple/swift-evolution/blob/main/proposals/0331-remove-sendable-from-unsafepointer.md>
 [SE-0337]: <https://github.com/apple/swift-evolution/blob/main/proposals/0337-support-incremental-migration-to-concurrency-checking.md>
 [SE-0335]: <https://github.com/apple/swift-evolution/blob/main/proposals/0335-existential-any.md>
+[SE-0341]: <https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
