@@ -323,6 +323,11 @@ GlobalActorAttributeRequest::evaluate(
   // Check that a global actor attribute makes sense on this kind of
   // declaration.
   auto decl = subject.get<Decl *>();
+
+  // no further checking required if it's from a serialized module.
+  if (decl->getDeclContext()->getParentSourceFile() == nullptr)
+    return result;
+
   auto globalActorAttr = result->first;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     // Nominal types are okay...
@@ -358,7 +363,7 @@ GlobalActorAttributeRequest::evaluate(
           if (isa<StructDecl>(nominal) && !isWrappedValueOfPropWrapper(var)) {
 
             var->diagnose(diag::global_actor_on_storage_of_value_type,
-                          var->getName(), nominal->getDescriptiveKind())
+                          var->getName())
               .highlight(globalActorAttr->getRangeWithAt())
               .warnUntilSwiftVersion(6);
 
