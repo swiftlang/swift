@@ -1347,8 +1347,9 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     SearchPathOpts.DeserializedPathRecoverer);
   SearchPathOpts.DeserializedPathRecoverer
     .forEachPair([&](StringRef lhs, StringRef rhs) {
-      GenericArgs.push_back(ArgSaver.save(llvm::Twine("-serialized-path-obfuscate ")
-        + lhs + "=" + rhs).str());
+      GenericArgs.push_back("-serialized-path-obfuscate");
+      std::string pair = (llvm::Twine(lhs) + "=" + rhs).str();
+      GenericArgs.push_back(ArgSaver.save(pair));
   });
 }
 
