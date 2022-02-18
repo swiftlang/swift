@@ -31,6 +31,11 @@ class DeclContext;
 class FuncDecl;
 class NominalTypeDecl;
 
+/// Determine the concrete type of 'ActorSystem' as seen from the member.
+/// E.g. when in a protocol, and trying to determine what the actor system was
+/// constrained to.
+Type getConcreteReplacementForProtocolActorSystemType(ValueDecl *member);
+
 /// Determine the `ActorSystem` type for the given actor.
 Type getDistributedActorSystemType(NominalTypeDecl *actor);
 

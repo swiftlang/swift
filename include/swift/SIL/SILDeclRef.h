@@ -105,6 +105,7 @@ struct SILDeclRef {
     /// entry point of a class ConstructorDecl or the constructor of a value
     /// ConstructorDecl.
     Allocator,
+
     /// Initializer - this constant references the initializing constructor
     /// entry point of the class ConstructorDecl in loc.
     Initializer,

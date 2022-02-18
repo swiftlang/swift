@@ -20,6 +20,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
@@ -40,20 +41,152 @@ using namespace Lowering;
 /// Obtain a nominal type's member by name, as a VarDecl.
 /// \returns nullptr if the name lookup doesn't resolve to exactly one member,
 ///          or the subsequent cast to VarDecl failed.
-static VarDecl* lookupProperty(NominalTypeDecl *ty, DeclName name) {
-  auto refs = ty->lookupDirect(name);
-  if (refs.size() != 1)
-    return nullptr;
-  return dyn_cast<VarDecl>(refs.front());
+static VarDecl* lookupProperty(NominalTypeDecl *decl, DeclName name) {
+  assert(decl && "decl was null");
+  auto &C = decl->getASTContext();
+  
+  if (auto clazz = dyn_cast<ClassDecl>(decl)) {
+    auto refs = decl->lookupDirect(name);
+    if (refs.size() != 1)
+      return nullptr;
+    return dyn_cast<VarDecl>(refs.front());
+  }
+  
+  return nullptr;
 }
 
 /// Emit a reference to a specific stored property of the actor.
 static SILValue emitActorPropertyReference(
     SILGenFunction &SGF, SILLocation loc, SILValue actorSelf,
     VarDecl *property) {
+  assert(property);
   Type formalType = SGF.F.mapTypeIntoContext(property->getInterfaceType());
   SILType loweredType = SGF.getLoweredType(formalType).getAddressType();
   return SGF.B.createRefElementAddr(loc, actorSelf, property, loweredType);
+}
+
+static SILValue emitActorPropertyOrWitnessReference(
+    SILGenFunction &SGF, SILGenBuilder &B,
+    SILLocation loc, SILValue base,
+    NominalTypeDecl *selfTyDecl,
+    SILType propertyType, Identifier identifier) {
+  /// If we're a class, just get the local property VarDecl and refer to it
+  if (auto clazz = dyn_cast<ClassDecl>(selfTyDecl)) {
+    return emitActorPropertyReference(
+        SGF, loc, base,
+        lookupProperty(selfTyDecl, identifier));
+  }
+
+  // Else, it may be a protocol, so we'd need to get the property via witness
+  if (auto protocol = dyn_cast<ProtocolDecl>(selfTyDecl)) {
+    auto &F = B.getFunction();
+    auto &M = B.getModule();
+    auto &C = protocol->getASTContext();
+    auto DA = C.getDistributedActorDecl();
+
+    fprintf(stderr, "[%s:%d] (%s) BASE IS PROTOCOL\n", __FILE__, __LINE__, __FUNCTION__);
+    protocol->dump();
+
+    // === Find the <Protocol>.<property>!getter function
+    auto actorASTType = base->getType().getASTType();
+    auto *module = M.getSwiftModule();
+    ProtocolConformanceRef actorConfRef;
+
+    // If the base is an existential open it.
+    if (actorASTType->isAnyExistentialType()) {
+      OpenedArchetypeType *opened;
+      actorASTType =
+          actorASTType->openAnyExistentialType(opened)->getCanonicalType();
+      base = B.createOpenExistentialAddr(
+          loc, base, F.getLoweredType(actorASTType),
+          OpenedExistentialAccess::Immutable);
+    }
+
+    if (actorASTType->isTypeParameter() || actorASTType->is<ArchetypeType>()) {
+      actorConfRef = ProtocolConformanceRef(DA);
+    } else {
+      actorConfRef = module->lookupConformance(actorASTType, DA);
+    }
+    assert(!actorConfRef.isInvalid() &&
+           "Missing conformance to `DistributedActor`");
+
+    // Dig out the var, and get the accessor for it (since a protocol req)
+    auto var = cast<VarDecl>(DA->getSingleRequirement(identifier));
+    fprintf(stderr, "[%s:%d] (%s) var:::\n", __FILE__, __LINE__, __FUNCTION__);
+    var->dump();
+    auto getAccessor = var->getAccessor(swift::AccessorKind::Get);
+    fprintf(stderr, "[%s:%d] (%s) getter:::\n", __FILE__, __LINE__, __FUNCTION__);
+    getAccessor->dump();
+
+    auto methodRef = SILDeclRef(getAccessor, SILDeclRef::Kind::Func);
+    fprintf(stderr, "[%s:%d] (%s) ref:::\n", __FILE__, __LINE__, __FUNCTION__);
+    methodRef.dump();
+    auto methodSILTy =
+        M.Types.getConstantInfo(B.getTypeExpansionContext(), methodRef)
+            .getSILType();
+
+    // === Make a reference to the getter
+    // --- buffer for the system to be stored
+    Optional<SILValue> temporaryResultBuffer;
+    auto buf = B.createAllocStack(loc, propertyType, None);
+    temporaryResultBuffer = SILValue(buf);
+
+    //   %5 = witness_method $Self, #DistributedActor.actorSystem!getter : <Self where Self : DistributedActor> (Self) -> () -> Self.ActorSystem : $@convention(witness_method: DistributedActor) <τ_0_0 where τ_0_0 : DistributedActor> (@in_guaranteed τ_0_0) -> @out τ_0_0.ActorSystem
+    auto witnessMethod = B.createWitnessMethod(
+        loc, actorASTType, actorConfRef, methodRef, methodSILTy);
+    fprintf(stderr, "[%s:%d] (%s) witness method\n", __FILE__, __LINE__, __FUNCTION__);
+    witnessMethod->dump();
+
+    // === Apply the getter, getting us the actual value
+    // prepare conformance substitutions
+    SubstitutionMap subs;
+    {
+      auto genericSig = getAccessor->getGenericSignature();
+      SmallVector<Type, 1> subTypes;
+      SmallVector<ProtocolConformanceRef, 1> subConformances;
+      subTypes.push_back(actorASTType);
+      subConformances.push_back(actorConfRef);
+//      if (actorType) {
+//        ProtocolDecl *actorProto = C.getProtocol(
+//            KnownProtocolKind::DistributedActor);
+//        assert(actorProto);
+//
+//        ProtocolConformanceRef conformance;
+//        auto distributedActorConfRef = module->lookupConformance(
+//            actorType.getASTType(), actorProto);
+//        assert(!distributedActorConfRef.isInvalid() &&
+//               "Missing conformance to `DistributedActor`");
+//        subTypes.push_back(actorType.getASTType());
+//        subConformances.push_back(distributedActorConfRef);
+//      }
+
+      subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
+    }
+
+    SmallVector<SILValue, 2> allArgs;
+    if (temporaryResultBuffer.hasValue()) {
+      allArgs.push_back(temporaryResultBuffer.getValue());
+    }
+    allArgs.push_back(base); // self
+
+    // --- Apply the getter
+    //   %6 = apply %5<Self>(%4, %2) : $@convention(witness_method: DistributedActor) <τ_0_0 where τ_0_0 : DistributedActor> (@in_guaranteed τ_0_0) -> @out τ_0_0.ActorSystem
+    auto apply = B.createApply( loc, witnessMethod, subs, allArgs);
+    apply->dump();
+
+    // --- Cleanup base buffer
+    if (temporaryResultBuffer) {
+      auto value = B.emitLoadValueOperation(
+          loc, *temporaryResultBuffer, LoadOwnershipQualifier::Take);
+      B.emitDestroyValueOperation(loc, value);
+      B.createDeallocStack(loc, *temporaryResultBuffer);
+    }
+
+    // %7 = load [trivial] %4 : $*SYSTEM_IMPL
+    return B.emitLoadValueOperation(loc, *temporaryResultBuffer, LoadOwnershipQualifier::Take);
+  }
+
+  llvm_unreachable("Unsupported self type decl!");
 }
 
 /// Perform an initializing store to the given property using the value
@@ -656,8 +789,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   loc.markAutoGenerated();
   Scope scope(Cleanups, CleanupLocation(loc));
 
-  auto methodTy = SGM.Types.getConstantOverrideType(getTypeExpansionContext(),
-                                                    thunk);
+  auto methodTy =
+      SGM.Types.getConstantOverrideType(getTypeExpansionContext(), thunk);
   auto derivativeFnSILTy = SILType::getPrimitiveObjectType(methodTy);
   auto silFnType = derivativeFnSILTy.castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGM.M);
@@ -689,9 +822,13 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   auto neverTy = F.mapTypeIntoContext(ctx.getNeverType());
   auto effectiveErrorTy = fd->hasThrows() ? errorTy : neverTy;
 
+  // === `ActorSystem` type
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(fd);
+  auto systemSILTy = getLoweredType(systemTy);
+
   // === `InvocationEncoder` types
   AbstractFunctionDecl *makeInvocationEncoderFnDecl =
-      ctx.getMakeInvocationEncoderOnDistributedActorSystem(selfTyDecl);
+      ctx.getMakeInvocationEncoderOnDistributedActorSystem(fd);
   assert(makeInvocationEncoderFnDecl && "no 'makeInvocationEncoder' func found!");
   auto makeInvocationEncoderFnRef = SILDeclRef(makeInvocationEncoderFnDecl);
 
@@ -786,7 +923,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     emitThrowWithCleanupBasicBlock(*this, loc, thunk, localCallErrorBB, errorBB);
   }
 
-
   // === Remote Call -----------------------------------------------------------
   SILGenFunctionBuilder builder(SGM);
   // {
@@ -814,10 +950,17 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       invocationEncoder = emitManagedBufferWithCleanup(invocationEncoderBuf);
 
       // === get the actorSystem property
-      // %16 = ref_element_addr %2 : $MyDistActor, #MyDistActor.actorSystem // user: %17
-      auto systemRef = emitActorPropertyReference(
-          *this, loc, selfValue.getValue(),
-          lookupProperty(selfTyDecl, ctx.Id_actorSystem));
+      // In concrete actor:
+      //     %16 = ref_element_addr %2 : $MyDistActor, #MyDistActor.actorSystem // user: %17
+      // In protocol/extension:
+      //     %4 = alloc_stack $SYSTEM_IMPL                   // users: %9, %7, %6
+      //     %5 = witness_method $Self, #DistributedActor.actorSystem!getter : <Self where Self : DistributedActor> (Self) -> () -> Self.ActorSystem : $@convention(witness_method: DistributedActor) <τ_0_0 where τ_0_0 : DistributedActor> (@in_guaranteed τ_0_0) -> @out τ_0_0.ActorSystem // user: %6
+      //     %6 = apply %5<Self>(%4, %2) : $@convention(witness_method: DistributedActor) <τ_0_0 where τ_0_0 : DistributedActor> (@in_guaranteed τ_0_0) -> @out τ_0_0.ActorSystem
+      auto systemRef = emitActorPropertyOrWitnessReference(
+          *this, B, loc,
+          selfValue.getValue(), selfTyDecl,
+          systemSILTy, ctx.Id_actorSystem);
+      assert(systemRef && "Could not find actorSystem property or requirement");
 
       auto actorSystemTy = systemRef->getType();
 
@@ -831,16 +974,11 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
           systemLoaded = B.createTrivialLoadOr(
               loc, systemRef, LoadOwnershipQualifier::Copy);
         } else {
-          assert(false);
+          systemLoaded = B.emitCopyValueOperation(loc, systemRef);
+//          actorSystemTy.dump();
+//          llvm_unreachable("Cannot support non address actor system here?");
         }
       }
-
-//            if (!actorSystemTy.isAddressOnly(F) &&
-//                !actorSystemTy.isTrivial(F)) {
-//              // retain_value %17 : $FakeActorSystem // id: %18
-//              B.createRetainValue(loc, systemLoaded,
-//                                  RefCountingInst::Atomicity::Atomic);
-//            }
 
       // function_ref FakeActorSystem.makeInvocationEncoder()
       // %19 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV21makeInvocationEncoderAA0aG0VyF : $@convention(method) (@guaranteed FakeActorSystem) -> FakeInvocation // user: %20
@@ -1155,16 +1293,14 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
           // --- Codable: Decodable
           auto decodableRequirementTy = ctx.getProtocol(
-              KnownProtocolKind::Decodable); // FIXME(distributed): actually use
-                                             // SerializationRequirement
+              KnownProtocolKind::Decodable); // FIXME(distributed): actually use SerializationRequirement
           auto paramDecodableTypeConfRef = module->lookupConformance(
               paramTy, decodableRequirementTy);
           subConformances.push_back(paramDecodableTypeConfRef);
 
           // --- Codable: Encodable
           auto encodableRequirementTy = ctx.getProtocol(
-              KnownProtocolKind::Encodable); // FIXME(distributed): actually use
-                                             // SerializationRequirement
+              KnownProtocolKind::Encodable); // FIXME(distributed): actually use SerializationRequirement
           auto paramEncodableTypeConfRef = module->lookupConformance(
               paramTy, encodableRequirementTy);
           subConformances.push_back(paramEncodableTypeConfRef);
@@ -1344,7 +1480,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     auto remoteCallTargetDecl = ctx.getRemoteCallTargetDecl();
     auto remoteCallTargetTy = F.mapTypeIntoContext(remoteCallTargetDecl->getDeclaredInterfaceType());
     ManagedValue remoteCallTargetValue;
-    LoadInst *remoteCallSystemSelf = nullptr;
+    // LoadInst *remoteCallSystemSelf = nullptr;
+    SILValue systemRef;
     SILBasicBlock *remoteCallReturnBB = createBasicBlock("remoteCallReturnBB");
     SILBasicBlock *remoteCallErrorBB = createBasicBlock("remoteCallErrorBB");
     ManagedValue remoteCallReturnValue;
@@ -1389,10 +1526,16 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto remoteCallReturnBuf = emitTemporaryAllocation(loc, resultType);
       remoteCallReturnValue = emitManagedBufferWithCleanup(remoteCallReturnBuf);
 
-      auto systemRef = emitActorPropertyReference(
-          *this, loc, selfValue.getValue(),
-          lookupProperty(selfTyDecl, ctx.Id_actorSystem));
-      remoteCallSystemSelf = B.createTrivialLoadOr(loc, systemRef, LoadOwnershipQualifier::Copy);
+//      auto systemRef = emitActorPropertyReference(
+//          *this, loc, selfValue.getValue(),
+//          lookupProperty(selfTyDecl, ctx.Id_actorSystem));
+      systemRef = emitActorPropertyOrWitnessReference(
+          *this, B, loc,
+          selfValue.getValue(), selfTyDecl,
+          systemSILTy, ctx.Id_actorSystem);
+      assert(systemRef);
+      F.dump();
+//      remoteCallSystemSelf = B.createTrivialLoadOr(loc, systemRef, LoadOwnershipQualifier::Copy);
 
       // --- Prepare 'throwing' type, Error or Never depending on throws of the target
       auto effectiveErrorMetatype = getLoweredType(
@@ -1502,7 +1645,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       if (!resultType.isVoid())
         remoteCallArgs.push_back(returnMetatypeValue); // returning type, only if non-void
       // self:
-      remoteCallArgs.push_back(remoteCallSystemSelf); // ActorSystem
+      remoteCallArgs.push_back(systemRef); // ActorSystem
 
       // try_apply %49<MyDistActor, Never, String>(%38, %2, %28, %48, %43, %46, %40) : $@convention(method) @async <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : DistributedActor, τ_0_2 : Decodable, τ_0_2 : Encodable, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @in_guaranteed RemoteCallTarget, @inout FakeInvocation, @thick τ_0_1.Type, Optional<@thick τ_0_2.Type>, @guaranteed FakeActorSystem) -> (@out τ_0_2, @error Error), normal bb5, error bb10 // id: %50
       B.createTryApply(loc, remoteCallFn,
@@ -1524,11 +1667,11 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       B.createDestroyAddr(loc, result);
 //      B.createDeallocStack(loc, result);
 
-      // FIXME: these are very hacky, how to do properly?
-      if (!remoteCallSystemSelf->getType().isTrivial(F))
-        B.createDestroyValue(loc, remoteCallSystemSelf);
-      if (remoteCallSystemSelf->getType().isAddress())
-        B.createEndLifetime(loc, remoteCallSystemSelf);
+//      // FIXME: these are very hacky, how to do properly?
+//      if (!systemRef->getType().isTrivial(F))
+//        B.createDestroyValue(loc, remoteCallSystemSelf);
+//      if (remoteCallSystemSelf->getType().isAddress())
+//        B.createEndLifetime(loc, remoteCallSystemSelf);
 
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
       Cleanups.emitCleanupsForReturn(CleanupLocation(loc), NotForUnwind);
@@ -1547,11 +1690,11 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       // TODO(distributed): make those into cleanups
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
 
-      // FIXME: these are very hacky, how to do properly?
-      if (!remoteCallSystemSelf->getType().isTrivial(F))
-        B.createDestroyValue(loc, remoteCallSystemSelf);
-      if (remoteCallSystemSelf->getType().isAddress())
-        B.createEndLifetime(loc, remoteCallSystemSelf);
+//      // FIXME: these are very hacky, how to do properly?
+//      if (!remoteCallSystemSelf->getType().isTrivial(F))
+//        B.createDestroyValue(loc, remoteCallSystemSelf);
+//      if (remoteCallSystemSelf->getType().isAddress())
+//        B.createEndLifetime(loc, remoteCallSystemSelf);
 
       Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
 
@@ -1577,4 +1720,10 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
     B.createThrow(loc, error);
   }
+
+  fprintf(stderr, "[%s:%d] (%s) ==============================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ==============================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  F.dump();
+  fprintf(stderr, "[%s:%d] (%s) ==============================================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ==============================================================================\n", __FILE__, __LINE__, __FUNCTION__);
 }

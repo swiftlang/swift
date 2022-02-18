@@ -101,19 +101,53 @@ VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
 
 VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *actor) const {
-  if (!actor->isDistributedActor())
-    return nullptr;
-
   auto &C = actor->getASTContext();
+  auto module = actor->getParentModule();
+//  auto module = C.getStdlibModule();
+
+  auto sys = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  sys->dump();
+  auto f = sys->lookupDirect(C.Id_makeInvocationEncoder);
 
   // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
   // we won't be emitting the offending decl after all.
   if (!C.getLoadedModule(C.Id_Distributed))
     return nullptr;
 
-  auto module = C.getStdlibModule();
+  if (!actor->isDistributedActor())
+    return nullptr;
+
+  auto expectedSystemType = getDistributedActorSystemType(actor);
+  fprintf(stderr, "[%s:%d] (%s) expectedSystemType\n", __FILE__, __LINE__, __FUNCTION__);
+  expectedSystemType.dump();
   auto DistSystemProtocol =
       C.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  fprintf(stderr, "[%s:%d] (%s) DistSystemProtocol\n", __FILE__, __LINE__, __FUNCTION__);
+  DistSystemProtocol->dump();
+
+  if (auto proto = dyn_cast<ProtocolDecl>(actor)) {
+    fprintf(stderr, "[%s:%d] (%s) protocol!\n", __FILE__, __LINE__, __FUNCTION__);
+    proto->dump();
+
+    if (auto systemAssocTyDecl = proto->getAssociatedType(C.Id_ActorSystem)) {
+      assert(false && "handling assoc type in protocol not handled");
+    }
+
+    auto DistributedActorProto = C.getDistributedActorDecl();
+    for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem, {})) {
+      if (auto var = dyn_cast<VarDecl>(system)) {
+        auto conformance = module->conformsToProtocol(var->getInterfaceType(),
+                                                      DistSystemProtocol);
+
+        if (conformance.isInvalid())
+          continue;
+
+        return var;
+      }
+    }
+
+    return nullptr;
+  }
 
   for (auto system : actor->lookupDirect(C.Id_actorSystem)) {
     if (auto var = dyn_cast<VarDecl>(system)) {
