@@ -296,6 +296,18 @@ static llvm::cl::opt<OptimizationMode> OptModeFlag(
                                 "ignore debug info, reduce runtime")),
     llvm::cl::init(OptimizationMode::NotSet));
 
+static llvm::cl::opt<IRGenDebugInfoLevel> IRGenDebugInfoLevelArg(
+    "irgen-debuginfo-level", llvm::cl::desc("IRGen debug info level"),
+    llvm::cl::values(clEnumValN(IRGenDebugInfoLevel::None, "none",
+                                "No debug info"),
+                     clEnumValN(IRGenDebugInfoLevel::LineTables, "line-tables",
+                                "Line tables only"),
+                     clEnumValN(IRGenDebugInfoLevel::ASTTypes, "ast-types",
+                                "Line tables + AST type references"),
+                     clEnumValN(IRGenDebugInfoLevel::DwarfTypes, "dwarf-types",
+                                "Line tables + AST type refs + Dwarf types")),
+    llvm::cl::init(IRGenDebugInfoLevel::ASTTypes));
+
 static llvm::cl::opt<OptGroup> OptimizationGroup(
     llvm::cl::desc("Predefined optimization groups:"),
     llvm::cl::values(
@@ -684,6 +696,7 @@ int main(int argc, char **argv) {
   } else {
     IRGenOpts.OptMode = OptModeFlag;
   }
+  IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevelArg;
 
   // Note: SILOpts, LangOpts, and IRGenOpts must be set before the
   // CompilerInstance is initializer below based on Invocation.
