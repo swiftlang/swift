@@ -392,18 +392,27 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
 static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
                                      OwnershipFixupContext &context) {
   switch (oldValue.getOwnershipKind()) {
-  case OwnershipKind::Guaranteed:
+  case OwnershipKind::Guaranteed: {
     // Check that the old lifetime can be extended and record the necessary
     // book-keeping in the OwnershipFixupContext.
     context.clear();
 
     // Check that no transitive uses have a PointerEscape, and record the leaf
     // uses for liveness extension.
-    if (!findExtendedTransitiveGuaranteedUses(oldValue,
-                                              context.guaranteedUsePoints))
+    //
+    // FIXME: Use findExtendedTransitiveGuaranteedUses and switch the
+    // implementation of borrowCopyOverGuaranteedUses to
+    // GuaranteedOwnershipExtension.  Utils then, reborrows are considered
+    // pointer escapes, causing findTransitiveGuaranteedUses to return false. So
+    // they can be ignored.
+    auto visitReborrow = [&](Operand *reborrow) {};
+    if (!findTransitiveGuaranteedUses(oldValue, context.guaranteedUsePoints,
+                                      visitReborrow)) {
       return false;
+    }
     return OwnershipRAUWHelper::hasValidRAUWOwnership(
         oldValue, newValue, context.guaranteedUsePoints);
+  }
   default: {
     SmallVector<Operand *, 8> ownedUsePoints;
     // If newValue is lexical, find the uses of oldValue so that it can be
