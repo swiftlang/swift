@@ -2801,7 +2801,13 @@ ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleBackDeployed(Node *node, unsigned depth) {
-  Buffer << "Tw";
+ManglingError Remangler::mangleBackDeploymentThunk(Node *node, unsigned depth) {
+  Buffer << "Twb";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
+                                                      unsigned depth) {
+  Buffer << "TwB";
   return ManglingError::Success;
 }

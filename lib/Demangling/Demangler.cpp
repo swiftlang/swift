@@ -139,6 +139,8 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
     case Node::Kind::AccessibleFunctionRecord:
+    case Node::Kind::BackDeploymentThunk:
+    case Node::Kind::BackDeploymentFallback:
       return true;
     default:
       return false;
@@ -2395,7 +2397,6 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'X': return createNode(Node::Kind::DynamicallyReplaceableFunctionVar);
     case 'x': return createNode(Node::Kind::DynamicallyReplaceableFunctionKey);
     case 'I': return createNode(Node::Kind::DynamicallyReplaceableFunctionImpl);
-    case 'w': return createNode(Node::Kind::BackDeployed);
     case 'Y':
     case 'Q': {
       NodePointer discriminator = demangleIndexAsNode();
@@ -2641,6 +2642,13 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       default:
         return demangleAutoDiffFunctionOrSimpleThunk(
             Node::Kind::AutoDiffFunction);
+      }
+    case 'w':
+      switch (nextChar()) {
+      case 'b': return createNode(Node::Kind::BackDeploymentThunk);
+      case 'B': return createNode(Node::Kind::BackDeploymentFallback);
+      default:
+        return nullptr;
       }
     default:
       return nullptr;

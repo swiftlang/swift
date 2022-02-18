@@ -857,9 +857,8 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::DistributedThunk: return appendOperator("TE");
     case SymbolKind::DistributedAccessor: return appendOperator("TF");
     case SymbolKind::AccessibleFunctionRecord: return appendOperator("HF");
-    // FIXME(backDeploy): Check whether mangling needs to be extended since
-    // the available thunk mangling names are almost exhausted.
-    case SymbolKind::BackDeployedThunk: return appendOperator("Tw");
+    case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
+    case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
   }
 }
 

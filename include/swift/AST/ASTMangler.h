@@ -106,7 +106,8 @@ public:
     DistributedThunk,
     DistributedAccessor,
     AccessibleFunctionRecord,
-    BackDeployedThunk,
+    BackDeploymentThunk,
+    BackDeploymentFallback,
   };
 
   ASTMangler(bool DWARFMangling = false)

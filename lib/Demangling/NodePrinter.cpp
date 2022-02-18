@@ -591,7 +591,8 @@ private:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
     case Node::Kind::AccessibleFunctionRecord:
-    case Node::Kind::BackDeployed:
+    case Node::Kind::BackDeploymentThunk:
+    case Node::Kind::BackDeploymentFallback:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2051,10 +2052,13 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "dynamically replaceable variable for ";
     }
     return nullptr;
-  case Node::Kind::BackDeployed:
+  case Node::Kind::BackDeploymentThunk:
     if (!Options.ShortenThunk) {
       Printer << "back deployment thunk for ";
     }
+    return nullptr;
+  case Node::Kind::BackDeploymentFallback:
+    Printer << "back deployment fallback for ";
     return nullptr;
   case Node::Kind::ProtocolSymbolicReference:
     Printer << "protocol symbolic reference 0x";
