@@ -4523,11 +4523,11 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                                                 source)))
         anyErrors = true;
 
-    auto *assocType = paramProtoType->getAssocType();
+    auto *assocType = protoDecl->getPrimaryAssociatedType();
     auto depType = DependentMemberType::get(
         resolvedSubject.getDependentType(*this), assocType);
     if (isErrorResult(addSameTypeRequirement(Type(depType),
-                                             paramProtoType->getArgumentType(),
+                                             paramProtoType->getArgs()[0],
                                              source,
                                              UnresolvedHandlingKind::GenerateConstraints)))
       anyErrors = true;

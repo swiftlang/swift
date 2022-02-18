@@ -26,11 +26,6 @@ namespace swift {
   class ProtocolType;
   class ProtocolCompositionType;
 
-struct PrimaryAssociatedTypeRequirement {
-  AssociatedTypeDecl *AssocType;
-  Type Argument;
-};
-
 struct ExistentialLayout {
   enum Kind { Class, Error, Opaque };
 
@@ -117,7 +112,7 @@ private:
 
   /// Zero or more primary associated type requirements from a
   /// ParameterizedProtocolType
-  ArrayRef<PrimaryAssociatedTypeRequirement> sameTypeRequirements;
+  ArrayRef<Type> sameTypeRequirements;
 };
 
 }

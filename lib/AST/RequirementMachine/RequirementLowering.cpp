@@ -225,7 +225,7 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
     auto *assocType = protoDecl->getPrimaryAssociatedType();
 
     auto memberType = lookupMemberType(subjectType, protoDecl, assocType);
-    desugarSameTypeRequirement(memberType, paramType->getArgumentType(),
+    desugarSameTypeRequirement(memberType, paramType->getArgs()[0],
                                loc, result, errors);
     return;
   }

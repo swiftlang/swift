@@ -535,10 +535,10 @@ static Type formExtensionInterfaceType(
 
     auto *depMemTy = DependentMemberType::get(
         protoTy->getDecl()->getSelfInterfaceType(),
-        paramProtoTy->getAssocType());
+        protoTy->getDecl()->getPrimaryAssociatedType());
     sameTypeReqs.emplace_back(
       RequirementKind::SameType, depMemTy,
-      paramProtoTy->getArgumentType());
+      paramProtoTy->getArgs()[0]);
   }
 
   Type parentType = type->getNominalParent();
