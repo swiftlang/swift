@@ -73,7 +73,7 @@ struct Test {
   let inferredOpaqueStructural2 = (bar(), bas()) // expected-error{{inferred type}}
 }
 
-let zingle = {() -> some P in 1 } // expected-error{{'some' types are only implemented}}
+let zingle = {() -> some P in 1 } // expected-error{{'some' types are only permitted}}
 
 
 func twoOpaqueTypes() -> (some P, some P) { return (1, 2) }
@@ -81,15 +81,15 @@ func asArrayElem() -> [some P] { return [1] }
 
 // Invalid positions
 
-typealias Foo = some P // expected-error{{'some' types are only implemented}}
+typealias Foo = some P // expected-error{{'some' types are only permitted}}
 
-func blibble(blobble: some P) {} // expected-error{{'some' types are only implemented}}
+func blibble(blobble: some P) {}
 func blib() -> P & some Q { return 1 } // expected-error{{'some' should appear at the beginning}}
 func blab() -> some P? { return 1 } // expected-error{{must specify only}} expected-note{{did you mean to write an optional of an 'opaque' type?}}
-func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only implemented}}
-func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only implemented}} expected-error{{cannot convert}}
+func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only permitted}}
+func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only permitted}} expected-error{{cannot convert}}
 
-protocol OP: some P {} // expected-error{{'some' types are only implemented}}
+protocol OP: some P {} // expected-error{{'some' types are only permitted}}
 
 func foo() -> some P {
   let x = (some P).self // expected-error*{{}}

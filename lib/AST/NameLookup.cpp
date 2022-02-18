@@ -2507,9 +2507,6 @@ static SmallVector<GenericTypeParamDecl *, 2>
 createOpaqueParameterGenericParams(
     GenericContext *genericContext, GenericParamList *parsedGenericParams) {
   ASTContext &ctx = genericContext->getASTContext();
-  if (!ctx.LangOpts.EnableExperimentalOpaqueParameters)
-    return { };
-
   auto value = dyn_cast_or_null<ValueDecl>(genericContext->getAsDecl());
   if (!value)
     return { };
