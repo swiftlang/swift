@@ -304,10 +304,9 @@ func testSameTypeCommutativity4<U, T>(_ t: T, _ u: U)
 func testSameTypeCommutativity5<U, T: P1>(_ t: T, _ u: U)
   where PPP & P3 == T.Assoc { } // Ok, equivalent to T.Assoc == PPP & P3
 
-// FIXME: Error emitted twice.
 func testSameTypeCommutativity6<U, T: P1>(_ t: T, _ u: U)
   where U & P3 == T.Assoc { } // Equivalent to T.Assoc == U & P3
-// expected-error@-1 2 {{non-protocol, non-class type 'U' cannot be used within a protocol-constrained type}}
+// expected-error@-1 {{non-protocol, non-class type 'U' cannot be used within a protocol-constrained type}}
 
 // rdar;//problem/46848889
 struct Foo<A: P1, B: P1, C: P1> where A.Assoc == B.Assoc, A.Assoc == C.Assoc {}

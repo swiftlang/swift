@@ -408,14 +408,15 @@ public:
 
   AllocRefDynamicInst *createAllocRefDynamic(SILLocation Loc, SILValue operand,
                                              SILType type, bool objc,
+                                             bool canAllocOnStack,
                                     ArrayRef<SILType> ElementTypes,
                                     ArrayRef<SILValue> ElementCountOperands) {
     // AllocRefDynamicInsts expand to function calls and can therefore
     // not be counted towards the function prologue.
     assert(!Loc.isInPrologue());
     return insert(AllocRefDynamicInst::create(
-        getSILDebugLocation(Loc), *F, operand, type, objc, ElementTypes,
-        ElementCountOperands));
+        getSILDebugLocation(Loc), *F, operand, type, objc, canAllocOnStack,
+        ElementTypes, ElementCountOperands));
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
@@ -896,19 +897,18 @@ public:
   ///   [trivial].
   ///
   /// * Otherwise, emit an actual store_borrow.
-  void emitStoreBorrowOperation(SILLocation loc, SILValue src,
-                                SILValue destAddr) {
+  SILInstruction *emitStoreBorrowOperation(SILLocation loc, SILValue src,
+                                           SILValue destAddr) {
     if (!hasOwnership()) {
-      return emitStoreValueOperation(loc, src, destAddr,
-                                     StoreOwnershipQualifier::Unqualified);
+      emitStoreValueOperation(loc, src, destAddr,
+                              StoreOwnershipQualifier::Unqualified);
+    } else if (src->getType().isTrivial(getFunction())) {
+      emitStoreValueOperation(loc, src, destAddr,
+                              StoreOwnershipQualifier::Trivial);
+    } else {
+      createStoreBorrow(loc, src, destAddr);
     }
-
-    if (src->getType().isTrivial(getFunction())) {
-      return emitStoreValueOperation(loc, src, destAddr,
-                                     StoreOwnershipQualifier::Trivial);
-    }
-
-    createStoreBorrow(loc, src, destAddr);
+    return &*std::prev(getInsertionPoint());
   }
 
   MarkUninitializedInst *
@@ -2691,7 +2691,7 @@ private:
     // sync. We don't care if an instruction is used in global_addr.
     if (F)
       TheInst->verifyDebugInfo();
-    TheInst->verifyOperandOwnership();
+    TheInst->verifyOperandOwnership(&C.silConv);
 #endif
   }
 

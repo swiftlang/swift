@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-explicit-existential-types
+// RUN: %target-typecheck-verify-swift
 
 protocol HasSelfRequirements {
   func foo(_ x: Self)

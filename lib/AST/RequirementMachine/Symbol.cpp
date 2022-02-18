@@ -637,23 +637,25 @@ Symbol Symbol::transformConcreteSubstitutions(
 
 /// Print the symbol using our mnemonic representation.
 void Symbol::dump(llvm::raw_ostream &out) const {
-  auto dumpSubstitutions = [&]() {
-    if (getSubstitutions().size() > 0) {
-      out << " with <";
+  llvm::DenseMap<CanType, Identifier> substitutionNames;
+  if (hasSubstitutions()) {
+    auto &ctx = getConcreteType()->getASTContext();
 
-      bool first = true;
-      for (auto substitution : getSubstitutions()) {
-        if (first) {
-          first = false;
-        } else {
-          out << ", ";
-        }
-        substitution.dump(out);
-      }
+    for (unsigned index : indices(getSubstitutions())) {
+      Term substitution = getSubstitutions()[index];
 
-      out << ">";
+      std::string s;
+      llvm::raw_string_ostream os(s);
+      os << substitution;
+
+      auto key = CanType(GenericTypeParamType::get(
+          /*isTypeSequence=*/false, 0, index, ctx));
+      substitutionNames[key] = ctx.getIdentifier(s);
     }
-  };
+  }
+
+  PrintOptions opts;
+  opts.AlternativeTypeNames = &substitutionNames;
 
   switch (getKind()) {
   case Kind::Name:
@@ -680,20 +682,20 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     return;
 
   case Kind::Superclass:
-    out << "[superclass: " << getConcreteType();
-    dumpSubstitutions();
+    out << "[superclass: ";
+    getConcreteType().print(out, opts);
     out << "]";
     return;
 
   case Kind::ConcreteType:
-    out << "[concrete: " << getConcreteType();
-    dumpSubstitutions();
+    out << "[concrete: ";
+    getConcreteType().print(out, opts);
     out << "]";
     return;
 
   case Kind::ConcreteConformance:
-    out << "[concrete: " << getConcreteType();
-    dumpSubstitutions();
+    out << "[concrete: ";
+    getConcreteType().print(out, opts);
     out << " : ";
     out << getProtocol()->getName();
     out << "]";

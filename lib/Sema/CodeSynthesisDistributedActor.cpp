@@ -21,6 +21,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -37,7 +38,6 @@ using namespace swift;
 // The "derived" mechanisms are not really geared towards emitting for
 // what already has a witness.
 static VarDecl *addImplicitDistributedActorIDProperty(
-//    DeclContext *parentDC,
     NominalTypeDecl *nominal) {
   if (!nominal || !nominal->isDistributedActor())
     return nullptr;
@@ -79,40 +79,6 @@ static VarDecl *addImplicitDistributedActorIDProperty(
 
   return propDecl;
 }
-
-/******************************************************************************/
-/************ LOCATING AD-HOC PROTOCOL REQUIREMENT IMPLS **********************/
-/******************************************************************************/
-
-AbstractFunctionDecl*
-GetDistributedActorSystemRemoteCallFunctionRequest::evaluate(
-    Evaluator &evaluator, NominalTypeDecl *decl, bool isVoidReturn) const {
-  auto &C = decl->getASTContext();
-
-  // It would be nice to check if this is a DistributedActorSystem
-  // "conforming" type, but we can't do this as we invoke this function WHILE
-  // deciding if the type conforms or not;
-
-  // Not via `ensureDistributedModuleLoaded` to avoid generating a warning,
-  // we won't be emitting the offending decl after all.
-  if (!C.getLoadedModule(C.Id_Distributed)) {
-    return nullptr;
-  }
-
-  auto callId = isVoidReturn ? C.Id_remoteCallVoid : C.Id_remoteCall;
-
-  AbstractFunctionDecl *remoteCallFunc = nullptr;
-  for (auto value : decl->lookupDirect(callId)) {
-    auto func = dyn_cast<AbstractFunctionDecl>(value);
-    if (func && func->isDistributedActorSystemRemoteCall(isVoidReturn)) {
-      remoteCallFunc = func;
-      break;
-    }
-  }
-
-  return remoteCallFunc;
-}
-
 
 /******************************************************************************/
 /************************ SYNTHESIS ENTRY POINT *******************************/

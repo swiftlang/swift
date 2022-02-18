@@ -20,6 +20,7 @@
 #include "TypeCheckDistributed.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/DistributedDecl.h"
 
 using namespace swift;
 

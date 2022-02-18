@@ -1767,7 +1767,7 @@ bool DataflowState::process(
         debug.markAsMoved();
         if (auto varInfo = debug.getVarInfo()) {
           builder.createDebugValue(
-              mvi->getLoc(),
+              debug.inst->getLoc(),
               SILUndef::get(address->getType(), builder.getModule()), *varInfo,
               false /*poison*/, true /*was moved*/);
         }
@@ -1913,7 +1913,7 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
     if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
       if (auto varInfo = debug.getVarInfo()) {
         builder.createDebugValue(
-            mvi->getLoc(),
+            debug.inst->getLoc(),
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,
             /*was moved*/ true);
@@ -2021,7 +2021,7 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
     if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
       if (auto varInfo = debug.getVarInfo()) {
         builder.createDebugValue(
-            mvi->getLoc(),
+            debug.inst->getLoc(),
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,
             /*was moved*/ true);
@@ -2060,7 +2060,7 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
     if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
       if (auto varInfo = debug.getVarInfo()) {
         builder.createDebugValue(
-            mvi->getLoc(),
+            debug.inst->getLoc(),
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,
             /*was moved*/ true);

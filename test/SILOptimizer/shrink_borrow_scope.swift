@@ -31,8 +31,8 @@ public func eliminate_copy_of_returned_then_consumed_owned_value(arg: __owned An
   // CHECK:       end_borrow [[ARG_LIFETIME]]
   // release result
   // release arg
-  // CHECK:       destroy_value [[RESULT]]
   // CHECK:       destroy_value [[ARG]]
+  // CHECK:       destroy_value [[RESULT]]
   // CHECK-LABEL: } // end sil function 'eliminate_copy_of_returned_then_consumed_owned_value'
 }
 

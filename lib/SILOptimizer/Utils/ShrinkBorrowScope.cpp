@@ -74,13 +74,8 @@ struct Usage final {
   /// i.e. copied lifetime of the introducer.
   SmallPtrSet<SILInstruction *, 16> users;
   // The instructions from which the shrinking starts, the scope ending
-  // instructions, keyed off the block in which they appear.
-  llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *> ends;
-
-  bool containsEnd(SILInstruction *end) const {
-    auto iterator = ends.find(end->getParent());
-    return iterator != ends.end() && iterator->second == end;
-  };
+  // instructions.
+  llvm::SmallSetVector<SILInstruction *, 4> ends;
 
   Usage(){};
   Usage(Usage const &) = delete;
@@ -95,13 +90,12 @@ bool findUsage(Context const &context, Usage &usage) {
   llvm::SmallVector<SILInstruction *, 16> scopeEndingInsts;
   context.borrowedValue.getLocalScopeEndingInstructions(scopeEndingInsts);
 
-  // Form a map of the scopeEndingInsts, keyed off the block they occur in.
+  // Add all the end_borrows to the collection of ends.
   for (auto *instruction : scopeEndingInsts) {
     // If a scope ending instruction is not an end_borrow, bail out.
     if (!isa<EndBorrowInst>(instruction))
       return false;
-    auto *block = instruction->getParent();
-    usage.ends[block] = instruction;
+    usage.ends.insert(instruction);
   }
 
   SmallVector<Operand *, 16> uses;
@@ -123,9 +117,6 @@ struct DeinitBarriers final {
 
   /// Blocks to "after the end" of which hoisting was able to proceed.
   BasicBlockSet hoistingReachesEndBlocks;
-
-  /// Borrows to be rewritten as borrows of %borrowee.
-  SmallVector<BeginBorrowInst *, 4> borrows;
 
   /// Copies to be rewritten as copies of %borrowee.
   SmallVector<CopyValueInst *, 4> copies;
@@ -153,7 +144,7 @@ class DataFlow final {
   Usage const &uses;
   DeinitBarriers &result;
 
-  enum class Classification { Barrier, Borrow, Copy, Other };
+  enum class Classification { Barrier, Copy, Other };
 
   BackwardReachability<DataFlow> reachability;
 
@@ -163,8 +154,8 @@ public:
         reachability(&context.function, *this) {
     // Seed reachability with the scope ending uses from which the backwards
     // data flow will begin.
-    for (auto pair : uses.ends) {
-      reachability.initLastUse(pair.second);
+    for (auto *end : uses.ends) {
+      reachability.initLastUse(end);
     }
   }
   DataFlow(DataFlow const &) = delete;
@@ -221,12 +212,7 @@ DataFlow::classifyInstruction(SILInstruction *instruction) {
   if (instruction == &context.introducer) {
     return Classification::Barrier;
   }
-  if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
-    if (bbi->isLexical() &&
-        isSimpleExtendedIntroducerDef(context, bbi->getOperand())) {
-      return Classification::Borrow;
-    }
-  } else if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+  if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
     if (isSimpleExtendedIntroducerDef(context, cvi->getOperand())) {
       return Classification::Copy;
     }
@@ -244,7 +230,6 @@ bool DataFlow::classificationIsBarrier(Classification classification) {
   switch (classification) {
   case Classification::Barrier:
     return true;
-  case Classification::Borrow:
   case Classification::Copy:
   case Classification::Other:
     return false;
@@ -258,9 +243,6 @@ void DataFlow::visitedInstruction(SILInstruction *instruction,
   switch (classification) {
   case Classification::Barrier:
     result.barriers.push_back(instruction);
-    return;
-  case Classification::Borrow:
-    result.borrows.push_back(cast<BeginBorrowInst>(instruction));
     return;
   case Classification::Copy:
     result.copies.push_back(cast<CopyValueInst>(instruction));
@@ -318,10 +300,6 @@ private:
 bool Rewriter::run() {
   bool madeChange = false;
 
-  for (auto *bbi : barriers.borrows) {
-    bbi->setOperand(context.borrowee);
-    madeChange = true;
-  }
   for (auto *cvi : barriers.copies) {
     cvi->setOperand(context.borrowee);
     context.modifiedCopyValueInsts.push_back(cvi);
@@ -342,25 +320,19 @@ bool Rewriter::run() {
   // Insert end_borrows after every non-terminator barrier.
   //
   // For terminator barriers, add end_borrows at the beginning of the successor
-  // blocks.  But only if all of its parent block P's successors S in succ(P)
-  // had reachable beginnings.  If any one of them didn't, then this isn't a
-  // barrier boundary but actually a control flow boundary, and will be handled
-  // below.  We witness that all of its successors had reachable beginnings by
-  // way of parent block P having a reachable end.
-  //
-  // terminator-boundary(B) := isBarrier(P->getTerminator()) && end-reachable(P)
-  //                           where P := pred(B)
+  // blocks.  In order to reach a terminator and classify it as a barrier, all
+  // of a block P's successors B had reachable beginnings.  If any of them
+  // didn't, then BackwardReachability::meetOverSuccessors would never have
+  // returned true for P, so none of its instructions would ever have been
+  // classified (except for via checkReachablePhiBarrier, which doesn't record
+  // terminator barriers).
   for (auto instruction : barriers.barriers) {
     if (auto *terminator = dyn_cast<TermInst>(instruction)) {
       auto successors = terminator->getParentBlock()->getSuccessorBlocks();
-      if (!barriers.hoistingReachesEndBlocks.contains(
-              terminator->getParentBlock())) {
-        // If reachability didn't make it to the begin of any one of this
-        // block's successors, then this isn't a terminator boundary, and will
-        // be handled below.
-        assert(successors.size() > 1);
-        continue;
-      }
+      // In order for the instruction to have been classified as a barrier,
+      // reachability would have had to reach the block containing it.
+      assert(barriers.hoistingReachesEndBlocks.contains(
+                terminator->getParentBlock()));
       for (auto *successor : successors) {
         madeChange |= createEndBorrow(&successor->front());
       }
@@ -394,11 +366,11 @@ bool Rewriter::run() {
 
   if (madeChange) {
     // Remove all the original end_borrow instructions.
-    for (auto pair : uses.ends) {
-      if (reusedEndBorrowInsts.contains(pair.second)) {
+    for (auto *end : uses.ends) {
+      if (reusedEndBorrowInsts.contains(end)) {
         continue;
       }
-      context.deleter.forceDelete(pair.getSecond());
+      context.deleter.forceDelete(end);
     }
   }
 
@@ -407,7 +379,7 @@ bool Rewriter::run() {
 
 bool Rewriter::createEndBorrow(SILInstruction *insertionPoint) {
   if (auto *ebi = dyn_cast<EndBorrowInst>(insertionPoint)) {
-    if (uses.containsEnd(insertionPoint)) {
+    if (uses.ends.contains(insertionPoint)) {
       reusedEndBorrowInsts.insert(insertionPoint);
       return false;
     }

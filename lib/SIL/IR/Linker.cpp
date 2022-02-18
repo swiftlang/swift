@@ -327,6 +327,20 @@ void SILLinkerVisitor::visitInitExistentialRefInst(
     visitProtocolConformance(C, Optional<SILDeclRef>());
   }
 }
+void SILLinkerVisitor::visitAllocRefDynamicInst(AllocRefDynamicInst *ARI) {
+  if (!isLinkAll())
+    return;
+
+  if (!ARI->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType())
+    return;
+
+  // Grab the class decl from the alloc ref inst.
+  ClassDecl *D = ARI->getType().getClassOrBoundGenericClass();
+  if (!D)
+    return;
+
+  linkInVTable(D);
+}
 
 void SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
   if (!isLinkAll())

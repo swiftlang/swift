@@ -1058,7 +1058,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       }
       nextNormalBB = nullptr;
 
-      FuncDecl *recordArgumentFnDecl =
+      AbstractFunctionDecl *recordArgumentFnDecl =
           ctx.getRecordArgumentOnDistributedInvocationEncoder(
               invocationEncoderNominal);
       auto recordArgumentFnRef = SILDeclRef(recordArgumentFnDecl);
@@ -1210,7 +1210,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto errorMetatypeValue = B.createMetatype(loc, errorMetatype);
 
       // Get the function
-      FuncDecl *recordErrorTypeFnDecl =
+      AbstractFunctionDecl *recordErrorTypeFnDecl =
           ctx.getRecordErrorTypeOnDistributedInvocationEncoder(
               invocationEncoderNominal);
       assert(recordErrorTypeFnDecl);
@@ -1258,7 +1258,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       auto returnMetatypeValue = B.createMetatype(loc, returnMetatype);
 
       // Get the function
-      FuncDecl *recordReturnTypeFnDecl =
+      AbstractFunctionDecl *recordReturnTypeFnDecl =
           ctx.getRecordReturnTypeOnDistributedInvocationEncoder(
               invocationEncoderNominal);
       assert(recordReturnTypeFnDecl);

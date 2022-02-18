@@ -6412,6 +6412,31 @@ public:
   /// 'DistributedActorSystem' protocol.
   bool isDistributedActorSystemRemoteCall(bool isVoidReturn) const;
 
+  /// Determines if this function is a 'recordArgument' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordArgument() const;
+
+  /// Determines if this function is a 'recordReturnType' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordReturnType() const;
+
+  /// Determines if this function is a 'recordErrorType' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationEncoder' protocol.
+  bool isDistributedTargetInvocationEncoderRecordErrorType() const;
+
+  /// Determines if this function is a 'decodeNextArgument' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationDecoder' protocol.
+  bool isDistributedTargetInvocationDecoderDecodeNextArgument() const;
+
+  /// Determines if this function is a 'onReturn' function,
+  /// which is used as ad-hoc protocol requirement by the
+  /// 'DistributedTargetInvocationResultHandler' protocol.
+  bool isDistributedTargetInvocationResultHandlerOnReturn() const;
+
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
   bool needsNewVTableEntry() const;

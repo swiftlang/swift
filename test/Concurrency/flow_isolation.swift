@@ -653,3 +653,38 @@ actor DeinitExceptionForSwift5 {
     x = 1 // expected-warning {{cannot access property 'x' here in deinitializer; this is an error in Swift 6}}
   }
 }
+
+@available(SwiftStdlib 5.5, *)
+actor OhBrother {
+  private var giver: (OhBrother) -> Int
+  private var whatever: Int = 0
+
+  static var DefaultResult: Int { 10 }
+
+  init() {
+    // expected-note@+2 {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+    // expected-warning@+1 {{cannot access property 'giver' here in non-isolated initializer; this is an error in Swift 6}}
+    self.giver = { (x: OhBrother) -> Int in Self.DefaultResult }
+  }
+
+  init(v2: Void) {
+    giver = { (x: OhBrother) -> Int in 0 }
+
+    // make sure we don't call this a closure, which is the more common situation.
+
+    _ = giver(self) // expected-note {{after a call involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+
+    whatever = 1 // expected-warning {{cannot access property 'whatever' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+
+  init(v3: Void) {
+    let blah = { (x: OhBrother) -> Int in 0 }
+    giver = blah
+
+    // TODO: would be nice if we didn't say "after this closure" since it's not a capture, but a call.
+
+    _ = blah(self) // expected-note {{after this closure involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
+
+    whatever = 2 // expected-warning {{cannot access property 'whatever' here in non-isolated initializer; this is an error in Swift 6}}
+  }
+}

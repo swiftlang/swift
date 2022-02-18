@@ -35,41 +35,6 @@ class ModuleDecl;
 
 namespace ide {
 
-/// The expected contextual type(s) for code-completion.
-struct ExpectedTypeContext {
-  /// Possible types of the code completion expression.
-  llvm::SmallVector<Type, 4> possibleTypes;
-
-  /// Pre typechecked type of the expression at the completion position.
-  Type idealType;
-
-  /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
-  /// `foo({ here })`.
-  ///
-  /// Since the input may be incomplete, we take into account that the types are
-  /// only a hint.
-  bool isImplicitSingleExpressionReturn = false;
-  bool preferNonVoid = false;
-
-  bool empty() const { return possibleTypes.empty(); }
-  bool requiresNonVoid() const {
-    if (isImplicitSingleExpressionReturn)
-      return false;
-    if (preferNonVoid)
-      return true;
-    if (possibleTypes.empty())
-      return false;
-    return std::all_of(possibleTypes.begin(), possibleTypes.end(), [](Type Ty) {
-      return !Ty->isVoid();
-    });
-  }
-
-  ExpectedTypeContext() = default;
-  ExpectedTypeContext(ArrayRef<Type> types, bool isImplicitSingleExprReturn)
-      : possibleTypes(types.begin(), types.end()),
-        isImplicitSingleExpressionReturn(isImplicitSingleExprReturn) {}
-};
-
 class CodeCompletionResultBuilder {
   friend CodeCompletionStringPrinter;
   
@@ -86,14 +51,20 @@ class CodeCompletionResultBuilder {
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
   ExpectedTypeContext declTypeContext;
-  CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
-      CodeCompletionResult::ExpectedTypeRelation::Unknown;
   bool Cancelled = false;
   ContextFreeNotRecommendedReason ContextFreeNotRecReason =
       ContextFreeNotRecommendedReason::None;
   ContextualNotRecommendedReason ContextualNotRecReason =
       ContextualNotRecommendedReason::None;
   StringRef BriefDocComment;
+
+  /// The result type that this completion item produces.
+  CodeCompletionResultType ResultType = CodeCompletionResultType::unknown();
+
+  /// The context in which this completion item is used. Used to compute the
+  /// type relation to \c ResultType.
+  const ExpectedTypeContext *TypeContext;
+  const DeclContext *DC = nullptr;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -159,9 +130,33 @@ public:
     Flair |= Options;
   }
 
-  void
-  setExpectedTypeRelation(CodeCompletionResult::ExpectedTypeRelation relation) {
-    ExpectedTypeRelation = relation;
+  /// Indicate that the code completion item does not produce something with a
+  /// sensible result type, like a keyword or a method override suggestion.
+  void setResultTypeNotApplicable() {
+    ResultType = CodeCompletionResultType::notApplicable();
+  }
+
+  /// Set the result type of this code completion item and the context that the
+  /// item may be used in.
+  /// If \p AlsoConsiderMetatype is \c true the code completion item will be
+  /// considered as producing the declared interface type (which is passed as
+  /// \p ResultTypes ) as well as the corresponding metatype.
+  /// This allows us to suggest 'Int' as 'Identical' for both of the following
+  /// functions
+  ///
+  ///   func receiveInstance(_: Int) {}
+  ///   func receiveMetatype(_: Int.Type) {}
+  void setResultType(Type ResultType, bool AlsoConsiderMetatype = false) {
+    this->ResultType =
+        CodeCompletionResultType(ResultType, AlsoConsiderMetatype);
+  }
+
+  /// Set context in which this code completion item occurs. Used to compute the
+  /// item's type relation.
+  void setTypeContext(const ExpectedTypeContext &TypeContext,
+                      const DeclContext *DC) {
+    this->TypeContext = &TypeContext;
+    this->DC = DC;
   }
 
   void withNestedGroup(CodeCompletionString::Chunk::ChunkKind Kind,

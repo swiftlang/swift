@@ -1689,7 +1689,7 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
 
   case ValueKind::SILPhiArgument: {
     auto *phiArg = cast<SILPhiArgument>(sourceAddr);
-    if (phiArg->isPhiArgument()) {
+    if (phiArg->isPhi()) {
       return asImpl().visitPhi(phiArg);
     }
 

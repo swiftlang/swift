@@ -661,6 +661,17 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
   return false;
 }
 
+bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) const {
+  return llvm::any_of(D->getAttrs(), [](const auto *Attr) { 
+    if (const auto *AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+      return !AvAttr->hasPlatform()
+        && AvAttr->isUnconditionallyUnavailable();
+    }
+
+    return false;
+  });
+}
+
 /// Returns `true` if the symbol should be included as a node in the graph.
 bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
   // If this decl isn't in this module, don't record it,
@@ -672,5 +683,6 @@ bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
   if (!isa<ValueDecl>(D)) {
     return false;
   }
-  return !isImplicitlyPrivate(cast<ValueDecl>(D));
+  return !isImplicitlyPrivate(cast<ValueDecl>(D)) 
+    && !isUnconditionallyUnavailableOnAllPlatforms(cast<ValueDecl>(D));
 }

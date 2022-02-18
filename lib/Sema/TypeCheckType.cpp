@@ -2142,11 +2142,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   }
 
   case TypeReprKind::Existential: {
-    if (!getASTContext().LangOpts.EnableExplicitExistentialTypes &&
-        !(options & TypeResolutionFlags::SilenceErrors)) {
-      diagnose(repr->getLoc(), diag::explicit_existential_not_supported);
-    }
-
     auto *existential = cast<ExistentialTypeRepr>(repr);
     return resolveExistentialType(existential, options);
   }
@@ -2638,6 +2633,8 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
           diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
               .fixItRemove(attrRange);
         }
+
+        ty = ErrorType::get(getASTContext());
       }
 
       attrs.clearAttribute(TAK_escaping);
@@ -3853,6 +3850,8 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     return false;
   };
 
+  bool IsInvalid = false;
+
   for (auto tyR : repr->getTypes()) {
     auto ty = resolveType(tyR,
         options.withContext(TypeResolverContext::GenericRequirement));
@@ -3885,6 +3884,13 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     diagnose(tyR->getStartLoc(),
              diag::invalid_protocol_composition_member,
              ty);
+
+    IsInvalid = true;
+  }
+
+  if (IsInvalid) {
+    repr->setInvalid();
+    return ErrorType::get(getASTContext());
   }
 
   // Avoid confusing diagnostics ('MyClass' not convertible to 'MyClass',
@@ -4134,7 +4140,7 @@ public:
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {
-    if (T->isInvalid() || !Ctx.LangOpts.EnableExplicitExistentialTypes)
+    if (T->isInvalid())
       return;
 
     auto comp = T->getComponentRange().back();

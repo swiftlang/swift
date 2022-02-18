@@ -88,6 +88,19 @@ public:
   }
 };
 
+/// Compute a single block's dominance frontier.
+///
+/// Precondition: no critical edges (OSSA)
+///
+/// Postcondition: each block in \p frontier is dominated by \p root and either
+/// exits the function or has a single successor that is not dominated by \p
+/// root.
+///
+/// With no critical edges, the dominance frontier is identified simply by leaf
+/// blocks in the dominance subtree.
+void computeDominanceFrontier(SILBasicBlock *root, DominanceInfo *domTree,
+                              SmallVectorImpl<SILBasicBlock *> &frontier);
+
 /// Helper class for visiting basic blocks in dominance order, based on a
 /// worklist algorithm. Example usage:
 /// \code

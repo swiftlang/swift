@@ -215,7 +215,10 @@ set(SWIFTLIB_SOURCES
   CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift
+  Duration.swift
+  DurationProtocol.swift
   FloatingPointRandom.swift
+  Instant.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
@@ -228,6 +231,7 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  Int128.swift.gyb
   Tuple.swift.gyb
   )
 

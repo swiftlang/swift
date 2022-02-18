@@ -665,6 +665,10 @@ using JobDelay = unsigned long long;
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueGlobalWithDeadline(long long sec, long long nsec,
+    long long tsec, long long tnsec, int clock, Job *job);
+
 /// Enqueue the given job on the main executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
@@ -690,6 +694,21 @@ SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_hook)(
     unsigned long long delay, Job *job,
     swift_task_enqueueGlobalWithDelay_original original);
+
+typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_original)(
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock, Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_hook)(
+    long long sec,
+    long long nsec,
+    long long tsec,
+    long long tnsec,
+    int clock, Job *job,
+    swift_task_enqueueGlobalWithDeadline_original original);
 
 /// A hook to take over main executor enqueueing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_original)(
@@ -824,6 +843,21 @@ void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
                                                   void *context);
 
 #endif
+
+enum swift_clock_id : int {
+  swift_clock_id_continuous = 1,
+  swift_clock_id_suspending = 2
+};
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_get_time(long long *seconds,
+                    long long *nanoseconds,
+                    swift_clock_id clock_id);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_get_clock_res(long long *seconds,
+                         long long *nanoseconds,
+                         swift_clock_id clock_id);
 
 #ifdef __APPLE__
 /// A magic symbol whose address is the mask to apply to a frame pointer to
