@@ -1,10 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s -trap-function oopsie -enable-objc-interop -emit-ir -module-name trap_function -I %t | %FileCheck %s -check-prefix=TRAPFN
-// RUN: %target-swift-frontend -O -sdk %S/Inputs -primary-file %s -trap-function oopsie -enable-objc-interop -emit-ir -module-name trap_function -I %t | %FileCheck %s -check-prefix=TRAPFN_OPT
-// RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s -enable-objc-interop -emit-ir -module-name trap_function -I %t | %FileCheck %s -check-prefix=NOTRAPFN
-
-import gizmo
+// RUN: %target-swift-frontend -primary-file %s -trap-function oopsie -emit-ir -module-name trap_function -I %t | %FileCheck %s -check-prefix=TRAPFN
+// RUN: %target-swift-frontend -O -primary-file %s -trap-function oopsie -emit-ir -module-name trap_function -I %t | %FileCheck %s -check-prefix=TRAPFN_OPT
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -module-name trap_function -I %t | %FileCheck %s -check-prefix=NOTRAPFN
 
 // TRAPFN-LABEL: define hidden swiftcc {{.*}} @"$s13trap_function14checkOverflow1yS2i_SitF"
 // TRAPFN: call void @llvm.trap() [[ATTR0:#[0-9]+]]
@@ -58,27 +56,11 @@ func checkPreconditionFailure(_ a: Int) {
   }
 }
 
-// TRAPFN-LABEL: define hidden swiftcc void @"$s13trap_function18checkClangImporteryyF"
-// TRAPFN: call {{.*}} @ackbar()
-
-// TRAPFN_OPT-LABEL: define hidden swiftcc void @"$s13trap_function18checkClangImporteryyF"
-// TRAPFN_OPT: call {{.*}} @ackbar()
-
-// NOTRAPFN-LABEL: define hidden swiftcc void @"$s13trap_function18checkClangImporteryyF"
-// NOTRAPFN: call {{.*}} @ackbar()
-func checkClangImporter() {
-  ackbar()
+// TRAPFN-LABEL: define hidden swiftcc void @"$s13trap_function10terminatoryyF"
+// TRAPFN_OPT-LABEL: define hidden swiftcc void @"$s13trap_function10terminatoryyF"
+// NOTRAPFN-LABEL: define hidden swiftcc void @"$s13trap_function10terminatoryyF"
+func terminator() {
 }
-
-// TRAPFN-LABEL: define internal {{.*}} @ackbar()
-// TRAPFN: call void @llvm.trap() [[ATTR0]]
-
-// TRAPFN_OPT-LABEL: define internal {{.*}} @ackbar()
-// TRAPFN_OPT: call void @llvm.trap() [[ATTR0]]
-
-// NOTRAPFN-LABEL: define internal {{.*}} @ackbar()
-// NOTRAPFN: call void @llvm.trap(){{$}}
-
 
 // TRAPFN: attributes [[ATTR0]] = { {{.*}}"trap-func-name"="oopsie" }
 // NOTRAPFN-NOT: attributes {{.*}} = { {{.*}}"trap-func-name"="oopsie" }
