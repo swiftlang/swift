@@ -145,6 +145,12 @@ static bool isDefaultActorType(CanType actorType, ModuleDecl *M,
   return false;
 }
 
+static bool isDefaultDistributedActorType(CanType actorType) {
+  if (auto cls = actorType.getClassOrBoundGenericClass())
+    return cls->isDistributedActor();
+  return false;
+}
+
 static AccessorDecl *getUnownedExecutorGetter(ASTContext &ctx,
                                               ProtocolDecl *actorProtocol) {
   for (auto member: actorProtocol->getAllMembers()) {
@@ -178,7 +184,8 @@ SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor,
   // If the actor type is a default actor, go ahead and devirtualize here.
   auto module = F->getModule().getSwiftModule();
   SILValue unmarkedExecutor;
-  if (isDefaultActorType(actorType, module, F->getResilienceExpansion())) {
+  if (isDefaultActorType(actorType, module, F->getResilienceExpansion()) ||
+      isDefaultDistributedActorType(actorType)) {
     auto builtinName = ctx.getIdentifier(
       getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
     auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
