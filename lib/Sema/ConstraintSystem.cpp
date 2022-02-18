@@ -4483,6 +4483,15 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
     // is not sufficiently centralized in the AST.
     DeclNameRef name(getOverloadChoiceName(overload.choices));
     auto anchor = simplifyLocatorToAnchor(overload.locator);
+    if (!anchor) {
+      // It's not clear that this is actually valid. Just use the overload's
+      // anchor for release builds, but assert so we can properly diagnose
+      // this case if it happens to be hit. Note that the overload will
+      // *always* be anchored, otherwise everything would be broken, ie. this
+      // assertion would be the least of our worries.
+      anchor = overload.locator->getAnchor();
+      assert(false && "locator could not be simplified to anchor");
+    }
 
     // Emit the ambiguity diagnostic.
     auto &DE = getASTContext().Diags;
