@@ -35,6 +35,8 @@ DependentTypesTestSuite.test("Multiple dependent arguments (not inferred).") {
   expectEqual(m.getValue(), 42)
 }
 
+// We still have some problems calling methods on Windows: SR-13129 and rdar://88391102
+#if !os(Windows)
 DependentTypesTestSuite.test("Function template methods") {
   let m = M<Int>(value: 42)
   let m2 = m.memberDependentReturnType(CInt(32)) as! M<CInt>
@@ -57,5 +59,6 @@ DependentTypesTestSuite.test("Function template methods (static)") {
   let m2 = M<Int>.memberDependentReturnTypeStatic(CInt(32)) as! M<CInt>
   expectEqual(m2.getValue(), 32)
 }
+#endif // Windows
 
 runAllTests()
