@@ -47,7 +47,7 @@ extension AsyncSequence {
   ///   non-`nil` elements produced by the `transform` closure.
   @inlinable
   public __consuming func compactMap<ElementOfResult>(
-    _ transform: @Sendable @escaping (Element) async -> ElementOfResult?
+    _ transform: @preconcurrency @Sendable @escaping (Element) async -> ElementOfResult?
   ) -> AsyncCompactMapSequence<Self, ElementOfResult> {
     return AsyncCompactMapSequence(self, transform: transform)
   }
@@ -61,12 +61,12 @@ public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   let base: Base
 
   @usableFromInline
-  let transform: @Sendable (Base.Element) async -> ElementOfResult?
+  let transform: @preconcurrency @Sendable (Base.Element) async -> ElementOfResult?
 
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @Sendable @escaping (Base.Element) async -> ElementOfResult?
+    transform: @preconcurrency @Sendable @escaping (Base.Element) async -> ElementOfResult?
   ) {
     self.base = base
     self.transform = transform
@@ -91,12 +91,12 @@ extension AsyncCompactMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: @Sendable (Base.Element) async -> ElementOfResult?
+    let transform: @preconcurrency @Sendable (Base.Element) async -> ElementOfResult?
 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @Sendable @escaping (Base.Element) async -> ElementOfResult?
+      transform: @preconcurrency @Sendable @escaping (Base.Element) async -> ElementOfResult?
     ) {
       self.baseIterator = baseIterator
       self.transform = transform

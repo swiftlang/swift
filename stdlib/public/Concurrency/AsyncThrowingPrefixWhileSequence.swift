@@ -52,7 +52,7 @@ extension AsyncSequence {
   ///   the error.
   @inlinable
   public __consuming func prefix(
-    while predicate: @Sendable @escaping (Element) async throws -> Bool
+    while predicate: @preconcurrency @Sendable @escaping (Element) async throws -> Bool
   ) rethrows -> AsyncThrowingPrefixWhileSequence<Self> {
     return AsyncThrowingPrefixWhileSequence(self, predicate: predicate)
   }
@@ -67,12 +67,12 @@ public struct AsyncThrowingPrefixWhileSequence<Base: AsyncSequence> {
   let base: Base
 
   @usableFromInline
-  let predicate: @Sendable (Base.Element) async throws -> Bool
+  let predicate: @preconcurrency @Sendable (Base.Element) async throws -> Bool
 
   @usableFromInline
   init(
     _ base: Base, 
-    predicate: @Sendable @escaping (Base.Element) async throws -> Bool
+    predicate: @preconcurrency @Sendable @escaping (Base.Element) async throws -> Bool
   ) {
     self.base = base
     self.predicate = predicate
@@ -98,12 +98,12 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let predicate: @Sendable (Base.Element) async throws -> Bool
+    let predicate: @preconcurrency @Sendable (Base.Element) async throws -> Bool
 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      predicate: @Sendable @escaping (Base.Element) async throws -> Bool
+      predicate: @preconcurrency @Sendable @escaping (Base.Element) async throws -> Bool
     ) {
       self.baseIterator = baseIterator
       self.predicate = predicate

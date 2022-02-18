@@ -43,7 +43,7 @@ extension AsyncSequence {
   ///   base sequence until the provided closure returns `false`.
   @inlinable
   public __consuming func drop(
-    while predicate: @Sendable @escaping (Element) async -> Bool
+    while predicate: @preconcurrency @Sendable @escaping (Element) async -> Bool
   ) -> AsyncDropWhileSequence<Self> {
     AsyncDropWhileSequence(self, predicate: predicate)
   }
@@ -58,12 +58,12 @@ public struct AsyncDropWhileSequence<Base: AsyncSequence> {
   let base: Base
 
   @usableFromInline
-  let predicate: @Sendable (Base.Element) async -> Bool
+  let predicate: @preconcurrency @Sendable (Base.Element) async -> Bool
 
   @usableFromInline
   init(
     _ base: Base, 
-    predicate: @Sendable @escaping (Base.Element) async -> Bool
+    predicate: @preconcurrency @Sendable @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
     self.predicate = predicate
@@ -87,12 +87,12 @@ extension AsyncDropWhileSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    var predicate: ((Base.Element) async -> Bool)?
+    var predicate: @preconcurrency (@Sendable (Base.Element) async -> Bool)?
 
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      predicate: @Sendable @escaping (Base.Element) async -> Bool
+      predicate: @preconcurrency @Sendable @escaping (Base.Element) async -> Bool
     ) {
       self.baseIterator = baseIterator
       self.predicate = predicate

@@ -58,7 +58,7 @@ extension AsyncSequence {
   ///   produced by the `transform` closure.
   @inlinable
   public __consuming func map<Transformed>(
-    _ transform: @Sendable @escaping (Element) async throws -> Transformed
+    _ transform: @preconcurrency @Sendable @escaping (Element) async throws -> Transformed
   ) -> AsyncThrowingMapSequence<Self, Transformed> {
     return AsyncThrowingMapSequence(self, transform: transform)
   }
@@ -72,12 +72,12 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   let base: Base
 
   @usableFromInline
-  let transform: @Sendable (Base.Element) async throws -> Transformed
+  let transform: @preconcurrency @Sendable (Base.Element) async throws -> Transformed
 
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @Sendable @escaping (Base.Element) async throws -> Transformed
+    transform: @preconcurrency @Sendable @escaping (Base.Element) async throws -> Transformed
   ) {
     self.base = base
     self.transform = transform
@@ -100,7 +100,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: @Sendable (Base.Element) async throws -> Transformed
+    let transform: @preconcurrency @Sendable (Base.Element) async throws -> Transformed
 
     @usableFromInline
     var finished = false
@@ -108,7 +108,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
-      transform: @Sendable @escaping (Base.Element) async throws -> Transformed
+      transform: @preconcurrency @Sendable @escaping (Base.Element) async throws -> Transformed
     ) {
       self.baseIterator = baseIterator
       self.transform = transform

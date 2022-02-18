@@ -55,7 +55,7 @@ extension AsyncSequence {
   ///   element from base sequence ends, or when `transform` throws an error.
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
-    _ transform: @Sendable @escaping (Element) async throws -> SegmentOfResult
+    _ transform: @preconcurrency @Sendable @escaping (Element) async throws -> SegmentOfResult
   ) -> AsyncThrowingFlatMapSequence<Self, SegmentOfResult> {
     return AsyncThrowingFlatMapSequence(self, transform: transform)
   }
@@ -69,12 +69,12 @@ public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult:
   let base: Base
 
   @usableFromInline
-  let transform: @Sendable (Base.Element) async throws -> SegmentOfResult
+  let transform: @preconcurrency @Sendable (Base.Element) async throws -> SegmentOfResult
 
   @usableFromInline
   init(
     _ base: Base,
-    transform: @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
+    transform: @preconcurrency @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
   ) {
     self.base = base
     self.transform = transform
@@ -97,7 +97,7 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: @Sendable (Base.Element) async throws -> SegmentOfResult
+    let transform: @preconcurrency @Sendable (Base.Element) async throws -> SegmentOfResult
 
     @usableFromInline
     var currentIterator: SegmentOfResult.AsyncIterator?
@@ -108,7 +108,7 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
-      transform: @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
+      transform: @preconcurrency @Sendable @escaping (Base.Element) async throws -> SegmentOfResult
     ) {
       self.baseIterator = baseIterator
       self.transform = transform
