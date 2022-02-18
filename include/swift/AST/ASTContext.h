@@ -658,12 +658,11 @@ public:
 
   /// Retrieve the declaration of DistributedActorSystem.make().
   ///
-  /// \param actorOrSystem distributed actor or actor system to get the
-  /// remoteCall function for. Since the method we're looking for is an ad-hoc
-  /// requirement, a specific type MUST be passed here as it is not possible
-  /// to obtain the decl from just the `DistributedActorSystem` protocol type.
+  /// \param thunk the function from which we'll be invoking things on the obtained
+  /// actor system; This way we'll always get the right type, taking care of any
+  /// where clauses etc.
   FuncDecl *getMakeInvocationEncoderOnDistributedActorSystem(
-      NominalTypeDecl *actorOrSystem) const;
+      AbstractFunctionDecl *thunk) const;
 
   // Retrieve the declaration of
   // DistributedInvocationEncoder.recordGenericSubstitution(_:).

@@ -22,6 +22,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -1277,15 +1278,32 @@ AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
 }
 
 FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
-    NominalTypeDecl *actorOrSystem) const {
-  NominalTypeDecl *system = actorOrSystem;
-  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
-  if (actorOrSystem->isDistributedActor()) {
-    auto var = actorOrSystem->getDistributedActorSystemProperty();
-    system = var->getInterfaceType()->getAnyNominal();
-  }
+    AbstractFunctionDecl *thunk) const {
+//  NominalTypeDecl *system = actorOrSystem;
+//  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
+//  if (actorOrSystem->isDistributedActor()) {
+//    auto ty = getDistributedActorSystemType(actorOrSystem);
+//    fprintf(stderr, "[%s:%d] (%s) getDistributedActorSystemType(actorOrSystem)\n", __FILE__, __LINE__, __FUNCTION__);
+//    ty.dump();
+//
+//    auto actor = actorOrSystem;
+//    auto var = actor->getDistributedActorSystemProperty();
+//    assert(var && "Could not locate 'actorSystem' property!");
+//    system = var->getInterfaceType()->getAnyNominal();
+//  }
 
-  for (auto result : system->lookupDirect(Id_makeInvocationEncoder)) {
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(thunk);
+  assert(systemTy && "No specific ActorSystem type found!");
+  fprintf(stderr, "[%s:%d] (%s) FOUND SYSTEM TYPE: %s\n", __FILE__, __LINE__, __FUNCTION__, systemTy->getAnyNominal()->getName().str().str().c_str());
+
+  auto systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  assert(systemNominal && "No system nominal type found!");
+
+//  // NO, since we need the specific one
+//  auto &C = thunk->getASTContext();
+//  auto systemNominal = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
+
+  for (auto result : systemNominal->lookupDirect(Id_makeInvocationEncoder)) {
     auto *fd = dyn_cast<FuncDecl>(result);
     if (!fd)
       continue;
