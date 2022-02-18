@@ -47,7 +47,7 @@ bool isLetAccessibleAnywhere(const ModuleDecl *fromModule, VarDecl *let);
 /// the actors with which it can interact.
 class ActorIsolation {
 public:
-  enum Kind {
+  enum Kind : uint8_t {
     /// The actor isolation has not been specified. It is assumed to be
     /// unsafe to interact with this declaration from any actor.
     Unspecified = 0,
@@ -69,18 +69,19 @@ public:
   };
 
 private:
-  Kind kind;
   union {
     NominalTypeDecl *actor;
     Type globalActor;
     void *pointer;
   };
+  uint8_t kind : 3;
+  uint8_t isolatedByPreconcurrency : 1;
 
   ActorIsolation(Kind kind, NominalTypeDecl *actor)
-      : kind(kind), actor(actor) { }
+      : actor(actor), kind(kind), isolatedByPreconcurrency(false) { }
 
   ActorIsolation(Kind kind, Type globalActor)
-      : kind(kind), globalActor(globalActor) { }
+      : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false) { }
 
 public:
   static ActorIsolation forUnspecified() {
@@ -100,7 +101,7 @@ public:
         unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
   }
 
-  Kind getKind() const { return kind; }
+  Kind getKind() const { return (Kind)kind; }
 
   operator Kind() const { return getKind(); }
 
@@ -122,6 +123,16 @@ public:
     return globalActor;
   }
 
+  bool preconcurrency() const {
+    return isolatedByPreconcurrency;
+  }
+
+  ActorIsolation withPreconcurrency(bool value) const {
+    auto copy = *this;
+    copy.isolatedByPreconcurrency = value;
+    return copy;
+  }
+
   /// Determine whether this isolation will require substitution to be
   /// evaluated.
   bool requiresSubstitution() const;
@@ -134,10 +145,10 @@ public:
     if (lhs.isGlobalActor() && rhs.isGlobalActor())
       return areTypesEqual(lhs.globalActor, rhs.globalActor);
 
-    if (lhs.kind != rhs.kind)
+    if (lhs.getKind() != rhs.getKind())
       return false;
 
-    switch (lhs.kind) {
+    switch (lhs.getKind()) {
     case Independent:
     case Unspecified:
       return true;

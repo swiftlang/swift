@@ -41,3 +41,15 @@ extension Delegate {
     }
   }
 }
+
+@MainActor class C {
+  func finish() { }
+  // expected-note@-1 {{calls to instance method 'finish()' from outside of its actor context are implicitly asynchronous}}
+
+  func handle(_ req: Request, with delegate: Delegate) {
+    delegate.makeRequest1(req) {
+      self.finish()
+      // expected-warning@-1 {{call to main actor-isolated instance method 'finish()' in a synchronous nonisolated context; this is an error in Swift 6}}
+    }
+  }
+}
