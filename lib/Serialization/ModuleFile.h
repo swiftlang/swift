@@ -352,6 +352,12 @@ public:
         llvm::inconvertibleErrorCode()));
   }
 
+  [[noreturn]] void fatal(StringRef msg) const {
+    fatal(llvm::make_error<llvm::StringError>(
+          msg,
+          llvm::inconvertibleErrorCode()));
+  }
+
   /// Outputs information useful for diagnostics to \p out
   void outputDiagnosticInfo(llvm::raw_ostream &os) const;
 
@@ -391,6 +397,12 @@ private:
   llvm::Error
   readGenericRequirementsChecked(SmallVectorImpl<Requirement> &requirements,
                                  llvm::BitstreamCursor &Cursor);
+
+  /// Read the requirement signature of a protocol, which consists of a list of
+  /// generic requirements and a list of protocol typealias records.
+  void readRequirementSignature(SmallVectorImpl<Requirement> &requirements,
+                                SmallVectorImpl<ProtocolTypeAlias> &typeAliases,
+                                llvm::BitstreamCursor &Cursor);
 
   /// Read a list of associated type declarations in a protocol.
   void readAssociatedTypes(SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
@@ -722,7 +734,8 @@ public:
 
   void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
-                           SmallVectorImpl<Requirement> &requirements) override;
+                           SmallVectorImpl<Requirement> &requirements,
+                           SmallVectorImpl<ProtocolTypeAlias> &typeAliases) override;
 
   void
   loadAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,

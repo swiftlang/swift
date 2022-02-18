@@ -207,9 +207,9 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
   for (auto *op : value->getUses()) {
     auto *user = op->getUser();
 
-    // If this op is a type dependent operand, skip it. It is not interesting
+    // For example, type dependent operands are non-use. It is not interesting
     // from an ownership perspective.
-    if (user->isTypeDependentOperand(*op))
+    if (op->getOperandOwnership() == OperandOwnership::NonUse)
       continue;
 
     // First check if this recursive use is compatible with our values ownership
@@ -687,7 +687,8 @@ bool SILValueOwnershipChecker::checkUses() {
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-void SILInstruction::verifyOperandOwnership() const {
+void SILInstruction::verifyOperandOwnership(
+    SILModuleConventions *silConv) const {
   if (DisableOwnershipVerification)
     return;
 
@@ -736,7 +737,7 @@ void SILInstruction::verifyOperandOwnership() const {
     if (isTypeDependentOperand(op))
       continue;
 
-    if (!checkOperandOwnershipInvariants(&op)) {
+    if (!checkOperandOwnershipInvariants(&op, silConv)) {
       errorBuilder->handleMalformedSIL([&] {
         llvm::errs() << "Found an operand with invalid invariants.\n";
         llvm::errs() << "Value: " << op.get();
@@ -747,8 +748,8 @@ void SILInstruction::verifyOperandOwnership() const {
       });
     }
 
-    if (!op.satisfiesConstraints()) {
-      auto constraint = op.getOwnershipConstraint();
+    if (!op.satisfiesConstraints(silConv)) {
+      auto constraint = op.getOwnershipConstraint(silConv);
       SILValue opValue = op.get();
       auto valueOwnershipKind = opValue.getOwnershipKind();
       errorBuilder->handleMalformedSIL([&] {

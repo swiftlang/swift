@@ -345,8 +345,9 @@ bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *inst) {
 }
 
 // Searches \p bb backwards from the instruction before \p frontierInst
-// to the beginning of the list and returns true if we find a dealloc_ref
-// /before/ we find \p defValue (the instruction that defines our target value).
+// to the beginning of the list and returns true if we find a dealloc_ref or an
+// dealloc_stack_ref /before/ we find \p defValue (the instruction that
+// defines our target value).
 static bool
 blockContainsDeallocRef(SILBasicBlock *bb,
                         PointerUnion<SILInstruction *, SILArgument *> defValue,
@@ -355,7 +356,7 @@ blockContainsDeallocRef(SILBasicBlock *bb,
   SILBasicBlock::reverse_iterator iter = frontierInst->getReverseIterator();
   for (++iter; iter != End; ++iter) {
     SILInstruction *inst = &*iter;
-    if (isa<DeallocRefInst>(inst))
+    if (isa<DeallocRefInst>(inst) || isa<DeallocStackRefInst>(inst))
       return true;
     // We know that inst is not a nullptr, so if we have a SILArgument, this
     // will always fail as we want.

@@ -40,6 +40,10 @@ public:
   using ReadBytesResult =
       std::unique_ptr<const void, std::function<void(const void *)>>;
 
+  template <typename T>
+  using ReadObjResult =
+      std::unique_ptr<const T, std::function<void(const void *)>>;
+
   virtual bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                                void *outBuffer) = 0;
 
@@ -90,6 +94,15 @@ public:
     return true;
   }
 
+  template <typename T>
+  ReadObjResult<T> readObj(RemoteAddress address) {
+    auto bytes = readBytes(address, sizeof(T));
+    auto deleter = bytes.get_deleter();
+    auto ptr = bytes.get();
+    bytes.release();
+    return ReadObjResult<T>(reinterpret_cast<const T *>(ptr), deleter);
+  }
+
   /// Attempts to read 'size' bytes from the given address in the remote process.
   ///
   /// Returns a pointer to the requested data and a function that must be called to
@@ -134,10 +147,21 @@ public:
     // Default implementation returns the read value as is.
     return RemoteAbsolutePointer("", readValue);
   }
-  
+
+  /// Atempt to resolve the pointer to a symbol for the given remote address.
+  virtual llvm::Optional<RemoteAbsolutePointer>
+  resolvePointerAsSymbol(RemoteAddress address) {
+    return llvm::None;
+  }
+
   /// Attempt to read and resolve a pointer value at the given remote address.
   llvm::Optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
                                                     unsigned pointerSize) {
+    // Try to resolve the pointer as a symbol first, as reading memory
+    // may potentially be expensive.
+    if (auto symbolPointer = resolvePointerAsSymbol(address))
+      return symbolPointer;
+
     auto result = readBytes(address, pointerSize);
     if (!result)
       return llvm::None;

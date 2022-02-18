@@ -82,7 +82,7 @@ enum class ImportFlags {
 
   /// The module is imported assuming that the module itself predates
   /// concurrency.
-  PredatesConcurrency = 0x20,
+  Preconcurrency = 0x20,
 
   /// Used for DenseMap.
   Reserved = 0x80
@@ -222,6 +222,22 @@ namespace detail {
         StringRef next;
         std::tie(next, text) = text.split(separator);
         push_back(ImportPathBuilder_getIdentifierImpl(ctx, next));
+      }
+    }
+
+    /// Parses \p text into elements separated by \p separator, with identifiers
+    /// from \p ctx starting at \p loc.
+    ///
+    /// \warning This is not very robust; for instance, it doesn't check the
+    /// validity of the identifiers.
+    ImportPathBuilder(ASTContext &ctx, StringRef text, char separator,
+                      SourceLoc loc)
+        : scratch() {
+      while (!text.empty()) {
+        StringRef next;
+        std::tie(next, text) = text.split(separator);
+        push_back({ImportPathBuilder_getIdentifierImpl(ctx, next), loc});
+        loc = loc.getAdvancedLocOrInvalid(next.size() + 1);
       }
     }
 
@@ -550,17 +566,17 @@ struct AttributedImport {
   /// Names of explicitly imported SPI groups.
   ArrayRef<Identifier> spiGroups;
 
-  /// When the import declaration has a `@_predatesConcurrency` annotation, this
+  /// When the import declaration has a `@preconcurrency` annotation, this
   /// is the source range covering the annotation.
-  SourceRange predatesConcurrencyRange;
+  SourceRange preconcurrencyRange;
 
   AttributedImport(ModuleInfo module, SourceLoc importLoc = SourceLoc(),
                    ImportOptions options = ImportOptions(),
                    StringRef filename = {}, ArrayRef<Identifier> spiGroups = {},
-                   SourceRange predatesConcurrencyRange = {})
+                   SourceRange preconcurrencyRange = {})
       : module(module), importLoc(importLoc), options(options),
         sourceFileArg(filename), spiGroups(spiGroups),
-        predatesConcurrencyRange(predatesConcurrencyRange) {
+        preconcurrencyRange(preconcurrencyRange) {
     assert(!(options.contains(ImportFlags::Exported) &&
              options.contains(ImportFlags::ImplementationOnly)) ||
            options.contains(ImportFlags::Reserved));
@@ -570,7 +586,7 @@ struct AttributedImport {
   AttributedImport(ModuleInfo module, AttributedImport<OtherModuleInfo> other)
     : AttributedImport(module, other.importLoc, other.options,
                        other.sourceFileArg, other.spiGroups,
-                       other.predatesConcurrencyRange) { }
+                       other.preconcurrencyRange) { }
 
   friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
                          const AttributedImport<ModuleInfo> &rhs) {

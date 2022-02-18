@@ -864,7 +864,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   entryBlock->createFunctionArgument(*std::next(paramTypeIter)); // argv
 
   // Lookup necessary functions
-  swift::ASTContext &ctx = entryPoint.getDecl()->getASTContext();
+  swift::ASTContext &ctx = entryPoint.getASTContext();
 
   B.setInsertionPoint(entryBlock);
 
@@ -880,7 +880,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   // Call CreateAsyncTask
   FuncDecl *builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(
-      getASTContext(),
+      ctx,
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask))));
   auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
                                    {TupleType::getEmpty(ctx)},
@@ -922,36 +922,9 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
       JobType, {}, {task});
   jobResult = wrapCallArgs(jobResult, swiftJobRunFuncDecl, 0);
 
-  // Get main executor
-  FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
-  if (!getMainExecutorFuncDecl) {
-    // If it doesn't exist due to an SDK-compiler mismatch, we can conjure one
-    // up instead of crashing:
-    // @available(SwiftStdlib 5.1, *)
-    // @_silgen_name("swift_task_getMainExecutor")
-    // internal func _getMainExecutor() -> Builtin.Executor
+  ModuleDecl * moduleDecl = entryPoint.getModuleContext();
 
-    ParameterList *emptyParams = ParameterList::createEmpty(getASTContext());
-    getMainExecutorFuncDecl = FuncDecl::createImplicit(
-        getASTContext(), StaticSpellingKind::None,
-        DeclName(
-            getASTContext(),
-            DeclBaseName(getASTContext().getIdentifier("_getMainExecutor")),
-            /*Arguments*/ emptyParams),
-        {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
-        getASTContext().TheExecutorType,
-        entryPoint.getDecl()->getModuleContext());
-    getMainExecutorFuncDecl->getAttrs().add(
-        new (getASTContext())
-            SILGenNameAttr("swift_task_getMainExecutor", /*implicit*/ true));
-  }
-
-  SILFunction *getMainExeutorSILFunc = SGM.getFunction(
-      SILDeclRef(getMainExecutorFuncDecl, SILDeclRef::Kind::Func),
-      NotForDefinition);
-  SILValue getMainExeutorFunc =
-      B.createFunctionRefFor(moduleLoc, getMainExeutorSILFunc);
-  SILValue mainExecutor = B.createApply(moduleLoc, getMainExeutorFunc, {}, {});
+  SILValue mainExecutor = emitMainExecutor(moduleLoc);
   mainExecutor = wrapCallArgs(mainExecutor, swiftJobRunFuncDecl, 1);
 
   // Run first part synchronously
@@ -972,8 +945,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
             DeclBaseName(getASTContext().getIdentifier("_asyncMainDrainQueue")),
             /*Arguments*/ emptyParams),
         {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
-        getASTContext().getNeverType(),
-        entryPoint.getDecl()->getModuleContext());
+        getASTContext().getNeverType(), moduleDecl);
     drainQueueFuncDecl->getAttrs().add(new (getASTContext()) SILGenNameAttr(
         "swift_task_asyncMainDrainQueue", /*implicit*/ true));
   }

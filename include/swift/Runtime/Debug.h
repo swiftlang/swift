@@ -142,6 +142,10 @@ void swift_abortDynamicReplacementEnabling();
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortDynamicReplacementDisabling();
 
+// Halt due to trying to use unicode data on platforms that don't have it.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+void swift_abortDisabledUnicodeSupport();
+
 /// This function dumps one line of a stack trace. It is assumed that \p framePC
 /// is the address of the stack frame at index \p index. If \p shortOutput is
 /// true, this functions prints only the name of the symbol and offset, ignores

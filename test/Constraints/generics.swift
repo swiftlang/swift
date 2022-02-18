@@ -358,8 +358,8 @@ func testFixItClassBound() {
   let y1: String = y // expected-error {{cannot convert value of type 'ClassBound2<X>' to specified type 'String'}}
 
   // ...but not in types.
-  let z1: ClassBound // expected-error {{reference to generic type 'ClassBound' requires arguments in <...>}} {{21-21=<X>}}
-  let z2: ClassBound2 // expected-error {{reference to generic type 'ClassBound2' requires arguments in <...>}} {{22-22=<X>}}
+  let z1: ClassBound // expected-error {{reference to generic type 'ClassBound' requires arguments in <...>}} {{21-21=<<#Foo: X#>>}}
+  let z2: ClassBound2 // expected-error {{reference to generic type 'ClassBound2' requires arguments in <...>}} {{22-22=<<#Foo: X#>>}}
 }
 
 func testFixItCasting(x: Any) {

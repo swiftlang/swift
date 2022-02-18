@@ -394,11 +394,23 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
   if (origTypeOfAbstraction) {
     (void) origTypeOfAbstraction.findIf([&](Type t) -> bool {
       if (auto *at = t->getAs<ArchetypeType>()) {
-        types.insert(at->getInterfaceType()->getCanonicalType());
-        for (auto *proto : at->getConformsTo()) {
-          reqs.push_back(Requirement(RequirementKind::Conformance,
-                                     at->getInterfaceType(),
-                                     proto->getDeclaredInterfaceType()));
+        auto interfaceTy = at->getInterfaceType();
+        auto genericParams = sig.getGenericParams();
+
+        // The GSB used to drop requirements which reference non-existent
+        // generic parameters, whereas the RequirementMachine asserts now.
+        // Filter thes requirements out explicitly to preserve the old
+        // behavior.
+        if (std::find_if(genericParams.begin(), genericParams.end(),
+                         [interfaceTy](CanGenericTypeParamType t) -> bool {
+                           return t->isEqual(interfaceTy->getRootGenericParam());
+                         }) != genericParams.end()) {
+          types.insert(interfaceTy->getCanonicalType());
+          for (auto *proto : at->getConformsTo()) {
+            reqs.push_back(Requirement(RequirementKind::Conformance,
+                                       interfaceTy,
+                                       proto->getDeclaredInterfaceType()));
+          }
         }
       }
       return false;
@@ -702,7 +714,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
   for (auto &param : diffParams) {
     // Skip `inout` parameters, which semantically behave as original results
     // and always appear as pullback parameters.
-    if (param.isIndirectInOut())
+    if (param.isIndirectMutating())
       continue;
     auto paramTanType = getAutoDiffTangentTypeForLinearMap(
         param.getInterfaceType(), lookupConformance,
@@ -2303,6 +2315,7 @@ static CanSILFunctionType getNativeSILFunctionType(
   switch (extInfoBuilder.getRepresentation()) {
   case SILFunctionType::Representation::Block:
   case SILFunctionType::Representation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::CXXMethod:
     return getSILFunctionTypeForAbstractCFunction(
         TC, origType, substInterfaceType, extInfoBuilder, constant);
 
@@ -2685,9 +2698,9 @@ public:
         TheDecl(decl), isMutating(isMutating) {}
   ParameterConvention
   getIndirectSelfParameter(const AbstractionPattern &type) const override {
-    llvm_unreachable(
-        "cxx functions do not have a Swift self parameter; "
-        "foreign self parameter is handled in getIndirectParameter");
+    if (isMutating)
+      return ParameterConvention::Indirect_Inout;
+    return ParameterConvention::Indirect_In_Guaranteed;
   }
 
   ParameterConvention
@@ -2695,9 +2708,7 @@ public:
                        const TypeLowering &substTL) const override {
     // `self` is the last parameter.
     if (index == TheDecl->getNumParams()) {
-      if (isMutating)
-        return ParameterConvention::Indirect_Inout;
-      return ParameterConvention::Indirect_In_Guaranteed;
+      return getIndirectSelfParameter(type);
     }
     return super::getIndirectParameter(index, type, substTL);
   }
@@ -3127,8 +3138,26 @@ SILFunctionTypeRepresentation
 TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   // If this is a foreign thunk, it always has the foreign calling convention.
   if (c.isForeign) {
-    if (!c.hasDecl() ||
-        c.getDecl()->isImportAsMember())
+    if (!c.hasDecl())
+      return SILFunctionTypeRepresentation::CFunctionPointer;
+
+    // TODO: Is this correct for operators?
+    if (auto method =
+            dyn_cast_or_null<clang::CXXMethodDecl>(c.getDecl()->getClangDecl())) {
+      // Subscripts and call operators are imported as normal methods.
+      bool staticOperator = method->isOverloadedOperator() &&
+                            method->getOverloadedOperator() != clang::OO_Call &&
+                            method->getOverloadedOperator() != clang::OO_Subscript;
+      return isa<clang::CXXConstructorDecl>(method) ||
+                     method->isStatic() ||
+                     staticOperator
+          ? SILFunctionTypeRepresentation::CFunctionPointer
+          : SILFunctionTypeRepresentation::CXXMethod;
+    }
+
+
+    // For example, if we have a function in a namespace:
+    if (c.getDecl()->isImportAsMember())
       return SILFunctionTypeRepresentation::CFunctionPointer;
 
     if (isObjCMethod(c.getDecl()) ||
@@ -4137,6 +4166,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     bridgedResultType = resultType;
     break;
 
+  case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer: {
     if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
@@ -4370,8 +4400,9 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
   if (getRepresentation() != other->getRepresentation())
     return ABICompatibilityCheckResult::DifferentFunctionRepresentations;
 
-  // `() async -> ()` is not compatible with `() async -> @error Error`.
-  if (!hasErrorResult() && other->hasErrorResult() && isAsync()) {
+  // `() async -> ()` is not compatible with `() async -> @error Error` and
+  // vice versa.
+  if (hasErrorResult() != other->hasErrorResult() && isAsync()) {
     return ABICompatibilityCheckResult::DifferentErrorResultConventions;
   }
 

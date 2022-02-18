@@ -6,6 +6,7 @@ target_sources(swiftSILOptimizer PRIVATE
   CanonicalizeBorrowScope.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp
+  CompileTimeInterpolationUtils.cpp
   ConstantFolding.cpp
   ConstExpr.cpp
   Devirtualize.cpp
@@ -17,6 +18,8 @@ target_sources(swiftSILOptimizer PRIVATE
   InstructionDeleter.cpp
   InstOptUtils.cpp
   KeyPathProjector.cpp
+  LexicalDestroyFolding.cpp
+  LexicalDestroyHoisting.cpp
   LoadStoreOptUtils.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp

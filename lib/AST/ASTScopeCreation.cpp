@@ -708,6 +708,26 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   // Initializers come before VarDecls, e.g. PCMacro/didSet.swift 19
   auto patternEntry = getPatternEntry();
 
+  // If the pattern type is for a named opaque result type, introduce the
+  // generic type parameters based on the first variable we find.
+  ASTScopeImpl *leaf = this;
+  auto pattern = patternEntry.getPattern();
+  if (auto typedPattern = dyn_cast<TypedPattern>(pattern)) {
+    if (auto namedOpaque =
+            dyn_cast_or_null<NamedOpaqueReturnTypeRepr>(
+              typedPattern->getTypeRepr())) {
+      bool addedOpaqueResultTypeScope = false;
+      pattern->forEachVariable([&](VarDecl *var) {
+        if (addedOpaqueResultTypeScope)
+          return;
+
+        leaf = scopeCreator.addNestedGenericParamScopesToTree(
+            var, namedOpaque->getGenericParams(), leaf);
+        addedOpaqueResultTypeScope = true;
+      });
+    }
+  }
+
   // Create a child for the initializer, if present.
   // Cannot trust the source range given in the ASTScopeImpl for the end of the
   // initializer (because of InterpolatedLiteralStrings and EditorPlaceHolders),
@@ -724,7 +744,7 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
         "Original inits are always after the '='");
     scopeCreator
         .constructExpandAndInsert<PatternEntryInitializerScope>(
-            this, decl, patternEntryIndex);
+            leaf, decl, patternEntryIndex);
   }
 
   // If this pattern binding entry was created by the debugger, it will always
@@ -741,12 +761,12 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
         "inits are always after the '='");
     scopeCreator
         .constructExpandAndInsert<PatternEntryInitializerScope>(
-            this, decl, patternEntryIndex);
+            leaf, decl, patternEntryIndex);
   }
 
   // Add accessors for the variables in this pattern.
-  patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
-    scopeCreator.addChildrenForParsedAccessors(var, this);
+  pattern->forEachVariable([&](VarDecl *var) {
+    scopeCreator.addChildrenForParsedAccessors(var, leaf);
   });
 
   // In local context, the PatternEntryDeclScope becomes the insertion point, so
@@ -849,6 +869,20 @@ TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
 
 // Create child scopes for every declaration in a body.
 
+namespace {
+  /// Retrieve the opaque generic parameter list if present, otherwise the normal generic parameter list.
+  template<typename T>
+  GenericParamList *getPotentiallyOpaqueGenericParams(T *decl) {
+    if (auto opaqueRepr = decl->getOpaqueResultTypeRepr()) {
+      if (auto namedOpaque = dyn_cast<NamedOpaqueReturnTypeRepr>(opaqueRepr)) {
+        return namedOpaque->getGenericParams();
+      }
+    }
+
+    return decl->getGenericParams();
+  }
+}
+
 void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addChildrenForKnownAttributes(decl, this);
@@ -860,7 +894,7 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
   if (!isa<AccessorDecl>(decl)) {
     leaf = scopeCreator.addNestedGenericParamScopesToTree(
-        decl, decl->getGenericParams(), leaf);
+        decl, getPotentiallyOpaqueGenericParams(decl), leaf);
 
     auto *params = decl->getParameters();
     if (params->size() > 0) {
@@ -1008,7 +1042,7 @@ void SubscriptDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addChildrenForKnownAttributes(decl, this);
   auto *leaf = scopeCreator.addNestedGenericParamScopesToTree(
-      decl, decl->getGenericParams(), this);
+      decl, getPotentiallyOpaqueGenericParams(decl), this);
   scopeCreator.constructExpandAndInsert<ParameterListScope>(
       leaf, decl->getIndices(), decl->getAccessor(AccessorKind::Get));
   scopeCreator.addChildrenForParsedAccessors(decl, leaf);

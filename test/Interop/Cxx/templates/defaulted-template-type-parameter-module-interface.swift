@@ -14,7 +14,7 @@
 // CHECK: func defaultedTemplateTypeParamAndUnrealtedParam(_: Int32)
 // CHECK: func overloadedDefaultedTemplate<T>(_: T)
 // CHECK: func overloadedDefaultedTemplate(_: Int32)
-// CHECK: func defaultedTemplateReferenceTypeParam<T>(_ t: UnsafeMutablePointer<T>)
+// CHECK: func defaultedTemplateReferenceTypeParam<T>(_ t: inout T)
 // The following types aren't imported correctly, but that does not have to do
 // with the fact that the template type paramaters are defaulted.
 // CHECK: func defaultedTemplatePointerTypeParam<T>(_ t: UnsafeMutablePointer<T>)

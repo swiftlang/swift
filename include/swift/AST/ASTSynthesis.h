@@ -56,7 +56,7 @@ inline Type synthesizeType(SynthesisContext &SC,
   switch (kind) {
   case _any: return SC.Context.TheAnyType;
   case _bridgeObject: return SC.Context.TheBridgeObjectType;
-  case _error: return SC.Context.getExceptionType();
+  case _error: return SC.Context.getErrorExistentialType();
   case _executor: return SC.Context.TheExecutorType;
   case _job: return SC.Context.TheJobType;
   case _nativeObject: return SC.Context.TheNativeObjectType;

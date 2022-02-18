@@ -350,9 +350,7 @@ bool ide::initCompilerInvocation(
   FrontendOpts.IndexStorePath.clear();
   ImporterOpts.IndexStorePath.clear();
 
-  // Force the action type to be -typecheck. This affects importing the
-  // SwiftONoneSupport module.
-  FrontendOpts.RequestedAction = FrontendOptions::ActionType::Typecheck;
+  FrontendOpts.RequestedAction = Action;
 
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
@@ -1299,8 +1297,10 @@ void swift::ide::getReceiverType(Expr *Base,
     ReceiverTy = SelfT->getSelfType();
 
   // TODO: Handle generics and composed protocols
-  if (auto OpenedTy = ReceiverTy->getAs<OpenedArchetypeType>())
-    ReceiverTy = OpenedTy->getOpenedExistentialType();
+  if (auto OpenedTy = ReceiverTy->getAs<OpenedArchetypeType>()) {
+    assert(OpenedTy->isRoot());
+    ReceiverTy = OpenedTy->getExistentialType();
+  }
 
   if (auto TyD = ReceiverTy->getAnyNominal()) {
     Types.push_back(TyD);

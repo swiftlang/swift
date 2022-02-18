@@ -202,10 +202,6 @@ cmake ^
   -D PYTHON_EXECUTABLE=%PYTHON_HOME%\python.exe ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE="%SourceRoot%\swift-corelibs-libdispatch" ^
   -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%SourceRoot%\swift-experimental-string-processing ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="%BuildRoot%\Library\icu-67.1\include\unicode" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC="%BuildRoot%\Library\icu-67.1\lib64\icuuc.lib" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="%BuildRoot%\Library\icu-67.1\include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N="%BuildRoot%\Library\icu-67.1\lib64\icuin.lib" ^
 
   -G Ninja ^
   -S llvm-project\llvm || (exit /b)
@@ -233,10 +229,6 @@ cmake ^
   -D SWIFT_NATIVE_SWIFT_TOOLS_PATH=%BuildRoot%\1\bin ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=%SourceRoot%\swift-corelibs-libdispatch ^
   -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%SourceRoot%\swift-experimental-string-processing ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="%BuildRoot%\Library\icu-67.1\include\unicode" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_UC="%BuildRoot%\Library\icu-67.1\lib64\icuuc.lib" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="%BuildRoot%\Library\icu-67.1\include" ^
-  -D SWIFT_WINDOWS_x86_64_ICU_I18N="%BuildRoot%\Library\icu-67.1\lib64\icuin.lib" ^
 
   -D SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES ^
@@ -483,6 +475,8 @@ cmake ^
   -D LLBuild_DIR=%BuildRoot%\8\cmake\modules ^
   -D ArgumentParser_DIR=%BuildRoot%\9\cmake\modules ^
   -D Yams_DIR=%BuildRoot%\10\cmake\modules ^
+  -D SQLite3_INCLUDE_DIR=%BuildRoot%\Library\sqlite-3.36.0\usr\include ^
+  -D SQLite3_LIBRARY=%BuildRoot%\Library\sqlite-3.36.0\usr\lib\SQLite3.lib ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-driver || (exit /b)
@@ -634,6 +628,7 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\toolchain.wixproj
   -p:RunWixToolsOutOfProc=true ^
   -p:OutputPath=%PackageRoot%\toolchain\ ^
   -p:IntermediateOutputPath=%PackageRoot%\toolchain\ ^
+  -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
   -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain
 :: TODO(compnerd) actually perform the code-signing
 :: signtool sign /f Apple_CodeSign.pfx /p Apple_CodeSign_Password /tr http://timestamp.digicert.com /fd sha256 %PackageRoot%\toolchain\toolchain.msi

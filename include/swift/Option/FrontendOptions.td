@@ -237,6 +237,15 @@ def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
+  def enable_lexical_lifetimes :
+    Joined<["-"], "enable-lexical-lifetimes=">,
+    HelpText<"Whether to enable lexical lifetimes">,
+    MetaVarName<"true|false">;
+  def enable_lexical_lifetimes_noArg :
+    Flag<["-"], "enable-lexical-lifetimes">,
+    HelpText<"Enable lexical lifetimes">;
+}
 
 // Flags that are saved into module interfaces
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
@@ -266,14 +275,6 @@ def enable_lexical_borrow_scopes :
   Joined<["-"], "enable-lexical-borrow-scopes=">,
   HelpText<"Whether to emit lexical borrow scopes (default: true)">,
   MetaVarName<"true|false">;
-          
-def enable_lexical_lifetimes :
-  Joined<["-"], "enable-lexical-lifetimes=">,
-  HelpText<"Whether to enable lexical lifetimes">,
-  MetaVarName<"true|false">;
-def enable_lexical_lifetimes_noArg :
-  Flag<["-"], "enable-lexical-lifetimes">,
-  HelpText<"Enable lexical lifetimes">;
 
 def enable_experimental_move_only :
   Flag<["-"], "enable-experimental-move-only">,
@@ -287,8 +288,28 @@ def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
   HelpText<"Enable flow-sensitive concurrent captures">;
 
+def disable_experimental_clang_importer_diagnostics :
+  Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
+  HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
+
+def enable_experimental_eager_clang_module_diagnostics :
+  Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
+  HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
+
+def enable_experimental_pairwise_build_block :
+  Flag<["-"], "enable-experimental-pairwise-build-block">,
+  HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
+
 def enable_resilience : Flag<["-"], "enable-resilience">,
      HelpText<"Deprecated, use -enable-library-evolution instead">;
+
+def enable_experimental_async_top_level :
+  Flag<["-"], "enable-experimental-async-top-level">,
+  HelpText<"Enable experimental concurrency in top-level code">;
+
+def enable_experimental_bound_generic_extensions :
+  Flag<["-"], "enable-experimental-bound-generic-extensions">,
+  HelpText<"Enable experimental support for extensions of bound generic types">;
 }
 
 // HIDDEN FLAGS
@@ -319,21 +340,17 @@ def analyze_requirement_machine : Flag<["-"], "analyze-requirement-machine">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print out requirement machine statistics at the end of the compilation job">;
 
-def requirement_machine_step_limit : Separate<["-"], "requirement-machine-step-limit">,
+def requirement_machine_max_rule_count : Joined<["-"], "requirement-machine-max-rule-count=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the maximum steps before we give up on confluent completion">;
+  HelpText<"Set the maximum number of rules before giving up">;
 
-def requirement_machine_depth_limit : Separate<["-"], "requirement-machine-depth-limit">,
+def requirement_machine_max_rule_length : Joined<["-"], "requirement-machine-max-rule-length=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the maximum depth before we give up on confluent completion">;
+  HelpText<"Set the maximum rule length before giving up">;
 
-def disable_requirement_machine_merged_associated_types : Flag<["-"], "disable-requirement-machine-merged-associated-types">,
+def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machine-max-concrete-nesting=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Disable merged associated types">;
-
-def enable_requirement_machine_merged_associated_types : Flag<["-"], "enable-requirement-machine-merged-associated-types">,
-  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Enable merged associated types">;
+  HelpText<"Set the maximum concrete type nesting depth before giving up">;
 
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
@@ -435,6 +452,9 @@ def enable_anonymous_context_mangled_names :
 def disable_reflection_metadata : Flag<["-"], "disable-reflection-metadata">,
   HelpText<"Disable emission of reflection metadata for nominal types">;
 
+def reflection_metadata_for_debugger_only : Flag<["-"], "reflection-metadata-for-debugger-only">,
+  HelpText<"Emit reflection metadata for debugger only, don't make them available at runtime">;
+
 def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
@@ -486,13 +506,13 @@ def enable_experimental_named_opaque_types :
   Flag<["-"], "enable-experimental-named-opaque-types">,
   HelpText<"Enable experimental support for named opaque result types">;
 
-def enable_experimental_structural_opaque_types :
-  Flag<["-"], "enable-experimental-structural-opaque-types">,
-  HelpText<"Enable experimental support for structural opaque result types">;
-
 def enable_explicit_existential_types :
   Flag<["-"], "enable-explicit-existential-types">,
   HelpText<"Enable experimental support for explicit existential types">;
+
+def enable_parameterized_protocol_types :
+  Flag<["-"], "enable-parameterized-protocol-types">,
+  HelpText<"Enable experimental support for primary associated types and parameterized protocols">;
 
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
@@ -558,6 +578,10 @@ def internalize_at_link : Flag<["-"], "internalize-at-link">,
 def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allow removal of runtime metadata records (public types, protocol conformances) based on whether they're used or unused">;
+
+def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocated-instantiation-caches">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Avoid preallocating metadata instantiation caches in globals">;
 
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,

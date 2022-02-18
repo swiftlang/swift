@@ -70,7 +70,7 @@ protected:
   /// Whether the mangling predates concurrency, and therefore shouldn't
   /// include concurrency features such as global actors or @Sendable
   /// function types.
-  bool PredatesConcurrency = false;
+  bool Preconcurrency = false;
 
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
@@ -104,7 +104,7 @@ public:
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
     DistributedThunk,
-    DistributedMethodAccessor,
+    DistributedAccessor,
     AccessibleFunctionRecord
   };
 
@@ -339,7 +339,8 @@ protected:
   }
 
   void appendBoundGenericArgs(Type type, GenericSignature sig,
-                              bool &isFirstArgList);
+                              bool &isFirstArgList,
+                              const ValueDecl *forDecl = nullptr);
 
   /// Append the bound generics arguments for the given declaration context
   /// based on a complete substitution map.
@@ -349,18 +350,26 @@ protected:
   unsigned appendBoundGenericArgs(DeclContext *dc,
                                   GenericSignature sig,
                                   SubstitutionMap subs,
-                                  bool &isFirstArgList);
+                                  bool &isFirstArgList,
+                                  const ValueDecl *forDecl = nullptr);
   
   /// Append the bound generic arguments as a flat list, disregarding depth.
   void appendFlatGenericArgs(SubstitutionMap subs,
-                             GenericSignature sig);
+                             GenericSignature sig,
+                             const ValueDecl *forDecl = nullptr);
 
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type, GenericSignature sig);
   void appendRetroactiveConformances(SubstitutionMap subMap,
                                      GenericSignature sig,
                                      ModuleDecl *fromModule);
-  void appendImplFunctionType(SILFunctionType *fn, GenericSignature sig);
+  void appendImplFunctionType(SILFunctionType *fn, GenericSignature sig,
+                              const ValueDecl *forDecl = nullptr);
+  void appendOpaqueTypeArchetype(ArchetypeType *archetype,
+                                 OpaqueTypeDecl *opaqueDecl,
+                                 SubstitutionMap subs,
+                                 GenericSignature sig,
+                                 const ValueDecl *forDecl);
 
   void appendContextOf(const ValueDecl *decl);
 

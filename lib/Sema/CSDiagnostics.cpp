@@ -221,6 +221,10 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     // diagnostic directly to its declaration without desugaring.
     if (auto *alias = dyn_cast<TypeAliasType>(type.getPointer()))
       return alias->getDecl();
+
+    if (auto existential = type->getAs<ExistentialType>())
+      return existential->getConstraintType()->getAnyGeneric();
+
     return type->getAnyGeneric();
   };
 
@@ -355,8 +359,25 @@ bool RequirementFailure::diagnoseAsError() {
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
 
-  auto lhs = getLHS();
-  auto rhs = getRHS();
+  // Instead of printing archetypes rooted on an opened existential, which
+  // are currently an implementation detail, have a weird textual
+  // representation, and may be misleading (a root opened archetype prints like
+  // an existential type), use the corresponding 'Self'-rooted interface types
+  // from the requirement, which are more familiar.
+  const auto lhs = [&] {
+    if (getLHS()->hasOpenedExistential()) {
+      return getRequirement().getFirstType();
+    }
+
+    return getLHS();
+  }();
+  const auto rhs = [&] {
+    if (getRHS()->hasOpenedExistential()) {
+      return getRequirement().getSecondType();
+    }
+
+    return getRHS();
+  }();
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
@@ -383,7 +404,8 @@ bool RequirementFailure::diagnoseAsError() {
                    AffectedDecl->getName(), lhs, rhs);
   }
 
-  emitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
+  maybeEmitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
+
   return true;
 }
 
@@ -402,8 +424,8 @@ bool RequirementFailure::diagnoseAsNote() {
   return true;
 }
 
-void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
-                                             Type rhs) const {
+void RequirementFailure::maybeEmitRequirementNote(const Decl *anchor, Type lhs,
+                                                  Type rhs) const {
   auto &req = getRequirement();
 
   if (req.getKind() != RequirementKind::SameType) {
@@ -427,6 +449,11 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 
   if (req.getKind() == RequirementKind::Layout ||
       rhs->isEqual(req.getSecondType())) {
+    // If the note is tautological, bail out.
+    if (lhs->isEqual(req.getFirstType())) {
+      return;
+    }
+
     emitDiagnosticAt(anchor, diag::where_requirement_failure_one_subst,
                      req.getFirstType(), lhs);
     return;
@@ -531,10 +558,14 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
     return false;
   }
 
+  Type constraintType = nonConformingType;
+  if (auto existential = constraintType->getAs<ExistentialType>())
+    constraintType = existential->getConstraintType();
+
   emitDiagnostic(diag::type_cannot_conform,
                  nonConformingType->isExistentialType(), 
                  nonConformingType, 
-                 nonConformingType->isEqual(protocolType),
+                 constraintType->isEqual(protocolType),
                  protocolType);
 
   bool emittedSpecializedNote = false;
@@ -2328,9 +2359,13 @@ bool ContextualFailure::diagnoseAsError() {
 
     if (CTP == CTP_ForEachStmt || CTP == CTP_ForEachSequence) {
       if (fromType->isAnyExistentialType()) {
+        Type constraintType = fromType;
+        if (auto existential = constraintType->getAs<ExistentialType>())
+          constraintType = existential->getConstraintType();
+
         emitDiagnostic(diag::type_cannot_conform,
                        /*isExistentialType=*/true, fromType, 
-                       fromType->isEqual(toType), toType);
+                       constraintType->isEqual(toType), toType);
         emitDiagnostic(diag::only_concrete_types_conform_to_protocols);
         return true;
       }
@@ -3063,7 +3098,10 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   // the protocols of the composition, then store the composition directly.
   // This is because we need to append 'Foo & Bar' instead of 'Foo, Bar' in
   // order to match the written type.
-  if (auto compositionTy = unwrappedToType->getAs<ProtocolCompositionType>()) {
+  auto constraint = unwrappedToType;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+  if (auto compositionTy = constraint->getAs<ProtocolCompositionType>()) {
     if (compositionTy->getMembers().size() == missingProtoTypeStrings.size()) {
       missingProtoTypeStrings = {compositionTy->getString()};
     }
@@ -3611,6 +3649,11 @@ bool MissingMemberFailure::diagnoseAsError() {
     emitDiagnostic(diagnostic, baseType, getName())
         .highlight(getSourceRange())
         .highlight(nameLoc.getSourceRange());
+    const auto &ctx = getSolution().getDC()->getASTContext();
+    if (!ctx.LangOpts.DisableExperimentalClangImporterDiagnostics) {
+      ctx.getClangModuleLoader()->diagnoseMemberValue(getName().getFullName(),
+                                                      baseType);
+    }
   };
 
   TypoCorrectionResults corrections(getName(), nameLoc);
@@ -3651,7 +3694,8 @@ bool MissingMemberFailure::diagnoseAsError() {
       diagnostic.highlight(getSourceRange())
           .highlight(nameLoc.getSourceRange());
       correction->addFixits(diagnostic);
-    } else if (instanceTy->getAnyNominal() &&
+    } else if ((instanceTy->getAnyNominal() ||
+                instanceTy->is<ExistentialType>()) &&
                getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto &cs = getConstraintSystem();
 
@@ -4123,7 +4167,11 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
           // If we are in a protocol extension of 'Proto' and we see
           // 'Proto.static', suggest 'Self.static'
           if (auto extensionContext = parent->getExtendedProtocolDecl()) {
-            if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
+            auto constraint = instanceTy;
+            if (auto existential = constraint->getAs<ExistentialType>())
+              constraint = existential->getConstraintType();
+
+            if (extensionContext->getDeclaredType()->isEqual(constraint)) {
               Diag->fixItReplace(getSourceRange(), "Self");
             }
           }
@@ -6244,6 +6292,16 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsError() {
+  const auto paramType = getToType();
+
+  // If the parameter type contains an opened archetype, it's an unsupported
+  // existential member access; refrain from exposing type system implementation
+  // details in diagnostics and complaining about a parameter the user cannot
+  // fulfill, and let the member access failure prevail.
+  if (paramType->hasOpenedExistential()) {
+    return false;
+  }
+
   if (diagnoseMisplacedMissingArgument())
     return true;
 
@@ -6269,7 +6327,6 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
     return true;
 
   auto argType = getFromType();
-  auto paramType = getToType();
 
   if (paramType->isAnyObject()) {
     emitDiagnostic(diag::cannot_convert_argument_value_anyobject, argType,
@@ -6838,10 +6895,14 @@ bool AssignmentTypeMismatchFailure::diagnoseMissingConformance() const {
 
   auto retrieveProtocols = [](Type type,
                               llvm::SmallPtrSetImpl<ProtocolDecl *> &members) {
-    if (auto *protocol = type->getAs<ProtocolType>())
+    auto constraint = type;
+    if (auto existential = constraint->getAs<ExistentialType>())
+      constraint = existential->getConstraintType();
+
+    if (auto *protocol = constraint->getAs<ProtocolType>())
       members.insert(protocol->getDecl());
 
-    if (auto *composition = type->getAs<ProtocolCompositionType>()) {
+    if (auto *composition = constraint->getAs<ProtocolCompositionType>()) {
       for (auto member : composition->getMembers()) {
         if (auto *protocol = member->getAs<ProtocolType>())
           members.insert(protocol->getDecl());
@@ -6993,6 +7054,20 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
 bool UnableToInferClosureReturnType::diagnoseAsError() {
   auto *closure = castToExpr<ClosureExpr>(getRawAnchor());
 
+  auto *body = closure->getBody();
+  // For empty closures, let's produce a tailored message and suggest
+  // adding an expression to the body.
+  if (body->empty()) {
+    auto diagnostic =
+        emitDiagnostic(diag::cannot_infer_empty_closure_result_type);
+
+    diagnostic.fixItInsertAfter(closure->getInLoc().isValid()
+                                    ? closure->getInLoc()
+                                    : body->getLBraceLoc(),
+                                "<#result#>");
+    return true;
+  }
+
   auto diagnostic = emitDiagnostic(diag::cannot_infer_closure_result_type);
 
   // If there is a location for an 'in' token, then the argument list was
@@ -7007,7 +7082,7 @@ bool UnableToInferClosureReturnType::diagnoseAsError() {
     //
     // As such, we insert " () -> ReturnType in " right after the '{' that
     // starts the closure body.
-    diagnostic.fixItInsertAfter(closure->getBody()->getLBraceLoc(),
+    diagnostic.fixItInsertAfter(body->getLBraceLoc(),
                                 diag::insert_closure_return_type_placeholder,
                                 /*argListSpecified=*/true);
   }

@@ -124,6 +124,8 @@ class BuildScriptInvocation(object):
             "--lldb-assertions", str(
                 args.lldb_assertions).lower(),
             "--cmake-generator", args.cmake_generator,
+            "--cross-compile-append-host-target-to-destdir", str(
+                args.cross_compile_append_host_target_to_destdir).lower(),
             "--build-jobs", str(args.build_jobs),
             "--common-cmake-options=%s" % ' '.join(
                 pipes.quote(opt) for opt in cmake.common_options()),

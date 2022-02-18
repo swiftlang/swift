@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -print-ast %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -print-ast-decl %s 2>&1 | %FileCheck %s
 
 // Check that synthesized members show up as 'fileprivate', not 'private.
 

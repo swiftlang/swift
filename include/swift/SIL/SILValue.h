@@ -46,6 +46,7 @@ class ConsumingUseIterator;
 class NonConsumingUseIterator;
 class NonTypeDependentUseIterator;
 class SILValue;
+class SILModuleConventions;
 
 /// An enumeration which contains values for all the concrete ValueBase
 /// subclasses.
@@ -540,6 +541,8 @@ public:
   /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
   ValueOwnershipKind getOwnershipKind() const;
 
+  bool isLexical() const;
+
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
            node->getKind() <= SILNodeKind::Last_ValueBase;
@@ -920,7 +923,8 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
 }
 
 /// Return true if all OperandOwnership invariants hold.
-bool checkOperandOwnershipInvariants(const Operand *operand);
+bool checkOperandOwnershipInvariants(const Operand *operand,
+                                     SILModuleConventions *silConv = nullptr);
 
 /// Return the OperandOwnership for a forwarded operand when the forwarding
 /// operation has this "forwarding ownership" (as returned by
@@ -1037,22 +1041,25 @@ public:
   /// Return the use ownership of this operand.
   ///
   /// NOTE: This is implemented in OperandOwnership.cpp.
-  OperandOwnership getOperandOwnership() const;
+  OperandOwnership
+  getOperandOwnership(SILModuleConventions *silConv = nullptr) const;
 
   /// Return the ownership constraint that restricts what types of values this
   /// Operand can contain.
-  OwnershipConstraint getOwnershipConstraint() const {
-    return getOperandOwnership().getOwnershipConstraint();
+  OwnershipConstraint
+  getOwnershipConstraint(SILModuleConventions *silConv = nullptr) const {
+    return getOperandOwnership(silConv).getOwnershipConstraint();
   }
 
   /// Returns true if changing the operand to use a value with the given
   /// ownership kind, without rewriting the instruction, would not cause the
   /// operand to violate the operand's ownership constraints.
-  bool canAcceptKind(ValueOwnershipKind kind) const;
+  bool canAcceptKind(ValueOwnershipKind kind,
+                     SILModuleConventions *silConv = nullptr) const;
 
   /// Returns true if this operand and its value satisfy the operand's
   /// operand constraint.
-  bool satisfiesConstraints() const;
+  bool satisfiesConstraints(SILModuleConventions *silConv = nullptr) const;
 
   /// Returns true if this operand acts as a use that ends the lifetime its
   /// associated value, either by consuming the owned value or ending the

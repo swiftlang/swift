@@ -41,7 +41,8 @@ struct ActorAddress: Sendable, Hashable, Codable {
 
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
-  typealias Invocation = FakeInvocation
+  typealias InvocationDecoder = FakeInvocationDecoder
+  typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
@@ -62,31 +63,56 @@ struct FakeActorSystem: DistributedActorSystem {
 
   func resignID(_ id: ActorID) {}
 
-  func makeInvocation() -> Invocation {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    fatalError("Not implemented")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+    fatalError("Not implemented")
   }
 }
 
-struct FakeInvocation: DistributedTargetInvocation {
-  typealias ArgumentDecoder = FakeArgumentDecoder
+// === Sending / encoding -------------------------------------------------
+struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
 
-  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
+}
 
-  // === Receiving / decoding -------------------------------------------------
+// === Receiving / decoding -------------------------------------------------
+class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
 
-  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
-  mutating func decodeReturnType() throws -> Any.Type? { nil }
-  mutating func decodeErrorType() throws -> Any.Type? { nil }
-
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
-  }
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
 }
 
 typealias DefaultDistributedActorSystem = FakeActorSystem

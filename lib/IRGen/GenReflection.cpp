@@ -199,8 +199,9 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   // Swift 5.1 runtime, so we needed to add a new mangling in 5.2.
   if (type->hasOpaqueArchetype()) {
     auto hasOpaqueAssocType = type.findIf([](CanType t) -> bool {
-      if (auto a = dyn_cast<NestedArchetypeType>(t)) {
-        return isa<OpaqueTypeArchetypeType>(a->getRoot());
+      if (auto a = dyn_cast<ArchetypeType>(t)) {
+        return isa<OpaqueTypeArchetypeType>(a) &&
+          a->getInterfaceType()->is<DependentMemberType>();
       }
       return false;
     });
@@ -622,7 +623,12 @@ protected:
 
     var->setSection(section);
 
-    IGM.addUsedGlobal(var);
+    // Only mark the reflection record as used when emitting for the runtime.
+    // In ReflectionMetadataMode::DebuggerOnly mode we want to allow the linker
+    // to remove/dead-strip these.
+    if (IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::Runtime) {
+      IGM.addUsedGlobal(var);
+    }
 
     disableAddressSanitizer(IGM, var);
 
@@ -1278,7 +1284,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
   case llvm::Triple::MachO:
     assert(LongName.size() <= 7 &&
            "Mach-O section name length must be <= 16 characters");
-    OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
+    OS << "__TEXT,__swift5_" << LongName << ", regular";
     break;
   }
   return std::string(OS.str());
@@ -1334,7 +1340,7 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
 llvm::Constant *
 IRGenModule::getAddrOfBoxDescriptor(SILType BoxedType,
                                     CanGenericSignature genericSig) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
+  if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
   BoxDescriptorBuilder builder(*this, BoxedType, genericSig);
@@ -1349,7 +1355,7 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
                                         CanSILFunctionType SubstCalleeType,
                                         SubstitutionMap Subs,
                                         const HeapLayout &Layout) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
+  if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
   if (CaptureDescriptorBuilder::hasOpenedExistential(OrigCalleeType, Layout))
@@ -1368,7 +1374,7 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
   if (!normalConf)
     return;
 
-  if (!IRGen.Opts.EnableReflectionMetadata)
+  if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return;
 
   SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
@@ -1427,7 +1433,7 @@ void IRGenerator::emitBuiltinReflectionMetadata() {
 }
 
 void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
-  if (!IRGen.Opts.EnableReflectionMetadata)
+  if (IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::None)
     return;
 
   auto T = D->getDeclaredTypeInContext()->getCanonicalType();

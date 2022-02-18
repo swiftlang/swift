@@ -92,31 +92,7 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
 
       if (info.completionContext->typeContextKind ==
               TypeContextKind::Required &&
-          result->getKind() == Completion::ResultKind::Declaration) {
-        // FIXME: because other-module results are cached, they will not be
-        // given a type-relation of invalid.  As a hack, we look at the text of
-        // the result type and look for 'Void'.
-        bool isVoid = false;
-        auto chunks = result->getCompletionString()->getChunks();
-        for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
-          using ChunkKind = ide::CodeCompletionString::Chunk::ChunkKind;
-          bool isVoid = false;
-          if (i->is(ChunkKind::TypeAnnotation)) {
-            isVoid = i->getText() == "Void";
-            break;
-          } else if (i->is(ChunkKind::TypeAnnotationBegin)) {
-            auto n = i + 1, t = i + 2;
-            isVoid =
-                // i+1 has text 'Void'.
-                n != e && n->hasText() && n->getText() == "Void" &&
-                // i+2 terminates the group.
-                (t == e || t->endsPreviousNestedGroup(i->getNestingLevel()));
-            break;
-          }
-        }
-        if (isVoid)
-          builder.setExpectedTypeRelation(
-              Completion::ExpectedTypeRelation::Invalid);
+          result->getKind() == CodeCompletionResultKind::Declaration) {
       }
     }
 
@@ -154,13 +130,21 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     auto chunk = Chunk::createWithText(Chunk::ChunkKind::Text, 0, nameCopy);
     auto *completionString =
         CodeCompletionString::create(sink.allocator, chunk);
-    CodeCompletion::SwiftResult swiftResult(
-        CodeCompletion::SwiftResult::ResultKind::Pattern,
-        SemanticContextKind::Local, CodeCompletionFlairBit::ExpressionSpecific,
-        /*NumBytesToErase=*/0, completionString,
-        CodeCompletionResult::ExpectedTypeRelation::Unknown);
+    auto *contextFreeResult =
+        new (sink.allocator) ContextFreeCodeCompletionResult(
+            CodeCompletionResultKind::Pattern, completionString,
+            CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
+            CodeCompletionResultType::unknown(),
+            ContextFreeNotRecommendedReason::None,
+            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+    auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
+        *contextFreeResult, SemanticContextKind::Local,
+        CodeCompletionFlairBit::ExpressionSpecific,
+        /*NumBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
+        ContextualNotRecommendedReason::None,
+        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
 
-    CompletionBuilder builder(sink, swiftResult);
+    CompletionBuilder builder(sink, *swiftResult);
     builder.setCustomKind(customCompletion.Kind);
     completions.push_back(builder.finish());
   };
@@ -348,6 +332,7 @@ CodeCompletionOrganizer::Impl::Impl(CompletionKind kind, TypeContextKind typeCon
 static bool matchesExpectedStyle(Completion *completion, NameStyle style) {
   switch (completion->getAssociatedDeclKind()) {
   case CodeCompletionDeclKind::Class:
+  case CodeCompletionDeclKind::Actor:
   case CodeCompletionDeclKind::Struct:
   case CodeCompletionDeclKind::Enum:
   case CodeCompletionDeclKind::Protocol:
@@ -391,14 +376,14 @@ bool FilterRules::hideFilterName(StringRef name) const {
   return hideAll;
 }
 
-bool FilterRules::hideCompletion(Completion *completion) const {
-  return hideCompletion(completion, completion->getName(),
-                        completion->getDescription(),
-                        completion->getCustomKind());
+bool FilterRules::hideCompletion(const Completion &completion) const {
+  return hideCompletion(completion.getSwiftResult(), completion.getName(),
+                        completion.getDescription(),
+                        completion.getCustomKind());
 }
 
-bool FilterRules::hideCompletion(SwiftResult *completion, StringRef filterName,
-                                 StringRef description,
+bool FilterRules::hideCompletion(const SwiftResult &completion,
+                                 StringRef filterName, StringRef description,
                                  void *customKind) const {
 
   if (!description.empty()) {
@@ -413,19 +398,19 @@ bool FilterRules::hideCompletion(SwiftResult *completion, StringRef filterName,
       return I->getValue();
   }
 
-  switch (completion->getKind()) {
-  case Completion::ResultKind::BuiltinOperator:
-  case Completion::ResultKind::Declaration:
+  switch (completion.getKind()) {
+  case CodeCompletionResultKind::BuiltinOperator:
+  case CodeCompletionResultKind::Declaration:
     break;
-  case Completion::ResultKind::Keyword: {
-    auto I = hideKeyword.find(completion->getKeywordKind());
+  case CodeCompletionResultKind::Keyword: {
+    auto I = hideKeyword.find(completion.getKeywordKind());
     if (I != hideKeyword.end())
       return I->second;
     if (hideAllKeywords)
       return true;
     break;
   }
-  case Completion::ResultKind::Pattern: {
+  case CodeCompletionResultKind::Pattern: {
     if (customKind) {
       // FIXME: individual custom completions
       if (hideCustomCompletions)
@@ -433,8 +418,8 @@ bool FilterRules::hideCompletion(SwiftResult *completion, StringRef filterName,
     }
     break;
   }
-  case Completion::ResultKind::Literal: {
-    auto I = hideValueLiteral.find(completion->getLiteralKind());
+  case CodeCompletionResultKind::Literal: {
+    auto I = hideValueLiteral.find(completion.getLiteralKind());
     if (I != hideValueLiteral.end())
       return I->second;
     if (hideAllValueLiterals)
@@ -443,9 +428,9 @@ bool FilterRules::hideCompletion(SwiftResult *completion, StringRef filterName,
   }
   }
 
-  if (!completion->getModuleName().empty()) {
+  if (!completion.getModuleName().empty()) {
     // FIXME: try each submodule chain starting from the most specific.
-    auto M = hideModule.find(completion->getModuleName());
+    auto M = hideModule.find(completion.getModuleName());
     if (M != hideModule.end())
       return M->getValue();
   }
@@ -468,13 +453,13 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
         completionKind != CompletionKind::TypeSimpleBeginning &&
         completionKind != CompletionKind::PostfixExpr;
     for (Completion *completion : completions) {
-      if (rules.hideCompletion(completion))
+      if (rules.hideCompletion(*completion))
         continue;
 
       if (options.hideLowPriority &&
           (completion->isNotRecommended() ||
            completion->getExpectedTypeRelation() ==
-               Completion::ExpectedTypeRelation::Invalid))
+               CodeCompletionResultTypeRelation::Invalid))
         continue;
 
       NameStyle style(completion->getName());
@@ -484,7 +469,7 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
 
       bool hideByNameStyle =
           options.hideByNameStyle &&
-          completion->getKind() == Completion::ResultKind::Declaration &&
+          completion->getKind() == CodeCompletionResultKind::Declaration &&
           !matchesExpectedStyle(completion, style);
 
       hideByNameStyle |= hideUnderscore;
@@ -502,13 +487,13 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
             break;
         }
         if (completion->getExpectedTypeRelation() >=
-                Completion::ExpectedTypeRelation::Convertible ||
-            (completion->getKind() == Completion::ResultKind::Literal &&
+                CodeCompletionResultTypeRelation::Convertible ||
+            (completion->getKind() == CodeCompletionResultKind::Literal &&
              completionKind != CompletionKind::StmtOrExpr &&
              typeContextKind < TypeContextKind::Required))
           break;
 
-        if (completion->getKind() == Completion::ResultKind::Keyword &&
+        if (completion->getKind() == CodeCompletionResultKind::Keyword &&
             completionKind == CompletionKind::StmtOrExpr &&
             isHighPriorityKeyword(completion->getKeywordKind()))
           break;
@@ -529,15 +514,15 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
   FuzzyStringMatcher pattern(filterText);
   pattern.normalize = true;
   for (Completion *completion : completions) {
-    if (rules.hideCompletion(completion))
+    if (rules.hideCompletion(*completion))
       continue;
 
     // Hide literals other than the ones that are also keywords if they don't
     // match the expected types.
-    if (completion->getKind() == Completion::ResultKind::Literal &&
+    if (completion->getKind() == CodeCompletionResultKind::Literal &&
         typeContextKind == TypeContextKind::Required &&
         completion->getExpectedTypeRelation() <
-            Completion::ExpectedTypeRelation::Convertible &&
+            CodeCompletionResultTypeRelation::Convertible &&
         completion->getLiteralKind() !=
             CodeCompletionLiteralKind::BooleanLiteral &&
         completion->getLiteralKind() != CodeCompletionLiteralKind::NilLiteral)
@@ -606,7 +591,7 @@ static double getSemanticContextScore(bool useImportDepth,
   }
   case SemanticContextKind::None: {
     order =
-        completion->getKind() == Completion::ResultKind::Keyword ? 5.5 : 8.0;
+        completion->getKind() == CodeCompletionResultKind::Keyword ? 5.5 : 8.0;
     break;
   }
   }
@@ -677,9 +662,9 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
     return ResultBucket::Operator;
 
   switch (completion->getKind()) {
-  case Completion::ResultKind::Literal:
+  case CodeCompletionResultKind::Literal:
     if (completion->getExpectedTypeRelation() >=
-        Completion::ExpectedTypeRelation::Convertible) {
+        CodeCompletionResultTypeRelation::Convertible) {
       return ResultBucket::LiteralTypeMatch;
     } else if (!hasRequiredTypes) {
       return ResultBucket::Literal;
@@ -688,26 +673,26 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
       // but we treat them as keywords instead of literals for prioritization.
       return ResultBucket::Normal;
     }
-  case Completion::ResultKind::Keyword:
+  case CodeCompletionResultKind::Keyword:
     return isHighPriorityKeyword(completion->getKeywordKind())
                ? ResultBucket::HighPriorityKeyword
                : ResultBucket::Normal;
-  case Completion::ResultKind::Pattern:
-  case Completion::ResultKind::Declaration:
+  case CodeCompletionResultKind::Pattern:
+  case CodeCompletionResultKind::Declaration:
     switch (completion->getExpectedTypeRelation()) {
-    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Convertible:
-    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Identical:
+    case swift::ide::CodeCompletionResultTypeRelation::Convertible:
+    case swift::ide::CodeCompletionResultTypeRelation::Identical:
       return ResultBucket::NormalTypeMatch;
-    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::NotApplicable:
-    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Unknown:
-    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Unrelated:
+    case swift::ide::CodeCompletionResultTypeRelation::NotApplicable:
+    case swift::ide::CodeCompletionResultTypeRelation::Unknown:
+    case swift::ide::CodeCompletionResultTypeRelation::Unrelated:
       return ResultBucket::Normal;
-    case swift::ide::CodeCompletionResult::ExpectedTypeRelation::Invalid:
+    case swift::ide::CodeCompletionResultTypeRelation::Invalid:
       if (!skipMetaGroups)
         return ResultBucket::NotRecommended;
       return ResultBucket::Normal;
     }
-  case Completion::ResultKind::BuiltinOperator:
+  case CodeCompletionResultKind::BuiltinOperator:
     llvm_unreachable("operators should be handled above");
   }
 }
@@ -852,7 +837,7 @@ static bool isTopNonLiteralResult(Item &item, ResultBucket literalBucket) {
            SemanticContextKind::CurrentNominal;
   case ResultBucket::LiteralTypeMatch:
     return completion->getExpectedTypeRelation() >=
-           Completion::ExpectedTypeRelation::Convertible;
+           CodeCompletionResultTypeRelation::Convertible;
   default:
     llvm_unreachable("invalid literal bucket");
   }
@@ -1128,19 +1113,19 @@ bool LimitedResultView::walk(CodeCompletionView::Walker &walker) const {
 // CompletionBuilder
 //===----------------------------------------------------------------------===//
 
-CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
-    : sink(sink), current(base) {
-  typeRelation = current.getExpectedTypeRelation();
-  semanticContext = current.getSemanticContext();
-  flair = current.getFlair();
+CompletionBuilder::CompletionBuilder(CompletionSink &sink,
+                                     const SwiftResult &base)
+    : sink(sink), base(base) {
+  semanticContext = base.getSemanticContext();
+  flair = base.getFlair();
   completionString =
-      const_cast<CodeCompletionString *>(current.getCompletionString());
+      const_cast<CodeCompletionString *>(base.getCompletionString());
 
   // FIXME: this works around the fact we're producing invalid completion
   // strings for our inner "." result.
-  if (current.getCompletionString()->getFirstTextChunkIndex().hasValue()) {
+  if (base.getCompletionString()->getFirstTextChunkIndex().hasValue()) {
     llvm::raw_svector_ostream OSS(originalName);
-    ide::printCodeCompletionResultFilterName(current, OSS);
+    ide::printCodeCompletionResultFilterName(base, OSS);
   }
 }
 
@@ -1160,49 +1145,53 @@ void CompletionBuilder::setPrefix(CodeCompletionString *prefix) {
     chunks.push_back(chunk);
   }
 
-  auto existing = current.getCompletionString()->getChunks();
+  auto existing = base.getCompletionString()->getChunks();
   chunks.insert(chunks.end(), existing.begin(), existing.end());
   completionString = CodeCompletionString::create(sink.allocator, chunks);
 }
 
 Completion *CompletionBuilder::finish() {
-  SwiftResult base = current;
+  const SwiftResult *newBase = &this->base;
   llvm::SmallString<64> nameStorage;
   StringRef name = getOriginalName();
   if (modified) {
     // We've modified the original result, so build a new one.
     auto opKind = CodeCompletionOperatorKind::None;
-    if (current.isOperator())
-      opKind = current.getOperatorKind();
+    if (base.isOperator())
+      opKind = base.getOperatorKind();
 
-    if (current.getKind() == SwiftResult::ResultKind::Declaration) {
-      base = SwiftResult(
-          semanticContext, flair, current.getNumBytesToErase(),
-          completionString, current.getAssociatedDeclKind(), current.isSystem(),
-          current.getModuleName(), current.getNotRecommendedReason(),
-          current.getDiagnosticSeverity(), current.getDiagnosticMessage(),
-          current.getBriefDocComment(), current.getAssociatedUSRs(),
-          typeRelation, opKind);
-    } else {
-      base = SwiftResult(current.getKind(), semanticContext, flair,
-                         current.getNumBytesToErase(), completionString,
-                         typeRelation, opKind);
-    }
+    const ContextFreeCodeCompletionResult &contextFreeBase =
+        base.getContextFreeResult();
+
+    ContextFreeCodeCompletionResult *contextFreeResult =
+        new (sink.allocator) ContextFreeCodeCompletionResult(
+            contextFreeBase.getKind(),
+            contextFreeBase.getOpaqueAssociatedKind(), opKind,
+            contextFreeBase.isSystem(), completionString,
+            contextFreeBase.getModuleName(),
+            contextFreeBase.getBriefDocComment(),
+            contextFreeBase.getAssociatedUSRs(),
+            contextFreeBase.getResultType(),
+            contextFreeBase.getNotRecommendedReason(),
+            contextFreeBase.getDiagnosticSeverity(),
+            contextFreeBase.getDiagnosticMessage());
+    newBase = base.withContextFreeResultSemanticContextAndFlair(
+        *contextFreeResult, semanticContext, flair, sink.swiftSink);
 
     llvm::raw_svector_ostream OSS(nameStorage);
-    ide::printCodeCompletionResultFilterName(base, OSS);
+    ide::printCodeCompletionResultFilterName(*newBase, OSS);
     name = OSS.str();
   }
 
   llvm::SmallString<64> description;
   {
     llvm::raw_svector_ostream OSS(description);
-    ide::printCodeCompletionResultDescription(base, OSS,
+    ide::printCodeCompletionResultDescription(*newBase, OSS,
                                               /*leadingPunctuation=*/true);
   }
 
   auto *result = new (sink.allocator)
-      Completion(std::move(base), copyString(sink.allocator, name),
+      Completion(*newBase, copyString(sink.allocator, name),
                  copyString(sink.allocator, description));
   result->moduleImportDepth = moduleImportDepth;
   result->popularityFactor = popularityFactor;

@@ -43,7 +43,7 @@ sil @simple_promote : $@convention(thin) () -> () {
 bb0:
   %o1 = alloc_ref [stack] $TestClass
   strong_release %o1 : $TestClass
-  dealloc_ref [stack] %o1 : $TestClass
+  dealloc_stack_ref %o1 : $TestClass
 
   %r = tuple()
   return %r : $()
@@ -73,8 +73,8 @@ bb0:
 
   strong_release %o1 : $TestClass
   strong_release %o2 : $TestClass
-  dealloc_ref [stack] %o2 : $TestClass
-  dealloc_ref [stack] %o1 : $TestClass
+  dealloc_stack_ref %o2 : $TestClass
+  dealloc_stack_ref %o1 : $TestClass
 
   %r = tuple()
   return %r : $()
@@ -98,7 +98,7 @@ bb0:
   set_deallocating %o1 : $TestClass
   %f = function_ref @not_inlined_destructor :  $@convention(thin) (TestClass) -> ()
   %a = apply %f(%o1) : $@convention(thin) (TestClass) -> ()
-  dealloc_ref [stack] %o1 : $TestClass
+  dealloc_stack_ref %o1 : $TestClass
 
   %r = tuple()
   return %r : $()
@@ -120,7 +120,7 @@ bb0:
   %o1 = alloc_ref [stack] $TestClass
   set_deallocating %o1 : $TestClass
   dealloc_ref %o1 : $TestClass
-  dealloc_ref [stack] %o1 : $TestClass
+  dealloc_stack_ref %o1 : $TestClass
 
   %r = tuple()
   return %r : $()
@@ -138,7 +138,7 @@ bb0:
   %o1 = alloc_ref [stack] $BigClass
   set_deallocating %o1 : $BigClass
   dealloc_ref %o1 : $BigClass
-  dealloc_ref [stack] %o1 : $BigClass
+  dealloc_stack_ref %o1 : $BigClass
 
   %r = tuple()
   return %r : $()

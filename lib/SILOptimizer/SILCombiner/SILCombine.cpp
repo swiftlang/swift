@@ -161,6 +161,57 @@ public:
   }
 };
 
+SILCombiner::SILCombiner(SILFunctionTransform *trans,
+                         bool removeCondFails, bool enableCopyPropagation) :
+  parentTransform(trans),
+  AA(trans->getPassManager()->getAnalysis<AliasAnalysis>(trans->getFunction())),
+  DA(trans->getPassManager()->getAnalysis<DominanceAnalysis>()),
+  PCA(trans->getPassManager()->getAnalysis<ProtocolConformanceAnalysis>()),
+  CHA(trans->getPassManager()->getAnalysis<ClassHierarchyAnalysis>()),
+  NLABA(trans->getPassManager()->getAnalysis<NonLocalAccessBlockAnalysis>()),
+  Worklist("SC"),
+  deleter(InstModCallbacks()
+              .onDelete([&](SILInstruction *instToDelete) {
+                // We allow for users in SILCombine to perform 2 stage
+                // deletion, so we need to split the erasing of
+                // instructions from adding operands to the worklist.
+                eraseInstFromFunction(*instToDelete,
+                                      false /* don't add operands */);
+              })
+              .onNotifyWillBeDeleted(
+                  [&](SILInstruction *instThatWillBeDeleted) {
+                    Worklist.addOperandsToWorklist(
+                      *instThatWillBeDeleted);
+                  })
+              .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
+                Worklist.add(newlyCreatedInst);
+              })
+              .onSetUseValue([&](Operand *use, SILValue newValue) {
+                use->set(newValue);
+                Worklist.add(use->getUser());
+              })),
+  deadEndBlocks(trans->getFunction()), MadeChange(false),
+  RemoveCondFails(removeCondFails),
+  enableCopyPropagation(enableCopyPropagation), Iteration(0),
+  Builder(*trans->getFunction(), &TrackingList),
+  FuncBuilder(*trans),
+  CastOpt(
+      FuncBuilder, nullptr /*SILBuilderContext*/,
+      /* ReplaceValueUsesAction */
+      [&](SILValue Original, SILValue Replacement) {
+        replaceValueUsesWith(Original, Replacement);
+      },
+      /* ReplaceInstUsesAction */
+      [&](SingleValueInstruction *I, ValueBase *V) {
+        replaceInstUsesWith(*I, V);
+      },
+      /* EraseAction */
+      [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
+  deBlocks(trans->getFunction()),
+  ownershipFixupContext(getInstModCallbacks(), deBlocks),
+  swiftPassInvocation(trans->getPassManager(),
+                      trans->getFunction(), this) {}
+
 bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
   if (auto *consumingUse = svi->getSingleConsumingUse()) {
     auto *consumingUser = consumingUse->getUser();
@@ -355,6 +406,9 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     if (I == nullptr)
       continue;
 
+    if (!parentTransform->continueWithNextSubpassRun(I))
+      return false;
+
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I)) {
       LLVM_DEBUG(llvm::dbgs() << "SC: DCE: " << *I << '\n');
@@ -455,7 +509,7 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
     StackNesting::fixNesting(&F);
   }
 
-  // Cleanup the builder and return whether or not we made any changes.
+  assert(TrackingList.empty() && "TrackingList should be fully processed");
   return Changed;
 }
 
@@ -471,20 +525,19 @@ void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
 /// Runs a Swift instruction pass.
 void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
                               void (*runFunction)(BridgedInstructionPassCtxt)) {
-  Worklist.setLibswiftPassInvocation(&libswiftPassInvocation);
-  runFunction({ {inst->asSILNode()}, {&libswiftPassInvocation} });
-  Worklist.setLibswiftPassInvocation(nullptr);
-  libswiftPassInvocation.finishedPassRun();
+  swiftPassInvocation.startInstructionPassRun(inst);
+  runFunction({ {inst->asSILNode()}, {&swiftPassInvocation} });
+  swiftPassInvocation.finishedInstructionPassRun();
 }
 
 /// Registered briged instruction pass run functions.
-static llvm::StringMap<BridgedInstructionPassRunFn> libswiftInstPasses;
+static llvm::StringMap<BridgedInstructionPassRunFn> swiftInstPasses;
 static bool passesRegistered = false;
 
 // Called from initializeSwiftModules().
 void SILCombine_registerInstructionPass(BridgedStringRef name,
                                         BridgedInstructionPassRunFn runFn) {
-  libswiftInstPasses[getStringRef(name)] = runFn;
+  swiftInstPasses[getStringRef(name)] = runFn;
   passesRegistered = true;
 }
 
@@ -492,16 +545,22 @@ void SILCombine_registerInstructionPass(BridgedStringRef name,
 SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   static BridgedInstructionPassRunFn runFunction = nullptr;                \
   static bool runFunctionSet = false;                                      \
+  static bool passDisabled = false;                                        \
   if (!runFunctionSet) {                                                   \
-    runFunction = libswiftInstPasses[TAG];                                 \
+    runFunction = swiftInstPasses[TAG];                                    \
     if (!runFunction && passesRegistered) {                                \
       llvm::errs() << "Swift pass " << TAG << " is not registered\n";      \
       abort();                                                             \
     }                                                                      \
+    passDisabled = SILPassManager::isPassDisabled(TAG);                    \
     runFunctionSet = true;                                                 \
   }                                                                        \
   if (!runFunction) {                                                      \
     LEGACY_RUN;                                                            \
+  }                                                                        \
+  if (passDisabled &&                                                      \
+      SILPassManager::disablePassesForFunction(inst->getFunction())) {     \
+    return nullptr;                                                        \
   }                                                                        \
   runSwiftInstructionPass(inst, runFunction);                              \
   return nullptr;                                                          \
@@ -527,16 +586,8 @@ namespace {
 
 class SILCombine : public SILFunctionTransform {
 
-  llvm::SmallVector<SILInstruction *, 64> TrackingList;
-  
   /// The entry point to the transformation.
   void run() override {
-    auto *AA = PM->getAnalysis<AliasAnalysis>(getFunction());
-    auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();
-    auto *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
-    auto *NLABA = PM->getAnalysis<NonLocalAccessBlockAnalysis>();
-
     bool enableCopyPropagation =
         getOptions().CopyPropagation == CopyPropagationOption::On;
     if (getOptions().EnableOSSAModules) {
@@ -544,16 +595,9 @@ class SILCombine : public SILFunctionTransform {
           getOptions().CopyPropagation != CopyPropagationOption::Off;
     }
 
-    SILOptFunctionBuilder FuncBuilder(*this);
-    // Create a SILBuilder with a tracking list for newly added
-    // instructions, which we will periodically move to our worklist.
-    SILBuilder B(*getFunction(), &TrackingList);
-    SILCombiner Combiner(this, FuncBuilder, B, AA, DA, PCA, CHA, NLABA,
-                         getOptions().RemoveRuntimeAsserts,
+    SILCombiner Combiner(this, getOptions().RemoveRuntimeAsserts,
                          enableCopyPropagation);
     bool Changed = Combiner.runOnFunction(*getFunction());
-    assert(TrackingList.empty() &&
-           "TrackingList should be fully processed by SILCombiner");
 
     if (Changed) {
       // Invalidate everything.
@@ -572,7 +616,7 @@ SILTransform *swift::createSILCombine() {
 //                          SwiftFunctionPassContext
 //===----------------------------------------------------------------------===//
 
-void LibswiftPassInvocation::eraseInstruction(SILInstruction *inst) {
+void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
   if (silCombiner) {
     silCombiner->eraseInstFromFunction(*inst);
   } else {

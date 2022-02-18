@@ -135,7 +135,7 @@ No yet implemented instruction classes are mapped to a "placeholder" instruction
 
 Similar to SIL, the optimizer also uses a small bridging layer (`OptimizerBridging.h`).
 Passes are registered in `registerSwiftPasses()`, called from `initializeSwiftModules()`.
-The C++ PassManager can then call a Swift pass like any other `SILFunctionTransform` pass.
+The C++ `PassManager` can then call a Swift pass like any other `SILFunctionTransform` pass.
 
 To add a new function pass:
 
@@ -160,7 +160,7 @@ To add a new instruction pass:
 * create a new Swift file in `SwiftCompilerSources/Optimizer/InstructionPasses`
 * add an `InstructionPass` global
 * register the pass in `registerSwiftPasses()`
-* if this passes replaces an existing `SILCombiner` visit function, remove the old visit function
+* if this pass replaces an existing `SILCombiner` visit function, remove the old visit function
 
 ## Performance
 
@@ -169,6 +169,6 @@ Some performance considerations:
 
 * Memory is managed on the C++ side. On the Swift side, SIL objects are treated as "immortal" objects, which avoids (most of) ARC overhead. ARC runtime functions are still being called, but no atomic reference counting operations are done. In future we could add a compiler feature to mark classes as immortal to avoid the runtime calls at all.
 
-* Minimizing memory allocations by using data structures which are malloc-free. For example `StackList` can be used in optimizations to implement work lists without any memory allocations. (Not yet done: `BasicBlockSet`, `BasicBlockData`)
+* Minimizing memory allocations by using data structures which are malloc-free, e.g. `Stack`
 
 * The Swift modules are compiled with `-cross-module-optimization`. This enables the compiler to optimize the Swift code across module boundaries.

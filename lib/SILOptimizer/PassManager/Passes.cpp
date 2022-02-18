@@ -240,7 +240,7 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
     llvm::errs() << "SILFunction metatype is not registered\n";
     abort();
   }
-  runFunction({{f}, {passManager->getLibswiftPassInvocation()}});
+  runFunction({{f}, {passManager->getSwiftPassInvocation()}});
 }
 
 // Called from initializeSwiftModules().

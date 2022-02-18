@@ -14,8 +14,10 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/MD5Stream.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
 using namespace Mangle;
@@ -68,10 +70,10 @@ void FunctionSignatureSpecializationMangler::setArgumentClosureProp(
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentConstantProp(
-    unsigned OrigArgIdx, LiteralInst *LI) {
+    unsigned OrigArgIdx, SILInstruction *constInst) {
   auto &Info = OrigArgs[OrigArgIdx];
   Info.first = ArgumentModifierIntBase(ArgumentModifier::ConstantProp);
-  Info.second = LI;
+  Info.second = constInst;
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentOwnedToGuaranteed(
@@ -109,6 +111,12 @@ void FunctionSignatureSpecializationMangler::setArgumentBoxToStack(
       ArgumentModifierIntBase(ArgumentModifier::BoxToStack);
 }
 
+void FunctionSignatureSpecializationMangler::setArgumentInOutToOut(
+    unsigned OrigArgIdx) {
+  OrigArgs[OrigArgIdx].first =
+      ArgumentModifierIntBase(ArgumentModifier::InOutToOut);
+}
+
 void
 FunctionSignatureSpecializationMangler::
 setReturnValueOwnedToUnowned() {
@@ -116,41 +124,41 @@ setReturnValueOwnedToUnowned() {
 }
 
 void
-FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
+FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *constInst) {
   // Append the prefix for constant propagation 'p'.
   ArgOpBuffer << 'p';
 
   // Then append the unique identifier of our literal.
-  switch (LI->getKind()) {
+  switch (constInst->getKind()) {
   default:
     llvm_unreachable("unknown literal");
   case SILInstructionKind::PreviousDynamicFunctionRefInst:
   case SILInstructionKind::DynamicFunctionRefInst:
   case SILInstructionKind::FunctionRefInst: {
     SILFunction *F =
-        cast<FunctionRefBaseInst>(LI)->getInitiallyReferencedFunction();
+        cast<FunctionRefBaseInst>(constInst)->getInitiallyReferencedFunction();
     ArgOpBuffer << 'f';
     appendIdentifier(F->getName());
     break;
   }
   case SILInstructionKind::GlobalAddrInst: {
-    SILGlobalVariable *G = cast<GlobalAddrInst>(LI)->getReferencedGlobal();
+    SILGlobalVariable *G = cast<GlobalAddrInst>(constInst)->getReferencedGlobal();
     ArgOpBuffer << 'g';
     appendIdentifier(G->getName());
     break;
   }
   case SILInstructionKind::IntegerLiteralInst: {
-    APInt apint = cast<IntegerLiteralInst>(LI)->getValue();
+    APInt apint = cast<IntegerLiteralInst>(constInst)->getValue();
     ArgOpBuffer << 'i' << apint;
     break;
   }
   case SILInstructionKind::FloatLiteralInst: {
-    APInt apint = cast<FloatLiteralInst>(LI)->getBits();
+    APInt apint = cast<FloatLiteralInst>(constInst)->getBits();
     ArgOpBuffer << 'd' << apint;
     break;
   }
   case SILInstructionKind::StringLiteralInst: {
-    StringLiteralInst *SLI = cast<StringLiteralInst>(LI);
+    StringLiteralInst *SLI = cast<StringLiteralInst>(constInst);
     StringRef V = SLI->getValue();
     assert(V.size() <= 32 && "Cannot encode string of length > 32");
     std::string VBuffer;
@@ -169,7 +177,43 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
     }
     break;
   }
+  case SILInstructionKind::KeyPathInst: {
+    // Mangle a keypath instruction by creating a MD5 hash of the printed
+    // instruction. Everything else would be too complicated.
+  
+    auto *kp = cast<KeyPathInst>(constInst);
+    KeyPathPattern *pattern = kp->getPattern();
+    
+    MD5Stream md5Stream;
+    SILPrintContext printCtxt(md5Stream);
+    for (auto &component : pattern->getComponents()) {
+      component.print(printCtxt);
+    }
+    llvm::MD5::MD5Result md5Hash;
+    md5Stream.final(md5Hash);
+    SmallString<32> resultStr;
+    llvm::MD5::stringifyResult(md5Hash, resultStr);
+    appendStringAsIdentifier(resultStr);
+
+    // Also, mangle the involved types.
+    appendType(pattern->getRootType(), nullptr);
+    appendType(pattern->getValueType(), nullptr);
+
+    ArgOpBuffer << 'k';
+    break;
   }
+  }
+}
+
+void
+FunctionSignatureSpecializationMangler::appendStringAsIdentifier(StringRef str) {
+  std::string buffer;
+  if (!str.empty() && (isDigit(str[0]) || str[0] == '_')) {
+    buffer = "_";
+    buffer.append(str.data(), str.size());
+    str = buffer;
+  }
+  appendIdentifier(str);
 }
 
 void
@@ -200,7 +244,7 @@ FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) 
 void FunctionSignatureSpecializationMangler::mangleArgument(
     ArgumentModifierIntBase ArgMod, NullablePtr<SILInstruction> Inst) {
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::ConstantProp)) {
-    mangleConstantProp(cast<LiteralInst>(Inst.get()));
+    mangleConstantProp(Inst.get());
     return;
   }
 
@@ -221,6 +265,11 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
 
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToStack)) {
     ArgOpBuffer << 's';
+    return;
+  }
+
+  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::InOutToOut)) {
+    ArgOpBuffer << 'r';
     return;
   }
 

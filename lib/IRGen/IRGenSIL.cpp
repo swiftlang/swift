@@ -1057,7 +1057,8 @@ public:
                                     SILType SILTy, const SILDebugScope *DS,
                                     SILLocation VarLoc,
                                     SILDebugVariable VarInfo,
-                                    IndirectionKind Indirection) {
+                                    IndirectionKind Indirection,
+                                    AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
     // TODO: fix demangling for C++ types (SR-13223).
     if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
@@ -1072,10 +1073,12 @@ public:
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarLoc,
-                                             VarInfo, Indirection);
+                                             VarInfo, Indirection, ArtificialKind::RealValue,
+                                             DbgInstrKind);
     } else
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarLoc,
-                                             VarInfo, Indirection);
+                                             VarInfo, Indirection, ArtificialKind::RealValue,
+                                             DbgInstrKind);
   }
 
   void emitFailBB() {
@@ -1153,6 +1156,9 @@ public:
   void visitMoveValueInst(MoveValueInst *i) {
     auto e = getLoweredExplosion(i->getOperand());
     setLoweredExplosion(i, e);
+  }
+  void visitMarkMustCheckInst(MarkMustCheckInst *i) {
+    llvm_unreachable("Invalid in Lowered SIL");
   }
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);
@@ -1257,6 +1263,7 @@ public:
   void visitEndCOWMutationInst(EndCOWMutationInst *i);
   void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
+  void visitDeallocStackRefInst(DeallocStackRefInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
@@ -1952,7 +1959,8 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     emitAsyncFunctionEntry(IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
                            LinkEntity::forSILFunction(IGF.CurSILFn),
                            Signature::forAsyncEntry(
-                               IGF.IGM, funcTy, /*useSpecialConvention*/ false)
+                               IGF.IGM, funcTy,
+                               FunctionPointerKind::defaultAsync())
                                .getAsyncContextIndex());
     if (IGF.CurSILFn->isDynamicallyReplaceable()) {
       IGF.IGM.createReplaceableProlog(IGF, IGF.CurSILFn);
@@ -2202,7 +2210,7 @@ void IRGenSILFunction::emitSILFunction() {
   // Emit distributed accessor, and mark the thunk as accessible
   // by name at runtime through it.
   if (CurSILFn->isDistributed() && CurSILFn->isThunk()) {
-    IGM.emitDistributedMethodAccessor(CurSILFn);
+    IGM.emitDistributedTargetAccessor(CurSILFn);
     IGM.addAccessibleFunction(CurSILFn);
   }
 
@@ -2572,6 +2580,9 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
     
     if (name.equals("swift_taskGroup_wait_next_throwing"))
       return SpecialKind::TaskGroupWaitNext;
+
+    if (name.equals("swift_distributed_execute_target"))
+      return SpecialKind::DistributedExecuteTarget;
   }
 
   return fn->getLoweredFunctionType();
@@ -2583,19 +2594,30 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
 
   auto fpKind = irgen::classifyFunctionPointerKind(fn);
 
-  auto sig = IGM.getSignature(fnType, fpKind.useSpecialConvention());
+  auto sig = IGM.getSignature(fnType, fpKind);
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
+  // FIXME: should we also be using this for dynamic async functions?
+  // We seem to completely ignore this in the standard async FP path below.
   auto *fnPtr = IGM.getAddrOfSILFunction(
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
+
+  // For ordinary async functions, produce both the async FP and the
+  // direct address of the function.  In the common case where we
+  // directly call the function, we'll want to call the latter rather
+  // than indirecting through the async FP.
   llvm::Constant *value;
   llvm::Constant *secondaryValue;
   if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
     secondaryValue = IGM.getAddrOfSILFunction(fn, NotForDefinition);
+
+  // For ordinary sync functions and special async functions, produce
+  // only the direct address of the function.  The runtime does not
+  // define async FP symbols for the special async functions it defines.
   } else {
     value = fnPtr;
     secondaryValue = nullptr;
@@ -2930,6 +2952,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
       return getBlockPointerCallee(IGF, functionValue, std::move(calleeInfo));
 
     case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::CXXMethod:
     case SILFunctionType::Representation::Thick:
       llvm_unreachable("unexpected function with singleton representation");
 
@@ -2991,6 +3014,7 @@ static std::unique_ptr<CallEmission> getCallEmissionForLoweredValue(
   }
 
   case SILFunctionType::Representation::ObjCMethod:
+  case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Block:
   case SILFunctionType::Representation::Thin:
@@ -3002,8 +3026,7 @@ static std::unique_ptr<CallEmission> getCallEmissionForLoweredValue(
 
   auto callEmission = getCallEmission(IGF, selfValue, std::move(callee));
   if (IGF.CurSILFn->isThunk())
-    callEmission->addAttribute(llvm::AttributeList::FunctionIndex,
-                               llvm::Attribute::NoInline);
+    callEmission->addFnAttribute(llvm::Attribute::NoInline);
 
   return callEmission;
 }
@@ -3247,14 +3270,17 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
                       llArgs);
   }
 
+  auto &calleeFP = emission->getCallee().getFunctionPointer();
+
   // Pass the generic arguments.
-  auto useSpecialConvention =
-      emission->getCallee().getFunctionPointer().useSpecialConvention();
-  if (hasPolymorphicParameters(origCalleeType) && !useSpecialConvention) {
+  if (hasPolymorphicParameters(origCalleeType) &&
+      !calleeFP.shouldSuppressPolymorphicArguments()) {
     SubstitutionMap subMap = site.getSubstitutionMap();
     emitPolymorphicArguments(*this, origCalleeType,
                              subMap, &witnessMetadata, llArgs);
-  } else if (useSpecialConvention) {
+  }
+
+  if (calleeFP.shouldPassContinuationDirectly()) {
     llArgs.add(emission->getResumeFunctionPointer());
     llArgs.add(emission->getAsyncContext());
   }
@@ -3363,6 +3389,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::ObjCMethod:
+    case SILFunctionTypeRepresentation::CXXMethod:
       llvm_unreachable("partial_apply of foreign functions not implemented");
         
     case SILFunctionTypeRepresentation::WitnessMethod:
@@ -4512,9 +4539,9 @@ void IRGenSILFunction::visitSetDeallocatingInst(SetDeallocatingInst *i) {
     //     ...
     //   set_deallocating %0 // not needed
     //     // code which does not depend on the RC_DEALLOCATING_FLAG flag.
-    //   dealloc_ref %0      // not needed (stems from the inlined deallocator)
+    //   dealloc_ref %0      // stems from the inlined deallocator
     //     ...
-    //   dealloc_ref [stack] %0
+    //   dealloc_stack_ref %0
     SILBasicBlock::iterator Iter(i);
     SILBasicBlock::iterator End = i->getParent()->end();
     for (++Iter; Iter != End; ++Iter) {
@@ -4905,7 +4932,11 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }
-    return;
+
+    // If we were not moved return early. If this SILUndef was moved, then we
+    // need to let it through so we can ensure the debug info invalidated.
+    if (!i->getWasMoved())
+      return;
   }
   bool IsInCoro = InCoroContext(*CurSILFn, *i);
 
@@ -4965,7 +4996,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
-                               i->getLoc(), *VarInfo, Indirection);
+                               i->getLoc(), *VarInfo, Indirection,
+                               AddrDbgInstrKind(i->getWasMoved()));
 }
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
@@ -5401,6 +5433,14 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
+  int StackAllocSize = -1;
+  if (i->canAllocOnStack()) {
+    assert(i->isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType());
+    estimateStackSize();
+    // Is there enough space for stack allocation?
+    StackAllocSize = IGM.IRGen.Opts.StackPromotionSizeLimit - EstimatedStackSize;
+  }
+
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
   buildTailArrays(*this, TailArrays, i);
 
@@ -5408,7 +5448,15 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
   auto metadataValue = metadata.claimNext();
   llvm::Value *alloced = emitClassAllocationDynamic(*this, metadataValue,
                                                     i->getType(), i->isObjC(),
+                                                    StackAllocSize,
                                                     TailArrays);
+
+  if (StackAllocSize >= 0) {
+    // Remember that this alloc_ref_dynamic allocates the object on the stack.
+    StackAllocs.insert(i);
+    EstimatedStackSize += StackAllocSize;
+  }
+
   Explosion e;
   e.add(alloced);
   setLoweredExplosion(i, e);
@@ -5429,32 +5477,10 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   allocatedTI.deallocateStack(*this, stackAddr, allocatedType);
 }
 
-void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
-  // Lower the operand.
+void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
   Explosion self = getLoweredExplosion(i->getOperand());
   auto selfValue = self.claimNext();
-  auto *ARI = dyn_cast<AllocRefInst>(i->getOperand());
-  if (!i->canAllocOnStack()) {
-    if (ARI && StackAllocs.count(ARI)) {
-      // We can ignore dealloc_refs (without [stack]) for stack allocated
-      // objects.
-      //
-      //   %0 = alloc_ref [stack]
-      //     ...
-      //   dealloc_ref %0     // not needed (stems from the inlined deallocator)
-      //     ...
-      //   dealloc_ref [stack] %0
-      return;
-    }
-
-    auto classType = i->getOperand()->getType();
-    emitClassDeallocation(*this, classType, selfValue);
-    return;
-  }
-  // It's a dealloc_ref [stack]. Even if the alloc_ref did not allocate the
-  // object on the stack, we don't have to deallocate it, because it is
-  // deallocated in the final release.
-  assert(ARI->canAllocOnStack());
+  auto *ARI = i->getAllocRef();
   if (StackAllocs.count(ARI)) {
     if (IGM.IRGen.Opts.EmitStackPromotionChecks) {
       selfValue = Builder.CreateBitCast(selfValue, IGM.RefCountedPtrTy);
@@ -5468,6 +5494,25 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
       Builder.CreateLifetimeEnd(selfValue);
     }
   }
+}
+
+void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
+  // Lower the operand.
+  Explosion self = getLoweredExplosion(i->getOperand());
+  auto selfValue = self.claimNext();
+  auto *ARI = dyn_cast<AllocRefInstBase>(i->getOperand());
+  if (ARI && StackAllocs.count(ARI)) {
+    // We can ignore dealloc_refs for stack allocated objects.
+    //
+    //   %0 = alloc_ref [stack]
+    //     ...
+    //   dealloc_ref %0     // not needed (stems from the inlined deallocator)
+    //     ...
+    //   dealloc_stack_ref %0
+    return;
+  }
+  auto classType = i->getOperand()->getType();
+  emitClassDeallocation(*this, classType, selfValue);
 }
 
 void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {

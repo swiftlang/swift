@@ -782,6 +782,14 @@ private:
   /// Whether objcMethodRequirements has been computed.
   bool computedObjCMethodRequirements = false;
 
+  // FIXME: SwiftUI source compatibility hack; see usage for details.
+  struct SwiftUIInvalidTypeWitness final {
+    AssociatedTypeDecl *AssocTypeDecl;
+    TypeAliasDecl *TypeWitnessDecl;
+    Requirement FailedReq;
+  };
+  llvm::Optional<SwiftUIInvalidTypeWitness> SwiftUIInvalidTyWitness = None;
+
   /// Retrieve the associated types that are referenced by the given
   /// requirement with a base of 'Self'.
   ArrayRef<AssociatedTypeDecl *> getReferencedAssociatedTypes(ValueDecl *req);
@@ -1128,12 +1136,19 @@ matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
                                                      ProtocolDecl *proto);
 
+enum class TypeAdjustment : uint8_t {
+  NoescapeToEscaping, NonsendableToSendable
+};
+
 /// Perform any necessary adjustments to the inferred associated type to
 /// make it suitable for later use.
 ///
-/// \param noescapeToEscaping Will be set \c true if this operation performed
-/// the noescape-to-escaping adjustment.
-Type adjustInferredAssociatedType(Type type, bool &noescapeToEscaping);
+/// \param performed Will be set \c true if this operation performed
+/// the adjustment, or \c false if the operation found a type that the
+/// adjustment could have applied to but did not actually need to adjust it.
+/// Unchanged otherwise.
+Type adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
+                                  bool &performed);
 
 /// Find the @objc requirement that are witnessed by the given
 /// declaration.

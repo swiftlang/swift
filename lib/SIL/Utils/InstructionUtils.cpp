@@ -425,6 +425,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::MarkMustCheckInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
@@ -461,6 +462,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::SwitchValueInst:
   case SILInstructionKind::SwitchEnumInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
@@ -665,10 +667,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       if (auto selfType = instTy->getAs<DynamicSelfType>())
         instTy = selfType->getSelfType();
       auto *cl = instTy->getClassOrBoundGenericClass();
-      bool isForeign =
-          cl->getObjectModel() == ReferenceCounting::ObjC ||
-          cl->isForeign();
-      if ((cl && isForeign) || instTy->isAnyObject())
+      bool isForeign = cl && (cl->getObjectModel() == ReferenceCounting::ObjC ||
+                              cl->isForeign());
+      if (isForeign || instTy->isAnyObject())
         return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
       return RuntimeEffect::MetaData;
     }
@@ -776,6 +777,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       rt |= RuntimeEffect::MetaData;
       break;
     case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::Closure:

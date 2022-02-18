@@ -33,6 +33,10 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/VersionTuple.h"
 
+namespace clang {
+class NamedDecl;
+}
+
 namespace swift {
   class Decl;
   class DeclAttribute;
@@ -116,7 +120,8 @@ namespace swift {
     VersionTuple,
     LayoutConstraint,
     ActorIsolation,
-    Diagnostic
+    Diagnostic,
+    ClangDecl
   };
 
   namespace diag {
@@ -149,6 +154,7 @@ namespace swift {
       LayoutConstraint LayoutConstraintVal;
       ActorIsolation ActorIsolationVal;
       DiagnosticInfo *DiagnosticVal;
+      const clang::NamedDecl *ClangDecl;
     };
     
   public:
@@ -250,6 +256,9 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::Diagnostic),
         DiagnosticVal(D) {
     }
+
+    DiagnosticArgument(const clang::NamedDecl *ND)
+        : Kind(DiagnosticArgumentKind::ClangDecl), ClangDecl(ND) {}
 
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
@@ -355,6 +364,11 @@ namespace swift {
     DiagnosticInfo *getAsDiagnostic() const {
       assert(Kind == DiagnosticArgumentKind::Diagnostic);
       return DiagnosticVal;
+    }
+
+    const clang::NamedDecl *getAsClangDecl() const {
+      assert(Kind == DiagnosticArgumentKind::ClangDecl);
+      return ClangDecl;
     }
   };
 
@@ -1327,18 +1341,20 @@ namespace swift {
     builder();
   }
 
-/// Temporary on-stack storage and unescaping for encoded diagnostic
-/// messages.
-class EncodedDiagnosticMessage {
-  llvm::SmallString<128> Buf;
+  void printClangDeclName(const clang::NamedDecl *ND, llvm::raw_ostream &os);
 
-public:
-  /// \param S A string with an encoded message
-  EncodedDiagnosticMessage(StringRef S);
+  /// Temporary on-stack storage and unescaping for encoded diagnostic
+  /// messages.
+  class EncodedDiagnosticMessage {
+    llvm::SmallString<128> Buf;
 
-  /// The unescaped message to display to the user.
-  const StringRef Message;
-};
+  public:
+    /// \param S A string with an encoded message
+    EncodedDiagnosticMessage(StringRef S);
+
+    /// The unescaped message to display to the user.
+    const StringRef Message;
+  };
 
 /// Returns a value that can be used to select between accessor kinds in
 /// diagnostics.

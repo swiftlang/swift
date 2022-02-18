@@ -14,6 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Define __STDC_WANT_LIB_EXT1__ to get memset_s on platforms that have it.
+// Other files may have included string.h without it already, so we also set
+// this with a -D flag when building, but this allows tests to build without
+// additional trouble.
+#define __STDC_WANT_LIB_EXT1__ 1
+#include <string.h>
+
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Debug.h"
 #include "llvm/Support/Alignment.h"
@@ -64,15 +71,15 @@ private:
   /// The first slab.
   Slab *firstSlab;
 
+  uint32_t firstSlabIsPreallocated:1;
   /// Used for unit testing.
-  int32_t numAllocatedSlabs = 0;
+  uint32_t numAllocatedSlabs:31 = 0;
 
   /// True if the first slab is pre-allocated.
-  bool firstSlabIsPreallocated;
 
   /// The minimal alignment of allocated memory.
   static constexpr size_t alignment = MaximumAlignment;
-  
+
   /// If set to true, memory allocations are checked for buffer overflows and
   /// use-after-free, similar to guard-malloc.
   static constexpr bool guardAllocations =
@@ -109,13 +116,27 @@ private:
     }
 
     /// The size of the slab header.
-    static size_t headerSize() {
-      return llvm::alignTo(sizeof(Slab), llvm::Align(alignment));
+    static constexpr size_t headerSize() {
+      return (sizeof(Slab) + alignment - 1) & ~(alignment - 1);
     }
 
     /// Return \p size with the added overhead of the slab header.
     static size_t includingHeader(size_t size) {
       return headerSize() + size;
+    }
+
+    /// Clear the fake metadata pointer. Call before freeing so that leftover
+    /// heap garbage doesn't have slab metadata pointers in it.
+    void clearMetadata() {
+      // Use memset_s on Apple platforms. Fall back to a plain
+      // assignment on other platforms. This is not necessary for
+      // correctness, just as an aid to analysis tools, so it's OK if
+      // the fallback gets optimized out.
+#if defined(__APPLE__)
+      memset_s(&metadata, sizeof(metadata), 0, sizeof(metadata));
+#else
+      metadata = 0;
+#endif
     }
 
     /// Return the payload buffer address at \p atOffset.
@@ -247,6 +268,7 @@ private:
     while (slab) {
       Slab *next = slab->next;
       freedCapacity += slab->capacity;
+      slab->clearMetadata();
       free(slab);
       numAllocatedSlabs--;
       slab = next;
@@ -272,8 +294,14 @@ public:
   ~StackAllocator() {
     if (lastAllocation)
       SWIFT_FATAL_ERROR(0, "not all allocations are deallocated");
+    if (firstSlabIsPreallocated)
+      firstSlab->clearMetadata();
     (void)freeAllSlabs(firstSlabIsPreallocated ? firstSlab->next : firstSlab);
     assert(getNumAllocatedSlabs() == 0);
+  }
+
+  static constexpr size_t slabHeaderSize() {
+    return Slab::headerSize();
   }
 
   /// Allocate a memory buffer of \p size.

@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -9,6 +12,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 import _Distributed
+import FakeDistributedActorSystems
 
 distributed actor SomeSpecificDistributedActor {
 
@@ -21,90 +25,20 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-// ==== Execute ----------------------------------------------------------------
-
-@_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
-
-func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
-}
-
-// ==== Fake Transport ---------------------------------------------------------
-
-struct ActorAddress: Sendable, Hashable, Codable {
-  let address: String
-  init(parse address : String) {
-    self.address = address
-  }
-}
-
-struct FakeActorSystem: DistributedActorSystem {
-  typealias ActorID = ActorAddress
-  typealias Invocation = FakeInvocation
-  typealias SerializationRequirement = Codable
-
-  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor,
-            Act.ID == ActorID {
-    return nil
-  }
-
-  func assignID<Act>(_ actorType: Act.Type) -> ActorID
-      where Act: DistributedActor,
-            Act.ID == ActorID {
-    ActorAddress(parse: "")
-  }
-
-  func actorReady<Act>(_ actor: Act)
-      where Act: DistributedActor,
-            Act.ID == ActorID {
-    print("\(#function):\(actor)")
-  }
-
-  func resignID(_ id: ActorID) {}
-
-  func makeInvocation() -> Invocation {
-    .init()
-  }
-}
-
-struct FakeInvocation: DistributedTargetInvocation {
-  typealias ArgumentDecoder = FakeArgumentDecoder
-  typealias SerializationRequirement = Codable
-
-  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
-  mutating func doneRecording() throws {}
-
-  // === Receiving / decoding -------------------------------------------------
-
-  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
-  mutating func decodeReturnType() throws -> Any.Type? { nil }
-  mutating func decodeErrorType() throws -> Any.Type? { nil }
-
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
-  }
-}
-
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
 func test_initializers() {
   let address = ActorAddress(parse: "")
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   _ = SomeSpecificDistributedActor(system: system)
   _ = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
 }
 
 func test_address() {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   let actor = SomeSpecificDistributedActor(system: system)
   _ = actor.id

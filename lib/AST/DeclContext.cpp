@@ -83,6 +83,16 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
   return nullptr;
 }
 
+VarDecl *DeclContext::getNonLocalVarDecl() const {
+  if (auto *init = dyn_cast<PatternBindingInitializer>(this)) {
+   if (auto *var =
+         init->getBinding()->getAnchoringVarDecl(init->getBindingIndex())) {
+      return var;
+     }
+  }
+  return nullptr;
+}
+
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   assert(getSelfProtocolDecl() && "not a protocol");
 
@@ -310,6 +320,7 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
   case FragileFunctionKind::AlwaysEmitIntoClient:
   case FragileFunctionKind::DefaultArgument:
   case FragileFunctionKind::PropertyInitializer:
+  case FragileFunctionKind::BackDeploy:
     return ResilienceExpansion::Minimal;
   case FragileFunctionKind::None:
     return ResilienceExpansion::Maximal;
@@ -405,6 +416,11 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
 
       if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
         return {FragileFunctionKind::AlwaysEmitIntoClient,
+                /*allowUsableFromInline=*/true};
+      }
+
+      if (AFD->getAttrs().hasAttribute<BackDeployAttr>()) {
+        return {FragileFunctionKind::BackDeploy,
                 /*allowUsableFromInline=*/true};
       }
 
@@ -1211,14 +1227,20 @@ bool DeclContext::isClassConstrainedProtocolExtension() const {
 bool DeclContext::isAsyncContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Initializer:
-  case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::EnumElementDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::Module:
-  case DeclContextKind::FileUnit:
   case DeclContextKind::GenericTypeDecl:
     return false;
+  case DeclContextKind::FileUnit:
+    if (const SourceFile *sf = dyn_cast<SourceFile>(this))
+      return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
+             sf->isAsyncTopLevelSourceFile();
+    return false;
+  case DeclContextKind::TopLevelCodeDecl:
+    return getASTContext().LangOpts.EnableExperimentalAsyncTopLevel &&
+           getParent()->isAsyncContext();
   case DeclContextKind::AbstractClosureExpr:
     return cast<AbstractClosureExpr>(this)->isBodyAsync();
   case DeclContextKind::AbstractFunctionDecl: {

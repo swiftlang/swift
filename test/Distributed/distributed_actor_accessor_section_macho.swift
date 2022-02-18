@@ -1,4 +1,3 @@
-
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s | %IRGenFileCheck %s
@@ -43,7 +42,7 @@ struct LargeStruct : Codable {
   var d: Double
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public distributed actor MyActor {
   distributed func simple1(_: Int) {
   }
@@ -77,7 +76,7 @@ public distributed actor MyActor {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
+@available(SwiftStdlib 5.7, *)
 public distributed actor MyOtherActor {
   distributed func empty() {
   }

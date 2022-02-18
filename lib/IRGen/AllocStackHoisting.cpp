@@ -348,14 +348,12 @@ private:
 } // end anonymous namespace
 
 bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
-  auto *Apply = dyn_cast<ApplyInst>(I);
-  if (!Apply)
-    return false;
-  if (Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION))
-    return true;
-  auto *FunRef = Apply->getReferencedFunctionOrNull();
-  if (!FunRef)
-    return false;
+  if (auto *Apply = dyn_cast<ApplyInst>(I)) {
+    return Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION);
+  }
+  if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast;
+  }
   return false;
 }
 

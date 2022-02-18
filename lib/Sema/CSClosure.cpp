@@ -512,37 +512,42 @@ private:
   }
 
   void visitBreakStmt(BreakStmt *breakStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Break");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Break");
   }
 
   void visitContinueStmt(ContinueStmt *continueStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Continue");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Continue");
   }
 
   void visitDeferStmt(DeferStmt *deferStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Defer");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Defer");
   }
 
   void visitFallthroughStmt(FallthroughStmt *fallthroughStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Fallthrough");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Fallthrough");
+  }
+
+  void visitStmtCondition(LabeledConditionalStmt *S,
+                          SmallVectorImpl<ElementInfo> &elements,
+                          ConstraintLocator *locator) {
+    auto *condLocator =
+        cs.getConstraintLocator(locator, ConstraintLocator::Condition);
+    for (auto &condition : S->getCond())
+      elements.push_back(makeElement(&condition, condLocator));
   }
 
   void visitIfStmt(IfStmt *ifStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: If");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: If");
 
     SmallVector<ElementInfo, 4> elements;
 
     // Condition
-    {
-      auto *condLoc =
-        cs.getConstraintLocator(locator, ConstraintLocator::Condition);
-      elements.push_back(makeElement(ifStmt->getCondPointer(), condLoc));
-    }
+    visitStmtCondition(ifStmt, elements, locator);
 
     // Then Branch
     {
@@ -562,39 +567,39 @@ private:
   }
 
   void visitGuardStmt(GuardStmt *guardStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Guard");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Guard");
 
-    createConjunction(cs,
-                      {makeElement(guardStmt->getCondPointer(),
-                                   cs.getConstraintLocator(
-                                       locator, ConstraintLocator::Condition)),
-                       makeElement(guardStmt->getBody(), locator)},
-                      locator);
+    SmallVector<ElementInfo, 4> elements;
+
+    visitStmtCondition(guardStmt, elements, locator);
+    elements.push_back(makeElement(guardStmt->getBody(), locator));
+
+    createConjunction(cs, elements, locator);
   }
 
   void visitWhileStmt(WhileStmt *whileStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Guard");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: While");
 
-    createConjunction(cs,
-                      {makeElement(whileStmt->getCondPointer(),
-                                   cs.getConstraintLocator(
-                                       locator, ConstraintLocator::Condition)),
-                       makeElement(whileStmt->getBody(), locator)},
-                      locator);
+    SmallVector<ElementInfo, 4> elements;
+
+    visitStmtCondition(whileStmt, elements, locator);
+    elements.push_back(makeElement(whileStmt->getBody(), locator));
+
+    createConjunction(cs, elements, locator);
   }
 
   void visitDoStmt(DoStmt *doStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Do");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Do");
 
     visitBraceStmt(doStmt->getBody());
   }
 
   void visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: RepeatWhile");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: RepeatWhile");
 
     createConjunction(cs,
                       {makeElement(repeatWhileStmt->getCond(),
@@ -606,8 +611,8 @@ private:
   }
 
   void visitPoundAssertStmt(PoundAssertStmt *poundAssertStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: PoundAssert");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: PoundAssert");
 
     createConjunction(cs,
                       {makeElement(poundAssertStmt->getCondition(),
@@ -618,16 +623,15 @@ private:
   }
 
   void visitThrowStmt(ThrowStmt *throwStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Throw");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Throw");
 
-    Type errType =
-        cs.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
-    if (!errType) {
+    if (!cs.getASTContext().getErrorDecl()) {
       hadError = true;
       return;
     }
 
+    auto errType = cs.getASTContext().getErrorExistentialType();
     auto *errorExpr = throwStmt->getSubExpr();
 
     createConjunction(
@@ -641,8 +645,8 @@ private:
   }
 
   void visitForEachStmt(ForEachStmt *forEachStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: ForEach");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: ForEach");
 
     auto *stmtLoc = cs.getConstraintLocator(locator);
 
@@ -679,8 +683,8 @@ private:
   }
 
   void visitSwitchStmt(SwitchStmt *switchStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Switch");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Switch");
 
     auto *switchLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::ClosureBodyElement(switchStmt));
@@ -705,8 +709,8 @@ private:
   }
 
   void visitDoCatchStmt(DoCatchStmt *doStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: DoCatch");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: DoCatch");
 
     auto *doLoc = cs.getConstraintLocator(
         locator, LocatorPathElt::ClosureBodyElement(doStmt));
@@ -725,8 +729,8 @@ private:
   }
 
   void visitCaseStmt(CaseStmt *caseStmt) {
-    if (!isSupportedMultiStatementClosure())
-      llvm_unreachable("Unsupported statement: Case");
+    assert(isSupportedMultiStatementClosure() &&
+           "Unsupported statement: Case");
 
     Type contextualTy;
 
@@ -739,7 +743,7 @@ private:
         auto *switchStmt = cast<SwitchStmt>(parent.get<Stmt *>());
         contextualTy = cs.getType(switchStmt->getSubjectExpr());
       } else if (parent.isStmt(StmtKind::DoCatch)) {
-        contextualTy = cs.getASTContext().getExceptionType();
+        contextualTy = cs.getASTContext().getErrorExistentialType();
       } else {
         hadError = true;
         return;
@@ -919,6 +923,19 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
   return false;
 }
 
+bool ConstraintSystem::isInResultBuilderContext(ClosureExpr *closure) const {
+  if (!closure->hasSingleExpressionBody()) {
+    auto *DC = closure->getParent();
+    do {
+      if (auto *parentClosure = dyn_cast<ClosureExpr>(DC)) {
+        if (resultBuilderTransformed.count(parentClosure))
+          return true;
+      }
+    } while ((DC = DC->getParent()));
+  }
+  return false;
+}
+
 bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
   auto last = locator.last();
   if (!(last && last->is<LocatorPathElt::Condition>()))
@@ -958,8 +975,8 @@ ConstraintSystem::simplifyClosureBodyElementConstraint(
     return SolutionKind::Solved;
   } else if (auto *stmt = element.dyn_cast<Stmt *>()) {
     generator.visit(stmt);
-  } else if (auto *cond = element.dyn_cast<StmtCondition *>()) {
-    if (generateConstraints(*cond, closure))
+  } else if (auto *cond = element.dyn_cast<StmtConditionElement *>()) {
+    if (generateConstraints({*cond}, closure))
       return SolutionKind::Error;
   } else if (auto *pattern = element.dyn_cast<Pattern *>()) {
     generator.visitPattern(pattern, context);
@@ -1559,7 +1576,7 @@ void ConjunctionElement::findReferencedVariables(
 
   TypeVariableRefFinder refFinder(cs, locator->getAnchor(), typeVars);
 
-  if (element.is<Decl *>() || element.is<StmtCondition *>() ||
+  if (element.is<Decl *>() || element.is<StmtConditionElement *>() ||
       element.is<Expr *>() || element.isStmt(StmtKind::Return))
     element.walk(refFinder);
 }

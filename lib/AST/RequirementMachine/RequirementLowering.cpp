@@ -28,6 +28,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
@@ -53,49 +54,90 @@ using namespace rewriting;
 /// Desugar a same-type requirement that possibly has concrete types on either
 /// side into a series of same-type and concrete-type requirements where the
 /// left hand side is always a type parameter.
-static void desugarSameTypeRequirement(Type lhs, Type rhs,
-                                       SmallVectorImpl<Requirement> &result) {
+static void desugarSameTypeRequirement(Type lhs, Type rhs, SourceLoc loc,
+                                       SmallVectorImpl<Requirement> &result,
+                                       SmallVectorImpl<RequirementError> &errors) {
   class Matcher : public TypeMatcher<Matcher> {
+    SourceLoc loc;
     SmallVectorImpl<Requirement> &result;
+    SmallVectorImpl<RequirementError> &errors;
 
   public:
-    explicit Matcher(SmallVectorImpl<Requirement> &result)
-      : result(result) {}
+    bool recordedErrors = false;
+    bool recordedRequirements = false;
+
+    explicit Matcher(SourceLoc loc,
+                     SmallVectorImpl<Requirement> &result,
+                     SmallVectorImpl<RequirementError> &errors)
+      : loc(loc), result(result), errors(errors) {}
+
+    bool alwaysMismatchTypeParameters() const { return true; }
 
     bool mismatch(TypeBase *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             firstType, secondType);
+        recordedRequirements = true;
         return true;
       }
 
       if (firstType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             firstType, secondType);
+        recordedRequirements = true;
         return true;
       }
 
       if (secondType->isTypeParameter()) {
         result.emplace_back(RequirementKind::SameType,
                             secondType, firstType);
+        recordedRequirements = true;
         return true;
       }
 
-      // FIXME: Record concrete type conflict, diagnose upstream
+      errors.push_back(
+          RequirementError::forConcreteTypeMismatch(firstType,
+                                                    secondType,
+                                                    loc));
+      recordedErrors = true;
       return true;
     }
-  } matcher(result);
+  } matcher(loc, result, errors);
 
-  // FIXME: Record redundancy and diagnose upstream
+  if (lhs->hasError() || rhs->hasError())
+    return;
+
   (void) matcher.match(lhs, rhs);
+
+  // If neither side is directly a type parameter, the type parameter
+  // must be in structural position where the enclosing type is redundant.
+  if (!lhs->isTypeParameter() && !rhs->isTypeParameter() &&
+      !matcher.recordedErrors) {
+    // FIXME: Add a tailored error message when requirements were
+    // recorded, e.g. Array<Int> == Array<T>. The outer type is
+    // redundant, but the inner requirement T == Int is not.
+    errors.push_back(RequirementError::forRedundantRequirement(
+        {RequirementKind::SameType, lhs, rhs}, loc));
+  }
 }
 
 static void desugarSuperclassRequirement(Type subjectType,
                                          Type constraintType,
-                                         SmallVectorImpl<Requirement> &result) {
+                                         SourceLoc loc,
+                                         SmallVectorImpl<Requirement> &result,
+                                         SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
-    // FIXME: Perform unification, diagnose redundancy or conflict upstream
+    Requirement requirement(RequirementKind::Superclass,
+                            subjectType, constraintType);
+    if (constraintType->isExactSuperclassOf(subjectType)) {
+      errors.push_back(
+          RequirementError::forRedundantRequirement(requirement, loc));
+    } else {
+      errors.push_back(
+          RequirementError::forConflictingRequirement(requirement, loc));
+    }
+
     return;
   }
 
@@ -104,24 +146,68 @@ static void desugarSuperclassRequirement(Type subjectType,
 
 static void desugarLayoutRequirement(Type subjectType,
                                      LayoutConstraint layout,
-                                     SmallVectorImpl<Requirement> &result) {
+                                     SourceLoc loc,
+                                     SmallVectorImpl<Requirement> &result,
+                                     SmallVectorImpl<RequirementError> &errors) {
   if (!subjectType->isTypeParameter()) {
-    // FIXME: Diagnose redundancy or conflict upstream
+    Requirement requirement(RequirementKind::Layout,
+                            subjectType, layout);
+    if (layout->isClass() && subjectType->isAnyClassReferenceType()) {
+      errors.push_back(
+          RequirementError::forRedundantRequirement(requirement, loc));
+    } else {
+      errors.push_back(
+          RequirementError::forConflictingRequirement(requirement, loc));
+    }
+
     return;
   }
 
   result.emplace_back(RequirementKind::Layout, subjectType, layout);
 }
 
+static Type lookupMemberType(Type subjectType, ProtocolDecl *protoDecl,
+                             AssociatedTypeDecl *assocType) {
+  if (subjectType->isTypeParameter())
+    return DependentMemberType::get(subjectType, assocType);
+
+  auto *M = protoDecl->getParentModule();
+  auto conformance = M->lookupConformance(
+      subjectType, protoDecl);
+  return conformance.getAssociatedType(subjectType,
+                                       assocType->getDeclaredInterfaceType());
+}
+
 /// Desugar a protocol conformance requirement by splitting up protocol
 /// compositions on the right hand side into conformance and superclass
 /// requirements.
 static void desugarConformanceRequirement(Type subjectType, Type constraintType,
-                                          SmallVectorImpl<Requirement> &result) {
+                                          SourceLoc loc,
+                                          SmallVectorImpl<Requirement> &result,
+                                          SmallVectorImpl<RequirementError> &errors) {
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
     if (!subjectType->isTypeParameter()) {
-      // FIXME: Check conformance, diagnose redundancy or conflict upstream
+      // Check if the subject type actually conforms.
+      auto *protoDecl = constraintType->castTo<ProtocolType>()->getDecl();
+      auto *module = protoDecl->getParentModule();
+      auto conformance = module->lookupConformance(subjectType, protoDecl);
+      if (conformance.isInvalid()) {
+        errors.push_back(RequirementError::forConflictingRequirement(
+            {RequirementKind::Conformance, subjectType, constraintType}, loc));
+        return;
+      }
+
+      errors.push_back(RequirementError::forRedundantRequirement(
+          {RequirementKind::Conformance, subjectType, constraintType}, loc));
+
+      assert(conformance.isConcrete());
+      auto *concrete = conformance.getConcrete();
+
+      // Introduce conditional requirements if the subject type is concrete.
+      for (auto req : concrete->getConditionalRequirements()) {
+        desugarRequirement(req, result, errors);
+      }
       return;
     }
 
@@ -130,18 +216,35 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
     return;
   }
 
+  if (auto *paramType = constraintType->getAs<ParameterizedProtocolType>()) {
+    auto *protoDecl = paramType->getBaseType()->getDecl();
+
+    desugarConformanceRequirement(subjectType, paramType->getBaseType(),
+                                  loc, result, errors);
+
+    auto *assocType = protoDecl->getPrimaryAssociatedType();
+
+    auto memberType = lookupMemberType(subjectType, protoDecl, assocType);
+    desugarSameTypeRequirement(memberType, paramType->getArgumentType(),
+                               loc, result, errors);
+    return;
+  }
+
   auto *compositionType = constraintType->castTo<ProtocolCompositionType>();
   if (compositionType->hasExplicitAnyObject()) {
     desugarLayoutRequirement(subjectType,
                              LayoutConstraint::getLayoutConstraint(
-                                 LayoutConstraintKind::Class), result);
+                                 LayoutConstraintKind::Class),
+                             loc, result, errors);
   }
 
   for (auto memberType : compositionType->getMembers()) {
     if (memberType->isExistentialType())
-      desugarConformanceRequirement(subjectType, memberType, result);
+      desugarConformanceRequirement(subjectType, memberType,
+                                    loc, result, errors);
     else
-      desugarSuperclassRequirement(subjectType, memberType, result);
+      desugarSuperclassRequirement(subjectType, memberType,
+                                   loc, result, errors);
   }
 }
 
@@ -151,24 +254,29 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
 /// converted into rewrite rules by the RuleBuilder.
 void
 swift::rewriting::desugarRequirement(Requirement req,
-                                     SmallVectorImpl<Requirement> &result) {
+                                     SmallVectorImpl<Requirement> &result,
+                                     SmallVectorImpl<RequirementError> &errors) {
   auto firstType = req.getFirstType();
 
   switch (req.getKind()) {
   case RequirementKind::Conformance:
-    desugarConformanceRequirement(firstType, req.getSecondType(), result);
+    desugarConformanceRequirement(firstType, req.getSecondType(),
+                                  SourceLoc(), result, errors);
     break;
 
   case RequirementKind::Superclass:
-    desugarSuperclassRequirement(firstType, req.getSecondType(), result);
+    desugarSuperclassRequirement(firstType, req.getSecondType(),
+                                 SourceLoc(), result, errors);
     break;
 
   case RequirementKind::Layout:
-    desugarLayoutRequirement(firstType, req.getLayoutConstraint(), result);
+    desugarLayoutRequirement(firstType, req.getLayoutConstraint(),
+                             SourceLoc(), result, errors);
     break;
 
   case RequirementKind::SameType:
-    desugarSameTypeRequirement(firstType, req.getSecondType(), result);
+    desugarSameTypeRequirement(firstType, req.getSecondType(),
+                               SourceLoc(), result, errors);
     break;
   }
 }
@@ -183,22 +291,22 @@ swift::rewriting::desugarRequirement(Requirement req,
 
 static void realizeTypeRequirement(Type subjectType, Type constraintType,
                                    SourceLoc loc,
-                                   SmallVectorImpl<StructuralRequirement> &result) {
-  // Check whether we have a reasonable constraint type at all.
-  if (!constraintType->isExistentialType() &&
-      !constraintType->getClassOrBoundGenericClass()) {
-    // FIXME: Diagnose
-    return;
-  }
-
+                                   SmallVectorImpl<StructuralRequirement> &result,
+                                   SmallVectorImpl<RequirementError> &errors) {
   SmallVector<Requirement, 2> reqs;
 
-  if (constraintType->isExistentialType()) {
+  if (constraintType->isConstraintType()) {
     // Handle conformance requirements.
-    desugarConformanceRequirement(subjectType, constraintType, reqs);
-  } else {
+    desugarConformanceRequirement(subjectType, constraintType, loc, reqs, errors);
+  } else if (constraintType->getClassOrBoundGenericClass()) {
     // Handle superclass requirements.
-    desugarSuperclassRequirement(subjectType, constraintType, reqs);
+    desugarSuperclassRequirement(subjectType, constraintType, loc, reqs, errors);
+  } else {
+    errors.push_back(
+        RequirementError::forInvalidTypeRequirement(subjectType,
+                                                    constraintType,
+                                                    loc));
+    return;
   }
 
   // Add source location information.
@@ -212,6 +320,7 @@ namespace {
 struct InferRequirementsWalker : public TypeWalker {
   ModuleDecl *module;
   SmallVector<Requirement, 2> reqs;
+  SmallVector<RequirementError, 2> errors;
 
   explicit InferRequirementsWalker(ModuleDecl *module) : module(module) {}
 
@@ -231,7 +340,7 @@ struct InferRequirementsWalker : public TypeWalker {
       auto subMap = typeAlias->getSubstitutionMap();
       for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
         if (auto req = rawReq.subst(subMap))
-          desugarRequirement(*req, reqs);
+          desugarRequirement(*req, reqs, errors);
       }
 
       return Action::Continue;
@@ -251,17 +360,14 @@ struct InferRequirementsWalker : public TypeWalker {
         auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
           Requirement req(RequirementKind::Conformance, type,
                           protocol->getDeclaredInterfaceType());
-          desugarRequirement(req, reqs);
+          desugarRequirement(req, reqs, errors);
         };
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
           auto *protocol = assocType->getProtocol();
-          auto *module = protocol->getParentModule();
-          auto conf = module->lookupConformance(firstType, protocol);
-          auto secondType = conf.getAssociatedType(
-              firstType, assocType->getDeclaredInterfaceType());
+          auto secondType = lookupMemberType(firstType, protocol, assocType);
           Requirement req(RequirementKind::SameType, firstType, secondType);
-          desugarRequirement(req, reqs);
+          desugarRequirement(req, reqs, errors);
         };
         auto *tangentVectorAssocType =
             differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
@@ -289,12 +395,6 @@ struct InferRequirementsWalker : public TypeWalker {
     auto decl = ty->getAnyNominal();
     if (!decl) return Action::Continue;
 
-    // FIXME: The GSB and the request evaluator both detect a cycle here if we
-    // force a recursive generic signature.  We should look into moving cycle
-    // detection into the generic signature request(s) - see rdar://55263708
-    if (!decl->hasComputedGenericSignature())
-      return Action::Continue;
-
     auto genericSig = decl->getGenericSignature();
     if (!genericSig)
       return Action::Continue;
@@ -306,7 +406,7 @@ struct InferRequirementsWalker : public TypeWalker {
     // FIXME: Inaccurate TypeReprs.
     for (const auto &rawReq : genericSig.getRequirements()) {
       if (auto req = rawReq.subst(subMap))
-        desugarRequirement(*req, reqs);
+        desugarRequirement(*req, reqs, errors);
     }
 
     return Action::Continue;
@@ -340,7 +440,8 @@ void swift::rewriting::inferRequirements(
 void swift::rewriting::realizeRequirement(
     Requirement req, RequirementRepr *reqRepr,
     ModuleDecl *moduleForInference,
-    SmallVectorImpl<StructuralRequirement> &result) {
+    SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<RequirementError> &errors) {
   auto firstType = req.getFirstType();
   auto loc = (reqRepr ? reqRepr->getSeparatorLoc() : SourceLoc());
 
@@ -358,7 +459,7 @@ void swift::rewriting::realizeRequirement(
       inferRequirements(secondType, secondLoc, moduleForInference, result);
     }
 
-    realizeTypeRequirement(firstType, secondType, loc, result);
+    realizeTypeRequirement(firstType, secondType, loc, result, errors);
     break;
   }
 
@@ -370,7 +471,8 @@ void swift::rewriting::realizeRequirement(
     }
 
     SmallVector<Requirement, 2> reqs;
-    desugarLayoutRequirement(firstType, req.getLayoutConstraint(), reqs);
+    desugarLayoutRequirement(firstType, req.getLayoutConstraint(),
+                             loc, reqs, errors);
 
     for (auto req : reqs)
       result.push_back({req, loc, /*wasInferred=*/false});
@@ -391,7 +493,8 @@ void swift::rewriting::realizeRequirement(
     }
 
     SmallVector<Requirement, 2> reqs;
-    desugarSameTypeRequirement(req.getFirstType(), secondType, reqs);
+    desugarSameTypeRequirement(req.getFirstType(), secondType, loc,
+                               reqs, errors);
 
     for (auto req : reqs)
       result.push_back({req, loc, /*wasInferred=*/false});
@@ -404,7 +507,8 @@ void swift::rewriting::realizeRequirement(
 /// AssociatedTypeDecl or GenericTypeParamDecl.
 void swift::rewriting::realizeInheritedRequirements(
     TypeDecl *decl, Type type, ModuleDecl *moduleForInference,
-    SmallVectorImpl<StructuralRequirement> &result) {
+    SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<RequirementError> &errors) {
   auto &ctx = decl->getASTContext();
   auto inheritedTypes = decl->getInherited();
 
@@ -422,8 +526,127 @@ void swift::rewriting::realizeInheritedRequirements(
       inferRequirements(inheritedType, loc, moduleForInference, result);
     }
 
-    realizeTypeRequirement(type, inheritedType, loc, result);
+    realizeTypeRequirement(type, inheritedType, loc, result, errors);
   }
+}
+
+/// Emit diagnostics for the given \c RequirementErrors.
+///
+/// \param ctx The AST context in which to emit diagnostics.
+/// \param errors The set of requirement diagnostics to be emitted.
+/// \param allowConcreteGenericParams Whether concrete type parameters
+/// are permitted in the generic signature. If true, diagnostics will
+/// offer fix-its to turn invalid type requirements, e.g. T: Int, into
+/// same-type requirements.
+///
+/// \returns true if any errors were emitted, and false otherwise (including
+/// when only warnings were emitted).
+bool swift::rewriting::diagnoseRequirementErrors(
+    ASTContext &ctx, SmallVectorImpl<RequirementError> &errors,
+    bool allowConcreteGenericParams) {
+  bool diagnosedError = false;
+
+  for (auto error : errors) {
+    SourceLoc loc = error.loc;
+    if (!loc.isValid())
+      continue;
+
+    switch (error.kind) {
+    case RequirementError::Kind::InvalidTypeRequirement: {
+      Type subjectType = error.requirement.getFirstType();
+      Type constraint = error.requirement.getSecondType();
+
+      if (subjectType->hasError() || constraint->hasError())
+        break;
+
+      // FIXME: The constraint string is printed directly here because
+      // the current default is to not print `any` for existential
+      // types, but this error message is super confusing without `any`
+      // if the user wrote it explicitly.
+      PrintOptions options;
+      options.PrintExplicitAny = true;
+      auto constraintString = constraint.getString(options);
+
+      ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol,
+                         subjectType, constraintString);
+      diagnosedError = true;
+
+      auto getNameWithoutSelf = [&](std::string subjectTypeName) {
+        std::string selfSubstring = "Self.";
+
+        if (subjectTypeName.rfind(selfSubstring, 0) == 0) {
+          return subjectTypeName.erase(0, selfSubstring.length());
+        }
+
+        return subjectTypeName;
+      };
+
+      if (allowConcreteGenericParams) {
+        auto subjectTypeName = subjectType.getString();
+        auto subjectTypeNameWithoutSelf = getNameWithoutSelf(subjectTypeName);
+        ctx.Diags.diagnose(loc, diag::requires_conformance_nonprotocol_fixit,
+                           subjectTypeNameWithoutSelf, constraintString)
+             .fixItReplace(loc, " == ");
+      }
+
+      break;
+    }
+
+    case RequirementError::Kind::ConcreteTypeMismatch: {
+      auto type1 = error.requirement.getFirstType();
+      auto type2 = error.requirement.getSecondType();
+
+      if (!type1->hasError() && !type2->hasError()) {
+        ctx.Diags.diagnose(loc, diag::requires_same_concrete_type,
+                           type1, type2);
+        diagnosedError = true;
+      }
+
+      break;
+    }
+
+    case RequirementError::Kind::ConflictingRequirement: {
+      auto subjectType = error.requirement.getFirstType();
+      if (subjectType->hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::requires_not_suitable_archetype,
+                         subjectType);
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::RedundantRequirement: {
+      auto requirement = error.requirement;
+      switch (requirement.getKind()) {
+      case RequirementKind::SameType:
+        ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
+                           requirement.getFirstType(),
+                           requirement.getSecondType());
+        break;
+      case RequirementKind::Conformance:
+        ctx.Diags.diagnose(loc, diag::redundant_conformance_constraint,
+                           requirement.getFirstType(),
+                           requirement.getProtocolDecl());
+        break;
+      case RequirementKind::Superclass:
+        ctx.Diags.diagnose(loc, diag::redundant_superclass_constraint,
+                           requirement.getFirstType(),
+                           requirement.getSecondType());
+        break;
+      case RequirementKind::Layout:
+        ctx.Diags.diagnose(loc, diag::redundant_layout_constraint,
+                           requirement.getFirstType(),
+                           requirement.getLayoutConstraint());
+        break;
+      }
+
+      break;
+    }
+    }
+  }
+
+  return diagnosedError;
 }
 
 ArrayRef<StructuralRequirement>
@@ -432,19 +655,22 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   assert(!proto->hasLazyRequirementSignature());
 
   SmallVector<StructuralRequirement, 4> result;
+  SmallVector<RequirementError, 4> errors;
 
   auto &ctx = proto->getASTContext();
 
   auto selfTy = proto->getSelfInterfaceType();
 
   realizeInheritedRequirements(proto, selfTy,
-                               /*moduleForInference=*/nullptr, result);
+                               /*moduleForInference=*/nullptr,
+                               result, errors);
 
   // Add requirements from the protocol's own 'where' clause.
   WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         realizeRequirement(req, reqRepr,
-                           /*moduleForInference=*/nullptr, result);
+                           /*moduleForInference=*/nullptr,
+                           result, errors);
         return false;
       });
 
@@ -459,13 +685,17 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     return ctx.AllocateCopy(result);
   }
 
-  // Add requirements for each of the associated types.
-  for (auto assocTypeDecl : proto->getAssociatedTypeMembers()) {
+  // Add requirements for each associated type.
+  llvm::SmallDenseSet<Identifier, 2> assocTypes;
+
+  for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
+    assocTypes.insert(assocTypeDecl->getName());
+
     // Add requirements placed directly on this associated type.
     auto assocType = assocTypeDecl->getDeclaredInterfaceType();
     realizeInheritedRequirements(assocTypeDecl, assocType,
                                  /*moduleForInference=*/nullptr,
-                                 result);
+                                 result, errors);
 
     // Add requirements from this associated type's where clause.
     WhereClauseOwner(assocTypeDecl).visitRequirements(
@@ -473,9 +703,41 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
         [&](const Requirement &req, RequirementRepr *reqRepr) {
           realizeRequirement(req, reqRepr,
                              /*moduleForInference=*/nullptr,
-                             result);
+                             result, errors);
           return false;
         });
+  }
+
+  // Add requirements for each typealias.
+  for (auto *decl : proto->getMembers()) {
+    // Protocol typealiases are modeled as same-type requirements
+    // where the left hand side is 'Self.X' for some unresolved
+    // DependentMemberType X, and the right hand side is the
+    // underlying type of the typealias.
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+      if (!typeAliasDecl->isGeneric()) {
+        // Ignore the typealias if we have an associated type with the same anme
+        // in the same protocol. This is invalid anyway, but it's just here to
+        // ensure that we produce the same requirement signature on some tests
+        // with -requirement-machine-protocol-signatures=verify.
+        if (assocTypes.contains(typeAliasDecl->getName()))
+          continue;
+
+        auto underlyingType = typeAliasDecl->getStructuralType();
+
+        auto subjectType = DependentMemberType::get(
+            selfTy, typeAliasDecl->getName());
+        Requirement req(RequirementKind::SameType, subjectType,
+                        underlyingType);
+        result.push_back({req, typeAliasDecl->getLoc(),
+                          /*inferred=*/false});
+      }
+    }
+  }
+
+  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
+      RequirementMachineMode::Enabled) {
+    diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
   }
 
   return ctx.AllocateCopy(result);
@@ -492,6 +754,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   assert(!proto->hasLazyRequirementSignature());
 
   SmallVector<Requirement, 2> result;
+  SmallVector<RequirementError, 2> errors;
 
   auto &ctx = proto->getASTContext();
 
@@ -533,7 +796,8 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   // within this protocol or a protocol it inherits.
   auto recordInheritedTypeRequirement = [&](TypeDecl *first, TypeDecl *second) {
     desugarSameTypeRequirement(getStructuralType(first),
-                               getStructuralType(second), result);
+                               getStructuralType(second),
+                               SourceLoc(), result, errors);
   };
 
   // Local function to find the insertion point for the protocol's "where"
@@ -730,6 +994,11 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     }
   }
 
+  if (ctx.LangOpts.RequirementMachineProtocolSignatures ==
+      RequirementMachineMode::Enabled) {
+    diagnoseRequirementErrors(ctx, errors, /*allowConcreteGenericParams=*/false);
+  }
+
   return ctx.AllocateCopy(result);
 }
 
@@ -747,7 +1016,7 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
   if (proto->hasLazyRequirementSignature() ||
       (ctx.LangOpts.RequirementMachineProtocolSignatures
         == RequirementMachineMode::Disabled)) {
-    for (auto req : proto->getRequirementSignature()) {
+    for (auto req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
         result.push_back(req.getProtocolDecl());
       }
@@ -770,35 +1039,6 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
 //
 // Building rewrite rules from desugared requirements.
 //
-
-/// Given a concrete type that may contain type parameters in structural positions,
-/// collect all the structural type parameter components, and replace them all with
-/// fresh generic parameters. The fresh generic parameters all have a depth of 0,
-/// and the index is an index into the 'result' array.
-///
-/// For example, given the concrete type Foo<X.Y, Array<Z>>, this produces the
-/// result type Foo<τ_0_0, Array<τ_0_1>>, with result array {X.Y, Z}.
-CanType
-RuleBuilder::getConcreteSubstitutionSchema(CanType concreteType,
-                                           const ProtocolDecl *proto,
-                                           SmallVectorImpl<Term> &result) {
-  assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
-
-  if (!concreteType->hasTypeParameter())
-    return concreteType;
-
-  return CanType(concreteType.transformRec([&](Type t) -> Optional<Type> {
-    if (!t->isTypeParameter())
-      return None;
-
-    unsigned index = result.size();
-    result.push_back(Context.getTermForType(CanType(t), proto));
-
-    return CanGenericTypeParamType::get(/*type sequence=*/ false,
-                                        /*depth=*/0, index,
-                                        Context.getASTContext());
-  }));
-}
 
 void RuleBuilder::addRequirements(ArrayRef<Requirement> requirements) {
   // Collect all protocols transitively referenced from these requirements.
@@ -858,7 +1098,7 @@ void RuleBuilder::addAssociatedType(const AssociatedTypeDecl *type,
   PermanentRules.emplace_back(lhs, rhs);
 }
 
-/// Lowers a generic requirement to a rewrite rule.
+/// Lowers a desugared generic requirement to a rewrite rule.
 ///
 /// If \p proto is null, this is a generic requirement from the top-level
 /// generic signature. The added rewrite rule will be rooted in a generic
@@ -867,17 +1107,20 @@ void RuleBuilder::addAssociatedType(const AssociatedTypeDecl *type,
 /// If \p proto is non-null, this is a generic requirement in the protocol's
 /// requirement signature. The added rewrite rule will be rooted in a
 /// protocol symbol.
-void RuleBuilder::addRequirement(const Requirement &req,
-                                 const ProtocolDecl *proto) {
-  if (Dump) {
-    llvm::dbgs() << "+ ";
-    req.dump(llvm::dbgs());
-    llvm::dbgs() << "\n";
-  }
+std::pair<MutableTerm, MutableTerm>
+swift::rewriting::getRuleForRequirement(const Requirement &req,
+                                        const ProtocolDecl *proto,
+                                        Optional<ArrayRef<Term>> substitutions,
+                                        RewriteContext &ctx) {
+  assert(!substitutions.hasValue() || proto == nullptr && "Can't have both");
 
   // Compute the left hand side.
   auto subjectType = CanType(req.getFirstType());
-  auto subjectTerm = Context.getMutableTermForType(subjectType, proto);
+  auto subjectTerm = (substitutions
+                      ? ctx.getRelativeTermForType(
+                          subjectType, *substitutions)
+                      : ctx.getMutableTermForType(
+                          subjectType, proto));
 
   // Compute the right hand side.
   MutableTerm constraintTerm;
@@ -892,7 +1135,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
     auto *proto = req.getProtocolDecl();
 
     constraintTerm = subjectTerm;
-    constraintTerm.add(Symbol::forProtocol(proto, Context));
+    constraintTerm.add(Symbol::forProtocol(proto, ctx));
     break;
   }
 
@@ -900,48 +1143,16 @@ void RuleBuilder::addRequirement(const Requirement &req,
     // A superclass requirement T : C<X, Y> becomes a rewrite rule
     //
     //   T.[superclass: C<X, Y>] => T
-    //
-    // Together with a rewrite rule
-    //
-    //   [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>]
-    //
-    // Where 'L' is either AnyObject or _NativeObject, depending on the
-    // ancestry of C.
-    //
-    // The second rule is marked permanent. Completion will derive a new
-    // rule as a consequence of these two rules:
-    //
-    //   T.[layout: L] => T
-    //
-    // The new rule will be marked redundant by homotopy reduction since
-    // it is a consequence of the other two rules.
     auto otherType = CanType(req.getSecondType());
 
     // Build the symbol [superclass: C<X, Y>].
-    SmallVector<Term, 1> substitutions;
-    otherType = getConcreteSubstitutionSchema(otherType, proto,
-                                              substitutions);
-    auto superclassSymbol = Symbol::forSuperclass(otherType, substitutions,
-                                                  Context);
-
-    {
-      // Build the symbol [layout: L].
-      auto layout =
-        LayoutConstraint::getLayoutConstraint(
-          otherType->getClassOrBoundGenericClass()->getLayoutConstraintKind(),
-          Context.getASTContext());
-      auto layoutSymbol = Symbol::forLayout(layout, Context);
-
-      MutableTerm layoutSubjectTerm;
-      layoutSubjectTerm.add(superclassSymbol);
-
-      MutableTerm layoutConstraintTerm = layoutSubjectTerm;
-      layoutConstraintTerm.add(layoutSymbol);
-
-      // Add the rule [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>].
-      PermanentRules.emplace_back(layoutConstraintTerm,
-                                  layoutSubjectTerm);
-    }
+    SmallVector<Term, 1> result;
+    otherType = (substitutions
+                 ? ctx.getRelativeSubstitutionSchemaFromType(
+                    otherType, *substitutions, result)
+                 : ctx.getSubstitutionSchemaFromType(
+                    otherType, proto, result));
+    auto superclassSymbol = Symbol::forSuperclass(otherType, result, ctx);
 
     // Build the term T.[superclass: C<X, Y>].
     constraintTerm = subjectTerm;
@@ -954,8 +1165,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
     //
     //   T.[layout: L] == T
     constraintTerm = subjectTerm;
-    constraintTerm.add(Symbol::forLayout(req.getLayoutConstraint(),
-                                         Context));
+    constraintTerm.add(Symbol::forLayout(req.getLayoutConstraint(), ctx));
     break;
   }
 
@@ -967,28 +1177,79 @@ void RuleBuilder::addRequirement(const Requirement &req,
       // rewrite rule
       //
       //   T.[concrete: C<X, Y>] => T
-      SmallVector<Term, 1> substitutions;
-      otherType = getConcreteSubstitutionSchema(otherType, proto,
-                                                substitutions);
+      SmallVector<Term, 1> result;
+      otherType = (substitutions
+                   ? ctx.getRelativeSubstitutionSchemaFromType(
+                        otherType, *substitutions, result)
+                   : ctx.getSubstitutionSchemaFromType(
+                        otherType, proto, result));
 
       constraintTerm = subjectTerm;
-      constraintTerm.add(Symbol::forConcreteType(otherType, substitutions,
-                                                 Context));
+      constraintTerm.add(Symbol::forConcreteType(otherType, result, ctx));
       break;
     }
 
-    constraintTerm = Context.getMutableTermForType(otherType, proto);
+    constraintTerm = (substitutions
+                      ? ctx.getRelativeTermForType(
+                            otherType, *substitutions)
+                      : ctx.getMutableTermForType(
+                            otherType, proto));
     break;
   }
   }
 
-  RequirementRules.emplace_back(subjectTerm, constraintTerm);
+  return std::make_pair(subjectTerm, constraintTerm);
+}
+
+void RuleBuilder::addRequirement(const Requirement &req,
+                                 const ProtocolDecl *proto) {
+  if (Dump) {
+    llvm::dbgs() << "+ ";
+    req.dump(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  }
+
+  RequirementRules.push_back(
+      getRuleForRequirement(req, proto, /*substitutions=*/None,
+                            Context));
 }
 
 void RuleBuilder::addRequirement(const StructuralRequirement &req,
                                  const ProtocolDecl *proto) {
   // FIXME: Preserve source location information for diagnostics.
   addRequirement(req.req.getCanonical(), proto);
+}
+
+/// Lowers a protocol typealias to a rewrite rule.
+void RuleBuilder::addTypeAlias(const ProtocolTypeAlias &alias,
+                               const ProtocolDecl *proto) {
+  // Build the term [P].T, where P is the protocol and T is a name symbol.
+  MutableTerm subjectTerm;
+  subjectTerm.add(Symbol::forProtocol(proto, Context));
+  subjectTerm.add(Symbol::forName(alias.getName(), Context));
+
+  auto constraintType = alias.getUnderlyingType()->getCanonicalType();
+  MutableTerm constraintTerm;
+
+  if (constraintType->isTypeParameter()) {
+    // If the underlying type of the typealias is a type parameter X, build
+    // a rule [P].T => X, where X,
+    constraintTerm = Context.getMutableTermForType(
+        constraintType, proto);
+  } else {
+    // If the underlying type of the typealias is a concrete type C, build
+    // a rule [P].T.[concrete: C] => [P].T.
+    constraintTerm = subjectTerm;
+
+    SmallVector<Term, 1> result;
+    auto concreteType =
+        Context.getSubstitutionSchemaFromType(
+            constraintType, proto, result);
+
+    constraintTerm.add(Symbol::forConcreteType(concreteType, result, Context));
+  }
+
+  RequirementRules.emplace_back(subjectTerm, constraintTerm);
 }
 
 /// Record information about a protocol if we have no seen it yet.
@@ -1019,6 +1280,7 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
+    // Add the identity conformance rule [P].[P] => [P].
     MutableTerm lhs;
     lhs.add(Symbol::forProtocol(proto, Context));
     lhs.add(Symbol::forProtocol(proto, Context));
@@ -1050,8 +1312,11 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
       for (auto req : proto->getTypeAliasRequirements())
         addRequirement(req.getCanonical(), proto);
     } else {
-      for (auto req : proto->getRequirementSignature())
+      auto reqs = proto->getRequirementSignature();
+      for (auto req : reqs.getRequirements())
         addRequirement(req.getCanonical(), proto);
+      for (auto alias : reqs.getTypeAliases())
+        addTypeAlias(alias, proto);
     }
 
     if (Dump) {

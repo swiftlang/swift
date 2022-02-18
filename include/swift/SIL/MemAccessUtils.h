@@ -234,8 +234,8 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 
 /// Return true if \p instruction is a deinitialization barrier.
 ///
-/// Deinitialization barriers constrain variable lifetimes. Lexical end_borrow
-/// and destroy_addr cannot be hoisted above them.
+/// Deinitialization barriers constrain variable lifetimes. Lexical end_borrow,
+/// destroy_value, and destroy_addr cannot be hoisted above them.
 bool isDeinitBarrier(SILInstruction *instruction);
 
 } // end namespace swift
@@ -948,7 +948,7 @@ namespace swift {
 /// The index of ref_element_addr is part of the storage identity and does
 /// not contribute to the access path indices.
 ///
-/// A well-formed path has at most one offset component at the begining of the
+/// A well-formed path has at most one offset component at the beginning of the
 /// path (chained index_addrs are merged into one offset). In other words,
 /// taking an offset from a subobject projection is not well-formed access
 /// path. However, it is possible (however undesirable) for programmers to
@@ -1689,7 +1689,7 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
 
   case ValueKind::SILPhiArgument: {
     auto *phiArg = cast<SILPhiArgument>(sourceAddr);
-    if (phiArg->isPhiArgument()) {
+    if (phiArg->isPhi()) {
       return asImpl().visitPhi(phiArg);
     }
 

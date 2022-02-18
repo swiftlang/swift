@@ -1086,12 +1086,19 @@ bool swift::extractCompilerFlagsFromInterface(StringRef interfacePath,
     // options and input-like options.
     if (!parse->getOption().hasFlag(options::FrontendOption))
       continue;
-    // Push the supported option and its value to the list.
-    // We shouldn't need to worry about cases like -tbd-install_name=Foo because
-    // the parsing function should have droped alias options already.
-    SubArgs.push_back(ArgSaver.save(parse->getSpelling()).data());
-    for (auto value: parse->getValues())
-      SubArgs.push_back(value);
+    auto spelling = ArgSaver.save(parse->getSpelling());
+    auto &values = parse->getValues();
+    if (spelling.endswith("=")) {
+      // Handle the case like -tbd-install_name=Foo. This should be rare because
+      // most equal-separated arguments are alias to the separate form.
+      assert(values.size() == 1);
+      SubArgs.push_back(ArgSaver.save((llvm::Twine(spelling) + values[0]).str()).data());
+    } else {
+      // Push the supported option and its value to the list.
+      SubArgs.push_back(spelling.data());
+      for (auto value: values)
+        SubArgs.push_back(value);
+    }
   }
 
   return false;
@@ -1123,8 +1130,9 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
   return result;
 }
 
-bool SerializedModuleLoaderBase::canImportModule(
-    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
+bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
+                                                 llvm::VersionTuple version,
+                                                 bool underlyingVersion) {
   // If underlying version is specified, this should be handled by Clang importer.
   if (!version.empty() && underlyingVersion)
     return false;
@@ -1145,6 +1153,8 @@ bool SerializedModuleLoaderBase::canImportModule(
     unusedModuleDocBuffer = &moduleDocBuffer;
   }
 
+  // FIXME: Swift submodules?
+  auto mID = path[0];
   auto found = findModule(mID, unusedModuleInterfacePath, unusedModuleBuffer,
                           unusedModuleDocBuffer, unusedModuleSourceInfoBuffer,
                           /* skipBuildingInterface */ true, isFramework,
@@ -1180,10 +1190,13 @@ bool SerializedModuleLoaderBase::canImportModule(
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
-    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
+    ImportPath::Module path, llvm::VersionTuple version,
+    bool underlyingVersion) {
   // If underlying version is specified, this should be handled by Clang importer.
   if (!version.empty() && underlyingVersion)
     return false;
+  // FIXME: Swift submodules?
+  auto mID = path[0];
   auto mIt = MemoryBuffers.find(mID.Item.str());
   if (mIt == MemoryBuffers.end())
     return false;

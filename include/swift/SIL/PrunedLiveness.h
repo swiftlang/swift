@@ -338,6 +338,10 @@ public:
   bool areUsesWithinBoundary(ArrayRef<Operand *> uses,
                              DeadEndBlocks *deadEndBlocks) const;
 
+  /// \p deadEndBlocks is optional.
+  bool areUsesOutsideBoundary(ArrayRef<Operand *> uses,
+                              DeadEndBlocks *deadEndBlocks) const;
+
   /// Compute liveness for a single SSA definition.
   void computeSSALiveness(SILValue def);
 };
@@ -347,6 +351,11 @@ public:
 struct PrunedLivenessBoundary {
   SmallVector<SILInstruction *, 8> lastUsers;
   SmallVector<SILBasicBlock *, 8> boundaryEdges;
+
+  void clear() {
+    lastUsers.clear();
+    boundaryEdges.clear();
+  }
 
   /// Visit the point at which a lifetime-ending instruction must be inserted,
   /// excluding dead-end blocks. This is only useful when it is known that none

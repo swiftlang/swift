@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -requirement-machine=verify
+// RUN: %target-typecheck-verify-swift
 
 protocol Base { // expected-note {{'Base' previously declared here}}
 // expected-note@-1 {{found this candidate}}

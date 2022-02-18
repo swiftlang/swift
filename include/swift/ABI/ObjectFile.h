@@ -12,14 +12,17 @@
 
 namespace swift {
 
-/// Represents the six reflection sections used by Swift
+/// Represents the nine reflection sections used by Swift
 enum ReflectionSectionKind : uint8_t {
   fieldmd,
   assocty,
   builtin,
   capture,
   typeref,
-  reflstr
+  reflstr,
+  conform,
+  protocs,
+  acfuncs,
 };
 
 /// Abstract base class responsible for providing the correct reflection section
@@ -28,6 +31,11 @@ class SwiftObjectFileFormat {
 public:
   virtual ~SwiftObjectFileFormat() {}
   virtual llvm::StringRef getSectionName(ReflectionSectionKind section) = 0;
+  virtual llvm::Optional<llvm::StringRef> getSegmentName() {
+    return {};
+  }
+  /// Predicate to identify if the named section can contain reflection data.
+  virtual bool sectionContainsReflectionData(llvm::StringRef sectionName) = 0;
 };
 
 /// Responsible for providing the Mach-O reflection section identifiers.
@@ -47,8 +55,21 @@ public:
       return "__swift5_typeref";
     case reflstr:
       return "__swift5_reflstr";
+    case conform:
+      return "__swift5_proto";
+    case protocs:
+      return "__swift5_protos";
+    case acfuncs:
+      return "__swift5_acfuncs";
     }
     llvm_unreachable("Section type not found.");
+  }
+  llvm::Optional<llvm::StringRef> getSegmentName() override {
+    return {"__TEXT"};
+  }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith("__swift5_") || sectionName == "__const";
   }
 };
 
@@ -69,8 +90,18 @@ public:
       return "swift5_typeref";
     case reflstr:
       return "swift5_reflstr";
+    case conform:
+      return "swift5_protocol_conformances";
+    case protocs:
+      return "swift5_protocols";
+    case acfuncs:
+      return "swift5_accessible_functions";
     }
     llvm_unreachable("Section type not found.");
+  }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith("swift5_");
   }
 };
 
@@ -91,8 +122,18 @@ public:
       return ".sw5tyrf";
     case reflstr:
       return ".sw5rfst";
+    case conform:
+      return ".sw5prtc$B";
+    case protocs:
+      return ".sw5prt$B";
+    case acfuncs:
+      return ".sw5acfn$B";
     }
     llvm_unreachable("Section  not found.");
+  }
+
+  bool sectionContainsReflectionData(llvm::StringRef sectionName) override {
+    return sectionName.startswith(".sw5");
   }
 };
 } // namespace swift

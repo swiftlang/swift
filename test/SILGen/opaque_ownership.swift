@@ -178,7 +178,7 @@ public struct Int : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
 // CHECK:   %5 = apply %4(%0, %1, %3) : $@convention(method) (FloatingPointSign, FloatingPointSign, @thin FloatingPointSign.Type) -> Bool // user: %6
 // CHECK:   return %5 : $Bool
 // CHECK-LABEL: } // end sil function '$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW'
-public enum FloatingPointSign: Int64 {
+public enum FloatingPointSign {
   /// The sign for a positive value.
   case plus
 

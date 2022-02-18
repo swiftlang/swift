@@ -547,3 +547,23 @@ func testGuardCase(x:FooStruct?) {
 // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<FooStruct>#]; name=none
 // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some()
 // OPTIONAL_FOOSTRUCT: End completions
+
+func returnOpt() -> String? { nil }
+func returnOptTuple() -> (String, String)? { nil}
+func test_rdar86050684() {
+  guard let local1 = returnOpt() else { return }
+  guard let (local2, _) =  returnOptTuple() else { return }
+  if let (local3, _) = returnOptTuple() {
+    if case (let local4, _)? = returnOptTuple() {
+      let (local5, _) = returnOptTuple() ?? ("", "")
+      _ = #^RDAR86050684^#
+// RDAR86050684: Begin completions
+// RDAR86050684-DAG: Decl[LocalVar]/Local:               local1[#String#];
+// RDAR86050684-DAG: Decl[LocalVar]/Local:               local2[#String#];
+// RDAR86050684-DAG: Decl[LocalVar]/Local:               local3[#String#];
+// RDAR86050684-DAG: Decl[LocalVar]/Local:               local4[#String#];
+// RDAR86050684-DAG: Decl[LocalVar]/Local:               local5[#String#];
+// RDAR86050684: End completions
+    }
+  }
+}

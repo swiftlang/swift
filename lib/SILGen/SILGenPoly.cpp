@@ -220,7 +220,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
     fromInstanceType = cast<MetatypeType>(fromInstanceType)
       .getInstanceType();
     toInstanceType = cast<ExistentialMetatypeType>(toInstanceType)
-      .getInstanceType();
+      ->getExistentialInstanceType()->getCanonicalType();
   }
 
   ArrayRef<ProtocolConformanceRef> conformances =
@@ -2944,11 +2944,10 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   // If the input is synchronous and global-actor-qualified, and the
   // output is asynchronous, hop to the executor expected by the input.
-  ExecutorBreadcrumb prevExecutor;
+  // Treat this thunk as if it were isolated to that global actor.
   if (outputSubstType->isAsync() && !inputSubstType->isAsync()) {
     if (Type globalActor = inputSubstType->getGlobalActor()) {
-      prevExecutor = SGF.emitHopToTargetActor(
-          loc, ActorIsolation::forGlobalActor(globalActor, false), None);
+      SGF.emitPrologGlobalActorHop(loc, globalActor);
     }
   }
 
@@ -2994,9 +2993,6 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   // Reabstract the result.
   SILValue outerResult = resultPlanner.execute(innerResult);
-
-  // If we hopped to the target's executor, then we need to hop back.
-  prevExecutor.emit(SGF, loc);
 
   scope.pop();
   SGF.B.createReturn(loc, outerResult);
@@ -3052,8 +3048,14 @@ buildThunkSignature(SILGenFunction &SGF,
   // Add a new generic parameter to replace the opened existential.
   auto *newGenericParam =
       GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
+
+  assert(openedExistential->isRoot());
+  auto constraint = openedExistential->getExistentialType();
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
-                             openedExistential->getOpenedExistentialType());
+                             constraint);
 
   auto genericSig = buildGenericSignature(ctx, baseGenericSig,
                                           { newGenericParam },
@@ -3125,10 +3127,11 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto archetypeVisitor = [&](CanType t) {
     if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
       if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
+        const auto root = cast<OpenedArchetypeType>(CanType(opened->getRoot()));
         assert((openedExistential == CanArchetypeType() ||
-                openedExistential == opened) &&
+                openedExistential == root) &&
                "one too many open existentials");
-        openedExistential = opened;
+        openedExistential = root;
       } else {
         hasArchetypes = true;
       }
@@ -3157,6 +3160,16 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto substTypeHelper = [&](SubstitutableType *type) -> Type {
     if (CanType(type) == openedExistential)
       return newArchetype;
+
+    // If a nested archetype is rooted on our opened existential, fail:
+    // Type::subst attempts to substitute the parent of a nested archetype
+    // only if it fails to find a replacement for the nested one.
+    if (auto *opened = dyn_cast<OpenedArchetypeType>(type)) {
+      if (openedExistential->isEqual(opened->getRoot())) {
+        return nullptr;
+      }
+    }
+
     return Type(type).subst(contextSubs);
   };
   auto substConformanceHelper =
@@ -4717,6 +4730,17 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                          origParams.back(),
                                          witnessUnsubstTy->getSelfParameter());
   }
+
+  // For static C++ methods and constructors, we need to drop the (metatype)
+  // "self" param. The "native" SIL representation will look like this:
+  //    @convention(method) (@thin Foo.Type) -> () but the "actual" SIL function
+  // looks like this:
+  //    @convention(c) () -> ()
+  // . We do this by simply omiting the last params.
+  // TODO: fix this for static C++ methods.
+  if (witness.getDecl()->getClangDecl() &&
+      isa<clang::CXXConstructorDecl>(witness.getDecl()->getClangDecl()))
+    reqtSubstParams = reqtSubstParams.drop_back();
 
   // For a free function witness, discard the 'self' parameter of the
   // requirement.

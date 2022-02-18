@@ -153,6 +153,13 @@ enum IsTypeExpansionSensitive_t : bool {
   IsTypeExpansionSensitive = true
 };
 
+/// Is the type infinitely defined in terms of itself? (Such types can never
+/// be concretely instantiated, but may still arise from generic specialization.)
+enum IsInfiniteType_t : bool {
+  IsNotInfiniteType = false,
+  IsInfiniteType = true,
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -164,6 +171,7 @@ public:
       AddressOnlyFlag            = 1 << 2,
       ResilientFlag              = 1 << 3,
       TypeExpansionSensitiveFlag = 1 << 4,
+      InfiniteFlag               = 1 << 5,
     };
 
     uint8_t Flags;
@@ -224,6 +232,9 @@ public:
       return IsTypeExpansionSensitive_t(
           (Flags & TypeExpansionSensitiveFlag) != 0);
     }
+    IsInfiniteType_t isInfinite() const {
+      return IsInfiniteType_t((Flags & InfiniteFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
@@ -233,6 +244,7 @@ public:
       Flags = (Flags & ~TypeExpansionSensitiveFlag) |
               (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0);
     }
+    void setInfinite() { Flags |= InfiniteFlag; }
   };
 
 private:
@@ -720,6 +732,9 @@ class TypeConverter {
 
   CanGenericSignature CurGenericSignature;
 
+  /// Stack of types currently being lowered as part of an aggregate.
+  llvm::SetVector<CanType> AggregateFieldsBeingLowered;
+  
   /// Mapping for types independent on contextual generic parameters.
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> LoweredTypes;
 
@@ -767,6 +782,31 @@ public:
   CanGenericSignature getCurGenericSignature() const {
     return CurGenericSignature;
   }
+  
+  // RAII type used when lowering nominal aggregate types (structs and enums)
+  // to catch self-recursion. Although Sema tries to catch direct circularity
+  // in value type definitions, it can't catch circularity that arises from
+  // generic substitutions. SIL may however be exposed to these circularities
+  // at any point by substituting bound generic types either during SILGen or
+  // after passes that perform generic specialization.
+  class LowerAggregateTypeRAII {
+    TypeConverter &TC;
+    
+  public:
+    // True if the aggregate about to be lowered is already being lowered,
+    // indicating a circularity.
+    const bool IsInfinite;
+    
+    LowerAggregateTypeRAII(TypeConverter &TC, CanType aggregate)
+      : TC(TC), IsInfinite(!TC.AggregateFieldsBeingLowered.insert(aggregate))
+    {}
+    
+    ~LowerAggregateTypeRAII() {
+      if (!IsInfinite) {
+        TC.AggregateFieldsBeingLowered.pop_back();
+      }
+    }
+  };
 
   class GenericContextRAII {
     TypeConverter &TC;

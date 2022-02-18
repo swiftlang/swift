@@ -42,7 +42,7 @@ namespace swift {
     template<typename U>
     /*implicit*/ OptionalEnum(
         U &&value,
-        typename std::enable_if<!std::is_integral<U>::value>::type * = {})
+        typename std::enable_if<std::is_convertible<U, T>::value>::type * = {})
       : Storage(static_cast<storage_type>(T{std::forward<U>(value)}) + 1) {
       assert(hasValue() && "cannot store this value");
     }
@@ -81,6 +81,32 @@ namespace swift {
     explicit operator intptr_t() const {
       assert(Storage == (storage_type)(intptr_t)Storage);
       return (intptr_t)Storage;
+    }
+
+    // Provide comparison operators for the optional value.
+
+    friend bool operator==(const OptionalEnum &lhs, const OptionalEnum &rhs) {
+      return (!lhs && !rhs) || (lhs && rhs && lhs.getValue() == rhs.getValue());
+    }
+
+    friend bool operator!=(const OptionalEnum &lhs, const OptionalEnum &rhs) {
+      return !(lhs == rhs);
+    }
+
+    friend bool operator<(const OptionalEnum &lhs, const OptionalEnum &rhs) {
+      return rhs && (!lhs || lhs.getValue() < rhs.getValue());
+    }
+
+    friend bool operator>(const OptionalEnum &lhs, const OptionalEnum &rhs) {
+      return rhs < lhs;
+    }
+
+    friend bool operator<=(const OptionalEnum &lhs, const OptionalEnum &rhs) {
+      return !(rhs < lhs);
+    }
+
+    friend bool operator>=(const OptionalEnum &lhs, const OptionalEnum &rhs) {
+      return !(lhs < rhs);
     }
   };
 } // end namespace swift

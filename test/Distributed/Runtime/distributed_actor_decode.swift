@@ -11,7 +11,6 @@ import _Distributed
 
 distributed actor DA: CustomStringConvertible {
   typealias ActorSystem = FakeActorSystem
-//  typealias ID = FakeActorSystem.ActorID
 
   nonisolated var description: String {
     "DA(\(self.id))"
@@ -42,7 +41,8 @@ struct ActorAddress: Hashable, Sendable, Codable {
 
 final class FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
-  typealias Invocation = FakeInvocation
+  typealias InvocationDecoder = FakeInvocation
+  typealias InvocationEncoder = FakeInvocation
   typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
@@ -69,31 +69,53 @@ final class FakeActorSystem: DistributedActorSystem {
     print("resign address:\(id)")
   }
 
-  func makeInvocation() -> Invocation {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
+
+  func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+      fatalError("not implemented: \(#function)")
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+      fatalError("not implemented: \(#function)")
+  }
+
 }
 
-struct FakeInvocation: DistributedTargetInvocation {
-  typealias ArgumentDecoder = FakeArgumentDecoder
+class FakeInvocation: DistributedTargetInvocationEncoder, DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
-  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
-  mutating func doneRecording() throws {}
+  func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  func doneRecording() throws {}
 
   // === Receiving / decoding -------------------------------------------------
 
-  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
-  mutating func decodeReturnType() throws -> Any.Type? { nil }
-  mutating func decodeErrorType() throws -> Any.Type? { nil }
-
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
-  }
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -218,7 +240,7 @@ class TestDecoder: Decoder {
 // ==== Execute ----------------------------------------------------------------
 
 func test() {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   // CHECK: assign type:DA, address:ActorAddress(address: "xxx")
   // CHECK: ready actor:DA(ActorAddress(address: "xxx"))

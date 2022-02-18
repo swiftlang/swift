@@ -218,10 +218,6 @@ protected:
     Length : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeallocRefInst, DeallocationInst, 1,
-    OnStack : 1
-  );
-
   // Ensure that AllocBoxInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(AllocBoxInst, AllocationInst);
   // Ensure that AllocExistentialBoxInst bitfield does not overflow.

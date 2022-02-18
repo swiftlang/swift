@@ -240,8 +240,14 @@ static bool shouldUseUnsafeEnforcement(VarDecl *var) {
   if (var->isDebuggerVar())
     return true;
 
-  // TODO: Check for the explicit "unsafe" attribute.
   return false;
+}
+
+static bool hasExclusivityAttr(VarDecl *var, ExclusivityAttr::Mode mode) {
+  if (!var)
+    return false;
+  auto *exclAttr = var->getAttrs().getAttribute<ExclusivityAttr>();
+  return exclAttr && exclAttr->getMode() == mode;
 }
 
 Optional<SILAccessEnforcement>
@@ -257,6 +263,10 @@ SILGenFunction::getDynamicEnforcement(VarDecl *var) {
   if (getOptions().EnforceExclusivityDynamic) {
     if (var && shouldUseUnsafeEnforcement(var))
       return SILAccessEnforcement::Unsafe;
+    if (hasExclusivityAttr(var, ExclusivityAttr::Unchecked))
+      return SILAccessEnforcement::Unsafe;
+    return SILAccessEnforcement::Dynamic;
+  } else if (hasExclusivityAttr(var, ExclusivityAttr::Checked)) {
     return SILAccessEnforcement::Dynamic;
   }
   return None;
@@ -2813,9 +2823,10 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
 
       // The only other case that should get here is a global variable.
       if (!address) {
-        address = SGF.emitGlobalVariableRef(Loc, Storage);
+        address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
       } else {
-        assert(!ActorIso && "local var should not be actor isolated!");
+        assert((!ActorIso || Storage->isTopLevelGlobal()) &&
+               "local var should not be actor isolated!");
       }
       assert(address.isLValue() &&
              "physical lvalue decl ref must evaluate to an address");

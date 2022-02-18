@@ -72,6 +72,7 @@ struct MyStruct {}
 // KEYWORD2-NEXT:             Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
+// KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2:                  Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2:                  End completions
@@ -93,6 +94,7 @@ struct MyStruct {}
 // KEYWORD3-NEXT:             Keyword/None:                       propertyWrapper[#Class Attribute#]; name=propertyWrapper
 // KEYWORD3-NEXT:             Keyword/None:                       resultBuilder[#Class Attribute#]; name=resultBuilder
 // KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
+// KEYWORD3-NEXT:             Keyword/None:                       preconcurrency[#Class Attribute#]; name=preconcurrency
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD3_2^#IB class C2 {}
@@ -110,6 +112,7 @@ struct MyStruct {}
 // KEYWORD4-NEXT:             Keyword/None:                       propertyWrapper[#Enum Attribute#]; name=propertyWrapper
 // KEYWORD4-NEXT:             Keyword/None:                       resultBuilder[#Enum Attribute#]; name=resultBuilder
 // KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
+// KEYWORD4-NEXT:             Keyword/None:                       preconcurrency[#Enum Attribute#]; name=preconcurrency
 // KEYWORD4-NEXT:             End completions
 
 
@@ -124,6 +127,7 @@ struct MyStruct {}
 // KEYWORD5-NEXT:             Keyword/None:                       propertyWrapper[#Struct Attribute#]; name=propertyWrapper
 // KEYWORD5-NEXT:             Keyword/None:                       resultBuilder[#Struct Attribute#]; name=resultBuilder
 // KEYWORD5-NEXT:             Keyword/None:                       globalActor[#Struct Attribute#]; name=globalActor
+// KEYWORD5-NEXT:             Keyword/None:                       preconcurrency[#Struct Attribute#]; name=preconcurrency
 // KEYWORD5-NEXT:             End completions
 
 @#^ON_GLOBALVAR^# var globalVar
@@ -141,6 +145,8 @@ struct MyStruct {}
 // ON_GLOBALVAR-DAG: Keyword/None:                       GKInspectable[#Var Attribute#]; name=GKInspectable
 // ON_GLOBALVAR-DAG: Keyword/None:                       differentiable[#Var Attribute#]; name=differentiable
 // ON_GLOBALVAR-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
+// ON_GLOBALVAR-DAG: Keyword/None:                       exclusivity[#Var Attribute#]; name=exclusivity
+// ON_GLOBALVAR-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
 // ON_GLOBALVAR-NOT: Keyword
 // ON_GLOBALVAR: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_GLOBALVAR: End completions
@@ -155,6 +161,7 @@ struct _S {
 // ON_INIT-DAG: Keyword/None:                       inlinable[#Constructor Attribute#]; name=inlinable
 // ON_INIT-DAG: Keyword/None:                       usableFromInline[#Constructor Attribute#]; name=usableFromInline
 // ON_INIT-DAG: Keyword/None:                       discardableResult[#Constructor Attribute#]; name=discardableResult
+// ON_INIT-DAG: Keyword/None:                       preconcurrency[#Constructor Attribute#]; name=preconcurrency
 // ON_INIT: End completions
 
   @#^ON_PROPERTY^# var foo
@@ -172,6 +179,8 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       GKInspectable[#Var Attribute#]; name=GKInspectable
 // ON_PROPERTY-DAG: Keyword/None:                       differentiable[#Var Attribute#]; name=differentiable
 // ON_PROPERTY-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
+// ON_PROPERTY-DAG: Keyword/None:                       exclusivity[#Var Attribute#]; name=exclusivity
+// ON_PROPERTY-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
 // ON_PROPERTY-NOT: Keyword
 // ON_PROPERTY: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_PROPERTY-NOT: Decl[PrecedenceGroup]
@@ -196,6 +205,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // ON_METHOD-DAG: Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
+// ON_METHOD-DAG: Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // ON_METHOD-NOT: Keyword
 // ON_METHOD: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_METHOD: End completions
@@ -257,6 +267,8 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
+// ON_MEMBER_LAST-DAG: Keyword/None:                       exclusivity[#Declaration Attribute#]; name=exclusivity
+// ON_MEMBER_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
@@ -307,6 +319,8 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // KEYWORD_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // KEYWORD_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
+// KEYWORD_LAST-DAG: Keyword/None:                       exclusivity[#Declaration Attribute#]; name=exclusivity
+// KEYWORD_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST:                  End completions

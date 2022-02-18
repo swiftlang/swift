@@ -58,6 +58,13 @@ enum Sym {
   static let CSSymbolicatorGetSymbolWithAddressAtTime: @convention(c)
     (CSSymbolicatorRef, mach_vm_address_t, CSMachineTime) -> CSSymbolRef =
     symbol(coreSymbolicationHandle, "CSSymbolicatorGetSymbolWithAddressAtTime")
+  static let CSSymbolicatorForeachSymbolOwnerAtTime:
+    @convention(c) (CSSymbolicatorRef, CSMachineTime, @convention(block) (CSSymbolOwnerRef) -> Void) -> UInt =
+      symbol(coreSymbolicationHandle, "CSSymbolicatorForeachSymbolOwnerAtTime")
+  static let CSSymbolOwnerGetBaseAddress: @convention(c) (CSSymbolOwnerRef) -> mach_vm_address_t =
+    symbol(symbolicationHandle, "CSSymbolOwnerGetBaseAddress")
+  static let CSIsNull: @convention(c) (CSTypeRef) -> CBool =
+    symbol(coreSymbolicationHandle, "CSIsNull")
   static let task_start_peeking: @convention(c) (task_t) -> kern_return_t =
     symbol(symbolicationHandle, "task_start_peeking")
   static let task_peek: @convention(c) (task_t, mach_vm_address_t, mach_vm_size_t,
@@ -77,13 +84,6 @@ enum Sym {
     @convention(c) (task_t, UnsafeMutableRawPointer?, CUnsignedInt, vm_range_recorder_t)
       -> Void =
     symbol(symbolicationHandle, "task_enumerate_malloc_blocks")
-
-  static let CSSymbolicatorForeachSymbolOwnerAtTime:
-    @convention(c) (CSSymbolicatorRef, CSMachineTime, @convention(block) (CSSymbolOwnerRef) -> Void) -> UInt =
-      symbol(coreSymbolicationHandle, "CSSymbolicatorForeachSymbolOwnerAtTime")
-
-  static let CSSymbolOwnerGetBaseAddress: @convention(c) (CSSymbolOwnerRef) -> mach_vm_address_t =
-    symbol(symbolicationHandle, "CSSymbolOwnerGetBaseAddress")
 }
 
 typealias CSMachineTime = UInt64
@@ -173,6 +173,10 @@ func CSSymbolOwnerGetBaseAddress(_ symbolOwner: CSSymbolOwnerRef) -> mach_vm_add
     return Sym.CSSymbolOwnerGetBaseAddress(symbolOwner)
 }
 
+func CSIsNull(_ symbol: CSTypeRef) -> Bool {
+  Sym.CSIsNull(symbol)
+}
+
 func task_start_peeking(_ task: task_t) -> Bool {
   let result = Sym.task_start_peeking(task)
   if result == KERN_SUCCESS {
@@ -189,7 +193,6 @@ func task_peek(
   var ptr: UnsafeRawPointer? = nil
   let result = Sym.task_peek(task, start, size, &ptr)
   if result != KERN_SUCCESS {
-    print("Unable to read (\(start), \(size)): \(machErrStr(result))", to: &Std.err)
     return nil
   }
   return ptr

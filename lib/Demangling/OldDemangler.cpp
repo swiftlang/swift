@@ -645,6 +645,11 @@ private:
         if (!result)
           return nullptr;
         param->addChild(result, Factory);
+      } else if (Mangled.nextIf("r_")) {
+        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(InOutToOut);
+        if (!result)
+          return nullptr;
+        param->addChild(result, Factory);
       } else {
         // Otherwise handle option sets.
         unsigned Value = 0;
@@ -2077,6 +2082,13 @@ private:
       if (Mangled.nextIf('u')) {
         // Special mangling for opaque return type.
         return Factory.createNode(Node::Kind::OpaqueReturnType);
+      }
+      if (Mangled.nextIf('U')) {
+        // Special mangling for opaque return type.
+        Node::IndexType ordinal;
+        if (!demangleIndex(ordinal, depth))
+          return nullptr;
+        return Factory.createNode(Node::Kind::OpaqueReturnTypeIndexed, ordinal);
       }
       return demangleArchetypeType(depth + 1);
     }

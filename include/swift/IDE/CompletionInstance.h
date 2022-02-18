@@ -53,7 +53,7 @@ struct CompletionInstanceResult {
 
 /// The results returned from \c CompletionInstance::codeComplete.
 struct CodeCompleteResult {
-  MutableArrayRef<CodeCompletionResult *> Results;
+  CodeCompletionResultSink &ResultSink;
   SwiftCompletionInfo &Info;
 };
 

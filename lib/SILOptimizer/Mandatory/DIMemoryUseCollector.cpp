@@ -51,7 +51,11 @@ static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
   // TODO: This should really be tracked separately from other destroys so that
   // we distinguish the lifetime of the container from the value itself.
   assert(isa<ProjectBoxInst>(uninitMemory));
-  auto *mui = cast<MarkUninitializedInst>(uninitMemory->getOperand(0));
+  auto value = uninitMemory->getOperand(0);
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(value)) {
+    value = bbi->getOperand();
+  }
+  auto *mui = cast<MarkUninitializedInst>(value);
   for (auto *user : mui->getUsersOfType<DestroyValueInst>()) {
     useInfo.trackDestroy(user);
   }
@@ -114,6 +118,12 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
   auto &Module = MI->getModule();
 
   SILValue Address = MemoryInst;
+  if (auto BBI = MemoryInst->getSingleUserOfType<BeginBorrowInst>()) {
+    if (auto PBI = BBI->getSingleUserOfType<ProjectBoxInst>()) {
+      IsBox = true;
+      Address = PBI;
+    }
+  }
   if (auto PBI = MemoryInst->getSingleUserOfType<ProjectBoxInst>()) {
     IsBox = true;
     Address = PBI;
@@ -440,11 +450,10 @@ ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
       // is it for an actor?
       if (decl->isAnyActor())
         if (auto *silFn = MemoryInst->getFunction())
-          // is it a designated initializer?
+          // are we in a constructor?
           if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
                             silFn->getDeclContext()->getAsDecl()))
-            if (ctor->isDesignatedInit())
-              return ctor;
+            return ctor;
 
   return nullptr;
 }

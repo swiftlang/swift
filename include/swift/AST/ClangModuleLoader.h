@@ -182,6 +182,15 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Emits diagnostics for any declarations named name
+  /// whose direct declaration context is a TU.
+  virtual void diagnoseTopLevelValue(const DeclName &name) = 0;
+
+  /// Emit diagnostics for declarations named name that are members
+  /// of the provided baseType.
+  virtual void diagnoseMemberValue(const DeclName &name,
+                                   const Type &baseType) = 0;
+
   /// Instantiate and import class template using given arguments.
   ///
   /// This method will find the clang::ClassTemplateSpecialization decl if

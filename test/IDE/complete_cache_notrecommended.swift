@@ -27,7 +27,7 @@ func testSync() -> Int{
 // GLOBAL_IN_SYNC: Begin completions
 // GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]: globalAsyncFunc()[' async'][#Int#];
 // GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended: deprecatedFunc()[#Void#];
-// GLOBAL_IN_SYNC-DAG: Decl[Class]/OtherModule[MyModule]:  MyActor[#MyActor#];
+// GLOBAL_IN_SYNC-DAG: Decl[Actor]/OtherModule[MyModule]:  MyActor[#MyActor#];
 // GLOBAL_IN_SYNC: End completions
 }
 func testAsync() async -> Int {
@@ -35,7 +35,7 @@ func testAsync() async -> Int {
 // GLOBAL_IN_ASYNC: Begin completions
 // GLOBAL_IN_ASYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]: globalAsyncFunc()[' async'][#Int#];
 // GLOBAL_IN_ASYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended: deprecatedFunc()[#Void#];
-// GLOBAL_IN_ASYNC-DAG: Decl[Class]/OtherModule[MyModule]:  MyActor[#MyActor#];
+// GLOBAL_IN_ASYNC-DAG: Decl[Actor]/OtherModule[MyModule]:  MyActor[#MyActor#];
 // GLOBAL_IN_ASYNC: End completions
 }
 func testSyncMember(obj: MyActor) -> Int {

@@ -136,6 +136,16 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
   *position = newJob;
 }
 
+SWIFT_CC(swift)
+static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+                                                     long long nsec,
+                                                     long long tsec,
+                                                     long long tnsec,
+                                                     int clock, Job *job) {
+  assert(job && "no job provided");
+  // TODO: implementation
+}
+
 /// Recognize jobs in the delayed-jobs queue that are ready to execute
 /// and move them to the primary queue.
 static void recognizeReadyDelayedJobs() {

@@ -1199,16 +1199,64 @@ public:
   }
 };
 
+/// Represents the exclusivity attribute.
+class ExclusivityAttr : public DeclAttribute {
+public:
+  enum Mode {
+    Checked,
+    Unchecked
+  };
+
+private:
+  Mode mode;
+
+public:
+  ExclusivityAttr(SourceLoc atLoc, SourceRange range, Mode mode)
+     : DeclAttribute(DAK_Exclusivity, atLoc, range, /*Implicit=*/false),
+       mode(mode) {}
+
+  ExclusivityAttr(Mode mode)
+    : ExclusivityAttr(SourceLoc(), SourceRange(), mode) {}
+
+  Mode getMode() const { return mode; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Exclusivity;
+  }
+};
+
 /// Represents the side effects attribute.
 class EffectsAttr : public DeclAttribute {
+  StringRef customString;
+  SourceLoc customStringLoc;
+
 public:
   EffectsAttr(SourceLoc atLoc, SourceRange range, EffectsKind kind)
       : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false) {
     Bits.EffectsAttr.kind = unsigned(kind);
   }
 
+  EffectsAttr(SourceLoc atLoc, SourceRange range, StringRef customString,
+              SourceLoc customStringLoc)
+      : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false),
+        customString(customString), customStringLoc(customStringLoc) {
+    Bits.EffectsAttr.kind = unsigned(EffectsKind::Custom);
+  }
+
   EffectsAttr(EffectsKind kind)
   : EffectsAttr(SourceLoc(), SourceRange(), kind) {}
+
+  EffectsAttr(StringRef customString)
+  : EffectsAttr(SourceLoc(), SourceRange(), customString, SourceLoc()) {}
+
+  StringRef getCustomString() const {
+    assert(getKind() == EffectsKind::Custom);
+    return customString;
+  }
+  
+  SourceLoc getCustomStringLocation() const {
+    return customStringLoc;
+  }
 
   EffectsKind getKind() const { return EffectsKind(Bits.EffectsAttr.kind); }
   static bool classof(const DeclAttribute *DA) {
@@ -2123,6 +2171,30 @@ public:
     return DA->getKind() == DAK_UnavailableFromAsync;
   }
 };
+
+/// The @_backDeploy(...) attribute, used to make function declarations available
+/// for back deployment to older OSes via emission into the client binary.
+class BackDeployAttr: public DeclAttribute {
+public:
+  BackDeployAttr(SourceLoc AtLoc, SourceRange Range,
+                 PlatformKind Platform,
+                 const llvm::VersionTuple Version,
+                 bool Implicit)
+    : DeclAttribute(DAK_BackDeploy, AtLoc, Range, Implicit),
+      Platform(Platform),
+      Version(Version) {}
+
+  /// The platform the symbol is available for back deployment on.
+  const PlatformKind Platform;
+
+  /// The earliest platform version that may use the back deployed implementation.
+  const llvm::VersionTuple Version;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_BackDeploy;
+  }
+};
+
 
 /// Attributes that may be applied to declarations.
 class DeclAttributes {

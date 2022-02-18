@@ -81,7 +81,7 @@ PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
   }
 
   // check associated conformances of associated types or inheritance
-  for (auto requirement : proto->getRequirementSignature()) {
+  for (auto requirement : proto->getRequirementSignature().getRequirements()) {
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;
 
@@ -1491,8 +1491,8 @@ public:
 
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
     // Top-level code implicitly handles errors.
-    // TODO: Eventually, it will handle async as well.
-    return Context(/*handlesErrors=*/true, /*handlesAsync=*/false, None);
+    return Context(/*handlesErrors=*/true,
+                   /*handlesAsync=*/D->isAsyncContext(), None);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {

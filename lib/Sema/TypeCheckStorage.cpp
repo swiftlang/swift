@@ -257,8 +257,10 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   llvm::SmallVector<VarDecl *, 2> vars;
   binding->getPattern(entryNumber)->collectVariables(vars);
   bool isReq = false;
+  bool shouldRequireStatic = false;
   if (auto *d = binding->getDeclContext()->getAsDecl()) {
     isReq = isa<ProtocolDecl>(d);
+    shouldRequireStatic = isa<NominalTypeDecl>(d);
   }
   for (auto *sv: vars) {
     bool hasConst = sv->getAttrs().getAttribute<CompileTimeConstAttr>();
@@ -266,7 +268,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
       continue;
     bool hasStatic = StaticSpelling != StaticSpellingKind::None;
     // only static _const let/var is supported
-    if (!hasStatic) {
+    if (shouldRequireStatic && !hasStatic) {
       binding->diagnose(diag::require_static_for_const);
       continue;
     }
@@ -3326,6 +3328,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
 
+  auto *DC = storage->getDeclContext();
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {
@@ -3354,10 +3357,10 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       readImpl = ReadImplKind::Stored;
     }
 
-  // Extensions can't have stored properties. If there are braces, assume
-  // this is an incomplete computed property. This avoids an "extensions
-  // must not contain stored properties" error later on.
-  } else if (isa<ExtensionDecl>(storage->getDeclContext()) &&
+  // Extensions and enums can't have stored properties. If there are braces,
+  // assume this is an incomplete computed property. This avoids an
+  // "extensions|enums must not contain stored properties" error later on.
+  } else if ((isa<ExtensionDecl>(DC) || isa<EnumDecl>(DC)) &&
              storage->getBracesRange().isValid()) {
     readImpl = ReadImplKind::Get;
 

@@ -26,8 +26,30 @@ enum class Feature {
   #include "swift/Basic/Features.def"
 };
 
+constexpr unsigned numFeatures() {
+  enum Features {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
+    FeatureName,
+#include "swift/Basic/Features.def"
+    NumFeatures
+  };
+  return NumFeatures;
+}
+
+/// Determine whether the given feature is suppressible.
+bool isSuppressibleFeature(Feature feature);
+
 /// Determine the in-source name of the given feature.
 llvm::StringRef getFeatureName(Feature feature);
+
+/// Determine whether the first feature is more recent (and thus implies
+/// the existence of) the second feature.  Only meaningful for suppressible
+/// features.
+inline bool featureImpliesFeature(Feature feature, Feature implied) {
+  // Suppressible features are expected to be listed in order of
+  // addition in Features.def.
+  return (unsigned) feature < (unsigned) implied;
+}
 
 }
 

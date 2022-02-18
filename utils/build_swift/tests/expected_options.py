@@ -84,6 +84,7 @@ EXPECTED_DEFAULTS = {
     'build_swift_static_stdlib': False,
     'build_swift_stdlib_unittest_extra': False,
     'build_swift_stdlib_static_print': False,
+    'build_swift_stdlib_unicode_data': True,
     'build_swiftpm': False,
     'build_swift_driver': False,
     'build_early_swift_driver': True,
@@ -127,6 +128,7 @@ EXPECTED_DEFAULTS = {
     'cmark_build_variant': 'Debug',
     'compiler_vendor': defaults.COMPILER_VENDOR,
     'coverage_db': None,
+    'cross_compile_append_host_target_to_destdir': True,
     'cross_compile_deps_path': None,
     'cross_compile_hosts': [],
     'darwin_deployment_version_ios':
@@ -218,6 +220,7 @@ EXPECTED_DEFAULTS = {
     'swift_freestanding_is_darwin': False,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
+    'swift_tools_ld64_lto_codegen_only_for_supporting_targets': False,
     'swift_tools_max_parallel_lto_link_jobs':
         defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
@@ -536,6 +539,8 @@ EXPECTED_OPTIONS = [
     EnableOption('--build-swift-stdlib-unittest-extra'),
     EnableOption('--build-swift-stdlib-static-print'),
     EnableOption('--build-swift-private-stdlib'),
+    EnableOption('--build-swift-stdlib-unicode-data'),
+    EnableOption('--cross-compile-append-host-target-to-destdir'),
     EnableOption('--distcc'),
     EnableOption('--sccache'),
     EnableOption('--enable-asan'),
@@ -710,6 +715,7 @@ EXPECTED_OPTIONS = [
     IntOption('--jobs', dest='build_jobs'),
     IntOption('--llvm-max-parallel-lto-link-jobs'),
     IntOption('--swift-tools-max-parallel-lto-link-jobs'),
+    EnableOption('--swift-tools-ld64-lto-codegen-only-for-supporting-targets'),
     IntOption('-j', dest='build_jobs'),
     IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
 

@@ -332,6 +332,13 @@ BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis
   return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
 }
 
+BridgedCalleeList CalleeAnalysis_getInstCallees(BridgedCalleeAnalysis calleeAnalysis,
+                                                BridgedInstruction inst) {
+  BasicCalleeAnalysis *bca = static_cast<BasicCalleeAnalysis *>(calleeAnalysis.bca);
+  CalleeList cl = bca->getCalleeList(castToInst(inst));
+  return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
+}
+
 SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees) {
   CalleeList cl = CalleeList::fromOpaque(callees.opaquePtr, callees.kind,
                                          callees.incomplete);

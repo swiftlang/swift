@@ -65,7 +65,7 @@ public func deletedConstructor(a: UnsafeMutablePointer<Int32>) {
 // CHECK: apply [[FN]]([[TEMPL]], [[ARG_VAL]]) : $@convention(c) (ArgType) -> @out TemplatedConstructor
 // CHECK-LABEL: end sil function '$s4main20templatedConstructoryyF'
 
-// CHECK-LABEL: sil hidden_external [clang TemplatedConstructor.init] @{{_ZN20TemplatedConstructorC1I7ArgTypeEET_|\?\?\$\?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z}} : $@convention(c) (ArgType) -> @out TemplatedConstructor
+// CHECK-LABEL: sil [clang TemplatedConstructor.init] @{{_ZN20TemplatedConstructorC1I7ArgTypeEET_|\?\?\$\?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z}} : $@convention(c) (ArgType) -> @out TemplatedConstructor
 public func templatedConstructor() {
   let templated = TemplatedConstructor(ArgType())
 }

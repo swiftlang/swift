@@ -416,6 +416,9 @@ namespace {
     else
       nameStr = cast<clang::ObjCPropertyDecl>(decl)->getName().str();
     for (unsigned i = 1, n = overriddenNames.size(); i != n; ++i) {
+      if (ctx.Diags.isPrettyPrintingDecl())
+        continue;
+
       ctx.Diags.diagnose(SourceLoc(), diag::inconsistent_swift_name,
                          method == nullptr,
                          nameStr,
@@ -2225,10 +2228,6 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
   if (macro->tokens_empty())
     return true;
 
-  // Currently we only convert non-function-like macros.
-  if (macro->isFunctionLike())
-    return true;
-
   // Consult the list of macros to suppress.
   auto suppressMacro = llvm::StringSwitch<bool>(name)
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
@@ -2271,6 +2270,17 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, version, givenName);
+
+  // Add information about the async version of the name to the non-async
+  // version of the name.
+  if (!version.supportsConcurrency()) {
+    if (auto importedAsyncName = importName(decl, version.withConcurrency(true),
+                                            givenName)) {
+      res.info.hasAsyncAlternateInfo = importedAsyncName.info.hasAsyncInfo;
+      res.info.asyncInfo = importedAsyncName.info.asyncInfo;
+    }
+  }
+
   if (!givenName)
     importNameCache[key] = res;
   return res;

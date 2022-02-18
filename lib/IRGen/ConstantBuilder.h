@@ -118,7 +118,7 @@ public:
   }
 
   void addAlignmentPadding(Alignment align) {
-    auto misalignment = getNextOffsetFromGlobal() % IGM().getPointerAlignment();
+    auto misalignment = getNextOffsetFromGlobal() % align;
     if (misalignment != Size(0))
       add(llvm::ConstantAggregateZero::get(
             llvm::ArrayType::get(IGM().Int8Ty,

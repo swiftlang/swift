@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/RequirementSignature.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/SILFunction.h"
@@ -483,10 +484,10 @@ class LinkEntity {
     KnownAsyncFunctionPointer,
 
     /// The pointer is SILFunction*
-    DistributedMethodAccessor,
-    /// An async function pointer for a distributed method accessor.
+    DistributedAccessor,
+    /// An async function pointer for a distributed accessor (method or property).
     /// The pointer is a SILFunction*.
-    DistributedMethodAccessorAsyncPointer,
+    DistributedAccessorAsyncPointer,
 
     /// Accessible function record, which describes a function that can be
     /// looked up by name by the runtime.
@@ -607,7 +608,7 @@ class LinkEntity {
                                                 CanType associatedType,
                                                 ProtocolDecl *requirement) {
     unsigned index = 0;
-    for (const auto &reqt : proto->getRequirementSignature()) {
+    for (const auto &reqt : proto->getRequirementSignature().getRequirements()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
           reqt.getProtocolDecl() == requirement) {
@@ -631,7 +632,7 @@ class LinkEntity {
   static std::pair<CanType, ProtocolDecl*>
   getAssociatedConformanceByIndex(const ProtocolDecl *proto,
                                   unsigned index) {
-    auto &reqt = proto->getRequirementSignature()[index];
+    auto &reqt = proto->getRequirementSignature().getRequirements()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
              reqt.getProtocolDecl() };
@@ -1246,10 +1247,10 @@ public:
           Kind, unsigned(LinkEntity::Kind::PartialApplyForwarderAsyncFunctionPointer));
       break;
 
-    case LinkEntity::Kind::DistributedMethodAccessor: {
+    case LinkEntity::Kind::DistributedAccessor: {
       entity.Data = LINKENTITY_SET_FIELD(
           Kind,
-          unsigned(LinkEntity::Kind::DistributedMethodAccessorAsyncPointer));
+          unsigned(LinkEntity::Kind::DistributedAccessorAsyncPointer));
       break;
     }
 
@@ -1280,12 +1281,12 @@ public:
     return entity;
   }
 
-  static LinkEntity forDistributedMethodAccessor(SILFunction *method) {
+  static LinkEntity forDistributedTargetAccessor(SILFunction *target) {
     LinkEntity entity;
-    entity.Pointer = method;
+    entity.Pointer = target;
     entity.SecondaryPointer = nullptr;
     entity.Data =
-        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::DistributedMethodAccessor));
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::DistributedAccessor));
     return entity;
   }
 
@@ -1329,9 +1330,9 @@ public:
           Kind, unsigned(LinkEntity::Kind::PartialApplyForwarder));
       break;
 
-    case LinkEntity::Kind::DistributedMethodAccessorAsyncPointer:
+    case LinkEntity::Kind::DistributedAccessorAsyncPointer:
       entity.Data = LINKENTITY_SET_FIELD(
-          Kind, unsigned(LinkEntity::Kind::DistributedMethodAccessor));
+          Kind, unsigned(LinkEntity::Kind::DistributedAccessor));
       break;
 
     default:
@@ -1382,7 +1383,7 @@ public:
            getKind() == Kind::DynamicallyReplaceableFunctionVariable ||
            getKind() == Kind::DynamicallyReplaceableFunctionKey ||
            getKind() == Kind::SILFunction ||
-           getKind() == Kind::DistributedMethodAccessor ||
+           getKind() == Kind::DistributedAccessor ||
            getKind() == Kind::AccessibleFunctionRecord;
   }
 

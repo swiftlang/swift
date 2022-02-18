@@ -26,8 +26,10 @@ class raw_ostream;
 namespace swift {
 class DeclContext;
 class ModuleDecl;
+class VarDecl;
 class NominalTypeDecl;
 class SubstitutionMap;
+class AbstractFunctionDecl;
 
 /// Determine whether the given types are (canonically) equal, declared here
 /// to avoid having to include Types.h.
@@ -35,6 +37,11 @@ bool areTypesEqual(Type type1, Type type2);
 
 /// Determine whether the given type is suitable as a concurrent value type.
 bool isSendableType(ModuleDecl *module, Type type);
+
+/// Determines if the 'let' can be read from anywhere within the given module,
+/// regardless of the isolation or async-ness of the context in which
+/// the var is read.
+bool isLetAccessibleAnywhere(const ModuleDecl *fromModule, VarDecl *let);
 
 /// Describes the actor isolation of a given declaration, which determines
 /// the actors with which it can interact.
@@ -48,10 +55,6 @@ public:
     /// For example, a mutable stored property or synchronous function within
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
-    /// The declaration is isolated to a (potentially) distributed actor.
-    /// Distributed actors may access _their_ state (same as 'ActorInstance')
-    /// however others may not access any properties on other distributed actors.
-    DistributedActorInstance,
     /// The declaration is explicitly specified to be independent of any actor,
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
@@ -92,10 +95,6 @@ public:
     return ActorIsolation(ActorInstance, actor);
   }
 
-  static ActorIsolation forDistributedActorInstance(NominalTypeDecl *actor) {
-    return ActorIsolation(DistributedActorInstance, actor);
-  }
-
   static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
     return ActorIsolation(
         unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
@@ -110,7 +109,7 @@ public:
   bool isIndependent() const { return kind == Independent; }
 
   NominalTypeDecl *getActor() const {
-    assert(getKind() == ActorInstance || getKind() == DistributedActorInstance);
+    assert(getKind() == ActorInstance);
     return actor;
   }
 
@@ -144,7 +143,6 @@ public:
       return true;
 
     case ActorInstance:
-    case DistributedActorInstance:
       return lhs.actor == rhs.actor;
 
     case GlobalActor:
@@ -168,6 +166,9 @@ ActorIsolation getActorIsolation(ValueDecl *value);
 
 /// Determine how the given declaration context is isolated.
 ActorIsolation getActorIsolationOfContext(DeclContext *dc);
+
+/// Determines whether this function's body uses flow-sensitive isolation.
+bool usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn);
 
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 

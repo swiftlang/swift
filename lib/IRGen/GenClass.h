@@ -167,10 +167,12 @@ namespace irgen {
                   bool objc, int &StackAllocSize, TailArraysRef TailArrays);
 
   /// Emit an allocation of a class using a metadata value.
-  llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF, 
+  llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF,
                                           llvm::Value *metadata,
                                           SILType selfType,
-                                          bool objc, TailArraysRef TailArrays);
+                                          bool objc,
+                                          int &StackAllocSize,
+                                          TailArraysRef TailArrays);
 
   /// Emit class deallocation.
   void emitClassDeallocation(IRGenFunction &IGF, SILType selfType,

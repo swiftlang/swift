@@ -889,6 +889,53 @@ llvm::Error ModuleFile::readGenericRequirementsChecked(
   return llvm::Error::success();
 }
 
+void ModuleFile::readRequirementSignature(
+                   SmallVectorImpl<Requirement> &requirements,
+                   SmallVectorImpl<ProtocolTypeAlias> &typeAliases,
+                   llvm::BitstreamCursor &Cursor) {
+  readGenericRequirements(requirements, Cursor);
+
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(Cursor);
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  while (true) {
+    lastRecordOffset.reset();
+    bool shouldContinue = true;
+
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = fatalIfUnexpected(
+        Cursor.readRecord(entry.ID, scratch, &blobData));
+    switch (recordID) {
+    case PROTOCOL_TYPEALIAS: {
+      uint64_t rawName;
+      uint64_t rawTypeID;
+      ProtocolTypeAliasLayout::readRecord(scratch, rawName, rawTypeID);
+
+      auto name = getIdentifier(rawName);
+      auto underlyingType = getType(rawTypeID);
+
+      typeAliases.emplace_back(name, underlyingType);
+      break;
+    }
+    default:
+      // This record is not part of the protocol requirement signature.
+      shouldContinue = false;
+      break;
+    }
+
+    if (!shouldContinue)
+      break;
+  }
+}
+
 void ModuleFile::readAssociatedTypes(
                    SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
                    llvm::BitstreamCursor &Cursor) {
@@ -919,8 +966,10 @@ void ModuleFile::readAssociatedTypes(
   }
 }
 
-/// Advances past any records that might be part of a requirement signature.
-static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
+/// Advances past any records that might be part of a protocol requirement
+/// signature, which consists of generic requirements together with protocol
+/// typealias records.
+static llvm::Error skipRequirementSignature(llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
 
   BCOffsetRAII lastRecordOffset(Cursor);
@@ -940,6 +989,7 @@ static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
     switch (maybeRecordID.get()) {
     case GENERIC_REQUIREMENT:
     case LAYOUT_REQUIREMENT:
+    case PROTOCOL_TYPEALIAS:
       break;
 
     default:
@@ -1047,9 +1097,9 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
       auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
       if (!name.empty()) {
-        auto paramDecl = createDecl<GenericTypeParamDecl>(
+        auto paramDecl = GenericTypeParamDecl::create(
             getAssociatedModule(), name, SourceLoc(), paramTy->isTypeSequence(),
-            paramTy->getDepth(), paramTy->getIndex());
+            paramTy->getDepth(), paramTy->getIndex(), false, nullptr);
         paramTy = paramDecl->getDeclaredInterfaceType()
                    ->castTo<GenericTypeParamType>();
       }
@@ -2680,16 +2730,18 @@ public:
     bool isTypeSequence;
     unsigned depth;
     unsigned index;
+    bool isOpaqueType;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, isTypeSequence, depth, index);
+        scratch, nameID, isImplicit, isTypeSequence, depth, index,
+        isOpaqueType);
 
     // Always create GenericTypeParamDecls in the associated file; the real
     // context will reparent them.
     auto *DC = MF.getFile();
-    auto genericParam = MF.createDecl<GenericTypeParamDecl>(
+    auto genericParam = GenericTypeParamDecl::create(
         DC, MF.getIdentifier(nameID), SourceLoc(), isTypeSequence, depth,
-        index);
+        index, isOpaqueType, /*opaqueTypeRepr=*/nullptr);
     declOrOffset = genericParam;
 
     if (isImplicit)
@@ -3447,59 +3499,49 @@ public:
     GenericSignatureID interfaceSigID;
     TypeID interfaceTypeID;
     GenericSignatureID genericSigID;
-    SubstitutionMapID underlyingTypeID;
+    SubstitutionMapID underlyingTypeSubsID;
     uint8_t rawAccessLevel;
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
                                               namingDeclID, interfaceSigID,
                                               interfaceTypeID, genericSigID,
-                                              underlyingTypeID, rawAccessLevel);
+                                              underlyingTypeSubsID,
+                                              rawAccessLevel);
     
     auto declContext = MF.getDeclContext(contextID);
     auto interfaceSig = MF.getGenericSignature(interfaceSigID);
-    auto interfaceType = MF.getType(interfaceTypeID)
-                            ->castTo<GenericTypeParamType>();
-    
+
     // Check for reentrancy.
     if (declOrOffset.isComplete())
       return cast<OpaqueTypeDecl>(declOrOffset.get());
-      
+
+    auto genericParams = MF.maybeReadGenericParams(declContext);
+
     // Create the decl.
-    auto opaqueDecl = new (ctx)
-        OpaqueTypeDecl(/*NamingDecl*/ nullptr,
-                       /*GenericParams*/ nullptr, declContext, interfaceSig,
-                       /*UnderlyingInterfaceTypeRepr*/ nullptr, interfaceType);
+    auto opaqueDecl = OpaqueTypeDecl::get(
+        /*NamingDecl=*/ nullptr, genericParams, declContext,
+        interfaceSig, /*OpaqueReturnTypeReprs*/ { });
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     opaqueDecl->setNamingDecl(namingDecl);
+
+    auto interfaceType = MF.getType(interfaceTypeID);
+    opaqueDecl->setInterfaceType(MetatypeType::get(interfaceType));
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       opaqueDecl->setAccess(*accessLevel);
     else
       MF.fatal();
 
-    if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl)) {
-      ctx.evaluator.cacheOutput(GenericParamListRequest{opaqueDecl},
-                                std::move(genericParams));
-    }
-
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
       opaqueDecl->setGenericSignature(genericSig);
-    if (underlyingTypeID) {
-      auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeID);
+    if (underlyingTypeSubsID) {
+      auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError)
         return subMapOrError.takeError();
       opaqueDecl->setUnderlyingTypeSubstitutions(subMapOrError.get());
     }
-    SubstitutionMap subs;
-    if (genericSig) {
-      subs = genericSig->getIdentitySubstitutionMap();
-    }
-    // TODO [OPAQUE SUPPORT]: multiple opaque types
-    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, 0, subs);
-    auto metatype = MetatypeType::get(opaqueTy);
-    opaqueDecl->setInterfaceType(metatype);
     return opaqueDecl;
   }
 
@@ -3619,7 +3661,7 @@ public:
 
     proto->setLazyRequirementSignature(&MF,
                                        MF.DeclTypeCursor.GetCurrentBitNo());
-    if (llvm::Error Err = skipGenericRequirements(MF.DeclTypeCursor))
+    if (llvm::Error Err = skipRequirementSignature(MF.DeclTypeCursor))
       MF.fatal(std::move(Err));
 
     proto->setLazyAssociatedTypeMembers(&MF,
@@ -4426,11 +4468,25 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Exclusivity_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::ExclusivityDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) ExclusivityAttr((ExclusivityAttr::Mode)kind);
+        break;
+      }
+
       case decls_block::Effects_DECL_ATTR: {
         unsigned kind;
-        serialization::decls_block::EffectsDeclAttrLayout::readRecord(scratch,
-                                                                      kind);
-        Attr = new (ctx) EffectsAttr((EffectsKind)kind);
+        IdentifierID customStringID;
+        serialization::decls_block::EffectsDeclAttrLayout::
+          readRecord(scratch, kind, customStringID);
+        if (customStringID) {
+          assert((EffectsKind)kind == EffectsKind::Custom);
+          Attr = new (ctx) EffectsAttr(MF.getIdentifier(customStringID).str());
+        } else {
+          Attr = new (ctx) EffectsAttr((EffectsKind)kind);
+        }
         break;
       }
       case decls_block::OriginallyDefinedIn_DECL_ATTR: {
@@ -4763,6 +4819,21 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         serialization::decls_block::UnavailableFromAsyncDeclAttrLayout::
             readRecord(scratch, isImplicit);
         Attr = new (ctx) UnavailableFromAsyncAttr(blobData, isImplicit);
+        break;
+      }
+
+      case decls_block::BackDeploy_DECL_ATTR: {
+        bool isImplicit;
+        unsigned Platform;
+        DEF_VER_TUPLE_PIECES(Version);
+        serialization::decls_block::BackDeployDeclAttrLayout::readRecord(
+            scratch, isImplicit, LIST_VER_TUPLE_PIECES(Version), Platform);
+        llvm::VersionTuple Version;
+        DECODE_VER_TUPLE(Version)
+        Attr = new (ctx) BackDeployAttr(SourceLoc(), SourceRange(),
+                                        (PlatformKind)Platform,
+                                        Version,
+                                        isImplicit);
         break;
       }
 
@@ -5490,19 +5561,21 @@ public:
   Expected<Type> deserializePrimaryArchetypeType(ArrayRef<uint64_t> scratch,
                                                  StringRef blobData) {
     GenericSignatureID sigID;
-    unsigned depth, index;
+    TypeID interfaceTypeID;
 
     decls_block::PrimaryArchetypeTypeLayout::readRecord(scratch, sigID,
-                                                        depth, index);
+                                                        interfaceTypeID);
 
-    auto sig = MF.getGenericSignature(sigID);
-    if (!sig)
-      MF.fatal();
+    auto sigOrError = MF.getGenericSignatureChecked(sigID);
+    if (!sigOrError)
+      return sigOrError.takeError();
 
-    Type interfaceType =
-        GenericTypeParamType::get(/*type sequence*/ false, depth, index, ctx);
-    Type contextType = sig.getGenericEnvironment()
-        ->mapTypeIntoContext(interfaceType);
+    auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTypeOrError)
+      return interfaceTypeOrError.takeError();
+
+    Type contextType = sigOrError.get().getGenericEnvironment()
+        ->mapTypeIntoContext(interfaceTypeOrError.get());
 
     if (contextType->hasError())
       MF.fatal();
@@ -5513,59 +5586,54 @@ public:
   Expected<Type> deserializeOpenedArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     TypeID existentialID;
+    TypeID interfaceID;
 
     decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
-                                                       existentialID);
+                                                       existentialID,
+                                                       interfaceID);
 
-    return OpenedArchetypeType::get(MF.getType(existentialID));
+    return OpenedArchetypeType::get(MF.getType(existentialID)->getCanonicalType(),
+                                    MF.getType(interfaceID));
   }
       
   Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     DeclID opaqueDeclID;
+    TypeID interfaceTypeID;
     SubstitutionMapID subsID;
-    decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
-                                                       opaqueDeclID, subsID);
+    decls_block::OpaqueArchetypeTypeLayout::readRecord(
+        scratch, opaqueDeclID, interfaceTypeID, subsID);
 
     auto opaqueTypeOrError = MF.getDeclChecked(opaqueDeclID);
     if (!opaqueTypeOrError)
       return opaqueTypeOrError.takeError();
+
+    auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
+    if (!interfaceTypeOrError)
+      return interfaceTypeOrError.takeError();
 
     auto opaqueDecl = cast<OpaqueTypeDecl>(opaqueTypeOrError.get());
     auto subsOrError = MF.getSubstitutionMapChecked(subsID);
     if (!subsOrError)
       return subsOrError.takeError();
 
-    // TODO [OPAQUE SUPPORT]: to support multiple opaque types we will probably
-    // have to serialize the ordinal, which is always 0 for now
-    return OpaqueTypeArchetypeType::get(opaqueDecl, 0, subsOrError.get());
+    return OpaqueTypeArchetypeType::get(
+        opaqueDecl, interfaceTypeOrError.get(), subsOrError.get());
   }
       
-  Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
-                                                StringRef blobData) {
-    TypeID rootID, interfaceTyID;
-    decls_block::NestedArchetypeTypeLayout::readRecord(scratch,
-                                                       rootID, interfaceTyID);
-    
-    auto rootTy = MF.getType(rootID)->castTo<ArchetypeType>();
-    auto interfaceTy = MF.getType(interfaceTyID)->castTo<DependentMemberType>();
-    return rootTy->getGenericEnvironment()->mapTypeIntoContext(interfaceTy);
-  }
-
   Expected<Type> deserializeSequenceArchetypeType(ArrayRef<uint64_t> scratch,
                                                   StringRef blobData) {
     GenericSignatureID sigID;
-    unsigned depth, index;
+    TypeID interfaceTypeID;
 
-    decls_block::SequenceArchetypeTypeLayout::readRecord(scratch, sigID, depth,
-                                                         index);
+    decls_block::SequenceArchetypeTypeLayout::readRecord(scratch, sigID,
+                                                         interfaceTypeID);
 
     auto sig = MF.getGenericSignature(sigID);
     if (!sig)
       MF.fatal();
 
-    Type interfaceType =
-        GenericTypeParamType::get(/*type sequence*/ true, depth, index, ctx);
+    Type interfaceType = MF.getType(interfaceTypeID);
     Type contextType =
         sig.getGenericEnvironment()->mapTypeIntoContext(interfaceType);
 
@@ -5615,6 +5683,26 @@ public:
     }
 
     return ProtocolCompositionType::get(ctx, protocols, hasExplicitAnyObject);
+  }
+
+  Expected<Type> deserializeParameterizedProtocolType(ArrayRef<uint64_t> scratch,
+                                                      StringRef blobData) {
+
+    uint64_t baseTyID, argTyID;
+
+    decls_block::ParameterizedProtocolTypeLayout::readRecord(scratch,
+                                                             baseTyID, argTyID);
+
+    auto baseTy = MF.getTypeChecked(baseTyID);
+    if (!baseTy)
+      return baseTy.takeError();
+
+    auto argTy = MF.getTypeChecked(argTyID);
+    if (!argTy)
+      return argTy.takeError();
+
+    return ParameterizedProtocolType::get(
+        ctx, (*baseTy)->castTo<ProtocolType>(), *argTy);
   }
 
   Expected<Type> deserializeExistentialType(ArrayRef<uint64_t> scratch,
@@ -6124,10 +6212,10 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(PrimaryArchetype)
   CASE(OpaqueArchetype)
   CASE(OpenedArchetype)
-  CASE(NestedArchetype)
   CASE(SequenceArchetype)
   CASE(GenericTypeParam)
   CASE(ProtocolComposition)
+  CASE(Existential)
   CASE(DependentMember)
   CASE(BoundGeneric)
   CASE(SILBlockStorage)
@@ -6525,7 +6613,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       conformancesForProtocols[confProto] = nextConformance;
     }
 
-    for (const auto &req : proto->getRequirementSignature()) {
+    for (const auto &req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
       ProtocolDecl *proto = req.getProtocolDecl();
@@ -6547,8 +6635,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto isConformanceReq = [](const Requirement &req) {
       return req.getKind() == RequirementKind::Conformance;
     };
+    auto requirements = proto->getRequirementSignature().getRequirements();
     if (!allowCompilerErrors() &&
-        conformanceCount != llvm::count_if(proto->getRequirementSignature(),
+        conformanceCount != llvm::count_if(requirements,
                                            isConformanceReq)) {
       fatal(llvm::make_error<llvm::StringError>(
           "serialized conformances do not match requirement signature",
@@ -6716,10 +6805,11 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
 void ModuleFile::loadRequirementSignature(const ProtocolDecl *decl,
                                           uint64_t contextData,
-                                          SmallVectorImpl<Requirement> &reqs) {
+                                          SmallVectorImpl<Requirement> &reqs,
+                                          SmallVectorImpl<ProtocolTypeAlias> &typeAliases) {
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
-  readGenericRequirements(reqs, DeclTypeCursor);
+  readRequirementSignature(reqs, typeAliases, DeclTypeCursor);
 }
 
 void ModuleFile::loadAssociatedTypes(const ProtocolDecl *decl,

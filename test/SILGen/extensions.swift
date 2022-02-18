@@ -52,7 +52,8 @@ struct Box<T> {
 // CHECK-LABEL: sil hidden [ossa] @$s10extensions3BoxV1tACyxGx_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T>
 // CHECK:      [[SELF_BOX:%.*]] = alloc_box $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK-NEXT: [[UNINIT_SELF_BOX:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]
-// CHECK-NEXT: [[SELF_ADDR:%.*]] = project_box [[UNINIT_SELF_BOX]] : $<τ_0_0> { var Box<τ_0_0> } <T>
+// CHECK-NEXT: [[UNINIT_SELF_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UNINIT_SELF_BOX]]
+// CHECK-NEXT: [[SELF_ADDR:%.*]] = project_box [[UNINIT_SELF_BOX_LIFETIME]] : $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK:      [[RESULT:%.*]] = struct_element_addr [[SELF_ADDR]] : $*Box<T>, #Box.t
 // CHECK:      [[INIT:%.*]] = function_ref @$s10extensions3BoxV1txSgvpfi : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
 // CHECK-NEXT: apply [[INIT]]<T>([[RESULT]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
@@ -67,6 +68,7 @@ struct Box<T> {
 // CHECK-NEXT: dealloc_stack [[RESULT]] : $*Optional<T>
 // CHECK-NEXT: copy_addr [[SELF_ADDR]] to [initialization] %0 : $*Box<T>
 // CHECK-NEXT: destroy_addr %1 : $*T
+// CHECK-NEXT: end_borrow [[UNINIT_SELF_BOX_LIFETIME]]
 // CHECK-NEXT: destroy_value [[UNINIT_SELF_BOX]] : $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()

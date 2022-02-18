@@ -1051,7 +1051,7 @@ public:
         // Note: All user-called initializations go through the calls to the
         // initializer, and synthesized initializers only have one level of
         // struct formation which will not result into any aggregate adjoint
-        // valeus.
+        // values.
         llvm_unreachable(
             "Aggregate adjoint values should not occur for `struct` "
             "instructions");

@@ -2849,18 +2849,15 @@ public:
     }
 
     if (AbstractClosureExpr *closure = dyn_cast<AbstractClosureExpr>(E)) {
-      // Multi-statement closures are collected by ExprWalker::rewriteFunction
-      // and checked by ExprWalker::processDelayed in CSApply.cpp.
-      // Single-statement closures only have the attributes checked
-      // by TypeChecker::checkClosureAttributes in that rewriteFunction.
-      // Multi-statement closures will be checked explicitly later (as the decl
-      // context in the Where). Single-expression closures will not be
-      // revisited, and are not automatically set as the context of the 'where'.
-      // Don't double-check multi-statement closures, but do check
-      // single-statement closures, setting the closure as the decl context.
-      if (closure->hasSingleExpressionBody()) {
+      if (shouldWalkIntoClosure(closure)) {
         walkAbstractClosure(closure);
         return skipChildren();
+      }
+    }
+    
+    if (auto EE = dyn_cast<ErasureExpr>(E)) {
+      for (ProtocolConformanceRef C : EE->getConformances()) {
+        diagnoseConformanceAvailability(E->getLoc(), C, Where);
       }
     }
 
@@ -2950,15 +2947,15 @@ private:
     // writeback. The AST should have this information.
     walkInContext(E, E->getBase(), MemberAccessContext::Getter);
 
-    ValueDecl *D = E->getMember().getDecl();
+    ConcreteDeclRef DR = E->getMember();
     // Diagnose for the member declaration itself.
-    if (diagnoseDeclAvailability(D, E->getNameLoc().getSourceRange(),
-                                 nullptr, Where))
+    if (diagnoseDeclRefAvailability(DR, E->getNameLoc().getSourceRange(),
+                                    getEnclosingApplyExpr(), None))
       return;
 
     // Diagnose for appropriate accessors, given the access context.
     auto *DC = Where.getDeclContext();
-    maybeDiagStorageAccess(D, E->getSourceRange(), DC);
+    maybeDiagStorageAccess(DR.getDecl(), E->getSourceRange(), DC);
   }
 
   /// Walk a keypath expression, checking all of its components for
@@ -2998,6 +2995,24 @@ private:
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
     walkInContext(E, E->getSubExpr(), MemberAccessContext::InOut);
+  }
+
+  bool shouldWalkIntoClosure(AbstractClosureExpr *closure) const {
+    // Multi-statement closures are collected by ExprWalker::rewriteFunction
+    // and checked by ExprWalker::processDelayed in CSApply.cpp.
+    // Single-statement closures only have the attributes checked
+    // by TypeChecker::checkClosureAttributes in that rewriteFunction.
+    // Multi-statement closures will be checked explicitly later (as the decl
+    // context in the Where). Single-expression closures will not be
+    // revisited, and are not automatically set as the context of the 'where'.
+    // Don't double-check multi-statement closures, but do check
+    // single-statement closures, setting the closure as the decl context.
+    //
+    // Note about SE-0326: When a flag is enabled multi-statement closures
+    // are type-checked together with enclosing context, so walker behavior
+    // should match that of single-expression closures.
+    return closure->hasSingleExpressionBody() ||
+           Context.TypeCheckerOpts.EnableMultiStatementClosureInference;
   }
 
   /// Walk an abstract closure expression, checking for availability
@@ -3099,7 +3114,8 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
       return true;
   }
 
-  diagnoseDeclAvailability(D, R, call, Where, Flags);
+  if (diagnoseDeclAvailability(D, R, call, Where, Flags))
+      return true;
 
   if (R.isValid()) {
     if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),

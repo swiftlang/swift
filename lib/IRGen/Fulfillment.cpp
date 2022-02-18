@@ -67,7 +67,6 @@ static bool isLeafTypeMetadata(CanType type) {
   // Type parameters are statically opaque.
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
   case TypeKind::GenericTypeParam:
@@ -101,6 +100,10 @@ static bool isLeafTypeMetadata(CanType type) {
 
   // Protocol compositions have component types.
   case TypeKind::ProtocolComposition:
+    return false;
+
+  // Parametrized protocols have component types.
+  case TypeKind::ParameterizedProtocol:
     return false;
 
   // Existential types have constraint types.

@@ -266,6 +266,14 @@ bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
 NullablePtr<const ASTScopeImpl>
 PatternEntryInitializerScope::getLookupParent() const {
   auto parent = getParent().get();
+
+  // Skip generic parameter scopes, which occur here due to named opaque
+  // result types.
+  // FIXME: Proper isa/dyn_cast support would be better than a string
+  // comparison here.
+  while (parent->getClassName() == "GenericParamScope")
+    parent = parent->getLookupParent().get();
+
   ASTScopeAssert(parent->getClassName() == "PatternEntryDeclScope",
                  "PatternEntryInitializerScope in unexpected place");
 

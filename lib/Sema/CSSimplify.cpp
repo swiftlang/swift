@@ -1321,6 +1321,7 @@ public:
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType,
+    ArgumentList *argList,
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
@@ -1340,8 +1341,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   ParameterListInfo paramInfo(params, callee, appliedSelf);
 
-  // Dig out the argument information.
-  auto *argList = cs.getArgumentList(loc);
+  // Make sure that argument list is available.
   assert(argList);
 
   // Apply labels to arguments.
@@ -2849,14 +2849,12 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Handle opaque archetypes.
   if (auto arch1 = type1->getAs<ArchetypeType>()) {
     auto arch2 = type2->castTo<ArchetypeType>();
-    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1->getRoot());
-    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2->getRoot());
-    assert(arch1->getInterfaceType()->getCanonicalType(
-                      opaque1->getGenericEnvironment()->getGenericSignature())
-        == arch2->getInterfaceType()->getCanonicalType(
-                      opaque2->getGenericEnvironment()->getGenericSignature()));
+    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1);
+    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2);
     assert(opaque1->getDecl() == opaque2->getDecl());
-    
+    assert(opaque1->getCanonicalInterfaceType(arch1->getInterfaceType())->isEqual(
+               opaque2->getCanonicalInterfaceType(arch2->getInterfaceType())));
+
     auto args1 = opaque1->getSubstitutions().getReplacementTypes();
     auto args2 = opaque2->getSubstitutions().getReplacementTypes();
 
@@ -2888,42 +2886,40 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     return result;
   }
 
-  // Handle protocol compositions.
-  if (auto existential1 = type1->getAs<ProtocolCompositionType>()) {
-    if (auto existential2 = type2->getAs<ProtocolCompositionType>()) {
-      auto layout1 = existential1->getExistentialLayout();
-      auto layout2 = existential2->getExistentialLayout();
+  // Handle existential types.
+  if (type1->isExistentialType() && type2->isExistentialType()) {
+    auto layout1 = type1->getExistentialLayout();
+    auto layout2 = type2->getExistentialLayout();
 
-      // Explicit AnyObject and protocols must match exactly.
-      if (layout1.hasExplicitAnyObject != layout2.hasExplicitAnyObject)
+    // Explicit AnyObject and protocols must match exactly.
+    if (layout1.hasExplicitAnyObject != layout2.hasExplicitAnyObject)
+      return getTypeMatchFailure(locator);
+
+    if (layout1.getProtocols().size() != layout2.getProtocols().size())
+      return getTypeMatchFailure(locator);
+
+    for (unsigned i: indices(layout1.getProtocols())) {
+      if (!layout1.getProtocols()[i]->isEqual(layout2.getProtocols()[i]))
         return getTypeMatchFailure(locator);
-
-      if (layout1.getProtocols().size() != layout2.getProtocols().size())
-        return getTypeMatchFailure(locator);
-
-      for (unsigned i: indices(layout1.getProtocols())) {
-        if (!layout1.getProtocols()[i]->isEqual(layout2.getProtocols()[i]))
-          return getTypeMatchFailure(locator);
-      }
-
-      // This is the only interesting case. We might have type variables
-      // on either side of the superclass constraint, so make sure we
-      // recursively call matchTypes() here.
-      if (layout1.explicitSuperclass || layout2.explicitSuperclass) {
-        if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
-          return getTypeMatchFailure(locator);
-
-        auto result = matchTypes(layout1.explicitSuperclass,
-                                 layout2.explicitSuperclass,
-                                 ConstraintKind::Bind, subflags,
-                                 locator.withPathElement(
-                                   ConstraintLocator::ExistentialSuperclassType));
-        if (result.isFailure())
-          return result;
-      }
-
-      return getTypeMatchSuccess();
     }
+
+    // This is the only interesting case. We might have type variables
+    // on either side of the superclass constraint, so make sure we
+    // recursively call matchTypes() here.
+    if (layout1.explicitSuperclass || layout2.explicitSuperclass) {
+      if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
+        return getTypeMatchFailure(locator);
+
+      auto result = matchTypes(layout1.explicitSuperclass,
+                               layout2.explicitSuperclass,
+                               ConstraintKind::Bind, subflags,
+                               locator.withPathElement(
+                                 ConstraintLocator::ExistentialSuperclassType));
+      if (result.isFailure())
+        return result;
+    }
+
+    return getTypeMatchSuccess();
   }
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
@@ -5819,6 +5815,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::Existential:
     case TypeKind::ProtocolComposition:
+    case TypeKind::ParameterizedProtocol:
       switch (kind) {
       case ConstraintKind::Equal:
       case ConstraintKind::Bind:
@@ -5888,35 +5885,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       break;
     }
     
-    // Same for nested archetypes rooted in opaque types.
-    case TypeKind::NestedArchetype: {
-      auto nested1 = cast<NestedArchetypeType>(desugar1);
-      auto nested2 = cast<NestedArchetypeType>(desugar2);
-      
-      auto rootOpaque1 = dyn_cast<OpaqueTypeArchetypeType>(nested1->getRoot());
-      auto rootOpaque2 = dyn_cast<OpaqueTypeArchetypeType>(nested2->getRoot());
-      if (rootOpaque1 && rootOpaque2) {
-        auto interfaceTy1 = nested1->getInterfaceType()
-          ->getCanonicalType(rootOpaque1->getGenericEnvironment()
-                                        ->getGenericSignature());
-        auto interfaceTy2 = nested2->getInterfaceType()
-          ->getCanonicalType(rootOpaque2->getGenericEnvironment()
-                                        ->getGenericSignature());
-        if (interfaceTy1 == interfaceTy2
-            && rootOpaque1->getDecl() == rootOpaque2->getDecl()) {
-          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
-          break;
-        }
-      }
-
-      // Before failing, let's give repair a chance to run in diagnostic mode.
-      if (shouldAttemptFixes())
-        break;
-
-      // If the archetypes aren't rooted in an opaque type, or are rooted in
-      // completely different decls, then there's nothing else we can do.
-      return getTypeMatchFailure(locator);
-    }
     case TypeKind::Pack: {
       auto tmpPackLoc = locator.withPathElement(LocatorPathElt::PackType(type1));
       auto packLoc = tmpPackLoc.withPathElement(LocatorPathElt::PackType(type2));
@@ -6037,8 +6005,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               return true;
           return false;
         };
+
+        auto constraintType = meta1->getInstanceType();
+        if (auto existential = constraintType->getAs<ExistentialType>())
+          constraintType = existential->getConstraintType();
         
-        if (auto protoTy = meta1->getInstanceType()->getAs<ProtocolType>()) {
+        if (auto protoTy = constraintType->getAs<ProtocolType>()) {
           if (protoTy->getDecl()->isObjC()
               && isProtocolClassType(type2)) {
             increaseScore(ScoreKind::SK_UserConversion);
@@ -6477,11 +6449,11 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::BoundGenericStruct:
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
+  case TypeKind::ParameterizedProtocol:
   case TypeKind::Protocol:
   case TypeKind::Existential:
     // Break out to handle the actual construction below.
@@ -7011,7 +6983,7 @@ static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
   if (!nilLiteral)
     return false;
 
-  return toType->isEqual(nilLiteral->getDeclaredType()) &&
+  return toType->isEqual(nilLiteral->getExistentialType()) &&
          fromType->getOptionalObjectType();
 }
 
@@ -7803,13 +7775,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
 
     const auto isUnsupportedExistentialMemberAccess = [&] {
-      // If our base is an existential type, we can't make use of any
-      // member whose signature involves associated types.
-      if (instanceTy->isExistentialType()) {
-        if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
-          if (!proto->isAvailableInExistential(decl)) {
-            return true;
-          }
+      // We may not be able to derive a well defined type for an existential
+      // member access if the member's signature references 'Self'.
+      if (instanceTy->isExistentialType() &&
+          decl->getDeclContext()->getSelfProtocolDecl()) {
+        if (!isMemberAvailableOnExistential(instanceTy, decl)) {
+          return true;
         }
       }
 
@@ -8812,8 +8783,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             baseTy->getMetatypeInstanceType()->getAs<ArchetypeType>()) {
       if (auto genericTy =
               archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
-        for (auto param :
-             archetype->getGenericEnvironment()->getGenericParams()) {
+        for (auto param : DC->getGenericSignatureOfContext()
+                              .getGenericParams()) {
           // Find a param at the same depth and one index past the type we're
           // dealing with
           if (param->getDepth() != genericTy->getDepth() ||
@@ -9584,16 +9555,35 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // we generated somewhat reasonable code that performed a force cast. To
   // maintain compatibility with that behavior, allow the coercion between
   // two collections, but add a warning fix telling the user to use as! or as?
-  // instead.
+  // instead. In Swift 6 mode, this becomes an error.
   //
-  // We only need to perform this compatibility logic if the LHS type is a
-  // (potentially optional) type variable, as only such a constraint could have
-  // been previously been left unsolved.
-  //
-  // FIXME: Once we get a new language version, change this condition to only
-  // preserve compatibility for Swift 5.x mode.
-  auto canUseCompatFix =
-      rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
+  // We only need to perform this compatibility logic if this is a coercion of
+  // something that isn't a collection expr (as collection exprs would have
+  // crashed in codegen due to CSApply peepholing them). Additionally, the LHS
+  // type must be a (potentially optional) type variable, as only such a
+  // constraint could have been previously been left unsolved.
+  auto canUseCompatFix = [&]() {
+    if (Context.isSwiftVersionAtLeast(6))
+      return false;
+
+    if (!rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember())
+      return false;
+
+    SmallVector<LocatorPathElt, 4> elts;
+    auto anchor = locator.getLocatorParts(elts);
+    if (!elts.empty())
+      return false;
+
+    auto *coercion = getAsExpr<CoerceExpr>(anchor);
+    if (!coercion)
+      return false;
+
+    auto *subject = coercion->getSubExpr();
+    while (auto *paren = dyn_cast<ParenExpr>(subject))
+      subject = paren->getSubExpr();
+
+    return !isa<CollectionExpr>(subject);
+  }();
 
   // Unless we're allowing the collection compatibility fix, the source cannot
   // be more optional than the destination.
@@ -9812,10 +9802,10 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
     auto instanceTy = type2;
     if (auto metaTy = type2->getAs<ExistentialMetatypeType>()) {
       isMetatype = true;
-      instanceTy = metaTy->getInstanceType();
+      instanceTy = metaTy->getExistentialInstanceType();
     }
     assert(instanceTy->isExistentialType());
-    Type openedTy = OpenedArchetypeType::get(instanceTy);
+    Type openedTy = OpenedArchetypeType::get(instanceTy->getCanonicalType());
     if (isMetatype)
       openedTy = MetatypeType::get(openedTy, getASTContext());
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
@@ -10523,6 +10513,32 @@ bool ConstraintSystem::simplifyAppliedOverloads(
                                       numOptionalUnwraps, locator);
 }
 
+/// Create an implicit dot-member reference expression to be used
+/// as a root for injected `.callAsFunction` call.
+static UnresolvedDotExpr *
+createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
+                                    ArgumentList *arguments,
+                                    ConstraintLocator *calleeLocator) {
+  auto &ctx = cs.getASTContext();
+  auto *baseExpr = castToExpr(calleeLocator->getAnchor());
+
+  SmallVector<Identifier, 2> closureLabelsScratch;
+  // Create implicit `.callAsFunction` expression to use as an anchor
+  // for new argument list that only has trailing closures in it.
+  auto *implicitRef = UnresolvedDotExpr::createImplicit(
+      ctx, baseExpr, {ctx.Id_callAsFunction},
+      arguments->getArgumentLabels(closureLabelsScratch));
+
+  {
+    // Record a type of the new reference in the constraint system.
+    cs.setType(implicitRef, refType);
+    // Record new `.callAsFunction` in the constraint system.
+    cs.recordCallAsFunction(implicitRef, arguments, calleeLocator);
+  }
+
+  return implicitRef;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
     Type type1, Type type2,
@@ -10577,17 +10593,20 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   };
 
   // Local function to form an unsolved result.
-  auto formUnsolved = [&] {
+  auto formUnsolved = [&](bool activate = false) {
     if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::createApplicableFunction(
+      auto *application = Constraint::createApplicableFunction(
           *this, type1, type2, trailingClosureMatching,
-          getConstraintLocator(locator)));
+          getConstraintLocator(locator));
+
+      addUnsolvedConstraint(application);
+      if (activate)
+        activateConstraint(application);
+
       return SolutionKind::Solved;
     }
     
     return SolutionKind::Unsolved;
-
   };
 
   // If right-hand side is a type variable, the constraint is unsolved.
@@ -10662,15 +10681,97 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                               ? ConstraintKind::OperatorArgumentConversion
                               : ConstraintKind::ArgumentConversion);
 
+    auto *argumentsLoc = getConstraintLocator(
+        outerLocator.withPathElement(ConstraintLocator::ApplyArgument));
+
+    auto *argumentList = getArgumentList(argumentsLoc);
     // The argument type must be convertible to the input type.
     auto matchCallResult = ::matchCallArguments(
-        *this, func2, func1->getParams(), func2->getParams(), subKind,
-        outerLocator.withPathElement(ConstraintLocator::ApplyArgument),
-        trailingClosureMatching);
+        *this, func2, argumentList, func1->getParams(), func2->getParams(),
+        subKind, argumentsLoc, trailingClosureMatching);
 
     switch (matchCallResult) {
-    case SolutionKind::Error:
+    case SolutionKind::Error: {
+      auto resultTy = func2->getResult();
+
+      // If this is a call that constructs a callable type with
+      // trailing closure(s), closure(s) might not belong to
+      // the constructor but rather to implicit `callAsFunction`,
+      // there is no way to determine that without trying.
+      if (resultTy->isCallableNominalType(DC) &&
+          argumentList->hasAnyTrailingClosures()) {
+        auto *calleeLoc = getCalleeLocator(argumentsLoc);
+
+        bool isInit = false;
+        if (auto overload = findSelectedOverloadFor(calleeLoc)) {
+          isInit = bool(dyn_cast_or_null<ConstructorDecl>(
+              overload->choice.getDeclOrNull()));
+        }
+
+        if (!isInit)
+          return SolutionKind::Error;
+
+        auto &ctx = getASTContext();
+        auto numTrailing = argumentList->getNumTrailingClosures();
+
+        SmallVector<Argument, 4> newArguments(
+            argumentList->getNonTrailingArgs());
+        SmallVector<Argument, 4> trailingClosures(
+            argumentList->getTrailingClosures());
+
+        // Original argument list with all the trailing closures removed.
+        auto *newArgumentList = ArgumentList::createParsed(
+            ctx, argumentList->getLParenLoc(), newArguments,
+            argumentList->getRParenLoc(),
+            /*firstTrailingClosureIndex=*/None);
+
+        auto trailingClosureTypes = func1->getParams().take_back(numTrailing);
+        // The original result type is going to become a result of
+        // implicit `.callAsFunction` instead since `.callAsFunction`
+        // is inserted between `.init` and trailing closures.
+        auto callAsFunctionResultTy = func1->getResult();
+
+        // The implicit replacement for original result type which
+        // represents a callable type produced by `.init` call.
+        auto callableType =
+            createTypeVariable(getConstraintLocator({}), /*flags=*/0);
+
+        // The original application type with all the trailing closures
+        // dropped from it and result replaced to the implicit variable.
+        func1 = FunctionType::get(func1->getParams().drop_back(numTrailing),
+                                  callableType, func1->getExtInfo());
+
+        auto matchCallResult = ::matchCallArguments(
+            *this, func2, newArgumentList, func1->getParams(),
+            func2->getParams(), subKind, argumentsLoc, trailingClosureMatching);
+
+        if (matchCallResult != SolutionKind::Solved)
+          return SolutionKind::Error;
+
+        auto *implicitCallArgumentList =
+            ArgumentList::createImplicit(ctx, trailingClosures,
+                                         /*firstTrailingClosureIndex=*/0);
+
+        auto *implicitRef = createImplicitRootForCallAsFunction(
+            *this, callAsFunctionResultTy, implicitCallArgumentList, calleeLoc);
+
+        auto callAsFunctionArguments =
+            FunctionType::get(trailingClosureTypes, callAsFunctionResultTy,
+                              FunctionType::ExtInfo());
+
+        // Form an unsolved constraint to apply trailing closures to a
+        // callable type produced by `.init`. This constraint would become
+        // active when `callableType` is bound.
+        addUnsolvedConstraint(Constraint::create(
+            *this, ConstraintKind::ApplicableFunction, callAsFunctionArguments,
+            callableType,
+            getConstraintLocator(implicitRef,
+                                 ConstraintLocator::ApplyFunction)));
+        break;
+      }
+
       return SolutionKind::Error;
+    }
 
     case SolutionKind::Unsolved: {
       // Only occurs when there is an ambiguity between forward scanning and
@@ -10719,6 +10820,26 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     auto instance2 = getFixedTypeRecursive(meta2->getInstanceType(), true);
     if (instance2->isTypeVariableOrMember())
       return formUnsolved();
+
+    auto *argumentsLoc = getConstraintLocator(
+        outerLocator.withPathElement(ConstraintLocator::ApplyArgument));
+
+    auto *argumentList = getArgumentList(argumentsLoc);
+    assert(argumentList);
+
+    // Cannot simplify construction of callable types during constraint
+    // generation when trailing closures are present because such calls
+    // have special trailing closure matching semantics. It's unclear
+    // whether trailing arguments belong to `.init` or implicit
+    // `.callAsFunction` in this case.
+    //
+    // Note that the constraint has to be activate so that solver attempts
+    // once constraint generation is done.
+    if (getPhase() == ConstraintSystemPhase::ConstraintGeneration &&
+        argumentList->hasAnyTrailingClosures() &&
+        instance2->isCallableNominalType(DC)) {
+      return formUnsolved(/*activate=*/true);
+    }
 
     // Construct the instance from the input arguments.
     auto simplified = simplifyConstructionConstraint(instance2, func1, subflags,
@@ -11608,6 +11729,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (!ArgumentLists.count(memberLoc)) {
       auto *argList = ArgumentList::createImplicit(
           getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
+          /*firstTrailingClosureIndex=*/None,
           AllocationArena::ConstraintSolver);
       ArgumentLists.insert({memberLoc, argList});
     }
@@ -11894,6 +12016,15 @@ void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
   argumentMatchingChoices.insert({locator, result});
+}
+
+void ConstraintSystem::recordCallAsFunction(UnresolvedDotExpr *root,
+                                            ArgumentList *arguments,
+                                            ConstraintLocator *locator) {
+  ImplicitCallAsFunctionRoots.insert({locator, root});
+
+  associateArgumentList(
+      getConstraintLocator(root, ConstraintLocator::ApplyArgument), arguments);
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(

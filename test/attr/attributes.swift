@@ -263,6 +263,38 @@ class C {
   @_optimize(size) var c : Int // expected-error {{'@_optimize(size)' attribute cannot be applied to stored properties}}
 }
 
+
+@exclusivity(checked) // ok
+var globalCheckedVar = 1
+
+@exclusivity(unchecked) // ok
+var globalUncheckedVar = 1
+
+@exclusivity(abc) // // expected-error {{unknown option 'abc' for attribute 'exclusivity'}}
+var globalUnknownVar = 1
+
+struct ExclusivityAttrStruct {
+  @exclusivity(unchecked) // expected-error {{@exclusivity can only be used on class properties, static properties and global variables}}
+  var instanceVar: Int = 27
+
+  @exclusivity(unchecked) // ok
+  static var staticVar: Int = 27
+
+  @exclusivity(unchecked) // expected-error {{@exclusivity can only be used on stored properties}}
+  static var staticComputedVar: Int { return 1 }
+}
+
+class ExclusivityAttrClass {
+  @exclusivity(unchecked) // ok
+  var instanceVar: Int = 27
+
+  @exclusivity(unchecked) // ok
+  static var staticVar: Int = 27
+
+  @exclusivity(unchecked) // expected-error {{@exclusivity can only be used on stored properties}}
+  static var staticComputedVar: Int { return 1 }
+}
+
 class HasStorage {
   @_hasStorage var x : Int = 42  // ok, _hasStorage is allowed here
 }

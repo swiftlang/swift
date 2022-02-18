@@ -41,6 +41,18 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
                        "swift_task_enqueueGlobalWithDelay");
 }
 
+SWIFT_CC(swift)
+static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
+                                                     long long nsec,
+                                                     long long tsec,
+                                                     long long tnsec,
+                                                     int clock, Job *job) {
+  assert(job && "no job provided");
+
+  swift_reportError(0, "operation unsupported without libdispatch: "
+                       "swift_task_enqueueGlobalWithDeadline");
+}
+
 /// Enqueues a task on the main executor.
 SWIFT_CC(swift)
 static void swift_task_enqueueMainExecutorImpl(Job *job) {

@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// REQUIRES: rdar_86744286
-
 struct TupleStruct<First, @_typeSequence Rest> {
   var first: First
   var rest: (Rest...)

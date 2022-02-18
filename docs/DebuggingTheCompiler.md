@@ -714,39 +714,31 @@ which causes the miscompile.
 Currently there is no tool to automatically identify the bad optimization, but
 it's quite easy to do this manually:
 
-1. Find the offending optimization with bisecting:
+1. Add the compiler option `-Xllvm -sil-opt-pass-count=<n>`, where `<n>`
+   is the number of optimizations to run.
 
-  a. Add the compiler option `-Xllvm -sil-opt-pass-count=<n>`, where `<n>`
-     is the number of optimizations to run.
+2. Bisect: find n where the executable crashes, but does not crash
+   with n-1. First just try n = 10, 100, 1000, 10000, etc. to find
+   an upper bound). Then can either bisect the invocation by hand or
+   place the invocation into a script and use
+   `./llvm-project/llvm/utils/bisect` to automatically bisect
+   based on the scripts error code. Example invocation:
 
-  b. Bisect: find n where the executable crashes, but does not crash
-     with n-1. First just try n = 10, 100, 1000, 10000, etc. to find
-     an upper bound). Then can either bisect the invocation by hand or
-     place the invocation into a script and use
-     `./llvm-project/llvm/utils/bisect` to automatically bisect
-     based on the scripts error code. Example invocation:
+     bisect --start=0 --end=10000 ./invoke_swift_passing_N.sh "%(count)s"
 
-       bisect --start=0 --end=10000 ./invoke_swift_passing_N.sh "%(count)s"
+3. Add another option `-Xllvm -sil-print-last`. The output can be
+   large, so it's best to redirect stderr to a file (`2> output`).
+   The output contains the SIL before and after the bad optimization.
 
-  c. Once one finds `n`, Add another option `-Xllvm -sil-print-pass-name`. The output can be
-     large, so it's best to redirect stderr to a file (`2> output`).
-     In the output search for the last pass before `stage Address Lowering`.
-     It should be the `Run #<n-1>`. This line tells you the name of the bad
-     optimization pass and on which function it run.
+4. Copy the two functions from the output into separate files and
+   compare both files. Try to figure out what the optimization pass
+   did wrong. To simplify the comparison, it's sometimes helpful to replace
+   all SIL values (e.g. `%27`) with a constant string (e.g. `%x`).
 
-2. Get the SIL before and after the bad optimization.
-
-  a. Add the compiler option
-     `-Xllvm -sil-print-function='<function>'`
-     where `<function>` is the function name (including the preceding `$`).
-     For example:
-     `-Xllvm -sil-print-function='$s4test6testityS2iF'`.
-     Again, the output can be large, so it's best to redirect stderr to a file.
-  b. From the output, copy the SIL of the function *before* the bad
-     run into a separate file and the SIL *after* the bad run into a file.
-  c. Compare both SIL files and try to figure out what the optimization pass
-     did wrong. To simplify the comparison, it's sometimes helpful to replace
-     all SIL values (e.g. `%27`) with a constant string (e.g. `%x`).
+5. If the bad optimization is SILCombine or SimplifyCFG (which do a lot of
+   transformations in a single run) it's helpful to continue bisecting on
+   the sub-pass number. The option `-Xllvm -sil-opt-pass-count=<n>.<m>`
+   can be used for that, where `m` is the sub-pass number.
 
 ### Using git-bisect in the presence of branch forwarding/feature branches
 
@@ -931,7 +923,7 @@ standalone driver must be built as a separate build product using the
 *just-built* Swift compiler and toolchain (the ones built in the same
 `build-script` invocation, preceding the SwiftDriver build product). The
 additional build product is added to the build by specifying the
-`--swift-driver` option of the `build-script`. The driver product is istalled
+`--swift-driver` option of the `build-script`. The driver product is installed
 into the resulting toolchain installation by specifying the
 `--install-swift-driver` option of the `build-script`.
 

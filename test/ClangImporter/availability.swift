@@ -14,7 +14,7 @@ func test_unavailable_instance_method(_ x : NSObject) -> Bool {
 }
 
 func test_unavailable_method_in_protocol(_ x : NSObjectProtocol) {
-  // expected-warning @+1 {{expression of type 'NSObjectProtocol' is unused}}
+  // expected-warning @+1 {{result of call to 'retain()' is unused}}
   x.retain() // expected-error {{'retain()' is unavailable}}
 }
 func test_unavailable_method_in_protocol_use_class_instance(_ x : NSObject) {

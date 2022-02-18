@@ -26,6 +26,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
@@ -759,6 +760,15 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const;
 
+  /// Determines whether this module should be recursed into when calling
+  /// \c getDisplayDecls.
+  ///
+  /// Some modules should not call \c getDisplayDecls, due to assertions
+  /// in their implementation. These are usually implicit imports that would be
+  /// recursed into for parsed modules. This function provides a guard against
+  /// recusing into modules that should not have decls collected.
+  bool shouldCollectDisplayDecls() const;
+
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.
   ///
@@ -855,6 +865,9 @@ public:
   /// \c SerializeOptionsForDebugging hack. Once this information can be
   /// transferred from module files to the dSYMs, remove this.
   bool isExternallyConsumed() const;
+
+  SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
+  SWIFT_DEBUG_DUMPER(dumpTopLevelDecls());
 
   SourceRange getSourceRange() const { return SourceRange(); }
 

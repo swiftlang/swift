@@ -356,7 +356,7 @@ DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
 
 void DeclAttributes::dump(const Decl *D) const {
   StreamPrinter P(llvm::errs());
-  PrintOptions PO = PrintOptions::printEverything();
+  PrintOptions PO = PrintOptions::printDeclarations();
   print(P, PO, D);
 }
 
@@ -883,8 +883,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
+  case DAK_Exclusivity:
   case DAK_NonSendable:
-    if (DeclAttribute::isDeclModifier(getKind())) {
+    if (getKind() == DAK_Effects &&
+        cast<EffectsAttr>(this)->getKind() == EffectsKind::Custom) {
+      Printer.printAttrName("@_effects");
+      Printer << "(" << cast<EffectsAttr>(this)->getCustomString() << ")";
+    } else if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
     } else if (Options.IsForSwiftInterface && getKind() == DAK_ResultBuilder) {
       // Use @_functionBuilder in Swift interfaces to maintain backward
@@ -1183,6 +1188,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_BackDeploy: {
+    Printer.printAttrName("@_backDeploy");
+    Printer << "(";
+    auto Attr = cast<BackDeployAttr>(this);
+    Printer << platformString(Attr->Platform) << " " <<
+      Attr->Version.getAsString();
+    Printer << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1289,6 +1304,15 @@ StringRef DeclAttribute::getAttrName() const {
       llvm_unreachable("Invalid optimization kind");
     }
   }
+  case DAK_Exclusivity: {
+    switch (cast<ExclusivityAttr>(this)->getMode()) {
+    case ExclusivityAttr::Checked:
+      return "exclusivity(checked)";
+    case ExclusivityAttr::Unchecked:
+      return "exclusivity(unchecked)";
+    }
+    llvm_unreachable("Invalid optimization kind");
+  }
   case DAK_Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
@@ -1301,6 +1325,8 @@ StringRef DeclAttribute::getAttrName() const {
         return "_effects(readwrite)";
       case EffectsKind::Unspecified:
         return "_effects(unspecified)";
+      case EffectsKind::Custom:
+        return "_effects";
     }
   case DAK_AccessControl:
   case DAK_SetterAccess: {
@@ -1340,6 +1366,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_typeSequence";
   case DAK_UnavailableFromAsync:
     return "_unavailableFromAsync";
+  case DAK_BackDeploy:
+    return "_backDeploy";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

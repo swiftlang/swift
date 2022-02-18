@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -76,55 +76,6 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-extension SomeSpecificDistributedActor {
-  @_dynamicReplacement(for:_remote_helloAsyncThrows())
-  nonisolated func _remote_impl_helloAsyncThrows() async throws -> String {
-    "remote(\(#function))"
-  }
-
-  @_dynamicReplacement(for:_remote_helloAsync())
-  nonisolated func _remote_impl_helloAsync() async throws -> String {
-    "remote(\(#function))"
-  }
-
-  @_dynamicReplacement(for:_remote_helloThrows())
-  nonisolated func _remote_impl_helloThrows() async throws -> String {
-    "remote(\(#function))"
-  }
-
-  @_dynamicReplacement(for:_remote_hello())
-  nonisolated func _remote_impl_hello() async throws -> String {
-    "remote(\(#function))"
-  }
-
-  @_dynamicReplacement(for:_remote_callTaskSelf())
-  nonisolated func _remote_impl_callTaskSelf() async throws -> String {
-    "remote(\(#function))"
-  }
-
-  @_dynamicReplacement(for:_remote_callDetachedSelf())
-  nonisolated func _remote_impl_callDetachedSelf() async throws -> String {
-    "remote(\(#function))"
-  }
-
-  @_dynamicReplacement(for:_remote_callTaskSelf_inner())
-  nonisolated func _remote_impl_callTaskSelf_inner() async throws -> String {
-    "remote(\(#function))"
-  }
-
-  // === errors
-
-  @_dynamicReplacement(for:_remote_helloThrowsImplBoom())
-  nonisolated func _remote_impl_helloThrowsImplBoom() async throws -> String {
-    "remote(\(#function))"
-  }
-
-  @_dynamicReplacement(for:_remote_helloThrowsTransportBoom())
-  nonisolated func _remote_impl_helloThrowsTransportBoom() async throws -> String {
-    throw Boom("system")
-  }
-}
-
 // ==== Execute ----------------------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
@@ -142,7 +93,8 @@ struct ActorAddress: Sendable, Hashable, Codable {
 
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
-  typealias Invocation = FakeInvocation
+  typealias InvocationDecoder = FakeInvocationDecoder
+  typealias InvocationEncoder = FakeInvocationEncoder
   typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
@@ -164,31 +116,60 @@ struct FakeActorSystem: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
-  func makeInvocation() -> Invocation {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
+  }
+
+  public func remoteCall<Act, Err, Res>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type,
+    returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    guard target.mangledName != "$s4main28SomeSpecificDistributedActorC24helloThrowsTransportBoomSSyKFTE" else {
+      throw Boom("system")
+    }
+
+    return "remote(\(target.mangledName))" as! Res
+  }
+
+  func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+    fatalError("not implemented: \(#function)")
   }
 }
 
-struct FakeInvocation: DistributedTargetInvocation {
-  typealias ArgumentDecoder = FakeArgumentDecoder
+// === Sending / encoding -------------------------------------------------
+struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
   typealias SerializationRequirement = Codable
 
-  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
-  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
-  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
-  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
+}
 
-  // === Receiving / decoding -------------------------------------------------
+// === Receiving / decoding -------------------------------------------------
+class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
 
-  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
-  mutating func decodeReturnType() throws -> Any.Type? { nil }
-  mutating func decodeErrorType() throws -> Any.Type? { nil }
-
-  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    typealias SerializationRequirement = Codable
-  }
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -221,15 +202,15 @@ func test_remote_invoke(address: ActorAddress, system: FakeActorSystem) async {
     // error throws
     if __isRemoteActor(actor) {
       do {
-        _ = try await actor.helloThrowsTransportBoom()
-        print("WRONG: helloThrowsTransportBoom: should have thrown")
+        let h7 = try await actor.helloThrowsTransportBoom()
+        print("WRONG: helloThrowsTransportBoom: should have thrown; got: \(h7)")
       } catch {
         print("\(personality) - helloThrowsTransportBoom: \(error)")
       }
     } else {
       do {
-        _ = try await actor.helloThrowsImplBoom()
-        print("WRONG: helloThrowsImplBoom: Should have thrown")
+        let h8 = try await actor.helloThrowsImplBoom()
+        print("WRONG: helloThrowsImplBoom: Should have thrown; got: \(h8)")
       } catch {
         print("\(personality) - helloThrowsImplBoom: \(error)")
       }
@@ -256,12 +237,18 @@ func test_remote_invoke(address: ActorAddress, system: FakeActorSystem) async {
   print("remote isRemote: \(__isRemoteActor(remote))")
   // CHECK: remote isRemote: true
   await check(actor: remote)
-  // CHECK: remote - helloAsyncThrows: remote(_remote_impl_helloAsyncThrows())
-  // CHECK: remote - helloAsync: remote(_remote_impl_helloAsync())
-  // CHECK: remote - helloThrows: remote(_remote_impl_helloThrows())
-  // CHECK: remote - hello: remote(_remote_impl_hello())
-  // CHECK: remote - callTaskSelf: remote(_remote_impl_callTaskSelf())
-  // CHECK: remote - callDetachedSelf: remote(_remote_impl_callDetachedSelf())
+  // TODO(distributed): remote - helloAsyncThrows: remote(_remote_impl_helloAsyncThrows())
+  // CHECK: remote - helloAsyncThrows: remote($s4main28SomeSpecificDistributedActorC16helloAsyncThrowsSSyYaKFTE)
+  // TODO(distributed): remote - helloAsync: remote()
+  // CHECK: remote - helloAsync: remote($s4main28SomeSpecificDistributedActorC10helloAsyncSSyYaFTE)
+  // TODO(distributed): remote - helloThrows: remote(_remote_impl_helloThrows())
+  // CHECK: remote - helloThrows: remote($s4main28SomeSpecificDistributedActorC11helloThrowsSSyKFTE)
+  // TODO(distributed): remote - hello: remote(_remote_impl_hello())
+  // CHECK: remote - hello: remote($s4main28SomeSpecificDistributedActorC5helloSSyFTE)
+  // TODO(distributed): remote - callTaskSelf: remote(_remote_impl_callTaskSelf())
+  // CHECK: remote - callTaskSelf: remote($s4main28SomeSpecificDistributedActorC12callTaskSelfSSyYaFTE)
+  // TODO(distributed): remote - callDetachedSelf: remote(_remote_impl_callDetachedSelf())
+  // CHECK: remote - callDetachedSelf: remote($s4main28SomeSpecificDistributedActorC16callDetachedSelfSSyYaFTE)
   // CHECK: remote - helloThrowsTransportBoom: Boom(whoFailed: "system")
 
   print(local)
@@ -271,7 +258,7 @@ func test_remote_invoke(address: ActorAddress, system: FakeActorSystem) async {
 @main struct Main {
   static func main() async {
     let address = ActorAddress(address: "")
-    let system = FakeActorSystem()
+    let system = DefaultDistributedActorSystem()
 
     await test_remote_invoke(address: address, system: system)
   }

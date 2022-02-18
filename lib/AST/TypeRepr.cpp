@@ -98,9 +98,37 @@ bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
 // TODO [OPAQUE SUPPORT]: We should probably use something like `Type`'s
 // `RecursiveProperties` to track this instead of computing it.
 bool TypeRepr::hasOpaque() {
-  // TODO [OPAQUE SUPPORT]: In the future we will also need to check if `this`
-  // is a `NamedOpaqueReturnTypeRepr`.
-  return findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
+  return isa<NamedOpaqueReturnTypeRepr>(this) ||
+    findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
+}
+
+TypeRepr *TypeRepr::getWithoutParens() const {
+  auto *repr = const_cast<TypeRepr *>(this);
+  while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(repr)) {
+    if (!tupleRepr->isParenType())
+      break;
+    repr = tupleRepr->getElementType(0);
+  }
+  return repr;
+}
+
+CollectedOpaqueReprs TypeRepr::collectOpaqueReturnTypeReprs() {
+  class Walker : public ASTWalker {
+    CollectedOpaqueReprs &Reprs;
+
+  public:
+    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
+
+    bool walkToTypeReprPre(TypeRepr *repr) override {
+      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
+        Reprs.push_back(opaqueRepr);
+      return true;
+    }
+  };
+
+  CollectedOpaqueReprs reprs;
+  walk(Walker(reprs));
+  return reprs;
 }
 
 SourceLoc TypeRepr::findUncheckedAttrLoc() const {

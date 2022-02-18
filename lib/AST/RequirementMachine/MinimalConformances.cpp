@@ -112,8 +112,8 @@ void RewriteLoop::findProtocolConformanceRules(
   for (const auto &step : Path) {
     if (!evaluator.isInContext()) {
       switch (step.Kind) {
-      case RewriteStep::ApplyRewriteRule: {
-        const auto &rule = system.getRule(step.RuleID);
+      case RewriteStep::Rule: {
+        const auto &rule = system.getRule(step.getRuleID());
 
         if (rule.isIdentityConformanceRule())
           break;
@@ -127,21 +127,20 @@ void RewriteLoop::findProtocolConformanceRules(
             // the prefix term is 'X'.
             const auto &term = evaluator.getCurrentTerm();
             MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
-            result[proto].RulesInContext.emplace_back(prefix, step.RuleID);
+            result[proto].RulesInContext.emplace_back(prefix, step.getRuleID());
           }
         }
 
         break;
       }
 
-      case RewriteStep::AdjustConcreteType:
+      case RewriteStep::PrefixSubstitutions:
       case RewriteStep::Shift:
       case RewriteStep::Decompose:
-      case RewriteStep::ConcreteConformance:
-      case RewriteStep::SuperclassConformance:
-      case RewriteStep::ConcreteTypeWitness:
-      case RewriteStep::SameTypeWitness:
-      case RewriteStep::AbstractTypeWitness:
+      case RewriteStep::Relation:
+      case RewriteStep::DecomposeConcrete:
+      case RewriteStep::LeftConcreteProjection:
+      case RewriteStep::RightConcreteProjection:
         break;
       }
     }
@@ -198,7 +197,7 @@ class MinimalConformances {
 
   bool isValidConformancePath(
       llvm::SmallDenseSet<unsigned, 4> &visited,
-      const llvm::SmallVectorImpl<unsigned> &path, bool allowConcrete) const;
+      const llvm::SmallVectorImpl<unsigned> &path) const;
 
   bool isValidRefinementPath(
       const llvm::SmallVectorImpl<unsigned> &path) const;
@@ -228,7 +227,7 @@ public:
 
   void verifyMinimalConformanceEquations() const;
 
-  void computeMinimalConformances(bool firstPass);
+  void computeMinimalConformances();
 
   void verifyMinimalConformances() const;
 
@@ -262,12 +261,12 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
   const auto &step = *steps.begin();
 
 #ifndef NDEBUG
-  const auto &rule = System.getRule(step.RuleID);
+  const auto &rule = System.getRule(step.getRuleID());
   assert(rule.isAnyConformanceRule());
   assert(!rule.isIdentityConformanceRule());
 #endif
 
-  assert(step.Kind == RewriteStep::ApplyRewriteRule);
+  assert(step.Kind == RewriteStep::Rule);
   assert(step.EndOffset == 0);
   assert(!step.Inverse);
 
@@ -277,9 +276,10 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
     // Build the term U.
     MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
 
-    decomposeTermIntoConformanceRuleLeftHandSides(prefix, step.RuleID, result);
+    decomposeTermIntoConformanceRuleLeftHandSides(
+        prefix, step.getRuleID(), result);
   } else {
-    result.push_back(step.RuleID);
+    result.push_back(step.getRuleID());
   }
 }
 
@@ -296,9 +296,7 @@ MinimalConformances::decomposeTermIntoConformanceRuleLeftHandSides(
 
   // Compute domain(V).
   const auto &lhs = rule.getLHS();
-  auto protocols = lhs[0].getProtocols();
-  assert(protocols.size() == 1);
-  auto protocol = Symbol::forProtocol(protocols[0], Context);
+  auto protocol = Symbol::forProtocol(lhs[0].getProtocol(), Context);
 
   // A same-type requirement of the form 'Self.Foo == Self' can induce a
   // conformance rule [P].[P] => [P], and we can end up with a minimal
@@ -343,10 +341,7 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
 
     // If we have a rule of the form X.[P:Y].[Q] => X.[P:Y] wih non-empty X,
     // then the parent type is X.[P].
-    const auto protos = parentSymbol.getProtocols();
-    assert(protos.size() == 1);
-
-    return protos[0];
+    return parentSymbol.getProtocol();
   }
 
   case Symbol::Kind::GenericParam:
@@ -378,19 +373,20 @@ void MinimalConformances::collectConformanceRules() {
     if (rule.isRedundant())
       continue;
 
+    if (rule.isRHSSimplified() ||
+        rule.isSubstitutionSimplified())
+      continue;
+
     if (rule.containsUnresolvedSymbols())
       continue;
 
     if (!rule.isAnyConformanceRule())
       continue;
 
-    ConformanceRules.push_back(ruleID);
+    if (!System.isInMinimizationDomain(rule.getLHS().getRootProtocol()))
+      continue;
 
-    // Initially, every non-redundant conformance rule can be expressed
-    // as itself.
-    SmallVector<unsigned, 2> path;
-    path.push_back(ruleID);
-    ConformancePaths[ruleID].push_back(path);
+    ConformanceRules.push_back(ruleID);
 
     // Save protocol refinement relations in a side table.
     if (rule.isProtocolRefinementRule()) {
@@ -405,10 +401,6 @@ void MinimalConformances::collectConformanceRules() {
     if (auto *parentProto = getParentConformanceForTerm(lhs)) {
       MutableTerm mutTerm(lhs.begin(), lhs.end() - 2);
       assert(!mutTerm.empty());
-
-      bool simplified = System.simplify(mutTerm);
-      assert(!simplified || rule.isSimplified());
-      (void) simplified;
 
       mutTerm.add(Symbol::forProtocol(parentProto, Context));
 
@@ -427,7 +419,7 @@ void MinimalConformances::collectConformanceRules() {
               if (lhsRule.isExplicit() != rhsRule.isExplicit())
                 return !lhsRule.isExplicit();
 
-              return lhsRule.getLHS().compare(rhsRule.getLHS(), Context) > 0;
+              return *lhsRule.getLHS().compare(rhsRule.getLHS(), Context) > 0;
             });
 
   Context.ConformanceRulesHistogram.add(ConformanceRules.size());
@@ -617,23 +609,11 @@ void MinimalConformances::computeCandidateConformancePaths() {
 /// rules.
 bool MinimalConformances::isValidConformancePath(
     llvm::SmallDenseSet<unsigned, 4> &visited,
-    const llvm::SmallVectorImpl<unsigned> &path, bool allowConcrete) const {
+    const llvm::SmallVectorImpl<unsigned> &path) const {
 
-  unsigned lastIdx = path.size() - 1;
-
-  for (unsigned ruleIdx : indices(path)) {
-    unsigned ruleID = path[ruleIdx];
+  for (unsigned ruleID : path) {
     if (visited.count(ruleID) > 0)
       return false;
-
-    bool isLastElement = (ruleIdx == lastIdx);
-
-    // Concrete conformances cannot appear in the middle of a conformance path.
-    if (!allowConcrete || !isLastElement) {
-      if (System.getRule(ruleID).getLHS().back().getKind()
-          == Symbol::Kind::ConcreteConformance)
-        return false;
-    }
 
     if (RedundantConformances.count(ruleID)) {
       SWIFT_DEFER {
@@ -642,12 +622,12 @@ bool MinimalConformances::isValidConformancePath(
       visited.insert(ruleID);
 
       auto found = ConformancePaths.find(ruleID);
-      assert(found != ConformancePaths.end());
+      if (found == ConformancePaths.end())
+        return false;
 
       bool foundValidConformancePath = false;
       for (const auto &otherPath : found->second) {
-        if (isValidConformancePath(visited, otherPath,
-                                   allowConcrete && isLastElement)) {
+        if (isValidConformancePath(visited, otherPath)) {
           foundValidConformancePath = true;
           break;
         }
@@ -666,10 +646,8 @@ bool MinimalConformances::isValidConformancePath(
         // If 'req' is based on some other conformance requirement
         // `T.[P.]A : Q', we want to make sure that we have a
         // non-redundant derivation for 'T : P'.
-        if (!isValidConformancePath(visited, found->second,
-                                    /*allowConcrete=*/false)) {
+        if (!isValidConformancePath(visited, found->second))
           return false;
-        }
       }
     }
   }
@@ -811,43 +789,14 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
 ///
 /// In the first pass, we only consider conformance requirements that are
 /// made redundant by concrete conformances.
-void MinimalConformances::computeMinimalConformances(bool firstPass) {
+void MinimalConformances::computeMinimalConformances() {
   for (unsigned ruleID : ConformanceRules) {
-    const auto &paths = ConformancePaths[ruleID];
+    auto found = ConformancePaths.find(ruleID);
+    if (found == ConformancePaths.end())
+      continue;
 
-    if (firstPass) {
-      bool derivedViaConcrete = false;
-      for (const auto &path : paths) {
-        if (path.empty())
-          continue;
-
-        // If the rule is itself a concrete conformance, it is not
-        // derived-via-concrete via itself.
-        if (path.size() == 1 && path.front() == ruleID)
-          continue;
-
-        if (System.getRule(path.back()).getLHS().back().getKind() ==
-            Symbol::Kind::ConcreteConformance) {
-          derivedViaConcrete = true;
-          break;
-        }
-      }
-
-      // If this rule doesn't involve concrete conformances it will be
-      // considered in the second pass.
-      if (!derivedViaConcrete)
-        continue;
-
-      if (Debug.contains(DebugFlags::MinimalConformances)) {
-        llvm::dbgs() << "Derived-via-concrete: ";
-        dumpMinimalConformanceEquation(llvm::dbgs(), ruleID, paths);
-        llvm::dbgs() << "\n";
-      }
-    } else {
-      // Ignore rules already determined to be redundant by the first pass.
-      if (RedundantConformances.count(ruleID) > 0)
-        continue;
-    }
+    const auto &rule = System.getRule(ruleID);
+    const auto &paths = found->second;
 
     bool isProtocolRefinement = ProtocolRefinements.count(ruleID) > 0;
 
@@ -860,13 +809,10 @@ void MinimalConformances::computeMinimalConformances(bool firstPass) {
       llvm::SmallDenseSet<unsigned, 4> visited;
       visited.insert(ruleID);
 
-      if (isValidConformancePath(visited, path,
-                                 /*allowConcrete=*/true)) {
+      if (isValidConformancePath(visited, path)) {
         if (Debug.contains(DebugFlags::MinimalConformances)) {
-          llvm::dbgs() << "Redundant rule in ";
-          llvm::dbgs() << (firstPass ? "first" : "second");
-          llvm::dbgs() << " pass: ";
-          llvm::dbgs() << System.getRule(ruleID).getLHS();
+          llvm::dbgs() << "Redundant rule: ";
+          llvm::dbgs() << rule.getLHS();
           llvm::dbgs() << "\n";
           llvm::dbgs() << "-- via valid path: ";
           dumpConformancePath(llvm::errs(), path);
@@ -895,8 +841,7 @@ void MinimalConformances::verifyMinimalConformances() const {
       llvm::SmallVector<unsigned, 1> path;
       path.push_back(ruleID);
 
-      if (!isValidConformancePath(visited, path,
-                                  /*allowConcrete=*/true)) {
+      if (!isValidConformancePath(visited, path)) {
         llvm::errs() << "Redundant conformance is not recoverable:\n";
         llvm::errs() << rule << "\n\n";
         dumpMinimalConformanceEquations(llvm::errs());
@@ -907,7 +852,7 @@ void MinimalConformances::verifyMinimalConformances() const {
       continue;
     }
 
-    if (rule.getLHS().containsUnresolvedSymbols()) {
+    if (rule.containsUnresolvedSymbols()) {
       llvm::errs() << "Minimal conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
       dumpMinimalConformanceEquations(llvm::errs());
@@ -922,11 +867,11 @@ void MinimalConformances::dumpMinimalConformances(
     llvm::raw_ostream &out) const {
   out << "Minimal conformances:\n";
 
-  for (const auto &pair : ConformancePaths) {
-    if (RedundantConformances.count(pair.first) > 0)
+  for (unsigned ruleID : ConformanceRules) {
+    if (RedundantConformances.count(ruleID) > 0)
       continue;
 
-    out << "- " << System.getRule(pair.first) << "\n";
+    out << "- " << System.getRule(ruleID) << "\n";
   }
 }
 
@@ -945,8 +890,7 @@ void RewriteSystem::computeMinimalConformances(
   }
 
   builder.verifyMinimalConformanceEquations();
-  builder.computeMinimalConformances(/*firstPass=*/true);
-  builder.computeMinimalConformances(/*firstPass=*/false);
+  builder.computeMinimalConformances();
   builder.verifyMinimalConformances();
 
   if (Debug.contains(DebugFlags::MinimalConformances)) {

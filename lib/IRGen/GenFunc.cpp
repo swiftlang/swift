@@ -528,6 +528,7 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
       
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::CFunctionPointer:
@@ -569,7 +570,7 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM) const {
 
   // Update the cache and return.
   TheSignature = Signature::getUncached(IGM, FormalType,
-                                        /*suppress generics*/ false);
+                                        FunctionPointerKind(FormalType));
   assert(TheSignature.isValid());
   return TheSignature;
 }
@@ -583,6 +584,7 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::CFunctionPointer:
   case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::CXXMethod:
   case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::Closure:
@@ -593,11 +595,15 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   llvm_unreachable("bad function type representation");
 }
 
+Signature IRGenModule::getSignature(CanSILFunctionType type) {
+  return getSignature(type, FunctionPointerKind(type));
+}
+
 Signature IRGenModule::getSignature(CanSILFunctionType type,
-                                    bool useSpecialConvention) {
-  // Don't bother caching if we've been asked to suppress generics.
-  if (useSpecialConvention)
-    return Signature::getUncached(*this, type, useSpecialConvention);
+                                    FunctionPointerKind kind) {
+  // Don't bother caching if we're working with a special kind.
+  if (kind.isSpecial())
+    return Signature::getUncached(*this, type, kind);
 
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
   return sigInfo.getSignature(*this);
@@ -1069,10 +1075,7 @@ public:
             IGM, subIGF, fwd, staticFnPtr, calleeHasContext, origSig, origType,
             substType, outType, subs, layout, conventions),
         layout(getAsyncContextLayout(
-            subIGF.IGM, origType, substType, subs,
-            staticFnPtr ? staticFnPtr->useSpecialConvention() : false,
-            FunctionPointer::Kind(
-                FunctionPointer::BasicKind::AsyncFunctionPointer))),
+            subIGF.IGM, origType, substType, subs)),
         currentArgumentIndex(outType->getNumParameters()) {}
 
   void begin() override { super::begin(); }
@@ -1085,10 +1088,9 @@ public:
   }
   void mapAsyncParameters(FunctionPointer fnPtr) override {
     llvm::Value *dynamicContextSize32;
-    auto initialContextSize = Size(0);
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
         subIGF, origType->getRepresentation(), fnPtr, nullptr,
-        std::make_pair(true, true), initialContextSize);
+        std::make_pair(true, true));
     auto *dynamicContextSize =
         subIGF.Builder.CreateZExt(dynamicContextSize32, subIGF.IGM.SizeTy);
     calleeContextBuffer =
@@ -1160,7 +1162,7 @@ public:
     auto newFnPtr = FunctionPointer(
         FunctionPointer::Kind::Function, fnPtr.getPointer(subIGF), newAuthInfo,
         Signature::forAsyncAwait(subIGF.IGM, origType,
-                                 /*useSpecialConvention*/ false));
+                                 FunctionPointerKind::defaultAsync()));
     auto &Builder = subIGF.Builder;
 
     auto argValues = args.claimAll();
@@ -1263,17 +1265,16 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Merge initial attributes with outAttrs.
   llvm::AttrBuilder b;
   IGM.constructInitialFnAttributes(b);
-  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
+  fwd->addFnAttrs(b);
 
   IRGenFunction subIGF(IGM, fwd);
   if (origType->isAsync()) {
+    auto fpKind = FunctionPointerKind::defaultAsync();
     auto asyncContextIdx =
-        Signature::forAsyncEntry(IGM, outType, /*useSpecialConvention*/ false)
+        Signature::forAsyncEntry(IGM, outType, fpKind)
             .getAsyncContextIndex();
     asyncLayout.emplace(irgen::getAsyncContextLayout(
-        IGM, origType, substType, subs, /*suppress generics*/ false,
-        FunctionPointer::Kind(
-            FunctionPointer::BasicKind::AsyncFunctionPointer)));
+        IGM, origType, substType, subs));
 
     //auto *calleeAFP = staticFnPtr->getDirectPointer();
     LinkEntity entity = LinkEntity::forPartialApplyForwarder(fwd);
@@ -1373,7 +1374,7 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
   // partially applied argument.
   bool hasPolymorphicParams =
       hasPolymorphicParameters(origType) &&
-      (!staticFnPtr || !staticFnPtr->useSpecialConvention());
+      (!staticFnPtr || !staticFnPtr->shouldSuppressPolymorphicArguments());
   if (!layout && hasPolymorphicParams) {
     assert(conventions.size() == 1);
     // We could have either partially applied an argument from the function

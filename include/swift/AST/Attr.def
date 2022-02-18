@@ -323,7 +323,7 @@ CONTEXTUAL_DECL_ATTR(weak, ReferenceOwnership,
 CONTEXTUAL_DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
 DECL_ATTR(_effects, Effects,
   OnAbstractFunction |
-  UserInaccessible |
+  AllowMultipleAttributes | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   50)
 DECL_ATTR(__objc_bridged, ObjCBridged,
@@ -636,7 +636,11 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   112)
 
 // 113 was experimental _unsafeSendable and is now unused
-// 114 was experimental _unsafeMainActor and is now unused
+
+SIMPLE_DECL_ATTR(_unsafeInheritExecutor, UnsafeInheritExecutor,
+  OnFunc | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  114) // previously experimental _unsafeMainActor
 
 SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
   OnParam | UserInaccessible |
@@ -651,13 +655,16 @@ SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
 // 117 was 'spawn' and is now unused
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
-  DeclModifier | OnClass | OnFunc |
+  DeclModifier | OnClass | OnFunc | OnVar |
   DistributedOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   118)
 
-// 119 is unused
+SIMPLE_DECL_ATTR(_primaryAssociatedType,
+  PrimaryAssociatedType, OnAssociatedType | UserInaccessible |
+  APIStableToAdd | ABIStableToAdd | APIBreakingToRemove | ABIStableToRemove,
+  119)
 
 SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
   OnFunc | UserInaccessible | NotSerialized | OnNominalType |
@@ -688,9 +695,9 @@ SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   124)
 
-SIMPLE_DECL_ATTR(_predatesConcurrency, PredatesConcurrency,
+SIMPLE_DECL_ATTR(preconcurrency, Preconcurrency,
   OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript |
-  OnEnumElement | OnImport | UserInaccessible |
+  OnEnumElement | OnImport |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   125)
 
@@ -704,6 +711,17 @@ DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIStableToRemove,
   127)
+
+DECL_ATTR(exclusivity, Exclusivity,
+  OnVar |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  128)
+
+DECL_ATTR(_backDeploy, BackDeploy,
+  OnAbstractFunction |
+  AllowMultipleAttributes | LongAttribute | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  129)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.

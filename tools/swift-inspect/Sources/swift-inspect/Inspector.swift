@@ -18,6 +18,7 @@ class Inspector {
   let task: task_t
   let symbolicator: CSTypeRef
   let swiftCore: CSTypeRef
+  let swiftConcurrency: CSTypeRef
   
   init?(pid: pid_t) {
     task = Self.findTask(pid, tryForkCorpse: false)
@@ -26,6 +27,8 @@ class Inspector {
     symbolicator = CSSymbolicatorCreateWithTask(task)
     swiftCore = CSSymbolicatorGetSymbolOwnerWithNameAtTime(
       symbolicator, "libswiftCore.dylib", kCSNow)
+    swiftConcurrency = CSSymbolicatorGetSymbolOwnerWithNameAtTime(
+      symbolicator, "libswift_Concurrency.dylib", kCSNow)
     _ = task_start_peeking(task)
   }
   
@@ -49,6 +52,12 @@ class Inspector {
       return 0
     }
 
+#if os(tvOS) || os(watchOS)
+    if tryForkCorpse {
+      print("warning: unable to generate corpse on this OS")
+    }
+    return task
+#else
     if !tryForkCorpse {
       return task
     }
@@ -63,6 +72,7 @@ class Inspector {
       print("warning: unable to generate corpse for pid \(pid): \(machErrStr(kr))", to: &Std.err)
       return task
     }
+#endif
   }
   
   func passContext() -> UnsafeMutableRawPointer {
@@ -74,8 +84,11 @@ class Inspector {
   }
   
   func getAddr(symbolName: String) -> swift_addr_t {
-    let symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore,
-                                                       "_" + symbolName)
+    let fullName = "_" + symbolName
+    var symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore, fullName)
+    if CSIsNull(symbol) {
+      symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftConcurrency, fullName)
+    }
     let range = CSSymbolGetRange(symbol)
     return swift_addr_t(range.location)
   }
@@ -104,6 +117,57 @@ class Inspector {
 
   func read(address: swift_addr_t, size: Int) -> UnsafeRawPointer? {
     return task_peek(task, address, mach_vm_size_t(size))
+  }
+
+  func threadCurrentTasks() -> [(threadID: UInt64, currentTask: swift_addr_t)] {
+    var threadList: UnsafeMutablePointer<thread_t>? = nil
+    var threadCount: mach_msg_type_number_t = 0
+
+    var kr = task_threads(task, &threadList, &threadCount)
+    if kr != KERN_SUCCESS {
+      print("Unable to gather threads of remote process: \(machErrStr(kr))")
+      return []
+    }
+
+    defer {
+      // Deallocate the port rights for the threads.
+      for i in 0..<threadCount {
+        mach_port_deallocate(mach_task_self_, threadList![Int(i)]);
+      }
+
+      // Deallocate the thread list.
+      let ptr = vm_address_t(truncatingIfNeeded: Int(bitPattern: threadList))
+      let size = vm_size_t(MemoryLayout<thread_t>.size) * vm_size_t(threadCount)
+      vm_deallocate(mach_task_self_, ptr, size);
+    }
+
+    var results: [(threadID: UInt64, currentTask: swift_addr_t)] = []
+    for i in 0..<threadCount {
+      let THREAD_IDENTIFIER_INFO_COUNT = MemoryLayout<thread_identifier_info_data_t>.size / MemoryLayout<natural_t>.size
+      var info = thread_identifier_info_data_t()
+      var infoCount = mach_msg_type_number_t(THREAD_IDENTIFIER_INFO_COUNT)
+      withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: THREAD_IDENTIFIER_INFO_COUNT) {
+          kr = thread_info(threadList![Int(i)],
+                           thread_flavor_t(THREAD_IDENTIFIER_INFO), $0,
+                           &infoCount)
+        }
+      }
+      if (kr != KERN_SUCCESS) {
+        print("Unable to get info for thread \(i): \(machErrStr(kr))")
+      } else {
+        let tlsStart = info.thread_handle
+        if tlsStart != 0 {
+          let SWIFT_CONCURRENCY_TASK_KEY = 103
+          let currentTaskPointer = tlsStart + UInt64(SWIFT_CONCURRENCY_TASK_KEY * MemoryLayout<UnsafeRawPointer>.size)
+          if let ptr = read(address: currentTaskPointer, size: MemoryLayout<UnsafeRawPointer>.size) {
+            let currentTask = ptr.load(as: UInt.self)
+            results.append((threadID: info.thread_id, currentTask: swift_addr_t(currentTask)))
+          }
+        }
+      }
+    }
+    return results
   }
 
   enum Callbacks {

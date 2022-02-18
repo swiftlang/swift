@@ -21,6 +21,11 @@ class C {
 sil [ossa] @dummy : $@convention(thin) () -> ()
 sil [ossa] @getOwnedC : $@convention(thin) () -> (@owned C)
 sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> ()
+sil [ossa] @getOwnedWrapper : $@convention(thin) () -> (@owned Wrapper)
+sil [ossa] @getOwnedMultiWrapper : $@convention(thin) () -> (@owned MultiWrapper)
+sil [ossa] @getOwnedHasObjectAndInt : $@convention(thin) () -> (@owned HasObjectAndInt)
+sil [ossa] @getOwnedString : $@convention(thin) () -> (@owned String)
+sil [ossa] @takeOwnedString : $@convention(thin) (@owned String) -> ()
 sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @accessRawP : $@convention(method) (Builtin.RawPointer) -> ()
@@ -147,15 +152,18 @@ bb0(%0 : @guaranteed $NativeObjectPair):
 
 // Test a basic copy with an outer use.
 //
-// CHECK-LABEL: sil [ossa] @testBorrowOuterUse : $@convention(thin) (@owned C) -> () {
-// CHECK: bb0(%0 : @owned $C):
+// CHECK-LABEL: sil [ossa] @testBorrowOuterUse : {{.*}} {
+// CHECK: bb0:
+// CHECK: [[INSTANCE:%.*]] = apply
 // CHECK-NOT: begin_borrow
 // CHECK-NOT: copy
-// CHECK: apply %{{.*}}(%0) : $@convention(thin) (@owned C) -> ()
+// CHECK: apply %{{.*}}([[INSTANCE]]) : $@convention(thin) (@owned C) -> ()
 // CHECK-NOT: destroy
 // CHECK: } // end sil function 'testBorrowOuterUse'
-sil [ossa] @testBorrowOuterUse : $@convention(thin) (@owned C) -> () {
-bb0(%0 : @owned $C):
+sil [ossa] @testBorrowOuterUse : $@convention(thin) () -> () {
+bb0:
+  %getOwnedC = function_ref @getOwnedC : $@convention(thin) () -> (@owned C)
+  %0 = apply %getOwnedC() : $@convention(thin) () -> (@owned C)
   %1 = begin_borrow %0 : $C
   %copy = copy_value %1 : $C
   end_borrow %1 : $C
@@ -225,12 +233,13 @@ bb3:
 // CHECK:      bb1:
 // CHECK-NEXT:   [[COPY:%.*]] = copy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:   apply %{{.*}}([[COPY]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
+// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   destroy_value [[OUTERCOPY]] : $C
-// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-LABEL: } // end sil function 'testLocalBorrowPostDomDestroy'
 sil [ossa] @testLocalBorrowPostDomDestroy : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
@@ -266,13 +275,14 @@ bb3:
 // CHECK:      bb1:
 // CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
 // CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-NEXT:   destroy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
-// CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-LABEL: } // end sil function 'testLocalBorrowNoPostDomDestroy'
 sil [ossa] @testLocalBorrowNoPostDomDestroy : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
@@ -308,17 +318,18 @@ bb3:
 // CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:  [[ARGCOPY:%.*]] = copy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:  apply %2([[OUTERCOPY]], [[ARGCOPY:%.*]]) : $@convention(thin) (@owned C, @owned C) -> ()
+// CHECK-NEXT:  destroy_value %0 : $C
 // CHECK-NEXT:  br bb3
 // CHECK:     bb2:
 // CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
 //
 // This copy would be eliminated if the outer lifetime were also canonicalized (no unchecked_ownership_conversion)
+// CHECK-NEXT:  destroy_value %0 : $C
 // CHECK-NEXT:  [[COPY2:%.*]] = copy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:  destroy_value [[COPY2]] : $C
 // CHECK-NEXT:  destroy_value %4 : $C
 // CHECK-NEXT:  br bb3
 // CHECK: bb3:
-// CHECK-NEXT:  destroy_value %0 : $C
 // CHECK-LABEL: } // end sil function 'testLocalBorrowDoubleConsume'
 sil [ossa] @testLocalBorrowDoubleConsume : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
@@ -394,9 +405,11 @@ bb3:
 // CHECK:        [[ALLOC:%.*]] = alloc_ref $C
 // CHECK-NEXT:   [[B1:%.*]] = begin_borrow [[ALLOC]]
 // CHECK-NOT:    copy
+// CHECK:        [[B2:%.*]] = begin_borrow [[ALLOC]]
 // CHECK-NOT:    copy
 // CHECK:        end_borrow [[B1]] : $C
-// CHECK:        apply %0([[ALLOC]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:        apply %0([[B2]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:        end_borrow [[B2]] : $C
 // CHECK-NEXT:   return [[ALLOC]] : $C
 // CHECK-LABEL: } // end sil function 'testInterleavedBorrow'
 sil [ossa] @testInterleavedBorrow : $@convention(thin) () -> @owned C {
@@ -426,11 +439,14 @@ bb0:
 // CHECK:        [[B1:%.*]] = begin_borrow [[ALLOC]]
 // CHECK:        apply %{{.*}}([[B1]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   end_borrow [[B1]] : $C
+// CHECK-NEXT:   [[B2:%.*]] = begin_borrow [[ALLOC]]
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
-// CHECK:        apply %{{.*}}([[ALLOC]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:        apply %{{.*}}([[B2]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK-NEXT:   end_borrow [[B2]] : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
+// CHECK-NEXT:   end_borrow [[B2]] : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   return [[ALLOC]] : $C
@@ -787,21 +803,24 @@ bb0(%0 : @owned $Wrapper):
 // Test two inner forwards with one inner and one outer use.
 // Check that the destroy is removed after sinking the destructure.
 //
-// CHECK-LABEL: sil [ossa] @testForwardBorrow1 : $@convention(thin) (@owned Wrapper) -> () {
-// CHECK:       bb0(%0 : @owned $Wrapper):
-// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $Wrapper
+// CHECK-LABEL: sil [ossa] @testForwardBorrow1 : {{.*}} {
+// CHECK:       bb0:
+// CHECK: [[INSTANCE:%.*]] = apply
+// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow [[INSTANCE]] : $Wrapper
 // CHECK-NEXT:   [[DSIN1:%.*]] = destructure_struct [[BORROW]] : $Wrapper
 // CHECK-NEXT:   ([[DSIN2:%.*]], %{{.*}}) = destructure_struct [[DSIN1]] : $HasObjectAndInt
 // CHECK:        apply %{{.*}}([[DSIN2]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   end_borrow [[BORROW]] : $Wrapper
-// CHECK:        [[DSOUT1:%.*]] = destructure_struct %0 : $Wrapper
+// CHECK:        [[DSOUT1:%.*]] = destructure_struct [[INSTANCE]] : $Wrapper
 // CHECK-NEXT:   ([[DSOUT2:%.*]], %{{.*}}) = destructure_struct [[DSOUT1]] : $HasObjectAndInt
 // CHECK:        apply %{{.*}}([[DSOUT2]]) : $@convention(thin) (@owned C) -> ()
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 // CHECK-LABEL: } // end sil function 'testForwardBorrow1'
-sil [ossa] @testForwardBorrow1 : $@convention(thin) (@owned Wrapper) -> () {
-bb0(%0 : @owned $Wrapper):
+sil [ossa] @testForwardBorrow1 : $@convention(thin) () -> () {
+bb0:
+  %getOwnedWrapper = function_ref @getOwnedWrapper : $@convention(thin) () -> (@owned Wrapper)
+  %0 = apply %getOwnedWrapper() : $@convention(thin) () -> (@owned Wrapper)
   %1 = begin_borrow %0 : $Wrapper
   %2 = destructure_struct %1 : $Wrapper
   (%3, %4) = destructure_struct %2 : $HasObjectAndInt
@@ -818,21 +837,24 @@ bb0(%0 : @owned $Wrapper):
 
 // Test two inner forwards where the copy has both and inner and outer uses.
 //
-// CHECK-LABEL: sil [ossa] @testForwardBorrow2 : $@convention(thin) (@owned Wrapper) -> () {
-// CHECK:       bb0(%0 : @owned $Wrapper):
-// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $Wrapper
+// CHECK-LABEL: sil [ossa] @testForwardBorrow2 : {{.*}} {
+// CHECK:       bb0:
+// CHECK: [[INSTANCE:%.*]] = apply
+// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow [[INSTANCE]] : $Wrapper
 // CHECK-NEXT:   [[DSIN1:%.*]] = destructure_struct [[BORROW]] : $Wrapper
 // CHECK-NEXT:   ([[DSIN2:%.*]], %{{.*}}) = destructure_struct [[DSIN1]] : $HasObjectAndInt
 // CHECK:        apply %{{.*}}([[DSIN2]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   end_borrow [[BORROW]] : $Wrapper
-// CHECK:        [[DSOUT1:%.*]] = destructure_struct %0 : $Wrapper
+// CHECK:        [[DSOUT1:%.*]] = destructure_struct [[INSTANCE]] : $Wrapper
 // CHECK-NEXT:   ([[DSOUT2:%.*]], %{{.*}}) = destructure_struct [[DSOUT1]] : $HasObjectAndInt
 // CHECK:        apply %{{.*}}([[DSOUT2]]) : $@convention(thin) (@owned C) -> ()
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 // CHECK-LABEL: } // end sil function 'testForwardBorrow2'
-sil [ossa] @testForwardBorrow2 : $@convention(thin) (@owned Wrapper) -> () {
-bb0(%0 : @owned $Wrapper):
+sil [ossa] @testForwardBorrow2 : $@convention(thin) () -> () {
+bb0:
+  %getOwnedWrapper = function_ref @getOwnedWrapper : $@convention(thin) () -> (@owned Wrapper)
+  %0 = apply %getOwnedWrapper() : $@convention(thin) () -> (@owned Wrapper)
   %1 = begin_borrow %0 : $Wrapper
   %2 = destructure_struct %1 : $Wrapper
   (%3, %4) = destructure_struct %2 : $HasObjectAndInt
@@ -850,18 +872,21 @@ bb0(%0 : @owned $Wrapper):
 // Test two inner forwards with no inner use.
 // Remove the borrow and inner forwards.
 //
-// CHECK-LABEL: sil [ossa] @testForwardBorrow3 : $@convention(thin) (@owned Wrapper) -> () {
-// CHECK:       bb0(%0 : @owned $Wrapper):
+// CHECK-LABEL: sil [ossa] @testForwardBorrow3 : {{.*}} {
+// CHECK:       bb0:
+// CHECK: [[INSTANCE:%.*]] = apply
 // CHECK-NOT:    borrow
 // CHECK-NOT:    copy
-// CHECK:        [[DSOUT1:%.*]] = destructure_struct %0 : $Wrapper
+// CHECK:        [[DSOUT1:%.*]] = destructure_struct [[INSTANCE]] : $Wrapper
 // CHECK-NEXT:   ([[DSOUT2:%.*]], %{{.*}}) = destructure_struct [[DSOUT1]] : $HasObjectAndInt
 // CHECK-NEXT:   apply %{{.*}}([[DSOUT2]]) : $@convention(thin) (@owned C) -> ()
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 // CHECK-LABEL: } // end sil function 'testForwardBorrow3'
-sil [ossa] @testForwardBorrow3 : $@convention(thin) (@owned Wrapper) -> () {
-bb0(%0 : @owned $Wrapper):
+sil [ossa] @testForwardBorrow3 : $@convention(thin) () -> () {
+bb0:
+  %getOwnedWrapper = function_ref @getOwnedWrapper : $@convention(thin) () -> (@owned Wrapper)
+  %0 = apply %getOwnedWrapper() : $@convention(thin) () -> (@owned Wrapper)
   %1 = begin_borrow %0 : $Wrapper
   %2 = destructure_struct %1 : $Wrapper
   (%3, %4) = destructure_struct %2 : $HasObjectAndInt
@@ -879,18 +904,21 @@ bb0(%0 : @owned $Wrapper):
 // Need to create two new destroys in this case.
 //
 //
-// CHECK-LABEL: sil [ossa] @testForwardBorrow4 : $@convention(thin) (@owned MultiWrapper) -> () {
-// CHECK: bb0(%0 : @owned $MultiWrapper):
-// CHECK-NEXT:   (%1, %2) = destructure_struct %0 : $MultiWrapper
-// CHECK-NEXT:   destroy_value %2 : $HasObjects
-// CHECK-NEXT:   ([[VAL:%.*]], %5) = destructure_struct %1 : $HasObjects
-// CHECK-NEXT:   destroy_value %5 : $C
+// CHECK-LABEL: sil [ossa] @testForwardBorrow4 : {{.*}} {
+// CHECK: bb0:
+// CHECK: [[INSTANCE:%.*]] = apply
+// CHECK-NEXT:   ([[HASOBJECTS_0:%[^,]+]], [[HASOBJECTS_1:%[^,]+]]) = destructure_struct [[INSTANCE]] : $MultiWrapper
+// CHECK-NEXT:   destroy_value [[HASOBJECTS_1]] : $HasObjects
+// CHECK-NEXT:   ([[VAL:%.*]], [[OBJECT_1:%[^,]+]]) = destructure_struct [[HASOBJECTS_0]] : $HasObjects
+// CHECK-NEXT:   destroy_value [[OBJECT_1]] : $C
 // CHECK-NOT:    borrow
 // CHECK:        apply %{{.*}}([[VAL]]) : $@convention(thin) (@owned C) -> ()
 // CHECK-NOT:    destroy
 // CHECK-LABEL: } // end sil function 'testForwardBorrow4'
-sil [ossa] @testForwardBorrow4 : $@convention(thin) (@owned MultiWrapper) -> () {
-bb0(%0 : @owned $MultiWrapper):
+sil [ossa] @testForwardBorrow4 : $@convention(thin) () -> () {
+bb0:
+  %getOwnedMultiWrapper = function_ref @getOwnedMultiWrapper : $@convention(thin) () -> (@owned MultiWrapper)
+  %0 = apply %getOwnedMultiWrapper() : $@convention(thin) () -> (@owned MultiWrapper)
   %1 = begin_borrow %0 : $MultiWrapper
   (%2, %3) = destructure_struct %1 : $MultiWrapper
   (%4, %5) = destructure_struct %2 : $HasObjects
@@ -913,25 +941,28 @@ bb0(%0 : @owned $MultiWrapper):
 // with its source live range when the guaranteed uses are within the
 // outer scope. But that analysis needs to "see through" destructures.
 //
-// CHECK-LABEL: sil shared [ossa] @testForwardBorrow5 : $@convention(method) (@owned HasObjectAndInt) -> () {
-// CHECK: bb0(%0 : @owned $HasObjectAndInt):
-// CHECK-NEXT:  %1 = copy_value %0 : $HasObjectAndInt
-// CHECK-NEXT:  (%2, %3) = destructure_struct %1 : $HasObjectAndInt
-// CHECK-NEXT:  %4 = begin_borrow %2 : $C
-// CHECK-NEXT:  %5 = ref_tail_addr %4 : $C, $Builtin.Int8
-// CHECK-NEXT:  %6 = index_addr %5 : $*Builtin.Int8, undef : $Builtin.Word
-// CHECK-NEXT:  %7 = address_to_pointer %6 : $*Builtin.Int8 to $Builtin.RawPointer
-// CHECK-NEXT:  end_borrow %4 : $C
-// CHECK-NEXT:  destroy_value %2 : $C
-// CHECK:       apply %{{.*}}(%7) : $@convention(method) (Builtin.RawPointer) -> ()
-// CHECK-NEXT:  ([[OBJ:%.*]], %{{.*}}) = destructure_struct %0 : $HasObjectAndInt
+// CHECK-LABEL: sil shared [ossa] @testForwardBorrow5 : {{.*}} {
+// CHECK: bb0:
+// CHECK: [[INSTANCE:%.*]] = apply
+// CHECK-NEXT:  [[COPY:%[^,]+]] = copy_value [[INSTANCE]] : $HasObjectAndInt
+// CHECK-NEXT:  ([[OBJECT:%[^,]+]], {{%[^,]+}}) = destructure_struct [[COPY]] : $HasObjectAndInt
+// CHECK-NEXT:  [[BORROW:%[^,]+]] = begin_borrow [[OBJECT]] : $C
+// CHECK-NEXT:  [[TAIL_ADDR:%[^,]+]] = ref_tail_addr [[BORROW]] : $C, $Builtin.Int8
+// CHECK-NEXT:  [[INDEX_ADDR:%[^,]+]] = index_addr [[TAIL_ADDR]] : $*Builtin.Int8, undef : $Builtin.Word
+// CHECK-NEXT:  [[POINTER:%[^,]+]] = address_to_pointer [[INDEX_ADDR]] : $*Builtin.Int8 to $Builtin.RawPointer
+// CHECK-NEXT:  end_borrow [[BORROW]] : $C
+// CHECK-NEXT:  destroy_value [[OBJECT]] : $C
+// CHECK:       apply %{{.*}}([[POINTER]]) : $@convention(method) (Builtin.RawPointer) -> ()
+// CHECK-NEXT:  ([[OBJ:%.*]], %{{.*}}) = destructure_struct [[INSTANCE]] : $HasObjectAndInt
 // CHECK-NEXT:  [[EXIS:%.*]] = init_existential_ref [[OBJ]] : $C : $C, $AnyObject
 // CHECK-NEXT:  fix_lifetime [[EXIS]] : $AnyObject
 // CHECK-NEXT:  destroy_value [[EXIS]] : $AnyObject
 // CHECK-NOT:   destroy
 // CHECK-LABEL: } // end sil function 'testForwardBorrow5'
-sil shared [ossa] @testForwardBorrow5 : $@convention(method) (@owned HasObjectAndInt) -> () {
-bb0(%0 : @owned $HasObjectAndInt):
+sil shared [ossa] @testForwardBorrow5 : $@convention(thin) () -> () {
+bb0:
+  %getOwnedHasObjectAndInt = function_ref @getOwnedHasObjectAndInt : $@convention(thin) () -> (@owned HasObjectAndInt)
+  %0 = apply %getOwnedHasObjectAndInt() : $@convention(thin) () -> (@owned HasObjectAndInt)
   %1 = begin_borrow %0 : $HasObjectAndInt
   %2 = struct_extract %1 : $HasObjectAndInt, #HasObjectAndInt.object
   %3 = copy_value %2 : $C
@@ -1040,9 +1071,10 @@ bb0(%0 : @owned $HasObject):
 // Removing this borrow scope will unblock removal of the final remaining copy_value:
 //    %_ = copy_value %_ : $String.UTF16View
 //
-// CHECK-LABEL: sil [ossa] @testUselessBorrowString : $@convention(thin) (@owned String) -> () {
-// CHECK: bb0(%0 : @owned $String):
-// CHECK-NEXT:   [[DESTRUCTURE:%.*]] = destructure_struct %0 : $String
+// CHECK-LABEL: sil [ossa] @testUselessBorrowString : {{.*}} {
+// CHECK: bb0:
+// CHECK: [[INSTANCE:%.*]] = apply
+// CHECK-NEXT:   [[DESTRUCTURE:%.*]] = destructure_struct [[INSTANCE]] : $String
 // CHECK-NEXT:   [[UTF16:%.*]] = struct $String.UTF16View ([[DESTRUCTURE]] : $_StringGuts)
 // CHECK-NEXT:   br bb1
 // CHECK:      bb1:
@@ -1074,8 +1106,10 @@ bb0(%0 : @owned $HasObject):
 // CHECK:      bb8:
 // CHECK-NEXT:   destroy_value [[UTF16]] : $String.UTF16View
 // CHECK-LABEL: } // end sil function 'testUselessBorrowString'
-sil [ossa] @testUselessBorrowString : $@convention(thin) (@owned String) -> () {
-bb0(%0 : @owned $String):
+sil [ossa] @testUselessBorrowString : $@convention(thin) () -> () {
+bb0:
+  %getOwnedString = function_ref @getOwnedString : $@convention(thin) () -> (@owned String)
+  %0 = apply %getOwnedString() : $@convention(thin) () -> (@owned String)
   %1 = begin_borrow %0 : $String
   %2 = struct_extract %1 : $String, #String._guts
   %3 = copy_value %2 : $_StringGuts

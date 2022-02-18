@@ -1138,6 +1138,7 @@ func badTypes() {
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
   // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // expected-error@-2 {{type placeholder not allowed here}}
 }
 
 do {

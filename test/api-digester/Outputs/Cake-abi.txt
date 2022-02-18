@@ -50,7 +50,7 @@ cake: Func C7.foo(_:_:) has removed default argument from parameter 1
 cake: Func EscapingFunctionType.addedEscaping(_:) has added @escaping in parameter 0
 cake: Func EscapingFunctionType.removedEscaping(_:) has removed @escaping in parameter 0
 cake: Func Somestruct2.foo1(_:) has parameter 0 type change from cake.C3 to cake.C1
-cake: Func Zoo.getCurrentAnimalInlinable() has return type change from cake.Cat to cake.Dog
+cake: Func Zoo.getCurrentAnimalInlinable() has return type change from [cake.Cat] to [cake.Dog]
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 cake: Func returnFunctionTypeOwnershipChange() has return type change from (cake.C1) -> () to (__owned cake.C1) -> ()

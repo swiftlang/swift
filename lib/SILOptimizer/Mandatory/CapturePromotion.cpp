@@ -1040,6 +1040,7 @@ public:
   ALWAYS_NON_ESCAPING_INST(Load)
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
   ALWAYS_NON_ESCAPING_INST(DestroyValue)
+  ALWAYS_NON_ESCAPING_INST(EndBorrow)
 #undef ALWAYS_NON_ESCAPING_INST
 
   bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
@@ -1213,7 +1214,8 @@ static bool findEscapeOrMutationUses(Operand *op,
   // we want to be more conservative around non-top level copies (i.e. a copy
   // derived from a projection like instruction). In fact such a thing may not
   // even make any sense!
-  if (isa<CopyValueInst>(user) || isa<MarkUninitializedInst>(user)) {
+  if (isa<CopyValueInst>(user) || isa<MarkUninitializedInst>(user) ||
+      isa<BeginBorrowInst>(user)) {
     bool foundSomeMutations = false;
     for (auto *use : cast<SingleValueInstruction>(user)->getUses()) {
       foundSomeMutations |= findEscapeOrMutationUses(use, state);

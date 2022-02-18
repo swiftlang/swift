@@ -69,7 +69,9 @@ struct DiagnosticInfo {
   public:
     FixIt(CharSourceRange R, StringRef Str, ArrayRef<DiagnosticArgument> Args);
 
-    CharSourceRange getRange() const { return Range; }
+    CharSourceRange &getRange() { return Range; }
+    const CharSourceRange &getRange() const { return Range; }
+
     StringRef getText() const { return Text; }
   };
 

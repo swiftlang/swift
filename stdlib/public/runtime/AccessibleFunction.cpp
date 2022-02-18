@@ -98,8 +98,8 @@ static void _registerAccessibleFunctions(AccessibleFunctionsState &C,
   C.SectionsToScan.push_back(section);
 }
 
-void swift::addImageAccessibleFunctionsBlockCallbackUnsafe(const void *functions,
-                                                           uintptr_t size) {
+void swift::addImageAccessibleFunctionsBlockCallbackUnsafe(
+  const void *baseAddress, const void *functions, uintptr_t size) {
   assert(
       size % sizeof(AccessibleFunctionRecord) == 0 &&
       "accessible function section not a multiple of AccessibleFunctionRecord");
@@ -108,10 +108,10 @@ void swift::addImageAccessibleFunctionsBlockCallbackUnsafe(const void *functions
   _registerAccessibleFunctions(C, AccessibleFunctionsSection{functions, size});
 }
 
-void swift::addImageAccessibleFunctionsBlockCallback(const void *functions,
-                                                     uintptr_t size) {
+void swift::addImageAccessibleFunctionsBlockCallback(
+  const void *baseAddress, const void *functions, uintptr_t size) {
   Functions.get();
-  addImageAccessibleFunctionsBlockCallbackUnsafe(functions, size);
+  addImageAccessibleFunctionsBlockCallbackUnsafe(baseAddress, functions, size);
 }
 
 static const AccessibleFunctionRecord *

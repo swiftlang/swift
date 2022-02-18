@@ -315,10 +315,20 @@ namespace swift {
 
     /// Enable support for explicit existential types via the \c any
     /// keyword.
-    bool EnableExplicitExistentialTypes = false;
+    bool EnableExplicitExistentialTypes = true;
+
+    /// Enable support for protocol types parameterized by primary
+    /// associated type.
+    bool EnableParameterizedProtocolTypes = false;
 
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
+
+    /// Disable experimental ClangImporter diagnostics.
+    bool DisableExperimentalClangImporterDiagnostics = false;
+
+    /// Enable experimental eager Clang module diagnostics.
+    bool EnableExperimentalEagerClangModuleDiagnostics = false;
 
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
@@ -328,6 +338,9 @@ namespace swift {
 
     /// Enable experimental 'move only' features.
     bool EnableExperimentalMoveOnly = false;
+
+    /// Enable experimental pairwise `buildBlock` for result builders.
+    bool EnableExperimentalPairwiseBuildBlock = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
@@ -383,6 +396,9 @@ namespace swift {
     /// Diagnose switches over non-frozen enums that do not have catch-all
     /// cases.
     bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
+
+    /// Enable making top-level code support concurrency
+    bool EnableExperimentalAsyncTopLevel = false;
 
     /// Regex for the passes that should report passed and missed optimizations.
     ///
@@ -457,6 +473,13 @@ namespace swift {
     // FrontendOptions.
     bool AllowModuleWithCompilerErrors = false;
 
+    /// Enable extensions of (sugared) bound generic types
+    ///
+    /// \code
+    /// extension [Int] { /**/ }
+    /// \endcode
+    bool EnableExperimentalBoundGenericExtensions = false;
+
     /// A helper enum to represent whether or not we customized the default
     /// ASTVerifier behavior via a frontend flag. By default, we do not
     /// customize.
@@ -471,13 +494,6 @@ namespace swift {
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
 
-    /// Whether the new experimental generics implementation is enabled.
-    RequirementMachineMode EnableRequirementMachine =
-        RequirementMachineMode::Enabled;
-
-    /// Enables merged associated type support, which might go away.
-    bool RequirementMachineMergedAssociatedTypes = true;
-
     /// Enables dumping rewrite systems from the requirement machine.
     bool DumpRequirementMachine = false;
 
@@ -487,13 +503,17 @@ namespace swift {
     /// Enables fine-grained debug output from the requirement machine.
     std::string DebugRequirementMachine;
 
-    /// Maximum iteration count for requirement machine Knuth-Bendix completion
+    /// Maximum rule count for requirement machine Knuth-Bendix completion
     /// algorithm.
-    unsigned RequirementMachineStepLimit = 4000;
+    unsigned RequirementMachineMaxRuleCount = 4000;
 
     /// Maximum term length for requirement machine Knuth-Bendix completion
     /// algorithm.
-    unsigned RequirementMachineDepthLimit = 10;
+    unsigned RequirementMachineMaxRuleLength = 12;
+
+    /// Maximum concrete type nesting depth for requirement machine property map
+    /// algorithm.
+    unsigned RequirementMachineMaxConcreteNesting = 30;
 
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.

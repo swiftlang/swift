@@ -421,6 +421,7 @@ private:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
+    case Node::Kind::CompileTimeConst:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
@@ -561,13 +562,14 @@ private:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
     case Node::Kind::DistributedThunk:
-    case Node::Kind::DistributedMethodAccessor:
+    case Node::Kind::DistributedAccessor:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
     case Node::Kind::OpaqueType:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     case Node::Kind::OpaqueReturnType:
+    case Node::Kind::OpaqueReturnTypeIndexed:
     case Node::Kind::OpaqueReturnTypeOf:
     case Node::Kind::CanonicalSpecializedGenericMetaclass:
     case Node::Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
@@ -1016,6 +1018,7 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
     switch (K) {
     case FunctionSigSpecializationParamKind::BoxToValue:
     case FunctionSigSpecializationParamKind::BoxToStack:
+    case FunctionSigSpecializationParamKind::InOutToOut:
       print(Node->getChild(Idx++), depth + 1);
       break;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
@@ -1050,6 +1053,17 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       print(Node->getChild(Idx++), depth + 1);
       Printer << "'";
       Printer << "]";
+      break;
+    case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      Printer << "[";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << " : ";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << "<";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ",";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ">]";
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "[";
@@ -1461,6 +1475,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "isolated ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::CompileTimeConst:
+    Printer << "_const ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::Shared:
     Printer << "__shared ";
     print(Node->getChild(0), depth + 1);
@@ -1586,6 +1604,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     case FunctionSigSpecializationParamKind::BoxToStack:
       Printer << "Stack Promoted from Box";
       return nullptr;
+    case FunctionSigSpecializationParamKind::InOutToOut:
+      Printer << "InOut Converted to Out";
+      return nullptr;
     case FunctionSigSpecializationParamKind::ConstantPropFunction:
       Printer << "Constant Propagated Function";
       return nullptr;
@@ -1600,6 +1621,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     case FunctionSigSpecializationParamKind::ConstantPropString:
       Printer << "Constant Propagated String";
+      return nullptr;
+    case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+      Printer << "Constant Propagated KeyPath";
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
@@ -2001,9 +2025,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "distributed thunk for ";
     }
     return nullptr;
-  case Node::Kind::DistributedMethodAccessor:
+  case Node::Kind::DistributedAccessor:
     if (!Options.ShortenThunk) {
-      Printer << "distributed method accessor for ";
+      Printer << "distributed accessor for ";
     }
     return nullptr;
   case Node::Kind::AccessibleFunctionRecord:
@@ -2817,6 +2841,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << ")";
     return nullptr;
   case Node::Kind::OpaqueReturnType:
+  case Node::Kind::OpaqueReturnTypeIndexed:
     Printer << "some";
     return nullptr;
   case Node::Kind::OpaqueReturnTypeOf:

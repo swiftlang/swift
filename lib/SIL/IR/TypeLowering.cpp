@@ -579,6 +579,11 @@ namespace {
                                        IsTypeExpansionSensitive_t isSensitive) {
       return visitExistentialType(type, origType, isSensitive);
     }
+    RetTy visitParameterizedProtocolType(CanParameterizedProtocolType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive) {
+      return visitExistentialType(type, origType, isSensitive);
+    }
 
     // Enums depend on their enumerators.
     RetTy visitEnumType(CanEnumType type, AbstractionPattern origType,
@@ -1686,6 +1691,15 @@ namespace {
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
     }
+    
+    TypeLowering *handleInfinite(CanType type,
+                                 RecursiveProperties properties) {
+      // Infinite types cannot actually be instantiated, so treat them as
+      // opaque for code generation purposes.
+      properties.setAddressOnly();
+      properties.setInfinite();
+      return handleAddressOnly(type, properties);
+    }
 
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     TypeLowering * \
@@ -1779,6 +1793,12 @@ namespace {
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
 
+      // Bail out if the struct layout relies on itself.
+      TypeConverter::LowerAggregateTypeRAII loweringStruct(TC, structType);
+      if (loweringStruct.IsInfinite) {
+        return handleInfinite(structType, properties);
+      }
+
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
@@ -1820,6 +1840,12 @@ namespace {
       RecursiveProperties properties;
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      // Bail out if the enum layout relies on itself.
+      TypeConverter::LowerAggregateTypeRAII loweringEnum(TC, enumType);
+      if (loweringEnum.IsInfinite) {
+        return handleInfinite(enumType, properties);
+      }
 
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
@@ -3406,6 +3432,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
         ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
+
+  // Asynchronous functions require a thunk if they differ in whether they
+  // have an error result.
+  if (fnTy1->hasErrorResult() != fnTy2->hasErrorResult() &&
+      (fnTy1->isAsync() || fnTy2->isAsync()))
+    return ABIDifference::NeedsThunk;
 
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {
     auto param1 = fnTy1->getParameters()[i], param2 = fnTy2->getParameters()[i];

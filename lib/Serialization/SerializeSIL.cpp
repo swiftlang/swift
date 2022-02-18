@@ -470,7 +470,16 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     replacedFunctionID =
         S.addUniquedStringRef(F.getObjCReplacement().str());
   }
-  unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
+
+  unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
+
+  auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
+  F.visitArgEffects(
+    [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
+      if (isDerived && resilience == ResilienceStrategy::Resilient)
+        return;
+      numAttrs++;
+    });
 
   Optional<llvm::VersionTuple> available;
   auto availability = F.getAvailabilityForLinkage();
@@ -487,11 +496,27 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(),
       (unsigned)F.hasCReferences(), (unsigned)F.getEffectsKind(),
-      (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
+      (unsigned)numAttrs, (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
       (unsigned)F.isDynamicallyReplaceable(), (unsigned)F.isExactSelfClass(),
       (unsigned)F.isDistributed(), FnID, replacedFunctionID, genericSigID,
       clangNodeOwnerID, SemanticsIDs);
+
+  F.visitArgEffects(
+    [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
+      if (isDerived && resilience == ResilienceStrategy::Resilient)
+        return;
+
+      llvm::SmallString<64> buffer;
+      llvm::raw_svector_ostream OS(buffer);
+      F.writeEffect(OS, effectIdx);
+
+      IdentifierID effectsStrID = S.addUniquedStringRef(OS.str());
+      unsigned abbrCode = SILAbbrCodes[SILArgEffectsAttrLayout::Code];
+
+      SILArgEffectsAttrLayout::emitRecord(
+          Out, ScratchRecord, abbrCode, effectsStrID, (unsigned)isDerived);
+    });
 
   if (NoBody)
     return;
@@ -1013,8 +1038,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocStackInst: {
     const AllocStackInst *ASI = cast<AllocStackInst>(&SI);
-    unsigned attr =
-        unsigned(ASI->hasDynamicLifetime()) + unsigned(ASI->isLexical() << 1);
+    unsigned attr = 0;
+    attr |= unsigned(ASI->hasDynamicLifetime());
+    attr |= unsigned(ASI->isLexical()) << 1;
+    attr |= unsigned(ASI->getWasMoved()) << 2;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }
@@ -1405,6 +1432,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::MoveValueInst:
+  case SILInstructionKind::MarkMustCheckInst:
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::ReleaseValueAddrInst:
@@ -1413,6 +1441,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UnmanagedAutoreleaseValueInst:
   case SILInstructionKind::SetDeallocatingInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
@@ -1445,8 +1474,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     else if (auto *LI = dyn_cast<Load##Name##Inst>(&SI)) \
       Attr = LI->isTake();
 #include "swift/AST/ReferenceStorage.def"
-    else if (auto *DRI = dyn_cast<DeallocRefInst>(&SI))
-      Attr = (unsigned)DRI->canAllocOnStack();
     else if (auto *RCI = dyn_cast<RefCountingInst>(&SI))
       Attr = RCI->isNonAtomic();
     else if (auto *UOCI = dyn_cast<UncheckedOwnershipConversionInst>(&SI)) {
@@ -1464,7 +1491,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
       Attr = BBI->isLexical();
     } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
-      Attr = MVI->getAllowDiagnostics();
+      Attr = unsigned(MVI->getAllowDiagnostics()) |
+             (unsigned(MVI->isLexical() << 1));
+    } else if (auto *I = dyn_cast<MarkMustCheckInst>(&SI)) {
+      Attr = unsigned(I->getCheckKind());
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
@@ -2833,6 +2863,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILTwoOperandsLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
   registerSILAbbr<SILSpecializeAttrLayout>();
+  registerSILAbbr<SILArgEffectsAttrLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionLayout>();
   registerSILAbbr<SILInstLinearFunctionLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
@@ -2949,12 +2980,19 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Now write function declarations for every function we've
   // emitted a reference to without emitting a function body for.
+  auto resilience = SILMod->getSwiftModule()->getResilienceStrategy();
   for (const SILFunction &F : *SILMod) {
     auto iter = FuncsToEmit.find(&F);
-    if (iter != FuncsToEmit.end() && iter->second) {
-      assert((emitDeclarationsForOnoneSupport ||
-              !shouldEmitFunctionBody(&F)) &&
-             "Should have emitted function body earlier");
+    if (iter != FuncsToEmit.end()) {
+      if (iter->second) {
+        assert((emitDeclarationsForOnoneSupport ||
+                !shouldEmitFunctionBody(&F)) &&
+               "Should have emitted function body earlier");
+        writeSILFunction(F, true);
+      }
+    } else if (F.getLinkage() == SILLinkage::Public &&
+               resilience != ResilienceStrategy::Resilient &&
+               F.hasArgumentEffects()) {
       writeSILFunction(F, true);
     }
   }

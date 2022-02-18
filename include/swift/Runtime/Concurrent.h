@@ -812,7 +812,7 @@ private:
   /// the first element of a variable-length array, whose size is determined by
   /// the allocation.
   struct ElementStorage {
-    uint32_t Capacity;
+    uintptr_t Capacity : 32;
     ElemTy Elem;
 
     static ElementStorage *allocate(size_t capacity) {
@@ -881,7 +881,7 @@ private:
     auto *newElements = ElementStorage::allocate(newCapacity);
 
     if (elements) {
-      if constexpr (std::is_trivially_copyable<ElemTy>::value) {
+      if (std::is_trivially_copyable<ElemTy>::value) {
         memcpy(newElements->data(), elements->data(),
                elementCount * sizeof(ElemTy));
       } else {

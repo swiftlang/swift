@@ -158,6 +158,8 @@ TypeDecl *DebugTypeInfo::getDecl() const {
     return UBG->getDecl();
   if (auto *BG = dyn_cast<BoundGenericType>(Type))
     return BG->getDecl();
+  if (auto *E = dyn_cast<ExistentialType>(Type))
+    return E->getConstraintType()->getAnyNominal();
   return nullptr;
 }
 

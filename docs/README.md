@@ -102,7 +102,9 @@ documentation, please create a thread on the Swift forums under the
 - [DependencyAnalysis.md](/docs/DependencyAnalysis.md):
   Describes different kinds of dependencies across files in the same module,
   important for understanding incremental builds.
-- C and ObjC interoperability: Clang Importer and PrintAsObjC
+- [DifferentiableProgrammingImplementation.md](/docs/DifferentiableProgrammingImplementation.md):
+  Describes how automatic differentiation is implemented in the Swift compiler.
+- C and ObjC interoperability: Clang Importer and PrintAsClang
   - [CToSwiftNameTranslation.md](/docs/CToSwiftNameTranslation.md):
     Describes how C and ObjC entities are imported into Swift
     by the Clang Importer.
@@ -131,7 +133,8 @@ documentation, please create a thread on the Swift forums under the
     Describes the design of the optimizer pipeline.
   - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
     Describes how the optimizer understands the semantics of high-level
-    operations on currency data types and optimizes accordingly.
+    operations on [currency](/docs/Lexicon.md#currency-type) data types and 
+    optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.
 
 ### SourceKit subsystems

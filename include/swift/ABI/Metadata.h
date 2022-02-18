@@ -48,6 +48,24 @@
 #include "llvm/Support/Casting.h"
 
 namespace swift {
+
+template <typename Runtime> struct TargetGenericMetadataInstantiationCache;
+template <typename Runtime> struct TargetAnyClassMetadata;
+template <typename Runtime> struct TargetAnyClassMetadataObjCInterop;
+template <typename Runtime, typename TargetAnyClassMetadataVariant>
+struct TargetClassMetadata;
+template <typename Runtime> struct TargetStructMetadata;
+template <typename Runtime> struct TargetOpaqueMetadata;
+template <typename Runtime> struct TargetValueMetadata;
+template <typename Runtime> struct TargetForeignClassMetadata;
+template <typename Runtime> struct TargetContextDescriptor;
+template <typename Runtime> class TargetTypeContextDescriptor;
+template <typename Runtime> class TargetClassDescriptor;
+template <typename Runtime> class TargetValueTypeDescriptor;
+template <typename Runtime> class TargetEnumDescriptor;
+template <typename Runtime> class TargetStructDescriptor;
+template <typename Runtime> struct TargetGenericMetadataPattern;
+
 template <unsigned PointerSize>
 struct RuntimeTarget;
 
@@ -90,6 +108,18 @@ struct InProcess {
   using StoredSize = size_t;
   using StoredPointerDifference = ptrdiff_t;
 
+#if SWIFT_OBJC_INTEROP
+  static constexpr bool ObjCInterop = true;
+  template <typename T>
+  using TargetAnyClassMetadata = TargetAnyClassMetadataObjCInterop<T>;
+#else
+  static constexpr bool ObjCInterop = false;
+  template <typename T>
+  using TargetAnyClassMetadata = TargetAnyClassMetadata<T>;
+#endif
+  template <typename T>
+  using TargetClassMetadata = TargetClassMetadata<T, TargetAnyClassMetadata<T>>;
+
   static_assert(sizeof(StoredSize) == sizeof(StoredPointerDifference),
                 "target uses differently-sized size_t and ptrdiff_t");
   
@@ -120,14 +150,44 @@ struct ExternalPointer {
   StoredPointer PointerValue;
 };
 
-/// An external process's runtime target, which may be a different architecture.
+template <typename Runtime> struct WithObjCInterop {
+  using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSignedPointer = typename Runtime::StoredSignedPointer;
+  using StoredSize = typename Runtime::StoredSize;
+  using StoredPointerDifference = typename Runtime::StoredPointerDifference;
+  static constexpr size_t PointerSize = Runtime::PointerSize;
+  static constexpr bool ObjCInterop = true;
+  template <typename T>
+  using TargetAnyClassMetadata = TargetAnyClassMetadataObjCInterop<T>;
+};
+
+template <typename Runtime> struct NoObjCInterop {
+  using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSignedPointer = typename Runtime::StoredSignedPointer;
+  using StoredSize = typename Runtime::StoredSize;
+  using StoredPointerDifference = typename Runtime::StoredPointerDifference;
+  static constexpr size_t PointerSize = Runtime::PointerSize;
+  static constexpr bool ObjCInterop = false;
+  template <typename T>
+  using TargetAnyClassMetadata = TargetAnyClassMetadata<T>;
+};
+
+/// An external process's runtime target, which may be a different architecture,
+/// and may or may not have Objective-C interoperability.
 template <typename Runtime>
 struct External {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
+  template <typename T>
+  using TargetAnyClassMetadata =
+      typename Runtime::template TargetAnyClassMetadata<T>;
+  template <typename T>
+  using TargetClassMetadata = TargetClassMetadata<T, TargetAnyClassMetadata<T>>;
+
   static constexpr size_t PointerSize = Runtime::PointerSize;
+  static constexpr bool ObjCInterop = Runtime::ObjCInterop;
   const StoredPointer PointerValue;
   
   template <typename T>
@@ -478,22 +538,10 @@ namespace {
   };
 }
 
-template <typename Runtime> struct TargetGenericMetadataInstantiationCache;
-template <typename Runtime> struct TargetAnyClassMetadata;
-template <typename Runtime> struct TargetClassMetadata;
-template <typename Runtime> struct TargetStructMetadata;
-template <typename Runtime> struct TargetOpaqueMetadata;
-template <typename Runtime> struct TargetValueMetadata;
-template <typename Runtime> struct TargetForeignClassMetadata;
-template <typename Runtime> struct TargetContextDescriptor;
-template <typename Runtime> class TargetTypeContextDescriptor;
-template <typename Runtime> class TargetClassDescriptor;
-template <typename Runtime> class TargetValueTypeDescriptor;
-template <typename Runtime> class TargetEnumDescriptor;
-template <typename Runtime> class TargetStructDescriptor;
-template <typename Runtime> struct TargetGenericMetadataPattern;
-
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
+
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalTypeContextDescriptor = TargetTypeContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 // FIXME: https://bugs.swift.org/browse/SR-1155
 #pragma clang diagnostic push
@@ -540,7 +588,7 @@ struct TargetMetadata {
 
 #if SWIFT_OBJC_INTEROP
 protected:
-  constexpr TargetMetadata(TargetAnyClassMetadata<Runtime> *isa)
+  constexpr TargetMetadata(TargetAnyClassMetadataObjCInterop<Runtime> *isa)
     : Kind(reinterpret_cast<StoredPointer>(isa)) {}
 #endif
 
@@ -559,7 +607,6 @@ public:
     Kind = static_cast<StoredPointer>(kind);
   }
 
-#if SWIFT_OBJC_INTEROP
 protected:
   const TargetAnyClassMetadata<Runtime> *getClassISA() const {
     return reinterpret_cast<const TargetAnyClassMetadata<Runtime> *>(Kind);
@@ -567,7 +614,6 @@ protected:
   void setClassISA(const TargetAnyClassMetadata<Runtime> *isa) {
     Kind = reinterpret_cast<StoredPointer>(isa);
   }
-#endif
 
 public:
   /// Is this a class object--the metadata record for a Swift class (which also
@@ -684,12 +730,23 @@ public:
   getTypeContextDescriptor() const {
     switch (getKind()) {
     case MetadataKind::Class: {
-      const auto cls = static_cast<const TargetClassMetadata<Runtime> *>(this);
-      if (!cls->isTypeMetadata())
-        return nullptr;
-      if (cls->isArtificialSubclass())
-        return nullptr;
-      return cls->getDescription();
+      if (Runtime::ObjCInterop) {
+        const auto cls = static_cast<const TargetClassMetadata<
+            Runtime, TargetAnyClassMetadataObjCInterop<Runtime>> *>(this);
+        if (!cls->isTypeMetadata())
+          return nullptr;
+        if (cls->isArtificialSubclass())
+          return nullptr;
+        return cls->getDescription();
+      } else {
+        const auto cls = static_cast<const TargetClassMetadata<
+            Runtime, TargetAnyClassMetadata<Runtime>> *>(this);
+        if (!cls->isTypeMetadata())
+          return nullptr;
+        if (cls->isArtificialSubclass())
+          return nullptr;
+        return cls->getDescription();
+      }
     }
     case MetadataKind::Struct:
     case MetadataKind::Enum:
@@ -706,7 +763,8 @@ public:
 
   /// Get the class object for this type if it has one, or return null if the
   /// type is not a class (or not a class with a class object).
-  const TargetClassMetadata<Runtime> *getClassObject() const;
+  const typename Runtime::template TargetClassMetadata<Runtime> *
+  getClassObject() const;
 
   /// Retrieve the generic arguments of this type, if it has any.
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *
@@ -740,8 +798,9 @@ public:
   typename std::enable_if<std::is_same<R, InProcess>::value, Class>::type
   getObjCClassObject() const {
     return reinterpret_cast<Class>(
-      const_cast<TargetClassMetadata<InProcess>*>(
-        getClassObject()));
+        const_cast<TargetClassMetadata<
+            InProcess, TargetAnyClassMetadataObjCInterop<InProcess>> *>(
+            getClassObject()));
   }
 #endif
 
@@ -777,7 +836,9 @@ template <typename Runtime>
 struct TargetHeapMetadataHeaderPrefix {
   /// Destroy the object, returning the allocated size of the object
   /// or 0 if the object shouldn't be deallocated.
-  TargetSignedPointer<Runtime, HeapObjectDestroyer *__ptrauth_swift_heap_object_destructor> destroy;
+  TargetSignedPointer<Runtime, HeapObjectDestroyer *
+                                   __ptrauth_swift_heap_object_destructor>
+      destroy;
 };
 using HeapMetadataHeaderPrefix =
   TargetHeapMetadataHeaderPrefix<InProcess>;
@@ -809,10 +870,8 @@ struct TargetHeapMetadata : TargetMetadata<Runtime> {
   TargetHeapMetadata() = default;
   constexpr TargetHeapMetadata(MetadataKind kind)
     : TargetMetadata<Runtime>(kind) {}
-#if SWIFT_OBJC_INTEROP
-  constexpr TargetHeapMetadata(TargetAnyClassMetadata<Runtime> *isa)
+  constexpr TargetHeapMetadata(TargetAnyClassMetadataObjCInterop<Runtime> *isa)
     : TargetMetadata<Runtime>(isa) {}
-#endif
 };
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
@@ -949,6 +1008,8 @@ struct TargetClassMetadataBounds : TargetMetadataBounds<Runtime> {
 
   using TargetMetadataBounds<Runtime>::NegativeSizeInWords;
   using TargetMetadataBounds<Runtime>::PositiveSizeInWords;
+  using TargetClassMetadata =
+      typename Runtime::template TargetClassMetadata<Runtime>;
 
   /// The offset from the address point of the metadata to the immediate
   /// members.
@@ -961,10 +1022,13 @@ struct TargetClassMetadataBounds : TargetMetadataBounds<Runtime> {
     : TargetMetadataBounds<Runtime>{negativeSizeInWords, positiveSizeInWords},
       ImmediateMembersOffset(immediateMembersOffset) {}
 
+  template <typename T>
+    using TargetClassMetadataT = typename Runtime::template TargetClassMetadata<T>;
+
   /// Return the basic bounds of all Swift class metadata.
   /// The immediate members offset will not be meaningful.
   static constexpr TargetClassMetadataBounds<Runtime> forSwiftRootClass() {
-    using Metadata = FullMetadata<TargetClassMetadata<Runtime>>;
+    using Metadata = FullMetadata<TargetClassMetadataT<Runtime>>;
     return forAddressPointAndSize(sizeof(typename Metadata::HeaderType),
                                   sizeof(Metadata));
   }
@@ -1007,39 +1071,65 @@ template <typename Runtime>
 struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
+  using TargetClassMetadata =
+      typename Runtime::template TargetClassMetadata<Runtime>;
 
-#if SWIFT_OBJC_INTEROP
-  constexpr TargetAnyClassMetadata(TargetAnyClassMetadata<Runtime> *isa,
-                                   TargetClassMetadata<Runtime> *superclass)
-    : TargetHeapMetadata<Runtime>(isa),
-      Superclass(superclass),
-      CacheData{nullptr, nullptr},
-      Data(SWIFT_CLASS_IS_SWIFT_MASK) {}
-#endif
-
-  constexpr TargetAnyClassMetadata(TargetClassMetadata<Runtime> *superclass)
-    : TargetHeapMetadata<Runtime>(MetadataKind::Class),
-      Superclass(superclass)
-#if SWIFT_OBJC_INTEROP
-      , CacheData{nullptr, nullptr},
-      Data(SWIFT_CLASS_IS_SWIFT_MASK)
-#endif
-      {}
-
-#if SWIFT_OBJC_INTEROP
-  // Allow setting the metadata kind to a class ISA on class metadata.
-  using TargetMetadata<Runtime>::getClassISA;
-  using TargetMetadata<Runtime>::setClassISA;
-#endif
+protected:
+  constexpr TargetAnyClassMetadata(
+      TargetAnyClassMetadataObjCInterop<Runtime> *isa,
+      TargetClassMetadata *superclass)
+      : TargetHeapMetadata<Runtime>(isa), Superclass(superclass) {}
+public:
+  constexpr TargetAnyClassMetadata(TargetClassMetadata *superclass)
+      : TargetHeapMetadata<Runtime>(MetadataKind::Class),
+        Superclass(superclass) {}
 
   // Note that ObjC classes do not have a metadata header.
 
   /// The metadata for the superclass.  This is null for the root class.
-  TargetSignedPointer<Runtime, const TargetClassMetadata<Runtime> *
+  TargetSignedPointer<Runtime, const TargetClassMetadata *
                                    __ptrauth_swift_objc_superclass>
       Superclass;
 
-#if SWIFT_OBJC_INTEROP
+  /// Is this object a valid swift type metadata?  That is, can it be
+  /// safely downcast to ClassMetadata?
+  bool isTypeMetadata() const {
+    return true;
+  }
+  /// A different perspective on the same bit.
+  bool isPureObjC() const {
+    return !isTypeMetadata();
+  }
+};
+
+/// This is the class metadata object for all classes (Swift and ObjC) in a
+/// runtime that has Objective-C interoperability.
+template <typename Runtime>
+struct TargetAnyClassMetadataObjCInterop
+    : public TargetAnyClassMetadata<Runtime> {
+  using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSize = typename Runtime::StoredSize;
+
+  using TargetClassMetadataObjCInterop =
+      swift::TargetClassMetadata<Runtime, TargetAnyClassMetadataObjCInterop<Runtime>>;
+
+  constexpr TargetAnyClassMetadataObjCInterop(
+      TargetAnyClassMetadataObjCInterop<Runtime> *isa,
+      TargetClassMetadataObjCInterop *superclass)
+      : TargetAnyClassMetadata<Runtime>(isa, superclass),
+        CacheData{nullptr, nullptr},
+        Data(SWIFT_CLASS_IS_SWIFT_MASK) {}
+
+  constexpr TargetAnyClassMetadataObjCInterop(
+      TargetClassMetadataObjCInterop *superclass)
+      : TargetAnyClassMetadata<Runtime>(superclass), CacheData{nullptr,
+                                                               nullptr},
+        Data(SWIFT_CLASS_IS_SWIFT_MASK) {}
+
+  // Allow setting the metadata kind to a class ISA on class metadata.
+  using TargetMetadata<Runtime>::getClassISA;
+  using TargetMetadata<Runtime>::setClassISA;
+
   /// The cache data is used for certain dynamic lookups; it is owned
   /// by the runtime and generally needs to interoperate with
   /// Objective-C's use.
@@ -1052,26 +1142,25 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
   StoredSize Data;
   
   static constexpr StoredPointer offsetToData() {
-    return offsetof(TargetAnyClassMetadata, Data);
+    return offsetof(TargetAnyClassMetadataObjCInterop, Data);
   }
-#endif
 
   /// Is this object a valid swift type metadata?  That is, can it be
   /// safely downcast to ClassMetadata?
   bool isTypeMetadata() const {
-#if SWIFT_OBJC_INTEROP
     return (Data & SWIFT_CLASS_IS_SWIFT_MASK);
-#else
-    return true;
-#endif
   }
   /// A different perspective on the same bit
   bool isPureObjC() const {
     return !isTypeMetadata();
   }
 };
-using AnyClassMetadata =
-  TargetAnyClassMetadata<InProcess>;
+
+#if SWIFT_OBJC_INTEROP
+using AnyClassMetadata = TargetAnyClassMetadataObjCInterop<InProcess>;
+#else
+using AnyClassMetadata = TargetAnyClassMetadata<InProcess>;
+#endif
 
 using ClassIVarDestroyer =
   SWIFT_CC(swift) void(SWIFT_CONTEXT HeapObject *);
@@ -1082,23 +1171,28 @@ using ClassIVarDestroyer =
 ///
 /// Note that the layout of this type is compatible with the layout of
 /// an Objective-C class.
-template <typename Runtime>
-struct TargetClassMetadata : public TargetAnyClassMetadata<Runtime> {
+///
+/// If the Runtime supports Objective-C interoperability, this class inherits
+/// from TargetAnyClassMetadataObjCInterop, otherwise it inherits from
+/// TargetAnyClassMetadata.
+template <typename Runtime, typename TargetAnyClassMetadataVariant>
+struct TargetClassMetadata : public TargetAnyClassMetadataVariant {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
 
   TargetClassMetadata() = default;
-  constexpr TargetClassMetadata(const TargetAnyClassMetadata<Runtime> &base,
-             ClassFlags flags,
-             ClassIVarDestroyer *ivarDestroyer,
-             StoredPointer size, StoredPointer addressPoint,
-             StoredPointer alignMask,
-             StoredPointer classSize, StoredPointer classAddressPoint)
-    : TargetAnyClassMetadata<Runtime>(base),
-      Flags(flags), InstanceAddressPoint(addressPoint),
-      InstanceSize(size), InstanceAlignMask(alignMask),
-      Reserved(0), ClassSize(classSize), ClassAddressPoint(classAddressPoint),
-      Description(nullptr), IVarDestroyer(ivarDestroyer) {}
+  constexpr TargetClassMetadata(const TargetAnyClassMetadataVariant &base,
+                                ClassFlags flags,
+                                ClassIVarDestroyer *ivarDestroyer,
+                                StoredPointer size, StoredPointer addressPoint,
+                                StoredPointer alignMask,
+                                StoredPointer classSize,
+                                StoredPointer classAddressPoint)
+      : TargetAnyClassMetadataVariant(base), Flags(flags),
+        InstanceAddressPoint(addressPoint), InstanceSize(size),
+        InstanceAlignMask(alignMask), Reserved(0), ClassSize(classSize),
+        ClassAddressPoint(classAddressPoint), Description(nullptr),
+        IVarDestroyer(ivarDestroyer) {}
 
   // The remaining fields are valid only when isTypeMetadata().
   // The Objective-C runtime knows the offsets to some of these fields.
@@ -1150,7 +1244,7 @@ public:
   //   - class variables (if we choose to support these)
   //   - "tabulated" virtual methods
 
-  using TargetAnyClassMetadata<Runtime>::isTypeMetadata;
+  using TargetAnyClassMetadataVariant::isTypeMetadata;
 
   ConstTargetMetadataPointer<Runtime, TargetClassDescriptor>
   getDescription() const {
@@ -1350,7 +1444,18 @@ public:
     return metadata->getKind() == MetadataKind::Class;
   }
 };
-using ClassMetadata = TargetClassMetadata<InProcess>;
+#if SWIFT_OBJC_INTEROP
+using ClassMetadata =
+    TargetClassMetadata<InProcess,
+                        TargetAnyClassMetadataObjCInterop<InProcess>>;
+#else
+using ClassMetadata =
+    TargetClassMetadata<InProcess, TargetAnyClassMetadata<InProcess>>;
+#endif
+
+template <typename Runtime>
+using TargetClassMetadataObjCInterop =
+    TargetClassMetadata<Runtime, TargetAnyClassMetadataObjCInterop<Runtime>>;
 
 /// The structure of class metadata that's compatible with dispatch objects.
 /// This includes Swift heap metadata, followed by the vtable entries that
@@ -1398,7 +1503,7 @@ using HeapLocalVariableMetadata
 /// Swift-compiled.
 template <typename Runtime>
 struct TargetObjCClassWrapperMetadata : public TargetMetadata<Runtime> {
-  ConstTargetMetadataPointer<Runtime, TargetClassMetadata> Class;
+  ConstTargetMetadataPointer<Runtime, TargetClassMetadataObjCInterop> Class;
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::ObjCClassWrapper;
@@ -1832,7 +1937,6 @@ TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements() -> StoredSize {
 
 template <typename Runtime> struct TargetProtocolDescriptor;
 
-#if SWIFT_OBJC_INTEROP
 /// Layout of a small prefix of an Objective-C protocol, used only to
 /// directly extract the name of the protocol.
 template <typename Runtime>
@@ -1843,7 +1947,6 @@ struct TargetObjCProtocolPrefix {
   /// The mangled name of the protocol.
   TargetPointer<Runtime, const char> Name;
 };
-#endif
 
 /// A reference to a protocol within the runtime, which may be either
 /// a Swift protocol or (when Objective-C interoperability is enabled) an
@@ -1877,13 +1980,14 @@ public:
   TargetProtocolDescriptorRef(
                         ProtocolDescriptorPointer protocol,
                         ProtocolDispatchStrategy dispatchStrategy) {
-#if SWIFT_OBJC_INTEROP
-    storage = reinterpret_cast<StoredPointer>(protocol)
-      | (dispatchStrategy == ProtocolDispatchStrategy::ObjC ? IsObjCBit : 0);
-#else
-    assert(dispatchStrategy == ProtocolDispatchStrategy::Swift);
-    storage = reinterpret_cast<StoredPointer>(protocol);
-#endif
+    if (Runtime::ObjCInterop) {
+      storage =
+          reinterpret_cast<StoredPointer>(protocol) |
+          (dispatchStrategy == ProtocolDispatchStrategy::ObjC ? IsObjCBit : 0);
+    } else {
+      assert(dispatchStrategy == ProtocolDispatchStrategy::Swift);
+      storage = reinterpret_cast<StoredPointer>(protocol);
+    }
   }
 
   const static TargetProtocolDescriptorRef forSwift(
@@ -1917,22 +2021,18 @@ public:
 
   /// Determine what kind of protocol this is, Swift or Objective-C.
   ProtocolDispatchStrategy getDispatchStrategy() const {
-#if SWIFT_OBJC_INTEROP
     if (isObjC()) {
       return ProtocolDispatchStrategy::ObjC;
     }
-#endif
 
     return ProtocolDispatchStrategy::Swift;
   }
 
   /// Determine whether this protocol has a 'class' constraint.
   ProtocolClassConstraint getClassConstraint() const {
-#if SWIFT_OBJC_INTEROP
     if (isObjC()) {
       return ProtocolClassConstraint::Class;
     }
-#endif
 
     return getSwiftProtocol()->getProtocolContextDescriptorFlags()
         .getClassConstraint();
@@ -1940,21 +2040,17 @@ public:
 
   /// Determine whether this protocol needs a witness table.
   bool needsWitnessTable() const {
-#if SWIFT_OBJC_INTEROP
     if (isObjC()) {
       return false;
     }
-#endif
 
     return true;
   }
 
   SpecialProtocol getSpecialProtocol() const {
-#if SWIFT_OBJC_INTEROP
     if (isObjC()) {
       return SpecialProtocol::None;
     }
-#endif
 
     return getSwiftProtocol()->getProtocolContextDescriptorFlags()
         .getSpecialProtocol();
@@ -1962,9 +2058,7 @@ public:
 
   /// Retrieve the Swift protocol descriptor.
   ProtocolDescriptorPointer getSwiftProtocol() const {
-#if SWIFT_OBJC_INTEROP
     assert(!isObjC());
-#endif
 
     // NOTE: we explicitly use a C-style cast here because cl objects to the
     // reinterpret_cast from a uintptr_t type to an unsigned type which the
@@ -1978,12 +2072,15 @@ public:
     return storage;
   }
 
-#if SWIFT_OBJC_INTEROP
   /// Whether this references an Objective-C protocol.
   bool isObjC() const {
-    return (storage & IsObjCBit) != 0;
+    if (Runtime::ObjCInterop)
+      return (storage & IsObjCBit) != 0;
+    else
+      return false;
   }
 
+#if SWIFT_OBJC_INTEROP
   /// Retrieve the Objective-C protocol.
   TargetPointer<Runtime, Protocol> getObjCProtocol() const {
     assert(isObjC());
@@ -2012,7 +2109,10 @@ using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
 
 template<typename Runtime> struct TargetProtocolDescriptor;
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
-  
+
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalProtocolDescriptor = TargetProtocolDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
+
 /// A witness table for a protocol.
 ///
 /// With the exception of the initial protocol conformance descriptor,
@@ -2362,7 +2462,8 @@ struct TargetGenericWitnessTable {
   using PrivateDataType = void *[swift::NumGenericMetadataPrivateDataWords];
 
   /// Private data for the instantiator.  Out-of-line so that the rest
-  /// of this structure can be constant.
+  /// of this structure can be constant. Might be null when building with
+  /// -disable-preallocated-instantiation-caches.
   RelativeDirectPointer<PrivateDataType> PrivateData;
 
   uint16_t getWitnessTablePrivateSizeInWords() const {
@@ -2460,11 +2561,13 @@ class RelativeTargetProtocolDescriptorPointer {
 #endif
   };
 
-#if SWIFT_OBJC_INTEROP
   bool isObjC() const {
-    return objcPointer.getInt();
-  }
+#if SWIFT_OBJC_INTEROP
+    if (Runtime::ObjCInterop)
+      return objcPointer.getInt();
 #endif
+    return false;
+  }
 
 public:
   /// Retrieve a reference to the protocol.
@@ -2472,13 +2575,14 @@ public:
 #if SWIFT_OBJC_INTEROP
     if (isObjC()) {
       return TargetProtocolDescriptorRef<Runtime>::forObjC(
-          const_cast<Protocol*>(objcPointer.getPointer()));
+          const_cast<Protocol *>(objcPointer.getPointer()));
     }
 #endif
 
     return TargetProtocolDescriptorRef<Runtime>::forSwift(
-        reinterpret_cast<ConstTargetMetadataPointer<
-            Runtime, TargetProtocolDescriptor>>(swiftPointer.getPointer()));
+        reinterpret_cast<
+            ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>>(
+            swiftPointer.getPointer()));
   }
 
   operator TargetProtocolDescriptorRef<Runtime>() const {
@@ -2489,6 +2593,9 @@ public:
 /// A reference to a type.
 template <typename Runtime>
 struct TargetTypeReference {
+  template <typename T>
+  using TargetClassMetadata = typename T::template TargetClassMetadata<T>;
+
   union {
     /// A direct reference to a TypeContextDescriptor or ProtocolDescriptor.
     RelativeDirectPointer<TargetContextDescriptor<Runtime>>
@@ -2502,7 +2609,7 @@ struct TargetTypeReference {
     /// An indirect reference to an Objective-C class.
     RelativeDirectPointer<
         ConstTargetMetadataPointer<Runtime, TargetClassMetadata>>
-      IndirectObjCClass;
+        IndirectObjCClass;
 
     /// A direct reference to an Objective-C class name.
     RelativeDirectPointer<const char>
@@ -2526,14 +2633,12 @@ struct TargetTypeReference {
     return nullptr;
   }
 
-#if SWIFT_OBJC_INTEROP
   /// If this type reference is one of the kinds that supports ObjC
   /// references,
-  const TargetClassMetadata<Runtime> *
+  const TargetClassMetadataObjCInterop<Runtime> *
   getObjCClass(TypeReferenceKind kind) const;
-#endif
 
-  const TargetClassMetadata<Runtime> * const *
+  const TargetClassMetadataObjCInterop<Runtime> * const *
   getIndirectObjCClass(TypeReferenceKind kind) const {
     assert(kind == TypeReferenceKind::IndirectObjCClass);
     return IndirectObjCClass.get();
@@ -2615,12 +2720,23 @@ public:
     return TypeRef.getDirectObjCClassName(getTypeKind());
   }
 
-  const TargetClassMetadata<Runtime> * const *getIndirectObjCClass() const {
+  const TargetClassMetadataObjCInterop<Runtime> *const *
+  getIndirectObjCClass() const {
     return TypeRef.getIndirectObjCClass(getTypeKind());
   }
-  
+
   const TargetContextDescriptor<Runtime> *getTypeDescriptor() const {
     return TypeRef.getTypeDescriptor(getTypeKind());
+  }
+
+  constexpr inline auto
+  getTypeRefDescriptorOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, TypeRef);
+  }
+
+  constexpr inline auto
+  getProtocolDescriptorOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Protocol);
   }
 
   TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor *
@@ -2741,6 +2857,12 @@ using TargetProtocolConformanceRecord =
 
 using ProtocolConformanceRecord = TargetProtocolConformanceRecord<InProcess>;
 
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalProtocolConformanceDescriptor = TargetProtocolConformanceDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
+
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalProtocolConformanceRecord = TargetProtocolConformanceRecord<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
+
 template<typename Runtime>
 struct TargetGenericContext;
 
@@ -2777,6 +2899,11 @@ struct TargetContextDescriptor {
               : 0;
   }
 
+  constexpr inline auto
+  getParentOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Parent);
+  }
+
 #ifndef NDEBUG
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use in the debugger");
@@ -2790,6 +2917,8 @@ private:
 };
 
 using ContextDescriptor = TargetContextDescriptor<InProcess>;
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalContextDescriptor = TargetContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 inline bool isCImportedModuleName(llvm::StringRef name) {
   // This does not include MANGLING_MODULE_CLANG_IMPORTER because that's
@@ -2809,12 +2938,20 @@ struct TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
     return isCImportedModuleName(Name.get());
   }
 
+  constexpr inline auto
+  getNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Name);
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Module;
   }
 };
 
 using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
+
+template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
+using ExternalModuleContextDescriptor = TargetModuleContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
 template<typename Runtime>
 inline bool TargetContextDescriptor<Runtime>::isCImportedContext() const {
@@ -2996,6 +3133,8 @@ public:
         Flags.getNumGenericRequirements());
   }
 };
+
+using GenericEnvironmentDescriptor = TargetGenericEnvironment<InProcess>;
 
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.
@@ -3314,6 +3453,11 @@ public:
             NumRequirements};
   }
 
+  constexpr inline auto
+  getNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Name);
+  }
+
   /// Retrieve the requirement base descriptor address.
   ConstTargetPointer<Runtime, TargetProtocolRequirement<Runtime>>
   getRequirementBaseDescriptor() const {
@@ -3393,7 +3537,8 @@ using OpaqueTypeDescriptor = TargetOpaqueTypeDescriptor<InProcess>;
 template <typename Runtime>
 struct TargetGenericMetadataInstantiationCache {
   /// Data that the runtime can use for its own purposes.  It is guaranteed
-  /// to be zero-filled by the compiler.
+  /// to be zero-filled by the compiler. Might be null when building with
+  /// -disable-preallocated-instantiation-caches.
   TargetPointer<Runtime, void>
   PrivateData[swift::NumGenericMetadataPrivateDataWords];
 };
@@ -3977,6 +4122,11 @@ public:
   /// Return the offset of the start of generic arguments in the nominal
   /// type's metadata. The returned value is measured in sizeof(StoredPointer).
   int32_t getGenericArgumentOffset() const;
+
+  constexpr inline auto
+  getNameOffset() const -> typename Runtime::StoredSize {
+    return offsetof(typename std::remove_reference<decltype(*this)>::type, Name);
+  }
 
   /// Return the start of the generic arguments array in the nominal
   /// type's metadata. The returned value is measured in sizeof(StoredPointer).
@@ -5045,6 +5195,10 @@ public:
   /// The name of the function, which is a unique string assigned to the
   /// function so it can be looked up later.
   RelativeDirectPointer<const char, /*nullable*/ false> Name;
+
+  /// The generic environment associated with this accessor function.
+  RelativeDirectPointer<GenericEnvironmentDescriptor, /*nullable*/ true>
+      GenericEnvironment;
 
   /// The Swift function type, encoded as a mangled name.
   RelativeDirectPointer<const char, /*nullable*/ false> FunctionType;

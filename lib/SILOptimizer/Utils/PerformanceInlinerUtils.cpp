@@ -879,6 +879,7 @@ static bool hasInterestingSideEffect(SILInstruction *I) {
     case swift::SILInstructionKind::RetainValueInst:
     case swift::SILInstructionKind::ReleaseValueInst:
     case swift::SILInstructionKind::StoreInst:
+    case swift::SILInstructionKind::DeallocStackRefInst:
     case swift::SILInstructionKind::DeallocRefInst:
       return false;
     default:

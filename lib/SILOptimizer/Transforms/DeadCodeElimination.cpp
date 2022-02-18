@@ -292,7 +292,7 @@ void DCE::markLive() {
           SmallVector<SILValue, 4> roots;
           findGuaranteedReferenceRoots(borrowInst->getOperand(), roots);
           for (auto root : roots) {
-            visitTransitiveEndBorrows(BorrowedValue(root),
+            visitTransitiveEndBorrows(root,
                                       [&](EndBorrowInst *endBorrow) {
                                         markInstructionLive(endBorrow);
                                       });
@@ -575,8 +575,8 @@ bool DCE::removeDead() {
         continue;
       }
 
-      if (!arg->isPhiArgument()) {
-        // We cannot delete a non phi arg. If it was @owned, insert a
+      if (!arg->isPhi()) {
+        // We cannot delete a non phi. If it was @owned, insert a
         // destroy_value, because its consuming user has already been marked
         // dead and will be deleted.
         // We do not have to end lifetime of a @guaranteed non phi arg.

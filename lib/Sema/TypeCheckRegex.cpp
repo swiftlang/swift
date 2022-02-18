@@ -26,6 +26,7 @@ using namespace swift;
 // 〚`name: T` (atom)〛 ==> .atom, `name`, '\0'
 // 〚`[T]`〛 ==> 〚`T`〛, .formArray
 // 〚`T?`〛 ==> 〚`T`〛, .formOptional
+// 〚`(T0, T1, ...)` (top level)〛 ==> 〚`T0`〛, 〚`T1`〛, ...
 // 〚`(T0, T1, ...)`〛 ==> .beginTuple, 〚`T0`〛, 〚`T1`〛, ..., .endTuple
 //
 // For details, see apple/swift-experimental-string-processing.
@@ -72,18 +73,21 @@ bool swift::decodeRegexCaptureTypes(ASTContext &ctx,
       if (length >= size - offset)
         return true; // Unterminated string.
       StringRef name(namePtr, length);
-      scopes.back().push_back(TupleTypeElt(atomType, ctx.getIdentifier(name)));
+      scopes.back().push_back(
+          TupleTypeElt(atomType, ctx.getIdentifier(name)));
       offset += length + /*NUL*/ 1;
       break;
     }
     case RegexCaptureStructureCode::FormArray: {
-      auto &type = scopes.back().back();
-      type = TupleTypeElt(ArraySliceType::get(type.getRawType()));
+      auto &element = scopes.back().back();
+      element = TupleTypeElt(ArraySliceType::get(element.getType()),
+                             element.getName());
       break;
     }
     case RegexCaptureStructureCode::FormOptional: {
-      auto &type = scopes.back().back();
-      type = TupleTypeElt(OptionalType::get(type.getRawType()));
+      auto &element = scopes.back().back();
+      element = TupleTypeElt(OptionalType::get(element.getType()),
+                             element.getName());
       break;
     }
     case RegexCaptureStructureCode::BeginTuple:
@@ -91,7 +95,8 @@ bool swift::decodeRegexCaptureTypes(ASTContext &ctx,
       break;
     case RegexCaptureStructureCode::EndTuple: {
       auto children = scopes.pop_back_val();
-      scopes.back().push_back(TupleType::get(children, ctx));
+      auto type = TupleType::get(children, ctx);
+      scopes.back().push_back(type);
       break;
     }
     case RegexCaptureStructureCode::CaseCount:

@@ -4,11 +4,15 @@
 
 import Swift
 
-public class Klass {}
-
 //////////////////
 // Declarations //
 //////////////////
+
+public class Klass {}
+
+public protocol P {}
+public protocol SubP1 : P {}
+public protocol SubP2 : P {}
 
 func consumingUse<T>(_ k: __owned T) {}
 var booleanValue: Bool { false }
@@ -283,4 +287,118 @@ public func multipleVarsWithSubsequentBorrows<T : Equatable>(_ p: T) -> Bool {
     let k2 = k
     let k3 = _move(k)
     return k2 == k3
+}
+
+////////////////
+// Cast Tests //
+////////////////
+
+public func castTest0<T : SubP1>(_ x: __owned T) -> P { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    return x as P // expected-note {{use here}}
+}
+
+public func castTest1<T : P>(_ x: __owned T) -> SubP2 { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    return x as! SubP2 // expected-note {{use here}}
+}
+
+public func castTest2<T : P>(_ x: __owned T) -> SubP1? { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    return x as? SubP1 // expected-note {{use here}}
+}
+
+public func castTestSwitch1<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    switch x { // expected-note {{use here}}
+    case let k as SubP1:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitch2<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    switch x { // expected-note {{use here}}
+    case let k as SubP1:
+        print(k)
+    case let k as SubP2:
+        print(k)
+    default:
+        print("Nope")
+    }
+}
+
+public func castTestSwitchInLoop<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+
+    for _ in 0..<1024 {
+        switch x { // expected-note {{use here}}
+        case let k as SubP1:
+            print(k)
+        default:
+            print("Nope")
+        }
+    }
+}
+
+public func castTestIfLet<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    if case let k as SubP1 = x { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+public func castTestIfLetInLoop<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    for _ in 0..<1024 {
+        if case let k as SubP1 = x { // expected-note {{use here}}
+            print(k)
+        } else {
+            print("no")
+        }
+    }
+}
+
+public enum EnumWithKlass {
+    case none
+    case klass(P)
+}
+
+public func castTestIfLet2(_ x : __owned EnumWithKlass) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    if case let .klass(k as SubP1) = x { // expected-note {{use here}}
+        print(k)
+    } else {
+        print("no")
+    }
+}
+
+/////////////////////////
+// Partial Apply Tests //
+/////////////////////////
+
+// Emit a better error here. At least we properly error.
+public func partialApplyTest<T>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    let f = { // expected-note {{use here}}
+        nonConsumingUse(x)
+    }
+    f()
+}
+
+/////////////////
+// Defer Tests //
+/////////////////
+
+// TODO: Emit an error in the defer.
+public func deferTest<T>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
+    let _ = _move(x) // expected-note {{move here}}
+    defer { // expected-note {{use here}}
+        nonConsumingUse(x)
+    }
+    print("do Something")
 }

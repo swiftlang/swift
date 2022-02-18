@@ -94,6 +94,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-profdata
       llvm-readelf
       llvm-readobj
+      llvm-size
       llvm-strings
       not
       split-file)
@@ -199,10 +200,12 @@ normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
 normalize_boolean_spelling(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
 normalize_boolean_spelling(SWIFT_OPTIMIZED)
 normalize_boolean_spelling(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+normalize_boolean_spelling(SWIFT_ENABLE_REFLECTION)
 normalize_boolean_spelling(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
 normalize_boolean_spelling(SWIFT_HAVE_LIBXML2)
 normalize_boolean_spelling(SWIFT_INCLUDE_TOOLS)
 normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
+normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
 normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)

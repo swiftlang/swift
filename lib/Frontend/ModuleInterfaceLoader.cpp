@@ -1341,6 +1341,15 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.getLangOptions().DisableAvailabilityChecking = true;
     GenericArgs.push_back("-disable-availability-checking");
   }
+
+  // Pass-down the obfuscators so we can get the serialized search paths properly.
+  genericSubInvocation.setSerializedPathObfuscator(
+    SearchPathOpts.DeserializedPathRecoverer);
+  SearchPathOpts.DeserializedPathRecoverer
+    .forEachPair([&](StringRef lhs, StringRef rhs) {
+      GenericArgs.push_back(ArgSaver.save(llvm::Twine("-serialized-path-obfuscate ")
+        + lhs + "=" + rhs).str());
+  });
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
@@ -1828,8 +1837,11 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
   return std::make_error_code(std::errc::not_supported);
 }
 
-bool ExplicitSwiftModuleLoader::canImportModule(
-    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
+bool ExplicitSwiftModuleLoader::canImportModule(ImportPath::Module path,
+                                                llvm::VersionTuple version,
+                                                bool underlyingVersion) {
+  // FIXME: Swift submodules?
+  ImportPath::Element mID = path.front();
   // Look up the module with the real name (physical name on disk);
   // in case `-module-alias` is used, the name appearing in source files
   // and the real module name are different. For example, '-module-alias Foo=Bar'

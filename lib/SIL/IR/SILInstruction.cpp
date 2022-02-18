@@ -371,6 +371,10 @@ namespace {
       return true;
     }
 
+    bool visitDeallocStackRefInst(const DeallocStackRefInst *RHS) {
+      return true;
+    }
+
     bool visitAllocStackInst(const AllocStackInst *RHS) {
       return true;
     }
@@ -1020,12 +1024,12 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
       auto IAttrs = IInfo.getOrCreateAttributes(getModule().getASTContext());
       // Read-only.
-      if (IAttrs.hasFnAttribute(llvm::Attribute::ReadOnly) &&
-          IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind))
+      if (IAttrs.hasFnAttr(llvm::Attribute::ReadOnly) &&
+          IAttrs.hasFnAttr(llvm::Attribute::NoUnwind))
         return MemoryBehavior::MayRead;
       // Read-none?
-      return IAttrs.hasFnAttribute(llvm::Attribute::ReadNone) &&
-                     IAttrs.hasFnAttribute(llvm::Attribute::NoUnwind)
+      return IAttrs.hasFnAttr(llvm::Attribute::ReadNone) &&
+                     IAttrs.hasFnAttr(llvm::Attribute::NoUnwind)
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }
@@ -1267,7 +1271,7 @@ bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this))
     return true;
 
-  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
+  if (auto *ARI = dyn_cast<AllocRefInstBase>(this)) {
     if (ARI->canAllocOnStack())
       return true;
   }
@@ -1285,13 +1289,8 @@ bool SILInstruction::isAllocatingStack() const {
 }
 
 bool SILInstruction::isDeallocatingStack() const {
-  if (isa<DeallocStackInst>(this))
+  if (isa<DeallocStackInst>(this) || isa<DeallocStackRefInst>(this))
     return true;
-
-  if (auto *DRI = dyn_cast<DeallocRefInst>(this)) {
-    if (DRI->canAllocOnStack())
-      return true;
-  }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     if (BI->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
@@ -1319,10 +1318,6 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isAllocatingStack())
     return false;
 
-  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
-    if (ARI->canAllocOnStack())
-      return false;
-  }
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
@@ -1383,7 +1378,7 @@ bool SILInstruction::mayTrap() const {
 bool SILInstruction::maySynchronize() const {
   // TODO: We need side-effect analysis and library annotation for this to be
   //       a reasonable API.  For now, this is just a placeholder.
-  return isa<FullApplySite>(this);
+  return isa<FullApplySite>(this) || isa<EndApplyInst>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {
@@ -1572,7 +1567,8 @@ const ValueBase *SILInstructionResultArray::back() const {
 //                           SingleValueInstruction
 //===----------------------------------------------------------------------===//
 
-CanArchetypeType SingleValueInstruction::getOpenedArchetype() const {
+CanOpenedArchetypeType
+SingleValueInstruction::getDefinedOpenedArchetype() const {
   switch (getKind()) {
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::OpenExistentialRefInst:
@@ -1580,13 +1576,12 @@ CanArchetypeType SingleValueInstruction::getOpenedArchetype() const {
   case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialValueInst: {
-    auto Ty = getOpenedArchetypeOf(getType().getASTType());
-    assert(Ty && Ty->isOpenedExistential() &&
-           "Type should be an opened archetype");
+    const auto Ty = getOpenedArchetypeOf(getType().getASTType());
+    assert(Ty && Ty->isRoot() && "Type should be a root opened archetype");
     return Ty;
   }
   default:
-    return CanArchetypeType();
+    return CanOpenedArchetypeType();
   }
 }
 

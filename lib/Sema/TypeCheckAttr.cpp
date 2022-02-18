@@ -117,7 +117,8 @@ public:
   IGNORED_ATTR(ImplicitSelfCapture)
   IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Isolated)
-  IGNORED_ATTR(PredatesConcurrency)
+  IGNORED_ATTR(Preconcurrency)
+  IGNORED_ATTR(BackDeploy)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -239,6 +240,7 @@ public:
   void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
   void visitInlinableAttr(InlinableAttr *attr);
   void visitOptimizeAttr(OptimizeAttr *attr);
+  void visitExclusivityAttr(ExclusivityAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
@@ -272,6 +274,12 @@ public:
   void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
 
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
+
+  void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
+
+  void visitPrimaryAssociatedTypeAttr(PrimaryAssociatedTypeAttr *attr);
+
+  void checkBackDeployAttrs(Decl *D, ArrayRef<BackDeployAttr *> Attrs);
 };
 
 } // end anonymous namespace
@@ -873,6 +881,19 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
                  D->getDescriptiveKind(),
                  extAttr->getAccess())
           .fixItRemove(attr->getRange());
+      }
+    } else {
+      if (auto VD = dyn_cast<ValueDecl>(D)) {
+        if (!isa<NominalTypeDecl>(VD)) {
+          // Emit warning when trying to declare non-@objc `open` member inside
+          // an extension.
+          if (!VD->isObjC() && attr->getAccess() == AccessLevel::Open) {
+            diagnose(attr->getLocation(),
+                     diag::access_control_non_objc_open_member,
+                     VD->getDescriptiveKind())
+                .fixItReplace(attr->getRange(), "public");
+          }
+        }
       }
     }
   }
@@ -2398,7 +2419,8 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
     if (Ctx.isSwiftVersionAtLeast(4,2))
-      diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline);
+      diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline,
+                            VD->getDescriptiveKind(), VD->getName());
     return;
   }
 }
@@ -2456,6 +2478,27 @@ void AttributeChecker::visitOptimizeAttr(OptimizeAttr *attr) {
       return;
     }
   }
+}
+
+void AttributeChecker::visitExclusivityAttr(ExclusivityAttr *attr) {
+  if (auto *varDecl = dyn_cast<VarDecl>(D)) {
+    if (!varDecl->hasStorage()) {
+      diagnose(attr->getLocation(), diag::exclusivity_on_computed_property);
+      attr->setInvalid();
+      return;
+    }
+  
+    if (isa<ClassDecl>(varDecl->getDeclContext()))
+      return;
+    
+    if (varDecl->getDeclContext()->isTypeContext() && !varDecl->isInstanceMember())
+      return;
+    
+    if (varDecl->getDeclContext()->isModuleScopeContext())
+      return;
+  }
+  diagnose(attr->getLocation(), diag::exclusivity_on_wrong_decl);
+  attr->setInvalid();
 }
 
 void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
@@ -2987,8 +3030,10 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
   Type T = attr->getProtocolType();
   if (!T && attr->getProtocolTypeRepr()) {
+    auto context = TypeResolverContext::GenericRequirement;
     T = TypeResolution::resolveContextualType(attr->getProtocolTypeRepr(), DC,
-                                              None, /*unboundTyOpener*/ nullptr,
+                                              TypeResolutionOptions(context),
+                                              /*unboundTyOpener*/ nullptr,
                                               /*placeholderHandler*/ nullptr);
   }
 
@@ -3374,6 +3419,22 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
   // Attrs are in the reverse order of the source order. We need to visit them
   // in source order to diagnose the later attribute.
   for (auto *Attr: Attrs) {
+    static StringRef AttrName = "_originallyDefinedIn";
+
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      // This attribute does not make sense on private declarations since
+      // clients can't use them.
+      auto access =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true);
+      if (!access.isPublic()) {
+        diagnoseAndRemoveAttr(Attr,
+                              diag::originally_defined_in_on_non_public,
+                              AttrName, VD->getFormalAccess());
+        continue;
+      }
+    }
+    
     if (!Attr->isActivePlatform(Ctx))
       continue;
     auto AtLoc = Attr->AtLoc;
@@ -3386,7 +3447,6 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
                platformString(Platform));
       return;
     }
-    static StringRef AttrName = "_originallyDefinedIn";
     if (!D->getDeclContext()->isModuleScopeContext()) {
       diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
       return;
@@ -3404,6 +3464,11 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
       return;
     }
   }
+}
+
+void AttributeChecker::checkBackDeployAttrs(Decl *D,
+    ArrayRef<BackDeployAttr *> Attrs) {
+  // FIXME(backDeploy): Diagnose incompatible uses of `@_backDeploy
 }
 
 Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
@@ -3508,7 +3573,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    if (!VD->hasStorage())
+    if (!VD->hasStorageOrWrapsStorage())
       return None;
 
     // Do not permit potential availability of script-mode global variables;
@@ -5485,9 +5550,14 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
 
   // distributed can be applied to actor definitions and their methods
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
-    // distributed can not be applied to stored properties
-    diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
-    return;
+    if (varDecl->isDistributed()) {
+      if (checkDistributedActorProperty(varDecl, /*diagnose=*/true))
+        return;
+    } else {
+      // distributed can not be applied to stored properties
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
+      return;
+    }
   }
 
   // distributed can only be declared on an `actor`
@@ -5551,28 +5621,40 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
     if (var->hasStorage()) {
-      auto nominal = dyn_cast<NominalTypeDecl>(dc);
-
-      // 'nonisolated' can not be applied to stored properties inside
-      // distributed actors. Attempts of nonisolated access would be
-      // cross-actor, and that means they might be accessing on a remote actor,
-      // in which case the stored property storage does not exist.
-      //
-      // The synthesized "id" and "actorSystem" are the only exceptions,
-      // because the implementation mirrors them.
-      if (nominal && nominal->isDistributedActor() &&
-          !(var->isImplicit() &&
-            (var->getName() == Ctx.Id_id ||
-             var->getName() == Ctx.Id_actorSystem))) {
-        diagnoseAndRemoveAttr(attr,
-                              diag::nonisolated_distributed_actor_storage);
-        return;
-      }
 
       // 'nonisolated' can not be applied to mutable stored properties.
       if (var->supportsMutation()) {
         diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
         return;
+      }
+
+      if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+        // 'nonisolated' can not be applied to stored properties inside
+        // distributed actors. Attempts of nonisolated access would be
+        // cross-actor, which means they might be accessing on a remote actor,
+        // in which case the stored property storage does not exist.
+        //
+        // The synthesized "id" and "actorSystem" are the only exceptions,
+        // because the implementation mirrors them.
+        if (nominal->isDistributedActor() &&
+            !(var->isImplicit() &&
+              (var->getName() == Ctx.Id_id ||
+               var->getName() == Ctx.Id_actorSystem))) {
+          diagnoseAndRemoveAttr(attr,
+                                diag::nonisolated_distributed_actor_storage);
+          return;
+        }
+
+        // 'nonisolated' is redundant for the stored properties of a struct.
+        if (isa<StructDecl>(nominal) &&
+            !var->isStatic() &&
+            var->isOrdinaryStoredProperty() &&
+            !isWrappedValueOfPropWrapper(var)) {
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_storage_value_type,
+                                nominal->getDescriptiveKind())
+            .warnUntilSwiftVersion(6);
+          return;
+        }
       }
     }
 
@@ -5589,17 +5671,13 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     }
   }
   
-  // `nonisolated` on most actor initializers is invalid or redundant.
+  // `nonisolated` on non-async actor initializers is invalid
+  // the reasoning is that there is a "little bit" of isolation,
+  // as afforded by flow-isolation.
   if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
       if (nominal->isAnyActor()) {
-        if (ctor->isConvenienceInit()) {
-          // all convenience inits are `nonisolated` by default
-          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_convenience_init)
-            .warnUntilSwiftVersion(6);
-          return;
-          
-        } else if (!ctor->hasAsync()) {
+        if (!ctor->hasAsync()) {
           // the isolation for a synchronous init cannot be `nonisolated`.
           diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
             .warnUntilSwiftVersion(6);
@@ -5738,6 +5816,18 @@ void AttributeChecker::visitUnavailableFromAsyncAttr(
       }
     }
   }
+}
+
+void AttributeChecker::visitUnsafeInheritExecutorAttr(
+    UnsafeInheritExecutorAttr *attr) {
+  auto fn = cast<FuncDecl>(D);
+  if (!fn->isAsyncContext()) {
+    diagnose(attr->getLocation(), diag::inherits_executor_without_async);
+  }
+}
+
+void AttributeChecker::visitPrimaryAssociatedTypeAttr(
+    PrimaryAssociatedTypeAttr *attr) {
 }
 
 namespace {

@@ -6,7 +6,7 @@
 // Test that lifetime extension preserves a dbg.declare for "n" in the resume
 // funclet.
 
-// CHECK-LABEL: define {{.*}} void @"$s1a4fiboyS2iYaFTQ0_"
+// CHECK-LABEL: define {{.*}} void @"$s1a4fiboyS2iYaFTY0_"
 // CHECK-NEXT: entryresume.0:
 // CHECK-NEXT: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[R:[0-9]+]], {{.*}}!DIExpression(DW_OP
 // CHECK-NEXT: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[N:[0-9]+]], {{.*}}!DIExpression(DW_OP

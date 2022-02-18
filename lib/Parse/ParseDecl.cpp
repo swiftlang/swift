@@ -1738,6 +1738,64 @@ void Parser::parseAllAvailabilityMacroArguments() {
   AvailabilityMacrosComputed = true;
 }
 
+ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
+    llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions) {
+  // FIXME(backDeploy): Parse availability macros (e.g. SwiftStdlib: 5.1)
+  SyntaxParsingContext argumentContext(SyntaxContext,
+      SyntaxKind::AvailabilityVersionRestriction);
+
+  // Expect a possible platform name (e.g. 'macOS' or '*').
+  if (!Tok.isAny(tok::identifier, tok::oper_binary_spaced)) {
+    diagnose(Tok, diag::attr_availability_expected_platform, AttrName);
+    return makeParserError();
+  }
+
+  // Parse the platform name.
+  auto MaybePlatform = platformFromString(Tok.getText());
+  SourceLoc PlatformLoc = Tok.getLoc();
+  if (!MaybePlatform.hasValue()) {
+    diagnose(PlatformLoc, diag::attr_availability_unknown_platform,
+             Tok.getText(), AttrName);
+    return makeParserError();
+  }
+  consumeToken();
+  PlatformKind Platform = *MaybePlatform;
+
+  // Wildcards ('*') aren't supported in this kind of list. If this list
+  // entry is just a wildcard, skip it. Wildcards with a version are
+  // diagnosed below.
+  if (Platform == PlatformKind::none && Tok.isAny(tok::comma, tok::r_paren)) {
+    diagnose(PlatformLoc, diag::attr_availability_wildcard_ignored,
+             AttrName);
+    return makeParserSuccess();
+  }
+
+  // Parse version number.
+  llvm::VersionTuple VerTuple;
+  SourceRange VersionRange;
+  if (parseVersionTuple(VerTuple, VersionRange,
+      Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+    return makeParserError();
+  }
+
+  // Diagnose specification of patch versions (e.g. '13.0.1').
+  if (VerTuple.getSubminor().hasValue() ||
+      VerTuple.getBuild().hasValue()) {
+    diagnose(VersionRange.Start,
+             diag::attr_availability_platform_version_major_minor_only,
+             AttrName);
+  }
+
+  // Wildcards ('*') aren't supported in this kind of list.
+  if (Platform == PlatformKind::none) {
+    diagnose(PlatformLoc, diag::attr_availability_wildcard_ignored,
+             AttrName);
+  } else {
+    PlatformAndVersions.emplace_back(Platform, VerTuple);
+  }
+  return makeParserSuccess();
+}
+
 /// Processes a parsed option name by attempting to match it to a list of
 /// alternative name/value pairs provided by a chain of \c when() calls, ending
 /// in either \c whenOmitted() if omitting the option is allowed, or
@@ -1949,19 +2007,58 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
 
   case DAK_Effects: {
-    auto kind = parseSingleAttrOption<EffectsKind>
-                         (*this, Loc, AttrRange, AttrName, DK)
-                    .when("readonly", EffectsKind::ReadOnly)
-                    .when("readnone", EffectsKind::ReadNone)
-                    .when("readwrite", EffectsKind::ReadWrite)
-                    .when("releasenone", EffectsKind::ReleaseNone)
-                    .diagnoseWhenOmitted();
-    if (!kind)
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));      return false;
+    }
+    EffectsKind kind = EffectsKind::Unspecified;
+    SourceLoc customStart, customEnd;
+    {
+      SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
+
+      if (Tok.isNot(tok::identifier)) {
+        diagnose(Loc, diag::error_in_effects_attribute, "expected identifier");
+        return false;
+      }
+
+      if (Tok.getText() == "readonly")
+        kind = EffectsKind::ReadOnly;
+      else if (Tok.getText() == "readnone")
+        kind = EffectsKind::ReadNone;
+      else if (Tok.getText() == "readwrite")
+        kind = EffectsKind::ReadWrite;
+      else if (Tok.getText() == "releasenone")
+        kind = EffectsKind::ReleaseNone;
+      else {
+        customStart = customEnd = Tok.getLoc();
+        while (Tok.isNot(tok::r_paren) && Tok.isNot(tok::eof)) {
+          consumeToken();
+        }
+        customEnd = Tok.getLoc();
+        kind = EffectsKind::Custom;
+        AttrRange = SourceRange(Loc, customEnd);
+      }
+      if (kind != EffectsKind::Custom) {
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+        consumeToken(tok::identifier);
+      }
+    }
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
       return false;
+    }
 
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) EffectsAttr(AtLoc, AttrRange, *kind));
-
+    if (!DiscardAttribute) {
+      if (kind == EffectsKind::Custom) {
+        StringRef customStr = SourceMgr.extractText(
+                          CharSourceRange(SourceMgr, customStart, customEnd));
+        Attributes.add(new (Context) EffectsAttr(AtLoc, AttrRange,
+                                                 customStr, customStart));
+      } else {
+        Attributes.add(new (Context) EffectsAttr(AtLoc, AttrRange, kind));
+      }
+    }
     break;
   }
 
@@ -1992,6 +2089,21 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     if (!DiscardAttribute)
       Attributes.add(new (Context) OptimizeAttr(AtLoc, AttrRange, *optMode));
+
+    break;
+  }
+
+  case DAK_Exclusivity: {
+    auto mode = parseSingleAttrOption<ExclusivityAttr::Mode>
+                            (*this, Loc, AttrRange, AttrName, DK)
+                       .when("checked", ExclusivityAttr::Mode::Checked)
+                       .when("unchecked", ExclusivityAttr::Mode::Unchecked)
+                       .diagnoseWhenOmitted();
+    if (!mode)
+      return false;
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ExclusivityAttr(AtLoc, AttrRange, *mode));
 
     break;
   }
@@ -2801,6 +2913,48 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         message, AtLoc, SourceRange(Loc, Tok.getLoc()), false));
     break;
   }
+  case DAK_BackDeploy: {
+    auto LeftLoc = Tok.getLoc();
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    bool SuppressLaterDiags = false;
+    SourceLoc RightLoc;
+    llvm::SmallVector<PlatformAndVersion, 4> PlatformAndVersions;
+    StringRef AttrName = "@_backDeploy";
+    ParserStatus Status = parseList(tok::r_paren, LeftLoc, RightLoc, false,
+                                    diag::attr_back_deploy_missing_rparen,
+                                    SyntaxKind::AvailabilitySpecList,
+                                    [&]() -> ParserStatus {
+      ParserStatus ListItemStatus =
+          parsePlatformVersionInList(AttrName, PlatformAndVersions);
+      if (ListItemStatus.isErrorOrHasCompletion())
+        SuppressLaterDiags = true;
+      return ListItemStatus;
+    });
+
+    if (Status.isErrorOrHasCompletion() || SuppressLaterDiags) {
+      return false;
+    }
+
+    if (PlatformAndVersions.empty()) {
+      diagnose(Loc, diag::attr_availability_need_platform_version, AttrName);
+      return false;
+    }
+    
+    assert(!PlatformAndVersions.empty());
+    AttrRange = SourceRange(Loc, Tok.getLoc());
+    for (auto &Item: PlatformAndVersions) {
+      Attributes.add(new (Context) BackDeployAttr(AtLoc, AttrRange,
+                                                  Item.first,
+                                                  Item.second,
+                                                  /*IsImplicit*/false));
+    }
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -3095,6 +3249,11 @@ ParserStatus Parser::parseDeclAttribute(
     DK = DAK_Nonisolated;
     AtLoc = SourceLoc();
   }
+
+  // Temporary name for @preconcurrency
+  checkInvalidAttrName(
+      "_predatesConcurrency", "preconcurrency", DAK_Preconcurrency,
+      diag::attr_renamed_warning);
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
@@ -4873,6 +5032,11 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                            /*diagnoseDollarPrefix=*/false,
                            diag::expected_identifier_in_decl, "import"))
       return nullptr;
+    if (Tok.is(tok::oper_postfix)) {
+        diagnose(Tok, diag::unexpected_operator_in_import_path)
+          .fixItRemove(Tok.getLoc());
+        return nullptr;
+    }
     HasNext = consumeIf(tok::period);
   } while (HasNext);
 
@@ -6226,7 +6390,7 @@ ParserStatus Parser::parseGetEffectSpecifier(ParsedAccessors &accessors,
 
 ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
                                  GenericParamList *GenericParams,
-                                 ParameterList *Indices,
+                                 ParameterList *Indices, TypeRepr *ResultType,
                                  ParsedAccessors &accessors,
                                  AbstractStorageDecl *storage,
                                  SourceLoc StaticLoc) {
@@ -6258,8 +6422,22 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     if (parsingLimitedSyntax)
       return makeParserSuccess();
 
-    diagnose(accessors.RBLoc, diag::computed_property_no_accessors,
-             /*subscript*/ Indices != nullptr);
+    if (ResultType != nullptr) {
+      // An error type at this point means we couldn't parse
+      // the result type for subscript correctly which will be
+      // already diagnosed as missing result type in declaration.
+      if (ResultType->getKind() == TypeReprKind::Error)
+        return makeParserError();
+
+      diagnose(accessors.RBLoc, diag::missing_accessor_return_decl,
+               /*subscript*/ Indices != nullptr, ResultType);
+    } else {
+      // This is supposed to be a computed property, but we don't
+      // have a result type representation which indicates this is probably not
+      // a well-formed computed property. So we can assume that empty braces
+      // are unexpected at this position for this declaration.
+      diagnose(accessors.LBLoc, diag::unexpected_curly_braces_in_decl);
+    }
     return makeParserError();
   }
 
@@ -6488,9 +6666,11 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
 
   // Parse getter and setter.
   ParsedAccessors accessors;
+  auto typedPattern = dyn_cast<TypedPattern>(pattern);
+  auto *resultTypeRepr = typedPattern ? typedPattern->getTypeRepr() : nullptr;
   auto AccessorStatus = parseGetSet(Flags, /*GenericParams=*/nullptr,
-                                    /*Indices=*/nullptr, accessors,
-                                    storage, StaticLoc);
+                                    /*Indices=*/nullptr, resultTypeRepr,
+                                    accessors, storage, StaticLoc);
   if (AccessorStatus.hasCodeCompletion())
     return makeParserCodeCompletionStatus();
   if (AccessorStatus.isErrorOrHasCompletion())
@@ -6500,7 +6680,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
   if (!PrimaryVar)
     return nullptr;
 
-  if (!isa<TypedPattern>(pattern)) {
+  if (!typedPattern) {
     if (accessors.Get || accessors.Set || accessors.Address ||
         accessors.MutableAddress) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
@@ -6777,8 +6957,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     
     bool hasOpaqueReturnTy = false;
     if (auto typedPattern = dyn_cast<TypedPattern>(pattern)) {
-      hasOpaqueReturnTy =
-                        isa<OpaqueReturnTypeRepr>(typedPattern->getTypeRepr());
+      hasOpaqueReturnTy = typedPattern->getTypeRepr()->hasOpaque();
     }
     auto sf = CurDeclContext->getParentSourceFile();
     
@@ -7108,7 +7287,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                               CurDeclContext);
 
   // Let the source file track the opaque return type mapping, if any.
-  if (isa_and_nonnull<OpaqueReturnTypeRepr>(FuncRetTy) &&
+  if (FuncRetTy && FuncRetTy->hasOpaque() &&
       !InInactiveClauseEnvironment) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(FD);
@@ -7986,7 +8165,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.
-  if (isa_and_nonnull<OpaqueReturnTypeRepr>(ElementTy.get()) &&
+  if (ElementTy.get() && ElementTy.get()->hasOpaque() &&
       !InInactiveClauseEnvironment) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);
@@ -8030,7 +8209,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       Status.setIsParseError();
     }
   } else if (!Status.hasCodeCompletion()) {
-    Status |= parseGetSet(Flags, GenericParams, Indices.get(),
+    Status |= parseGetSet(Flags, GenericParams, Indices.get(), ElementTy.get(),
                           accessors, Subscript, StaticLoc);
   }
 

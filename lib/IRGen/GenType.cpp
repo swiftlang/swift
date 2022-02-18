@@ -2158,7 +2158,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::SequenceArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
@@ -2183,6 +2182,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
+  case TypeKind::ParameterizedProtocol:
+    return convertParameterizedProtocolType(cast<ParameterizedProtocolType>(ty));
   case TypeKind::Existential:
     return convertExistentialType(cast<ExistentialType>(ty));
   case TypeKind::GenericTypeParam:

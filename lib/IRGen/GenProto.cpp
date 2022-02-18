@@ -944,7 +944,7 @@ static bool isDependentConformance(
 
   // Check whether any of the conformances are dependent.
   auto proto = conformance->getProtocol();
-  for (const auto &req : proto->getRequirementSignature()) {
+  for (const auto &req : proto->getRequirementSignature().getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
@@ -1978,8 +1978,11 @@ namespace {
                 Description.requiresSpecialization);
       // Instantiation function
       B.addRelativeAddressOrNull(Description.instantiationFn);
+
       // Private data
-      {
+      if (IGM.IRGen.Opts.NoPreallocatedInstantiationCaches) {
+        B.addInt32(0);
+      } else {
         auto privateDataTy =
           llvm::ArrayType::get(IGM.Int8PtrTy,
                                swift::NumGenericMetadataPrivateDataWords);
@@ -2321,6 +2324,7 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::CXXMethod:
     // May be polymorphic at the SIL level, but no type metadata is actually
     // passed.
     return false;
@@ -3648,10 +3652,8 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
                                      /*varargs*/ false);
   }
 
-  auto attrs = llvm::AttributeList::get(getLLVMContext(),
-                                       llvm::AttributeList::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
-
+  auto attrs = llvm::AttributeList().addFnAttribute(getLLVMContext(),
+                                                    llvm::Attribute::NoUnwind);
   return Signature(fnType, attrs, SwiftCC);
 }
 
@@ -3730,6 +3732,11 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
                                                false)
                           .getIntValue());
         });
+
+        // Need to pad the structure after generic parameters
+        // up to four bytes because generic requirements that
+        // follow expect that alignment.
+        fields.addAlignmentPadding(Alignment(4));
 
         // Generic requirements
         irgen::addGenericRequirements(*this, fields, signature,

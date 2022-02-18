@@ -118,9 +118,7 @@ IRGenThunk::IRGenThunk(IRGenFunction &IGF, SILDeclRef declRef)
 
   if (isAsync) {
     asyncLayout.emplace(irgen::getAsyncContextLayout(
-        IGF.IGM, origTy, substTy, subMap, /*suppress generics*/ false,
-        FunctionPointer::Kind(
-            FunctionPointer::BasicKind::AsyncFunctionPointer)));
+        IGF.IGM, origTy, substTy, subMap));
   }
 }
 
@@ -251,7 +249,8 @@ void IRGenThunk::emit() {
 
   if (isAsync) {
     auto asyncContextIdx = Signature::forAsyncEntry(
-                               IGF.IGM, origTy, /*useSpecialConvention*/ false)
+                               IGF.IGM, origTy,
+                               FunctionPointerKind::defaultAsync())
                                .getAsyncContextIndex();
 
     auto entity = LinkEntity::forDispatchThunk(declRef);

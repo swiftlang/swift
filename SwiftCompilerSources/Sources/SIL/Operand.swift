@@ -91,7 +91,7 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   }
 }
 
-public struct UseList : Sequence, CustomReflectable {
+public struct UseList : CollectionLikeSequence {
   public struct Iterator : IteratorProtocol {
     var currentOpPtr: UnsafeRawPointer?
     
@@ -120,10 +120,5 @@ public struct UseList : Sequence, CustomReflectable {
 
   public func makeIterator() -> Iterator {
     return Iterator(currentOpPtr: firstOpPtr)
-  }
-
-  public var customMirror: Mirror {
-    let c: [Mirror.Child] = map { (label: "use", value: $0) }
-    return Mirror(self, children: c)
   }
 }

@@ -122,6 +122,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
 
+  P.addFlowIsolation();
+
   // Automatic differentiation: canonicalize all differentiability witnesses
   // and `differentiable_function` instructions.
   P.addDifferentiation();
@@ -157,6 +159,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // SSA based diagnostics.
   P.addPredictableMemoryAccessOptimizations();
 
+  // Now that we have promoted simple loads for SSA based diagnostics, perform
+  // SSA based move function checking and no implicit copy checking.
+  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
+                                         //   value.
+  P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
+
   // This phase performs optimizations necessary for correct interoperation of
   // Swift os log APIs with C os_log ABIs.
   // Pass dependencies: this pass depends on MandatoryInlining and Mandatory
@@ -172,11 +180,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Now that we have emitted constant propagation diagnostics, try to eliminate
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
-
-  // Now perform move semantic checking.
-  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
-                                         //   value.
-  P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
 
   // Now that we have finished performing diagnostics that rely on lexical
   // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.
@@ -343,6 +346,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
 
+  P.addSSADestroyHoisting();
+
   // Propagate copies through stack locations.  Should run after
   // box-to-stack promotion since it is limited to propagating through
   // stack locations. Should run before aggregate lowering since that
@@ -360,6 +365,16 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addEarlySROA();
   } else {
     P.addSROA();
+  }
+
+  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
+    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+      return;
+
+    if (SILPrintFinalOSSAModule) {
+      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+    }
+    P.addNonTransparentFunctionOwnershipModelEliminator();
   }
 
   // Promote stack allocations to values.
@@ -571,16 +586,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // optimization.
   P.addGlobalOpt();
 
-  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
-    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-      return;
-
-    if (SILPrintFinalOSSAModule) {
-      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
-    }
-    P.addNonTransparentFunctionOwnershipModelEliminator();
-  }
-
   // Add the outliner pass (Osize).
   P.addOutliner();
 }
@@ -766,7 +771,9 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 #endif
 
   // Only has an effect if the -assume-single-thread option is specified.
-  P.addAssumeSingleThreaded();
+  if (P.getOptions().AssumeSingleThreaded) {
+    P.addAssumeSingleThreaded();
+  }
 
   // Emits remarks on all functions with @_assemblyVision attribute.
   P.addAssemblyVisionRemarkGenerator();
@@ -826,16 +833,16 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // This also performs early OSSA based optimizations on *all* swift code.
   addPerfEarlyModulePassPipeline(P);
 
-  // Then if we were asked to stop optimization before lowering OSSA (causing us
-  // to exit early from addPerfEarlyModulePassPipeline), exit early.
-  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-    return P;
-
   // Then run an iteration of the high-level SSA passes.
   //
   // FIXME: When *not* emitting a .swiftmodule, skip the high-level function
   // pipeline to save compile time.
   addHighLevelFunctionPipeline(P);
+
+  // Then if we were asked to stop optimization before lowering OSSA (causing us
+  // to exit early from addHighLevelFunctionPipeline), exit early.
+  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+    return P;
 
   addHighLevelModulePipeline(P);
 
@@ -925,7 +932,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.addUsePrespecialized();
 
   // Has only an effect if the -assume-single-thread option is specified.
-  P.addAssumeSingleThreaded();
+  if (P.getOptions().AssumeSingleThreaded) {
+    P.addAssumeSingleThreaded();
+  }
 
   // Create pre-specializations.
   P.addOnonePrespecializations();

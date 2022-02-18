@@ -80,6 +80,7 @@ class BackDeployConcurrency(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_SDK_OVERLAY:BOOL', False)
         self.cmake_options.define('SWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL', False)
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', False)
+        self.cmake_options.define('SWIFT_BUILD_PERF_TESTSUITE:BOOL', False)
 
         self.cmake_options.define('SWIFT_HOST_VARIANT_ARCH:STRING', arch)
         self.cmake_options.define('BUILD_STANDALONE:BOOL', True)

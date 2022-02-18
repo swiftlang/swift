@@ -118,13 +118,19 @@ function(_add_host_variant_c_compile_link_flags name)
     set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
   endif()
 
-  # MSVC, clang-cl, gcc don't understand -target.
-  if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+  # MSVC and gcc don't understand -target.
+  # clang-cl understands --target.
+  if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
-    target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+    if("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC") # clang-cl options
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
+    else()
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+    endif()
   endif()
 
   if (CMAKE_Swift_COMPILER)
@@ -156,9 +162,9 @@ function(_add_host_variant_c_compile_link_flags name)
     # side effects are introduced should a new search path be added.
     target_compile_options(${name} PRIVATE
       $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:
-      -arch ${SWIFT_HOST_VARIANT_ARCH}
       "-F${SWIFT_SDK_${SWIFT_HOST_VARIANT_ARCH}_PATH}/../../../Developer/Library/Frameworks"
     >)
+    set_property(TARGET ${name} PROPERTY OSX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
   endif()
 
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
@@ -630,7 +636,7 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(options HAS_SWIFT_MODULES)
+  set(options HAS_SWIFT_MODULES THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
   set(single_parameter_options SWIFT_COMPONENT BOOTSTRAPPING)
   set(multiple_parameter_options LLVM_LINK_COMPONENTS)
 
@@ -851,6 +857,19 @@ function(add_swift_host_tool executable)
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
         )
     endif()
+  endif()
+
+  if(ASHT_THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
+    string(CONCAT lto_codegen_only_link_options
+      "$<"
+        "$<AND:"
+          "$<BOOL:${LLVM_LINKER_IS_LD64}>,"
+          "$<BOOL:${SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS}>,"
+          "$<STREQUAL:${SWIFT_TOOLS_ENABLE_LTO},thin>"
+        ">:"
+        "LINKER:-flto-codegen-only"
+      ">")
+    target_link_options(${executable} PRIVATE "${lto_codegen_only_link_options}")
   endif()
 
   if(NOT ${ASHT_SWIFT_COMPONENT} STREQUAL "no_component")

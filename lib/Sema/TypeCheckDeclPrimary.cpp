@@ -249,6 +249,14 @@ static void checkInheritanceClause(
       inheritedTy = layout.explicitSuperclass;
     }
 
+    if (inheritedTy->is<ParameterizedProtocolType>()) {
+      if (!isa<ProtocolDecl>(decl)) {
+        decl->diagnose(diag::inheritance_from_parameterized_protocol,
+                       inheritedTy);
+      }
+      continue;
+    }
+
     // If this is an enum inheritance clause, check for a raw type.
     if (isa<EnumDecl>(decl)) {
       // Check if we already had a raw type.
@@ -1477,7 +1485,7 @@ static StringRef prettyPrintAttrs(const ValueDecl *VD,
   llvm::raw_svector_ostream os(out);
   StreamPrinter printer(os);
 
-  PrintOptions opts = PrintOptions::printEverything();
+  PrintOptions opts = PrintOptions::printDeclarations();
   VD->getAttrs().print(printer, opts, attrs, VD);
   return StringRef(out.begin(), out.size()).drop_back();
 }
@@ -1656,6 +1664,30 @@ ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   return {};
 }
 
+static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
+                                            const Pattern *P,
+                                            Expr *init) {
+  // Make sure we have a user-written type annotation.
+  auto *TP = dyn_cast<TypedPattern>(P);
+  if (!TP || !TP->getTypeRepr()) {
+    return;
+  }
+
+  auto *repr = TP->getTypeRepr()->getWithoutParens();
+  if (auto *PTR = dyn_cast<PlaceholderTypeRepr>(repr)) {
+    Ctx.Diags.diagnose(P->getLoc(),
+                       diag::placeholder_type_not_allowed_in_pattern)
+        .highlight(P->getSourceRange());
+    if (init && !init->getType()->hasError()) {
+      auto initTy = init->getType()->mapTypeOutOfContext();
+      Ctx.Diags
+          .diagnose(PTR->getLoc(),
+                    diag::replace_placeholder_with_inferred_type, initTy)
+          .fixItReplace(PTR->getSourceRange(), initTy.getString());
+    }
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -1769,10 +1801,15 @@ public:
                               "@_implementationOnly ");
         }
 
-        static bool treatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
 #ifndef NDEBUG
-        treatAsError = true;
+        static bool enableTreatAsError = true;
+#else
+        static bool enableTreatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
 #endif
+
+        bool isImportOfUnderlying = importer->getName() == target->getName();
+        bool treatAsError = enableTreatAsError &&
+                            !isImportOfUnderlying;
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
@@ -2064,6 +2101,11 @@ public:
         diagnoseUnownedImmediateDeallocation(Ctx, PBD->getPattern(i),
                                              PBD->getEqualLoc(i),
                                              init);
+
+        // Written placeholder types are banned in the signatures of pattern
+        // bindings. If there's a valid initializer, try to offer its type
+        // as a replacement.
+        diagnoseWrittenPlaceholderTypes(Ctx, PBD->getPattern(i), init);
 
         // If we entered an initializer context, contextualize any
         // auto-closures we might have created.
@@ -2548,6 +2590,10 @@ public:
         if (!isInvalidSuperclass) {
           CD->diagnose(diag::inheritance_from_class_with_missing_vtable_entries,
                        Super->getName());
+          for (const auto &member : Super->getMembers())
+            if (const auto *MMD = dyn_cast<MissingMemberDecl>(member))
+              CD->diagnose(diag::inheritance_from_class_with_missing_vtable_entry,
+                           MMD->getName());
           isInvalidSuperclass = true;
         }
       }
@@ -2613,7 +2659,7 @@ public:
         TypeChecker::inferDefaultWitnesses(PD);
 
     // Explicity compute the requirement signature to detect errors.
-    auto reqSig = PD->getRequirementSignature();
+    auto reqSig = PD->getRequirementSignature().getRequirements();
 
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       auto requirementsSig =
@@ -2624,14 +2670,16 @@ public:
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Requirement signature: ";
-      requirementsSig->print(llvm::errs());
+      PrintOptions Opts;
+      Opts.ProtocolQualifiedDependentMemberTypes = true;
+      requirementsSig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
 
       llvm::errs() << "Canonical requirement signature: ";
       auto canRequirementSig =
         CanGenericSignature::getCanonical(requirementsSig.getGenericParams(),
                                           requirementsSig.getRequirements());
-      canRequirementSig->print(llvm::errs());
+      canRequirementSig->print(llvm::errs(), Opts);
       llvm::errs() << "\n";
     }
 
@@ -3201,6 +3249,44 @@ void TypeChecker::checkParameterList(ParameterList *params,
             addAsyncNotes(func);
         }
       }
+    }
+
+    // Opaque types cannot occur in parameter position.
+    Type interfaceType = param->getInterfaceType();
+    if (interfaceType->hasTypeParameter()) {
+      interfaceType.findIf([&](Type type) {
+        if (auto fnType = type->getAs<FunctionType>()) {
+          for (auto innerParam : fnType->getParams()) {
+            auto paramType = innerParam.getPlainType();
+            if (!paramType->hasTypeParameter())
+              continue;
+
+            bool hadError = paramType.findIf([&](Type innerType) {
+              auto genericParam = innerType->getAs<GenericTypeParamType>();
+              if (!genericParam)
+                return false;
+
+              auto genericParamDecl = genericParam->getDecl();
+              if (!genericParamDecl)
+                return false;
+
+              if (!genericParamDecl->isOpaqueType())
+                return false;
+
+              param->diagnose(
+                 diag::opaque_type_in_parameter, true, interfaceType);
+              return true;
+            });
+
+            if (hadError)
+              return true;
+          }
+
+          return false;
+        }
+
+        return false;
+      });
     }
 
     if (param->hasAttachedPropertyWrapper())

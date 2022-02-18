@@ -789,7 +789,9 @@ public struct ConstantVPrintFMessage :
   @_semantics("oslog.message.init_interpolation")
   @_semantics("constant_evaluable")
   public init(stringInterpolation: ConstantVPrintFInterpolation) {
-    self.interpolation = stringInterpolation
+    var s = stringInterpolation
+    s.appendLiteral("\n")
+    self.interpolation = s
   }
 
   @inlinable
@@ -802,6 +804,7 @@ public struct ConstantVPrintFMessage :
       interpolationCount: 0
     )
     s.appendLiteral(value)
+    s.appendLiteral("\n")
     self.interpolation = s
   }
 }
@@ -836,23 +839,30 @@ internal func constant_vprintf_backend(
   if let closure = argumentClosures.first {
     closure { newArg in
       args.append(contentsOf: newArg)
-      print(argumentClosures.count)
       constant_vprintf_backend_recurse(
         fmt: fmt,
         argumentClosures: argumentClosures.dropFirst(),
         args: &args
       )
     }
+  } else {
+    constant_vprintf_backend_recurse(
+      fmt: fmt,
+      argumentClosures: ArraySlice(argumentClosures),
+      args: &args
+    )
   }
 }
 
 @_semantics("oslog.requires_constant_arguments")
 @inlinable
 @_transparent
+@_alwaysEmitIntoClient
 @_optimize(none)
-public func constant_vprintf(_ message: ConstantVPrintFMessage) {
+public func print(_ message: ConstantVPrintFMessage) {
   let formatString = message.interpolation.formatString
   let argumentClosures = message.interpolation.arguments.argumentClosures
+  if Bool(_builtinBooleanLiteral: Builtin.ifdef_SWIFT_STDLIB_PRINT_DISABLED()) { return }
   let formatStringPointer = _getGlobalStringTablePointer(formatString)
   constant_vprintf_backend(
     fmt: formatStringPointer,

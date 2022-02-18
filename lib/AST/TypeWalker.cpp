@@ -174,6 +174,13 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
+  bool visitParameterizedProtocolType(ParameterizedProtocolType *ty) {
+    if (doIt(ty->getBaseType()))
+      return true;
+
+    return doIt(ty->getArgumentType());
+  }
+
   bool visitExistentialType(ExistentialType *ty) {
     return doIt(ty->getConstraintType());
   }
@@ -207,8 +214,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitArchetypeType(ArchetypeType *ty) {
     // If the root is an opaque archetype, visit its substitution replacement
     // types.
-    if (auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(ty->getRoot())) {
-      for (auto arg : opaqueRoot->getSubstitutions().getReplacementTypes()) {
+    if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(ty)) {
+      for (auto arg : opaque->getSubstitutions().getReplacementTypes()) {
         if (doIt(arg)) {
           return true;
         }

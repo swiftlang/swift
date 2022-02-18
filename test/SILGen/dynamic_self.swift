@@ -246,8 +246,9 @@ class Z {
     // so that IRGen can recover metadata.
 
     // CHECK:      [[WEAK_SELF:%.*]] = alloc_box ${ var @sil_weak Optional<Z> }
+    // CHECK:      [[WEAK_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[WEAK_SELF]]
     // CHECK:      [[FN:%.*]] = function_ref @$s12dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU1_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
-    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF]] : ${ var @sil_weak Optional<Z> }
+    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF_LIFETIME]] : ${ var @sil_weak Optional<Z> }
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
     // CHECK:      partial_apply [callee_guaranteed] [[FN]]([[WEAK_SELF_COPY]], [[DYNAMIC_SELF]]) : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     let fn3 = {

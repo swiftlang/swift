@@ -145,7 +145,13 @@ public struct AnyHashable {
   /// Creates a type-erased hashable value that wraps the given instance.
   ///
   /// - Parameter base: A hashable value to wrap.
+  @_specialize(where H == String)
   public init<H: Hashable>(_ base: H) {
+    if H.self == String.self {
+      self.init(_box: _ConcreteHashableBox(base))
+      return
+    }
+    
     if let custom =
       (base as? _HasCustomAnyHashableRepresentation)?._toCustomAnyHashable() {
       self = custom

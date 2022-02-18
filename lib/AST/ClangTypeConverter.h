@@ -122,6 +122,7 @@ private:
   clang::QualType visitEnumType(EnumType *type);
   clang::QualType visitFunctionType(FunctionType *type);
   clang::QualType visitProtocolCompositionType(ProtocolCompositionType *type);
+  clang::QualType visitExistentialType(ExistentialType *type);
   clang::QualType visitBuiltinRawPointerType(BuiltinRawPointerType *type);
   clang::QualType visitBuiltinIntegerType(BuiltinIntegerType *type);
   clang::QualType visitBuiltinFloatType(BuiltinFloatType *type);

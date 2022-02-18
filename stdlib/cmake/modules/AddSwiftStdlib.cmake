@@ -364,12 +364,20 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS")
   endif()
 
+  if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+    list(APPEND result "-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES")
+  endif()
+
   if(SWIFT_STDLIB_HAS_TYPE_PRINTING)
     list(APPEND result "-DSWIFT_STDLIB_HAS_TYPE_PRINTING")
   endif()
 
   if(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING)
     list(APPEND result "-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING")
+  endif()
+  
+  if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
+    list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
   endif()
 
   list(APPEND result ${SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS})
@@ -538,9 +546,20 @@ function(_add_swift_lipo_target)
     if(LIPO_CODESIGN)
       set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
+
+    set(lipo_lto_env)
+    # When lipo-ing LTO-based libraries with lipo on Darwin, the tool uses
+    # libLTO.dylib to inspect the bitcode files. However, by default the "host"
+    # libLTO.dylib is loaded, which might be too old and not understand the
+    # just-built bitcode format. Let's ask lipo to use the just-built
+    # libLTO.dylib from the toolchain that we're using to build.
+    if(APPLE AND SWIFT_NATIVE_CLANG_TOOLS_PATH)
+      set(lipo_lto_env "LIBLTO_PATH=${SWIFT_NATIVE_CLANG_TOOLS_PATH}/../lib/libLTO.dylib")
+    endif()
+
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
-        COMMAND "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
+        COMMAND "${CMAKE_COMMAND}" "-E" "env" ${lipo_lto_env} "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
         ${codesign_command}
         CUSTOM_TARGET_NAME "${LIPO_TARGET}"
         OUTPUT "${LIPO_OUTPUT}"
@@ -750,7 +769,9 @@ function(add_swift_target_library_single target name)
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
   if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
-    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
+    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
+       "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+       "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
       set(embed_bitcode_arg EMBED_BITCODE)
     endif()
@@ -822,6 +843,11 @@ function(add_swift_target_library_single target name)
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
       -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
+
+  # Define availability macros.
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}") 
+  endforeach()
 
   # Don't install the Swift module content for back-deployment libraries.
   if (SWIFTLIB_SINGLE_BACK_DEPLOYMENT_LIBRARY)
@@ -1152,17 +1178,9 @@ function(add_swift_target_library_single target name)
     target_link_libraries("${target}" INTERFACE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
   endif()
 
-  # Don't add the icucore target.
-  set(SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU)
-  foreach(item ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
-    if(NOT "${item}" STREQUAL "icucore")
-      list(APPEND SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU "${item}")
-    endif()
-  endforeach()
-
   if(target_static)
     _list_add_string_suffix(
-        "${SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU}"
+        "${SWIFTLIB_SINGLE_LINK_LIBRARIES}"
         "-static"
         target_static_depends)
     # FIXME: should this be target_link_libraries?
@@ -1318,9 +1336,9 @@ function(add_swift_target_library_single target name)
     endif()
     # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
     if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
-      if(${SWIFTLIB_SINGLE_SDK} STREQUAL "IOS" OR
-         ${SWIFTLIB_SINGLE_SDK} STREQUAL "TVOS" OR
-         ${SWIFTLIB_SINGLE_SDK} STREQUAL "WATCHOS")
+      if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR
+         "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR
+         "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
         # Please note that using a generator expression to fit
         # this in a single target_link_options does not work
         # (at least in CMake 3.15 and 3.16),
@@ -1710,17 +1728,13 @@ function(add_swift_target_library name)
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
 
-  # Define availability macros.
-  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}") 
-  endforeach()
-  
   # In the standard library and overlays, warn about implicit overrides
   # as a reminder to consider when inherited protocols need different
   # behavior for their requirements.
   if (SWIFTLIB_IS_STDLIB)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
   endif()
 
   if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE AND

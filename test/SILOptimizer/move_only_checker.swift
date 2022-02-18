@@ -6,6 +6,10 @@ public class Klass {
     var k: Klass? = nil
 }
 
+public final class FinalKlass {
+    var k: Klass? = nil
+}
+
 var boolValue: Bool { return true }
 
 public func classUseMoveOnlyWithoutEscaping(_ x: Klass) {
@@ -111,11 +115,146 @@ public func classAssignToVar5(_ x: Klass) {
     print(x3)
 }
 
-public func classAccessField(_ x: Klass) {
+public func classAccessAccessField(_ x: Klass) {
     @_noImplicitCopy let x2 = x
-    print(x2.k!)
+    classUseMoveOnlyWithoutEscaping(x2.k!)
     for _ in 0..<1024 {
-        print(x2.k!)
+        classUseMoveOnlyWithoutEscaping(x2.k!)
+    }
+}
+
+public func classAccessConsumeField(_ x: Klass) {
+    @_noImplicitCopy let x2 = x
+    // Since a class is a reference type, we do not emit an error here.
+    classConsume(x2.k!)
+    for _ in 0..<1024 {
+        classConsume(x2.k!)
+    }
+}
+
+/////////////////
+// Final Class //
+/////////////////
+
+public func finalClassUseMoveOnlyWithoutEscaping(_ x: FinalKlass) {
+}
+public func finalClassConsume(_ x: __owned FinalKlass) {
+}
+
+public func finalClassSimpleChainTest(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    let y2 = x2
+    let k2 = y2
+    finalClassUseMoveOnlyWithoutEscaping(k2)
+}
+
+public func finalClassSimpleNonConsumingUseTest(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+}
+
+public func finalClassMultipleNonConsumingUseTest(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+    print(x2)
+}
+
+public func finalClassUseAfterConsume(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+    finalClassConsume(x2) // expected-note {{consuming use}}
+    print(x2) // expected-note {{consuming use}}
+}
+
+public func finalClassDoubleConsume(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x  // expected-error {{'x2' consumed more than once}}
+    finalClassConsume(x2) // expected-note {{consuming use}}
+    finalClassConsume(x2) // expected-note {{consuming use}}
+}
+
+public func finalClassLoopConsume(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+        finalClassConsume(x2) // expected-note {{consuming use}}
+    }
+}
+
+public func finalClassDiamond(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    if boolValue {
+        finalClassConsume(x2)
+    } else {
+        finalClassConsume(x2)
+    }
+}
+
+public func finalClassDiamondInLoop(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+      if boolValue {
+          finalClassConsume(x2) // expected-note {{consuming use}}
+      } else {
+          finalClassConsume(x2) // expected-note {{consuming use}}
+      }
+    }
+}
+
+public func finalClassAssignToVar1(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    x3 = x2 // expected-note {{consuming use}}
+    x3 = x
+    print(x3)
+}
+
+public func finalClassAssignToVar2(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    x3 = x2 // expected-note {{consuming use}}
+    finalClassUseMoveOnlyWithoutEscaping(x3)
+}
+
+public func finalClassAssignToVar3(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    var x3 = x2
+    x3 = x
+    print(x3)
+}
+
+public func finalClassAssignToVar4(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x3 = x2 // expected-note {{consuming use}}
+    print(x2) // expected-note {{consuming use}}
+    print(x3)
+}
+
+public func finalClassAssignToVar5(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    // TODO: Need to mark this as the lifetime extending use. We fail
+    // appropriately though.
+    finalClassUseMoveOnlyWithoutEscaping(x2)
+    x3 = x
+    print(x3)
+}
+
+public func finalClassAccessField(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+    classUseMoveOnlyWithoutEscaping(x2.k!)
+    for _ in 0..<1024 {
+        classUseMoveOnlyWithoutEscaping(x2.k!)
+    }
+}
+
+public func finalClassConsumeField(_ x: FinalKlass) {
+    @_noImplicitCopy let x2 = x
+
+    // No diagnostic here since class is a reference type and we are not copying
+    // the class, we are copying its field.
+    classConsume(x2.k!)
+    for _ in 0..<1024 {
+        classConsume(x2.k!)
     }
 }
 
@@ -123,10 +262,16 @@ public func classAccessField(_ x: Klass) {
 // Aggregate Struct //
 //////////////////////
 
+public struct KlassPair {
+    var lhs: Klass
+    var rhs: Klass
+}
+
 public struct AggStruct {
     var lhs: Klass
     var center: Builtin.Int32
     var rhs: Klass
+    var pair: KlassPair
 }
 
 public func aggStructUseMoveOnlyWithoutEscaping(_ x: AggStruct) {
@@ -195,9 +340,33 @@ public func aggStructDiamondInLoop(_ x: AggStruct) {
 
 public func aggStructAccessField(_ x: AggStruct) {
     @_noImplicitCopy let x2 = x
-    print(x2.lhs)
+    classUseMoveOnlyWithoutEscaping(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs)
+        classUseMoveOnlyWithoutEscaping(x2.lhs)
+    }
+}
+
+public func aggStructConsumeField(_ x: AggStruct) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.lhs) // expected-note {{consuming use}}
+    }
+}
+
+public func aggStructAccessGrandField(_ x: AggStruct) {
+    @_noImplicitCopy let x2 = x
+    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    for _ in 0..<1024 {
+        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    }
+}
+
+public func aggStructConsumeGrandField(_ x: AggStruct) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -208,6 +377,7 @@ public func aggStructAccessField(_ x: AggStruct) {
 public struct AggGenericStruct<T> {
     var lhs: Klass
     var rhs: Builtin.RawPointer
+    var pair: KlassPair
 }
 
 public func aggGenericStructUseMoveOnlyWithoutEscaping(_ x: AggGenericStruct<Klass>) {
@@ -276,9 +446,33 @@ public func aggGenericStructDiamondInLoop(_ x: AggGenericStruct<Klass>) {
 
 public func aggGenericStructAccessField(_ x: AggGenericStruct<Klass>) {
     @_noImplicitCopy let x2 = x
-    print(x2.lhs)
+    classUseMoveOnlyWithoutEscaping(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs)
+        classUseMoveOnlyWithoutEscaping(x2.lhs)
+    }
+}
+
+public func aggGenericStructConsumeField(_ x: AggGenericStruct<Klass>) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.lhs) // expected-note {{consuming use}}
+    }
+}
+
+public func aggGenericStructAccessGrandField(_ x: AggGenericStruct<Klass>) {
+    @_noImplicitCopy let x2 = x
+    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    for _ in 0..<1024 {
+        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    }
+}
+
+public func aggGenericStructConsumeGrandField(_ x: AggGenericStruct<Klass>) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -352,9 +546,33 @@ public func aggGenericStructDiamondInLoop<T>(_ x: AggGenericStruct<T>) {
 
 public func aggGenericStructAccessField<T>(_ x: AggGenericStruct<T>) {
     @_noImplicitCopy let x2 = x
-    print(x2.lhs)
+    classUseMoveOnlyWithoutEscaping(x2.lhs)
     for _ in 0..<1024 {
-        print(x2.lhs)
+        classUseMoveOnlyWithoutEscaping(x2.lhs)
+    }
+}
+
+public func aggGenericStructConsumeField<T>(_ x: AggGenericStruct<T>) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.lhs) // expected-note {{consuming use}}
+    }
+}
+
+public func aggGenericStructAccessGrandField<T>(_ x: AggGenericStruct<T>) {
+    @_noImplicitCopy let x2 = x
+    classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    for _ in 0..<1024 {
+        classUseMoveOnlyWithoutEscaping(x2.pair.lhs)
+    }
+}
+
+public func aggGenericStructConsumeGrandField<T>(_ x: AggGenericStruct<T>) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    classConsume(x2.pair.lhs) // expected-note {{consuming use}}
+    for _ in 0..<1024 {
+        classConsume(x2.pair.lhs) // expected-note {{consuming use}}
     }
 }
 
@@ -370,4 +588,175 @@ public func klassNoImplicitCopyArgumentError(@_noImplicitCopy _ x: Klass) -> Kla
     let y = x // expected-note {{consuming use}}
     print(y)
     return x // expected-note {{consuming use}}
+}
+
+/////////////////////
+// Enum Test Cases //
+/////////////////////
+
+public enum EnumTy {
+    case klass(Klass)
+    case int(Int)
+
+    func doSomething() -> Bool { true }
+}
+
+public func enumUseMoveOnlyWithoutEscaping(_ x: EnumTy) {
+}
+public func enumConsume(_ x: __owned EnumTy) {
+}
+
+public func enumSimpleChainTest(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    let y2 = x2
+    let k2 = y2
+    enumUseMoveOnlyWithoutEscaping(k2)
+}
+
+public func enumSimpleNonConsumingUseTest(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    enumUseMoveOnlyWithoutEscaping(x2)
+}
+
+public func enumMultipleNonConsumingUseTest(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    enumUseMoveOnlyWithoutEscaping(x2)
+    enumUseMoveOnlyWithoutEscaping(x2)
+    print(x2)
+}
+
+public func enumUseAfterConsume(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    enumUseMoveOnlyWithoutEscaping(x2)
+    enumConsume(x2) // expected-note {{consuming use}}
+    print(x2) // expected-note {{consuming use}}
+}
+
+public func enumDoubleConsume(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x  // expected-error {{'x2' consumed more than once}}
+    enumConsume(x2) // expected-note {{consuming use}}
+    enumConsume(x2) // expected-note {{consuming use}}
+}
+
+public func enumLoopConsume(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+        enumConsume(x2) // expected-note {{consuming use}}
+    }
+}
+
+public func enumDiamond(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    if boolValue {
+        enumConsume(x2)
+    } else {
+        enumConsume(x2)
+    }
+}
+
+public func enumDiamondInLoop(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+      if boolValue {
+          enumConsume(x2) // expected-note {{consuming use}}
+      } else {
+          enumConsume(x2) // expected-note {{consuming use}}
+      }
+    }
+}
+
+public func enumAssignToVar1(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    x3 = x2 // expected-note {{consuming use}}
+    x3 = x
+    print(x3)
+}
+
+public func enumAssignToVar2(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    x3 = x2 // expected-note {{consuming use}}
+    enumUseMoveOnlyWithoutEscaping(x3)
+}
+
+public func enumAssignToVar3(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x
+    var x3 = x2
+    x3 = x
+    print(x3)
+}
+
+public func enumAssignToVar4(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    let x3 = x2 // expected-note {{consuming use}}
+    print(x2) // expected-note {{consuming use}}
+    print(x3)
+}
+
+public func enumAssignToVar5(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    var x3 = x2 // expected-note {{consuming use}}
+    // TODO: Need to mark this as the lifetime extending use. We fail
+    // appropriately though.
+    enumUseMoveOnlyWithoutEscaping(x2)
+    x3 = x
+    print(x3)
+}
+
+public func enumPatternMatchIfLet1(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    if case let .klass(x) = x2 { // expected-note {{consuming use}}
+        classUseMoveOnlyWithoutEscaping(x)
+    }
+    if case let .klass(x) = x2 { // expected-note {{consuming use}}
+        classUseMoveOnlyWithoutEscaping(x)
+    }
+}
+
+public func enumPatternMatchIfLet2(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    for _ in 0..<1024 {
+        if case let .klass(x) = x2 {  // expected-note {{consuming use}}
+            classUseMoveOnlyWithoutEscaping(x)
+        }
+    }
+}
+
+// This is wrong.
+public func enumPatternMatchSwitch1(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    switch x2 {
+    case let .klass(k):  // expected-note {{consuming use}}
+        classUseMoveOnlyWithoutEscaping(k)
+        // TODO: This should be flagged as a consuming use!
+        enumUseMoveOnlyWithoutEscaping(x2)
+    case .int:
+        break
+    }
+}
+
+// This is wrong.
+public func enumPatternMatchSwitch2(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    switch x2 {
+    case let .klass(k): // expected-note {{consuming use}}
+        classUseMoveOnlyWithoutEscaping(k)
+    case .int:
+        break
+    }
+}
+
+// This is wrong today. We should error on x2.
+public func enumPatternMatchSwitch2WhereClause(_ x: EnumTy) {
+    @_noImplicitCopy let x2 = x // expected-error {{'x2' consumed more than once}}
+    switch x2 {
+    case let .klass(k) // expected-note {{consuming use}}
+           where x2.doSomething():
+        classUseMoveOnlyWithoutEscaping(k)
+    case .int:
+        break
+    case .klass:
+        break
+    }
 }

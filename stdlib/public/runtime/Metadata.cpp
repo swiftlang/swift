@@ -389,7 +389,35 @@ namespace {
   };
 
   using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
-}
+
+  class GlobalMetadataCacheEntry {
+  public:
+    const TypeContextDescriptor *Description;
+    GenericMetadataCache Cache;
+
+    GlobalMetadataCacheEntry(const TypeContextDescriptor *description)
+        : Description(description), Cache(*description->getGenericContext()) {}
+
+    intptr_t getKeyIntValueForDump() {
+      return reinterpret_cast<intptr_t>(Description);
+    }
+    bool matchesKey(const TypeContextDescriptor *description) const {
+      return description == Description;
+    }
+    friend llvm::hash_code hash_value(const GlobalMetadataCacheEntry &value) {
+      return llvm::hash_value(value.Description);
+    }
+    static size_t
+    getExtraAllocationSize(const TypeContextDescriptor *description) {
+      return 0;
+    }
+    size_t getExtraAllocationSize() const { return 0; }
+  };
+
+  static SimpleGlobalCache<GlobalMetadataCacheEntry, GlobalMetadataCacheTag>
+      GlobalMetadataCache;
+
+} // end anonymous namespace
 
 /// Fetch the metadata cache for a generic metadata structure.
 static GenericMetadataCache &getCache(
@@ -400,6 +428,11 @@ static GenericMetadataCache &getCache(
   static_assert(sizeof(LazyGenericMetadataCache) <=
                 sizeof(GenericMetadataInstantiationCache::PrivateData),
                 "metadata cache is larger than the allowed space");
+
+  auto *cacheStorage = generics.getInstantiationCache();
+  if (cacheStorage == nullptr) {
+    return GlobalMetadataCache.getOrInsert(&description).first->Cache;
+  }
 
   auto lazyCache =
     reinterpret_cast<LazyGenericMetadataCache*>(
@@ -4606,11 +4639,38 @@ public:
                          const void * const *instantiationArgs);
 };
 
-} // end anonymous namespace
-
 using GenericWitnessTableCache =
   MetadataCache<WitnessTableCacheEntry, GenericWitnessTableCacheTag>;
 using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
+
+class GlobalWitnessTableCacheEntry {
+public:
+  const GenericWitnessTable *Gen;
+  GenericWitnessTableCache Cache;
+
+  GlobalWitnessTableCacheEntry(const GenericWitnessTable *gen)
+      : Gen(gen), Cache() {}
+
+  intptr_t getKeyIntValueForDump() {
+    return reinterpret_cast<intptr_t>(Gen);
+  }
+  bool matchesKey(const GenericWitnessTable *gen) const {
+    return gen == Gen;
+  }
+  friend llvm::hash_code hash_value(const GlobalWitnessTableCacheEntry &value) {
+    return llvm::hash_value(value.Gen);
+  }
+  static size_t
+  getExtraAllocationSize(const GenericWitnessTable *gen) {
+    return 0;
+  }
+  size_t getExtraAllocationSize() const { return 0; }
+};
+
+static SimpleGlobalCache<GlobalWitnessTableCacheEntry, GlobalWitnessTableCacheTag>
+    GlobalWitnessTableCache;
+
+} // end anonymous namespace
 
 /// Fetch the cache for a generic witness-table structure.
 static GenericWitnessTableCache &getCache(const GenericWitnessTable *gen) {
@@ -4618,6 +4678,10 @@ static GenericWitnessTableCache &getCache(const GenericWitnessTable *gen) {
   static_assert(sizeof(LazyGenericWitnessTableCache) <=
                 sizeof(GenericWitnessTable::PrivateDataType),
                 "metadata cache is larger than the allowed space");
+
+  if (gen->PrivateData == nullptr) {
+    return GlobalWitnessTableCache.getOrInsert(gen).first->Cache;
+  }
 
   auto lazyCache =
     reinterpret_cast<LazyGenericWitnessTableCache*>(gen->PrivateData.get());
@@ -4935,6 +4999,8 @@ WitnessTableCacheEntry::allocate(
 static WitnessTable *
 getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
                             const Metadata *type) {
+  assert(conformance->getGenericWitnessTable()->PrivateData != nullptr);
+
   // Check whether the table has already been instantiated.
   auto tablePtr = reinterpret_cast<std::atomic<WitnessTable*> *>(
                      conformance->getGenericWitnessTable()->PrivateData.get());
@@ -5001,7 +5067,8 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // least, not today). However, a generic type conformance may also be
   // nondependent if it 
   auto typeDescription = conformance->getTypeDescriptor();
-  if (typeDescription && !typeDescription->isGeneric()) {
+  if (typeDescription && !typeDescription->isGeneric() &&
+      genericTable->PrivateData != nullptr) {
     return getNondependentWitnessTable(conformance, type);
   }
 
@@ -5285,14 +5352,16 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
     // Resolve the relative reference to the witness function.
     int32_t offset;
     memcpy(&offset, mangledName.data() + 1, 4);
-    auto ptr = detail::applyRelativeOffset(mangledName.data() + 1, offset);
+    uintptr_t ptr = detail::applyRelativeOffset(mangledName.data() + 1, offset);
 
     // Call the witness function.
-    auto witnessFn = (AssociatedWitnessTableAccessFunction *)ptr;
+    AssociatedWitnessTableAccessFunction *witnessFn;
 #if SWIFT_PTRAUTH
-    witnessFn = ptrauth_sign_unauthenticated(witnessFn,
-                                             ptrauth_key_function_pointer,
-                                             0);
+    witnessFn =
+        (AssociatedWitnessTableAccessFunction *)ptrauth_sign_unauthenticated(
+            (void *)ptr, ptrauth_key_function_pointer, 0);
+#else
+    witnessFn = (AssociatedWitnessTableAccessFunction *)ptr;
 #endif
 
     auto assocWitnessTable = witnessFn(assocType, conformingType, wtable);
@@ -5851,7 +5920,7 @@ namespace {
 alignas(void *) static struct {
   char Pool[InitialPoolSize];
 } InitialAllocationPool;
-static std::atomic<PoolRange>
+static swift::atomic<PoolRange>
 AllocationPool{PoolRange{InitialAllocationPool.Pool,
                          sizeof(InitialAllocationPool.Pool)}};
 
@@ -6004,10 +6073,9 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
     }
 
     // Swap in the new state.
-    if (std::atomic_compare_exchange_weak_explicit(&AllocationPool,
-                                                   &curState, newState,
-                                              std::memory_order_relaxed,
-                                              std::memory_order_relaxed)) {
+    if (AllocationPool.compare_exchange_weak(curState, newState,
+                                             std::memory_order_relaxed,
+                                             std::memory_order_relaxed)) {
       // If that succeeded, we've successfully allocated.
       __msan_allocated_memory(allocation, sizeWithHeader);
       __asan_unpoison_memory_region(allocation, sizeWithHeader);
@@ -6062,11 +6130,10 @@ void MetadataAllocator::Deallocate(const void *allocation, size_t size,
   // don't bother trying again; we'll just leak the allocation.
   PoolRange newState = { reinterpret_cast<char*>(const_cast<void*>(allocation)),
                          curState.Remaining + size };
-  (void)
-    std::atomic_compare_exchange_strong_explicit(&AllocationPool,
-                                                 &curState, newState,
-                                                 std::memory_order_relaxed,
-                                                 std::memory_order_relaxed);
+
+  AllocationPool.compare_exchange_weak(curState, newState,
+                                       std::memory_order_relaxed,
+                                       std::memory_order_relaxed);
 }
 
 #endif

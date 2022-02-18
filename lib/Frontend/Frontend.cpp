@@ -96,6 +96,11 @@ CompilerInvocation::getObjCHeaderOutputPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.ObjCHeaderOutputPath;
 }
+std::string
+CompilerInvocation::getCxxHeaderOutputPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.CxxHeaderOutputPath;
+}
 std::string CompilerInvocation::getModuleOutputPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.ModuleOutputPath;
@@ -852,8 +857,10 @@ void CompilerInstance::verifyImplicitConcurrencyImport() {
 }
 
 bool CompilerInstance::canImportSwiftConcurrency() const {
-  return getASTContext().canImportModule(
-      {getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME), SourceLoc()});
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath);
 }
 
 void CompilerInstance::verifyImplicitStringProcessingImport() {
@@ -865,9 +872,10 @@ void CompilerInstance::verifyImplicitStringProcessingImport() {
 }
 
 bool CompilerInstance::canImportSwiftStringProcessing() const {
-  return getASTContext().canImportModule(
-      {getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME),
-       SourceLoc()});
+  ImportPath::Module::Builder builder(
+      getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME));
+  auto modulePath = builder.get();
+  return getASTContext().canImportModule(modulePath);
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
@@ -1360,6 +1368,10 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
   return false;
 }
 
+bool CompilerInstance::isCancellationRequested() const {
+  auto flag = getASTContext().CancellationFlag;
+  return flag && flag->load(std::memory_order_relaxed);
+}
 
 const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForWholeModuleOptimizationMode()

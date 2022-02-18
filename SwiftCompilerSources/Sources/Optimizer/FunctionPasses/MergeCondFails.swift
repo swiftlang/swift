@@ -35,7 +35,7 @@ private func runMergeCondFails(function: Function, context: PassContext) {
   // between them.
   for block in function.blocks {
     // Per basic block list of cond_fails to merge.
-    var condFailToMerge = StackList<CondFailInst>(context)
+    var condFailToMerge = Stack<CondFailInst>(context)
 
     for inst in block.instructions {
       if let cfi = inst as? CondFailInst {
@@ -58,7 +58,7 @@ private func runMergeCondFails(function: Function, context: PassContext) {
 
 /// Try to merge the cond_fail instructions. Returns true if any could
 /// be merge.
-private func mergeCondFails(_ condFailToMerge: inout StackList<CondFailInst>,
+private func mergeCondFails(_ condFailToMerge: inout Stack<CondFailInst>,
                             context: PassContext) {
   guard let lastCFI = condFailToMerge.last else {
     return

@@ -31,6 +31,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -468,9 +469,10 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
         depth = genericSig.getGenericParams().back()->getDepth() + 1;
 
       for (auto *param : genericParams->getParams()) {
-        auto *newParam = new (ctx) GenericTypeParamDecl(
+        auto *newParam = GenericTypeParamDecl::create(
             classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
-            depth, param->getIndex());
+            depth, param->getIndex(), param->isOpaqueType(),
+            /*opaqueTypeRepr=*/nullptr);
         newParams.push_back(newParam);
       }
 
@@ -927,10 +929,7 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
           if (VD->getAttrs().hasAttribute<NSManagedAttr>())
             CheckDefaultInitializer = false;
 
-          if (VD->hasStorage())
-            HasStorage = true;
-          auto *backing = VD->getPropertyWrapperBackingProperty();
-          if (backing && backing->hasStorage())
+          if (VD->hasStorageOrWrapsStorage())
             HasStorage = true;
         });
 

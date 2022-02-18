@@ -859,11 +859,11 @@ func release(ptr: Builtin.NativeObject) {
 // Other Operations
 //===----------------------------------------------------------------------===//
 
-func once_helper() {}
+func once_helper(_ context: Builtin.RawPointer) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins4once7controlyBp_tF
-// CHECK:      [[T0:%.*]] = function_ref @$s8builtins11once_helperyyFTo : $@convention(c) () -> ()
-// CHECK-NEXT: builtin "once"(%0 : $Builtin.RawPointer, [[T0]] : $@convention(c) () -> ())
+// CHECK:      [[T0:%.*]] = function_ref @$s8builtins11once_helperyyBpFTo : $@convention(c) (Builtin.RawPointer) -> ()
+// CHECK-NEXT: builtin "once"(%0 : $Builtin.RawPointer, [[T0]] : $@convention(c) (Builtin.RawPointer) -> ())
 func once(control: Builtin.RawPointer) {
   Builtin.once(control, once_helper)
 }

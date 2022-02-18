@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
+#include "Diagnostics.h"
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -30,6 +31,7 @@ namespace swift {
 
 class AssociatedTypeDecl;
 class ProtocolDecl;
+class ProtocolTypeAlias;
 class Requirement;
 
 namespace rewriting {
@@ -39,18 +41,32 @@ namespace rewriting {
 // documentation
 // comments.
 
-void desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
+void desugarRequirement(Requirement req,
+                        SmallVectorImpl<Requirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
 
 void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
                        SmallVectorImpl<StructuralRequirement> &result);
 
 void realizeRequirement(Requirement req, RequirementRepr *reqRepr,
                         ModuleDecl *moduleForInference,
-                        SmallVectorImpl<StructuralRequirement> &result);
+                        SmallVectorImpl<StructuralRequirement> &result,
+                        SmallVectorImpl<RequirementError> &errors);
 
 void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   ModuleDecl *moduleForInference,
-                                  SmallVectorImpl<StructuralRequirement> &result);
+                                  SmallVectorImpl<StructuralRequirement> &result,
+                                  SmallVectorImpl<RequirementError> &errors);
+
+bool diagnoseRequirementErrors(ASTContext &ctx,
+                               SmallVectorImpl<RequirementError> &errors,
+                               bool allowConcreteGenericParams);
+
+std::pair<MutableTerm, MutableTerm>
+getRuleForRequirement(const Requirement &req,
+                      const ProtocolDecl *proto,
+                      Optional<ArrayRef<Term>> substitutions,
+                      RewriteContext &ctx);
 
 /// A utility class for bulding rewrite rules from the top-level requirements
 /// of a generic signature.
@@ -59,7 +75,6 @@ void realizeInheritedRequirements(TypeDecl *decl, Type type,
 /// appearing on the right hand side of conformance requirements.
 struct RuleBuilder {
   RewriteContext &Context;
-  bool Dump;
 
   /// The keys are the unique protocols we've added so far. The value indicates
   /// whether the protocol's SCC is an initial component for the rewrite system.
@@ -75,7 +90,9 @@ struct RuleBuilder {
   ///
   /// This is what breaks the cycle in requirement signature computation for a
   /// group of interdependent protocols.
-  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
+  llvm::DenseMap<const ProtocolDecl *, bool> &ProtocolMap;
+
+  /// The keys of the above map in insertion order.
   std::vector<const ProtocolDecl *> Protocols;
 
   /// New rules to add which will be marked 'permanent'. These are rules for
@@ -89,11 +106,15 @@ struct RuleBuilder {
   /// eliminated by homotopy reduction.
   std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
 
-  CanType getConcreteSubstitutionSchema(CanType concreteType,
-                                        const ProtocolDecl *proto,
-                                        SmallVectorImpl<Term> &result);
+  /// Enables debugging output. Controlled by the -dump-requirement-machine
+  /// frontend flag.
+  bool Dump;
 
-  RuleBuilder(RewriteContext &ctx, bool dump) : Context(ctx), Dump(dump) {}
+  RuleBuilder(RewriteContext &ctx,
+              llvm::DenseMap<const ProtocolDecl *, bool> &protocolMap)
+      : Context(ctx), ProtocolMap(protocolMap),
+        Dump(ctx.getASTContext().LangOpts.DumpRequirementMachine) {}
+
   void addRequirements(ArrayRef<Requirement> requirements);
   void addRequirements(ArrayRef<StructuralRequirement> requirements);
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);
@@ -105,6 +126,8 @@ struct RuleBuilder {
                       const ProtocolDecl *proto);
   void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
+  void addTypeAlias(const ProtocolTypeAlias &alias,
+                    const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();
 };
 

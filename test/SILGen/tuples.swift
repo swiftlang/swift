@@ -25,9 +25,11 @@ func make_xy() -> (x: Int, y: P) { return (make_int(), make_p()) }
 // CHECK-LABEL: sil hidden [ossa] @$s6tuples17testShuffleOpaqueyyF
 func testShuffleOpaque() {
   // CHECK: [[X:%.*]] = alloc_box ${ var P }
-  // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
+  // CHECK: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+  // CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
   // CHECK: [[Y:%.*]] = alloc_box ${ var Int }
-  // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y]]
+  // CHECK: [[Y_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[Y]]
+  // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y_LIFETIME]]
   // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $P
 
   // CHECK:      [[T0:%.*]] = function_ref @$s6tuples7make_xySi1x_AA1P_p1ytyF
@@ -38,7 +40,8 @@ func testShuffleOpaque() {
   var (x,y) : (y:P, x:Int) = make_xy()
 
   // CHECK-NEXT: [[PAIR:%.*]] = alloc_box ${ var (y: P, x: Int) }
-  // CHECK-NEXT: [[PBPAIR:%.*]] = project_box [[PAIR]]
+  // CHECK-NEXT: [[PAIR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[PAIR]]
+  // CHECK-NEXT: [[PBPAIR:%.*]] = project_box [[PAIR_LIFETIME]]
   // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $P
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples7make_xySi1x_AA1P_p1ytyF
@@ -67,9 +70,11 @@ func testShuffleOpaque() {
 // CHECK-LABEL: testShuffleTuple
 func testShuffleTuple() {
   // CHECK: [[X:%.*]] = alloc_box ${ var P }
-  // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
+  // CHECK: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+  // CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
   // CHECK: [[Y:%.*]] = alloc_box ${ var Int }
-  // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y]]
+  // CHECK: [[Y_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[Y]]
+  // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y_LIFETIME]]
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples8make_intSiyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]()
@@ -83,7 +88,8 @@ func testShuffleTuple() {
   var (x,y) : (y:P, x:Int) = (x: make_int(), y: make_p())
 
   // CHECK-NEXT: [[PAIR:%.*]] = alloc_box ${ var (y: P, x: Int) }
-  // CHECK-NEXT: [[PBPAIR:%.*]] = project_box [[PAIR]]
+  // CHECK-NEXT: [[PAIR_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[PAIR]]
+  // CHECK-NEXT: [[PBPAIR:%.*]] = project_box [[PAIR_LIFETIME]]
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples8make_intSiyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]()

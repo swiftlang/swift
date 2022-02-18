@@ -176,7 +176,7 @@ func testOptionalSequence() {
 }
 
 // FIXME: Should this be allowed?
-func testExistentialSequence(s: Sequence) {
+func testExistentialSequence(s: any Sequence) {
   for x in s { // expected-error {{protocol 'Sequence' as a type cannot conform to the protocol itself}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
     _ = x
   }

@@ -196,12 +196,16 @@ protocol DistributedTacoMaker: DistributedActor, TacoPreparation {
 }
 
 extension DistributedTacoMaker {
-    distributed func makeTacos(with: Salsa) {}
+  distributed func makeTacos(with: Salsa) {}
 }
 
 extension TacoPreparation {
-    distributed func makeSalsa() -> Salsa {}
+  distributed func makeSalsa() -> Salsa {}
   // expected-error@-1{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 distributed actor TacoWorker: DistributedTacoMaker {} // implemented in extensions
+
+extension DistributedTacoMaker where SerializationRequirement == Codable {
+  distributed func makeGreatTacos(with: Salsa) {}
+}

@@ -168,7 +168,6 @@ KNOWN_SETTINGS=(
     ## LLDB Options
     lldb-assertions                               "1"               "build lldb with assertions enabled"
     lldb-extra-cmake-args                         ""                "extra command line args to pass to lldb cmake"
-    lldb-no-debugserver                           ""                "delete debugserver after building it, and don't try to codesign it"
     lldb-test-cc                                  ""                "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-swift-compatibility                 ""                "specify additional Swift compilers to test lldb with"
     lldb-test-swift-only                          "0"               "when running lldb tests, only include Swift-specific tests"
@@ -196,6 +195,7 @@ KNOWN_SETTINGS=(
     extra-swift-args                              ""                "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
+    sil-verify-all-macos-only                     "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process when building a macos stdlib"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
     swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Darwin platforms, 0 otherwise"
     swift-enable-dispatch                         "1"               "whether to enable use of libdispatch"
@@ -218,7 +218,9 @@ KNOWN_SETTINGS=(
     swift-stdlib-enable-prespecialization         ""                "whether stdlib should be built with generic metadata prespecialization enabled, defaults to true on Darwin and Linux, false otherwise"
     swift-stdlib-passthrough-metadata-allocator   "0"               "whether stdlib should be built without a custom implementation of MetadataAllocator, relying on malloc+free instead"
     swift-stdlib-short-mangling-lookups           "1"               "whether to build stdlib with fast-path context descriptor lookups based on well-known short manglings"
+    swift-stdlib-enable-vector-types              "1"               "whether to build stdlib with support for SIMD and vector types"
     swift-stdlib-experimental-hermetic-seal-at-link     "0"         "whether stdlib should be built with -experimental-hermetic-seal-at-link"
+    swift-stdlib-disable-instantiation-caches     "0"               "whether to build stdlib with -disable-preallocated-instantiation-caches"
     swift-stdlib-has-type-printing                "1"               "whether stdlib should support printing user-friendly type name as strings at runtime"
     swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
@@ -249,6 +251,7 @@ KNOWN_SETTINGS=(
     cross-compile-with-host-tools                 ""                "set to use the clang we build for the host to then build the cross-compile hosts"
     cross-compile-install-prefixes                ""                "semicolon-separated list of install prefixes to use for the cross-compiled hosts. The list expands, so if there are more cross-compile hosts than prefixes, unmatched hosts use the last prefix in the list"
     cross-compile-deps-path                       ""                "path for CMake to look for cross-compiled library dependencies, such as libXML2"
+    cross-compile-append-host-target-to-destdir   "1"               "turns on appending the host target name of each cross-compiled toolchain to its install-destdir, to keep them separate from the natively-built toolchain"
     skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
     skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
@@ -1133,8 +1136,10 @@ function get_host_install_destdir() {
         if [[ $(should_include_host_in_lipo ${host}) ]]; then
             # If this is one of the hosts we should lipo, install in to a temporary subdirectory.
             local host_install_destdir="${BUILD_DIR}/intermediate-install/${host}"
-        elif [[ "${host}" == "merged-hosts" ]]; then
-            # This assumes that all hosts are merged to the lipo.
+        elif [[ "${host}" == "merged-hosts" ]] ||
+             [[ "$(true_false ${CROSS_COMPILE_APPEND_HOST_TARGET_TO_DESTDIR})" == "FALSE" ]]; then
+            # This assumes that all hosts are merged to the lipo, or the build
+            # was told not to append anything.
             local host_install_destdir="${INSTALL_DESTDIR}"
         else
             local host_install_destdir="${INSTALL_DESTDIR}/${host}"
@@ -1685,6 +1690,7 @@ for host in "${ALL_HOSTS[@]}"; do
         "${swift_cmake_options[@]}"
         -DSWIFT_AST_VERIFIER:BOOL=$(true_false "${SWIFT_ENABLE_AST_VERIFIER}")
         -DSWIFT_SIL_VERIFY_ALL:BOOL=$(true_false "${SIL_VERIFY_ALL}")
+        -DSWIFT_SIL_VERIFY_ALL_MACOS_ONLY:BOOL=$(true_false "${SIL_VERIFY_ALL_MACOS_ONLY}")
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
     )
 
@@ -1769,14 +1775,15 @@ for host in "${ALL_HOSTS[@]}"; do
                     # build of Swift depend on these for building and testing.
                     build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
                     # If we are not performing a toolchain only build, then we
-                    # also want to include FileCheck, not, llvm-nm for testing
-                    # purposes.
+                    # also want to include FileCheck, not, llvm-nm, and similar
+                    # for testing purposes.
                     if [[ ! "${BUILD_TOOLCHAIN_ONLY}" ]] ; then
                       build_targets=(
                           "${build_targets[@]}"
                           FileCheck
                           not
                           llvm-nm
+                          llvm-size
                       )
                     fi
                 fi
@@ -2004,8 +2011,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_ENABLE_LTO:STRING="${SWIFT_STDLIB_LTO}"
                     -DSWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR:BOOL=$(true_false "${SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR}")
                     -DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS:BOOL=$(true_false "${SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS}")
+                    -DSWIFT_STDLIB_ENABLE_VECTOR_TYPES:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_VECTOR_TYPES}")
                     -DSWIFT_STDLIB_HAS_TYPE_PRINTING:BOOL=$(true_false "${SWIFT_STDLIB_HAS_TYPE_PRINTING}")
                     -DSWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK:BOOL=$(true_false "${SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK}")
+                    -DSWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES:BOOL=$(true_false "${SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
@@ -2063,19 +2072,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                     -DSWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD:PATH="$(build_directory ${host} libdispatch_static)"
                 )
-
-                if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
-                    LIBICU_BUILD_DIR="$(build_directory ${host} libicu)"
-                    ICU_TMPINSTALL=${LIBICU_BUILD_DIR}/tmp_install
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_PATH_TO_LIBICU_SOURCE:PATH="${LIBICU_SOURCE_DIR}"
-                        -DSWIFT_PATH_TO_LIBICU_BUILD:PATH="${LIBICU_BUILD_DIR}"
-                        -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
-                        -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
-                        -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB:BOOL=TRUE
-                    )
-                fi
 
                 if [[ "${SWIFT_SDKS}" ]] ; then
                     cmake_options=(
@@ -2489,6 +2485,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=(
                         -DICU_ROOT:PATH=${ICU_ROOT}
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
+                        -DICU_DATA_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
@@ -2959,6 +2959,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=(
                         -DICU_ROOT:PATH=${ICU_ROOT}
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
+                        -DICU_DATA_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
+                        -DICU_DATA_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicudataswift.so
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so

@@ -42,3 +42,9 @@ public struct SimpleThingInAlphabeticalOrderForMacros1 {}
 @available(tvOS 0.7, OSX 1.1, iOS 2.1, watchOS 3.2, *)
 @_originallyDefinedIn(module: "other2", _myProject 1.0)
 public struct SimpleThingInAlphabeticalOrderForMacros2 {}
+
+// CHECK: @_originallyDefinedIn(module: "another", macOS 13.13)
+@available(OSX 10.8, *)
+@_originallyDefinedIn(module: "another", OSX 13.13)
+@usableFromInline
+internal struct SimpleThingInAlphabeticalOrderForMacros3_UsableFromInline {}

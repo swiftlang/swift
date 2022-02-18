@@ -122,7 +122,10 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are checking the underlying type of a generic typealias.
   GenericTypeAliasDecl,
 
-  /// Whether we are in a requirement of a generic declaration
+  /// Whether we are in the constraint type of an existential type.
+  ExistentialConstraint,
+
+  /// Whether we are in a requirement of a generic declaration.
   GenericRequirement,
 
   /// Whether we are in a same-type requirement of a generic
@@ -225,6 +228,7 @@ public:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
+    case Context::ExistentialConstraint:
     case Context::SameTypeRequirement:
     case Context::ProtocolMetatypeBase:
     case Context::MetatypeBase:
@@ -246,6 +250,7 @@ public:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
+    case Context::ExistentialConstraint:
     case Context::MetatypeBase:
       return false;
     case Context::None:
@@ -268,6 +273,40 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
       return true;
+    }
+  }
+
+  /// Whether parameterized protocol types are supported in this context.
+  bool isParameterizedProtocolSupported() const {
+    switch (context) {
+    case Context::Inherited:
+    case Context::ExtensionBinding:
+    case Context::GenericRequirement:
+      return true;
+    case Context::None:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::MetatypeBase:
+    case Context::ExistentialConstraint:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::FunctionInput:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::EnumPatternPayload:
+    case Context::SameTypeRequirement:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+      return false;
     }
   }
 

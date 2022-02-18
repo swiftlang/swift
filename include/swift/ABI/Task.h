@@ -222,9 +222,9 @@ public:
     void *Storage[14];
 
     /// Initialize this storage during the creation of a task.
-    void initialize(AsyncTask *task);
-    void initializeWithSlab(AsyncTask *task,
-                            void *slab, size_t slabCapacity);
+    void initialize(JobPriority basePri);
+    void initializeWithSlab(JobPriority basePri, void *slab,
+                            size_t slabCapacity);
 
     /// React to the completion of the enclosing task's execution.
     void complete(AsyncTask *task);
@@ -272,6 +272,14 @@ public:
 
   /// Set the task's ID field to the next task ID.
   void setTaskId();
+  uint64_t getTaskId();
+
+  /// Get the task's resume function, for logging purposes only. This will
+  /// attempt to see through the various adapters that are sometimes used, and
+  /// failing that will return ResumeTask. The returned function pointer may
+  /// have a different signature than ResumeTask, and it's only for identifying
+  /// code associated with the task.
+  const void *getResumeFunctionForLogging();
 
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
@@ -282,6 +290,22 @@ public:
     return ResumeTask(ResumeContext); // 'return' forces tail call
   }
 
+  /// A task can have the following states:
+  ///   * suspended: In this state, a task is considered not runnable
+  ///   * enqueued: In this state, a task is considered runnable
+  ///   * running on a thread
+  ///   * completed
+  ///
+  /// The following state transitions are possible:
+  ///       suspended -> enqueued
+  ///       suspended -> running
+  ///       enqueued -> running
+  ///       running -> suspended
+  ///       running -> completed
+  ///       running -> enqueued
+  ///
+  /// The 4 methods below are how a task switches from one state to another.
+
   /// Flag that this task is now running.  This can update
   /// the priority stored in the job flags if the priority has been
   /// escalated.
@@ -289,16 +313,13 @@ public:
   /// Generally this should be done immediately after updating
   /// ActiveTask.
   void flagAsRunning();
-  void flagAsRunning_slow();
 
-  /// Flag that this task is now suspended.  This can update the
-  /// priority stored in the job flags if the priority hsa been
-  /// escalated.  Generally this should be done immediately after
-  /// clearing ActiveTask and immediately before enqueuing the task
-  /// somewhere.  TODO: record where the task is enqueued if
-  /// possible.
+  /// Flag that this task is now suspended.
   void flagAsSuspended();
-  void flagAsSuspended_slow();
+
+  /// Flag that the task is to be enqueued on the provided executor and actually
+  /// enqueue it
+  void flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor);
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.

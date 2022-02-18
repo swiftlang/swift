@@ -342,7 +342,8 @@ class D: C {
   // CHECK:       bb0([[SELF:%.*]] : @owned $D):
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var D }
   // CHECK-NEXT:    [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
-  // CHECK-NEXT:    [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
+  // CHECK-NEXT:    [[LIFETIME:%.+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK-NEXT:    [[PB:%.*]] = project_box [[LIFETIME]]
   // CHECK-NEXT:    store [[SELF]] to [init] [[PB]]
   // CHECK-NOT:     [[PB]]
   // CHECK:         [[SELF1:%.*]] = load [take] [[PB]]
@@ -357,6 +358,7 @@ class D: C {
   // CHECK-NOT:     [[SELF2]]
   // CHECK-NOT:     [[SUPER2]]
   // CHECK:         [[SELF_FINAL:%.*]] = load [copy] [[PB]]
+  // CHECK-NEXT:    end_borrow [[LIFETIME]]
   // CHECK-NEXT:    destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT:    return [[SELF_FINAL]]
   required init() {
@@ -462,7 +464,8 @@ class LetFieldClass {
   // CHECK-NEXT: end_borrow [[REBORROWED_KRAKEN]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
+  // CHECK-NEXT: [[KRAKEN_LIFETIME:%.+]] = begin_borrow [lexical] [[KRAKEN_BOX]]
+  // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_LIFETIME]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
   // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
   // CHECK-NEXT: store [[KRAKEN]] to [init] [[PB]]
@@ -472,6 +475,7 @@ class LetFieldClass {
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
+  // CHECK-NEXT: end_borrow [[KRAKEN_LIFETIME]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
@@ -505,7 +509,8 @@ class LetFieldClass {
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN]])
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
-  // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
+  // CHECK-NEXT: [[KRAKEN_LIFETIME:%.+]] = begin_borrow [lexical] [[KRAKEN_BOX]]
+  // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_LIFETIME]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter : (LetFieldClass) -> () -> Kraken, $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN2:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK-NEXT: store [[KRAKEN2]] to [init] [[PB]]
@@ -515,6 +520,7 @@ class LetFieldClass {
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$s15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
   // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
+  // CHECK-NEXT: end_borrow [[KRAKEN_LIFETIME]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
   // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]

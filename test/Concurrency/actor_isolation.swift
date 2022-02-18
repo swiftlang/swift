@@ -3,7 +3,7 @@
 // RUN: %target-typecheck-verify-swift -I %t  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
-import OtherActors // expected-remark{{add '@_predatesConcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@_predatesConcurrency }}
+import OtherActors // expected-remark{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@preconcurrency }}
 
 let immutableGlobal: String = "hello"
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
@@ -46,7 +46,7 @@ actor MySuperActor {
   }
 }
 
-class Point { // expected-note{{class 'Point' does not conform to the 'Sendable' protocol}}
+class Point { // expected-note 5{{class 'Point' does not conform to the 'Sendable' protocol}}
   var x : Int = 0
   var y : Int = 0
 }
@@ -108,6 +108,66 @@ func checkAsyncPropertyAccess() async {
 
   _ = act.point  // expected-warning{{non-sendable type 'Point' in asynchronous access to actor-isolated property 'point' cannot cross actor boundary}}
 }
+
+/// ------------------------------------------------------------------
+/// -- Value types do not need isolation on their stored properties --
+protocol MainCounter {
+  @MainActor var counter: Int { get set }
+  @MainActor var ticker: Int { get set }
+}
+
+struct InferredFromConformance: MainCounter {
+  var counter = 0
+  var ticker: Int {
+    get { 1 }
+    set {}
+  }
+}
+
+@MainActor
+struct InferredFromContext {
+  var point = Point()
+  var polygon: [Point] {
+    get { [] }
+  }
+
+  nonisolated var status: Bool = true // expected-error {{'nonisolated' can not be applied to stored properties}}{{3-15=}}
+
+  nonisolated let flag: Bool = false // expected-warning {{'nonisolated' is redundant on struct's stored properties; this is an error in Swift 6}}{{3-15=}}
+
+  subscript(_ i: Int) -> Int { return i }
+
+  static var stuff: [Int] = []
+}
+
+func checkIsolationValueType(_ formance: InferredFromConformance,
+                             _ ext: InferredFromContext,
+                             _ anno: NoGlobalActorValueType) async {
+  // these still do need an await in Swift 5
+  _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
+  _ = await formance.counter
+  _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
+  _ = anno.counter
+
+  // these will always need an await
+  _ = await (formance as MainCounter).counter
+  _ = await ext[1]
+  _ = await formance.ticker
+  _ = await ext.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated property 'polygon' cannot cross actor boundary}}
+  _ = await InferredFromContext.stuff
+  _ = await NoGlobalActorValueType.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated static property 'polygon' cannot cross actor boundary}}
+}
+
+// check for instance members that do not need global-actor protection
+struct NoGlobalActorValueType {
+  @SomeGlobalActor var point: Point // expected-warning {{stored property 'point' within struct cannot have a global actor; this is an error in Swift 6}}
+
+  @MainActor let counter: Int // expected-warning {{stored property 'counter' within struct cannot have a global actor; this is an error in Swift 6}}
+
+  @MainActor static var polygon: [Point] = []
+}
+
+/// -----------------------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)
 extension MyActor {
@@ -751,15 +811,44 @@ extension SomeClassInActor.ID {
 // ----------------------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 actor SomeActorWithInits {
-  var mutableState: Int = 17
+  var mutableState: Int = 17 // expected-note 3 {{mutation of this property is only permitted within the actor}}
   var otherMutableState: Int
+  let nonSendable: SomeClass
+
+  // Sema should not complain about referencing non-sendable members
+  // in an actor init or deinit, as those are diagnosed later by flow-isolation.
+  init(_ x: SomeClass) {
+    self.nonSendable = x
+  }
 
   init(i1: Bool) {
     self.mutableState = 42
     self.otherMutableState = 17
 
-    self.isolated()
+    self.isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
     self.nonisolated()
+
+    defer {
+      isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+      mutableState += 1 // okay
+      nonisolated()
+    }
+
+    func local() {
+      isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+      mutableState += 1 // expected-error{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context}}
+      nonisolated()
+    }
+    local()
+
+    let _ = {
+      defer {
+        isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+        mutableState += 1  // expected-error{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context}}
+        nonisolated()
+      }
+      nonisolated()
+    }()
   }
 
   init(i2: Bool) async {
@@ -778,15 +867,16 @@ actor SomeActorWithInits {
 
   convenience init(i4: Bool) async {
     self.init(i1: i4)
-    await self.isolated()
+    self.isolated()
     self.nonisolated()
   }
 
-  @MainActor init(i5: Bool) {
+  @MainActor init(i5 x: SomeClass) {
     self.mutableState = 42
     self.otherMutableState = 17
+    self.nonSendable = x
 
-    self.isolated()
+    self.isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from the main actor}}
     self.nonisolated()
   }
 
@@ -794,7 +884,7 @@ actor SomeActorWithInits {
     self.mutableState = 42
     self.otherMutableState = 17
 
-    self.isolated()
+    await self.isolated()
     self.nonisolated()
   }
 
@@ -810,8 +900,27 @@ actor SomeActorWithInits {
     self.nonisolated()
   }
 
+  deinit {
+    let _ = self.nonSendable // OK only through typechecking, not SIL.
 
-  func isolated() { } // expected-note 2 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+    defer {
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated deinit; this is an error in Swift 6}}
+      mutableState += 1 // okay
+      nonisolated()
+    }
+
+    let _ = {
+      defer {
+        isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+        mutableState += 1  // expected-error{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context}}
+        nonisolated()
+      }
+      nonisolated()
+    }()
+  }
+
+
+  func isolated() { } // expected-note 8 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func nonisolated() {}
 }
 
@@ -890,6 +999,27 @@ extension OtherModuleActor {
     _ = self.b
     _ = self.c
     _ = self.d
+  }
+}
+
+actor CrossModuleFromInitsActor {
+  init(v1 actor: OtherModuleActor) {
+    _ = actor.a   // expected-error {{actor-isolated property 'a' can not be referenced from a non-isolated context}}
+    _ = actor.b   // okay
+
+    _ = actor.c   // expected-error {{actor-isolated property 'c' can not be referenced from a non-isolated context}}
+  }
+
+  init(v2 actor: OtherModuleActor) async {
+    _ = actor.a         // expected-error{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-1{{property access is 'async'}}
+    _ = await actor.a   // okay
+    _ = actor.b         // okay
+    _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-1{{property access is 'async'}}
+    // expected-warning@-2{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
+    _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
+    _ = await actor.d // okay
   }
 }
 
@@ -1030,11 +1160,18 @@ func test_invalid_reference_to_actor_member_without_a_call_note() {
   }
 }
 
-// Actor isolation and "defer"
+// Actor isolation and initializers through typechecking only, not flow-isolation.
 actor Counter {
   var counter: Int = 0
 
-  func next() -> Int {
+  // expected-note@+2{{mutation of this property is only permitted within the actor}}
+  // expected-note@+1{{property declared here}}
+  var computedProp : Int {
+      get { 0 }
+      set { }
+  }
+
+  func next() -> Int { // expected-note 2 {{calls to instance method 'next()' from outside of its actor context are implicitly asynchronous}}
     defer {
       counter = counter + 1
     }
@@ -1049,6 +1186,20 @@ actor Counter {
     doIt()
 
     return counter
+  }
+
+  init() {
+    _ = self.next() // expected-error {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context}}
+    defer { _ = self.next() } // expected-error {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context}}
+
+    _ = computedProp  // expected-error {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context}}
+    computedProp = 1  // expected-error {{actor-isolated property 'computedProp' can not be mutated from a non-isolated context}}
+
+  }
+
+  convenience init(material: Int) async {
+    self.init()
+    self.counter = 10 // FIXME: this should work, and also needs to work in definite initialization by injecting hops
   }
 }
 
@@ -1069,16 +1220,25 @@ class GenericSub2<T>: GenericSuper<[T]> { } // expected-error{{global actor 'Gen
 
 /// Diagnostics for `nonisolated` on an actor initializer.
 actor Butterfly {
+  var flapsPerSec = 0 // expected-note 3{{mutation of this property is only permitted within the actor}}
+
   nonisolated init() {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
 
   nonisolated init(async: Void) async {}
 
-  nonisolated convenience init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+  nonisolated convenience init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
     self.init()
+    self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
   }
 
-  nonisolated convenience init(cookies: Void) async { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+  nonisolated convenience init(cookies: Void) async {
     self.init()
+    self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
+  }
+
+  convenience init(brownies: Void) {
+    self.init()
+    self.flapsPerSec = 0 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
   }
 }
 

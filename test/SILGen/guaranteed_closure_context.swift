@@ -11,10 +11,13 @@ struct S {}
 // CHECK-LABEL: sil hidden [ossa] @$s26guaranteed_closure_context0A9_capturesyyF
 func guaranteed_captures() {
   // CHECK: [[MUTABLE_TRIVIAL_BOX:%.*]] = alloc_box ${ var S }
+  // CHECK: [[MUTABLE_TRIVIAL_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MUTABLE_TRIVIAL_BOX]]
   var mutableTrivial = S()
   // CHECK: [[MUTABLE_RETAINABLE_BOX:%.*]] = alloc_box ${ var C }
+  // CHECK: [[MUTABLE_RETAINABLE_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MUTABLE_RETAINABLE_BOX]]
   var mutableRetainable = C()
   // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX:%.*]] = alloc_box ${ var P }
+  // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MUTABLE_ADDRESS_ONLY_BOX]]
   var mutableAddressOnly: P = C()
 
   // CHECK: [[IMMUTABLE_TRIVIAL:%.*]] = apply {{.*}} -> S
@@ -30,38 +33,34 @@ func guaranteed_captures() {
          immutableTrivial, immutableRetainable, immutableAddressOnly))
   }
 
-  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]
-  // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX]]
-  // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX]]
+  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX_LIFETIME]]
+  // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX_LIFETIME]]
+  // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[IMMUTABLE_RETAINABLE]]
 
-  // CHECK:     [[B_MUTABLE_TRIVIAL_BOX:%.*]] = begin_borrow [[MUTABLE_TRIVIAL_BOX]] : ${ var S }
-  // CHECK:     [[B_MUTABLE_RETAINABLE_BOX:%.*]] = begin_borrow [[MUTABLE_RETAINABLE_BOX]] : ${ var C }
-  // CHECK:     [[B_MUTABLE_ADDRESS_ONLY_BOX:%.*]] = begin_borrow [[MUTABLE_ADDRESS_ONLY_BOX]] : ${ var P }
-
   // CHECK: [[FN:%.*]] = function_ref [[FN_NAME:@\$s26guaranteed_closure_context0A9_capturesyyF17captureEverythingL_yyF]]
-  // CHECK: apply [[FN]]([[B_MUTABLE_TRIVIAL_BOX]], [[B_MUTABLE_RETAINABLE_BOX]], [[B_MUTABLE_ADDRESS_ONLY_BOX]], [[IMMUTABLE_TRIVIAL]], [[B_IMMUTABLE_RETAINABLE]], [[IMMUTABLE_ADDRESS_ONLY]])
+  // CHECK: apply [[FN]]([[MUTABLE_TRIVIAL_BOX_LIFETIME]], [[MUTABLE_RETAINABLE_BOX_LIFETIME]], [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]], [[IMMUTABLE_TRIVIAL]], [[B_IMMUTABLE_RETAINABLE]], [[IMMUTABLE_ADDRESS_ONLY]])
   captureEverything()
 
-  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]
-  // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX]]
-  // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX]]
+  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX_LIFETIME]]
+  // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX_LIFETIME]]
+  // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[IMMUTABLE_RETAINABLE]]
 
   // -- partial_apply still takes ownership of its arguments.
   // CHECK: [[FN:%.*]] = function_ref [[FN_NAME]]
-  // CHECK: [[MUTABLE_TRIVIAL_BOX_COPY:%.*]] = copy_value [[MUTABLE_TRIVIAL_BOX]]
-  // CHECK: [[MUTABLE_RETAINABLE_BOX_COPY:%.*]] = copy_value [[MUTABLE_RETAINABLE_BOX]]
-  // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX_COPY:%.*]] = copy_value [[MUTABLE_ADDRESS_ONLY_BOX]]
+  // CHECK: [[MUTABLE_TRIVIAL_BOX_COPY:%.*]] = copy_value [[MUTABLE_TRIVIAL_BOX_LIFETIME]]
+  // CHECK: [[MUTABLE_RETAINABLE_BOX_COPY:%.*]] = copy_value [[MUTABLE_RETAINABLE_BOX_LIFETIME]]
+  // CHECK: [[MUTABLE_ADDRESS_ONLY_BOX_COPY:%.*]] = copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK: [[IMMUTABLE_RETAINABLE_COPY:%.*]] = copy_value [[B_IMMUTABLE_RETAINABLE]]
   // CHECK: [[IMMUTABLE_ADDRESS:%.*]] = alloc_stack $P
   // CHECK: [[CLOSURE:%.*]] = partial_apply {{.*}}([[MUTABLE_TRIVIAL_BOX_COPY]], [[MUTABLE_RETAINABLE_BOX_COPY]], [[MUTABLE_ADDRESS_ONLY_BOX_COPY]], [[IMMUTABLE_TRIVIAL]], [[IMMUTABLE_RETAINABLE_COPY]], [[IMMUTABLE_ADDRESS]])
   // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
   // CHECK: apply {{.*}}[[CONVERT]]
 
-  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX]]
-  // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX]]
-  // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX]]
+  // CHECK-NOT: copy_value [[MUTABLE_TRIVIAL_BOX_LIFETIME]]
+  // CHECK-NOT: copy_value [[MUTABLE_RETAINABLE_BOX_LIFETIME]]
+  // CHECK-NOT: copy_value [[MUTABLE_ADDRESS_ONLY_BOX_LIFETIME]]
   // CHECK-NOT: copy_value [[IMMUTABLE_RETAINABLE]]
 
   escape(captureEverything)

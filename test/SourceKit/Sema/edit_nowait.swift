@@ -1,3 +1,5 @@
+// REQUIRES: rdar88504525
+
 // RUN: %empty-directory(%t)
 // RUN: echo "func f() { f() }" > %t/t.swift
 

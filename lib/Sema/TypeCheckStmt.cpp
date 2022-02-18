@@ -855,10 +855,11 @@ public:
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
-    Type exnType = getASTContext().getErrorDecl()->getDeclaredInterfaceType();
-    if (!exnType) return TS;
+    if (!getASTContext().getErrorDecl())
+      return TS;
 
-    TypeChecker::typeCheckExpression(E, DC, {exnType, CTP_ThrowStmt});
+    Type errorType = getASTContext().getErrorExistentialType();
+    TypeChecker::typeCheckExpression(E, DC, {errorType, CTP_ThrowStmt});
     TS->setSubExpr(E);
 
     return TS;
@@ -1205,7 +1206,7 @@ public:
     auto catches = S->getCatches();
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,
-                          getASTContext().getExceptionType());
+                          getASTContext().getErrorExistentialType());
 
     return S;
   }
@@ -1286,7 +1287,12 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     return;
   }
 
-  // Drill through noop expressions we don't care about.
+  // Stash the type of the original expression for display: the precise
+  // expression we're looking for might have an intermediary, non-user-facing
+  // type, such as an opened archetype.
+  const Type TypeForDiag = E->getType();
+
+  // Drill through expressions we don't care about.
   auto valueE = E;
   while (1) {
     valueE = valueE->getValueProvidingExpr();
@@ -1297,14 +1303,33 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
       valueE = CRCE->getSubExpr();
     else if (auto *EE = dyn_cast<ErasureExpr>(valueE))
       valueE = EE->getSubExpr();
-    else
-      break;
+    else if (auto *BOE = dyn_cast<BindOptionalExpr>(valueE))
+      valueE = BOE->getSubExpr();
+    else {
+      // If we have an OptionalEvaluationExpr at the top level, then someone is
+      // "optional chaining" and ignoring the result. Keep drilling if it
+      // doesn't make sense to ignore it.
+      if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(valueE)) {
+        if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr())) {
+          valueE = IIO->getSubExpr();
+        } else if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr())) {
+          valueE = C;
+        } else if (auto *OE =
+                       dyn_cast<OpenExistentialExpr>(OEE->getSubExpr())) {
+          valueE = OE;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
   }
-  
+
   // Complain about functions that aren't called.
   // TODO: What about tuples which contain functions by-value that are
   // dead?
-  if (E->getType()->is<AnyFunctionType>()) {
+  if (valueE->getType()->is<AnyFunctionType>()) {
     bool isDiscardable = false;
 
     // The called function could be wrapped inside a `dot_syntax_call_expr`
@@ -1321,8 +1346,9 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     // }
     //
     // So look through the DSCE and get the function being called.
-    auto expr =
-        isa<DotSyntaxCallExpr>(E) ? cast<DotSyntaxCallExpr>(E)->getFn() : E;
+    auto expr = isa<DotSyntaxCallExpr>(valueE)
+                    ? cast<DotSyntaxCallExpr>(valueE)->getFn()
+                    : valueE;
 
     if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
       if (auto *calledValue = Fn->getCalledValue()) {
@@ -1366,18 +1392,6 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     DE.diagnose(OTE->getTryLoc(), diag::expression_unused_optional_try)
       .highlight(E->getSourceRange());
     return;
-  }
-
-  // If we have an OptionalEvaluationExpr at the top level, then someone is
-  // "optional chaining" and ignoring the result.  Produce a diagnostic if it
-  // doesn't make sense to ignore it.
-  if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(valueE)) {
-    if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
-      return checkIgnoredExpr(IIO->getSubExpr());
-    if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
-      return checkIgnoredExpr(C);
-    if (auto *OE = dyn_cast<OpenExistentialExpr>(OEE->getSubExpr()))
-      return checkIgnoredExpr(OE);
   }
 
   if (auto *LE = dyn_cast<LiteralExpr>(valueE)) {
@@ -1458,16 +1472,16 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         .highlight(SR1).highlight(SR2);
     } else
       DE.diagnose(fn->getLoc(), diag::expression_unused_result_unknown,
-               isa<ClosureExpr>(fn), valueE->getType())
-        .highlight(SR1).highlight(SR2);
+                  isa<ClosureExpr>(fn), TypeForDiag)
+          .highlight(SR1)
+          .highlight(SR2);
 
     return;
   }
 
   // Produce a generic diagnostic.
-  DE.diagnose(valueE->getLoc(), diag::expression_unused_result,
-              valueE->getType())
-    .highlight(valueE->getSourceRange());
+  DE.diagnose(valueE->getLoc(), diag::expression_unused_result, TypeForDiag)
+      .highlight(valueE->getSourceRange());
 }
 
 void StmtChecker::typeCheckASTNode(ASTNode &node) {

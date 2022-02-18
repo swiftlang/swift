@@ -532,6 +532,14 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
          SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
+def emit_cxx_header : Flag<["-"], "emit-cxx-header">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
+  HelpText<"Emit a C++ header file">;
+def emit_cxx_header_path : Separate<["-"], "emit-cxx-header-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
+  MetaVarName<"<path>">, HelpText<"Emit a C++ header file to <path>">;
+
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
   HelpText<"Make this module statically linkable and make the output of -emit-library a static library.">;
@@ -615,10 +623,6 @@ def no_emit_module_separately:
   Flag<["-"], "no-emit-module-separately">,
   Flags<[NoInteractiveOption, HelpHidden]>,
   HelpText<"Force using merge-module as the incremental build mode (new Driver only)">;
-
-def requirement_machine_EQ : Joined<["-"], "requirement-machine=">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
-  HelpText<"Control usage of experimental generics implementation: 'on', 'off', or 'verify'">;
 
 def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-machine-protocol-signatures=">,
   Flags<[FrontendOption]>,
@@ -808,7 +812,7 @@ def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
 
 def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
   Flags<[HelpHidden, FrontendOption]>,
-  HelpText<"Perform cross-module optimization">;
+  HelpText<"Enable experimental performance annotations">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
@@ -839,6 +843,10 @@ def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
   HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
+
+def file_compilation_dir : Separate<["-"], "file-compilation-dir">,
+  Flags<[FrontendOption]>, MetaVarName<"<path>">,
+  HelpText<"The compilation directory to embed in the debug info. Coverage mapping is not supported yet.">;
 
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,
@@ -1049,6 +1057,10 @@ def dump_type_info : Flag<["-"], "dump-type-info">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def print_ast_decl : Flag<["-"], "print-ast-decl">,
+  HelpText<"Parse and type-check input file(s) and pretty print declarations from AST(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_pcm : Flag<["-"], "dump-pcm">,

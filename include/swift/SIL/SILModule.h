@@ -163,6 +163,8 @@ public:
       llvm::ilist<SILDifferentiabilityWitness>;
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
+  using BasicBlockNameMapType =
+      llvm::DenseMap<const SILBasicBlock *, std::string>;
 
   enum class LinkingMode : uint8_t {
     /// Link functions with non-public linkage. Used by the mandatory pipeline.
@@ -323,20 +325,21 @@ private:
   /// projections, shared between all functions in the module.
   std::unique_ptr<IndexTrieNode> indexTrieRoot;
 
-  /// A mapping from opened archetypes to the instructions which define them.
+  /// A mapping from root opened archetypes to the instructions which define
+  /// them.
   ///
   /// The value is either a SingleValueInstrution or a PlaceholderValue, in case
-  /// an opened-archetype definition is lookedup during parsing or deserializing
-  /// SIL, where opened archetypes can be forward referenced.
+  /// an opened archetype definition is looked up during parsing or
+  /// deserializing SIL, where opened archetypes can be forward referenced.
   ///
   /// In theory we wouldn't need to have the SILFunction in the key, because
-  /// opened archetypes _should_ be unique across the module. But currently
+  /// opened archetypes \em should be unique across the module. But currently
   /// in some rare cases SILGen re-uses the same opened archetype for multiple
   /// functions.
-  using OpenedArchetypeKey = std::pair<ArchetypeType*, SILFunction*>;
-  llvm::DenseMap<OpenedArchetypeKey, SILValue> openedArchetypeDefs;
+  using OpenedArchetypeKey = std::pair<OpenedArchetypeType *, SILFunction *>;
+  llvm::DenseMap<OpenedArchetypeKey, SILValue> RootOpenedArchetypeDefs;
 
-  /// The number of PlaceholderValues in openedArchetypeDefs.
+  /// The number of PlaceholderValues in RootOpenedArchetypeDefs.
   int numUnresolvedOpenedArchetypes = 0;
 
   /// The options passed into this SILModule.
@@ -359,6 +362,10 @@ private:
 
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
+
+#if NDEBUG
+  BasicBlockNameMapType basicBlockNames;
+#endif
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options);
@@ -408,24 +415,25 @@ public:
     regDeserializationNotificationHandlerForAllFuncOME = true;
   }
 
-  /// Returns the instruction which defines an opened archetype, e.g. an
-  /// open_existential_addr.
+  /// Returns the instruction which defines the given root opened archetype,
+  /// e.g. an open_existential_addr.
   ///
   /// In case the opened archetype is not defined yet (e.g. during parsing or
   /// deserilization), a PlaceholderValue is returned. This should not be the
   /// case outside of parsing or deserialization.
-  SILValue getOpenedArchetypeDef(CanArchetypeType archetype,
-                                 SILFunction *inFunction);
+  SILValue getRootOpenedArchetypeDef(CanOpenedArchetypeType archetype,
+                                     SILFunction *inFunction);
 
-  /// Returns the instruction which defines an opened archetype, e.g. an
-  /// open_existential_addr.
+  /// Returns the instruction which defines the given root opened archetype,
+  /// e.g. an open_existential_addr.
   ///
   /// In contrast to getOpenedArchetypeDef, it is required that all opened
   /// archetypes are resolved.
-  SingleValueInstruction *getOpenedArchetypeInst(CanArchetypeType archetype,
-                                                 SILFunction *inFunction) {
-    return cast<SingleValueInstruction>(getOpenedArchetypeDef(archetype,
-                                                              inFunction));
+  SingleValueInstruction *
+  getRootOpenedArchetypeDefInst(CanOpenedArchetypeType archetype,
+                                SILFunction *inFunction) {
+    return cast<SingleValueInstruction>(
+        getRootOpenedArchetypeDef(archetype, inFunction));
   }
 
   /// Returns true if there are unresolved opened archetypes in the module.
@@ -446,6 +454,23 @@ public:
   /// Set a flag indicating that this module is serialized already.
   void setSerialized() { serialized = true; }
   bool isSerialized() const { return serialized; }
+
+  void setBasicBlockName(const SILBasicBlock *block, StringRef name) {
+    #if NDEBUG
+    basicBlockNames[block] = name.str();
+    #endif
+  }
+  Optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
+    #if NDEBUG
+    auto Known = basicBlockNames.find(block);
+    if (Known == basicBlockNames.end())
+      return None;
+
+    return StringRef(Known->second);
+    #else
+    return None;
+    #endif
+  }
 
   /// Serialize a SIL module using the configured SerializeSILAction.
   void serialize();

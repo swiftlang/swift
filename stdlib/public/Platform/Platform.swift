@@ -423,6 +423,57 @@ public func sem_open(
 #endif
 
 //===----------------------------------------------------------------------===//
+// time.h
+//===----------------------------------------------------------------------===//
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(Linux)
+
+@available(SwiftStdlib 5.7, *)
+extension timespec {
+  @available(SwiftStdlib 5.7, *)
+  public init(_ duration: Duration) {
+    let comps = duration.components
+    self.init(tv_sec: Int(comps.seconds),
+              tv_nsec: Int(comps.attoseconds / 1_000_000_000))
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
+extension Duration {
+  @available(SwiftStdlib 5.7, *)
+  public init(_ ts: timespec) {
+    self = .seconds(ts.tv_sec) + .nanoseconds(ts.tv_nsec)
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
+extension timeval {
+  @available(SwiftStdlib 5.7, *)
+  public init(_ duration: Duration) {
+    let comps = duration.components
+#if os(Linux)
+  // Linux platforms define timeval as Int/Int
+  self.init(tv_sec: Int(comps.seconds),
+              tv_usec: Int(comps.attoseconds / 1_000_000_000_000))
+#else
+    // Darwin platforms define timeval as Int/Int32
+    self.init(tv_sec: Int(comps.seconds),
+              tv_usec: Int32(comps.attoseconds / 1_000_000_000_000))
+#endif
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
+extension Duration {
+  @available(SwiftStdlib 5.7, *)
+  public init(_ tv: timeval) {
+    self = .seconds(tv.tv_sec) + .microseconds(tv.tv_usec)
+  }
+}
+
+#endif
+
+//===----------------------------------------------------------------------===//
 // Misc.
 //===----------------------------------------------------------------------===//
 

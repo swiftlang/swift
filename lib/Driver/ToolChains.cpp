@@ -306,6 +306,12 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map);
   inputArgs.AddAllArgs(arguments, options::OPT_coverage_prefix_map);
 
+  std::string globalRemapping = getGlobalDebugPathRemapping();
+  if (!globalRemapping.empty()) {
+    arguments.push_back("-debug-prefix-map");
+    arguments.push_back(inputArgs.MakeArgString(globalRemapping));
+  }
+
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
@@ -334,6 +340,9 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     auto OptArg = inputArgs.getLastArgNoClaim(options::OPT_O_Group);
     if (!OptArg || OptArg->getOption().matches(options::OPT_Onone))
       arguments.push_back("-enable-anonymous-context-mangled-names");
+
+    // TODO: Should we support -fcoverage-compilation-dir?
+    inputArgs.AddAllArgs(arguments, options::OPT_file_compilation_dir);
   }
 
   // Pass through any subsystem flags.
@@ -667,6 +676,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftModuleDocFile:
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ObjCHeader:
+  case file_types::TY_CXXHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
   case file_types::TY_ExternalSwiftDeps:
@@ -927,6 +937,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SwiftModuleDocFile:
     case file_types::TY_SerializedDiagnostics:
     case file_types::TY_ObjCHeader:
+    case file_types::TY_CXXHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:
     case file_types::TY_ExternalSwiftDeps:

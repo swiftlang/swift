@@ -85,15 +85,15 @@
     "default-branch-scheme": "main",
     "branch-schemes": {
        "main": {
-            "aliases": ["swift/main", "main", "stable/20210726"],
+            "aliases": ["swift/main", "main", "stable/20211026"],
             "repos": {
-                "llvm-project": "stable/20210726",
+                "llvm-project": "stable/20211026",
                 "swift": "main",
                 "cmark": "main",
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "1.0.1",
+                "swift-argument-parser": "1.0.3",
                 "swift-atomics": "1.0.2",
                 "swift-collections": "1.0.1",
                 "swift-crypto": "1.1.5",
@@ -123,11 +123,11 @@
                 "swift-cmark-gfm": "gfm",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
-                "swift-experimental-string-processing": "dev/4"
+                "swift-experimental-string-processing": "dev/6"
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/20211026"],
+            "aliases": ["rebranch"],
             "repos": {
                 "llvm-project": "stable/20211026",
                 "swift": "rebranch",
@@ -135,7 +135,7 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "1.0.1",
+                "swift-argument-parser": "1.0.3",
                 "swift-atomics": "1.0.2",
                 "swift-collections": "1.0.1",
                 "swift-crypto": "1.1.5",
@@ -157,7 +157,7 @@
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
                 "swift-installer-scripts": "main",
-                "swift-experimental-string-processing": "dev/4"
+                "swift-experimental-string-processing": "dev/6"
             }
         },
         "release/5.6": {
@@ -169,7 +169,7 @@
                 "llbuild": "release/5.6",
                 "swift-tools-support-core": "release/5.6",
                 "swiftpm": "release/5.6",
-                "swift-argument-parser": "1.0.1",
+                "swift-argument-parser": "1.0.3",
                 "swift-atomics": "1.0.2",
                 "swift-collections": "1.0.1",
                 "swift-crypto": "1.1.5",
@@ -190,7 +190,7 @@
                 "indexstore-db": "release/5.6",
                 "sourcekit-lsp": "release/5.6",
                 "swift-format": "release/5.6",
-                "swift-installer-scripts": "main",
+                "swift-installer-scripts": "release/5.6",
                 "swift-docc": "release/5.6",
                 "swift-lmdb": "release/5.6",
                 "swift-docc-render-artifact": "release/5.6",
@@ -286,7 +286,7 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "1.0.1",
+                "swift-argument-parser": "1.0.3",
                 "swift-atomics": "1.0.2",
                 "swift-collections": "1.0.1",                
                 "swift-crypto": "1.1.5",                
@@ -308,7 +308,7 @@
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
                 "swift-installer-scripts": "main",
-                "swift-experimental-string-processing": "dev/4"
+                "swift-experimental-string-processing": "dev/6"
             }
         },
         "release/5.4": {

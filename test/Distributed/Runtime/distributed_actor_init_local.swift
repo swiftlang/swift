@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -70,7 +70,8 @@ var nextID: Int = 1
 
 struct FakeActorSystem: DistributedActorSystem {
   public typealias ActorID = ActorAddress
-  public typealias Invocation = FakeInvocation
+  public typealias InvocationDecoder = FakeInvocationDecoder
+  public typealias InvocationEncoder = FakeInvocationEncoder
   public typealias SerializationRequirement = Codable
 
   init() {
@@ -101,32 +102,44 @@ struct FakeActorSystem: DistributedActorSystem {
     print("resign id:\(id)")
   }
 
-
-  public func makeInvocation() -> Invocation {
+  func makeInvocationEncoder() -> InvocationEncoder {
     .init()
   }
+
+  func remoteCall<Act, Err, Res>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationDecoder,
+      throwing: Err.Type,
+      returning: Res.Type
+  ) async throws -> Res
+      where Act: DistributedActor,
+            Act.ID == ActorID,
+            Res: SerializationRequirement {
+    throw ExecuteDistributedTargetError(message: "Not implemented")
+  }
+
 }
 
-public struct FakeInvocation: DistributedTargetInvocation {
-  public typealias ArgumentDecoder = FakeArgumentDecoder
-  public typealias SerializationRequirement = Codable
+// === Sending / encoding -------------------------------------------------
+struct FakeInvocationEncoder: DistributedTargetInvocationEncoder {
+  typealias SerializationRequirement = Codable
 
-  public mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
-  public mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
-  public mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
-  public mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
-  public mutating func doneRecording() throws {}
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
 
-  // === Receiving / decoding -------------------------------------------------
+// === Receiving / decoding -------------------------------------------------
+class FakeInvocationDecoder : DistributedTargetInvocationDecoder {
+  typealias SerializationRequirement = Codable
 
-  public mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
-  public mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
-  public mutating func decodeReturnType() throws -> Any.Type? { nil }
-  public mutating func decodeErrorType() throws -> Any.Type? { nil }
-
-  public struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
-    public typealias SerializationRequirement = Codable
-  }
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
 }
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
@@ -134,7 +147,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // ==== Execute ----------------------------------------------------------------
 
 func test() async {
-  let system = FakeActorSystem()
+  let system = DefaultDistributedActorSystem()
 
   // NOTE: All allocated distributed actors should be saved in this array, so
   // that they will be deallocated together at the end of this test!

@@ -66,8 +66,14 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
   // Add a new generic parameter to replace the opened existential.
   auto *newGenericParam =
       GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
+
+  assert(openedExistential->isRoot());
+  auto constraint = openedExistential->getExistentialType();
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
-                             openedExistential->getOpenedExistentialType());
+                             constraint);
 
   auto genericSig = buildGenericSignature(ctx, baseGenericSig,
                                           { newGenericParam },
@@ -139,12 +145,13 @@ CanSILFunctionType buildThunkType(SILFunction *fn,
   // Does the thunk type involve an open existential type?
   CanOpenedArchetypeType openedExistential;
   auto archetypeVisitor = [&](CanType t) {
-    if (auto archetypeTy = dyn_cast<OpenedArchetypeType>(t)) {
+    if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
       if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
+        const auto root = cast<OpenedArchetypeType>(CanType(opened->getRoot()));
         assert((openedExistential == CanArchetypeType() ||
-                openedExistential == opened) &&
+                openedExistential == root) &&
                "one too many open existentials");
-        openedExistential = opened;
+        openedExistential = root;
       } else {
         hasArchetypes = true;
       }

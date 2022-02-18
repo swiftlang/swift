@@ -633,24 +633,37 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
   return result;
 }
 
-Type swift::adjustInferredAssociatedType(Type type, bool &noescapeToEscaping) {
+Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
+                                         bool &performed) {
   // If we have an optional type, adjust its wrapped type.
   if (auto optionalObjectType = type->getOptionalObjectType()) {
     auto newOptionalObjectType =
-      adjustInferredAssociatedType(optionalObjectType, noescapeToEscaping);
+      adjustInferredAssociatedType(adjustment, optionalObjectType, performed);
     if (newOptionalObjectType.getPointer() == optionalObjectType.getPointer())
       return type;
 
     return OptionalType::get(newOptionalObjectType);
   }
 
+  auto needsAdjustment = [=](FunctionType *funcType) -> bool {
+    if (adjustment == TypeAdjustment::NoescapeToEscaping)
+      return funcType->isNoEscape();
+    else
+      return !funcType->isSendable();
+  };
+  auto adjust = [=](const ASTExtInfo &info) -> ASTExtInfo {
+    if (adjustment == TypeAdjustment::NoescapeToEscaping)
+      return info.withNoEscape(false);
+    else
+      return info.withConcurrent(true);
+  };
+
   // If we have a noescape function type, make it escaping.
   if (auto funcType = type->getAs<FunctionType>()) {
-    if (funcType->isNoEscape()) {
-      noescapeToEscaping = true;
+    performed = needsAdjustment(funcType);
+    if (performed)
       return FunctionType::get(funcType->getParams(), funcType->getResult(),
-                               funcType->getExtInfo().withNoEscape(false));
-    }
+                               adjust(funcType->getExtInfo()));
   }
   return type;
 }
@@ -713,7 +726,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       // Adjust the type to a type that can be written explicitly.
       bool noescapeToEscaping = false;
       Type inferredType =
-        adjustInferredAssociatedType(secondType, noescapeToEscaping);
+        adjustInferredAssociatedType(TypeAdjustment::NoescapeToEscaping,
+                                     secondType, noescapeToEscaping);
       if (!inferredType->isMaterializable())
         return true;
 
@@ -1084,7 +1098,8 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                                     ProtocolConformanceRef(conformance));
 
   SmallVector<Requirement, 4> sanitizedRequirements;
-  sanitizeProtocolRequirements(proto, proto->getRequirementSignature(),
+  auto requirements = proto->getRequirementSignature().getRequirements();
+  sanitizeProtocolRequirements(proto, requirements,
                                sanitizedRequirements);
   auto result =
     TypeChecker::checkGenericArguments(dc->getParentModule(), SourceLoc(),

@@ -660,7 +660,7 @@ class SelfProtocolConformance : public RootProtocolConformance {
 public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const {
-    return getType()->castTo<ProtocolType>()->getDecl();
+    return dyn_cast<ProtocolDecl>(getType()->getAnyNominal());
   }
 
   /// Get the declaration context in which this conformance was declared.

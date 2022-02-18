@@ -1092,11 +1092,11 @@ shouldBePartiallySpecialized(Type Replacement,
   llvm::SmallSetVector<ArchetypeType *, 2> UsedArchetypes;
   Replacement.visit([&](Type Ty) {
     if (auto Archetype = Ty->getAs<ArchetypeType>()) {
-      if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
+      if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype)) {
         UsedArchetypes.insert(Primary);
       }
 
-      if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype->getRoot())) {
+      if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
         UsedArchetypes.insert(Seq);
       }
     }
@@ -1322,11 +1322,11 @@ void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
     // Add used generic parameters/archetypes.
     Replacement.visit([&](Type Ty) {
       if (auto Archetype = Ty->getAs<ArchetypeType>()) {
-        if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
+        if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype)) {
           UsedCallerArchetypes.insert(Primary);
         }
 
-        if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype->getRoot())) {
+        if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
           UsedCallerArchetypes.insert(Seq);
         }
       }
@@ -2244,8 +2244,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
       Arguments.push_back(NewArg);
     }
     FullApplySite ApplySite = createReabstractionThunkApply(Builder);
-    SILValue ReturnValue = ApplySite.getSingleDirectResult();
-    assert(ReturnValue && "getSingleDirectResult out of sync with ApplySite?!");
+    SILValue ReturnValue = ApplySite.getPseudoResult();
+    assert(ReturnValue && "getPseudoResult out of sync with ApplySite?!");
     Builder.createReturn(Loc, ReturnValue);
 
     return Thunk;
@@ -2257,8 +2257,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
 
   FullApplySite ApplySite = createReabstractionThunkApply(Builder);
 
-  SILValue ReturnValue = ApplySite.getSingleDirectResult();
-  assert(ReturnValue && "getSingleDirectResult out of sync with ApplySite?!");
+  SILValue ReturnValue = ApplySite.getPseudoResult();
+  assert(ReturnValue && "getPseudoResult out of sync with ApplySite?!");
 
   if (ReturnValueAddr) {
     // Need to store the direct results to the original indirect address.
@@ -2512,7 +2512,20 @@ usePrespecialized(SILOptFunctionBuilder &funcBuilder, ApplySite apply,
     auto specializationAvail = SA->getAvailability();
     auto &ctxt = funcBuilder.getModule().getSwiftModule()->getASTContext();
     auto deploymentAvail = AvailabilityContext::forDeploymentTarget(ctxt);
-    auto currentFnAvailability = apply.getFunction()->getAvailabilityForLinkage();
+    auto currentFn = apply.getFunction();
+    auto isInlinableCtxt = (currentFn->getResilienceExpansion()
+                             == ResilienceExpansion::Minimal);
+    auto currentFnAvailability = currentFn->getAvailabilityForLinkage();
+
+    // If we are in an inlineable function we can't use the specialization except
+    // the inlinable function itself has availability we can use.
+    if (currentFnAvailability.isAlwaysAvailable() && isInlinableCtxt) {
+      continue;
+    }
+    else if (isInlinableCtxt) {
+      deploymentAvail = currentFnAvailability;
+    }
+
     if (!currentFnAvailability.isAlwaysAvailable() &&
         !deploymentAvail.isContainedIn(currentFnAvailability))
       deploymentAvail = currentFnAvailability;

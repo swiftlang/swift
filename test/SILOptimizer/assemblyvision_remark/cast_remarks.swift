@@ -42,6 +42,7 @@ public func forcedCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T {
   var x = ns
   x = ns2
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
+                  // expected-note @-9:44 {{of 'ns2'}}
 }
 
 public func condCast<NS, T>(_ ns: NS) -> T? {
@@ -79,6 +80,7 @@ public func condCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T? {
   var x = ns
   x = ns2
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
+                  // expected-note @-9:42 {{of 'ns2'}}
 }
 
 public func condCast5<NS, T>(_ ns: NS) -> T? {
@@ -249,6 +251,7 @@ public func forcedCast4(_ ns: Existential1, _ ns2: Existential1) -> Existential2
   var x = ns
   x = ns2
   return x as! Existential2  // expected-remark @:12 {{unconditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+                             // expected-note @-5:47 {{of 'ns2'}}
 }
 
 public func condCast(_ ns: Existential1) -> Existential2? {
@@ -283,6 +286,7 @@ public func condCast4(_ ns: Existential1, _ ns2: Existential1) -> Existential2? 
   var x = ns
   x = ns2
   return x as? Existential2 // expected-remark @:12 {{conditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+                            // expected-note @-5:45 {{of 'ns2'}}
 }
 
 public func condCast5(_ ns: Existential1) -> Existential2? {

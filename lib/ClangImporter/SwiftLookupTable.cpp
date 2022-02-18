@@ -1849,12 +1849,12 @@ SwiftNameLookupExtension::getExtensionMetadata() const {
   return metadata;
 }
 
-llvm::hash_code
-SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
-  return llvm::hash_combine(code, StringRef("swift.lookup"),
-                            SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
-                            SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            version::getSwiftFullVersion());
+void
+SwiftNameLookupExtension::hashExtension(ExtensionHashBuilder &HBuilder) const {
+  HBuilder.add(StringRef("swift.lookup"));
+  HBuilder.add(SWIFT_LOOKUP_TABLE_VERSION_MAJOR);
+  HBuilder.add(SWIFT_LOOKUP_TABLE_VERSION_MINOR);
+  HBuilder.add(version::getSwiftFullVersion());
 }
 
 void importer::addEntryToLookupTable(SwiftLookupTable &table,

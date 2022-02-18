@@ -511,7 +511,9 @@ struct AssemblyVisionRemarkGeneratorInstructionVisitor
   void visitStrongReleaseInst(StrongReleaseInst *sri);
   void visitRetainValueInst(RetainValueInst *rvi);
   void visitReleaseValueInst(ReleaseValueInst *rvi);
+  void visitAllocRefInstBase(AllocRefInstBase *ari);
   void visitAllocRefInst(AllocRefInst *ari);
+  void visitAllocRefDynamicInst(AllocRefDynamicInst *ari);
   void visitAllocBoxInst(AllocBoxInst *abi);
   void visitSILInstruction(SILInstruction *) {}
   void visitBeginAccessInst(BeginAccessInst *bai);
@@ -704,8 +706,8 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
   });
 }
 
-void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInst(
-    AllocRefInst *ari) {
+void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInstBase(
+    AllocRefInstBase *ari) {
   if (ari->canAllocOnStack()) {
     return ORE.emit([&]() {
       using namespace OptRemark;
@@ -738,6 +740,17 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInst(
       resultRemark << arg;
     return resultRemark;
   });
+}
+
+
+void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInst(
+  AllocRefInst *ari) {
+  visitAllocRefInstBase(ari);
+}
+
+void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefDynamicInst(
+  AllocRefDynamicInst *ari) {
+  visitAllocRefInstBase(ari);
 }
 
 void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocBoxInst(

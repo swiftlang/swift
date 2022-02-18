@@ -135,6 +135,7 @@ namespace irgen {
   class ForeignClassMetadataLayout;
   class ForeignFunctionInfo;
   class FormalType;
+  class FunctionPointerKind;
   class HeapLayout;
   class StructLayout;
   class IRGenDebugInfo;
@@ -401,7 +402,7 @@ public:
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
 
-  /// Emit type metadata recrods for functions that can be looked up by name at
+  /// Emit type metadata records for functions that can be looked up by name at
   /// runtime.
   void emitAccessibleFunctions();
 
@@ -732,7 +733,7 @@ public:
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
-  llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32}
+  llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32}
 
   llvm::StructType *AsyncFunctionPointerTy; // { i32, i32 }
   llvm::StructType *SwiftContextTy;
@@ -1217,6 +1218,9 @@ private:
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 
+  llvm::SmallVector<llvm::MDNode *> UsedConditionals;
+  void emitUsedConditionals();
+
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();
@@ -1418,8 +1422,9 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
+  Signature getSignature(CanSILFunctionType fnType);
   Signature getSignature(CanSILFunctionType fnType,
-                         bool useSpecialConvention = false);
+                         FunctionPointerKind kind);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
@@ -1643,10 +1648,10 @@ public:
   Address getAddrOfObjCISAMask();
 
   llvm::Function *
-  getAddrOfDistributedMethodAccessor(SILFunction *F,
+  getAddrOfDistributedTargetAccessor(SILFunction *F,
                                      ForDefinition_t forDefinition);
 
-  void emitDistributedMethodAccessor(SILFunction *method);
+  void emitDistributedTargetAccessor(SILFunction *method);
 
   /// Retrieve the generic signature for the current generic context, or null if no
   /// generic environment is active.

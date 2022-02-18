@@ -1267,19 +1267,21 @@ namespace {
                            ctx.Id_Regex.str());
         return Type();
       }
-      SmallVector<TupleTypeElt, 4> captureTypes;
+      SmallVector<TupleTypeElt, 4> matchElements {ctx.getSubstringType()};
       if (decodeRegexCaptureTypes(ctx,
                                   E->getSerializedCaptureStructure(),
                                   /*atomType*/ ctx.getSubstringType(),
-                                  captureTypes)) {
+                                  matchElements)) {
         ctx.Diags.diagnose(E->getLoc(),
                            diag::regex_capture_types_failed_to_decode);
         return Type();
       }
-      auto genericArg = captureTypes.size() == 1
-          ? captureTypes[0].getRawType()
-          : TupleType::get(captureTypes, ctx);
-      return BoundGenericStructType::get(regexDecl, Type(), {genericArg});
+      if (matchElements.size() == 1)
+        return BoundGenericStructType::get(
+            regexDecl, Type(), matchElements.front().getType());
+      // Form a tuple.
+      auto matchType = TupleType::get(matchElements, ctx);
+      return BoundGenericStructType::get(regexDecl, Type(), {matchType});
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
@@ -1355,7 +1357,7 @@ namespace {
         return Type();
       }
       // Diagnose top-level usages of placeholder types.
-      if (isa<TopLevelCodeDecl>(CS.DC) && isa<PlaceholderTypeRepr>(repr)) {
+      if (isa<PlaceholderTypeRepr>(repr->getWithoutParens())) {
         CS.getASTContext().Diags.diagnose(repr->getLoc(),
                                           diag::placeholder_type_not_allowed);
       }
@@ -1771,16 +1773,12 @@ namespace {
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       auto joinElementTypes = [&](Optional<Type> elementType) {
-        auto openedElementType = elementType.map([&](Type type) {
-          return CS.openOpaqueType(type, contextualPurpose, locator);
-        });
-
         const auto elements = expr->getElements();
         unsigned index = 0;
 
         using Iterator = decltype(elements)::iterator;
         CS.addJoinConstraint<Iterator>(
-            locator, elements.begin(), elements.end(), openedElementType,
+            locator, elements.begin(), elements.end(), elementType,
             [&](const auto it) {
               auto *locator = CS.getConstraintLocator(
                   expr, LocatorPathElt::TupleElement(index++));
@@ -1793,6 +1791,8 @@ namespace {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        contextualType = CS.openOpaqueType(
+            contextualType, contextualPurpose, locator);
         Optional<Type> arrayElementType =
             ConstraintSystem::isArrayType(contextualType);
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
@@ -1906,8 +1906,6 @@ namespace {
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
         auto openedType =
             CS.openOpaqueType(contextualType, contextualPurpose, locator);
-        openedType = CS.replaceInferableTypesWithTypeVars(
-            openedType, CS.getConstraintLocator(expr));
         auto dictionaryKeyValue =
             ConstraintSystem::isDictionaryType(openedType);
         Type contextualDictionaryKeyType;

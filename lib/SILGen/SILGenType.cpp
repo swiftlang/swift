@@ -415,8 +415,19 @@ public:
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(reqDecl)) {
+        auto newDecl = requirementRef.withDecl(witness.getDecl());
+        // Only import C++ methods as foreign. If the following
+        // Objective-C function is imported as foreign:
+        //   () -> String
+        // It will be imported as the following type:
+        //   () -> NSString
+        // But the first is correct, so make sure we don't mark this witness
+        // as foreign.
+        if (dyn_cast_or_null<clang::CXXMethodDecl>(
+                witness.getDecl()->getClangDecl()))
+          newDecl = newDecl.asForeign();
         return addMethodImplementation(
-            requirementRef, getWitnessRef(requirementRef, witness),
+            requirementRef, getWitnessRef(newDecl, witness),
             witness);
       }
 
@@ -831,7 +842,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                           ProtocolConformanceRef(conformance));
 
   // Open the protocol type.
-  auto openedType = OpenedArchetypeType::get(protocolType);
+  auto openedType = OpenedArchetypeType::get(
+      protocol->getExistentialType()->getCanonicalType());
 
   // Form the substitutions for calling the witness.
   auto witnessSubs = SubstitutionMap::getProtocolSubstitutions(protocol,

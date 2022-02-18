@@ -13,7 +13,7 @@ public struct S1: P1 {
 
 public struct S2: P2 {}
 
-// CHECK-LABEL: Generic signature: <X, Y where X : P1, Y : P2, Y == X.A>
+// CHECK-LABEL: Generic signature: <X, Y where X : P1, Y : P2, Y == X.[P1]A>
 public struct G<X: P1, Y: P2> where Y == X.A {}
 
 // CHECK-LABEL: Generic signature: <X, Y where X == S1, Y == S1.A>

@@ -71,10 +71,20 @@ class MoviesViewController {
 
 // SR-15053
 func SR15053<T : Numeric>(_ a: T, _ b: T) -> T {
-  (a + b) / 2 // expected-error{{cannot convert return expression of type 'Int' to return type 'T'}}
-  // expected-error@-1{{cannot convert value of type 'T' to expected argument type 'Int'}}
+  (a + b) / 2 // expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int)}}
+  // expected-error@-1 {{binary operator '/' cannot be applied to operands of type 'T' and 'Int'}}
+}
+
+infix operator %%
+
+func %% (_ lhs: Int, _ rhs: Int) -> Int {
+  lhs / rhs
+}
+
+func %% (_ lhs: Float, _ rhs: Float) -> Float {
+  lhs / rhs
 }
 
 func SR15053<T : Numeric>(_ a: T, _ b: T) {
-  (a + b) / 2 // expected-error{{cannot convert value of type 'T' to expected argument type 'Int'}}
+  (a + b) %% 2 // expected-error {{cannot convert value of type 'T' to expected argument type 'Int'}}
 }

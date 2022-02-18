@@ -199,6 +199,8 @@ public:
   }
 
   /// Determine the isolation rules for a given declaration.
+  /// The isolation restriction represents the isolation requirement of the
+  /// using context.
   ///
   /// \param fromExpression Indicates that the reference is coming from an
   /// expression.
@@ -265,7 +267,24 @@ enum class SendableCheck {
 
   /// Implicit conformance to Sendable.
   Implicit,
+
+  /// Implicit conformance to Sendable that would be externally-visible, i.e.,
+  /// for a public @_frozen type.
+  ImplicitForExternallyVisible,
 };
+
+/// Whether this sendable check is implicit.
+static inline bool isImplicitSendableCheck(SendableCheck check) {
+  switch (check) {
+  case SendableCheck::Explicit:
+  case SendableCheck::ImpliedByStandardProtocol:
+    return false;
+
+  case SendableCheck::Implicit:
+  case SendableCheck::ImplicitForExternallyVisible:
+    return true;
+  }
+}
 
 /// Describes the context in which a \c Sendable check occurs.
 struct SendableCheckContext {

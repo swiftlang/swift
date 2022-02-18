@@ -789,7 +789,7 @@ protected:
       ref = svi->getOperand(0);
     };
     auto *phi = dyn_cast<SILPhiArgument>(ref);
-    if (!phi || !phi->isPhiArgument()) {
+    if (!phi || !phi->isPhi()) {
       return ref;
     }
     // Handle phis...
@@ -854,8 +854,10 @@ void swift::findGuaranteedReferenceRoots(SILValue value,
   while (auto value = worklist.pop()) {
     if (auto *arg = dyn_cast<SILPhiArgument>(value)) {
       if (auto *terminator = arg->getSingleTerminator()) {
-        worklist.insert(terminator->getOperand(arg->getIndex()));
-        continue;
+        if (terminator->isTransformationTerminator()) {
+          worklist.insert(terminator->getOperand(0));
+          continue;
+        }
       }
     } else if (auto *inst = value->getDefiningInstruction()) {
       if (auto *result =
@@ -1531,7 +1533,7 @@ protected:
   void initializeDFS(SILValue root) {
     // If root is a phi, record it so that its uses aren't visited twice.
     if (auto *phi = dyn_cast<SILPhiArgument>(root)) {
-      if (phi->isPhiArgument())
+      if (phi->isPhi())
         visitedPhis.insert(phi);
     }
     pushUsers(root,
@@ -1957,42 +1959,34 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Indirect_Out:
-      visitor.visitStore(use);
-      break;
+      return visitor.visitStore(use);
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_In_Constant:
-      visitor.visitLoad(use);
-      break;
+      return visitor.visitLoad(use);
     case SILArgumentConvention::Direct_Unowned:
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Guaranteed:
       // most likely an escape of a box
-      visitor.visitUnknownUse(use);
-      break;
+      return visitor.visitUnknownUse(use);
     }
-    return true;
   }
   switch (user->getKind()) {
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::DestroyValueInst:
     if (useTy == AccessUseType::Exact) {
-      visitor.visitDestroy(use);
-      return true;
+      return visitor.visitDestroy(use);
     }
-    visitor.visitUnknownUse(use);
-    return true;
+    return visitor.visitUnknownUse(use);
 
   case SILInstructionKind::DebugValueInst:
-    visitor.visitDebugUse(use);
-    return true;
+    return visitor.visitDebugUse(use);
 
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadWeakInst:
   case SILInstructionKind::LoadUnownedInst:
   case SILInstructionKind::ExistentialMetatypeInst:
-    visitor.visitLoad(use);
-    return true;
+    return visitor.visitLoad(use);
 
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreWeakInst:
@@ -2004,27 +1998,22 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
     break;
 
   case SILInstructionKind::InjectEnumAddrInst:
-    visitor.visitStore(use);
-    return true;
+    return visitor.visitStore(use);
 
   case SILInstructionKind::CopyAddrInst:
     if (operIdx == CopyLikeInstruction::Dest) {
-      visitor.visitStore(use);
-      return true;
+      return visitor.visitStore(use);
     }
     assert(operIdx == CopyLikeInstruction::Src);
-    visitor.visitLoad(use);
-    return true;
+    return visitor.visitLoad(use);
 
   case SILInstructionKind::DeallocStackInst:
-    visitor.visitDealloc(use);
-    return true;
+    return visitor.visitDealloc(use);
 
   default:
     break;
   }
-  visitor.visitUnknownUse(use);
-  return true;
+  return visitor.visitUnknownUse(use);
 }
 
 //===----------------------------------------------------------------------===//

@@ -437,6 +437,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     M = Impl.getStdlibModule();
   else
     M = Impl.getNamedModule(SwiftModuleName);
+
   if (!M) {
     // User did not import the library module that contains the type we want to
     // substitute.
@@ -445,8 +446,18 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   }
 
   Type SwiftType = Impl.getNamedSwiftType(M, SwiftTypeName);
+
+  if (!SwiftType && CTypeKind == MappedCTypeKind::CGFloat) {
+    // Look for CGFloat in CoreFoundation.
+    M = Impl.getNamedModule("CoreFoundation");
+    SwiftType = Impl.getNamedSwiftType(M, SwiftTypeName);
+  }
+
   if (!SwiftType && !CanBeMissing) {
     // The required type is not defined in the standard library.
+    // The required type is not defined in the library, or the user has not
+    // imported the library that defines it (so `M` was null and
+    // `getNamedSwiftType()` returned early).
     *IsError = true;
     return std::make_pair(Type(), "");
   }
@@ -2473,6 +2484,12 @@ namespace {
       for (auto redecl : decl->redecls())
         Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
 
+      // Because a namespaces's decl context is the bridging header, make sure
+      // we add them to the bridging header lookup table.
+      addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
+                            const_cast<clang::NamespaceDecl *>(decl),
+                            Impl.getNameImporter());
+
       return enumDecl;
     }
 
@@ -2779,6 +2796,15 @@ namespace {
                                       SourceLoc(), Name,
                                       Loc,
                                       /*genericparams*/nullptr, DC);
+
+      // If the typedef is marked with @Sendable and not @_nonSendable, make
+      // any function type in it Sendable.
+      auto sendability = Result->getAttrs().getEffectiveSendableAttr();
+      if (isa_and_nonnull<SendableAttr>(sendability))
+        SwiftType = applyToFunctionType(SwiftType, [](ASTExtInfo info) {
+          return info.withConcurrent();
+        });
+
       Result->setUnderlyingType(SwiftType);
       
       // Make Objective-C's 'id' unavailable.
@@ -3087,7 +3113,7 @@ namespace {
         if (!result)
           return nullptr;
 
-        // HACK: Make sure PrintAsObjC always omits the 'enum' tag for
+        // HACK: Make sure PrintAsClang always omits the 'enum' tag for
         // option set enums.
         Impl.DeclsWithSuperfluousTypedefs.insert(decl);
         break;
@@ -3412,9 +3438,29 @@ namespace {
       SmallVector<FuncDecl *, 4> methods;
       SmallVector<ConstructorDecl *, 4> ctors;
 
+      // Cxx methods may have the same name but differ in "constness".
+      // In such a case we must differentiate in swift (See VisitFunction).
+      // Before importing the different CXXMethodDecl's we track functions
+      // that differ this way so we can disambiguate later
+      for (auto m : decl->decls()) {
+        if (auto method = dyn_cast<clang::CXXMethodDecl>(m)) {
+          if(method->getDeclName().isIdentifier()) {
+            if(Impl.cxxMethods.find(method->getName()) == Impl.cxxMethods.end()) {
+              Impl.cxxMethods[method->getName()] = {};
+            }
+            if(method->isConst()) {
+              // Add to const set
+              Impl.cxxMethods[method->getName()].first.insert(method);
+            } else {
+              // Add to mutable set
+              Impl.cxxMethods[method->getName()].second.insert(method);
+            }
+          }
+        }
+      }
+
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
-
       for (auto m : decl->decls()) {
         if (isa<clang::AccessSpecDecl>(m)) {
           // The presence of AccessSpecDecls themselves does not influence
@@ -3957,6 +4003,25 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // Handle cases where 2 CXX methods differ strictly in "constness"
+      // In such a case append a suffix ("Mutating") to the mutable version
+      // of the method when importing to swift
+      if(decl->getDeclName().isIdentifier()) {
+        const auto &cxxMethodPair = Impl.cxxMethods[decl->getName()];
+        const auto &constFuncPtrs = cxxMethodPair.first;
+        const auto &mutFuncPtrs = cxxMethodPair.second;
+
+        // Check to see if this function has both const & mut versions and
+        // that this decl refers to the mutable version.
+        if (!constFuncPtrs.empty() && mutFuncPtrs.contains(decl)) {
+          auto newName = decl->getName().str() + "Mutating";
+          auto newId = dc->getASTContext().getIdentifier(newName);
+          auto oldArgNames = importedName.getDeclName().getArgumentNames();
+          auto newDeclName = DeclName(Impl.SwiftContext, newId, oldArgNames);
+          importedName.setDeclName(newDeclName);
+        }
+      }
+
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       auto selfIdx = importedName.getSelfIndex();
 
@@ -4085,18 +4150,20 @@ namespace {
             templateParams);
 
         if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
+          // Subscripts and call operators are imported as normal methods.
+          bool staticOperator = mdecl->isOverloadedOperator() &&
+                                mdecl->getOverloadedOperator() != clang::OO_Call &&
+                                mdecl->getOverloadedOperator() != clang::OO_Subscript;
           if (mdecl->isStatic() ||
               // C++ operators that are implemented as non-static member
               // functions get imported into Swift as static member functions
               // that use an additional parameter for the left-hand side operand
               // instead of the receiver object.
-              (mdecl->getDeclName().getNameKind() ==
-                  clang::DeclarationName::CXXOperatorName &&
-                  isImportedAsStatic(mdecl->getOverloadedOperator()))) {
+              staticOperator) {
             selfIdx = None;
           } else {
-            selfIdx = 0;
-            // Don't import members of a class decl as mutating.
+            // Swift imports the "self" param last, even for clang functions.
+            selfIdx = bodyParams ? bodyParams->size() : 0;
             // If the method is imported as mutating, this implicitly makes the
             // parameter indirect.
             selfIsInOut =
@@ -4114,8 +4181,12 @@ namespace {
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }
 
-      if (!bodyParams)
+      if (!bodyParams) {
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(diag::invoked_func_not_imported, decl),
+            decl->getSourceRange().getBegin());
         return nullptr;
+      }
 
       if (name && name.getArgumentNames().size() != bodyParams->size()) {
         // We synthesized additional parameters so rebuild the DeclName.
@@ -4277,8 +4348,12 @@ namespace {
       auto importedType =
           Impl.importType(decl->getType(), ImportTypeKind::RecordField,
                           isInSystemModule(dc), Bridgeability::None);
-      if (!importedType)
+      if (!importedType) {
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(diag::record_field_not_imported, decl),
+            decl->getSourceRange().getBegin());
         return nullptr;
+      }
 
       auto type = importedType.getType();
 
@@ -4927,6 +5002,12 @@ namespace {
             dc, decl, decl->parameters(), decl->isVariadic(),
             isInSystemModule(dc), &bodyParams, importedName,
             asyncConvention, errorConvention, kind);
+
+        if (!importedType) {
+          Impl.addImportDiagnostic(
+              decl, Diagnostic(diag::record_method_not_imported, decl),
+              decl->getSourceRange().getBegin());
+        }
       }
       if (!importedType)
         return nullptr;
@@ -5390,6 +5471,10 @@ namespace {
                                                            clangModule))
             return native;
 
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(diag::forward_declared_protocol_label, decl),
+            decl->getSourceRange().getBegin());
+
         forwardDeclaration = true;
         return nullptr;
       }
@@ -5520,6 +5605,10 @@ namespace {
           result->getAttrs().add(
               new (Impl.SwiftContext) ForbidSerializingReferenceAttr(true));
           return result;
+        } else {
+          Impl.addImportDiagnostic(
+              decl, Diagnostic(diag::forward_declared_interface_label, decl),
+              decl->getSourceRange().getBegin());
         }
 
         forwardDeclaration = true;
@@ -5739,8 +5828,12 @@ namespace {
       }
 
       auto importedType = Impl.importPropertyType(decl, isInSystemModule(dc));
-      if (!importedType)
+      if (!importedType) {
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(diag::objc_property_not_imported, decl),
+            decl->getSourceRange().getBegin());
         return nullptr;
+      }
 
       // Check whether the property already got imported.
       if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
@@ -6216,6 +6309,9 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // Local function to add a known protocol only when the
   // underlying type conforms to it.
   auto computedNominal = computedPropertyUnderlyingType->getAnyNominal();
+  if (auto existential =
+          computedPropertyUnderlyingType->getAs<ExistentialType>())
+    computedNominal = existential->getConstraintType()->getAnyNominal();
   auto transferKnown = [&](KnownProtocolKind kind) {
     if (!computedNominal)
       return false;
@@ -6515,7 +6611,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
 
   // Update the failability appropriately based on the imported method type.
   bool failable = false, isIUO = false;
-  if (importedType.isImplicitlyUnwrapped()) {
+  if (!importedType.getType().isNull() &&
+      importedType.isImplicitlyUnwrapped()) {
     assert(importedType.getType()->getOptionalObjectType());
     failable = true;
     isIUO = true;
@@ -9162,10 +9259,8 @@ void ClangImporter::Implementation::finishNormalConformance(
 }
 
 Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
-    const clang::NamedDecl *ClangDecl,
-    ImportNameVersion version,
-    bool SuperfluousTypedefsAreTransparent,
-    bool UseCanonicalDecl) {
+    const clang::NamedDecl *ClangDecl, ImportNameVersion version,
+    bool SuperfluousTypedefsAreTransparent, bool UseCanonicalDecl) {
   if (!ClangDecl)
     return nullptr;
 
@@ -9839,13 +9934,21 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   llvm::SmallVector<Decl *, 16> members;
   for (const clang::Decl *m : clangRecord->decls()) {
     auto nd = dyn_cast<clang::NamedDecl>(m);
+    if (!nd)
+      continue;
+
     // Currently, we don't import unnamed bitfields.
     if (isa<clang::FieldDecl>(m) &&
         cast<clang::FieldDecl>(m)->isUnnamedBitfield())
       continue;
 
-    if (nd && nd == nd->getCanonicalDecl() &&
-        nd->getDeclContext() == clangRecord &&
+    // Make sure we always pull in record fields. Everything else had better
+    // be canonical. Note that this check mostly catches nested C++ types since
+    // we import nested C struct types by C's usual convention of chucking them
+    // into the global namespace.
+    const bool isCanonicalInContext =
+        (isa<clang::FieldDecl>(nd) || nd == nd->getCanonicalDecl());
+    if (isCanonicalInContext && nd->getDeclContext() == clangRecord &&
         isVisibleClangEntry(nd))
       insertMembersAndAlternates(nd, members);
   }
@@ -10043,8 +10146,12 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
   forEachDistinctName(
       nd, [&](ImportedName name, ImportNameVersion nameVersion) -> bool {
     auto member = importDecl(nd, nameVersion);
-    if (!member)
+    if (!member) {
+      if (SwiftContext.LangOpts.EnableExperimentalEagerClangModuleDiagnostics) {
+        diagnoseTargetDirectly(nd);
+      }
       return false;
+    }
 
     // If there are alternate declarations for this member, add them.
     for (auto alternate : getAlternateDecls(member)) {

@@ -47,7 +47,7 @@ sil @consume_int : $@convention(thin) (Int32) -> ()
 // CHECK-LABEL: sil @simple_promote
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: strong_release
-// CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: dealloc_stack_ref [[O]] : $XX
 // CHECK: return
 sil @simple_promote : $@convention(thin) () -> Int32 {
 bb0:
@@ -99,8 +99,8 @@ bb2:
 // CHECK: [[X:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: [[Y:%[0-9]+]] = alloc_ref [stack] $YY
 // CHECK: apply
-// CHECK: dealloc_ref [stack] [[Y]] : $YY
-// CHECK: dealloc_ref [stack] [[X]] : $XX
+// CHECK: dealloc_stack_ref [[Y]] : $YY
+// CHECK: dealloc_stack_ref [[X]] : $XX
 // CHECK: return
 sil @promote_nested : $@convention(thin) () -> () {
 bb0:
@@ -121,7 +121,7 @@ bb0:
 // CHECK-NEXT: unreachable
 // CHECK: bb2:
 // CHECK: strong_release
-// CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: dealloc_stack_ref [[O]] : $XX
 // CHECK: return
 sil @promote_with_unreachable_block : $@convention(thin) () -> Int32 {
 bb0:
@@ -162,10 +162,10 @@ bb1:
 // CHECK:        [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK:      bb2:
 // CHECK:        strong_release
-// CHECK-NEXT:   dealloc_ref [stack] [[O]] : $XX
+// CHECK-NEXT:   dealloc_stack_ref [[O]] : $XX
 // CHECK:      bb3:
 // CHECK-NEXT:   strong_release
-// CHECK-NEXT:   dealloc_ref [stack] [[O]] : $XX
+// CHECK-NEXT:   dealloc_stack_ref [[O]] : $XX
 // CHECK: return
 sil @promote_in_loop_with_if : $@convention(thin) () -> Int32 {
 bb0:
@@ -225,7 +225,7 @@ bb2:
 // CHECK-NOT: dealloc_ref
 // CHECK: bb2:
 // CHECK:   apply
-// CHECK:   dealloc_ref [stack] [[Y]] : $YY
+// CHECK:   dealloc_stack_ref [[Y]] : $YY
 // CHECK:   return
 sil @dont_promote_use_of_container_outside_loop : $@convention(thin) () -> () {
 bb0:
@@ -268,7 +268,7 @@ bb2:
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: {{^}}bb2:
 // CHECK-NEXT: strong_release
-// CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
+// CHECK-NEXT: dealloc_stack_ref [[O]] : $XX
 // CHECK-NEXT: return
 sil @promote_with_use_in_loop : $@convention(thin) () -> Int32 {
 bb0:
@@ -293,7 +293,7 @@ bb2:
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: {{^}}bb4:
 // CHECK-NEXT: strong_release
-// CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
+// CHECK-NEXT: dealloc_stack_ref [[O]] : $XX
 // CHECK-NEXT: return
 sil @promote_with_use_in_multi_block_backedge_loop : $@convention(thin) () -> Int32 {
 bb0:
@@ -324,7 +324,7 @@ bb4:
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: {{^}}bb5:
 // CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
+// CHECK-NEXT: dealloc_stack_ref [[O]] : $XX
 // CHECK-NEXT: return
 sil @promote_with_other_stack_allocs : $@convention(thin) () -> Int32 {
 bb0:
@@ -361,7 +361,7 @@ bb5:
 // CHECK: {{^}}bb2:
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
 // CHECK: strong_release
-// CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: dealloc_stack_ref [[O]] : $XX
 // CHECK: dealloc_stack
 // CHECK: return
 sil @promote_and_fix_stack_nesting1 : $@convention(thin) () -> Int32 {
@@ -388,7 +388,7 @@ bb2:
 // CHECK-NEXT: alloc_ref [stack] $XX
 // CHECK: {{^}}bb3:
 // CHECK: strong_release
-// CHECK-NEXT: dealloc_ref [stack]
+// CHECK-NEXT: dealloc_stack_ref
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return
 sil @promote_and_fix_stack_nesting2 : $@convention(thin) () -> Int32 {
@@ -419,7 +419,7 @@ bb3:
 // CHECK: {{^}}bb2:
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] [tail_elems{{.*}}] $XX
 // CHECK: strong_release
-// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack_ref
 // CHECK: dealloc_stack
 // CHECK: return
 sil @promote_and_fix_stack_nesting3 : $@convention(thin) () -> Int32 {
@@ -447,7 +447,7 @@ bb2:
 // CHECK: {{^}}bb2:
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] [tail_elems{{.*}}] $XX
 // CHECK: strong_release
-// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack_ref
 // CHECK: dealloc_stack
 // CHECK: return
 sil @promote_and_fix_stack_nesting4 : $@convention(thin) () -> Int32 {
@@ -475,7 +475,7 @@ bb2:
 // CHECK: {{^}}bb2({{.*}}):
 // CHECK: [[O:%[0-9]+]] = alloc_ref [stack] [tail_elems{{.*}}] $XX
 // CHECK: strong_release
-// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack_ref
 // CHECK: dealloc_stack
 // CHECK: return
 sil @promote_and_fix_stack_nesting5 : $@convention(thin) (Builtin.Word) -> Int32 {
@@ -505,7 +505,7 @@ bb2(%i : $Builtin.Word):
 // CHECK: tuple_extract [[A]]
 // CHECK: [[TAF:%[0-9]+]] = function_ref @take_array
 // CHECK: apply [[TAF]]
-// CHECK: dealloc_ref [stack] [[B]]
+// CHECK: dealloc_stack_ref [[B]]
 // CHECK: return
 sil @promote_array : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
@@ -586,7 +586,7 @@ bb0(%0 : $Array<Int>):
 // CHECK: [[AV:%.*]] = tuple_extract [[A]]{{.*}}, 0
 // CHECK: tuple_extract [[A]]
 // CHECK: store [[AV]] to [[ARR]]
-// CHECK: dealloc_ref [stack] [[B]]
+// CHECK: dealloc_stack_ref [[B]]
 // CHECK: return
 
 sil @promote_array_withUnsafeMutableBufferPointer_use : $@convention(thin) (Int, @owned @callee_owned (@inout Int) -> (@out (), @error Error)) -> () {
@@ -693,7 +693,7 @@ bb0(%0 : $Int):
 // CHECK: [[AV:%.*]] = tuple_extract [[A]]{{.*}}, 0
 // CHECK: tuple_extract [[A]]
 // CHECK: store [[AV]] to [[ARR]]
-// CHECK: dealloc_ref [stack] [[B]]
+// CHECK: dealloc_stack_ref [[B]]
 // CHECK: return
 
 sil @promote_array_withUnsafeMutableBufferPointer_capture : $@convention(thin) (Int, @owned Array<Int>) -> () {
@@ -745,13 +745,13 @@ bb0(%0 : $Int, %another: $Array<Int>):
 
 // CHECK-LABEL: sil @promote_with_unreachable_block_nest_bug
 // CHECK: bb3:
-// CHECK: dealloc_ref [stack] %{{.*}}
+// CHECK: dealloc_stack_ref %{{.*}}
 // CHECK: bb4:
 // CHECK: br bb5
 // CHECK: bb5:
-// CHECK: dealloc_ref [stack] %{{.*}}
+// CHECK: dealloc_stack_ref %{{.*}}
 // CHECK: bb6:
-// CHECK: dealloc_ref [stack] %{{.*}}
+// CHECK: dealloc_stack_ref %{{.*}}
 // CHECK: bb11:
 // CHECK: alloc_ref [stack] $XX
 // CHECK: return

@@ -245,13 +245,14 @@ void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
 }
 
 void SILModule::willDeleteInstruction(SILInstruction *I) {
-  // Update openedArchetypeDefs.
+  // Update RootOpenedArchetypeDefs.
   if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
-    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
+    if (const CanOpenedArchetypeType archeTy =
+            svi->getDefinedOpenedArchetype()) {
       OpenedArchetypeKey key = {archeTy, svi->getFunction()};
-      assert(openedArchetypeDefs.lookup(key) == svi &&
+      assert(RootOpenedArchetypeDefs.lookup(key) == svi &&
              "archetype def was not registered");
-      openedArchetypeDefs.erase(key);
+      RootOpenedArchetypeDefs.erase(key);
     }
   }
 }
@@ -761,9 +762,11 @@ void SILModule::registerDeserializationNotificationHandler(
   deserializationNotificationHandlers.add(std::move(handler));
 }
 
-SILValue SILModule::getOpenedArchetypeDef(CanArchetypeType archetype,
-                                          SILFunction *inFunction) {
-  SILValue &def = openedArchetypeDefs[{archetype, inFunction}];
+SILValue SILModule::getRootOpenedArchetypeDef(CanOpenedArchetypeType archetype,
+                                              SILFunction *inFunction) {
+  assert(archetype->isRoot());
+
+  SILValue &def = RootOpenedArchetypeDefs[{archetype, inFunction}];
   if (!def) {
     numUnresolvedOpenedArchetypes++;
     def = ::new PlaceholderValue(SILType::getPrimitiveAddressType(archetype));
@@ -778,12 +781,13 @@ bool SILModule::hasUnresolvedOpenedArchetypeDefinitions() {
 
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {
   if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
-    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
-      SILValue &val = openedArchetypeDefs[{archeTy, inst->getFunction()}];
+    if (const CanOpenedArchetypeType archeTy =
+            svi->getDefinedOpenedArchetype()) {
+      SILValue &val = RootOpenedArchetypeDefs[{archeTy, inst->getFunction()}];
       if (val) {
         if (!isa<PlaceholderValue>(val)) {
           // Print a useful error message (and not just abort with an assert).
-          llvm::errs() << "re-definition of opened archetype in function "
+          llvm::errs() << "re-definition of root opened archetype in function "
                        << svi->getFunction()->getName() << ":\n";
           svi->print(llvm::errs());
           llvm::errs() << "previously defined in function "
@@ -806,12 +810,13 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
 void SILModule::notifyMovedInstruction(SILInstruction *inst,
                                        SILFunction *fromFunction) {
   if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
-    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
+    if (const CanOpenedArchetypeType archeTy =
+            svi->getDefinedOpenedArchetype()) {
       OpenedArchetypeKey key = {archeTy, fromFunction};
-      assert(openedArchetypeDefs.lookup(key) == svi &&
+      assert(RootOpenedArchetypeDefs.lookup(key) == svi &&
              "archetype def was not registered");
-      openedArchetypeDefs.erase(key);
-      openedArchetypeDefs[{archeTy, svi->getFunction()}] = svi;
+      RootOpenedArchetypeDefs.erase(key);
+      RootOpenedArchetypeDefs[{archeTy, svi->getFunction()}] = svi;
     }
   }
 }
@@ -821,9 +826,8 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
 bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   const auto &IntrinsicInfo = getIntrinsicInfo(Name);
   if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
-    return IntrinsicInfo
-              .getOrCreateAttributes(getASTContext())
-              .hasFnAttribute(llvm::Attribute::NoReturn);
+    return IntrinsicInfo.getOrCreateAttributes(getASTContext())
+        .hasFnAttr(llvm::Attribute::NoReturn);
   }
   const auto &BuiltinInfo = getBuiltinInfo(Name);
   switch (BuiltinInfo.ID) {

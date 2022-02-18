@@ -75,8 +75,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     auto *ti = dyn_cast<TermInst>(user);
     if ((ti && !ti->isTransformationTerminator()) ||
         !canOpcodeForwardGuaranteedValues(op) ||
-        1 != count_if(user->getOperandValues(
-                          true /*ignore type dependent operands*/),
+        1 != count_if(user->getNonTypeDependentOperandValues(),
                       [&](SILValue v) {
                         return v.getOwnershipKind() == OwnershipKind::Owned;
                       })) {
