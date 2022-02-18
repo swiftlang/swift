@@ -4173,6 +4173,13 @@ public:
                              OpenedTypeMap &replacements,
                              ConstraintLocatorBuilder locator);
 
+  /// Open a generic parameter into a type variable and record
+  /// it in \c replacements.
+  TypeVariableType *openGenericParameter(DeclContext *outerDC,
+                                         GenericTypeParamType *parameter,
+                                         OpenedTypeMap &replacements,
+                                         ConstraintLocatorBuilder locator);
+
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
   /// constraint system for further processing.

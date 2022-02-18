@@ -1591,22 +1591,30 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig.getGenericParams()) {
-    auto *paramLocator = getConstraintLocator(
-        locator.withPathElement(LocatorPathElt::GenericParameter(gp)));
-
-    auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding |
-                                                    TVO_CanBindToHole);
-    auto result = replacements.insert(std::make_pair(
-        cast<GenericTypeParamType>(gp->getCanonicalType()), typeVar));
-
-    assert(result.second);
-    (void)result;
+    (void)openGenericParameter(outerDC, gp, replacements, locator);
   }
 
   auto *baseLocator = getConstraintLocator(
       locator.withPathElement(LocatorPathElt::OpenedGeneric(sig)));
 
   bindArchetypesFromContext(*this, outerDC, baseLocator, replacements);
+}
+
+TypeVariableType *ConstraintSystem::openGenericParameter(
+    DeclContext *outerDC, GenericTypeParamType *parameter,
+    OpenedTypeMap &replacements, ConstraintLocatorBuilder locator) {
+  auto *paramLocator = getConstraintLocator(
+      locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
+
+  auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding |
+                                                      TVO_CanBindToHole);
+  auto result = replacements.insert(std::make_pair(
+      cast<GenericTypeParamType>(parameter->getCanonicalType()), typeVar));
+
+  assert(result.second);
+  (void)result;
+
+  return typeVar;
 }
 
 void ConstraintSystem::openGenericRequirements(
