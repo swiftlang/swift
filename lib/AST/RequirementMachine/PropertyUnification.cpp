@@ -114,33 +114,9 @@ static void recordRelation(Term key,
   (void) system.addRule(lhs, rhs, &path);
 }
 
-/// Given a term T == U.V, an existing rule (V.[C] => V) and a new rule
-/// (U.V.[D] => U.V) where [C] and [D] are understood to be two property
-/// symbols in conflict with each other, mark the new rule as conflicting,
-/// and if the existing rule applies to the entire term T (that is, if
-/// |U| == 0) also mark the existing rule as conflicting.
-static void recordConflict(Term key,
-                           unsigned existingRuleID,
-                           unsigned newRuleID,
-                           RewriteSystem &system) {
-  auto &existingRule = system.getRule(existingRuleID);
-  auto &newRule = system.getRule(newRuleID);
-
-  auto existingKind = existingRule.isPropertyRule()->getKind();
-  auto newKind = newRule.isPropertyRule()->getKind();
-
-  // The GSB only dropped the new rule in the case of a conflicting
-  // superclass requirement, so maintain that behavior here.
-  if (existingKind != Symbol::Kind::Superclass &&
-      existingKind == newKind) {
-    if (existingRule.getRHS().size() == key.size())
-      existingRule.markConflicting();
-  }
-
-  if (newRule.getRHS().size() == key.size())
-    newRule.markConflicting();
-
-  // FIXME: Record the conflict and diagnose it later.
+void RewriteSystem::recordConflict(unsigned existingRuleID,
+                                   unsigned newRuleID) {
+  ConflictingRules.emplace_back(existingRuleID, newRuleID);
 }
 
 void PropertyMap::addConformanceProperty(
@@ -170,7 +146,7 @@ void PropertyMap::addLayoutProperty(
 
   // If the intersection is invalid, we have a conflict.
   if (!mergedLayout->isKnownLayout()) {
-    recordConflict(key, *props->LayoutRule, ruleID, System);
+    System.recordConflict(*props->LayoutRule, ruleID);
     return;
   }
 
@@ -369,6 +345,7 @@ void PropertyMap::addSuperclassProperty(
                    << props->SuperclassDecl->getName() << "\n";
     }
 
+    // FIXME: Record the conflict better
     newRule.markConflicting();
   }
 }
@@ -408,7 +385,7 @@ void PropertyMap::unifyConcreteTypes(Term key,
     if (debug) {
       llvm::dbgs() << "%% Concrete type conflict\n";
     }
-    recordConflict(key, lhsRuleID, rhsRuleID, System);
+    System.recordConflict(lhsRuleID, rhsRuleID);
     return;
   }
 
@@ -670,8 +647,7 @@ void PropertyMap::checkConcreteTypeRequirements() {
       } else if (props->hasSuperclassBound()) {
         const auto &req = props->getSuperclassRequirement();
         for (auto pair : req.SuperclassRules) {
-          recordConflict(props->getKey(), concreteTypeRule,
-                         pair.second, System);
+          System.recordConflict(concreteTypeRule, pair.second);
         }
       }
 
@@ -699,8 +675,7 @@ void PropertyMap::checkConcreteTypeRequirements() {
       // we have such a layout requirement, we have a conflict.
       } else if (props->LayoutRule &&
                  props->Layout->isClass()) {
-        recordConflict(props->getKey(), concreteTypeRule,
-                       *props->LayoutRule, System);
+        System.recordConflict(concreteTypeRule, *props->LayoutRule);
       }
     }
   }
