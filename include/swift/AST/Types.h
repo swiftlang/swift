@@ -5289,6 +5289,8 @@ public:
             Bits.ParameterizedProtocolType.ArgCount};
   }
 
+  void getRequirements(Type baseType, SmallVectorImpl<Requirement> &reqs) const;
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Base, getArgs());
   }

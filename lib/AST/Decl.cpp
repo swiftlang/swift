@@ -5398,9 +5398,10 @@ bool ProtocolDecl::existentialRequiresAny() const {
     ExistentialRequiresAnyRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
-AssociatedTypeDecl *ProtocolDecl::getPrimaryAssociatedType() const {
+ArrayRef<AssociatedTypeDecl *>
+ProtocolDecl::getPrimaryAssociatedTypes() const {
   return evaluateOrDefault(getASTContext().evaluator,
-    PrimaryAssociatedTypeRequest{const_cast<ProtocolDecl *>(this)},
+    PrimaryAssociatedTypesRequest{const_cast<ProtocolDecl *>(this)},
     nullptr);
 }
 

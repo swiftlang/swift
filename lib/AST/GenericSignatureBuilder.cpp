@@ -4523,14 +4523,13 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                                                 source)))
         anyErrors = true;
 
-    auto *assocType = protoDecl->getPrimaryAssociatedType();
-    auto depType = DependentMemberType::get(
-        resolvedSubject.getDependentType(*this), assocType);
-    if (isErrorResult(addSameTypeRequirement(Type(depType),
-                                             paramProtoType->getArgs()[0],
-                                             source,
-                                             UnresolvedHandlingKind::GenerateConstraints)))
-      anyErrors = true;
+    SmallVector<Requirement, 2> reqs;
+    auto baseType = resolvedSubject.getDependentType(*this);
+    paramProtoType->getRequirements(baseType, reqs);
+    for (auto req : reqs) {
+      if (isErrorResult(addRequirement(req, source, inferForModule)))
+        anyErrors = true;
+    }
 
     return anyErrors ? ConstraintResult::Conflicting
                      : ConstraintResult::Resolved;

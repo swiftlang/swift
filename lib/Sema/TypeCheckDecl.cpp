@@ -698,15 +698,17 @@ ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-AssociatedTypeDecl *
-PrimaryAssociatedTypeRequest::evaluate(Evaluator &evaluator,
-                                       ProtocolDecl *decl) const {
+ArrayRef<AssociatedTypeDecl *>
+PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *decl) const {
+  SmallVector<AssociatedTypeDecl *, 2> assocTypes;
+
   for (auto *assocType : decl->getAssociatedTypeMembers()) {
     if (assocType->getAttrs().hasAttribute<PrimaryAssociatedTypeAttr>())
-      return assocType;
+      assocTypes.push_back(assocType);
   }
 
-  return nullptr;
+  return decl->getASTContext().AllocateCopy(assocTypes);
 }
 
 bool

@@ -217,16 +217,15 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
   }
 
   if (auto *paramType = constraintType->getAs<ParameterizedProtocolType>()) {
-    auto *protoDecl = paramType->getBaseType()->getDecl();
-
     desugarConformanceRequirement(subjectType, paramType->getBaseType(),
                                   loc, result, errors);
 
-    auto *assocType = protoDecl->getPrimaryAssociatedType();
+    SmallVector<Requirement, 2> reqs;
+    paramType->getRequirements(subjectType, reqs);
 
-    auto memberType = lookupMemberType(subjectType, protoDecl, assocType);
-    desugarSameTypeRequirement(memberType, paramType->getArgs()[0],
-                               loc, result, errors);
+    for (const auto &req : reqs)
+      desugarRequirement(req, result, errors);
+
     return;
   }
 

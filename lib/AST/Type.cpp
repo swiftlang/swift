@@ -3894,6 +3894,24 @@ void ParameterizedProtocolType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(arg.getPointer());
 }
 
+void ParameterizedProtocolType::getRequirements(
+    Type baseType, SmallVectorImpl<Requirement> &reqs) const {
+  auto *protoDecl = getBaseType()->getDecl();
+
+  auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
+  auto argTypes = getArgs();
+  assert(argTypes.size() <= assocTypes.size());
+
+  for (unsigned i : indices(argTypes)) {
+    auto argType = argTypes[i];
+    auto *assocType = assocTypes[i];
+    auto subjectType = assocType->getDeclaredInterfaceType()
+        ->castTo<DependentMemberType>()
+        ->substBaseType(protoDecl->getParentModule(), baseType);
+    reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
+  }
+}
+
 bool ProtocolType::requiresClass() {
   return getDecl()->requiresClass();
 }
