@@ -496,6 +496,13 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
   }
   auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});
   setCallingConvUsingCallee(Call);
+
+  if (!IGM.IRGen.Opts.TrapFuncName.empty()) {
+    auto A = llvm::Attribute::get(getContext(), "trap-func-name",
+                                  IGM.IRGen.Opts.TrapFuncName);
+    Call->addFnAttr(A);
+  }
+
   return Call;
 }
 

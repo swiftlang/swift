@@ -132,6 +132,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
   }
+  if (!Opts.TrapFuncName.empty()) {
+    CGO.TrapFuncName = Opts.TrapFuncName;
+  }
 
   auto &HSI = Importer->getClangPreprocessor()
                   .getHeaderSearchInfo()
