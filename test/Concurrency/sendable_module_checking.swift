@@ -15,7 +15,6 @@ actor A {
 func testA(a: A) async {
   _ = await a.f() // CHECK: warning: cannot call function returning non-sendable type '[StrictStruct : NonStrictClass]' across actors}}
   // CHECK: note: struct 'StrictStruct' does not conform to the 'Sendable' protocol
-  // CHECK: note: class 'NonStrictClass' does not conform to the 'Sendable' protocol
 }
 
 extension NonStrictStruct: @unchecked Sendable { }

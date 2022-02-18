@@ -103,26 +103,6 @@ Swift 5.6
   }
   ```
 
-* [SE-0302][]:
-
-  Swift will now produce warnings to indicate potential data races when
-  non-`Sendable` types are passed across actor or task boundaries. For
-  example:
-
-  ```swift
-  class MyCounter {
-    var value = 0
-  }
-
-  func f() -> MyCounter {
-    let counter = MyCounter()
-    Task {
-      counter.value += 1  // warning: capture of non-Sendable type 'MyCounter'
-    }
-    return counter
-  }
-  ```
-
 * [SE-0331][]:
 
   The conformance of the unsafe pointer types (e.g., `UnsafePointer`,

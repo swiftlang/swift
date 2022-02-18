@@ -750,6 +750,14 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
 
   auto defaultBehavior = defaultDiagnosticBehavior();
 
+  // If we're in Swift 5 without -warn-concurrency, suppress the diagnostic
+  // entirely. This is the partial rollback of SE-0302
+  ASTContext &ctx = fromDC->getASTContext();
+  if (!ctx.isSwiftVersionAtLeast(6) && !ctx.LangOpts.WarnConcurrency &&
+      (!conformanceCheck ||
+       *conformanceCheck == SendableCheck::ImpliedByStandardProtocol))
+    defaultBehavior = DiagnosticBehavior::Ignore;
+
   // If we are checking an implicit Sendable conformance, don't suppress
   // diagnostics for declarations in the same module. We want them so make
   // enclosing inferred types non-Sendable.
@@ -776,6 +784,15 @@ static bool diagnoseSingleNonSendableType(
     behavior = fromContext.diagnosticBehavior(nominal);
   } else {
     behavior = fromContext.defaultDiagnosticBehavior();
+
+    // If we're in Swift 5 without -warn-concurrency, suppress the diagnostic
+    // entirely. This is the partial rollback of SE-0302
+    ASTContext &ctx = fromContext.fromDC->getASTContext();
+    if (!ctx.isSwiftVersionAtLeast(6) && !ctx.LangOpts.WarnConcurrency &&
+        (!fromContext.conformanceCheck ||
+         *fromContext.conformanceCheck ==
+            SendableCheck::ImpliedByStandardProtocol))
+      behavior = DiagnosticBehavior::Ignore;
   }
 
   bool wasSuppressed = diagnose(type, behavior);
