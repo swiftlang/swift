@@ -11,18 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 import SIL
+import Parse
 import OptimizerBridging
-
-#if canImport(ExperimentalRegex)
-import ExperimentalRegex
-#endif
 
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerSILClasses()
   registerSwiftPasses()
 
-  #if canImport(ExperimentalRegex)
+  #if SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
   registerRegexParser()
   #endif
 }

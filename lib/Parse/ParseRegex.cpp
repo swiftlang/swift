@@ -15,23 +15,30 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
+
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Parse/ParseBridging.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxKind.h"
 
 // Regex parser delivered via Swift modules.
-#include "swift/Parse/ExperimentalRegexBridging.h"
+
+#ifdef SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
 static RegexLiteralParsingFn regexLiteralParsingFn = nullptr;
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
   regexLiteralParsingFn = fn;
 }
+#endif
 
 using namespace swift;
 using namespace swift::syntax;
 
 ParserResult<Expr> Parser::parseExprRegexLiteral() {
   assert(Tok.is(tok::regex_literal));
+#ifndef SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
+  llvm_unreachable("string processing is not enabled");
+#else
   assert(regexLiteralParsingFn);
 
   SyntaxParsingContext LocalContext(SyntaxContext,
@@ -59,4 +66,5 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
   auto loc = consumeToken();
   return makeParserResult(RegexLiteralExpr::createParsed(
       Context, loc, regexText, version, capturesBuf));
+#endif
 }

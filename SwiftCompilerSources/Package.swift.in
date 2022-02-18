@@ -1,0 +1,68 @@
+// swift-tools-version:5.3
+//===--- Package.swift.in - SwiftCompiler SwiftPM package -----------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// NOTE: This 'Package.swift.in' file is for CMake configure_file().
+// Generated 'Package.swift' can be found in
+// '${swift_build_dir}/SwiftCompilerSources/Package.swift'.
+
+
+import PackageDescription
+
+var swiftSettings: [SwiftSetting] = [
+  .unsafeFlags([
+    "-Xfrontend", "-validate-tbd-against-ir=none",
+    "-Xfrontend", "-enable-cxx-interop",
+    // Bridging modules and headers
+    "-Xcc", "-I", "-Xcc", "@SWIFT_SOURCE_DIR@/include",
+    // Generated C headers
+    "-Xcc", "-I", "-Xcc", "@CMAKE_BINARY_DIR@/include",
+    "-cross-module-optimization"
+  ]),
+]
+
+if "@SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING@" == "TRUE" {
+  swiftSettings.append(.define("SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING"))
+}
+
+func getTarget(_ name: String, dependencies: [Target.Dependency]) -> Target {
+  .target(
+    name: name,
+    dependencies: dependencies, 
+    path: "@swiftcompiler_source_dir_name@/\(name)",
+    exclude: ["CMakeLists.txt"],
+    swiftSettings: swiftSettings)
+}
+
+let package = Package(
+  name: "SwiftCompilerSources",
+  platforms: [
+    .macOS("10.9"),
+  ],
+  products: [
+    .library(
+      name: "SwiftCompiler",
+      type: .static,
+      targets: ["Basic", "AST", "Parse", "SIL", "Optimizer"]),
+  ],
+  dependencies: [
+  ],
+  // Note that all modules must be added to LIBSWIFT_MODULES in the top-level
+  // CMakeLists.txt file to get debugging working.
+  targets: [
+    getTarget("Basic", dependencies: []),
+    getTarget("AST", dependencies: ["Basic"]),
+    getTarget("Parse", dependencies: ["Basic", "AST"]),
+    getTarget("SIL", dependencies: ["Basic"]),
+    getTarget("Optimizer", dependencies: ["Basic", "SIL", "Parse"]),
+  ]
+)

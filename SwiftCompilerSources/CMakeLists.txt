@@ -83,6 +83,10 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-O" "-cross-module-optimization")
   endif()
 
+  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+    list(APPEND swift_compile_options "-D" "SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING")
+  endif()
+
   get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
 
   set(sdk_option "")
@@ -251,3 +255,12 @@ else()
 
 endif()
 
+# Configure SwiftPM package.
+
+set(swiftcompiler_source_dir_name "_Sources")
+configure_file(Package.swift.in
+  "${CMAKE_CURRENT_BINARY_DIR}/Package.swift" @ONLY)
+# SwiftPM requires all sources are inside the directory of 'Package.swift'.
+execute_process(COMMAND
+  "${CMAKE_COMMAND}" -E create_symlink
+  "${CMAKE_CURRENT_SOURCE_DIR}/Sources" "${CMAKE_CURRENT_BINARY_DIR}/${swiftcompiler_source_dir_name}")

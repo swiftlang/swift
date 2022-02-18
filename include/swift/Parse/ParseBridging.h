@@ -1,5 +1,21 @@
-#ifndef EXPERIMENTAL_REGEX_BRIDGING
-#define EXPERIMENTAL_REGEX_BRIDGING
+//===--- ParseBrdiging.h - header for the swift ParseBriding moudle -------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_PARSE_PARSEBRIDGING_H
+#define SWIFT_PARSE_PARSEBRIDGING_H
+
+#include "swift/AST/ASTBridging.h"
+#include "swift/Basic/BasicBridging.h"
+#include "swift/Config.h"
 
 #include <stdbool.h>
 
@@ -7,6 +23,10 @@
 extern "C" {
 #endif
 
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+// TODO: Audit nullability annotations.
+
+#ifdef SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
 /// Attempt to lex a regex literal string. Takes the following arguments:
 ///
 /// - CurPtrPtr: A pointer to the current pointer of lexer, which should be the
@@ -21,10 +41,10 @@ extern "C" {
 /// Returns: A bool indicating whether lexing was completely erroneous, and
 ///          cannot be recovered from, or false if there either was no error,
 ///          or there was a recoverable error.
-typedef bool (* RegexLiteralLexingFn)(/*CurPtrPtr*/ const char **,
-                                      /*BufferEnd*/ const char *,
-                                      /*ErrorOut*/ const char **);
-void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn);
+typedef bool (*RegexLiteralLexingFn)(
+    /*CurPtrPtr*/ const char *_Nullable *_Nonnull,
+    /*BufferEnd*/ const char *_Nonnull, BridgedDiagnosticEngine);
+void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn _Nonnull fn);
 
 /// Parse a regex literal string. Takes the following arguments:
 ///
@@ -35,12 +55,17 @@ void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn);
 ///                        capture structure of the literal.
 /// - CaptureStructureSize: The size of the capture structure buffer. Must be
 ///                         greater than or equal to `strlen(InputPtr) + 3`.
-typedef void(* RegexLiteralParsingFn)(/*InputPtr*/ const char *,
-                                      /*ErrorOut*/ const char **,
-                                      /*VersionOut*/ unsigned *,
-                                      /*CaptureStructureOut*/ void *,
-                                      /*CaptureStructureSize*/ unsigned);
-void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn);
+typedef void (*RegexLiteralParsingFn)(
+    /*InputPtr*/ const char *_Nullable,
+    /*ErrorOut*/ const char *_Nullable *_Nullable,
+    /*VersionOut*/ unsigned *_Nullable,
+    /*CaptureStructureOut*/ void *_Nullable,
+    /*CaptureStructureSize*/ unsigned);
+void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn _Nonnull fn);
+
+#endif // SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
+
+SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifdef __cplusplus
 } // extern "C"

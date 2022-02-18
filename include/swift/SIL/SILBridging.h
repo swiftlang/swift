@@ -17,6 +17,8 @@
 #include "swift/Basic/BridgedSwiftObject.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdbool.h>
+
 
 #ifdef __cplusplus
 extern "C" {

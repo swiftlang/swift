@@ -14,31 +14,33 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/ExperimentalRegexBridging.h"
+#include "swift/Parse/Confusables.h"
+#include "swift/Parse/ParseBridging.h"
 #include "swift/Syntax/Trivia.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MathExtras.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/MathExtras.h"
+#include "llvm/Support/MemoryBuffer.h"
 // FIXME: Figure out if this can be migrated to LLVM.
 #include "clang/Basic/CharInfo.h"
 
 #include <limits>
 
+#ifdef SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
 // Regex lexing delivered via libSwift.
-#include "swift/Parse/ExperimentalRegexBridging.h"
 static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
 void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
   regexLiteralLexingFn = fn;
 }
+#endif
 
 using namespace swift;
 using namespace swift::syntax;
@@ -1959,6 +1961,9 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
 }
 
 bool Lexer::tryLexRegexLiteral(const char *TokStart) {
+#ifndef SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
+  return false;
+#else
   assert(*TokStart == '\'');
 
   // We need to have experimental string processing enabled, and have the
@@ -1972,10 +1977,7 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
   // - CompletelyErroneous will be set if there was an error that cannot be
   //   recovered from.
   auto *Ptr = TokStart;
-  const char *ErrStr = nullptr;
-  bool CompletelyErroneous = regexLiteralLexingFn(&Ptr, BufferEnd, &ErrStr);
-  if (ErrStr)
-    diagnose(TokStart, diag::regex_literal_parsing_error, ErrStr);
+  bool CompletelyErroneous = regexLiteralLexingFn(&Ptr, BufferEnd, getBridgedDiagnosticEngine(Diags));
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
@@ -1988,16 +1990,15 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
 
   // If the lexing was completely erroneous, form an unknown token.
   if (CompletelyErroneous) {
-    assert(ErrStr);
     formToken(tok::unknown, TokStart);
     return true;
   }
 
   // Otherwise, we either had a successful lex, or something that was
   // recoverable.
-  assert(ErrStr || CurPtr[-1] == '\'');
   formToken(tok::regex_literal, TokStart);
   return true;
+#endif
 }
 
 /// lexEscapedIdentifier:
