@@ -220,14 +220,22 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
       continue;
     }
 
-    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
-                                              /*Implicit=*/true);
+    Expr *paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                               /*Implicit=*/true);
     paramRefExpr->setType(param->getType());
+
+    if (param->isInOut()) {
+      paramRefExpr->setType(LValueType::get(param->getType()));
+
+      paramRefExpr = new (ctx) InOutExpr(
+          SourceLoc(), paramRefExpr, param->getType(), /*isImplicit*/ true);
+      paramRefExpr->setType(InOutType::get(param->getType()));
+    }
 
     auto specParamTy = specializedFuncDecl->getParameters()->get(paramIndex)->getType();
 
     Expr *argExpr = nullptr;
-    if (specParamTy->isEqual(paramRefExpr->getType())) {
+    if (specParamTy->isEqual(param->getType())) {
       argExpr = paramRefExpr;
     } else {
       argExpr = ForcedCheckedCastExpr::createImplicit(ctx, paramRefExpr,
@@ -353,9 +361,18 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
     if (isa<MetatypeType>(param->getType().getPointer())) {
       continue;
     }
-    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
-                                             /*Implicit=*/true);
+    Expr *paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                               /*Implicit=*/true);
     paramRefExpr->setType(param->getType());
+
+    if (param->isInOut()) {
+      paramRefExpr->setType(LValueType::get(param->getType()));
+
+      paramRefExpr = new (ctx) InOutExpr(
+          SourceLoc(), paramRefExpr, param->getType(), /*isImplicit*/ true);
+      paramRefExpr->setType(InOutType::get(param->getType()));
+    }
+
     forwardingParams.push_back(Argument(SourceLoc(), Identifier(), paramRefExpr));
   }
 
