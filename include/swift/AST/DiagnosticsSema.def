@@ -4707,10 +4707,6 @@ ERROR(any_not_existential,none,
 ERROR(existential_requires_any,none,
       "protocol %0 as a type must be explicitly marked as 'any'",
       (Identifier))
-ERROR(explicit_existential_not_supported,none,
-       "explicit 'any' not supported; use frontend flag "
-       "-enable-explicit-existential-types to enable this feature",
-       ())
 
 ERROR(nonisolated_let,none,
       "'nonisolated' is meaningless on 'let' declarations because "
