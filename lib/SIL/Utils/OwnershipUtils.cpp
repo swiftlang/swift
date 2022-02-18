@@ -90,6 +90,9 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 // Skip over nested borrow scopes. Their scope-ending instructions are their use
 // points. Transitively find all nested scope-ending instructions by looking
 // through nested reborrows. Nested reborrows are not use points.
+//
+// FIXME: handle inner reborrows, which aren't dominated by
+// guaranteedValue. Audit all users to handle reborrows.
 bool swift::findInnerTransitiveGuaranteedUses(
   SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints) {
 
@@ -183,13 +186,18 @@ bool swift::findInnerTransitiveGuaranteedUses(
       break;
     }
     case OperandOwnership::Borrow:
-      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
+      // FIXME: Use visitExtendedScopeEndingUses and audit all clients to handle
+      // reborrows.
+      //
+      // FIXME: visit[Extended]ScopeEndingUses can't return false here once dead
       // borrows are disallowed.
-      if (!BorrowingOperand(use).visitExtendedScopeEndingUses(
-            [&](Operand *endUse) {
-              leafUse(endUse);
-              return true;
-            })) {
+      if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *endUse) {
+            if (endUse->getOperandOwnership() == OperandOwnership::Reborrow) {
+              foundPointerEscape = true;
+            }
+            leafUse(endUse);
+            return true;
+          })) {
         // Special case for dead borrows. This is dangerous because clients
         // don't expect a begin_borrow to be in the use list.
         leafUse(use);
