@@ -784,7 +784,8 @@ int main(int argc, char **argv) {
   case OptGroup::Unknown: {
     auto T = irgen::createIRGenModule(
         SILMod.get(), Invocation.getOutputFilenameForAtMostOnePrimary(),
-        Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "");
+        Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(), "",
+        IRGenOpts);
     runCommandLineSelectedPasses(SILMod.get(), T.second);
     irgen::deleteIRGenModule(T);
     break;
