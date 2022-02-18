@@ -573,6 +573,15 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
       { LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl) }, 0);
 }
 
+std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
+    Type type, ConstraintLocator *locator) {
+  OpenedArchetypeType *opened = nullptr;
+  Type result = type->openAnyExistentialType(opened);
+  assert(OpenedExistentialTypes.count(locator) == 0);
+  OpenedExistentialTypes.insert({locator, opened});
+  return {result, opened};
+}
+
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
 static void extendDepthMap(
@@ -1847,6 +1856,40 @@ static Type typeEraseCovariantExistentialSelfReferences(Type refTy,
   return transformFn(refTy, TypePosition::Covariant);
 }
 
+Type constraints::typeEraseOpenedExistentialReference(
+    Type type, Type existentialBaseType, TypeVariableType *openedTypeVar) {
+  Type selfGP = GenericTypeParamType::get(false, 0, 0, type->getASTContext());
+
+  // First, temporarily reconstitute the 'Self' generic parameter.
+  type = type.transformRec([&](TypeBase *t) -> Optional<Type> {
+    // Don't recurse into children unless we have to.
+    if (!type->hasTypeVariable())
+      return Type(t);
+
+    if (isa<TypeVariableType>(t) && t->isEqual(openedTypeVar))
+      return selfGP;
+
+    // Recurse.
+    return None;
+  });
+
+  // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
+  type = typeEraseCovariantExistentialSelfReferences(type, existentialBaseType);
+
+  // Finally, swap the 'Self'-corresponding type variable back in.
+  return type.transformRec([&](TypeBase *t) -> Optional<Type> {
+    // Don't recurse into children unless we have to.
+    if (!type->hasTypeParameter())
+      return Type(t);
+
+    if (isa<GenericTypeParamType>(t) && t->isEqual(selfGP))
+      return Type(openedTypeVar);
+
+    // Recurse.
+    return None;
+  });
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
@@ -2119,35 +2162,8 @@ ConstraintSystem::getTypeOfMemberReference(
       type->hasTypeVariable()) {
     const auto selfGP = cast<GenericTypeParamType>(
         outerDC->getSelfInterfaceType()->getCanonicalType());
-
-    // First, temporarily reconstitute the 'Self' generic parameter.
-    type = type.transformRec([&](TypeBase *t) -> Optional<Type> {
-      // Don't recurse into children unless we have to.
-      if (!type->hasTypeVariable())
-        return Type(t);
-
-      if (isa<TypeVariableType>(t) && t->isEqual(replacements.lookup(selfGP)))
-        return selfGP;
-
-      // Recurse.
-      return None;
-    });
-
-    // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
-    type = typeEraseCovariantExistentialSelfReferences(type, baseObjTy);
-
-    // Finally, swap the 'Self'-corresponding type variable back in.
-    type = type.transformRec([&](TypeBase *t) -> Optional<Type> {
-      // Don't recurse into children unless we have to.
-      if (!type->hasTypeParameter())
-        return Type(t);
-
-      if (isa<GenericTypeParamType>(t) && t->isEqual(selfGP))
-        return Type(replacements.lookup(selfGP));
-
-      // Recurse.
-      return None;
-    });
+    auto openedTypeVar = replacements.lookup(selfGP);
+    type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar);
   }
 
   // Construct an idealized parameter type of the initializer associated

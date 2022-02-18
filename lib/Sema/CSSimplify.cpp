@@ -1319,13 +1319,17 @@ public:
 }
 
 // Match the argument of a call to the parameter.
-ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
+static ConstraintSystem::TypeMatchResult matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType,
     ArgumentList *argList,
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
-    Optional<TrailingClosureMatching> trailingClosureMatching) {
+    Optional<TrailingClosureMatching> trailingClosureMatching,
+    SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+      &openedExistentials) {
+  assert(subKind == ConstraintKind::OperatorArgumentConversion ||
+         subKind == ConstraintKind::ArgumentConversion);
   auto *loc = cs.getConstraintLocator(locator);
   assert(loc->isLastElement<LocatorPathElt::ApplyArgument>());
 
@@ -1544,6 +1548,27 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           argIdx == *argList->getFirstTrailingClosureIndex()) {
         cs.recordFix(SpecifyLabelToAssociateTrailingClosure::create(
             cs, cs.getConstraintLocator(loc)));
+      }
+
+      // If the argument is an existential type and the parameter is generic,
+      // consider opening the existential type.
+      if (argTy->isAnyExistentialType() &&
+          cs.getASTContext().LangOpts.EnableOpenedExistentialTypes &&
+          paramTy->hasTypeVariable() &&
+          !(callee &&
+            TypeChecker::getDeclTypeCheckingSemantics(callee) ==
+              DeclTypeCheckingSemantics::OpenExistential)) {
+        if (auto param = getParameterAt(callee, argIdx)) {
+          if (auto paramTypeVar = paramTy->getAs<TypeVariableType>()) {
+            if (param->getInterfaceType()->is<GenericTypeParamType>()) {
+              OpenedArchetypeType *opened;
+              std::tie(argTy, opened) = cs.openExistentialType(
+                  argTy, cs.getConstraintLocator(loc));
+
+              openedExistentials.push_back({paramTypeVar, opened});
+            }
+          }
+        }
       }
 
       auto argLabel = argument.getLabel();
@@ -10686,9 +10711,11 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     auto *argumentList = getArgumentList(argumentsLoc);
     // The argument type must be convertible to the input type.
+    SmallVector<std::pair<TypeVariableType *, OpenedArchetypeType *>, 2>
+        openedExistentials;
     auto matchCallResult = ::matchCallArguments(
         *this, func2, argumentList, func1->getParams(), func2->getParams(),
-        subKind, argumentsLoc, trailingClosureMatching);
+        subKind, argumentsLoc, trailingClosureMatching, openedExistentials);
 
     switch (matchCallResult) {
     case SolutionKind::Error: {
@@ -10743,7 +10770,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
         auto matchCallResult = ::matchCallArguments(
             *this, func2, newArgumentList, func1->getParams(),
-            func2->getParams(), subKind, argumentsLoc, trailingClosureMatching);
+            func2->getParams(), subKind, argumentsLoc, trailingClosureMatching,
+            openedExistentials);
 
         if (matchCallResult != SolutionKind::Solved)
           return SolutionKind::Error;
@@ -10796,9 +10824,18 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       break;
     }
 
+    // Erase all of the opened existentials.
+    Type result2 = func2->getResult();
+    if (result2->hasTypeVariable() && !openedExistentials.empty()) {
+      for (const auto &opened : openedExistentials) {
+        result2 = typeEraseOpenedExistentialReference(
+            result2, opened.second->getExistentialType(), opened.first);
+      }
+    }
+
     // The result types are equivalent.
     if (matchFunctionResultTypes(
-            func1->getResult(), func2->getResult(), subflags,
+            func1->getResult(), result2, subflags,
             locator.withPathElement(ConstraintLocator::FunctionResult))
             .isFailure())
       return SolutionKind::Error;
