@@ -794,9 +794,12 @@ bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
 
   RewriteInnerBorrowUses innerRewriter(*this);
   beginVisitBorrowScopeUses(); // reset the def/use worklist
-  bool succeed = visitBorrowScopeUses(borrowedValue.value, innerRewriter);
-  assert(succeed && "should be filtered by FindBorrowScopeUses");
-  return true;
+
+  // visitBorrowScopeUses may fail because of a pointer escape or unowned
+  // forward of an owned value, after having already looked through a copy. The
+  // canonicalization could proceed had we not looked through the copy but this
+  // case would require extra book-keeping.
+  return visitBorrowScopeUses(borrowedValue.value, innerRewriter);
 }
 
 /// Canonicalize a worklist of extended lifetimes. This iterates after rewriting
