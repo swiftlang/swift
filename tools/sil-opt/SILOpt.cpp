@@ -675,8 +675,18 @@ int main(int argc, char **argv) {
     SILOpts.OptMode = OptModeFlag;
   }
 
-  // Note: SILOpts must be set before the CompilerInstance is initializer below
-  // based on Invocation.
+  auto &IRGenOpts = Invocation.getIRGenOptions();
+  if (OptModeFlag == OptimizationMode::NotSet) {
+    if (OptimizationGroup == OptGroup::Diagnostics)
+      IRGenOpts.OptMode = OptimizationMode::NoOptimization;
+    else
+      IRGenOpts.OptMode = OptimizationMode::ForSpeed;
+  } else {
+    IRGenOpts.OptMode = OptModeFlag;
+  }
+
+  // Note: SILOpts, LangOpts, and IRGenOpts must be set before the
+  // CompilerInstance is initializer below based on Invocation.
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
