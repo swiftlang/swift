@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements the Decl class and subclasses.
+//  This file handles lookups related to distributed actor decls.
 //
 //===----------------------------------------------------------------------===//
 
@@ -89,7 +89,7 @@ Type swift::getDistributedActorSystemActorIDRequirementType(NominalTypeDecl *sys
   assert(!system->isDistributedActor());
   auto &ctx = system->getASTContext();
 
-  auto protocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  auto protocol = ctx.getDistributedActorSystemDecl();
   if (!protocol)
     return Type();
 
@@ -128,7 +128,7 @@ Type ASTContext::getAssociatedTypeOfDistributedSystemOfActor(
   if (!actorSystemDecl)
     return Type();
 
-  auto actorSystemProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  auto actorSystemProtocol = ctx.getDistributedActorSystemDecl();
   if (!actorSystemProtocol)
     return Type();
 
@@ -252,7 +252,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
 
   // === Must be declared in a 'DistributedActorSystem' conforming type
   ProtocolDecl *systemProto =
-      C.getProtocol(KnownProtocolKind::DistributedActorSystem);
+      C.getDistributedActorSystemDecl();
 
   auto systemNominal = getDeclContext()->getSelfNominalTypeDecl();
   auto distSystemConformance = module->lookupConformance(
@@ -968,7 +968,7 @@ llvm::SmallPtrSet<ProtocolDecl *, 2>
 swift::extractDistributedSerializationRequirements(
     ASTContext &C, ArrayRef<Requirement> allRequirements) {
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-  auto systemProto = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  auto systemProto = C.getDistributedActorSystemDecl();
   auto serializationReqAssocType =
       systemProto->getAssociatedType(C.Id_SerializationRequirement);
   auto systemSerializationReqTy = serializationReqAssocType->getInterfaceType();
