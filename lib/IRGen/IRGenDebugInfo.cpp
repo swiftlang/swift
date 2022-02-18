@@ -98,9 +98,6 @@ public:
 };
 
 static bool equalWithoutExistentialTypes(Type t1, Type t2) {
-  if (!t1->getASTContext().LangOpts.EnableExplicitExistentialTypes)
-    return false;
-
   auto withoutExistentialTypes = [](Type type) -> Type {
     return type.transform([](Type type) -> Type {
       if (auto existential = type->getAs<ExistentialType>())

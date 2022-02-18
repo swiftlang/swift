@@ -2989,8 +2989,7 @@ public:
     // metatype with the same constraint type as its existential operand.
     auto formalInstanceTy
       = MI->getType().castTo<ExistentialMetatypeType>().getInstanceType();
-    if (M->getASTContext().LangOpts.EnableExplicitExistentialTypes &&
-        formalInstanceTy->isConstraintType() &&
+    if (formalInstanceTy->isConstraintType() &&
         !(formalInstanceTy->isAny() || formalInstanceTy->isAnyObject())) {
       require(MI->getOperand()->getType().is<ExistentialType>(),
               "existential_metatype operand must be an existential type");

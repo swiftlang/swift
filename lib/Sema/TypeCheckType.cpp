@@ -2142,11 +2142,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   }
 
   case TypeReprKind::Existential: {
-    if (!getASTContext().LangOpts.EnableExplicitExistentialTypes &&
-        !(options & TypeResolutionFlags::SilenceErrors)) {
-      diagnose(repr->getLoc(), diag::explicit_existential_not_supported);
-    }
-
     auto *existential = cast<ExistentialTypeRepr>(repr);
     return resolveExistentialType(existential, options);
   }
@@ -4145,7 +4140,7 @@ public:
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {
-    if (T->isInvalid() || !Ctx.LangOpts.EnableExplicitExistentialTypes)
+    if (T->isInvalid())
       return;
 
     auto comp = T->getComponentRange().back();
