@@ -268,11 +268,13 @@ struct crashreporter_annotations_t gCRAnnotations
 __attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
     CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
 }
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
 // Report a message to any forthcoming crash log.
 static void
 reportOnCrash(uint32_t flags, const char *message)
 {
+#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
   // We must use an "unsafe" mutex in this pathway since the normal "safe"
   // mutex calls fatalError when an error is detected and fatalError ends up
   // calling us. In other words we could get infinite recursion if the
@@ -293,17 +295,10 @@ reportOnCrash(uint32_t flags, const char *message)
   CRSetCrashLogMessage(newMessage);
 
   crashlogLock.unlock();
-}
-
 #else
-
-static void
-reportOnCrash(uint32_t flags, const char *message)
-{
   // empty
+#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 }
-
-#endif
 
 // Report a message to system console and stderr.
 static void
