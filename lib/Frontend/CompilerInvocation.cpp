@@ -448,8 +448,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableParameterizedProtocolTypes |=
       Args.hasArg(OPT_enable_parameterized_protocol_types);
 
-  Opts.EnableOpenedExistentialTypes |=
-      Args.hasArg(OPT_enable_experimental_opened_existential_types);
+  Opts.EnableOpenedExistentialTypes =
+    Args.hasFlag(OPT_enable_experimental_opened_existential_types,
+                 OPT_disable_experimental_opened_existential_types,
+                 false);
 
   // SwiftOnoneSupport produces different symbols when opening existentials,
   // so disable it.
