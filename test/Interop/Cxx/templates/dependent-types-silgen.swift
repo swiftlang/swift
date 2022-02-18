@@ -27,14 +27,9 @@ import DependentTypes
 // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$sSC27dependantReturnTypeInfferedyyps5Int64VF : $@convention(thin) (Int64) -> @out Any
 // CHECK: bb0(%0 : $*Any, %1 : $Int64):
 // CHECK:   [[SPEC_OUT:%.*]] = alloc_stack $__CxxTemplateInst1MIxE
-// CHECK:   [[TMP_INT:%.*]] = alloc_stack $Int64
-// CHECK:   store %1 to [trivial] [[TMP_INT]] : $*Int64
-// CHECK:   [[TMP_INT_CASTED:%.*]] = alloc_stack $Int64
-// CHECK:   unconditional_checked_cast_addr Int64 in [[TMP_INT]] : $*Int64 to Int64 in [[TMP_INT_CASTED]] : $*Int64
 
-// CHECK:   [[ARG:%.*]] = load [trivial] [[TMP_INT_CASTED]] : $*Int64
 // CHECK:   [[FN:%.*]] = function_ref @{{_Z27dependantReturnTypeInfferedIxE1MIT_ES1_|\?\?\$dependantReturnTypeInffered@_J@@YA\?AU\?\$M@_J@@_J@Z}} : $@convention(c) (Int64) -> __CxxTemplateInst1MIxE
-// CHECK:   [[OUT:%.*]] = apply [[FN]]([[ARG]]) : $@convention(c) (Int64) -> __CxxTemplateInst1MIxE
+// CHECK:   [[OUT:%.*]] = apply [[FN]](%1) : $@convention(c) (Int64) -> __CxxTemplateInst1MIxE
 
 // CHECK:   store [[OUT]] to [trivial] [[SPEC_OUT]] : $*__CxxTemplateInst1MIxE
 // CHECK:   unconditional_checked_cast_addr __CxxTemplateInst1MIxE in [[SPEC_OUT]] : $*__CxxTemplateInst1MIxE to Any in %0 : $*Any
