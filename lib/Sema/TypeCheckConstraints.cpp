@@ -441,6 +441,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter,
       paramType, /*isDiscarded=*/false);
 
+  auto paramInterfaceTy = paramType->mapTypeOutOfContext();
+
   {
     // Buffer all of the diagnostics produced by \c typeCheckExpression
     // since in some cases we need to try type-checking again with a
@@ -459,6 +461,11 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     if (!ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments)
       return Type();
 
+    // Parameter type doesn't have any generic parameters mentioned
+    // in it, so there is nothing to infer.
+    if (!paramInterfaceTy->hasTypeParameter())
+      return Type();
+
     // Ignore any diagnostics emitted by the original type-check.
     diagnostics.abort();
   }
@@ -475,40 +482,76 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // If both of aforementioned conditions are true, let's attempt
   // to open generic parameter and infer the type of this default
   // expression.
-  auto interfaceType = paramType->mapTypeOutOfContext();
-  if (!interfaceType->isTypeParameter())
-    return Type();
+  OpenedTypeMap genericParameters;
 
-  auto containsType = [&](Type type, Type contained) {
-    return type.findIf(
-        [&contained](Type nested) { return nested->isEqual(contained); });
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::AllowFixes;
+
+  ConstraintSystem cs(DC, options);
+
+  auto *locator = cs.getConstraintLocator(
+      defaultValue, LocatorPathElt::ContextualType(
+                        defaultExprTarget.getExprContextualTypePurpose()));
+
+  auto getCanonicalGenericParamTy = [](GenericTypeParamType *GP) {
+    return cast<GenericTypeParamType>(GP->getCanonicalType());
   };
 
-  // Anchor of this default expression.
+  // Find and open all of the generic parameters used by the parameter
+  // and replace them with type variables.
+  auto contextualTy = paramInterfaceTy.transform([&](Type type) -> Type {
+    assert(!type->is<UnboundGenericType>());
+
+    if (auto *GP = type->getAs<GenericTypeParamType>()) {
+      return cs.openGenericParameter(DC->getParent(), GP, genericParameters,
+                                     locator);
+    }
+    return type;
+  });
+
+  auto containsTypes = [&](Type type, OpenedTypeMap &toFind) {
+    return type.findIf([&](Type nested) {
+      if (auto *GP = nested->getAs<GenericTypeParamType>())
+        return toFind.count(getCanonicalGenericParamTy(GP)) > 0;
+      return false;
+    });
+  };
+
+  auto containsGenericParamsExcluding = [&](Type type,
+                                            OpenedTypeMap &exclusions) -> bool {
+    return type.findIf([&](Type type) {
+      if (auto *GP = type->getAs<GenericTypeParamType>())
+        return !exclusions.count(getCanonicalGenericParamTy(GP));
+      return false;
+    });
+  };
+
+  // Anchor of this default expression i.e. function, subscript
+  // or enum case.
   auto *anchor = cast<ValueDecl>(DC->getParent()->getAsDecl());
 
-  // Check whether generic parameter is only mentioned once in
+  // Check whether generic parameters are only mentioned once in
   // the anchor's signature.
   {
     auto anchorTy = anchor->getInterfaceType()->castTo<GenericFunctionType>();
 
-    // Reject if generic parameter could be inferred from result type.
-    if (containsType(anchorTy->getResult(), interfaceType)) {
+    // Reject if generic parameters could be inferred from result type.
+    if (containsTypes(anchorTy->getResult(), genericParameters)) {
       ctx.Diags.diagnose(
           defaultValue->getLoc(),
           diag::cannot_default_generic_parameter_inferrable_from_result,
-          interfaceType);
+          paramInterfaceTy);
       return Type();
     }
 
-    // Reject if generic parameter is used in multiple different positions
+    // Reject if generic parameters are used in multiple different positions
     // in the parameter list.
 
     llvm::SmallVector<unsigned, 2> affectedParams;
     for (unsigned i : indices(anchorTy->getParams())) {
       const auto &param = anchorTy->getParams()[i];
 
-      if (containsType(param.getPlainType(), interfaceType))
+      if (containsTypes(param.getPlainType(), genericParameters))
         affectedParams.push_back(i);
     }
 
@@ -524,26 +567,13 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
           defaultValue->getLoc(),
           diag::
               cannot_default_generic_parameter_inferrable_from_another_parameter,
-          interfaceType, params.str());
+          paramInterfaceTy, params.str());
       return Type();
     }
   }
 
   auto signature = DC->getGenericSignatureOfContext();
   assert(signature && "generic parameter without signature?");
-
-  ConstraintSystemOptions options;
-  options |= ConstraintSystemFlags::AllowFixes;
-
-  ConstraintSystem cs(DC, options);
-
-  auto *locator = cs.getConstraintLocator(
-      defaultValue, LocatorPathElt::ContextualType(
-                        defaultExprTarget.getExprContextualTypePurpose()));
-
-  // A replacement for generic parameter type to associate any generic
-  // requirements with.
-  auto *contextualTy = cs.createTypeVariable(locator, /*flags=*/0);
 
   auto *requirementBaseLocator = cs.getConstraintLocator(
       locator, LocatorPathElt::OpenedGeneric(signature));
@@ -553,15 +583,25 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // a dependent member type), that means it could be inferred through
   // them e.g. `T: X.Y` or `T == U`.
   {
-    auto isViable = [](Type type) {
-      return !(type->hasTypeParameter() && type->hasDependentMember());
-    };
-
     auto recordRequirement = [&](unsigned index, Requirement requirement,
                                  ConstraintLocator *locator) {
       cs.openGenericRequirement(DC->getParent(), index, requirement,
                                 /*skipSelfProtocolConstraint=*/false, locator,
-                                [](Type type) -> Type { return type; });
+                                [&](Type type) -> Type {
+                                  return cs.openType(type, genericParameters);
+                                });
+    };
+
+    auto diagnoseInvalidRequirement = [&](Requirement requirement) {
+      SmallString<32> reqBuf;
+      llvm::raw_svector_ostream req(reqBuf);
+
+      requirement.print(req, PrintOptions());
+
+      ctx.Diags.diagnose(
+          defaultValue->getLoc(),
+          diag::cannot_default_generic_parameter_invalid_requirement,
+          paramInterfaceTy, req.str());
     };
 
     auto requirements = signature.getRequirements();
@@ -569,60 +609,58 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       auto &requirement = requirements[reqIdx];
 
       switch (requirement.getKind()) {
-      case RequirementKind::Conformance: {
-        if (!requirement.getFirstType()->isEqual(interfaceType))
+      case RequirementKind::SameType: {
+        auto lhsTy = requirement.getFirstType();
+        auto rhsTy = requirement.getSecondType();
+
+        // Unrelated requirement.
+        if (!containsTypes(lhsTy, genericParameters) &&
+            !containsTypes(rhsTy, genericParameters))
           continue;
 
-        recordRequirement(reqIdx,
-                          {RequirementKind::Conformance, contextualTy,
-                           requirement.getSecondType()},
-                          requirementBaseLocator);
-        break;
-      }
-
-      case RequirementKind::Superclass: {
-        auto subclassTy = requirement.getFirstType();
-        auto superclassTy = requirement.getSecondType();
-
-        if (subclassTy->isEqual(interfaceType) && isViable(superclassTy)) {
-          recordRequirement(
-              reqIdx, {RequirementKind::Superclass, contextualTy, superclassTy},
-              requirementBaseLocator);
+        // Allow a subset of generic same-type requirements that only mention
+        // "in scope" generic parameters e.g. `T.X == Int` or `T == U.Z`
+        if (!containsGenericParamsExcluding(lhsTy, genericParameters) &&
+            !containsGenericParamsExcluding(rhsTy, genericParameters)) {
+          recordRequirement(reqIdx, requirement, requirementBaseLocator);
+          continue;
         }
 
-        break;
+        // If there is a same-type constraint that involves out of scope
+        // generic parameters mixed with in-scope ones, fail the type-check
+        // since the type could be inferred through other positions.
+        {
+          diagnoseInvalidRequirement(requirement);
+          return Type();
+        }
       }
 
-      case RequirementKind::SameType: {
-        // If there is a same-type constraint that involves our parameter
-        // type, fail the type-check since the type could be inferred
-        // through other positions.
-        if (containsType(requirement.getFirstType(), interfaceType) ||
-            containsType(requirement.getSecondType(), interfaceType)) {
-          SmallString<32> reqBuf;
-          llvm::raw_svector_ostream req(reqBuf);
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+      case RequirementKind::Layout:
+        auto adheringTy = requirement.getFirstType();
 
-          requirement.print(req, PrintOptions());
+        // Unrelated requirement.
+        if (!containsTypes(adheringTy, genericParameters))
+          continue;
 
-          ctx.Diags.diagnose(
-              defaultValue->getLoc(),
-              diag::
-                  cannot_default_generic_parameter_inferrable_through_same_type,
-              interfaceType, req.str());
+        // If adhering type has a mix or in- and out-of-scope parameters
+        // mentioned we need to diagnose.
+        if (containsGenericParamsExcluding(adheringTy, genericParameters)) {
+          diagnoseInvalidRequirement(requirement);
           return Type();
         }
 
-        continue;
-      }
+        if (requirement.getKind() == RequirementKind::Superclass) {
+          auto superclassTy = requirement.getSecondType();
 
-      case RequirementKind::Layout:
-        if (!requirement.getFirstType()->isEqual(interfaceType))
-          continue;
+          if (containsGenericParamsExcluding(superclassTy, genericParameters)) {
+            diagnoseInvalidRequirement(requirement);
+            return Type();
+          }
+        }
 
-        recordRequirement(reqIdx,
-                          {RequirementKind::Layout, contextualTy,
-                           requirement.getLayoutConstraint()},
-                          requirementBaseLocator);
+        recordRequirement(reqIdx, requirement, requirementBaseLocator);
         break;
       }
     }

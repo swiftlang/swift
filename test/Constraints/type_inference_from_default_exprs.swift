@@ -16,7 +16,7 @@ protocol P {
 }
 
 func testInferFromSameType<T, U: P>(_: T = 42, _: [U]) where T == U.X {}
-// expected-error@-1 {{cannot use default expression for inference of 'T' because it is inferrable through same-type requirement: T == U.X}}
+// expected-error@-1 {{cannot use default expression for inference of 'T' because requirement 'T == U.X' refers to other generic parameters}}
 
 func test1<T>(_: T = 42) {} // Ok
 
@@ -60,6 +60,46 @@ extension S {
   }
 }
 
+// In nested positions
+func testNested1<T>(_: [T] = [0, 1.0]) {} // Ok (T == Double)
+func testNested2<T>(_: T? = 42.0) {} // Ok
+func testNested2NoInference<T>(_: T? = nil) {} // Ok (old semantics)
+// expected-note@-1 {{in call to function 'testNested2NoInference'}}
+
+struct D : P {
+  typealias X = B
+}
+
+func testNested3<T: P>(_: T = B()) where T.X == String {}
+func testNested4<T: P>(_: T = B()) where T.X == Int {}
+// expected-error@-1 {{global function 'testNested4' requires the types 'B.X' (aka 'String') and 'Int' be equivalent}}
+// expected-note@-2 {{where 'T.X' = 'B.X' (aka 'String')}}
+
+func testNested5<T: P>(_: [T]? = [D()]) where T.X: P, T.X: AnyObject {}
+
+func testNested5Invalid<T: P>(_: [T]? = [B()]) where T.X: P, T.X: AnyObject {}
+// expected-error@-1 {{global function 'testNested5Invalid' requires that 'B.X' (aka 'String') conform to 'P'}}
+// expected-error@-2 {{global function 'testNested5Invalid' requires that 'B.X' (aka 'String') be a class type}}
+// expected-note@-3 2 {{where 'T.X' = 'B.X' (aka 'String')}}
+// expected-note@-4 {{in call to function 'testNested5Invalid'}}
+
+func testNested6<T: P, U>(_: (a: [T?], b: U) = (a: [D()], b: B())) where T.X == U, T.X: P, U: AnyObject { // Ok
+}
+
+// Generic requirements
+
+class GenClass<T> {}
+
+func testReq1<T, U>(_: T = B(), _: U) where T: GenClass<U> {}
+// expected-error@-1 {{cannot use default expression for inference of 'T' because requirement 'T : GenClass<U>' refers to other generic parameters}}
+
+class E : GenClass<B> {
+}
+
+func testReq2<T, U>(_: (T, U) = (E(), B())) where T: GenClass<U>, U: AnyObject {} // Ok
+
+func testReq3<T: P, U>(_: [T?] = [B()], _: U) where T.X == U {}
+// expected-error@-1 {{cannot use default expression for inference of '[T?]' because requirement 'U == T.X' refers to other generic parameters}}
 
 func main() {
   test1() // Ok
@@ -78,4 +118,15 @@ func main() {
 
   _ = S()[] // Ok
   _ = S()[B()] // Ok
+
+  testNested1() // Ok
+  testNested2() // Ok
+  testNested2NoInference() // expected-error {{generic parameter 'T' could not be inferred}}
+
+  testNested3() // Ok
+  testNested5() // Ok
+  testNested5Invalid() // expected-error {{generic parameter 'T' could not be inferred}}
+  testNested6() // Ok
+
+  testReq2() // Ok
 }

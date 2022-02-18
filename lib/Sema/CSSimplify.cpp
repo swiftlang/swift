@@ -1632,13 +1632,13 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     if (parameterBindings[paramIdx].empty()) {
       auto &ctx = cs.getASTContext();
 
-      if (paramTy->isTypeVariableOrMember() &&
+      if (paramTy->hasTypeVariable() &&
           ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments) {
         auto *paramList = getParameterList(callee);
         auto defaultExprType = paramList->get(paramIdx)->getTypeOfDefaultExpr();
 
         // A caller side default.
-        if (!defaultExprType)
+        if (!defaultExprType || defaultExprType->hasError())
           continue;
 
         // If this is just a regular default type that works

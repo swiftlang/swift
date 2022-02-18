@@ -6254,7 +6254,12 @@ ERROR(cannot_default_generic_parameter_inferrable_from_another_parameter, none,
 
 ERROR(cannot_default_generic_parameter_inferrable_through_same_type, none,
       "cannot use default expression for inference of %0 because it "
-      "is inferrable through same-type requirement: %1",
+      "is inferrable through same-type requirement: '%1'",
+      (Type, StringRef))
+
+ERROR(cannot_default_generic_parameter_invalid_requirement, none,
+      "cannot use default expression for inference of %0 because "
+      "requirement '%1' refers to other generic parameters",
       (Type, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
