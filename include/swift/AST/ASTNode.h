@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the ASTNode, which is a union of Stmt, Expr, and Decl.
+// This file defines the ASTNode, which is a union of Stmt, Expr, Decl,
+// Pattern, TypeRepr, StmtCondition, and CaseLabelItem.
 //
 //===----------------------------------------------------------------------===//
 
