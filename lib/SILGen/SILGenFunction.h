@@ -687,10 +687,10 @@ public:
   /// \param cd The class declaration whose members are being destroyed.
   /// \param recursiveLinks The set of stored properties that form the
   ///        recursive data structure.
-  void emitRecursiveChainDestruction(ManagedValue selfValue,
-                                ClassDecl *cd,
-                                llvm::SmallSetVector<VarDecl*, 4> recursiveLinks,
-                                CleanupLocation cleanupLoc);
+  void emitRecursiveChainDestruction(
+      ManagedValue selfValue, ClassDecl *cd,
+      llvm::SmallSetVector<VarDecl *, 4> recursiveLinks,
+      CleanupLocation cleanupLoc);
 
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
