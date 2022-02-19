@@ -4870,6 +4870,25 @@ bool ConstraintSystem::repairFailures(
     if (hasFixFor(loc, FixKind::RemoveExtraneousArguments))
       return true;
 
+    // If the argument couldn't be found, this could be a default value
+    // type mismatch.
+    if (!simplifyLocatorToAnchor(loc)) {
+      auto *calleeLocator = getCalleeLocator(loc);
+      unsigned paramIdx =
+          loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>()
+              .getParamIdx();
+
+      if (auto overload = findSelectedOverloadFor(calleeLocator)) {
+        if (auto *decl = overload->choice.getDeclOrNull()) {
+          if (getParameterList(decl)->get(paramIdx)->getTypeOfDefaultExpr()) {
+            conversionsOrFixes.push_back(
+                IgnoreDefaultExprTypeMismatch::create(*this, lhs, rhs, loc));
+            break;
+          }
+        }
+      }
+    }
+
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
     break;
@@ -12438,7 +12457,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                : SolutionKind::Solved;
   }
 
-  case FixKind::AllowArgumentTypeMismatch: {
+  case FixKind::AllowArgumentTypeMismatch:
+  case FixKind::IgnoreDefaultExprTypeMismatch: {
     auto impact = 2;
     // If there are any other argument mismatches already detected for this
     // call, we increase the score even higher so more argument fixes means

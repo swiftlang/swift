@@ -7966,3 +7966,27 @@ bool SwiftToCPointerConversionInInvalidContext::diagnoseAsError() {
                  paramType, callee->getDescriptiveKind(), callee->getName());
   return true;
 }
+
+bool DefaultExprTypeMismatch::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  unsigned paramIdx =
+      locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>()
+          .getParamIdx();
+
+  emitDiagnostic(diag::cannot_convert_default_value_type_to_argument_type,
+                 getFromType(), getToType(), paramIdx);
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(locator);
+  assert(overload);
+
+  auto *PD = getParameterList(overload->choice.getDecl())->get(paramIdx);
+
+  auto note = emitDiagnosticAt(PD->getLoc(), diag::default_value_declared_here);
+
+  if (auto *defaultExpr = PD->getTypeCheckedDefaultExpr()) {
+    note.highlight(defaultExpr->getSourceRange());
+  }
+
+  return true;
+}

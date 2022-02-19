@@ -2076,3 +2076,18 @@ AllowSwiftToCPointerConversion::create(ConstraintSystem &cs,
                                        ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowSwiftToCPointerConversion(cs, locator);
 }
+
+bool IgnoreDefaultExprTypeMismatch::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  DefaultExprTypeMismatch failure(solution, getFromType(), getToType(),
+                                  getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreDefaultExprTypeMismatch *
+IgnoreDefaultExprTypeMismatch::create(ConstraintSystem &cs, Type argType,
+                                      Type paramType,
+                                      ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreDefaultExprTypeMismatch(cs, argType, paramType, locator);
+}
