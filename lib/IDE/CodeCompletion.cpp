@@ -111,21 +111,6 @@ std::string swift::ide::removeCodeCompletionTokens(
   return CleanFile;
 }
 
-llvm::StringRef swift::ide::copyString(llvm::BumpPtrAllocator &Allocator,
-                                       llvm::StringRef Str) {
-  char *Buffer = Allocator.Allocate<char>(Str.size());
-  std::copy(Str.begin(), Str.end(), Buffer);
-  return llvm::StringRef(Buffer, Str.size());
-}
-
-const char *swift::ide::copyCString(llvm::BumpPtrAllocator &Allocator,
-                                    llvm::StringRef Str) {
-  char *Buffer = Allocator.Allocate<char>(Str.size() + 1);
-  std::copy(Str.begin(), Str.end(), Buffer);
-  Buffer[Str.size()] = '\0';
-  return Buffer;
-}
-
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   std::uninitialized_copy(Chunks.begin(), Chunks.end(),
                           getTrailingObjects<Chunk>());
@@ -321,6 +306,74 @@ void CodeCompletionString::dump() const {
     }
     OS << ")\n";
   }
+}
+
+ContextFreeCodeCompletionResult *
+ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionResultKind Kind,
+    CodeCompletionString *CompletionString,
+    CodeCompletionOperatorKind KnownOperatorKind,
+    NullTerminatedStringRef BriefDocComment,
+    CodeCompletionResultType ResultType,
+    ContextFreeNotRecommendedReason NotRecommended,
+    CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+    NullTerminatedStringRef DiagnosticMessage) {
+  return new (Allocator) ContextFreeCodeCompletionResult(
+      Kind, /*AssociatedKind=*/0, KnownOperatorKind,
+      /*IsSystem=*/false, CompletionString, /*ModuleName=*/"", BriefDocComment,
+      /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
+      DiagnosticMessage,
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
+}
+
+ContextFreeCodeCompletionResult *
+ContextFreeCodeCompletionResult::createKeywordResult(
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionKeywordKind Kind,
+    CodeCompletionString *CompletionString,
+    NullTerminatedStringRef BriefDocComment,
+    CodeCompletionResultType ResultType) {
+  return new (Allocator) ContextFreeCodeCompletionResult(
+      CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
+      CodeCompletionOperatorKind::None, /*IsSystem=*/false, CompletionString,
+      /*ModuleName=*/"", BriefDocComment,
+      /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
+      CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
+}
+
+ContextFreeCodeCompletionResult *
+ContextFreeCodeCompletionResult::createLiteralResult(
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionLiteralKind LiteralKind,
+    CodeCompletionString *CompletionString,
+    CodeCompletionResultType ResultType) {
+  return new (Allocator) ContextFreeCodeCompletionResult(
+      CodeCompletionResultKind::Literal, static_cast<uint8_t>(LiteralKind),
+      CodeCompletionOperatorKind::None,
+      /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
+      /*BriefDocComment=*/"",
+      /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
+      CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
+}
+
+ContextFreeCodeCompletionResult *
+ContextFreeCodeCompletionResult::createDeclResult(
+    llvm::BumpPtrAllocator &Allocator, CodeCompletionString *CompletionString,
+    const Decl *AssociatedDecl, NullTerminatedStringRef ModuleName,
+    NullTerminatedStringRef BriefDocComment,
+    ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+    CodeCompletionResultType ResultType,
+    ContextFreeNotRecommendedReason NotRecommended,
+    CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+    NullTerminatedStringRef DiagnosticMessage) {
+  assert(AssociatedDecl && "should have a decl");
+  return new (Allocator) ContextFreeCodeCompletionResult(
+      CodeCompletionResultKind::Declaration,
+      static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
+      CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
+      CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
+      NotRecommended, DiagnosticSeverity, DiagnosticMessage,
+      getCodeCompletionResultFilterName(CompletionString, Allocator));
 }
 
 CodeCompletionDeclKind
@@ -576,7 +629,7 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
   case SemanticContextKind::OtherModule:
     Prefix.append("OtherModule");
     if (!getModuleName().empty())
-      Prefix.append((Twine("[") + getModuleName() + "]").str());
+      Prefix.append((Twine("[") + StringRef(getModuleName()) + "]").str());
     break;
   }
   if (getFlair().toRaw()) {
@@ -664,7 +717,7 @@ void CodeCompletionResultBuilder::withNestedGroup(
 
 void CodeCompletionResultBuilder::addChunkWithText(
     CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
-  addChunkWithTextNoCopy(Kind, copyString(*Sink.Allocator, Text));
+  addChunkWithTextNoCopy(Kind, Text.copy(*Sink.Allocator));
 }
 
 void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
@@ -1107,7 +1160,7 @@ void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
 }
 
 StringRef CodeCompletionContext::copyString(StringRef Str) {
-  return ::copyString(*CurrentResults.Allocator, Str);
+  return Str.copy(*CurrentResults.Allocator);
 }
 
 bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
@@ -1132,9 +1185,9 @@ static void walkValueDeclAndOverriddenDecls(const Decl *D, const FnTy &Fn) {
   }
 }
 
-ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
-                                       const Decl *D) {
-  llvm::SmallVector<StringRef, 4> USRs;
+ArrayRef<NullTerminatedStringRef>
+copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
+  llvm::SmallVector<NullTerminatedStringRef, 4> USRs;
   walkValueDeclAndOverriddenDecls(D, [&](llvm::PointerUnion<const ValueDecl*,
                                                   const clang::NamedDecl*> OD) {
     llvm::SmallString<128> SS;
@@ -1149,13 +1202,13 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
     }
 
     if (!Ignored)
-      USRs.push_back(copyString(Allocator, SS));
+      USRs.emplace_back(SS, Allocator);
   });
 
   if (!USRs.empty())
-    return copyArray(Allocator, ArrayRef<StringRef>(USRs));
+    return makeArrayRef(USRs).copy(Allocator);
 
-  return ArrayRef<StringRef>();
+  return {};
 }
 
 CodeCompletionResult::CodeCompletionResult(
@@ -1164,7 +1217,7 @@ CodeCompletionResult::CodeCompletionResult(
     uint8_t NumBytesToErase, const ExpectedTypeContext *TypeContext,
     const DeclContext *DC, ContextualNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-    StringRef DiagnosticMessage)
+    NullTerminatedStringRef DiagnosticMessage)
     : ContextFree(ContextFree), SemanticContext(SemanticContext),
       Flair(Flair.toRaw()), NotRecommended(NotRecommended),
       DiagnosticSeverity(DiagnosticSeverity),
@@ -1235,11 +1288,12 @@ ContextFreeCodeCompletionResult::getCodeCompletionOperatorKind(
 }
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
-  auto *CCS = CodeCompletionString::create(*Sink.Allocator, Chunks);
+  auto &Allocator = *Sink.Allocator;
+  auto *CCS = CodeCompletionString::create(Allocator, Chunks);
 
   CodeCompletionDiagnosticSeverity ContextFreeDiagnosticSeverity =
       CodeCompletionDiagnosticSeverity::None;
-  StringRef ContextFreeDiagnosticMessage;
+  NullTerminatedStringRef ContextFreeDiagnosticMessage;
   if (ContextFreeNotRecReason != ContextFreeNotRecommendedReason::None) {
     // FIXME: We should generate the message lazily.
     if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
@@ -1249,7 +1303,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       if (!getContextFreeCompletionDiagnostics(ContextFreeNotRecReason, VD,
                                                severity, messageOS)) {
         ContextFreeDiagnosticSeverity = severity;
-        ContextFreeDiagnosticMessage = copyString(*Sink.Allocator, message);
+        ContextFreeDiagnosticMessage =
+            NullTerminatedStringRef(message, Allocator);
       }
     }
   }
@@ -1259,55 +1314,57 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
   switch (Kind) {
   case CodeCompletionResultKind::Declaration: {
-    StringRef ModuleName;
+    NullTerminatedStringRef ModuleName;
     if (CurrentModule) {
       if (Sink.LastModule.first == CurrentModule.getOpaqueValue()) {
         ModuleName = Sink.LastModule.second;
       } else {
         if (auto *C = CurrentModule.dyn_cast<const clang::Module *>()) {
-          ModuleName = copyString(*Sink.Allocator, C->getFullModuleName());
+          ModuleName =
+              NullTerminatedStringRef(C->getFullModuleName(), Allocator);
         } else {
-          ModuleName = copyString(
-              *Sink.Allocator,
-              CurrentModule.get<const swift::ModuleDecl *>()->getName().str());
+          ModuleName = NullTerminatedStringRef(
+              CurrentModule.get<const swift::ModuleDecl *>()->getName().str(),
+              Allocator);
         }
         Sink.LastModule.first = CurrentModule.getOpaqueValue();
         Sink.LastModule.second = ModuleName;
       }
     }
 
-    ContextFreeResult = new (*Sink.Allocator) ContextFreeCodeCompletionResult(
-        CCS, AssociatedDecl, ModuleName,
-        copyString(*Sink.Allocator, BriefDocComment),
-        copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl), ResultType,
+    ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
+        Allocator, CCS, AssociatedDecl, ModuleName,
+        NullTerminatedStringRef(BriefDocComment, Allocator),
+        copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
         ContextFreeDiagnosticMessage);
     break;
   }
 
   case CodeCompletionResultKind::Keyword:
-    ContextFreeResult = new (*Sink.Allocator) ContextFreeCodeCompletionResult(
-        KeywordKind, CCS, copyString(*Sink.Allocator, BriefDocComment),
-        ResultType);
+    ContextFreeResult = ContextFreeCodeCompletionResult::createKeywordResult(
+        Allocator, KeywordKind, CCS,
+        NullTerminatedStringRef(BriefDocComment, Allocator), ResultType);
     break;
   case CodeCompletionResultKind::BuiltinOperator:
   case CodeCompletionResultKind::Pattern:
-    ContextFreeResult = new (*Sink.Allocator) ContextFreeCodeCompletionResult(
-        Kind, CCS, CodeCompletionOperatorKind::None,
-        copyString(*Sink.Allocator, BriefDocComment), ResultType,
-        ContextFreeNotRecReason,
-          ContextFreeDiagnosticSeverity, ContextFreeDiagnosticMessage);
+    ContextFreeResult =
+        ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
+            Allocator, Kind, CCS, CodeCompletionOperatorKind::None,
+            NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
+            ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
+            ContextFreeDiagnosticMessage);
     break;
   case CodeCompletionResultKind::Literal:
     assert(LiteralKind.hasValue());
-    ContextFreeResult = new (*Sink.Allocator)
-        ContextFreeCodeCompletionResult(*LiteralKind, CCS, ResultType);
+    ContextFreeResult = ContextFreeCodeCompletionResult::createLiteralResult(
+        Allocator, *LiteralKind, CCS, ResultType);
     break;
   }
 
   CodeCompletionDiagnosticSeverity ContextualDiagnosticSeverity =
       CodeCompletionDiagnosticSeverity::None;
-  StringRef ContextualDiagnosticMessage;
+  NullTerminatedStringRef ContextualDiagnosticMessage;
   if (ContextualNotRecReason != ContextualNotRecommendedReason::None) {
     // FIXME: We should generate the message lazily.
     if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
@@ -1317,14 +1374,15 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       if (!getContextualCompletionDiagnostics(ContextualNotRecReason, VD,
                                               severity, messageOS)) {
         ContextualDiagnosticSeverity = severity;
-        ContextualDiagnosticMessage = copyString(*Sink.Allocator, message);
+        ContextualDiagnosticMessage =
+            NullTerminatedStringRef(message, Allocator);
       }
     }
   }
 
   assert(ContextFreeResult != nullptr &&
          "ContextFreeResult should have been constructed by the switch above");
-  CodeCompletionResult *result = new (*Sink.Allocator) CodeCompletionResult(
+  CodeCompletionResult *result = new (Allocator) CodeCompletionResult(
       *ContextFreeResult, SemanticContext, Flair, NumBytesToErase, TypeContext,
       DC, ContextualNotRecReason, ContextualDiagnosticSeverity,
       ContextualDiagnosticMessage);
@@ -1426,36 +1484,18 @@ CodeCompletionContext::sortCompletionResults(
     ArrayRef<CodeCompletionResult *> Results) {
   std::vector<CodeCompletionResult *> SortedResults(Results.begin(),
                                                     Results.end());
-  struct ResultAndName {
-    CodeCompletionResult *result;
-    std::string name;
-  };
 
-  // Caching the name of each field is important to avoid unnecessary calls to
-  // CodeCompletionString::getName().
-  std::vector<ResultAndName> nameCache(SortedResults.size());
-  for (unsigned i = 0, n = SortedResults.size(); i < n; ++i) {
-    auto *result = SortedResults[i];
-    nameCache[i].result = result;
-    llvm::raw_string_ostream OS(nameCache[i].name);
-    printCodeCompletionResultFilterName(*result, OS);
-    OS.flush();
-  }
-
-  // Sort nameCache, and then transform SortedResults to return the pointers in
-  // order.
-  std::sort(nameCache.begin(), nameCache.end(),
-            [](const ResultAndName &LHS, const ResultAndName &RHS) {
-              int Result = StringRef(LHS.name).compare_insensitive(RHS.name);
+  std::sort(SortedResults.begin(), SortedResults.end(),
+            [](const auto &LHS, const auto &RHS) {
+              int Result = StringRef(LHS->getFilterName())
+                               .compare_insensitive(RHS->getFilterName());
               // If the case insensitive comparison is equal, then secondary
               // sort order should be case sensitive.
               if (Result == 0)
-                Result = LHS.name.compare(RHS.name);
+                Result = LHS->getFilterName().compare(RHS->getFilterName());
               return Result < 0;
             });
 
-  llvm::transform(nameCache, SortedResults.begin(),
-                  [](const ResultAndName &entry) { return entry.result; });
   return SortedResults;
 }
 

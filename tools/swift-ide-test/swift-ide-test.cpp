@@ -1091,8 +1091,7 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
       Result->getCompletionString()->print(OS);
     }
 
-    OS << "; name=";
-    printCodeCompletionResultFilterName(*Result, OS);
+    OS << "; name=" << Result->getFilterName();
 
     if (IncludeSourceText) {
       OS << "; sourcetext=";
