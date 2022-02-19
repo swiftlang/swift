@@ -133,7 +133,9 @@ RequirementMachine *RewriteContext::getRequirementMachine(
 
   // This might re-entrantly invalidate 'machine', which is a reference
   // into Protos.
-  newMachine->initWithGenericSignature(sig);
+  auto status = newMachine->initWithGenericSignature(sig);
+  newMachine->checkCompletionResult(status.first);
+
   return newMachine;
 }
 
