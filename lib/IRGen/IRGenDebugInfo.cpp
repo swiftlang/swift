@@ -216,6 +216,7 @@ public:
   bool buildDebugInfoExpression(const SILDebugVariable &VarInfo,
                                 SmallVectorImpl<uint64_t> &Operands);
 
+  /// Emit a dbg.declare at the current insertion point in Builder.
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
@@ -224,6 +225,7 @@ public:
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue,
                                AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
+
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
@@ -2643,7 +2645,6 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   auto *InlinedAt = createInlinedAt(DS);
   auto DL =
       llvm::DILocation::get(IGM.getLLVMContext(), Line, Col, Scope, InlinedAt);
-  auto *BB = Builder.GetInsertBlock();
 
   // An alloca may only be described by exactly one dbg.declare.
   if (isa<llvm::AllocaInst>(Storage) &&
@@ -2692,17 +2693,25 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   };
   DbgInserter inserter{DBuilder, AddrDInstKind};
 
-  // If we have a single alloca, just insert the debug in
+  // If we have a single alloca...
   if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
-    auto *ParentBB = Alloca->getParent();
-    auto InsertBefore = std::next(Alloca->getIterator());
-    if (InsertBefore != ParentBB->end())
+    auto *ParentBB = Builder.GetInsertBlock();
+    auto InsertBefore = Builder.GetInsertPoint();
+
+    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
+      ParentBB = Alloca->getParent();
+      InsertBefore = std::next(Alloca->getIterator());
+    }
+
+    if (InsertBefore != ParentBB->end()) {
       inserter.insert(Alloca, Var, Expr, DL, &*InsertBefore);
-    else
+    } else {
       inserter.insert(Alloca, Var, Expr, DL, ParentBB);
+    }
     return;
   }
 
+  auto *BB = Builder.GetInsertBlock();
   if ((isa<llvm::IntrinsicInst>(Storage) &&
        cast<llvm::IntrinsicInst>(Storage)->getIntrinsicID() ==
            llvm::Intrinsic::coro_alloca_get)) {

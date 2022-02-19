@@ -1429,6 +1429,8 @@ bool DataflowState::cleanupAllDestroyAddr(
   bool madeChange = false;
   BasicBlockWorklist worklist(fn);
 
+  auto debugVarInst = DebugVarCarryingInst::getFromValue(address);
+
   LLVM_DEBUG(llvm::dbgs() << "Cleanup up destroy addr!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Visiting destroys!\n");
   LLVM_DEBUG(llvm::dbgs() << "    Destroy Indices: " << destroyIndices << "\n");
@@ -1531,6 +1533,15 @@ bool DataflowState::cleanupAllDestroyAddr(
       continue;
     LLVM_DEBUG(llvm::dbgs() << "Converting reinit to init: " << *reinit);
     convertMemoryReinitToInitForm(*reinit);
+
+    // Make sure to create a new debug_value for the reinit value.
+    if (debugVarInst) {
+      if (auto varInfo = debugVarInst.getVarInfo()) {
+        SILBuilderWithScope reinitBuilder(*reinit);
+        reinitBuilder.createDebugValue(debugVarInst.inst->getLoc(), address,
+                                       *varInfo, false, /*was moved*/ true);
+      }
+    }
     madeChange = true;
   }
 
@@ -2025,6 +2036,14 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,
             /*was moved*/ true);
+        {
+          // Make sure at the reinit point to create a new debug value after the
+          // reinit instruction so we reshow the variable.
+          auto *next = interestingUser->getNextInstruction();
+          SILBuilderWithScope reinitBuilder(next);
+          reinitBuilder.createDebugValue(debug.inst->getLoc(), address,
+                                         *varInfo, false, /*was moved*/ true);
+        }
       }
       debug.markAsMoved();
     }

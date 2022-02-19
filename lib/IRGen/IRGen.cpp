@@ -937,9 +937,8 @@ static void initLLVMModule(const IRGenModule &IGM, SILModule &SIL) {
 std::pair<IRGenerator *, IRGenModule *>
 swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                                 StringRef MainInputFilenameForDebugInfo,
-                                StringRef PrivateDiscriminator) {
-
-  IRGenOptions Opts;
+                                StringRef PrivateDiscriminator,
+                                IRGenOptions &Opts) {
   IRGenerator *irgen = new IRGenerator(Opts, *SILMod);
   auto targetMachine = irgen->createTargetMachine();
   if (!targetMachine)
