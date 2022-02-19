@@ -339,6 +339,113 @@ DiagnosticVerifier::renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
   return OS.str();
 }
 
+/// Parse the introductory line-column range of an expected fix-it by consuming
+/// the given input string. The range format is \c ([+-]?N:)?N-([+-]?N:)?N
+/// where \c 'N' is \c [0-9]+.
+///
+/// \param DiagnosticLineNo The line number of the associated expected
+/// diagnostic; used to turn line offsets into line numbers.
+static Optional<LineColumnRange> parseExpectedFixItRange(
+    StringRef &Str, unsigned DiagnosticLineNo,
+    llvm::function_ref<void(const char *, const Twine &)> diagnoseError) {
+  assert(!Str.empty());
+
+  const auto parseLineAndColumn =
+      [&]() -> Optional<std::pair<unsigned, unsigned>> {
+    enum class LineOffsetKind : uint8_t { None, Plus, Minus };
+
+    LineOffsetKind lineOffsetKind = LineOffsetKind::None;
+    if (!Str.empty()) {
+      switch (Str.front()) {
+      case '+':
+        lineOffsetKind = LineOffsetKind::Plus;
+        Str = Str.drop_front();
+        break;
+      case '-':
+        lineOffsetKind = LineOffsetKind::Minus;
+        Str = Str.drop_front();
+        break;
+      default:
+        break;
+      }
+    }
+
+    unsigned firstNumber = LineColumnRange::NoValue;
+    if (Str.consumeInteger(10, firstNumber)) {
+      if (lineOffsetKind > LineOffsetKind::None) {
+        diagnoseError(Str.data(),
+                      "expected line offset after leading '+' or '-' in fix-it "
+                      "verification");
+      } else {
+        diagnoseError(Str.data(),
+                      "expected line or column number in fix-it verification");
+      }
+      return None;
+    }
+
+    unsigned secondNumber = LineColumnRange::NoValue;
+    if (!Str.empty() && Str.front() == ':') {
+      Str = Str.drop_front();
+
+      if (Str.consumeInteger(10, secondNumber)) {
+        diagnoseError(
+            Str.data(),
+            "expected column number after ':' in fix-it verification");
+        return None;
+      }
+    } else if (lineOffsetKind > LineOffsetKind::None) {
+      diagnoseError(Str.data(),
+                    "expected colon-separated column number after line offset "
+                    "in fix-it verification");
+      return None;
+    }
+
+    if (secondNumber == LineColumnRange::NoValue) {
+      // If only one value is specified, it's a column number;
+      return std::make_pair(LineColumnRange::NoValue, firstNumber);
+    }
+
+    unsigned lineNo = DiagnosticLineNo;
+    switch (lineOffsetKind) {
+    case LineOffsetKind::None:
+      lineNo = firstNumber;
+      break;
+    case LineOffsetKind::Plus:
+      lineNo += firstNumber;
+      break;
+    case LineOffsetKind::Minus:
+      lineNo -= firstNumber;
+      break;
+    }
+
+    return std::make_pair(lineNo, secondNumber);
+  };
+
+  LineColumnRange Range;
+
+  if (const auto lineAndCol = parseLineAndColumn()) {
+    std::tie(Range.StartLine, Range.StartCol) = lineAndCol.getValue();
+  } else {
+    return None;
+  }
+
+  if (!Str.empty() && Str.front() == '-') {
+    Str = Str.drop_front();
+  } else {
+    diagnoseError(Str.data(),
+                  "expected '-' range separator in fix-it verification");
+    return None;
+  }
+
+  if (const auto lineAndCol = parseLineAndColumn()) {
+    std::tie(Range.EndLine, Range.EndCol) = lineAndCol.getValue();
+  } else {
+    return None;
+  }
+
+  return Range;
+}
+
 /// After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
@@ -574,69 +681,35 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
         break;
       }
 
-      // Parse the pieces of the fix-it: (L:)?C-(L:)?C=text
-      const size_t MinusLoc = CheckStr.find('-');
-      if (MinusLoc == StringRef::npos) {
-        addError(CheckStr.data(), "expected '-' in fix-it verification");
+      if (CheckStr.empty()) {
+        addError(CheckStr.data(), Twine("expected fix-it verification within "
+                                        "braces; example: '1-2=text' or '") +
+                                      fixitExpectationNoneString + Twine("'"));
         continue;
       }
 
-      const size_t EqualLoc = CheckStr.find('=', /*From=*/MinusLoc + 1);
-      if (EqualLoc == StringRef::npos) {
-        addError(CheckStr.data(),
-                 "expected '=' after '-' in fix-it verification");
-        continue;
-      }
-
-      const size_t FirstColonLoc = CheckStr.take_front(MinusLoc).find(':');
-      const size_t SecondColonLoc =
-          CheckStr.take_front(EqualLoc).find(':', /*From=*/MinusLoc + 1);
-
+      // Parse the pieces of the fix-it.
       ExpectedFixIt FixIt;
       FixIt.StartLoc = OpenLoc;
       FixIt.EndLoc = CloseLoc;
-      if (FirstColonLoc != StringRef::npos) {
-        const StringRef StartLineStr = CheckStr.take_front(FirstColonLoc);
-        if (StartLineStr.getAsInteger(10, FixIt.Range.StartLine)) {
-          addError(StartLineStr.data(),
-                   "invalid line number in fix-it verification");
-          continue;
-        }
-      }
 
-      const StringRef StartColStr =
-          (FirstColonLoc != StringRef::npos)
-              ? CheckStr.slice(FirstColonLoc + 1, MinusLoc)
-              : CheckStr.take_front(MinusLoc);
-      if (StartColStr.getAsInteger(10, FixIt.Range.StartCol)) {
-        addError(StartColStr.data(),
-                 "invalid column number in fix-it verification");
+      if (const auto range =
+              parseExpectedFixItRange(CheckStr, Expected.LineNo, addError)) {
+        FixIt.Range = range.getValue();
+      } else {
         continue;
       }
 
-      if (SecondColonLoc != StringRef::npos) {
-        const StringRef EndLineStr =
-            CheckStr.slice(MinusLoc + 1, SecondColonLoc);
-        if (EndLineStr.getAsInteger(10, FixIt.Range.EndLine)) {
-          addError(EndLineStr.data(),
-                   "invalid line number in fix-it verification");
-          continue;
-        }
-      }
-
-      const StringRef EndColStr =
-          (SecondColonLoc != StringRef::npos)
-              ? CheckStr.slice(SecondColonLoc + 1, EqualLoc)
-              : CheckStr.slice(MinusLoc + 1, EqualLoc);
-      if (EndColStr.getAsInteger(10, FixIt.Range.EndCol)) {
-        addError(EndColStr.data(),
-                 "invalid column number in fix-it verification");
+      if (!CheckStr.empty() && CheckStr.front() == '=') {
+        CheckStr = CheckStr.drop_front();
+      } else {
+        addError(CheckStr.data(),
+                 "expected '=' after range in fix-it verification");
         continue;
       }
-      
+
       // Translate literal "\\n" into '\n', inefficiently.
-      const StringRef fixItText = CheckStr.substr(EqualLoc + 1);
-      for (const char *current = fixItText.begin(), *end = fixItText.end();
+      for (const char *current = CheckStr.begin(), *end = CheckStr.end();
            current != end; /* in loop */) {
         if (*current == '\\' && current + 1 < end) {
           if (current[1] == 'n') {

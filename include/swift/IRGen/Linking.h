@@ -70,9 +70,9 @@ public:
   /// duplicate symbols.
   bool needLinkerToMergeDuplicateSymbols() const { return HasMultipleIGMs; }
 
-  /// This  is used  by  the  LLDB expression  evaluator  since an  expression's
-  /// llvm::Module  may   need  to  access   private  symbols  defined   in  the
-  /// expression's  context.  This  flag  ensures  that  private  accessors  are
+  /// This is used by the LLDB expression evaluator since an expression's
+  /// llvm::Module may need to access private symbols defined in the
+  /// expression's context. This flag ensures that private accessors are
   /// forward-declared as public external in the expression's module.
   bool forcePublicDecls() const { return ForcePublicDecls; }
 };

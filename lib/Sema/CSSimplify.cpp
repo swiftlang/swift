@@ -1318,14 +1318,148 @@ public:
 };
 }
 
+namespace {
+  /// Flags that should be applied to the existential argument type after
+  /// opening.
+  enum class OpenedExistentialAdjustmentFlags {
+    /// The argument should be made inout after opening.
+    InOut = 0x01,
+  };
+
+  using OpenedExistentialAdjustments =
+    OptionSet<OpenedExistentialAdjustmentFlags>;
+}
+
+/// Determine whether we should open up the existential argument to the
+/// given parameters.
+///
+/// \param callee The function or subscript being called.
+/// \param paramIdx The index specifying which function parameter is being
+/// initialized.
+/// \param paramTy The type of the parameter as it was opened in the constraint
+/// system.
+/// \param argTy The type of the argument.
+///
+/// \returns If the argument type is existential and opening it can bind a
+/// generic parameter in the callee, returns the type variable (from the
+/// opened parameter type) the existential type that needs to be opened
+/// (from the argument type), and the adjustements that need to be applied to
+/// the existential type after it is opened.
+static Optional<
+    std::tuple<TypeVariableType *, Type, OpenedExistentialAdjustments>>
+shouldOpenExistentialCallArgument(
+    ValueDecl *callee, unsigned paramIdx, Type paramTy, Type argTy) {
+  if (!callee)
+    return None;
+
+  // Only applies to functions and subscripts.
+  if (!isa<AbstractFunctionDecl>(callee) && !isa<SubscriptDecl>(callee))
+    return None;
+
+  // Special semantics prohibit opening existentials.
+  switch (TypeChecker::getDeclTypeCheckingSemantics(callee)) {
+  case DeclTypeCheckingSemantics::OpenExistential:
+  case DeclTypeCheckingSemantics::TypeOf:
+    // type(of:) and _openExistential handle their own opening.
+    return None;
+
+  case DeclTypeCheckingSemantics::Normal:
+  case DeclTypeCheckingSemantics::WithoutActuallyEscaping:
+    break;
+  }
+
+  // C++ function templates require specialization, which is not possible with
+  // opened existential archetypes, so do not open.
+  if (isa_and_nonnull<clang::FunctionTemplateDecl>(callee->getClangDecl()))
+    return None;
+
+  ASTContext &ctx = callee->getASTContext();
+  if (!ctx.LangOpts.EnableOpenedExistentialTypes)
+    return None;
+
+  // The actual parameter type needs to involve a type variable, otherwise
+  // type inference won't be possible.
+  if (!paramTy->hasTypeVariable())
+    return None;
+
+  OpenedExistentialAdjustments adjustments;
+
+  // If the argument is inout, strip it off and we can add it back.
+  if (auto inOutArg = argTy->getAs<InOutType>()) {
+    argTy = inOutArg->getObjectType();
+    adjustments |= OpenedExistentialAdjustmentFlags::InOut;
+  }
+
+  // The argument type needs to be an existential type or metatype thereof.
+  if (!argTy->isAnyExistentialType())
+    return None;
+
+  auto param = getParameterAt(callee, paramIdx);
+  if (!param)
+    return None;
+
+  // If the parameter is non-generic variadic, don't open.
+  if (param->isVariadic() && !param->getVarargBaseTy()->hasTypeSequence())
+    return None;
+
+  // Look through an inout type on the formal type of the parameter.
+  auto formalParamTy = param->getInterfaceType()->getInOutObjectType();
+
+  // If the argument is of an existential metatype, look through the
+  // metatype on the parameter.
+  if (argTy->is<AnyMetatypeType>()) {
+    formalParamTy = formalParamTy->getMetatypeInstanceType();
+    paramTy = paramTy->getMetatypeInstanceType();
+  }
+
+  // Look through an inout type on the parameter.
+  paramTy = paramTy->getInOutObjectType();
+
+  // The parameter type must be a type variable.
+  auto paramTypeVar = paramTy->getAs<TypeVariableType>();
+  if (!paramTypeVar)
+    return None;
+
+  auto genericParam = formalParamTy->getAs<GenericTypeParamType>();
+  if (!genericParam)
+    return None;
+
+  // Only allow opening the innermost generic parameters.
+  auto genericContext = callee->getAsGenericContext();
+  if (!genericContext || !genericContext->isGeneric())
+    return None;
+
+  auto genericSig = callee->getInnermostDeclContext()
+      ->getGenericSignatureOfContext().getCanonicalSignature();
+  if (genericParam->getDepth() <
+          genericSig.getGenericParams().back()->getDepth())
+    return None;
+
+  // Ensure that the formal parameter is only used in covariant positions,
+  // because it won't match anywhere else.
+  auto referenceInfo = findGenericParameterReferences(
+      callee, genericSig, genericParam,
+      /*treatNonResultCovarianceAsInvariant=*/false,
+      /*skipParamIdx=*/paramIdx);
+  if (referenceInfo.selfRef > TypePosition::Covariant ||
+      referenceInfo.assocTypeRef > TypePosition::Covariant)
+    return None;
+
+  return std::make_tuple(paramTypeVar, argTy, adjustments);
+}
+
 // Match the argument of a call to the parameter.
-ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
+static ConstraintSystem::TypeMatchResult matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType,
     ArgumentList *argList,
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
-    Optional<TrailingClosureMatching> trailingClosureMatching) {
+    Optional<TrailingClosureMatching> trailingClosureMatching,
+    SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+      &openedExistentials) {
+  assert(subKind == ConstraintKind::OperatorArgumentConversion ||
+         subKind == ConstraintKind::ArgumentConversion);
   auto *loc = cs.getConstraintLocator(locator);
   assert(loc->isLastElement<LocatorPathElt::ApplyArgument>());
 
@@ -1544,6 +1678,26 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           argIdx == *argList->getFirstTrailingClosureIndex()) {
         cs.recordFix(SpecifyLabelToAssociateTrailingClosure::create(
             cs, cs.getConstraintLocator(loc)));
+      }
+
+      // If the argument is an existential type and the parameter is generic,
+      // consider opening the existential type.
+      if (auto existentialArg = shouldOpenExistentialCallArgument(
+              callee, paramIdx, paramTy, argTy)) {
+        // My kingdom for a decent "if let" in C++.
+        TypeVariableType *openedTypeVar;
+        Type existentialType;
+        OpenedExistentialAdjustments adjustments;
+        std::tie(openedTypeVar, existentialType, adjustments) = *existentialArg;
+
+        OpenedArchetypeType *opened;
+        std::tie(argTy, opened) = cs.openExistentialType(
+            existentialType, cs.getConstraintLocator(loc));
+
+        if (adjustments.contains(OpenedExistentialAdjustmentFlags::InOut))
+          argTy = InOutType::get(argTy);
+
+        openedExistentials.push_back({openedTypeVar, opened});
       }
 
       auto argLabel = argument.getLabel();
@@ -10686,9 +10840,11 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     auto *argumentList = getArgumentList(argumentsLoc);
     // The argument type must be convertible to the input type.
+    SmallVector<std::pair<TypeVariableType *, OpenedArchetypeType *>, 2>
+        openedExistentials;
     auto matchCallResult = ::matchCallArguments(
         *this, func2, argumentList, func1->getParams(), func2->getParams(),
-        subKind, argumentsLoc, trailingClosureMatching);
+        subKind, argumentsLoc, trailingClosureMatching, openedExistentials);
 
     switch (matchCallResult) {
     case SolutionKind::Error: {
@@ -10743,7 +10899,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
         auto matchCallResult = ::matchCallArguments(
             *this, func2, newArgumentList, func1->getParams(),
-            func2->getParams(), subKind, argumentsLoc, trailingClosureMatching);
+            func2->getParams(), subKind, argumentsLoc, trailingClosureMatching,
+            openedExistentials);
 
         if (matchCallResult != SolutionKind::Solved)
           return SolutionKind::Error;
@@ -10796,9 +10953,18 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       break;
     }
 
+    // Erase all of the opened existentials.
+    Type result2 = func2->getResult();
+    if (result2->hasTypeVariable() && !openedExistentials.empty()) {
+      for (const auto &opened : openedExistentials) {
+        result2 = typeEraseOpenedExistentialReference(
+            result2, opened.second->getExistentialType(), opened.first);
+      }
+    }
+
     // The result types are equivalent.
     if (matchFunctionResultTypes(
-            func1->getResult(), func2->getResult(), subflags,
+            func1->getResult(), result2, subflags,
             locator.withPathElement(ConstraintLocator::FunctionResult))
             .isFailure())
       return SolutionKind::Error;

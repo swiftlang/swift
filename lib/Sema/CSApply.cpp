@@ -180,6 +180,27 @@ static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
   return newDecl;
 }
 
+static Expr *createSelfExpr(FuncDecl *fnDecl) {
+  ASTContext &ctx = fnDecl->getASTContext();
+
+  auto selfDecl = fnDecl->getImplicitSelfDecl();
+  auto selfRefExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                           /*implicit*/ true);
+
+  if (!fnDecl->isMutating()) {
+    selfRefExpr->setType(selfDecl->getInterfaceType());
+    return selfRefExpr;
+  }
+  selfRefExpr->setType(LValueType::get(selfDecl->getInterfaceType()));
+
+  auto inoutSelfExpr = new (ctx) InOutExpr(
+      SourceLoc(), selfRefExpr,
+      fnDecl->mapTypeIntoContext(selfDecl->getValueInterfaceType()),
+      /*isImplicit*/ true);
+  inoutSelfExpr->setType(InOutType::get(selfDecl->getInterfaceType()));
+  return inoutSelfExpr;
+}
+
 // Synthesize a thunk body for the function created in
 // "addThunkForDependentTypes". This will just cast all params and forward them
 // along to the specialized function. It will also cast the result before
@@ -199,31 +220,68 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
       continue;
     }
 
-    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
-                                              /*Implicit=*/true);
+    Expr *paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                               /*Implicit=*/true);
     paramRefExpr->setType(param->getType());
 
-    auto specParamTy = specializedFuncDecl->getParameters()->get(paramIndex)->getType();
-    auto cast = ForcedCheckedCastExpr::createImplicit(
-        ctx, paramRefExpr, specParamTy);
+    if (param->isInOut()) {
+      paramRefExpr->setType(LValueType::get(param->getType()));
 
-    forwardingParams.push_back(Argument(SourceLoc(), Identifier(), cast));
+      paramRefExpr = new (ctx) InOutExpr(
+          SourceLoc(), paramRefExpr, param->getType(), /*isImplicit*/ true);
+      paramRefExpr->setType(InOutType::get(param->getType()));
+    }
+
+    auto specParamTy = specializedFuncDecl->getParameters()->get(paramIndex)->getType();
+
+    Expr *argExpr = nullptr;
+    if (specParamTy->isEqual(param->getType())) {
+      argExpr = paramRefExpr;
+    } else {
+      argExpr = ForcedCheckedCastExpr::createImplicit(ctx, paramRefExpr,
+                                                      specParamTy);
+    }
+
+    forwardingParams.push_back(Argument(SourceLoc(), Identifier(), argExpr));
     paramIndex++;
   }
 
-  auto *specializedFuncDeclRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),
+  Expr *specializedFuncDeclRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),
                                                        DeclNameLoc(), true);
   specializedFuncDeclRef->setType(specializedFuncDecl->getInterfaceType());
+
+  if (specializedFuncDecl->isInstanceMember()) {
+    auto selfExpr = createSelfExpr(thunkDecl);
+    auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(), selfExpr);
+    memberCall->setThrows(false);
+    auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
+    specializedFuncDeclRef = memberCall;
+    specializedFuncDeclRef->setType(resultType);
+  } else if (specializedFuncDecl->isStatic()) {
+    auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
+    auto selfType = cast<NominalTypeDecl>(thunkDecl->getDeclContext()->getAsDecl())->getDeclaredInterfaceType();
+    auto selfTypeExpr = TypeExpr::createImplicit(selfType, ctx);
+    auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(), selfTypeExpr);
+    memberCall->setThrows(false);
+    specializedFuncDeclRef = memberCall;
+    specializedFuncDeclRef->setType(resultType);
+  }
 
   auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
   auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
   specializedFuncCallExpr->setType(specializedFuncDecl->getResultInterfaceType());
   specializedFuncCallExpr->setThrows(false);
 
-  auto cast = ForcedCheckedCastExpr::createImplicit(
-      ctx, specializedFuncCallExpr, thunkDecl->getResultInterfaceType());
+  Expr *resultExpr = nullptr;
+  if (specializedFuncCallExpr->getType()->isEqual(thunkDecl->getResultInterfaceType())) {
+    resultExpr = specializedFuncCallExpr;
+  } else {
+    resultExpr = ForcedCheckedCastExpr::createImplicit(
+        ctx, specializedFuncCallExpr, thunkDecl->getResultInterfaceType());
+  }
 
-  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), cast, /*implicit=*/true);
+  auto returnStmt = new (ctx)
+      ReturnStmt(SourceLoc(), resultExpr, /*implicit=*/true);
   auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit=*/true);
   return {body, /*isTypeChecked=*/true};
@@ -279,6 +337,7 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
   newFnDecl->copyFormalAccessFrom(newDecl);
   newFnDecl->setBodySynthesizer(synthesizeDependentTypeThunkParamForwarding, newDecl);
   newFnDecl->setSelfAccessKind(newDecl->getSelfAccessKind());
+  if (newDecl->isStatic()) newFnDecl->setStatic();
   newFnDecl->getAttrs().add(
       new (newDecl->getASTContext()) TransparentAttr(/*IsImplicit=*/true));
   return newFnDecl;
@@ -302,15 +361,41 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
     if (isa<MetatypeType>(param->getType().getPointer())) {
       continue;
     }
-    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
-                                             /*Implicit=*/true);
+    Expr *paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                               /*Implicit=*/true);
     paramRefExpr->setType(param->getType());
+
+    if (param->isInOut()) {
+      paramRefExpr->setType(LValueType::get(param->getType()));
+
+      paramRefExpr = new (ctx) InOutExpr(
+          SourceLoc(), paramRefExpr, param->getType(), /*isImplicit*/ true);
+      paramRefExpr->setType(InOutType::get(param->getType()));
+    }
+
     forwardingParams.push_back(Argument(SourceLoc(), Identifier(), paramRefExpr));
   }
 
-  auto *specializedFuncDeclRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),
+  Expr *specializedFuncDeclRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),
                                                 DeclNameLoc(), true);
   specializedFuncDeclRef->setType(specializedFuncDecl->getInterfaceType());
+
+  if (specializedFuncDecl->isInstanceMember()) {
+    auto selfExpr = createSelfExpr(thunkDecl);
+    auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(), selfExpr);
+    memberCall->setThrows(false);
+    auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
+    specializedFuncDeclRef = memberCall;
+    specializedFuncDeclRef->setType(resultType);
+  } else if (specializedFuncDecl->isStatic()) {
+    auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
+    auto selfType = cast<NominalTypeDecl>(thunkDecl->getDeclContext()->getAsDecl())->getDeclaredInterfaceType();
+    auto selfTypeExpr = TypeExpr::createImplicit(selfType, ctx);
+    auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(), selfTypeExpr);
+    memberCall->setThrows(false);
+    specializedFuncDeclRef = memberCall;
+    specializedFuncDeclRef->setType(resultType);
+  }
 
   auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
   auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
@@ -379,6 +464,7 @@ static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
   thunk->copyFormalAccessFrom(newDecl);
   thunk->setBodySynthesizer(synthesizeForwardingThunkBody, newDecl);
   thunk->setSelfAccessKind(newDecl->getSelfAccessKind());
+  if (newDecl->isStatic()) thunk->setStatic();
   thunk->getAttrs().add(
       new (newDecl->getASTContext()) TransparentAttr(/*IsImplicit=*/true));
 
@@ -1085,8 +1171,16 @@ namespace {
       // Dig out the base type.
       Type baseTy = cs.getType(base);
 
-      // Look through lvalues.
+      // Look through inout.
       bool isLValue = false;
+      InOutExpr *origInOutBase = dyn_cast<InOutExpr>(base);
+      if (origInOutBase) {
+        base = origInOutBase->getSubExpr();
+        baseTy = baseTy->getInOutObjectType();
+        isLValue = true;
+      }
+
+      // Look through lvalues.
       if (auto lvalueTy = baseTy->getAs<LValueType>()) {
         isLValue = true;
         baseTy = lvalueTy->getObjectType();
@@ -1104,7 +1198,7 @@ namespace {
       // If the base was an lvalue but it will only be treated as an
       // rvalue, turn the base into an rvalue now. This results in
       // better SILGen.
-      if (isLValue &&
+      if (isLValue && !origInOutBase &&
           (isNonMutatingMember(member) ||
            member->getDeclContext()->getDeclaredInterfaceType()
              ->hasReferenceSemantics())) {
@@ -1138,12 +1232,20 @@ namespace {
       // Record the opened existential.
       OpenedExistentials.push_back({archetype, base, archetypeVal, depth});
 
-      return archetypeVal;
+      // Re-apply inout if needed.
+      Expr *resultExpr = archetypeVal;
+      if (origInOutBase) {
+        resultExpr = new (ctx) InOutExpr(
+            origInOutBase->getLoc(), resultExpr, opaqueType->getRValueType());
+        cs.cacheType(resultExpr);
+      }
+
+      return resultExpr;
     }
 
-    /// Trying to close the active existential, if there is one.
+    /// Try to close the innermost active existential, if there is one.
     bool closeExistential(Expr *&result, ConstraintLocatorBuilder locator,
-                          bool force=false) {
+                          bool force) {
       if (OpenedExistentials.empty())
         return false;
 
@@ -1183,6 +1285,18 @@ namespace {
 
       OpenedExistentials.pop_back();
       return true;
+    }
+
+    /// Close any active existentials.
+    bool closeExistentials(Expr *&result, ConstraintLocatorBuilder locator,
+                           bool force=false) {
+      bool closedAny = false;
+      while (closeExistential(result, locator, force)) {
+        force = false;
+        closedAny = true;
+      }
+
+      return closedAny;
     }
 
     /// Determines if a partially-applied member reference should be
@@ -1706,7 +1820,7 @@ namespace {
 
         cs.setType(ref, refType);
 
-        closeExistential(ref, locator, /*force=*/openedExistential);
+        closeExistentials(ref, locator, /*force=*/openedExistential);
 
         // If this attribute was inferred based on deprecated Swift 3 rules,
         // complain.
@@ -1758,7 +1872,7 @@ namespace {
         cs.setType(memberRefExpr, refTy->castTo<FunctionType>()->getResult());
 
         Expr *result = memberRefExpr;
-        closeExistential(result, locator);
+        closeExistentials(result, locator);
 
         // If the property is of dynamic 'Self' type, wrap an implicit
         // conversion around the resulting expression, with the destination
@@ -1959,7 +2073,7 @@ namespace {
                                                               ref,
                                                               cs.getType(ref));
         cs.cacheType(result);
-        closeExistential(result, locator, /*force=*/openedExistential);
+        closeExistentials(result, locator, /*force=*/openedExistential);
         return forceUnwrapIfExpected(result, memberLocator);
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
@@ -2263,7 +2377,7 @@ namespace {
                && "open existential archetype in AnyObject subscript type?");
         cs.setType(subscriptExpr, resultTy);
         Expr *result = subscriptExpr;
-        closeExistential(result, locator);
+        closeExistentials(result, locator);
         return result;
       }
 
@@ -2305,7 +2419,7 @@ namespace {
                      : fullSubscriptTy->getResult());
 
       Expr *result = subscriptExpr;
-      closeExistential(result, locator);
+      closeExistentials(result, locator);
 
       // If the element is of dynamic 'Self' type, wrap an implicit conversion
       // around the resulting expression, with the destination type having
@@ -6029,6 +6143,23 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       cs.cacheExprTypes(argExpr);
     }
 
+    auto argLoc = getArgLocator(argIdx, paramIdx, param.getParameterFlags());
+
+    // If the argument is an existential type that has been opened, perform
+    // the open operation.
+    if (argType->getInOutObjectType()->isAnyExistentialType() &&
+        paramType->hasOpenedExistential()) {
+      // FIXME: Look for an opened existential and use it. We need to
+      // know how far out we need to go to close the existentials. Huh.
+      auto knownOpened = solution.OpenedExistentialTypes.find(
+          cs.getConstraintLocator(argLoc));
+      if (knownOpened != solution.OpenedExistentialTypes.end()) {
+        argExpr = openExistentialReference(
+            argExpr, knownOpened->second, callee.getDecl());
+        argType = cs.getType(argExpr);
+      }
+    }
+
     if (argRequiresAutoClosureExpr(param, argType)) {
       assert(!param.isInOut());
 
@@ -6037,8 +6168,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       //   - impilict autoclosure is created to wrap argument expression
       //   - new types are propagated to constraint system
       auto *closureType = param.getPlainType()->castTo<FunctionType>();
-
-      auto argLoc = getArgLocator(argIdx, paramIdx, param.getParameterFlags());
 
       argExpr = coerceToType(
           argExpr, closureType->getResult(),
@@ -6062,9 +6191,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
       convertedArg = cs.buildAutoClosureExpr(argExpr, closureType, dc);
     } else {
-      convertedArg = coerceToType(
-          argExpr, paramType,
-          getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
+      convertedArg = coerceToType(argExpr, paramType, argLoc);
     }
 
     // Perform the wrapped value placeholder injection
@@ -7800,8 +7927,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
             result, covariantResultType));
     }
 
-    // Try closing the existential, if there is one.
-    closeExistential(result, locator);
+    // Try closing existentials, if there are any.
+    closeExistentials(result, locator);
 
     // We may also need to force the result for an IUO. We don't apply this on
     // SelfApplyExprs, as the force unwraps should be inserted at the result of

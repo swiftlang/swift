@@ -18,6 +18,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
@@ -63,12 +64,6 @@ struct RequestedCachedModule;
 std::string removeCodeCompletionTokens(StringRef Input,
                                        StringRef TokenName,
                                        unsigned *CompletionOffset);
-
-StringRef copyString(llvm::BumpPtrAllocator &Allocator,
-                     StringRef Str);
-
-const char *copyCString(llvm::BumpPtrAllocator &Allocator,
-                        StringRef Str);
 
 template <typename T>
 ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
@@ -723,9 +718,9 @@ class ContextFreeCodeCompletionResult {
 
   bool IsSystem : 1;
   CodeCompletionString *CompletionString;
-  StringRef ModuleName;
-  StringRef BriefDocComment;
-  ArrayRef<StringRef> AssociatedUSRs;
+  NullTerminatedStringRef ModuleName;
+  NullTerminatedStringRef BriefDocComment;
+  ArrayRef<NullTerminatedStringRef> AssociatedUSRs;
   CodeCompletionResultType ResultType;
 
   ContextFreeNotRecommendedReason NotRecommended : 3;
@@ -734,7 +729,8 @@ class ContextFreeCodeCompletionResult {
   CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
   static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
 
-  StringRef DiagnosticMessage;
+  NullTerminatedStringRef DiagnosticMessage;
+  NullTerminatedStringRef FilterName;
 
 public:
   /// Memberwise initializer. \p AssociatedKInd is opaque and will be
@@ -748,18 +744,21 @@ public:
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, uint8_t AssociatedKind,
       CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem,
-      CodeCompletionString *CompletionString, StringRef ModuleName,
-      StringRef BriefDocComment, ArrayRef<StringRef> AssociatedUSRs,
+      CodeCompletionString *CompletionString,
+      NullTerminatedStringRef ModuleName,
+      NullTerminatedStringRef BriefDocComment,
+      ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-      StringRef DiagnosticMessage)
+      NullTerminatedStringRef DiagnosticMessage,
+      NullTerminatedStringRef FilterName)
       : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         ResultType(ResultType), NotRecommended(NotRecommended),
         DiagnosticSeverity(DiagnosticSeverity),
-        DiagnosticMessage(DiagnosticMessage) {
+        DiagnosticMessage(DiagnosticMessage), FilterName(FilterName) {
     this->AssociatedKind.Opaque = AssociatedKind;
     assert((NotRecommended == ContextFreeNotRecommendedReason::None) ==
                (DiagnosticSeverity == CodeCompletionDiagnosticSeverity::None) &&
@@ -777,78 +776,58 @@ public:
                "isOperator implies operator kind != None");
   }
 
-  /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
+  /// Constructs a \c Pattern or \c BuiltinOperator result.
   ///
   /// \note The caller must ensure that the \p CompletionString and \c
   /// StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
-  ContextFreeCodeCompletionResult(
-      CodeCompletionResultKind Kind, CodeCompletionString *CompletionString,
-      CodeCompletionOperatorKind KnownOperatorKind, StringRef BriefDocComment,
+  static ContextFreeCodeCompletionResult *createPatternOrBuiltInOperatorResult(
+      llvm::BumpPtrAllocator &Allocator, CodeCompletionResultKind Kind,
+      CodeCompletionString *CompletionString,
+      CodeCompletionOperatorKind KnownOperatorKind,
+      NullTerminatedStringRef BriefDocComment,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-      StringRef DiagnosticMessage)
-      : ContextFreeCodeCompletionResult(
-            Kind, /*AssociatedKind=*/0, KnownOperatorKind,
-            /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
-            BriefDocComment, /*AssociatedUSRs=*/{}, ResultType, NotRecommended,
-            DiagnosticSeverity, DiagnosticMessage) {}
+      NullTerminatedStringRef DiagnosticMessage);
 
   /// Constructs a \c Keyword result.
   ///
   /// \note The caller must ensure that the \p CompletionString and
-  /// \p BriefDocComment outlive this result, typically by storing them in the
-  /// same \c CodeCompletionResultSink as the result itself.
-  ContextFreeCodeCompletionResult(CodeCompletionKeywordKind Kind,
-                                  CodeCompletionString *CompletionString,
-                                  StringRef BriefDocComment,
-                                  CodeCompletionResultType ResultType)
-      : ContextFreeCodeCompletionResult(
-            CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
-            CodeCompletionOperatorKind::None, /*IsSystem=*/false,
-            CompletionString, /*ModuleName=*/"", BriefDocComment,
-            /*AssociatedUSRs=*/{}, ResultType,
-            ContextFreeNotRecommendedReason::None,
-            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
+  /// \p BriefDocComment outlive this result, typically by storing them in
+  /// the same \c CodeCompletionResultSink as the result itself.
+  static ContextFreeCodeCompletionResult *
+  createKeywordResult(llvm::BumpPtrAllocator &Allocator,
+                      CodeCompletionKeywordKind Kind,
+                      CodeCompletionString *CompletionString,
+                      NullTerminatedStringRef BriefDocComment,
+                      CodeCompletionResultType ResultType);
 
   /// Constructs a \c Literal result.
   ///
   /// \note The caller must ensure that the \p CompletionString outlives this
   /// result, typically by storing them in the same \c CodeCompletionResultSink
   /// as the result itself.
-  ContextFreeCodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
-                                  CodeCompletionString *CompletionString,
-                                  CodeCompletionResultType ResultType)
-      : ContextFreeCodeCompletionResult(
-            CodeCompletionResultKind::Literal,
-            static_cast<uint8_t>(LiteralKind), CodeCompletionOperatorKind::None,
-            /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
-            /*BriefDocComment=*/"",
-            /*AssociatedUSRs=*/{}, ResultType,
-            ContextFreeNotRecommendedReason::None,
-            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
+  static ContextFreeCodeCompletionResult *
+  createLiteralResult(llvm::BumpPtrAllocator &Allocator,
+                      CodeCompletionLiteralKind LiteralKind,
+                      CodeCompletionString *CompletionString,
+                      CodeCompletionResultType ResultType);
 
   /// Constructs a \c Declaration result.
   ///
   /// \note The caller must ensure that the \p CompletionString and all
   /// \c StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
-  ContextFreeCodeCompletionResult(
-      CodeCompletionString *CompletionString, const Decl *AssociatedDecl,
-      StringRef ModuleName, StringRef BriefDocComment,
-      ArrayRef<StringRef> AssociatedUSRs, CodeCompletionResultType ResultType,
+  static ContextFreeCodeCompletionResult *createDeclResult(
+      llvm::BumpPtrAllocator &Allocator, CodeCompletionString *CompletionString,
+      const Decl *AssociatedDecl, NullTerminatedStringRef ModuleName,
+      NullTerminatedStringRef BriefDocComment,
+      ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
+      CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-      StringRef DiagnosticMessage)
-      : ContextFreeCodeCompletionResult(
-            CodeCompletionResultKind::Declaration,
-            static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
-            CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
-            CompletionString, ModuleName, BriefDocComment, AssociatedUSRs,
-            ResultType, NotRecommended, DiagnosticSeverity, DiagnosticMessage) {
-    assert(AssociatedDecl && "should have a decl");
-  }
+      NullTerminatedStringRef DiagnosticMessage);
 
   CodeCompletionResultKind getKind() const { return Kind; }
 
@@ -878,11 +857,13 @@ public:
 
   CodeCompletionString *getCompletionString() const { return CompletionString; }
 
-  StringRef getModuleName() const { return ModuleName; }
+  NullTerminatedStringRef getModuleName() const { return ModuleName; }
 
-  StringRef getBriefDocComment() const { return BriefDocComment; }
+  NullTerminatedStringRef getBriefDocComment() const { return BriefDocComment; }
 
-  ArrayRef<StringRef> getAssociatedUSRs() const { return AssociatedUSRs; }
+  ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
+    return AssociatedUSRs;
+  }
 
   const CodeCompletionResultType &getResultType() const { return ResultType; }
 
@@ -893,7 +874,11 @@ public:
   CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
     return DiagnosticSeverity;
   }
-  StringRef getDiagnosticMessage() const { return DiagnosticMessage; };
+  NullTerminatedStringRef getDiagnosticMessage() const {
+    return DiagnosticMessage;
+  }
+
+  NullTerminatedStringRef getFilterName() const { return FilterName; }
 
   bool isOperator() const {
     if (getKind() == CodeCompletionResultKind::Declaration) {
@@ -935,7 +920,7 @@ class CodeCompletionResult {
   CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
   static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
 
-  StringRef DiagnosticMessage;
+  NullTerminatedStringRef DiagnosticMessage;
 
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
@@ -959,7 +944,7 @@ private:
                        CodeCompletionResultTypeRelation TypeDistance,
                        ContextualNotRecommendedReason NotRecommended,
                        CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                       StringRef DiagnosticMessage)
+                       NullTerminatedStringRef DiagnosticMessage)
       : ContextFree(ContextFree), SemanticContext(SemanticContext),
         Flair(Flair.toRaw()), NotRecommended(NotRecommended),
         DiagnosticSeverity(DiagnosticSeverity),
@@ -981,7 +966,7 @@ public:
                        const DeclContext *DC,
                        ContextualNotRecommendedReason NotRecommended,
                        CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                       StringRef DiagnosticMessage);
+                       NullTerminatedStringRef DiagnosticMessage);
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;
@@ -1090,15 +1075,15 @@ public:
     return getContextFreeResult().getCompletionString();
   }
 
-  StringRef getModuleName() const {
+  NullTerminatedStringRef getModuleName() const {
     return getContextFreeResult().getModuleName();
   }
 
-  StringRef getBriefDocComment() const {
+  NullTerminatedStringRef getBriefDocComment() const {
     return getContextFreeResult().getBriefDocComment();
   }
 
-  ArrayRef<StringRef> getAssociatedUSRs() const {
+  ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return getContextFreeResult().getAssociatedUSRs();
   }
 
@@ -1110,7 +1095,9 @@ public:
 
   /// Get the contextual diagnostic message. This disregards context-free
   /// diagnostics.
-  StringRef getContextualDiagnosticMessage() const { return DiagnosticMessage; }
+  NullTerminatedStringRef getContextualDiagnosticMessage() const {
+    return DiagnosticMessage;
+  }
 
   /// Return the contextual diagnostic severity if there was a contextual
   /// diagnostic. If there is no contextual diagnostic, return the context-free
@@ -1126,12 +1113,16 @@ public:
   /// Return the contextual diagnostic message if there was a contextual
   /// diagnostic. If there is no contextual diagnostic, return the context-free
   /// diagnostic message.
-  StringRef getDiagnosticMessage() const {
+  NullTerminatedStringRef getDiagnosticMessage() const {
     if (NotRecommended != ContextualNotRecommendedReason::None) {
       return DiagnosticMessage;
     } else {
       return getContextFreeResult().getDiagnosticMessage();
     }
+  }
+
+  NullTerminatedStringRef getFilterName() const {
+    return getContextFreeResult().getFilterName();
   }
 
   /// Print a debug representation of the code completion result to \p OS.
@@ -1169,7 +1160,7 @@ struct CodeCompletionResultSink {
 
   /// A single-element cache for module names stored in Allocator, keyed by a
   /// clang::Module * or swift::ModuleDecl *.
-  std::pair<void *, StringRef> LastModule;
+  std::pair<void *, NullTerminatedStringRef> LastModule;
 
   CodeCompletionResultSink()
       : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}

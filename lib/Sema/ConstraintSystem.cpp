@@ -573,6 +573,15 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
       { LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl) }, 0);
 }
 
+std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
+    Type type, ConstraintLocator *locator) {
+  OpenedArchetypeType *opened = nullptr;
+  Type result = type->openAnyExistentialType(opened);
+  assert(OpenedExistentialTypes.count(locator) == 0);
+  OpenedExistentialTypes.insert({locator, opened});
+  return {result, opened};
+}
+
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
 static void extendDepthMap(
@@ -1768,6 +1777,19 @@ static Type typeEraseCovariantExistentialSelfReferences(Type refTy,
 
   unsigned metatypeDepth = 0;
 
+  /// Check whether the given type has a reference to the generic parameter
+  /// that we are erasing.
+  auto hasErasedGenericParameter = [&](Type type) {
+    if (!type->hasTypeParameter())
+      return false;
+
+    return type.findIf([&](Type type) {
+      if (auto gp = type->getAs<GenericTypeParamType>())
+        return gp->getDepth() == 0;
+      return false;
+    });
+  };
+
   std::function<Type(Type, TypePosition)> transformFn;
   transformFn = [&](Type type, TypePosition initialPos) -> Type {
     return type.transformWithPosition(
@@ -1787,6 +1809,20 @@ static Type typeEraseCovariantExistentialSelfReferences(Type refTy,
         }
 
         return Type(ExistentialMetatypeType::get(erasedTy));
+      }
+
+      // Opaque types whose substitutions involve this type parameter are
+      // erased to their upper bound.
+      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t)) {
+        for (auto replacementType :
+                 opaque->getSubstitutions().getReplacementTypes()) {
+          if (hasErasedGenericParameter(replacementType)) {
+            Type interfaceType = opaque->getInterfaceType();
+            auto genericSig =
+                opaque->getDecl()->getOpaqueInterfaceGenericSignature();
+            return genericSig->getNonDependentUpperBounds(interfaceType);
+          }
+        }
       }
 
       if (!t->isTypeParameter()) {
@@ -1845,6 +1881,40 @@ static Type typeEraseCovariantExistentialSelfReferences(Type refTy,
   };
 
   return transformFn(refTy, TypePosition::Covariant);
+}
+
+Type constraints::typeEraseOpenedExistentialReference(
+    Type type, Type existentialBaseType, TypeVariableType *openedTypeVar) {
+  Type selfGP = GenericTypeParamType::get(false, 0, 0, type->getASTContext());
+
+  // First, temporarily reconstitute the 'Self' generic parameter.
+  type = type.transformRec([&](TypeBase *t) -> Optional<Type> {
+    // Don't recurse into children unless we have to.
+    if (!type->hasTypeVariable())
+      return Type(t);
+
+    if (isa<TypeVariableType>(t) && t->isEqual(openedTypeVar))
+      return selfGP;
+
+    // Recurse.
+    return None;
+  });
+
+  // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
+  type = typeEraseCovariantExistentialSelfReferences(type, existentialBaseType);
+
+  // Finally, swap the 'Self'-corresponding type variable back in.
+  return type.transformRec([&](TypeBase *t) -> Optional<Type> {
+    // Don't recurse into children unless we have to.
+    if (!type->hasTypeParameter())
+      return Type(t);
+
+    if (isa<GenericTypeParamType>(t) && t->isEqual(selfGP))
+      return Type(openedTypeVar);
+
+    // Recurse.
+    return None;
+  });
 }
 
 std::pair<Type, Type>
@@ -2119,35 +2189,8 @@ ConstraintSystem::getTypeOfMemberReference(
       type->hasTypeVariable()) {
     const auto selfGP = cast<GenericTypeParamType>(
         outerDC->getSelfInterfaceType()->getCanonicalType());
-
-    // First, temporarily reconstitute the 'Self' generic parameter.
-    type = type.transformRec([&](TypeBase *t) -> Optional<Type> {
-      // Don't recurse into children unless we have to.
-      if (!type->hasTypeVariable())
-        return Type(t);
-
-      if (isa<TypeVariableType>(t) && t->isEqual(replacements.lookup(selfGP)))
-        return selfGP;
-
-      // Recurse.
-      return None;
-    });
-
-    // Then, type-erase occurrences of covariant 'Self'-rooted type parameters.
-    type = typeEraseCovariantExistentialSelfReferences(type, baseObjTy);
-
-    // Finally, swap the 'Self'-corresponding type variable back in.
-    type = type.transformRec([&](TypeBase *t) -> Optional<Type> {
-      // Don't recurse into children unless we have to.
-      if (!type->hasTypeParameter())
-        return Type(t);
-
-      if (isa<GenericTypeParamType>(t) && t->isEqual(selfGP))
-        return Type(replacements.lookup(selfGP));
-
-      // Recurse.
-      return None;
-    });
+    auto openedTypeVar = replacements.lookup(selfGP);
+    type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar);
   }
 
   // Construct an idealized parameter type of the initializer associated
@@ -4483,6 +4526,15 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
     // is not sufficiently centralized in the AST.
     DeclNameRef name(getOverloadChoiceName(overload.choices));
     auto anchor = simplifyLocatorToAnchor(overload.locator);
+    if (!anchor) {
+      // It's not clear that this is actually valid. Just use the overload's
+      // anchor for release builds, but assert so we can properly diagnose
+      // this case if it happens to be hit. Note that the overload will
+      // *always* be anchored, otherwise everything would be broken, ie. this
+      // assertion would be the least of our worries.
+      anchor = overload.locator->getAnchor();
+      assert(false && "locator could not be simplified to anchor");
+    }
 
     // Emit the ambiguity diagnostic.
     auto &DE = getASTContext().Diags;

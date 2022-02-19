@@ -12,6 +12,7 @@
 
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/Basic/Cache.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -102,7 +103,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 4; // Store ContextFreeCodeCompletionResults in cache
+static constexpr uint32_t onDiskCompletionCacheVersion = 5; // Store FilterName in cache
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -153,10 +154,10 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
   auto stringCount = read32le(strings);
   assert(strings + stringCount == end && "incorrect file size");
   (void)stringCount; // so it is not seen as "unused" in release builds.
-  llvm::DenseMap<uint32_t, StringRef> knownStrings;
-  
+  llvm::DenseMap<uint32_t, NullTerminatedStringRef> knownStrings;
+
   // STRINGS
-  auto getString = [&](uint32_t index) -> StringRef {
+  auto getString = [&](uint32_t index) -> NullTerminatedStringRef {
     if (index == ~0u)
       return "";
     auto found = knownStrings.find(index);
@@ -165,8 +166,8 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     }
 
     const char *p = strings + index;
-    auto size = read32le(p);
-    auto str = copyString(*V.Allocator, StringRef(p, size));
+    size_t size = read32le(p);
+    auto str = NullTerminatedStringRef(StringRef(p, size), *V.Allocator);
     knownStrings[index] = str;
     return str;
   };
@@ -209,9 +210,10 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
     auto diagMessageIndex = read32le(cursor);
+    auto filterNameIndex = read32le(cursor);
 
     auto assocUSRCount = read32le(cursor);
-    SmallVector<StringRef, 4> assocUSRs;
+    SmallVector<NullTerminatedStringRef, 4> assocUSRs;
     for (unsigned i = 0; i < assocUSRCount; ++i) {
       assocUSRs.push_back(getString(read32le(cursor)));
     }
@@ -220,14 +222,14 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto moduleName = getString(moduleIndex);
     auto briefDocComment = getString(briefDocIndex);
     auto diagMessage = getString(diagMessageIndex);
+    auto filterName = getString(filterNameIndex);
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
             kind, associatedKind, opKind, isSystem, string, moduleName,
-            briefDocComment,
-            copyArray(*V.Allocator, ArrayRef<StringRef>(assocUSRs)),
+            briefDocComment, makeArrayRef(assocUSRs).copy(*V.Allocator),
             CodeCompletionResultType::unknown(), notRecommended, diagSeverity,
-            diagMessage);
+            diagMessage, filterName);
 
     V.Results.push_back(result);
   }
@@ -352,6 +354,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(addString(R->getModuleName()));      // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
       LE.write(addString(R->getDiagnosticMessage())); // index into strings
+      LE.write(addString(R->getFilterName())); // index into strings
 
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {

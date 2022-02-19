@@ -46,12 +46,6 @@ struct SwiftToSourceKitCompletionAdapter {
   static bool handleResult(SourceKit::CodeCompletionConsumer &consumer,
                            CodeCompletionResult *result,
                            bool annotatedDescription) {
-    llvm::SmallString<64> name;
-    {
-      llvm::raw_svector_ostream OSS(name);
-      ide::printCodeCompletionResultFilterName(*result, OSS);
-    }
-
     llvm::SmallString<64> description;
     {
       llvm::raw_svector_ostream OSS(description);
@@ -64,7 +58,7 @@ struct SwiftToSourceKitCompletionAdapter {
                                                 /*leadingPunctuation=*/false);
     }
 
-    Completion extended(*result, name, description);
+    Completion extended(*result, description);
     return handleResult(consumer, &extended, /*leadingPunctuation=*/false,
                         /*legacyLiteralToKeyword=*/true, annotatedDescription);
   }
@@ -74,8 +68,9 @@ struct SwiftToSourceKitCompletionAdapter {
                            bool legacyLiteralToKeyword,
                            bool annotatedDescription);
 
-  static void getResultAssociatedUSRs(ArrayRef<StringRef> AssocUSRs,
-                                      raw_ostream &OS);
+  static void
+  getResultAssociatedUSRs(ArrayRef<NullTerminatedStringRef> AssocUSRs,
+                          raw_ostream &OS);
 };
 
 } // anonymous namespace
@@ -478,7 +473,7 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   }
   unsigned USRsEnd = SS.size();
 
-  Info.Name = Result->getName();
+  Info.Name = Result->getFilterName();
   Info.Description = StringRef(SS.begin() + DescBegin, DescEnd - DescBegin);
   Info.SourceText = StringRef(SS.begin() + TextBegin, TextEnd - TextBegin);
   Info.TypeName = StringRef(SS.begin() + TypeBegin, TypeEnd - TypeBegin);
@@ -600,7 +595,7 @@ getCodeCompletionKeywordKindForUID(UIdent uid) {
 }
 
 void SwiftToSourceKitCompletionAdapter::getResultAssociatedUSRs(
-    ArrayRef<StringRef> AssocUSRs, raw_ostream &OS) {
+    ArrayRef<NullTerminatedStringRef> AssocUSRs, raw_ostream &OS) {
   bool First = true;
   for (auto USR : AssocUSRs) {
     if (!First)
@@ -882,18 +877,13 @@ filterInnerResults(ArrayRef<Result *> results, bool includeInner,
     if (!includeInnerOperators && result->isOperator())
       continue;
 
-    llvm::SmallString<64> filterName;
-    {
-      llvm::raw_svector_ostream OSS(filterName);
-      ide::printCodeCompletionResultFilterName(*result, OSS);
-    }
     llvm::SmallString<64> description;
     {
       llvm::raw_svector_ostream OSS(description);
       ide::printCodeCompletionResultDescription(*result, OSS,
                                                 /*leadingPunctuation=*/false);
     }
-    if (rules.hideCompletion(*result, filterName, description))
+    if (rules.hideCompletion(*result, result->getFilterName(), description))
       continue;
 
     bool inner = checkInnerResult(*result, hasDot, hasQDot, hasInit);
@@ -920,9 +910,9 @@ static void transformAndForwardResults(
     auto *completionString =
         CodeCompletionString::create(innerSink.allocator, chunks);
     ContextFreeCodeCompletionResult *contextFreeResult =
-        new (innerSink.allocator) ContextFreeCodeCompletionResult(
-            CodeCompletionResultKind::BuiltinOperator, completionString,
-            CodeCompletionOperatorKind::None,
+        ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
+            innerSink.allocator, CodeCompletionResultKind::BuiltinOperator,
+            completionString, CodeCompletionOperatorKind::None,
             /*BriefDocComment=*/"", CodeCompletionResultType::notApplicable(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None,

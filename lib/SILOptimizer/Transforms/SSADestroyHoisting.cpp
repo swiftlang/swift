@@ -142,6 +142,14 @@ protected:
     return true;
   }
 
+  bool visitBeginAccess(Operand *use) override {
+    auto *bai = cast<BeginAccessInst>(use->getUser());
+    for (auto *eai : bai->getEndAccesses()) {
+      storageUsers.insert(eai);
+    }
+    return true;
+  }
+
   bool visitLoad(Operand *use) override { return recordUser(use->getUser()); }
 
   bool visitStore(Operand *use) override { return recordUser(use->getUser()); }
@@ -196,41 +204,188 @@ public:
   // Debug instructions that are no longer within this lifetime after shrinking.
   SmallVector<SILInstruction *, 4> deadUsers;
 
-  explicit DeinitBarriers(SILFunction *function)
-    : destroyReachesBeginBlocks(function),
-      destroyReachesEndBlocks(function)
-  {}
+  // The access scopes which are hoisting barriers.
+  //
+  // They are hoisting barriers if they include any barriers.  We need to be
+  // sure not to hoist a destroy_addr into an access scope and by doing so cause
+  // a deinit which had previously executed outside an access scope to start
+  // executing within it--that could violate exclusivity.
+  llvm::SmallPtrSet<BeginAccessInst *, 8> barrierAccessScopes;
 
-  void compute(const KnownStorageUses &knownUses) {
-    DestroyReachability(knownUses, *this).solveBackward();
+  explicit DeinitBarriers(bool ignoreDeinitBarriers,
+                          const KnownStorageUses &knownUses,
+                          SILFunction *function)
+      : destroyReachesBeginBlocks(function), destroyReachesEndBlocks(function),
+        ignoreDeinitBarriers(ignoreDeinitBarriers), knownUses(knownUses) {
+    auto rootValue = knownUses.getStorage().getRoot();
+    assert(rootValue && "HoistDestroys requires a single storage root");
+    // null for function args
+    storageDefInst = rootValue->getDefiningInstruction();
   }
+
+  void compute() {
+    FindBarrierAccessScopes(*this).solveBackward();
+    DestroyReachability(*this).solveBackward();
+  }
+
+  bool isBarrier(SILInstruction *instruction) const {
+    return classificationIsBarrier(
+        classifyInstruction(instruction, ignoreDeinitBarriers, storageDefInst,
+                            barrierAccessScopes, knownUses));
+  };
 
 private:
   DeinitBarriers(DeinitBarriers const &) = delete;
   DeinitBarriers &operator=(DeinitBarriers const &) = delete;
 
+  bool ignoreDeinitBarriers;
+  const KnownStorageUses &knownUses;
+  SILInstruction *storageDefInst = nullptr;
+
+  enum class Classification { DeadUser, Barrier, Other };
+
+  Classification classifyInstruction(SILInstruction *inst) {
+    return classifyInstruction(inst, ignoreDeinitBarriers, storageDefInst,
+                               barrierAccessScopes, knownUses);
+  }
+
+  static Classification classifyInstruction(
+      SILInstruction *inst, bool ignoreDeinitBarriers,
+      SILInstruction *storageDefInst,
+      const llvm::SmallPtrSetImpl<BeginAccessInst *> &barrierAccessScopes,
+      const KnownStorageUses &knownUses);
+
+  void visitedInstruction(SILInstruction *instruction,
+                          Classification classification);
+
+  static bool classificationIsBarrier(Classification classification);
+
+  // Implements BackwardReachability::BlockReachability
+  //
+  // Determine which end_access instructions must be treated as barriers.
+  //
+  // An end_access is a barrier if the access scope it ends contains any deinit
+  // barriers.  Suppose that it weren't treated as a barrier.  Then the
+  // destroy_addr would be hoisted up to the in-scope deinit barrier.  That
+  // could result in a deinit being executed within the scope which was
+  // previously executed outside it.  Executing a deinit in the scope could
+  // violate exclusivity.
+  //
+  // So before determining what ALL the barriers are, we need to determine which
+  // end_access instructions are barriers.  Do that by observing which access
+  // scopes are open when encountering a barrier.  The access scopes which are
+  // open are those for which we've seen an end_access instruction when walking
+  // backwards from the destroy_addrs.  Add these access scopes to
+  // DeinitBarriers::barrierAccessScopes.
+  //
+  // Tracking which access scopes are open consists of two parts:
+  // (1) in-block analysis
+  // (2) cross-block analysis
+  // For (1), maintain a set of access scopes which are currently open.  Insert
+  // and erase scopes when seeing begin_access and end_access instructions when
+  // they're visited in checkReachableBarrier.  A stack can't be used here
+  // because access scopes are not necessarily nested.
+  // For (2), when entering a block, the access scope is the union of all the
+  // open access scopes in the block's predecessors.
+  class FindBarrierAccessScopes {
+    DeinitBarriers &result;
+    BasicBlockSetVector destroyReachesBeginBlocks;
+    llvm::DenseMap<SILBasicBlock *, llvm::SmallPtrSet<BeginAccessInst *, 2>>
+        liveInAccessScopes;
+    llvm::SmallPtrSet<BeginAccessInst *, 2> runningLiveAccessScopes;
+
+    BackwardReachability<FindBarrierAccessScopes> reachability;
+
+  public:
+    FindBarrierAccessScopes(DeinitBarriers &result)
+        : result(result),
+          destroyReachesBeginBlocks(result.knownUses.getFunction()),
+          reachability(result.knownUses.getFunction(), *this) {
+      // Seed backward reachability with destroy points.
+      for (SILInstruction *destroy : result.knownUses.originalDestroys) {
+        reachability.initLastUse(destroy);
+      }
+    }
+
+    void markLiveAccessScopesAsBarriers() {
+      for (auto *scope : runningLiveAccessScopes) {
+        result.barrierAccessScopes.insert(scope);
+      }
+    }
+
+    bool hasReachableBegin(SILBasicBlock *block) {
+      return destroyReachesBeginBlocks.contains(block);
+    }
+
+    void markReachableBegin(SILBasicBlock *block) {
+      destroyReachesBeginBlocks.insert(block);
+      if (!runningLiveAccessScopes.empty()) {
+        liveInAccessScopes[block] = runningLiveAccessScopes;
+      }
+    }
+
+    void markReachableEnd(SILBasicBlock *block) {
+      runningLiveAccessScopes.clear();
+      for (auto *predecessor : block->getPredecessorBlocks()) {
+        auto iterator = liveInAccessScopes.find(predecessor);
+        if (iterator != liveInAccessScopes.end()) {
+          for (auto *bai : iterator->getSecond()) {
+            runningLiveAccessScopes.insert(bai);
+          }
+        }
+      }
+    }
+
+    bool checkReachableBarrier(SILInstruction *inst) {
+      // For correctness, it is required that
+      // FindBarrierAccessScopes::checkReachableBarrier return true whenever
+      // DestroyReachability::checkReachableBarrier does, with one exception:
+      // DestryReachability::checkReachableBarrier will also return true for any
+      // end_access barrier that FindBarrierAccessScopes finds.
+      if (auto *eai = dyn_cast<EndAccessInst>(inst)) {
+        runningLiveAccessScopes.insert(eai->getBeginAccess());
+      } else if (auto *bai = dyn_cast<BeginAccessInst>(inst)) {
+        runningLiveAccessScopes.erase(bai);
+      }
+      bool isBarrier = result.isBarrier(inst);
+      if (isBarrier) {
+        markLiveAccessScopesAsBarriers();
+      }
+      // If we've seen a barrier, then we can stop looking for access scopes.
+      // Any that were open already have now been marked as barriers.  And if
+      // none are open, the second data flow won't get beyond this barrier to
+      // face subsequent end_access instructions.
+      return isBarrier;
+    }
+
+    bool checkReachablePhiBarrier(SILBasicBlock *block) {
+      bool isBarrier =
+          llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
+            return result.isBarrier(block->getTerminator());
+          });
+      if (isBarrier) {
+        // If there's a barrier preventing us from hoisting out of this block,
+        // then every open access scope contains a barrier, so all the
+        // corresponding end_access instructions are barriers too.
+        markLiveAccessScopesAsBarriers();
+      }
+      return isBarrier;
+    }
+
+    void solveBackward() { reachability.solveBackward(); }
+  };
+
   // Conforms to BackwardReachability::BlockReachability
   class DestroyReachability {
-    const KnownStorageUses &knownUses;
     DeinitBarriers &result;
-    SILInstruction *storageDefInst = nullptr; // null for function args
-
-    enum class Classification { DeadUser, Barrier, Other };
 
     BackwardReachability<DestroyReachability> reachability;
 
   public:
-    DestroyReachability(const KnownStorageUses &knownUses,
-                        DeinitBarriers &result)
-        : knownUses(knownUses), result(result),
-          reachability(knownUses.getFunction(), *this) {
-
-      auto rootValue = knownUses.getStorage().getRoot();
-      assert(rootValue && "HoistDestroys requires a single storage root");
-      storageDefInst = rootValue->getDefiningInstruction();
-
+    DestroyReachability(DeinitBarriers &result)
+        : result(result), reachability(result.knownUses.getFunction(), *this) {
       // Seed backward reachability with destroy points.
-      for (SILInstruction *destroy : knownUses.originalDestroys) {
+      for (SILInstruction *destroy : result.knownUses.originalDestroys) {
         reachability.initLastUse(destroy);
       }
     }
@@ -247,13 +402,6 @@ private:
       result.destroyReachesEndBlocks.insert(block);
     }
 
-    Classification classifyInstruction(SILInstruction *inst);
-
-    bool classificationIsBarrier(Classification classification);
-
-    void visitedInstruction(SILInstruction *instruction,
-                            Classification classification);
-
     bool checkReachableBarrier(SILInstruction *);
 
     bool checkReachablePhiBarrier(SILBasicBlock *);
@@ -262,26 +410,32 @@ private:
   };
 };
 
-DeinitBarriers::DestroyReachability::Classification
-DeinitBarriers::DestroyReachability::classifyInstruction(SILInstruction *inst) {
+DeinitBarriers::Classification DeinitBarriers::classifyInstruction(
+    SILInstruction *inst, bool ignoreDeinitBarriers,
+    SILInstruction *storageDefInst,
+    const llvm::SmallPtrSetImpl<BeginAccessInst *> &barrierAccessScopes,
+    const KnownStorageUses &knownUses) {
   if (knownUses.debugInsts.contains(inst)) {
     return Classification::DeadUser;
   }
   if (inst == storageDefInst) {
-    result.barriers.push_back(inst);
     return Classification::Barrier;
   }
   if (knownUses.storageUsers.contains(inst)) {
     return Classification::Barrier;
   }
-  if (isDeinitBarrier(inst)) {
+  if (!ignoreDeinitBarriers && isDeinitBarrier(inst)) {
     return Classification::Barrier;
+  }
+  if (auto *eai = dyn_cast<EndAccessInst>(inst)) {
+    return barrierAccessScopes.contains(eai->getBeginAccess())
+               ? Classification::Barrier
+               : Classification::Other;
   }
   return Classification::Other;
 }
 
-bool DeinitBarriers::DestroyReachability::classificationIsBarrier(
-    Classification classification) {
+bool DeinitBarriers::classificationIsBarrier(Classification classification) {
   switch (classification) {
   case Classification::DeadUser:
   case Classification::Other:
@@ -292,15 +446,15 @@ bool DeinitBarriers::DestroyReachability::classificationIsBarrier(
   llvm_unreachable("exhaustive switch is not exhaustive?!");
 }
 
-void DeinitBarriers::DestroyReachability::visitedInstruction(
-    SILInstruction *instruction, Classification classification) {
+void DeinitBarriers::visitedInstruction(SILInstruction *instruction,
+                                        Classification classification) {
   assert(classifyInstruction(instruction) == classification);
   switch (classification) {
   case Classification::DeadUser:
-    result.deadUsers.push_back(instruction);
+    deadUsers.push_back(instruction);
     break;
   case Classification::Barrier:
-    result.barriers.push_back(instruction);
+    barriers.push_back(instruction);
     break;
   case Classification::Other:
     break;
@@ -315,9 +469,14 @@ void DeinitBarriers::DestroyReachability::visitedInstruction(
 /// which is a storageUser and therefore a barrier.
 bool DeinitBarriers::DestroyReachability::checkReachableBarrier(
     SILInstruction *instruction) {
-  auto classification = classifyInstruction(instruction);
-  visitedInstruction(instruction, classification);
-  return classificationIsBarrier(classification);
+  // For correctness, it is required that
+  // DestroyReachability::checkReachableBarrier return true whenever
+  // FindBarrierAccessScopes::checkReachableBarrier does.  It must additionally
+  // return true when encountering an end_access barrier that
+  // FindBarrierAccessScope determined is a barrier.
+  auto classification = result.classifyInstruction(instruction);
+  result.visitedInstruction(instruction, classification);
+  return result.classificationIsBarrier(classification);
 }
 
 bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
@@ -325,8 +484,8 @@ bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
   assert(llvm::all_of(block->getArguments(),
                       [&](auto argument) { return PhiValue(argument); }));
   return llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-    return classificationIsBarrier(
-        classifyInstruction(predecessor->getTerminator()));
+    return result.classificationIsBarrier(
+        result.classifyInstruction(predecessor->getTerminator()));
   });
 }
 
@@ -334,6 +493,8 @@ bool DeinitBarriers::DestroyReachability::checkReachablePhiBarrier(
 /// object.
 class HoistDestroys {
   SILValue storageRoot;
+  bool ignoreDeinitBarriers;
+  SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs;
   InstructionDeleter &deleter;
 
   // Book-keeping for the rewriting stage.
@@ -342,16 +503,22 @@ class HoistDestroys {
   BasicBlockSetVector destroyMergeBlocks;
 
 public:
-  HoistDestroys(SILValue storageRoot, InstructionDeleter &deleter)
-    : storageRoot(storageRoot), deleter(deleter),
-      destroyMergeBlocks(getFunction()) {}
+  HoistDestroys(SILValue storageRoot, bool ignoreDeinitBarriers,
+                SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs,
+                InstructionDeleter &deleter)
+      : storageRoot(storageRoot), ignoreDeinitBarriers(ignoreDeinitBarriers),
+        remainingDestroyAddrs(remainingDestroyAddrs), deleter(deleter),
+        destroyMergeBlocks(getFunction()) {}
 
   bool perform();
 
 protected:
   SILFunction *getFunction() const { return storageRoot->getFunction(); }
 
-  bool foldBarrier(SILInstruction *barrier);
+  bool foldBarrier(SILInstruction *barrier, SILValue accessScope);
+
+  bool foldBarrier(SILInstruction *barrier, const KnownStorageUses &knownUses,
+                   const DeinitBarriers &deinitBarriers);
 
   void insertDestroy(SILInstruction *barrier, SILInstruction *insertBefore,
                      const KnownStorageUses &knownUses);
@@ -370,16 +537,17 @@ protected:
 } // namespace
 
 bool HoistDestroys::perform() {
-  auto storage = AccessStorage::compute(storageRoot);
-  if (!storage.isUniquelyIdentified())
+  auto storage = AccessStorage::computeInScope(storageRoot);
+  if (!storage.isUniquelyIdentified() &&
+      storage.getKind() != AccessStorage::Kind::Nested)
     return false;
 
   KnownStorageUses knownUses(storage, getFunction());
   if (!knownUses.findUses())
     return false;
 
-  DeinitBarriers deinitBarriers(getFunction());
-  deinitBarriers.compute(knownUses);
+  DeinitBarriers deinitBarriers(ignoreDeinitBarriers, knownUses, getFunction());
+  deinitBarriers.compute();
 
   // No SIL changes happen before rewriting.
   return rewriteDestroys(knownUses, deinitBarriers);
@@ -391,7 +559,7 @@ bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
   for (SILInstruction *barrier : deinitBarriers.barriers) {
     auto *barrierBlock = barrier->getParent();
     if (barrier != barrierBlock->getTerminator()) {
-      if (!foldBarrier(barrier))
+      if (!foldBarrier(barrier, knownUses, deinitBarriers))
         insertDestroy(barrier, barrier->getNextInstruction(), knownUses);
       continue;
     }
@@ -428,6 +596,7 @@ bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
     if (reusedDestroys.contains(destroyInst))
       continue;
 
+    remainingDestroyAddrs.erase(destroyInst);
     deleter.forceDelete(destroyInst);
   }
   deleter.cleanupDeadInstructions();
@@ -438,9 +607,10 @@ bool HoistDestroys::rewriteDestroys(const KnownStorageUses &knownUses,
   return deleter.hadCallbackInvocation();
 }
 
-bool HoistDestroys::foldBarrier(SILInstruction *barrier) {
+bool HoistDestroys::foldBarrier(SILInstruction *barrier, SILValue storageRoot) {
   if (auto *load = dyn_cast<LoadInst>(barrier)) {
-    if (load->getOperand() == storageRoot) {
+    if (stripAccessMarkers(load->getOperand()) ==
+        stripAccessMarkers(storageRoot)) {
       if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
         load->setOwnershipQualifier(LoadOwnershipQualifier::Take);
         return true;
@@ -451,13 +621,30 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier) {
     }
   }
   if (auto *copy = dyn_cast<CopyAddrInst>(barrier)) {
-    if (copy->getSrc() == storageRoot) {
+    if (stripAccessMarkers(copy->getSrc()) == stripAccessMarkers(storageRoot)) {
       assert(!copy->isTakeOfSrc());
       copy->setIsTakeOfSrc(IsTake);
       return true;
     }
   }
   return false;
+}
+
+bool HoistDestroys::foldBarrier(SILInstruction *barrier,
+                                const KnownStorageUses &knownUses,
+                                const DeinitBarriers &deinitBarriers) {
+  if (auto *eai = dyn_cast<EndAccessInst>(barrier)) {
+    SILInstruction *instruction = eai;
+    while ((instruction = instruction->getPreviousInstruction())) {
+      if (instruction == eai->getBeginAccess())
+        return false;
+      if (foldBarrier(instruction, storageRoot))
+        return true;
+      if (deinitBarriers.isBarrier(instruction))
+        return false;
+    }
+  }
+  return foldBarrier(barrier, storageRoot);
 }
 
 // \p barrier may be null if the destroy is at function entry.
@@ -514,6 +701,7 @@ void HoistDestroys::mergeDestroys(SILBasicBlock *mergeBlock) {
   createDestroy(&mergeBlock->front(), deadDestroys[0]->getDebugScope());
 
   for (auto *deadDestroy : deadDestroys) {
+    remainingDestroyAddrs.erase(deadDestroy);
     deleter.forceDelete(deadDestroy);
   }
 }
@@ -522,7 +710,9 @@ void HoistDestroys::mergeDestroys(SILBasicBlock *mergeBlock) {
 // Top-Level API
 // =============================================================================
 
-bool hoistDestroys(SILValue root, InstructionDeleter &deleter) {
+bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
+                   SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs,
+                   InstructionDeleter &deleter) {
   LLVM_DEBUG(llvm::dbgs() << "Performing destroy hoisting on " << root);
 
   SILFunction *function = root->getFunction();
@@ -532,7 +722,9 @@ bool hoistDestroys(SILValue root, InstructionDeleter &deleter) {
   // The algorithm assumes no critical edges.
   assert(function->hasOwnership() && "requires OSSA");
 
-  return HoistDestroys(root, deleter).perform();
+  return HoistDestroys(root, ignoreDeinitBarriers, remainingDestroyAddrs,
+                       deleter)
+      .perform();
 }
 
 // =============================================================================
@@ -554,18 +746,106 @@ void SSADestroyHoisting::run() {
 
   InstructionDeleter deleter;
   bool changed = false;
-  for (auto *arg : getFunction()->getArguments()) {
-    if (arg->getType().isAddress()) {
-      changed |= hoistDestroys(arg, deleter);
-    }
-  }
+
+  llvm::SmallVector<AllocStackInst *, 4> asis;
+  llvm::SmallVector<BeginAccessInst *, 4> bais;
+  llvm::SmallVector<StoreInst *, 4> sis;
+
+  // Collect the instructions that we'll be transforming.
   for (auto &block : *getFunction()) {
     for (auto &inst : block) {
-      if (auto *alloc = dyn_cast<AllocStackInst>(&inst)) {
-        changed |= hoistDestroys(alloc, deleter);
+      if (auto *asi = dyn_cast<AllocStackInst>(&inst)) {
+        asis.push_back(asi);
+      } else if (auto *bai = dyn_cast<BeginAccessInst>(&inst)) {
+        if (bai->getAccessKind() == SILAccessKind::Modify) {
+          bais.push_back(bai);
+        }
+      } else if (auto *si = dyn_cast<StoreInst>(&inst)) {
+        if (si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign) {
+          sis.push_back(si);
+        }
       }
     }
   }
+
+  // Before hoisting, expand all
+  //
+  //     store [assign]
+  //
+  // instructions into
+  //
+  //     destroy_addr
+  //     store [init]
+  //
+  // sequences to create more destroy_addrs to hoist.
+  //
+  // Record the newly created destroy_addrs and the stores they were split off
+  // of.  After hoisting, if they have not been hoisted away from the store
+  // instruction, we will merge them back together.
+  llvm::SmallVector<std::pair<DestroyAddrInst *, StoreInst *>, 8>
+      splitDestroysAndStores;
+  // The destroy_addrs that were created that have not been deleted.  Items are
+  // erased from the set as the destroy_addrs are deleted.
+  SmallPtrSet<SILInstruction *, 8> remainingDestroyAddrs;
+  // The number of destroys that were split off of store [init]s and not
+  // recombined.
+  int splitDestroys = 0;
+  for (auto *si : sis) {
+    auto builder = SILBuilderWithScope(si);
+    auto *dai = builder.createDestroyAddr(
+        RegularLocation::getAutoGeneratedLocation(si->getLoc()),
+        si->getOperand(1));
+    si->setOwnershipQualifier(StoreOwnershipQualifier::Init);
+    splitDestroysAndStores.push_back({dai, si});
+    remainingDestroyAddrs.insert(dai);
+    ++splitDestroys;
+  }
+
+  // We assume that the function is in reverse post order so visiting the
+  // blocks and pushing begin_access as we see them and then popping them off
+  // the end will result in hoisting inner begin_access' destroy_addrs first.
+  while (!bais.empty()) {
+    auto *bai = bais.pop_back_val();
+    changed |= hoistDestroys(bai, /*ignoreDeinitBarriers=*/true,
+                             remainingDestroyAddrs, deleter);
+  }
+  // Alloc stacks always enclose their accesses.
+  for (auto *asi : asis) {
+    changed |= hoistDestroys(asi, /*ignoreDeinitBarriers=*/false,
+                             remainingDestroyAddrs, deleter);
+  }
+  // Arguments enclose everything.
+  for (auto *arg : getFunction()->getArguments()) {
+    if (arg->getType().isAddress()) {
+      bool isInout = cast<SILFunctionArgument>(arg)
+                         ->getArgumentConvention()
+                         .isInoutConvention();
+      changed |= hoistDestroys(arg, /*ignoreDeinitBarriers=*/
+                               isInout, remainingDestroyAddrs, deleter);
+    }
+  }
+
+  for (auto pair : splitDestroysAndStores) {
+    auto *dai = pair.first;
+    if (!remainingDestroyAddrs.contains(dai))
+      continue;
+    auto *si = pair.second;
+    if (dai->getNextInstruction() == si) {
+      // No stores should have been rewritten during hoisting.  Their ownership
+      // qualifiers were set to [init] when splitting off the destroy_addrs.
+      assert(si->getOwnershipQualifier() == StoreOwnershipQualifier::Init);
+      // If a newly created destroy_addr has not been hoisted from its previous
+      // location, combine it back together with the store [init] which it was
+      // split off from.
+      deleter.forceDelete(dai);
+      si->setOwnershipQualifier(StoreOwnershipQualifier::Assign);
+      --splitDestroys;
+    }
+  }
+  // If there were any destroy_addrs split off of stores and not recombined
+  // with them, then the function has changed.
+  changed |= splitDestroys > 0;
+
   if (changed) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
