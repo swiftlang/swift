@@ -5688,21 +5688,26 @@ public:
   Expected<Type> deserializeParameterizedProtocolType(ArrayRef<uint64_t> scratch,
                                                       StringRef blobData) {
 
-    uint64_t baseTyID, argTyID;
+    uint64_t baseTyID;
+    ArrayRef<uint64_t> rawArgIDs;
 
     decls_block::ParameterizedProtocolTypeLayout::readRecord(scratch,
-                                                             baseTyID, argTyID);
+                                                             baseTyID, rawArgIDs);
 
     auto baseTy = MF.getTypeChecked(baseTyID);
     if (!baseTy)
       return baseTy.takeError();
 
-    auto argTy = MF.getTypeChecked(argTyID);
-    if (!argTy)
-      return argTy.takeError();
+    SmallVector<Type, 4> args;
+    for (TypeID argID : rawArgIDs) {
+      auto argTy = MF.getTypeChecked(argID);
+      if (!argTy)
+        return argTy.takeError();
+      args.push_back(argTy.get());
+    }
 
     return ParameterizedProtocolType::get(
-        ctx, (*baseTy)->castTo<ProtocolType>(), *argTy);
+        ctx, (*baseTy)->castTo<ProtocolType>(), args);
   }
 
   Expected<Type> deserializeExistentialType(ArrayRef<uint64_t> scratch,

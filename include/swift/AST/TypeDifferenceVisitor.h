@@ -344,8 +344,8 @@ public:
     if (asImpl().visit(type1.getBaseType(), type2.getBaseType()))
       return true;
 
-    return asImpl().visit(type1.getArgumentType(),
-                          type2.getArgumentType());
+    return visitComponentArray(type1, type2,
+                               type1->getArgs(), type2->getArgs());
   }
 
   bool visitExistentialType(CanExistentialType type1,

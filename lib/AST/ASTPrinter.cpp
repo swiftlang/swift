@@ -6105,7 +6105,8 @@ public:
   void visitParameterizedProtocolType(ParameterizedProtocolType *T) {
     visit(T->getBaseType());
     Printer << "<";
-    visit(T->getArgumentType());
+    interleave(T->getArgs(), [&](Type Ty) { visit(Ty); },
+               [&] { Printer << ", "; });
     Printer << ">";
   }
 
