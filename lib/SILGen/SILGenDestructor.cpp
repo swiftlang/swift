@@ -222,14 +222,14 @@ void SILGenFunction::destroyClassMember(SILLocation cleanupLoc,
 
 llvm::SmallSetVector<VarDecl *, 4> findRecursiveLinks(DeclContext *DC,
                                                       ClassDecl *cd) {
-  auto SelfTy = DC->mapTypeIntoContext(cd->getDeclaredType());
+  auto SelfTy = DC->mapTypeIntoContext(cd->getDeclaredInterfaceType());
 
   // Collect all stored properties that would form a recursive structure,
   // so we can remove the recursion and prevent the call stack from
   // overflowing.
   llvm::SmallSetVector<VarDecl *, 4> recursiveLinks;
   for (VarDecl *vd : cd->getStoredProperties()) {
-    auto Ty = vd->getType()->getOptionalObjectType();
+    auto Ty = vd->getInterfaceType()->getOptionalObjectType();
     if (Ty && Ty->getCanonicalType() == SelfTy->getCanonicalType()) {
       recursiveLinks.insert(vd);
     }
@@ -237,7 +237,7 @@ llvm::SmallSetVector<VarDecl *, 4> findRecursiveLinks(DeclContext *DC,
 
   // NOTE: Right now we only optimize linear recursion, so if there is more than
   // one link, clear out the set and don't perform any recursion optimization.
-  if (recursiveLinks.size() < 1) {
+  if (recursiveLinks.size() > 1) {
     recursiveLinks.clear();
   }
 
@@ -247,7 +247,7 @@ llvm::SmallSetVector<VarDecl *, 4> findRecursiveLinks(DeclContext *DC,
 void SILGenFunction::emitRecursiveChainDestruction(
     ManagedValue selfValue, ClassDecl *cd,
     SmallSetVector<VarDecl *, 4> recursiveLinks, CleanupLocation cleanupLoc) {
-  auto SelfTy = F.mapTypeIntoContext(cd->getDeclaredType());
+  auto SelfTy = F.mapTypeIntoContext(cd->getDeclaredInterfaceType());
 
   assert(recursiveLinks.size() <= 1 && "Only linear recursion supported.");
 
@@ -262,7 +262,7 @@ void SILGenFunction::emitRecursiveChainDestruction(
 
     // var iter = self.link
     // self.link = nil
-    auto Ty = getTypeLowering(vd->getType()).getLoweredType();
+    auto Ty = getTypeLowering(vd->getInterfaceType()).getLoweredType();
     auto optionalNone = B.createOptionalNone(cleanupLoc, Ty);
     SILValue varAddr = B.createRefElementAddr(cleanupLoc, selfValue.getValue(),
                                               vd, Ty.getAddressType());
