@@ -1609,7 +1609,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   return requirementInfo.isContainedIn(witnessInfo);
 }
 
-// Returns 'nullptr' if this is the setter's 'newValue' parameter;
+// Returns 'nullptr' if this is the 'newValue' or 'oldValue' parameter;
 // otherwise, returns the corresponding parameter of the subscript
 // declaration.
 static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
@@ -1621,11 +1621,9 @@ static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
   switch (accessor->getAccessorKind()) {
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
-      return nullptr;
-
   case AccessorKind::Set:
     if (param == accessorParams->get(0)) {
-      // This is the 'newValue' parameter.
+      // This is the 'newValue' or 'oldValue' parameter.
       return nullptr;
     }
 
