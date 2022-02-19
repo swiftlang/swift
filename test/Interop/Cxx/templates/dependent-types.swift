@@ -38,6 +38,13 @@ DependentTypesTestSuite.test("Multiple dependent arguments (not inferred).") {
   expectEqual(m.getValue(), 42)
 }
 
+DependentTypesTestSuite.test("Takes inout argument and returns dependent type.") {
+  var x = 42
+  let m = refToDependent(&x) as! M<Int>
+  expectEqual(m.getValue(), 42)
+}
+
+
 // We still have some problems calling methods on Windows: SR-13129 and rdar://88391102
 #if !os(Windows)
 DependentTypesTestSuite.test("Function template methods") {
