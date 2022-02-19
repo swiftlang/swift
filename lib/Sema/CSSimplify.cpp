@@ -1632,17 +1632,24 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     if (parameterBindings[paramIdx].empty()) {
       auto &ctx = cs.getASTContext();
 
-      if (paramTy->hasTypeVariable() &&
-          ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments) {
+      if (ctx.TypeCheckerOpts.EnableTypeInferenceFromDefaultArguments) {
         auto *paramList = getParameterList(callee);
-        auto defaultExprType = paramList->get(paramIdx)->getTypeOfDefaultExpr();
+        auto *PD = paramList->get(paramIdx);
+
+        // There is nothing to infer if parameter doesn't have any
+        // generic parameters in its type.
+        if (!PD->getInterfaceType()->hasTypeParameter())
+          continue;
+
+        auto defaultExprType = PD->getTypeOfDefaultExpr();
 
         // A caller side default.
         if (!defaultExprType || defaultExprType->hasError())
           continue;
 
-        // If this is just a regular default type that works
-        // for any generic parameter type, let's continue.
+        // If this is just a regular default type that should
+        // work for all substitutions of generic parameter,
+        // let's continue.
         if (defaultExprType->hasArchetype())
           continue;
 
