@@ -514,6 +514,14 @@ def enable_parameterized_protocol_types :
   Flag<["-"], "enable-parameterized-protocol-types">,
   HelpText<"Enable experimental support for primary associated types and parameterized protocols">;
 
+def enable_experimental_opened_existential_types :
+  Flag<["-"], "enable-experimental-opened-existential-types">,
+  HelpText<"Enable experimental support for implicitly opened existentials">;
+
+def disable_experimental_opened_existential_types :
+  Flag<["-"], "disble-experimental-opened-existential-types">,
+  HelpText<"Disable experimental support for implicitly opened existentials">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;

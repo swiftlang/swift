@@ -2159,9 +2159,9 @@ public:
 class OpaqueTypeDecl;
 
 /// Describes the least favorable positions at which a requirement refers
-/// to 'Self' in terms of variance, for use in the is-inheritable and
-/// is-available-existential checks.
-class SelfReferenceInfo final {
+/// to a given generic parameter in terms of variance, for use in the
+/// is-inheritable and is-available-existential checks.
+class GenericParameterReferenceInfo final {
   using OptionalTypePosition = OptionalEnum<decltype(TypePosition::Covariant)>;
 
 public:
@@ -2171,27 +2171,27 @@ public:
   OptionalTypePosition assocTypeRef;
 
   /// A reference to 'Self'.
-  static SelfReferenceInfo forSelfRef(TypePosition position) {
-    return SelfReferenceInfo(false, position, llvm::None);
+  static GenericParameterReferenceInfo forSelfRef(TypePosition position) {
+    return GenericParameterReferenceInfo(false, position, llvm::None);
   }
 
   /// A reference to 'Self' through an associated type.
-  static SelfReferenceInfo forAssocTypeRef(TypePosition position) {
-    return SelfReferenceInfo(false, llvm::None, position);
+  static GenericParameterReferenceInfo forAssocTypeRef(TypePosition position) {
+    return GenericParameterReferenceInfo(false, llvm::None, position);
   }
 
-  SelfReferenceInfo &operator|=(const SelfReferenceInfo &other);
+  GenericParameterReferenceInfo &operator|=(const GenericParameterReferenceInfo &other);
 
   explicit operator bool() const {
     return hasCovariantSelfResult || selfRef || assocTypeRef;
   }
 
-  SelfReferenceInfo()
+  GenericParameterReferenceInfo()
       : hasCovariantSelfResult(false), selfRef(llvm::None),
         assocTypeRef(llvm::None) {}
 
 private:
-  SelfReferenceInfo(bool hasCovariantSelfResult, OptionalTypePosition selfRef,
+  GenericParameterReferenceInfo(bool hasCovariantSelfResult, OptionalTypePosition selfRef,
                     OptionalTypePosition assocTypeRef)
       : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
         assocTypeRef(assocTypeRef) {}
@@ -2682,7 +2682,7 @@ public:
   /// is considered covariant only when it appears as the immediate type of a
   /// property, or the uncurried result type of a method/subscript, e.g.
   /// '() -> () -> Self'.
-  SelfReferenceInfo findExistentialSelfReferences(
+  GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
 };
 
@@ -7799,6 +7799,14 @@ public:
     return D->getKind() == DeclKind::MissingMember;
   }
 };
+
+/// Find references to the given generic paramaeter in the generic signature
+/// and the type of the given value.
+GenericParameterReferenceInfo findGenericParameterReferences(
+    const ValueDecl *value,
+    CanGenericSignature sig, GenericTypeParamType *genericParam,
+    bool treatNonResultCovarianceAsInvariant,
+    Optional<unsigned> skipParamIndex);
 
 inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
                                             const DeclRefExpr *base) const {

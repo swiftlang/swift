@@ -99,10 +99,10 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
         /*type sequence*/ false, /*depth*/ 0, /*index*/ i, ctx);
     params.push_back(param);
 
-    const auto constraintTy = openedTypes[i]
-                                  ->getExistentialType()
-                                  ->castTo<ExistentialType>()
-                                  ->getConstraintType();
+    Type constraintTy = openedTypes[i]->getExistentialType();
+    if (auto existentialTy = constraintTy->getAs<ExistentialType>())
+      constraintTy = existentialTy->getConstraintType();
+
     requirements.emplace_back(RequirementKind::Conformance, param,
                               constraintTy);
   }

@@ -3353,6 +3353,11 @@ public:
   ConstraintLocator *getOpenOpaqueLocator(
       ConstraintLocatorBuilder locator, OpaqueTypeDecl *opaqueDecl);
 
+  /// Open the given existential type, recording the opened type in the
+  /// constraint system and returning both it and the root opened archetype.
+  std::pair<Type, OpenedArchetypeType *> openExistentialType(
+      Type type, ConstraintLocator *locator);
+
   /// Retrive the constraint locator for the given anchor and
   /// path, uniqued and automatically infer the summary flags
   ConstraintLocator *
@@ -5506,19 +5511,15 @@ matchCallArguments(
     MatchCallArgumentListener &listener,
     Optional<TrailingClosureMatching> trailingClosureMatching);
 
-ConstraintSystem::TypeMatchResult
-matchCallArguments(ConstraintSystem &cs,
-                   FunctionType *contextualType,
-                   ArgumentList *argumentList,
-                   ArrayRef<AnyFunctionType::Param> args,
-                   ArrayRef<AnyFunctionType::Param> params,
-                   ConstraintKind subKind,
-                   ConstraintLocatorBuilder locator,
-                   Optional<TrailingClosureMatching> trailingClosureMatching);
-
 /// Given an expression that is the target of argument labels (for a call,
 /// subscript, etc.), find the underlying target expression.
 Expr *getArgumentLabelTargetExpr(Expr *fn);
+
+/// Given a type that includes an existential type that has been opened to
+/// the given type variable, type-erase occurences of that opened type
+/// variable and anything that depends on it to their non-dependent bounds.
+Type typeEraseOpenedExistentialReference(Type type, Type existentialBaseType,
+                                         TypeVariableType *openedTypeVar);
 
 /// Returns true if a reference to a member on a given base type will apply
 /// its curried self parameter, assuming it has one.

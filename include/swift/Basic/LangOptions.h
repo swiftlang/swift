@@ -313,6 +313,10 @@ namespace swift {
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;
 
+    /// Enable support for implicitly opening existential argument types
+    /// in calls to generic functions.
+    bool EnableOpenedExistentialTypes = false;
+
     /// Enable support for protocol types parameterized by primary
     /// associated type.
     bool EnableParameterizedProtocolTypes = false;

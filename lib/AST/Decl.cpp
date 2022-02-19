@@ -3800,8 +3800,8 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
   }
 }
 
-SelfReferenceInfo &
-SelfReferenceInfo::operator|=(const SelfReferenceInfo &other) {
+GenericParameterReferenceInfo &
+GenericParameterReferenceInfo::operator|=(const GenericParameterReferenceInfo &other) {
   hasCovariantSelfResult |= other.hasCovariantSelfResult;
   if (other.selfRef > selfRef) {
     selfRef = other.selfRef;
@@ -3812,23 +3812,25 @@ SelfReferenceInfo::operator|=(const SelfReferenceInfo &other) {
   return *this;
 }
 
-/// Report references to 'Self' within the given type using the given
-/// existential generic signature.
+/// Report references to the given generic parameter within the given type
+/// using the given existential generic signature.
 ///
 /// \param position The current position in terms of variance.
-static SelfReferenceInfo
-findExistentialSelfReferences(CanGenericSignature existentialSig, Type type,
-                              TypePosition position) {
+static GenericParameterReferenceInfo
+findGenericParameterReferences(CanGenericSignature existentialSig,
+                               GenericTypeParamType *genericParam,
+                               Type type,
+                               TypePosition position) {
   // If there are no type parameters, we're done.
   if (!type->hasTypeParameter())
-    return SelfReferenceInfo();
+    return GenericParameterReferenceInfo();
 
   // Tuples preserve variance.
   if (auto tuple = type->getAs<TupleType>()) {
-    auto info = SelfReferenceInfo();
+    auto info = GenericParameterReferenceInfo();
     for (auto &elt : tuple->getElements()) {
-      info |= findExistentialSelfReferences(existentialSig, elt.getType(),
-                                            position);
+      info |= findGenericParameterReferences(existentialSig, genericParam,
+                                            elt.getType(), position);
     }
 
     // A covariant Self result inside a tuple will not be bona fide.
@@ -3840,23 +3842,25 @@ findExistentialSelfReferences(CanGenericSignature existentialSig, Type type,
   // Function types preserve variance in the result type, and flip variance in
   // the parameter type.
   if (auto funcTy = type->getAs<AnyFunctionType>()) {
-    auto inputInfo = SelfReferenceInfo();
+    auto inputInfo = GenericParameterReferenceInfo();
     for (auto param : funcTy->getParams()) {
       // inout parameters are invariant.
       if (param.isInOut()) {
-        inputInfo |= findExistentialSelfReferences(
-            existentialSig, param.getPlainType(), TypePosition::Invariant);
+        inputInfo |= findGenericParameterReferences(
+            existentialSig, genericParam, param.getPlainType(),
+            TypePosition::Invariant);
         continue;
       }
-      inputInfo |= findExistentialSelfReferences(
-          existentialSig, param.getParameterType(), position.flipped());
+      inputInfo |= findGenericParameterReferences(
+          existentialSig, genericParam, param.getParameterType(),
+          position.flipped());
     }
 
     // A covariant Self result inside a parameter will not be bona fide.
     inputInfo.hasCovariantSelfResult = false;
 
-    auto resultInfo = findExistentialSelfReferences(
-        existentialSig, funcTy->getResult(), position);
+    auto resultInfo = findGenericParameterReferences(
+        existentialSig, genericParam, funcTy->getResult(), position);
     if (resultInfo.selfRef == TypePosition::Covariant) {
       resultInfo.hasCovariantSelfResult = true;
     }
@@ -3865,48 +3869,52 @@ findExistentialSelfReferences(CanGenericSignature existentialSig, Type type,
 
   // Metatypes preserve variance.
   if (auto metaTy = type->getAs<MetatypeType>()) {
-    return findExistentialSelfReferences(existentialSig,
+    return findGenericParameterReferences(existentialSig, genericParam,
                                          metaTy->getInstanceType(), position);
   }
 
   // Optionals preserve variance.
   if (auto optType = type->getOptionalObjectType()) {
-    return findExistentialSelfReferences(existentialSig, optType, position);
+    return findGenericParameterReferences(
+        existentialSig, genericParam, optType, position);
   }
 
   // DynamicSelfType preserves variance.
   // FIXME: This shouldn't ever appear in protocol requirement
   // signatures.
   if (auto selfType = type->getAs<DynamicSelfType>()) {
-    return findExistentialSelfReferences(existentialSig,
+    return findGenericParameterReferences(existentialSig, genericParam,
                                          selfType->getSelfType(), position);
   }
 
   if (auto *const nominal = type->getAs<NominalOrBoundGenericNominalType>()) {
-    auto info = SelfReferenceInfo();
+    auto info = GenericParameterReferenceInfo();
 
     // Don't forget to look in the parent.
     if (const auto parent = nominal->getParent()) {
-      info |= findExistentialSelfReferences(existentialSig, parent, position);
+      info |= findGenericParameterReferences(
+          existentialSig, genericParam, parent, position);
     }
 
     // Most bound generic types are invariant.
     if (auto *const bgt = type->getAs<BoundGenericType>()) {
       if (bgt->isArray()) {
         // Swift.Array preserves variance in its 'Value' type.
-        info |= findExistentialSelfReferences(
-            existentialSig, bgt->getGenericArgs().front(), position);
+        info |= findGenericParameterReferences(
+            existentialSig, genericParam, bgt->getGenericArgs().front(),
+            position);
       } else if (bgt->isDictionary()) {
         // Swift.Dictionary preserves variance in its 'Element' type.
-        info |= findExistentialSelfReferences(existentialSig,
+        info |= findGenericParameterReferences(existentialSig, genericParam,
                                               bgt->getGenericArgs().front(),
                                               TypePosition::Invariant);
-        info |= findExistentialSelfReferences(
-            existentialSig, bgt->getGenericArgs().back(), position);
+        info |= findGenericParameterReferences(
+            existentialSig, genericParam, bgt->getGenericArgs().back(),
+            position);
       } else {
         for (auto paramType : bgt->getGenericArgs()) {
-          info |= findExistentialSelfReferences(existentialSig, paramType,
-                                                TypePosition::Invariant);
+          info |= findGenericParameterReferences(
+              existentialSig, genericParam, paramType, TypePosition::Invariant);
         }
       }
     }
@@ -3914,10 +3922,34 @@ findExistentialSelfReferences(CanGenericSignature existentialSig, Type type,
     return info;
   }
 
-  // Opaque result types of protocol extension members contain an invariant
-  // reference to 'Self'.
-  if (type->is<OpaqueTypeArchetypeType>())
-    return SelfReferenceInfo::forSelfRef(TypePosition::Invariant);
+  // If the signature of an opaque result type has a same-type constraint
+  // that refereces Self, it's invariant.
+  if (auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
+    auto info = GenericParameterReferenceInfo();
+    auto opaqueSig = opaque->getDecl()->getOpaqueInterfaceGenericSignature();
+    for (const auto &req : opaqueSig.getRequirements()) {
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+      case RequirementKind::Layout:
+        continue;
+
+      case RequirementKind::SameType:
+        info |= findGenericParameterReferences(
+            existentialSig, genericParam, req.getFirstType(),
+            TypePosition::Invariant);
+
+        LLVM_FALLTHROUGH;
+
+      case RequirementKind::Superclass:
+        info |= findGenericParameterReferences(
+            existentialSig, genericParam, req.getSecondType(),
+            TypePosition::Invariant);
+        break;
+      }
+    }
+
+    return info;
+  }
 
   // Protocol compositions preserve variance.
   if (auto *existential = type->getAs<ExistentialType>())
@@ -3926,72 +3958,81 @@ findExistentialSelfReferences(CanGenericSignature existentialSig, Type type,
     // 'Self' may be referenced only in an explicit superclass component.
     for (const auto member : comp->getMembers()) {
       if (member->getClassOrBoundGenericClass()) {
-        return findExistentialSelfReferences(existentialSig, member, position);
+        return findGenericParameterReferences(
+            existentialSig, genericParam, member, position);
       }
     }
 
-    return SelfReferenceInfo();
+    return GenericParameterReferenceInfo();
   }
 
   if (!type->isTypeParameter()) {
-    return SelfReferenceInfo();
+    return GenericParameterReferenceInfo();
   }
 
-  const auto selfTy = existentialSig.getGenericParams().front();
+  Type selfTy(genericParam);
   if (!type->getRootGenericParam()->isEqual(selfTy)) {
-    return SelfReferenceInfo();
+    return GenericParameterReferenceInfo();
   }
 
   // A direct reference to 'Self'.
   if (selfTy->isEqual(type)) {
-    return SelfReferenceInfo::forSelfRef(position);
+    return GenericParameterReferenceInfo::forSelfRef(position);
   }
 
   // If the type parameter is beyond the domain of the existential generic
   // signature, ignore it.
   if (!existentialSig->isValidTypeInContext(type)) {
-    return SelfReferenceInfo();
+    return GenericParameterReferenceInfo();
   }
 
   if (const auto concreteTy = existentialSig->getConcreteType(type)) {
-    return findExistentialSelfReferences(existentialSig, concreteTy, position);
+    return findGenericParameterReferences(
+        existentialSig, genericParam, concreteTy, position);
   }
 
   // A reference to an associated type rooted on 'Self'.
-  return SelfReferenceInfo::forAssocTypeRef(position);
+  return GenericParameterReferenceInfo::forAssocTypeRef(position);
 }
 
-SelfReferenceInfo ValueDecl::findExistentialSelfReferences(
-    Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const {
-  assert(baseTy->isExistentialType());
+GenericParameterReferenceInfo swift::findGenericParameterReferences(
+    const ValueDecl *value, CanGenericSignature sig,
+    GenericTypeParamType *genericParam,
+    bool treatNonResultCovarianceAsInvariant,
+    Optional<unsigned> skipParamIndex)  {
 
   // Types never refer to 'Self'.
-  if (isa<TypeDecl>(this))
-    return SelfReferenceInfo();
+  if (isa<TypeDecl>(value))
+    return GenericParameterReferenceInfo();
 
-  auto type = getInterfaceType();
+  auto type = value->getInterfaceType();
 
   // Skip invalid declarations.
   if (type->hasError())
-    return SelfReferenceInfo();
+    return GenericParameterReferenceInfo();
 
-  const auto sig = getASTContext().getOpenedArchetypeSignature(baseTy);
-
-  if (isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this)) {
+  if (isa<AbstractFunctionDecl>(value) || isa<SubscriptDecl>(value)) {
     // For a method, skip the 'self' parameter.
-    if (isa<AbstractFunctionDecl>(this))
+    if (value->hasCurriedSelf())
       type = type->castTo<AnyFunctionType>()->getResult();
 
-    auto inputInfo = SelfReferenceInfo();
-    for (auto param : type->castTo<AnyFunctionType>()->getParams()) {
+    auto inputInfo = GenericParameterReferenceInfo();
+    auto params = type->castTo<AnyFunctionType>()->getParams();
+    for (auto paramIdx : indices(params)) {
+      // If this is the parameter we were supposed to skip, do so.
+      if (skipParamIndex && paramIdx == *skipParamIndex)
+        continue;
+
+      const auto &param = params[paramIdx];
       // inout parameters are invariant.
       if (param.isInOut()) {
-        inputInfo |= ::findExistentialSelfReferences(sig, param.getPlainType(),
-                                                     TypePosition::Invariant);
+        inputInfo |= ::findGenericParameterReferences(
+            sig, genericParam, param.getPlainType(), TypePosition::Invariant);
         continue;
       }
-      inputInfo |= ::findExistentialSelfReferences(
-          sig, param.getParameterType(), TypePosition::Contravariant);
+      inputInfo |= ::findGenericParameterReferences(
+          sig, genericParam, param.getParameterType(),
+          TypePosition::Contravariant);
     }
 
     // A covariant Self result inside a parameter will not be bona fide.
@@ -4003,13 +4044,13 @@ SelfReferenceInfo ValueDecl::findExistentialSelfReferences(
     //
     // Methods of non-final classes can only contain a covariant 'Self'
     // as their result type.
-    if (treatNonResultCovariantSelfAsInvariant &&
+    if (treatNonResultCovarianceAsInvariant &&
         inputInfo.selfRef == TypePosition::Covariant) {
       inputInfo.selfRef = TypePosition::Invariant;
     }
 
-    auto resultInfo = ::findExistentialSelfReferences(
-        sig, type->castTo<AnyFunctionType>()->getResult(),
+    auto resultInfo = ::findGenericParameterReferences(
+        sig, genericParam, type->castTo<AnyFunctionType>()->getResult(),
         TypePosition::Covariant);
     if (resultInfo.selfRef == TypePosition::Covariant) {
       resultInfo.hasCovariantSelfResult = true;
@@ -4017,10 +4058,10 @@ SelfReferenceInfo ValueDecl::findExistentialSelfReferences(
 
     return inputInfo |= resultInfo;
   } else {
-    assert(isa<VarDecl>(this));
+    assert(isa<VarDecl>(value));
 
-    auto info =
-        ::findExistentialSelfReferences(sig, type, TypePosition::Covariant);
+    auto info = ::findGenericParameterReferences(
+        sig, genericParam, type, TypePosition::Covariant);
     if (info.selfRef == TypePosition::Covariant) {
       info.hasCovariantSelfResult = true;
     }
@@ -4028,7 +4069,27 @@ SelfReferenceInfo ValueDecl::findExistentialSelfReferences(
     return info;
   }
 
-  return SelfReferenceInfo();
+  return GenericParameterReferenceInfo();
+}
+
+GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
+    Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const {
+  assert(baseTy->isExistentialType());
+
+  // Types never refer to 'Self'.
+  if (isa<TypeDecl>(this))
+    return GenericParameterReferenceInfo();
+
+  auto type = getInterfaceType();
+
+  // Skip invalid declarations.
+  if (type->hasError())
+    return GenericParameterReferenceInfo();
+
+  const auto sig = getASTContext().getOpenedArchetypeSignature(baseTy);
+  auto genericParam = sig.getGenericParams().front();
+  return findGenericParameterReferences(
+      this, sig, genericParam, treatNonResultCovariantSelfAsInvariant, None);
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
