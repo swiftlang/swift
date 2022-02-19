@@ -39,4 +39,10 @@ TemplateNotInSignatureTestSuite.test("Member function templates (static)") {
   Struct.templateTypeParamNotUsedInSignatureStatic(T: Int.self)
 }
 
+TemplateNotInSignatureTestSuite.test("Type not used in signature and takes an inout parameter.") {
+  var x = 42
+  let out = templateTypeParamNotUsedInSignatureWithRef(&x, U: Int.self)
+  expectEqual(out, 42)
+}
+
 runAllTests()

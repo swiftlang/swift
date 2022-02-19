@@ -34,6 +34,9 @@ template <typename T>
 T templateTypeParamUsedInReferenceParam(T &t) { return t; }
 
 template <typename T, typename U>
+T templateTypeParamNotUsedInSignatureWithRef(T &t) { return t; }
+
+template <typename T, typename U>
 void templateTypeParamNotUsedInSignatureWithVarargs(...) {}
 
 template <typename T, typename U, typename V>
