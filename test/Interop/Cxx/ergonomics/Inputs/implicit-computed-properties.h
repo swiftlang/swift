@@ -57,4 +57,9 @@ struct IntGetterSetter {
     void setX(int) {}
 };
 
+struct UTF8Str  {
+    int getUTF8Str() { return 42; }
+    void setUTF8Str(int) {}
+};
+
 #endif //SWIFT_IMPLICIT_COMPUTED_PROPERTIES_H

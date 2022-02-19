@@ -441,6 +441,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     M = Impl.getStdlibModule();
   else
     M = Impl.getNamedModule(SwiftModuleName);
+
   if (!M) {
     // User did not import the library module that contains the type we want to
     // substitute.
@@ -695,7 +696,7 @@ static AccessorDecl *makeStructRawValueGetter(
   assert(storedVar->hasStorage());
 
   ASTContext &C = Impl.SwiftContext;
-
+  
   auto *params = ParameterList::createEmpty(C);
 
   auto computedType = computedVar->getInterfaceType();
@@ -729,7 +730,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   auto &C = Impl.SwiftContext;
 
   auto *params = ParameterList::createEmpty(C);
-
+  
   auto getterType = importedFieldDecl->getInterfaceType();
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/importedFieldDecl->getLoc(),
@@ -1155,7 +1156,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                          cSetterParamTypes,
                                          clang::FunctionProtoType::ExtProtoInfo());
   auto cSetterTypeInfo = Ctx.getTrivialTypeSourceInfo(cSetterType);
-
+  
   auto cSetterDecl = clang::FunctionDecl::Create(Ctx,
                                                  structDecl->getDeclContext(),
                                                  clang::SourceLocation(),
@@ -1187,7 +1188,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                   clang::SC_None,
                                                   nullptr);
     cGetterDecl->setParams(cGetterSelf);
-
+    
     auto cGetterSelfExpr = new (Ctx) clang::DeclRefExpr(Ctx, cGetterSelf, false,
                                                         recordType,
                                                         clang::VK_PRValue,
@@ -1200,7 +1201,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                          clang::VK_PRValue,
                                                          clang::OK_BitField);
 
-
+    
     auto cGetterBody = clang::ReturnStmt::Create(Ctx, clang::SourceLocation(),
                                                    cGetterExpr,
                                                    nullptr);
@@ -1231,12 +1232,12 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                   nullptr);
     cSetterParams.push_back(cSetterSelf);
     cSetterDecl->setParams(cSetterParams);
-
+    
     auto cSetterSelfExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterSelf, false,
                                                         recordPointerType,
                                                         clang::VK_PRValue,
                                                         clang::SourceLocation());
-
+    
     auto cSetterMemberExpr = clang::MemberExpr::CreateImplicit(Ctx,
                                                                cSetterSelfExpr,
                                                                /*isarrow=*/true,
@@ -1244,7 +1245,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                                fieldType,
                                                                clang::VK_LValue,
                                                                clang::OK_BitField);
-
+    
     auto cSetterValueExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterValue, false,
                                                          fieldType,
                                                          clang::VK_PRValue,
@@ -1259,7 +1260,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                      clang::OK_Ordinary,
                                                      clang::SourceLocation(),
                                                      clang::FPOptionsOverride());
-
+    
     cSetterDecl->setBody(cSetterExpr);
   }
 
@@ -2422,7 +2423,7 @@ namespace {
         if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
           return importFullName(typedefForAnon);
       }
-
+      
       return {ImportedName(), None};
     }
 
@@ -2809,7 +2810,7 @@ namespace {
         });
 
       Result->setUnderlyingType(SwiftType);
-
+      
       // Make Objective-C's 'id' unavailable.
       if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
         auto attr = AvailableAttr::createPlatformAgnostic(
@@ -2885,7 +2886,7 @@ namespace {
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
-
+      
       auto name = importedName.getDeclName().getBaseIdentifier();
 
       // Create the enum declaration and record it.
@@ -2951,7 +2952,7 @@ namespace {
         ProtocolDecl *bridgedNSError = nullptr;
         ClassDecl *nsErrorDecl = nullptr;
         ProtocolDecl *errorCodeProto = nullptr;
-        if (enumInfo.isErrorEnum() &&
+        if (enumInfo.isErrorEnum() && 
             (bridgedNSError =
                C.getProtocol(KnownProtocolKind::BridgedStoredNSError)) &&
             (nsErrorDecl = C.getNSErrorDecl()) &&
@@ -3127,7 +3128,7 @@ namespace {
       Impl.ImportedDecls[{canonicalClangDecl, getVersion()}] = result;
 
       // Import each of the enumerators.
-
+      
       bool addEnumeratorsAsMembers;
       switch (enumKind) {
       case EnumKind::Constants:
@@ -3285,7 +3286,7 @@ namespace {
           addDecl(result, enumeratorDecl);
           for (auto *variant : variantDecls)
             addDecl(result, variant);
-
+          
           // If there is an error wrapper, add an alias within the
           // wrapper to the corresponding value within the enumerator
           // context.
@@ -3337,7 +3338,7 @@ namespace {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
       bool hasUnreferenceableStorage = false;
-
+      
       // Track whether this record contains fields that can't be zero-
       // initialized.
       bool hasZeroInitializableStorage = true;
@@ -3443,7 +3444,6 @@ namespace {
 
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
-
       for (auto m : decl->decls()) {
         if (isa<clang::AccessSpecDecl>(m)) {
           // The presence of AccessSpecDecls themselves does not influence
@@ -3619,7 +3619,7 @@ namespace {
             if (!getter || getter->getResultInterfaceType()->isVoid()) continue;
 
             auto p = makeProperty(getterAndSetter.first,getter, setter);
-            p->getDeclContext()->dumpContext();
+
             if (p->getDeclContext()!=result ){
                 continue;
             }
@@ -4213,10 +4213,10 @@ namespace {
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
-            clangNode, AccessLevel::Public, ctorName, loc,
+            clangNode, AccessLevel::Public, ctorName, loc, 
             /*failable=*/false, /*FailabilityLoc=*/SourceLoc(),
             /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), 
             bodyParams, genericParams, dc);
       } else {
         auto resultTy = importedType.getType();
@@ -4425,7 +4425,9 @@ namespace {
           auto ASTstr =
               importedName.getDeclName().getBaseIdentifier().str().drop_front(
                   3);
-          auto name = Impl.SwiftContext.getIdentifier(ASTstr.lower());
+          
+              
+          auto name = Impl.SwiftContext.getIdentifier(ASTstr);
           auto dc = Impl.importDeclContextOf(
               decl, importedName.getEffectiveContext());
           if (!dc)
@@ -4454,24 +4456,13 @@ namespace {
             return nullptr;
           }
 
-          auto ASTstr =
-              importedName.getDeclName().getBaseIdentifier().str().drop_front(
-                  3);
-          auto name = Impl.SwiftContext.getIdentifier(ASTstr.lower());
+          auto ASTstr = importedName.getDeclName().getBaseIdentifier().str().drop_front(3);
+          auto name = Impl.SwiftContext.getIdentifier(ASTstr);
           auto dc = Impl.importDeclContextOf(
               decl, importedName.getEffectiveContext());
           if (!dc)
             return nullptr;
-
-//          auto importedType =
-//              Impl.importType(decl->getReturnType(), ImportTypeKind::Result,
-//                              isInSystemModule(dc), Bridgeability::None);
-//          if (!importedType)
-//            return nullptr;
-//
-//          auto type = importedType.getType();
-//          auto It = Impl.GetterSetterMap.find(name);
-
+          
           Impl.GetterSetterMap[name].second = static_cast<FuncDecl *>(method);
           // store the cxx methods then generate the property accessors
           // move the logic to vicitmethod decl
@@ -7948,8 +7939,24 @@ VarDecl *SwiftDeclConverter::makeProperty(Identifier identifier, FuncDecl *gette
   auto &ctx = Impl.SwiftContext;
 //  DeclName name(identifier);
   auto dc = getter->getDeclContext();
-
-  auto result = VarDecl::createImported(ctx, identifier, getter->getStartLoc(), getter->getStartLoc(), getter->getResultInterfaceType(), dc, getter->getClangNode());
+    std::string propertyCamel = identifier.str().str();
+   propertyCamel[0]=std::tolower(propertyCamel[0]);
+    for (size_t i = 1; i < propertyCamel.size(); i++) {
+        int z =i+1;
+        if (std::isupper(propertyCamel[i]) && (std::isupper(propertyCamel[z]) || std::isdigit(propertyCamel[z])) ) {
+            propertyCamel[i]= std::tolower(propertyCamel[i]);
+        }
+        if(std::isupper(propertyCamel[i])&&std::islower(propertyCamel[z])){
+            break;
+        }
+        if(std::isupper(propertyCamel[i]) && z+1>propertyCamel.size()){
+            propertyCamel[i]= std::tolower(propertyCamel[i]);
+            break;
+        }
+        
+    }
+    
+  auto result = VarDecl::createImported(ctx, ctx.getIdentifier(propertyCamel), getter->getStartLoc(), getter->getStartLoc(), getter->getResultInterfaceType(), dc, getter->getClangNode());
   result->setAccess(AccessLevel::Public);
   result->setImplInfo(StorageImplInfo::getMutableComputed());
 
