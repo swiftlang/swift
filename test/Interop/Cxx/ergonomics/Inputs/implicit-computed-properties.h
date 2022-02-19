@@ -1,6 +1,8 @@
 #ifndef SWIFT_IMPLICIT_COMPUTED_PROPERTIES_H
 #define SWIFT_IMPLICIT_COMPUTED_PROPERTIES_H
 
+// TODO: tests for non-const getters.
+
 struct VoidGetter {
     void getX();
     void setX(int);
@@ -28,20 +30,19 @@ struct NoNameVoidGetter {
 };
 
 struct LongNameAllLower {
-    int getfoo() { return 42; }
-
+    int getfoo() const { return 42; }
 };
 
 struct LongNameAllUpper {
-    int getFOO() { return 42; }
+    int getFOO() const { return 42; }
 };
 
 struct LongNameMix {
-    int GetFoo(){ return 42; }
+    int GetFoo() const { return 42; }
 };
 
 struct GetterOnly {
-    int getFoo() { return 42; }
+    int getFoo() const { return 42; }
 };
 
 struct NoNameUpperGetter {
@@ -53,13 +54,15 @@ struct NotypeSetter {
 };
 
 struct IntGetterSetter {
-    int getX() const {}
+    int getX() { return 42; }
     void setX(int) {}
 };
 
 struct UTF8Str  {
-    int getUTF8Str() { return 42; }
+    int getUTF8Str() const { return 42; }
     void setUTF8Str(int) {}
 };
+
+// TODO: when setter and getter have different types.
 
 #endif //SWIFT_IMPLICIT_COMPUTED_PROPERTIES_H

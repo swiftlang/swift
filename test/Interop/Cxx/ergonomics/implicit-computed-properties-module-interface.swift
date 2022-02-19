@@ -45,6 +45,7 @@
 
 //CHECK: struct LongNameMix {
 //CHECK-NEXT: init()
+//CHECK-NEXT: var foo: Int32
 //CHECK-NEXT: mutating func GetFoo() -> Int32
 //CHECK-NEXT: }
 
