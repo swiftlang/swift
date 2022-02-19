@@ -2,8 +2,11 @@
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/InferViaDefaults.swiftmodule -enable-experimental-type-inference-from-defaults -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift
 // RUN: %target-swift-frontend -enable-experimental-type-inference-from-defaults -module-name main -typecheck -verify -I %t %s %S/Inputs/type_inference_via_defaults_other_module.swift
 
-func testInferFromResult<T>(_: T = 42) -> T { fatalError() }
-// expected-error@-1 {{cannot use default expression for inference of 'T' because it is inferrable from result type}}
+func testInferFromResult<T>(_: T = 42) -> T { fatalError() } // Ok
+
+enum ETest<T> {
+  case test(_: T = 42) // expected-note {{default value declared here}}
+}
 
 func testInferFromOtherPos1<T>(_: T = 42, _: [T]) {}
 // expected-error@-1 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1}}
@@ -101,7 +104,27 @@ func testReq2<T, U>(_: (T, U) = (E(), B())) where T: GenClass<U>, U: AnyObject {
 func testReq3<T: P, U>(_: [T?] = [B()], _: U) where T.X == U {}
 // expected-error@-1 {{cannot use default expression for inference of '[T?]' because requirement 'U == T.X' refers to other generic parameters}}
 
+protocol Shape {
+}
+
+struct Circle : Shape {
+}
+
+struct Rectangle : Shape {
+}
+
+struct Figure<S: Shape> {
+  init(_: S = Circle()) {} // expected-note 2 {{default value declared here}}
+}
+
 func main() {
+  _ = testInferFromResult() // Ok T == Int
+  let _: Float = testInferFromResult() // expected-error {{cannot convert value of type 'Int' to specified type 'Float'}}
+
+  _ = ETest.test() // Ok
+
+  let _: ETest<String> = .test() // expected-error {{cannot convert default value of type 'String' to expected argument type 'Int' for parameter #0}}
+
   test1() // Ok
 
   test2() // Ok
@@ -129,4 +152,18 @@ func main() {
   testNested6() // Ok
 
   testReq2() // Ok
+
+  func takesFigure<T>(_: Figure<T>) {}
+  func takesCircle(_: Figure<Circle>) {}
+  func takesRectangle(_: Figure<Rectangle>) {}
+
+  _ = Figure.init() // Ok S == Circle
+  let _: Figure<Circle> = .init() // Ok (S == Circle)
+  let _: Figure<Rectangle> = .init()
+  // expected-error@-1 {{cannot convert default value of type 'Rectangle' to expected argument type 'Circle' for parameter #0}}
+
+  takesFigure(.init()) // Ok
+  takesCircle(.init()) // Ok
+  takesRectangle(.init())
+  // expected-error@-1 {{cannot convert default value of type 'Rectangle' to expected argument type 'Circle' for parameter #0}}
 }

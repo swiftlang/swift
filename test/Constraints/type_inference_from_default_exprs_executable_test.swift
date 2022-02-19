@@ -99,6 +99,25 @@ struct OtherD : P {
   typealias X = OtherB
 }
 
+protocol Shape {
+}
+
+struct Circle : Shape {
+}
+
+struct Rectangle : Shape {
+}
+
+struct Figure<S: Shape> {
+  init(v: S = Circle()) {
+    print("Figure: \(v); type = \(type(of: v))")
+  }
+}
+
+enum TestE<T: Collection> {
+case a(_: T = [B()])
+}
+
 func run_tests() {
   test1()
   // CHECK: test1: 42; type = Int
@@ -159,6 +178,20 @@ func run_tests() {
 
   testReq1()
   // CHECK: testReq1: (main.E, main.B); type = (E, B)
+
+  _ = Figure.init()
+  // CHECK: Figure: Circle(); type = Circle
+  let _: Figure<Circle> = .init()
+  // CHECK: Figure: Circle(); type = Circle
+
+  func takesFigure<T>(_: Figure<T>) {}
+
+  takesFigure(.init())
+  // CHECK: Figure: Circle(); type = Circle
+
+  let e: TestE = .a()
+  print("ETEst: \(e); type = \(type(of: e))")
+  // CHECK: ETEst: a([main.B]); type = TestE<Array<B>>
 }
 
 @main struct Test {

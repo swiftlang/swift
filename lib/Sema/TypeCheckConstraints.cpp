@@ -535,15 +535,6 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   {
     auto anchorTy = anchor->getInterfaceType()->castTo<GenericFunctionType>();
 
-    // Reject if generic parameters could be inferred from result type.
-    if (containsTypes(anchorTy->getResult(), genericParameters)) {
-      ctx.Diags.diagnose(
-          defaultValue->getLoc(),
-          diag::cannot_default_generic_parameter_inferrable_from_result,
-          paramInterfaceTy);
-      return Type();
-    }
-
     // Reject if generic parameters are used in multiple different positions
     // in the parameter list.
 
