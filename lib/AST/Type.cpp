@@ -299,10 +299,7 @@ ExistentialLayout::ExistentialLayout(ParameterizedProtocolType *type) {
   assert(type->isCanonical());
 
   *this = ExistentialLayout(type->getBaseType());
-  sameTypeRequirements = {
-      reinterpret_cast<PrimaryAssociatedTypeRequirement *>(&type->AssocType),
-      1
-  };
+  sameTypeRequirements = type->getArgs();
 }
 
 ExistentialLayout TypeBase::getExistentialLayout() {
@@ -1569,9 +1566,11 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::ParameterizedProtocol: {
     auto *PPT = cast<ParameterizedProtocolType>(this);
     auto Base = cast<ProtocolType>(PPT->getBaseType()->getCanonicalType());
-    auto Arg = PPT->getArgumentType()->getCanonicalType();
+    SmallVector<Type, 1> CanArgs;
+    for (Type t : PPT->getArgs())
+      CanArgs.push_back(t->getCanonicalType());
     auto &C = Base->getASTContext();
-    Result = ParameterizedProtocolType::get(C, Base, Arg).getPointer();
+    Result = ParameterizedProtocolType::get(C, Base, CanArgs).getPointer();
     break;
   }
   case TypeKind::Existential: {
@@ -3891,20 +3890,40 @@ void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
 
 ParameterizedProtocolType::ParameterizedProtocolType(
     const ASTContext *ctx,
-    ProtocolType *base, Type arg,
+    ProtocolType *base, ArrayRef<Type> args,
     RecursiveTypeProperties properties)
   : TypeBase(TypeKind::ParameterizedProtocol, /*Context=*/ctx, properties),
-    Base(base), AssocType(base->getDecl()->getPrimaryAssociatedType()),
-    Arg(arg) {
-  assert(AssocType != nullptr &&
-         "Protocol doesn't have a primary associated type");
+    Base(base) {
+  assert(args.size() > 0);
+  Bits.ParameterizedProtocolType.ArgCount = args.size();
+  for (unsigned i : indices(args))
+    getTrailingObjects<Type>()[i] = args[i];
 }
 
 void ParameterizedProtocolType::Profile(llvm::FoldingSetNodeID &ID,
                                         ProtocolType *baseTy,
-                                        Type argTy) {
+                                        ArrayRef<Type> args) {
   ID.AddPointer(baseTy);
-  ID.AddPointer(argTy.getPointer());
+  for (auto arg : args)
+    ID.AddPointer(arg.getPointer());
+}
+
+void ParameterizedProtocolType::getRequirements(
+    Type baseType, SmallVectorImpl<Requirement> &reqs) const {
+  auto *protoDecl = getBaseType()->getDecl();
+
+  auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
+  auto argTypes = getArgs();
+  assert(argTypes.size() <= assocTypes.size());
+
+  for (unsigned i : indices(argTypes)) {
+    auto argType = argTypes[i];
+    auto *assocType = assocTypes[i];
+    auto subjectType = assocType->getDeclaredInterfaceType()
+        ->castTo<DependentMemberType>()
+        ->substBaseType(protoDecl->getParentModule(), baseType);
+    reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
+  }
 }
 
 bool ProtocolType::requiresClass() {
@@ -5663,25 +5682,15 @@ case TypeKind::Id:
     SmallVector<Type, 4> substMembers;
     auto members = pc->getMembers();
     bool anyChanged = false;
-    unsigned index = 0;
     for (auto member : members) {
       auto substMember = member.transformWithPosition(pos, fn);
       if (!substMember)
         return Type();
-      
-      if (anyChanged) {
-        substMembers.push_back(substMember);
-        ++index;
-        continue;
-      }
-      
-      if (substMember.getPointer() != member.getPointer()) {
+
+      substMembers.push_back(substMember);
+
+      if (substMember.getPointer() != member.getPointer())
         anyChanged = true;
-        substMembers.append(members.begin(), members.begin() + index);
-        substMembers.push_back(substMember);
-      }
-      
-      ++index;
     }
     
     if (!anyChanged)
@@ -5695,7 +5704,6 @@ case TypeKind::Id:
   case TypeKind::ParameterizedProtocol: {
     auto *ppt = cast<ParameterizedProtocolType>(base);
     Type base = ppt->getBaseType();
-    Type arg = ppt->getArgumentType();
 
     bool anyChanged = false;
 
@@ -5706,12 +5714,17 @@ case TypeKind::Id:
     if (substBase.getPointer() != base.getPointer())
       anyChanged = true;
 
-    auto substArg = arg.transformWithPosition(TypePosition::Invariant, fn);
-    if (!substArg)
-      return Type();
+    SmallVector<Type, 2> substArgs;
+    for (auto arg : ppt->getArgs()) {
+      auto substArg = arg.transformWithPosition(TypePosition::Invariant, fn);
+      if (!substArg)
+        return Type();
 
-    if (substArg.getPointer() != arg.getPointer())
-      anyChanged = true;
+      substArgs.push_back(substArg);
+
+      if (substArg.getPointer() != arg.getPointer())
+        anyChanged = true;
+    }
 
     if (!anyChanged)
       return *this;
@@ -5719,7 +5732,7 @@ case TypeKind::Id:
     return ParameterizedProtocolType::get(
         Ptr->getASTContext(),
         substBase->castTo<ProtocolType>(),
-        substArg);
+        substArgs);
   }
   }
   

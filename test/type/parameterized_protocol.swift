@@ -85,6 +85,21 @@ protocol SequenceWrapperProtocol2 {
 }
 
 
+/// Multiple primary associated types
+protocol Collection {
+  @_primaryAssociatedType associatedtype Element
+  @_primaryAssociatedType associatedtype Index
+}
+
+// CHECK-LABEL: .testCollection1@
+// CHECK-NEXT: Generic signature: <T where T : Collection, T.[Collection]Element == String>
+func testCollection1<T : Collection<String>>(_: T) {}
+
+// CHECK-LABEL: .testCollection2@
+// CHECK-NEXT: Generic signature: <T where T : Collection, T.[Collection]Element == String, T.[Collection]Index == Int>
+func testCollection2<T : Collection<String, Int>>(_: T) {}
+
+
 /// Parametrized protocol in opaque result type
 
 struct OpaqueTypes<E> {
@@ -126,20 +141,20 @@ extension Sequence<Int> {
 /// Cannot use parameterized protocol as the type of a value
 
 func takesSequenceOfInt1(_: Sequence<Int>) {}
-// expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
+// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 
 func returnsSequenceOfInt1() -> Sequence<Int> {}
-// expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
+// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 
 func takesSequenceOfInt2(_: any Sequence<Int>) {}
-// expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
+// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 
 func returnsSequenceOfInt2() -> any Sequence<Int> {}
-// expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
+// expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 
 func typeExpr() {
   _ = Sequence<Int>.self
-  // expected-error@-1 {{protocol type with generic argument can only be used as a generic constraint}}
+  // expected-error@-1 {{protocol type with generic arguments can only be used as a generic constraint}}
 }
 
 /// Not supported as a protocol composition term for now

@@ -3360,25 +3360,31 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
 
 Type ParameterizedProtocolType::get(const ASTContext &C,
                                     ProtocolType *baseTy,
-                                    Type argTy) {
+                                    ArrayRef<Type> args) {
+  assert(args.size() > 0);
+
   bool isCanonical = baseTy->isCanonical();
   RecursiveTypeProperties properties = baseTy->getRecursiveProperties();
-  properties |= argTy->getRecursiveProperties();
-  isCanonical &= argTy->isCanonical();
+  for (auto arg : args) {
+    properties |= arg->getRecursiveProperties();
+    isCanonical &= arg->isCanonical();
+  }
 
   auto arena = getArena(properties);
 
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
-  ParameterizedProtocolType::Profile(ID, baseTy, argTy);
+  ParameterizedProtocolType::Profile(ID, baseTy, args);
 
   if (auto paramTy
       = C.getImpl().getArena(arena).ParameterizedProtocolTypes
           .FindNodeOrInsertPos(ID, InsertPos))
     return paramTy;
 
-  auto paramTy = new (C, arena) ParameterizedProtocolType(
-        isCanonical ? &C : nullptr, baseTy, argTy, properties);
+  auto size = totalSizeToAlloc<Type>(args.size());
+  auto mem = C.Allocate(size, alignof(ParameterizedProtocolType), arena);
+  auto paramTy = new (mem) ParameterizedProtocolType(
+        isCanonical ? &C : nullptr, baseTy, args, properties);
   C.getImpl().getArena(arena).ParameterizedProtocolTypes.InsertNode(
       paramTy, InsertPos);
   return paramTy;

@@ -916,10 +916,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
-  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
-    // MandatoryCopyPropagation should only be run at -Onone, not -O.
-    P.addMandatoryCopyPropagation();
-  }
+
   // TODO: MandatoryARCOpts should be subsumed by CopyPropagation. There should
   // be no need to run another analysis of copies at -Onone.
   P.addMandatoryARCOpts();

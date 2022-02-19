@@ -4402,10 +4402,10 @@ public:
   /// a protocol having nested types (ObjC protocols).
   ArrayRef<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
 
-  /// Returns the primary associated type, or nullptr if there isn't one. This is
-  /// the associated type that is parametrized with a same-type requirement in a
-  /// parametrized protocol type of the form SomeProtocol<SomeArgType>.
-  AssociatedTypeDecl *getPrimaryAssociatedType() const;
+  /// Returns the list of primary associated types. These are the associated
+  /// types that is parametrized with same-type requirements in a
+  /// parametrized protocol type of the form SomeProtocol<Arg1, Arg2...>.
+  ArrayRef<AssociatedTypeDecl *> getPrimaryAssociatedTypes() const;
 
   /// Returns a protocol requirement with the given name, or nullptr if the
   /// name has multiple overloads, or no overloads at all.

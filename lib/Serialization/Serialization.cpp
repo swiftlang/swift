@@ -4761,12 +4761,16 @@ public:
   visitParameterizedProtocolType(const ParameterizedProtocolType *type) {
     using namespace decls_block;
 
+    SmallVector<TypeID, 4> args;
+    for (auto arg : type->getArgs())
+      args.push_back(S.addTypeRef(arg));
+
     unsigned abbrCode =
         S.DeclTypeAbbrCodes[ParameterizedProtocolTypeLayout::Code];
     ParameterizedProtocolTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(type->getBaseType()),
-        S.addTypeRef(type->getArgumentType()));
+        args);
   }
 
   void

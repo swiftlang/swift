@@ -3947,7 +3947,9 @@ namespace {
                                         StringRef label) {
       printCommon(label, "parameterized_protocol_type");
       printRec("base", T->getBaseType());
-      printRec("arg", T->getArgumentType());
+      for (auto arg : T->getArgs()) {
+        printRec(arg);
+      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
