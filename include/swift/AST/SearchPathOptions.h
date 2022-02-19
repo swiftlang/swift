@@ -36,10 +36,9 @@ enum class ModuleSearchPathKind {
 
 /// A single module search path that can come from different sources, e.g.
 /// framework search paths, import search path etc.
-class ModuleSearchPath {
-  /// The actual path of the module search path. References a search path string
-  /// stored inside \c SearchPathOptions, which must outlive this reference.
-  StringRef Path;
+class ModuleSearchPath : public llvm::RefCountedBase<ModuleSearchPath> {
+  /// The actual path of the module search path.
+  std::string Path;
 
   /// The kind of the search path.
   ModuleSearchPathKind Kind;
@@ -72,6 +71,8 @@ public:
     }
   }
 };
+
+using ModuleSearchPathPtr = llvm::IntrusiveRefCntPtr<ModuleSearchPath>;
 
 class SearchPathOptions;
 
@@ -109,7 +110,7 @@ class ModuleSearchPathLookup {
     const SearchPathOptions *Opts;
   } State;
 
-  llvm::StringMap<SmallVector<ModuleSearchPath, 4>> LookupTable;
+  llvm::StringMap<SmallVector<ModuleSearchPathPtr, 4>> LookupTable;
 
   /// Scan the directory at \p SearchPath for files and add those files to the
   /// lookup table. \p Kind specifies the search path kind and \p Index the
