@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -module-name Swift %s | %FileCheck %s
+// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK-NOSCOPES
 //
 // Most CopyPropagation tests are still in copy_propagation_opaque.sil.
 //
@@ -12,7 +13,20 @@ import Builtin
 
 typealias AnyObject = Builtin.AnyObject
 
+protocol Error {}
+
 class B { }
+
+
+struct UInt64 {
+  @_hasStorage public var _value: Builtin.Int64 { get set }
+  init(_value: Builtin.Int64)
+}
+
+struct Int64 {
+  @_hasStorage public var _value: Builtin.Int64 { get set }
+  init(_value: Builtin.Int64)
+}
 
 class C {
   var a: Int64
@@ -57,16 +71,6 @@ struct MultiWrapper {
 struct HasObjects {
   var object0: C
   var object1: C
-}
-
-struct UInt64 {
-  @_hasStorage public var _value: Builtin.Int64 { get set }
-  init(_value: Builtin.Int64)
-}
-
-struct Int64 {
-  @_hasStorage public var _value: Builtin.Int64 { get set }
-  init(_value: Builtin.Int64)
 }
 
 internal struct _StringObject {
@@ -1177,4 +1181,53 @@ bb0(%0 : @guaranteed $String):
   debug_value %3 : $_StringGuts, let, name "guts"
   %5 = struct $String.UTF16View (%3 : $_StringGuts)
   return %5 : $String.UTF16View
+}
+
+// visitBorrowScopeUses first looks through this copy then sees a
+// unowned forwarding operation (ref_to_unmanaged). It generally
+// cannot prove that all uses of an unowned forward are within the
+// borrow scope. This is still safe, however, because the borrowed
+// value is a function argument. In fact, borrow scope rewriting
+// *must* succeed because it begins rewriting guaranteed function
+// arguments without checking the uses first.
+//
+// CHECK-NOSCOPES-LABEL: sil [ossa] @testEscapingGuaranteedToOwned : $@convention(method) (@guaranteed C) -> () {
+// CHECK-NOSCOPES: bb0(%0 : @guaranteed $C):
+// CHECK-NOSCOPES-NEXT:  %1 = ref_to_unmanaged %0 : $C to $@sil_unmanaged C
+// CHECK-NOSCOPES-NEXT:  tuple ()
+// CHECK-NOSCOPES-NEXT:  return
+// CHECK-NOSCOPES-LABEL: } // end sil function 'testEscapingGuaranteedToOwned'
+sil [ossa] @testEscapingGuaranteedToOwned : $@convention(method) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = copy_value %0 : $C
+  %2 = ref_to_unmanaged %1 : $C to $@sil_unmanaged C
+  destroy_value %1 : $C
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// visitBorrowScopeUses first looks through this copy, then a normal
+// forwarding operation (convert_function), then an unowned forwarding
+// operation (convert_escape_to_noescape). It must successfully
+// analyze and replace all uses because borrow scope rewriting begins
+// rewriting guaranteed function arguments without checking the uses
+// first.
+//
+// CHECK-NOSCOPES-LABEL: sil [ossa] @testEscapingEscapingCast : $@convention(method) (@guaranteed @callee_guaranteed (Int64) -> Int64) -> () {
+// CHECK-NOSCOPES:      bb0(%0 : @guaranteed $@callee_guaranteed (Int64) -> Int64):
+// CHECK-NOSCOPES-NEXT: %1 = convert_function %0 : $@callee_guaranteed (Int64) -> Int64 to $@callee_guaranteed (Int64) -> (Int64, @error Error) // user: %2
+// CHECK-NOSCOPES-NEXT: %2 = convert_escape_to_noescape %1 : $@callee_guaranteed (Int64) -> (Int64, @error Error) to $@noescape @callee_guaranteed (Int64) -> (Int64, @error Error)
+// CHECK-NOSCOPES-NEXT: = tuple ()
+// CHECK-NOSCOPES-NEXT: return
+// CHECK-NOSCOPES-LABEL: } // end sil function 'testEscapingEscapingCast'
+sil [ossa] @testEscapingEscapingCast : $@convention(method) (@guaranteed @callee_guaranteed (Int64) -> Int64) -> () {
+bb0(%0 : @guaranteed $@callee_guaranteed (Int64) -> Int64):
+  %1 = copy_value %0 : $@callee_guaranteed (Int64) -> Int64
+  %2 = convert_function %1 : $@callee_guaranteed (Int64) -> Int64 to $@callee_guaranteed (Int64) -> (Int64, @error Error)
+  %3 = copy_value %2 : $@callee_guaranteed (Int64) -> (Int64, @error Error)
+  %4 = convert_escape_to_noescape %3 : $@callee_guaranteed (Int64) -> (Int64, @error Error) to $@noescape @callee_guaranteed (Int64) -> (Int64, @error Error) // user: %29
+  destroy_value %3 : $@callee_guaranteed (Int64) -> (Int64, @error Error)
+  destroy_value %2 : $@callee_guaranteed (Int64) -> (Int64, @error Error)
+  %7 = tuple ()
+  return %7 : $()
 }
