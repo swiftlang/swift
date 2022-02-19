@@ -254,3 +254,147 @@ entry(%instance : @none $TrivialStruct):
     %retval = tuple ()
     return %retval : $()
 }
+
+// Fold destroy_addr and a load [copy] into a load [take] even when that
+// load [take] is guarded by an access scope.
+//
+// CHECK-LABEL: sil [ossa] @fold_scoped_load : {{.*}} {
+// CHECK: load [take]
+// CHECK-LABEL: // end sil function 'fold_scoped_load'
+sil [ossa] @fold_scoped_load : $@convention(thin) (@owned S) -> (@owned S) {
+entry(%instance : @owned $S):
+  %addr = alloc_stack $S
+  %store_scope = begin_access [modify] [static] %addr : $*S
+  store %instance to [init] %store_scope : $*S
+  end_access %store_scope : $*S
+  %load_scope = begin_access [read] [static] %addr : $*S
+  %value = load [copy] %load_scope : $*S
+  end_access %load_scope : $*S
+  destroy_addr %addr : $*S
+  dealloc_stack %addr : $*S
+  return %value : $S
+}
+
+// Don't fold when there's a deinit barrier in the way.
+//
+// CHECK-LABEL: sil [ossa] @nofold_scoped_load_barrier : {{.*}} {
+// CHECK: load [copy]
+// CHECK-LABEL: // end sil function 'nofold_scoped_load_barrier'
+sil [ossa] @nofold_scoped_load_barrier : $@convention(thin) (@owned S) -> (@owned S) {
+entry(%instance : @owned $S):
+  %addr = alloc_stack $S
+  %store_scope = begin_access [modify] [static] %addr : $*S
+  store %instance to [init] %store_scope : $*S
+  end_access %store_scope : $*S
+  %load_scope = begin_access [read] [static] %addr : $*S
+  %value = load [copy] %load_scope : $*S
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  end_access %load_scope : $*S
+  destroy_addr %addr : $*S
+  dealloc_stack %addr : $*S
+  return %value : $S
+}
+
+// Don't fold with a copy_addr of a struct_element_addr.
+//
+// CHECK-LABEL: sil [ossa] @nofold_scoped_copy_addr_projection : {{.*}} {
+// CHECK:         load [copy]
+// CHECK-LABEL: // end sil function 'nofold_scoped_copy_addr_projection'
+sil [ossa] @nofold_scoped_copy_addr_projection : $@convention(thin) (@owned S) -> (@owned S) {
+entry(%instance : @owned $S):
+  %addr = alloc_stack $S
+  %store_scope = begin_access [modify] [static] %addr : $*S
+  store %instance to [init] %store_scope : $*S
+  end_access %store_scope : $*S
+  %load_scope = begin_access [read] [static] %addr : $*S
+  %field_addr = struct_element_addr %load_scope : $*S, #S.x
+  %field = load [copy] %field_addr : $*X
+  end_access %load_scope : $*S
+  destroy_addr %addr : $*S
+  dealloc_stack %addr : $*S
+  %value = struct $S (%field : $X)
+  return %value : $S
+}
+
+// Don't fold destroy of outer scope with struct_element_addr of inner scope.
+//
+// CHECK-LABEL: sil [ossa] @nofold_with_copy_addr_projection : {{.*}} {
+// CHECK:         copy_addr {{%[^,]+}}
+// CHECK-LABEL: // end sil function 'nofold_with_copy_addr_projection'
+sil [ossa] @nofold_with_copy_addr_projection : $@convention(thin) (@owned S) -> (@owned S) {
+entry(%instance : @owned $S):
+  %addr = alloc_stack $S
+  %addr_2 = alloc_stack $S
+  %store_scope = begin_access [modify] [static] %addr : $*S
+  store %instance to [init] %store_scope : $*S
+  end_access %store_scope : $*S
+  %outer = begin_access [read] [static] %addr : $*S
+  apply undef(%outer) : $@convention(thin) (@inout S) -> ()
+  %inner = begin_access [read] [static] %outer : $*S
+  %field_addr = struct_element_addr %inner : $*S, #S.x
+  %field_addr_2 =  struct_element_addr %addr_2 : $*S, #S.x
+  copy_addr %field_addr to [initialization] %field_addr_2 : $*X
+  end_access %inner : $*S
+  destroy_addr %outer : $*S
+  end_access %outer : $*S
+  %value = load [take] %addr_2 : $*S
+  dealloc_stack %addr_2 : $*S
+  dealloc_stack %addr : $*S
+  return %value : $S
+}
+
+// Don't fold destroy of outer scope with struct_element_addr of inner scope.
+//
+// CHECK-LABEL: sil [ossa] @fold_scoped_destroy_with_scoped_copy_addr : {{.*}} {
+// CHECK:         copy_addr [take] {{%[^,]+}}
+// CHECK-LABEL: // end sil function 'fold_scoped_destroy_with_scoped_copy_addr'
+sil [ossa] @fold_scoped_destroy_with_scoped_copy_addr : $@convention(thin) (@owned S) -> (@owned S) {
+entry(%instance : @owned $S):
+  %addr = alloc_stack $S
+  %addr_2 = alloc_stack $S
+  %store_scope = begin_access [modify] [static] %addr : $*S
+  store %instance to [init] %store_scope : $*S
+  end_access %store_scope : $*S
+  %outer = begin_access [read] [static] %addr : $*S
+  apply undef(%outer) : $@convention(thin) (@inout S) -> ()
+  %inner = begin_access [read] [static] %outer : $*S
+  copy_addr %inner to [initialization] %addr_2 : $*S
+  end_access %inner : $*S
+  destroy_addr %outer : $*S
+  end_access %outer : $*S
+  %value = load [take] %addr_2 : $*S
+  dealloc_stack %addr_2 : $*S
+  dealloc_stack %addr : $*S
+  return %value : $S
+}
+
+// Don't fold with an unrelated load [copy].
+// CHECK-LABEL: sil [ossa] @nofold_unrelated_scoped_load_copy : {{.*}} {
+// CHECK:         load [copy] 
+// CHECK:         destroy_addr
+// CHECK:         destroy_addr
+// CHECK-LABEL: // end sil function 'nofold_unrelated_scoped_load_copy'
+sil [ossa] @nofold_unrelated_scoped_load_copy : $@convention(thin) (@owned X) -> (@owned X) {
+entry(%instance : @owned $X):
+  %copy = copy_value %instance : $X
+  %addr_1 = alloc_stack $X
+  %addr_2 = alloc_stack $X
+  store %instance to [init] %addr_1 : $*X
+  store %copy to [init] %addr_2 : $*X
+
+  %access = begin_access [read] [static] %addr_1 : $*X
+  %loaded = load [copy] %access : $*X
+  end_access %access : $*X
+  destroy_addr %addr_2 : $*X
+  
+  %barrier = function_ref @unknown : $@convention(thin) () -> ()
+  apply %barrier() : $@convention(thin) () -> ()
+
+  destroy_addr %addr_1 : $*X
+
+  dealloc_stack %addr_2 : $*X
+  dealloc_stack %addr_1 : $*X
+
+  return %loaded : $X
+}

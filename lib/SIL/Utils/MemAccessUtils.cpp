@@ -1941,7 +1941,8 @@ struct GatherUniqueStorageUses : public AccessUseVisitor {
 };
 
 bool UniqueStorageUseVisitor::findUses(UniqueStorageUseVisitor &visitor) {
-  assert(visitor.storage.isUniquelyIdentified());
+  assert(visitor.storage.isUniquelyIdentified() ||
+         visitor.storage.getKind() == AccessStorage::Kind::Nested);
 
   GatherUniqueStorageUses gather(visitor);
   return visitAccessStorageUses(gather, visitor.storage, visitor.function);
@@ -1972,6 +1973,9 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
     }
   }
   switch (user->getKind()) {
+  case SILInstructionKind::BeginAccessInst:
+    return visitor.visitBeginAccess(use);
+
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::DestroyValueInst:
     if (useTy == AccessUseType::Exact) {
@@ -1981,6 +1985,9 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
 
   case SILInstructionKind::DebugValueInst:
     return visitor.visitDebugUse(use);
+
+  case SILInstructionKind::EndAccessInst:
+    return true;
 
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadWeakInst:
