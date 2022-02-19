@@ -570,6 +570,8 @@ void CopyPropagation::run() {
   }
 }
 
+// MandatoryCopyPropagation is not currently enabled in the -Onone pipeline
+// because it may negatively affect the debugging experience.
 SILTransform *swift::createMandatoryCopyPropagation() {
   return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
                              /*canonicalizeBorrows*/ false,
@@ -581,4 +583,3 @@ SILTransform *swift::createCopyPropagation() {
                              /*canonicalizeBorrows*/ EnableRewriteBorrows,
                              /*poisonRefs*/ false);
 }
-

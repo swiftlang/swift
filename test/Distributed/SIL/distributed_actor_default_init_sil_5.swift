@@ -64,6 +64,8 @@ distributed actor MyDistActor {
 
 // CHECK: [[CONTINUE]]:
 // CHECK:        hop_to_executor [[SELF]] : $MyDistActor
+// One of the following retain_value operations could be optimized away.
+// CHECK-NEXT:   retain_value [[SYSTEM]] : $FakeActorSystem
 // CHECK-NEXT:   retain_value [[SYSTEM]] : $FakeActorSystem
 // CHECK-NEXT:   // function_ref FakeActorSystem.actorReady<A>(_:)
 // CHECK-NEXT:   [[READY_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV10actorReadyyyx01_B00bC0RzAA0C7AddressV2IDRtzlF : $@convention(method) <τ_0_0 where τ_0_0 : DistributedActor, τ_0_0.ID == ActorAddress> (@guaranteed τ_0_0, @guaranteed FakeActorSystem) -> ()
