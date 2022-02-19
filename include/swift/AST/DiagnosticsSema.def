@@ -4794,8 +4794,8 @@ ERROR(global_actor_on_actor_class,none,
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
 ERROR(global_actor_on_storage_of_value_type,none,
-      "stored property %0 within %1 cannot have a global actor",
-      (DeclName, DescriptiveDeclKind))
+      "stored property %0 within struct cannot have a global actor",
+      (DeclName))
 ERROR(global_actor_non_unsafe_init,none,
       "global actor attribute %0 argument can only be '(unsafe)'", (Type))
 ERROR(global_actor_non_final_class,none,
