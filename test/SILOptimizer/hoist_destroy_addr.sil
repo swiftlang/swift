@@ -255,6 +255,21 @@ entry(%instance : @none $TrivialStruct):
     return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @nohoist_inout_aliasable : {{.*}} {
+// CHECK:         apply
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nohoist_inout_aliasable'
+sil [ossa] @nohoist_inout_aliasable : $@convention(thin) (@inout_aliasable X) -> () {
+entry(%addr : $*X):
+  %value = load [copy] %addr : $*X
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  destroy_addr %addr : $*X
+  store %value to [init] %addr : $*X
+  %tuple = tuple ()
+  return %tuple : $()
+}
+
 // Fold destroy_addr and a load [copy] into a load [take] even when that
 // load [take] is guarded by an access scope.
 //
@@ -426,4 +441,3 @@ entry(%instance : @owned $X):
   dealloc_stack %addr_outer : $*X
   return %value : $X
 }
-
