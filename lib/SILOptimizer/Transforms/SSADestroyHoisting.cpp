@@ -634,9 +634,13 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
                                 const KnownStorageUses &knownUses,
                                 const DeinitBarriers &deinitBarriers) {
   if (auto *eai = dyn_cast<EndAccessInst>(barrier)) {
+    auto *bai = eai->getBeginAccess();
+    // Don't hoist a destroy into an unrelated access scope.
+    if (stripAccessMarkers(bai) != stripAccessMarkers(storageRoot))
+      return false;
     SILInstruction *instruction = eai;
     while ((instruction = instruction->getPreviousInstruction())) {
-      if (instruction == eai->getBeginAccess())
+      if (instruction == bai)
         return false;
       if (foldBarrier(instruction, storageRoot))
         return true;
