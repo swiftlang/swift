@@ -342,10 +342,19 @@ class TypeMatcher {
           return false;
         }
 
-        return this->visit(firstParametrizedProto.getArgumentType(),
-                           secondParametrizedProto->getArgumentType(),
-                           sugaredFirstType->castTo<ParameterizedProtocolType>()
-                               ->getArgumentType());
+        auto firstArgs = firstParametrizedProto->getArgs();
+        auto secondArgs = secondParametrizedProto->getArgs();
+
+        if (firstArgs.size() == secondArgs.size()) {
+          for (unsigned i : indices(firstArgs)) {
+            return this->visit(CanType(firstArgs[i]),
+                               secondArgs[i],
+                               sugaredFirstType->castTo<ParameterizedProtocolType>()
+                                   ->getArgs()[i]);
+          }
+
+          return true;
+        }
       }
 
       return mismatch(firstParametrizedProto.getPointer(), secondType,

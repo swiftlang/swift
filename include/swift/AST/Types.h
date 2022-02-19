@@ -413,6 +413,11 @@ protected:
     Count : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(ParameterizedProtocolType, TypeBase, 32,
+    /// The number of type arguments.
+    ArgCount : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
     /// Whether an element of the tuple is inout, __shared or __owned.
     /// Values cannot have such tuple types in the language.
@@ -5243,8 +5248,8 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
-/// ParameterizedProtocolType - A type that constrains the primary associated
-/// type of a protocol to an argument type.
+/// ParameterizedProtocolType - A type that constrains one or more primary
+/// associated type of a protocol to a list of argument types.
 ///
 /// Written like a bound generic type, eg Sequence<Int>.
 ///
@@ -5252,6 +5257,7 @@ END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 /// - Inheritance clauses of protocols, generic parameters, associated types
 /// - Conformance requirements in where clauses
 /// - Extensions
+/// - Opaque result types
 ///
 /// Assuming that the primary associated type of Sequence is Element, the
 /// desugaring is that T : Sequence<Int> is equivalent to
@@ -5260,51 +5266,54 @@ END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 /// T : Sequence where T.Element == Int.
 /// \endcode
 class ParameterizedProtocolType final : public TypeBase,
-    public llvm::FoldingSetNode {
+    public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<ParameterizedProtocolType, Type> {
   friend struct ExistentialLayout;
+  friend TrailingObjects;
 
   ProtocolType *Base;
-  AssociatedTypeDecl *AssocType;
   Type Arg;
 
 public:
   /// Retrieve an instance of a protocol composition type with the
   /// given set of members.
   static Type get(const ASTContext &C, ProtocolType *base,
-                  Type arg);
+                  ArrayRef<Type> args);
 
   ProtocolType *getBaseType() const {
     return Base;
   }
 
-  AssociatedTypeDecl *getAssocType() const {
-    return AssocType;
+  ArrayRef<Type> getArgs() const {
+    return {getTrailingObjects<Type>(),
+            Bits.ParameterizedProtocolType.ArgCount};
   }
 
-  Type getArgumentType() const {
-    return Arg;
-  }
+  void getRequirements(Type baseType, SmallVectorImpl<Requirement> &reqs) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Base, Arg);
+    Profile(ID, Base, getArgs());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ProtocolType *base,
-                      Type arg);
+                      ArrayRef<Type> args);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ParameterizedProtocol;
   }
-  
+
 private:
   ParameterizedProtocolType(const ASTContext *ctx,
-                            ProtocolType *base, Type arg,
+                            ProtocolType *base,
+                            ArrayRef<Type> args,
                             RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getArgumentType)
+  CanTypeArrayRef getArgs() const {
+    return CanTypeArrayRef(getPointer()->getArgs());
+  }
 END_CAN_TYPE_WRAPPER(ParameterizedProtocolType, Type)
 
 /// An existential type, spelled with \c any .

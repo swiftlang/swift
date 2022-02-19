@@ -166,18 +166,6 @@ static void desugarLayoutRequirement(Type subjectType,
   result.emplace_back(RequirementKind::Layout, subjectType, layout);
 }
 
-static Type lookupMemberType(Type subjectType, ProtocolDecl *protoDecl,
-                             AssociatedTypeDecl *assocType) {
-  if (subjectType->isTypeParameter())
-    return DependentMemberType::get(subjectType, assocType);
-
-  auto *M = protoDecl->getParentModule();
-  auto conformance = M->lookupConformance(
-      subjectType, protoDecl);
-  return conformance.getAssociatedType(subjectType,
-                                       assocType->getDeclaredInterfaceType());
-}
-
 /// Desugar a protocol conformance requirement by splitting up protocol
 /// compositions on the right hand side into conformance and superclass
 /// requirements.
@@ -217,16 +205,15 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
   }
 
   if (auto *paramType = constraintType->getAs<ParameterizedProtocolType>()) {
-    auto *protoDecl = paramType->getBaseType()->getDecl();
-
     desugarConformanceRequirement(subjectType, paramType->getBaseType(),
                                   loc, result, errors);
 
-    auto *assocType = protoDecl->getPrimaryAssociatedType();
+    SmallVector<Requirement, 2> reqs;
+    paramType->getRequirements(subjectType, reqs);
 
-    auto memberType = lookupMemberType(subjectType, protoDecl, assocType);
-    desugarSameTypeRequirement(memberType, paramType->getArgumentType(),
-                               loc, result, errors);
+    for (const auto &req : reqs)
+      desugarRequirement(req, result, errors);
+
     return;
   }
 
@@ -364,8 +351,9 @@ struct InferRequirementsWalker : public TypeWalker {
         };
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
-          auto *protocol = assocType->getProtocol();
-          auto secondType = lookupMemberType(firstType, protocol, assocType);
+          auto secondType = assocType->getDeclaredInterfaceType()
+              ->castTo<DependentMemberType>()
+              ->substBaseType(module, firstType);
           Requirement req(RequirementKind::SameType, firstType, secondType);
           desugarRequirement(req, reqs, errors);
         };

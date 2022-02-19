@@ -635,7 +635,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       }
 
       auto *protoDecl = protoType->getDecl();
-      if (protoDecl->getPrimaryAssociatedType() == nullptr) {
+      auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
+      if (assocTypes.empty()) {
         diags.diagnose(loc, diag::protocol_does_not_have_primary_assoc_type,
                        protoType);
 
@@ -644,9 +645,9 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
       auto genericArgs = generic->getGenericArgs();
 
-      if (genericArgs.size() != 1) {
-        diags.diagnose(loc, diag::protocol_cannot_have_multiple_generic_arguments,
-                       protoType);
+      if (genericArgs.size() > assocTypes.size()) {
+        diags.diagnose(loc, diag::parameterized_protocol_too_many_type_arguments,
+                       protoType, genericArgs.size(), assocTypes.size());
 
         return ErrorType::get(ctx);
       }
@@ -654,11 +655,16 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       auto genericResolution =
         resolution.withOptions(adjustOptionsForGenericArgs(options));
 
-      Type argTy = genericResolution.resolveType(genericArgs[0], silParams);
-      if (!argTy || argTy->hasError())
-        return ErrorType::get(ctx);
+      SmallVector<Type, 2> argTys;
+      for (auto *genericArg : genericArgs) {
+        Type argTy = genericResolution.resolveType(genericArg, silParams);
+        if (!argTy || argTy->hasError())
+          return ErrorType::get(ctx);
 
-      return ParameterizedProtocolType::get(ctx, protoType, argTy);
+        argTys.push_back(argTy);
+      }
+
+      return ParameterizedProtocolType::get(ctx, protoType, argTys);
     }
   }
 

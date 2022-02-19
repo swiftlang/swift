@@ -313,10 +313,10 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Find the primary associated type of the given protocol.
-class PrimaryAssociatedTypeRequest :
-    public SimpleRequest<PrimaryAssociatedTypeRequest,
-                         AssociatedTypeDecl *(ProtocolDecl *),
+/// Find the list of primary associated types of the given protocol.
+class PrimaryAssociatedTypesRequest :
+    public SimpleRequest<PrimaryAssociatedTypesRequest,
+                         ArrayRef<AssociatedTypeDecl *>(ProtocolDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -325,7 +325,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  AssociatedTypeDecl *
+  ArrayRef<AssociatedTypeDecl *>
   evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
 
 public:
