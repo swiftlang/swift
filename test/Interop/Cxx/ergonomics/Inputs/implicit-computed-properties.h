@@ -58,6 +58,23 @@ struct IntGetterSetter {
     void setX(int) {}
 };
 
+struct NonTrivial {
+    int value = 42; 
+    ~NonTrivial() {} 
+};
+
+struct RefGetterSetter {
+    int value = 42;
+    const int& getX() { return value; }
+    void setX(const int& v) { value = v; }
+};
+
+struct NonTrivialGetterSetter {
+    NonTrivial value = {42};
+    NonTrivial getX() { return value; }
+    void setX(NonTrivial v) { value = v; }
+};
+
 struct UTF8Str  {
     int getUTF8Str() const { return 42; }
     void setUTF8Str(int) {}
