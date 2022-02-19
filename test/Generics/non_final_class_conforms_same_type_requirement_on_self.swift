@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -requirement-machine-inferred-signatures=on
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-inferred-signatures=on %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -debug-generic-signatures -requirement-machine-inferred-signatures=on -disable-requirement-machine-concrete-contraction %s 2>&1 | %FileCheck %s
 
 public protocol P {
   associatedtype A : Q where A.B == Self
