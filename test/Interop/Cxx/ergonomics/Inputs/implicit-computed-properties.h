@@ -4,82 +4,81 @@
 // TODO: tests for non-const getters.
 
 struct VoidGetter {
-    void getX();
-    void setX(int);
+  void getX();
+  void setX(int);
 };
 
 struct VoidGetterNoName {
-    void set();
+  void set();
 };
 
 struct IllegalIntReturnSetter {
-    int setX(int);
+  int setX(int);
 };
 
 struct TwoParameterSetter {
-    void setX(int, int);
+  void setX(int, int);
 };
 
 struct NoNameSetter {
-    void set(int);
+  void set(int);
 };
 
 struct NoNameVoidGetter {
   void get();
-
 };
 
 struct LongNameAllLower {
-    int getfoo() const { return 42; }
+  int getfoo() const { return 42; }
 };
 
 struct LongNameAllUpper {
-    int getFOO() const { return 42; }
+  int getFOO() const { return 42; }
 };
 
 struct LongNameMix {
-    int GetFoo() const { return 42; }
+  int GetFoo() const { return 42; }
 };
 
 struct GetterOnly {
-    int getFoo() const { return 42; }
+  int getFoo() const { return 42; }
 };
 
 struct NoNameUpperGetter {
-    int Getter();
+  int Getter();
 };
 
 struct NotypeSetter {
-    void setX();
+  void setX();
 };
 
 struct IntGetterSetter {
-    int getX() { return 42; }
-    void setX(int) {}
+  int getX() { return 42; }
+  void setX(int) {}
 };
 
 struct NonTrivial {
-    int value = 42; 
-    ~NonTrivial() {} 
+  int value = 42;
+  ~NonTrivial() {}
 };
 
 struct RefGetterSetter {
-    int value = 42;
-    const int& getX() { return value; }
-    void setX(const int& v) { value = v; }
+  int value = 42;
+  const int &getX() { return value; }
+  void setX(const int &v) { value = v; }
 };
 
 struct NonTrivialGetterSetter {
-    NonTrivial value = {42};
-    NonTrivial getX() { return value; }
-    void setX(NonTrivial v) { value = v; }
+  NonTrivial value = {42};
+  NonTrivial getX() { return value; }
+  void setX(NonTrivial v) { value = v; }
 };
 
-struct UTF8Str  {
-    int getUTF8Str() const { return 42; }
-    void setUTF8Str(int) {}
+struct UTF8Str {
+  int getUTF8Str() const { return 42; }
+  void setUTF8Str(int) {}
 };
 
 // TODO: when setter and getter have different types.
 
-#endif //SWIFT_IMPLICIT_COMPUTED_PROPERTIES_H
+#endif // SWIFT_IMPLICIT_COMPUTED_PROPERTIES_H

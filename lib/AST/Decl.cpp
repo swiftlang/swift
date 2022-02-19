@@ -7273,16 +7273,15 @@ SubscriptDecl *SubscriptDecl::create(ASTContext &Context, DeclName Name,
 }
 
 VarDecl *VarDecl::createImported(ASTContext &Context, DeclName Name,
-                                             SourceLoc SubscriptLoc,
-                                             SourceLoc ArrowLoc, Type ElementTy,
-                                             DeclContext *Parent,
-                                             ClangNode ClangN) {
+                                 SourceLoc SubscriptLoc, SourceLoc ArrowLoc,
+                                 Type ElementTy, DeclContext *Parent,
+                                 ClangNode ClangN) {
   assert(ClangN && ElementTy);
   auto *DeclPtr = allocateMemoryForDecl<VarDecl>(
       Context, sizeof(VarDecl), /*includeSpaceForClangNode=*/true);
 
-  auto *const SD = ::new (DeclPtr)
-      VarDecl(false, Introducer::Var, SourceLoc(), Name.getBaseIdentifier(), Parent);
+  auto *const SD = ::new (DeclPtr) VarDecl(false, Introducer::Var, SourceLoc(),
+                                           Name.getBaseIdentifier(), Parent);
   SD->setInterfaceType(ElementTy);
   SD->setClangNode(ClangN);
   return SD;

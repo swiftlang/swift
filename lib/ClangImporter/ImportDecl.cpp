@@ -201,120 +201,121 @@ static void makeComputed(AbstractStorageDecl *storage,
 }
 
 struct CXXMethodBridging {
-    enum class Kind {
-        unkown, getter, setter, subscript
-    };
-    
-    enum class NameKind {
-        unkown, snake, lower, camel, title
-    };
-    
-    CXXMethodBridging(const clang::CXXMethodDecl *method) : method(method) { }
-    
-    Kind classify() {
-        if (nameIsBlacklist())
-            return Kind::unkown;
-        
-        // TODO: right now we can't transform names that aren't title case or camel case. In the future we could 
-        //  import these too, though.
-        auto nameKind = classifyNameKind();
-        if (nameKind != NameKind::title && nameKind != NameKind::camel && 
-            nameKind != NameKind::lower)
-            return Kind::unkown;
+  enum class Kind { unkown, getter, setter, subscript };
 
-        if (getClangName().startswith_insensitive("set"))
-            return Kind::setter;
-        
-        // Getters and subscripts cannot return void.
-        if (method->getReturnType()->isVoidType())
-            return Kind::unkown;
-        
-        if (getClangName().startswith_insensitive("get"))
-            return Kind::getter;
-        
-        // TODO: classify subscripts.
-        return Kind::unkown;
-    }
-    
-    NameKind classifyNameKind() {
-        bool allLower = llvm::all_of(getClangName(), islower);
-        
-        if (getClangName().empty())
-            return NameKind::unkown;
-        
-        if (getClangName().contains('_'))
-            return allLower ? NameKind::snake : NameKind::unkown;
-        
-        if (allLower)
-            return NameKind::lower;
+  enum class NameKind { unkown, snake, lower, camel, title };
 
-        return islower(getClangName().front()) ? NameKind::camel : NameKind::title;
-    }
-    
-    llvm::StringRef getClangName() {
-        if (!method->getDeclName().isIdentifier())
-            return "";
+  CXXMethodBridging(const clang::CXXMethodDecl *method) : method(method) {}
 
-        return method->getName(); 
-    }
-    
-    // TODO: handle snake case as well.
-    std::string importNameAsCamelCaseName() {
-        std::string output;
-        auto kind = classify();
-        if (kind == Kind::getter || kind == Kind::setter) {
-            output = getClangName().drop_front(3).str();
-        } else {
-            output = getClangName().str();
-        }
-        
-        if (output.empty())
-            return output;
-        
-        // No work to do.
-        if (classifyNameKind() == NameKind::lower)
-            return output;
-        
-        // The first character is always lowercase.
-        output.front() = std::tolower(output.front());
-        
-        // We already lowercased the first element, so start at one. Look at the current element and the next one. 
-        // To handle cases like UTF8String, start making all the uppercase characters lower, until we see an upper case 
-        // character followed by a lower case character (i.e., "St"). 
-        for (size_t i = 1; i < output.size(); i++) {
-            size_t next = i + 1;
+  Kind classify() {
+    if (nameIsBlacklist())
+      return Kind::unkown;
 
-            // If we see two upper case characters (or an upper case character and a number) make the current character 
-            // lower case.
-            if (std::isupper(output[i]) && (std::isupper(output[next]) || std::isdigit(output[next]))) {
-                output[i] = std::tolower(output[i]);
-            // If we found an upper case character followed by a lower case character, we went far enough. We're done. 
-            } else if (std::isupper(output[i]) && std::islower(output[next])) {
-                break;
-            // If we got to the end of the string, we're done.
-            } else if (std::isupper(output[i]) && next + 1 > output.size()) {
-                output[i] = std::tolower(output[i]);
-                break;
-            }
-        }
-        
-        return output;
+    // TODO: right now we can't transform names that aren't title case or camel
+    // case. In the future we could
+    //  import these too, though.
+    auto nameKind = classifyNameKind();
+    if (nameKind != NameKind::title && nameKind != NameKind::camel &&
+        nameKind != NameKind::lower)
+      return Kind::unkown;
+
+    if (getClangName().startswith_insensitive("set"))
+      return Kind::setter;
+
+    // Getters and subscripts cannot return void.
+    if (method->getReturnType()->isVoidType())
+      return Kind::unkown;
+
+    if (getClangName().startswith_insensitive("get"))
+      return Kind::getter;
+
+    // TODO: classify subscripts.
+    return Kind::unkown;
+  }
+
+  NameKind classifyNameKind() {
+    bool allLower = llvm::all_of(getClangName(), islower);
+
+    if (getClangName().empty())
+      return NameKind::unkown;
+
+    if (getClangName().contains('_'))
+      return allLower ? NameKind::snake : NameKind::unkown;
+
+    if (allLower)
+      return NameKind::lower;
+
+    return islower(getClangName().front()) ? NameKind::camel : NameKind::title;
+  }
+
+  llvm::StringRef getClangName() {
+    if (!method->getDeclName().isIdentifier())
+      return "";
+
+    return method->getName();
+  }
+
+  // TODO: handle snake case as well.
+  std::string importNameAsCamelCaseName() {
+    std::string output;
+    auto kind = classify();
+    if (kind == Kind::getter || kind == Kind::setter) {
+      output = getClangName().drop_front(3).str();
+    } else {
+      output = getClangName().str();
     }
-    
-    std::string importNameAsTitleCaseName() {
-        auto output = importNameAsCamelCaseName();
-        output.front() = std::toupper(output.front());
-        return output;
+
+    if (output.empty())
+      return output;
+
+    // No work to do.
+    if (classifyNameKind() == NameKind::lower)
+      return output;
+
+    // The first character is always lowercase.
+    output.front() = std::tolower(output.front());
+
+    // We already lowercased the first element, so start at one. Look at the
+    // current element and the next one. To handle cases like UTF8String, start
+    // making all the uppercase characters lower, until we see an upper case
+    // character followed by a lower case character (i.e., "St").
+    for (size_t i = 1; i < output.size(); i++) {
+      size_t next = i + 1;
+
+      // If we see two upper case characters (or an upper case character and a
+      // number) make the current character lower case.
+      if (std::isupper(output[i]) &&
+          (std::isupper(output[next]) || std::isdigit(output[next]))) {
+        output[i] = std::tolower(output[i]);
+        // If we found an upper case character followed by a lower case
+        // character, we went far enough. We're done.
+      } else if (std::isupper(output[i]) && std::islower(output[next])) {
+        break;
+        // If we got to the end of the string, we're done.
+      } else if (std::isupper(output[i]) && next + 1 > output.size()) {
+        output[i] = std::tolower(output[i]);
+        break;
+      }
     }
-    
+
+    return output;
+  }
+
+  std::string importNameAsTitleCaseName() {
+    auto output = importNameAsCamelCaseName();
+    output.front() = std::toupper(output.front());
+    return output;
+  }
+
 private:
-    const clang::CXXMethodDecl *method = nullptr;
+  const clang::CXXMethodDecl *method = nullptr;
 
-    bool nameIsBlacklist() {
-        auto loweredName = getClangName().lower();
-        // Names that start with "get" or "set" but aren't getters or setters.
-        return loweredName == "getter" || loweredName == "setter" || loweredName == "get" || loweredName == "set";
-    }
+  bool nameIsBlacklist() {
+    auto loweredName = getClangName().lower();
+    // Names that start with "get" or "set" but aren't getters or setters.
+    return loweredName == "getter" || loweredName == "setter" ||
+           loweredName == "get" || loweredName == "set";
+  }
 };
 
 #ifndef NDEBUG
@@ -3726,16 +3727,16 @@ namespace {
               !cxxRecordDecl->isTriviallyCopyable());
 
         for (auto &getterAndSetter : Impl.GetterSetterMap) {
-            auto getter = getterAndSetter.second.first;
-            auto setter = getterAndSetter.second.second;
-            // We cannot make a computed property without a getter.
-            if (!getter ||
-                getter->getDeclContext() != result) continue;
+          auto getter = getterAndSetter.second.first;
+          auto setter = getterAndSetter.second.second;
+          // We cannot make a computed property without a getter.
+          if (!getter || getter->getDeclContext() != result)
+            continue;
 
-            auto p = makeComputedPropertyFromCXXMethods(getter, setter);
-            // Add computed properties directly because they won't be found from the
-            // clang decl during lazy member lookup.
-            result->addMember(p);
+          auto p = makeComputedPropertyFromCXXMethods(getter, setter);
+          // Add computed properties directly because they won't be found from
+          // the clang decl during lazy member lookup.
+          result->addMember(p);
         }
 
         for (auto &subscriptInfo : Impl.cxxSubscripts) {
@@ -4422,56 +4423,56 @@ namespace {
 
       recordObjCOverride(result);
     }
-      static std::pair<BraceStmt *, bool>
-      synthesizeGetterBody(AbstractFunctionDecl *afd, void *context) {
-          auto accessor = cast<AccessorDecl>(afd);
-          auto method = static_cast<FuncDecl *>(context);
+    static std::pair<BraceStmt *, bool>
+    synthesizeGetterBody(AbstractFunctionDecl *afd, void *context) {
+      auto accessor = cast<AccessorDecl>(afd);
+      auto method = static_cast<FuncDecl *>(context);
 
-          Expr *selfExpr = createSelfExpr(accessor);
-          
-          auto *getterImplCallExpr =
-                  createAccessorImplCallExpr(method, selfExpr);
-          auto returnStmt = new (method->getASTContext()) ReturnStmt(SourceLoc(), getterImplCallExpr);
-          auto body = BraceStmt::create(method->getASTContext(), SourceLoc(),
-                                        {returnStmt}, SourceLoc());
+      Expr *selfExpr = createSelfExpr(accessor);
 
-          return { body,/*isTypeChecked=*/true };
+      auto *getterImplCallExpr = createAccessorImplCallExpr(method, selfExpr);
+      auto returnStmt = new (method->getASTContext())
+          ReturnStmt(SourceLoc(), getterImplCallExpr);
+      auto body = BraceStmt::create(method->getASTContext(), SourceLoc(),
+                                    {returnStmt}, SourceLoc());
+
+      return {body, /*isTypeChecked=*/true};
     }
 
-      static std::pair<BraceStmt *, bool>
-      synthesizeSetterBody(AbstractFunctionDecl *afd, void *context) {
-          auto setterDecl = cast<AccessorDecl>(afd);
-          auto setterImpl = static_cast<FuncDecl *>(context);
+    static std::pair<BraceStmt *, bool>
+    synthesizeSetterBody(AbstractFunctionDecl *afd, void *context) {
+      auto setterDecl = cast<AccessorDecl>(afd);
+      auto setterImpl = static_cast<FuncDecl *>(context);
 
-          ASTContext &ctx = setterDecl->getASTContext();
+      ASTContext &ctx = setterDecl->getASTContext();
 
-          Expr *selfExpr = createSelfExpr(setterDecl);
-          DeclRefExpr *valueParamRefExpr = createParamRefExpr(setterDecl, 0);
+      Expr *selfExpr = createSelfExpr(setterDecl);
+      DeclRefExpr *valueParamRefExpr = createParamRefExpr(setterDecl, 0);
 
-          auto *getterImplCallExpr =
-               createAccessorImplCallExpr(setterImpl, selfExpr,valueParamRefExpr);
+      auto *getterImplCallExpr =
+          createAccessorImplCallExpr(setterImpl, selfExpr, valueParamRefExpr);
 
-          auto body = BraceStmt::create(setterImpl->getASTContext(), SourceLoc(),
-                                       {getterImplCallExpr}, SourceLoc());
-          return { body, /*isTypeChecked=*/true };
-      }
-      
-      Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
-        auto method = VisitFunctionDecl(decl);
-        
-        CXXMethodBridging bridgingInfo(decl);
-        if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
-            auto name = bridgingInfo.getClangName().drop_front(3);
-            Impl.GetterSetterMap[name].first = static_cast<FuncDecl *>(method);
-        } else if (bridgingInfo.classify() == CXXMethodBridging::Kind::setter) {
-            auto name = bridgingInfo.getClangName().drop_front(3);
-            Impl.GetterSetterMap[name].second = static_cast<FuncDecl *>(method);
-        }
+      auto body = BraceStmt::create(setterImpl->getASTContext(), SourceLoc(),
+                                    {getterImplCallExpr}, SourceLoc());
+      return {body, /*isTypeChecked=*/true};
+    }
 
-        return method;
+    Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
+      auto method = VisitFunctionDecl(decl);
+
+      CXXMethodBridging bridgingInfo(decl);
+      if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
+        auto name = bridgingInfo.getClangName().drop_front(3);
+        Impl.GetterSetterMap[name].first = static_cast<FuncDecl *>(method);
+      } else if (bridgingInfo.classify() == CXXMethodBridging::Kind::setter) {
+        auto name = bridgingInfo.getClangName().drop_front(3);
+        Impl.GetterSetterMap[name].second = static_cast<FuncDecl *>(method);
       }
 
-      Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
+      return method;
+    }
+
+    Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
       Optional<ImportedName> correctSwiftName;
       ImportedName importedName;
@@ -5362,7 +5363,8 @@ namespace {
     /// \param setter function returning `UnsafeMutablePointer<T>`
     /// \return subscript declaration
     SubscriptDecl *makeSubscript(FuncDecl *getter, FuncDecl *setter);
-    VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter, FuncDecl *setter);
+    VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
+                                                FuncDecl *setter);
 
     /// Import the accessor and its attributes.
     AccessorDecl *importAccessor(const clang::ObjCMethodDecl *clangAccessor,
@@ -7794,8 +7796,7 @@ Expr *createSelfExpr(AccessorDecl *accessorDecl) {
   return inoutSelfExpr;
 }
 
- DeclRefExpr *
-createParamRefExpr(AccessorDecl *accessorDecl, unsigned index) {
+DeclRefExpr *createParamRefExpr(AccessorDecl *accessorDecl, unsigned index) {
   ASTContext &ctx = accessorDecl->getASTContext();
 
   auto paramDecl = accessorDecl->getParameters()->get(index);
@@ -7806,10 +7807,8 @@ createParamRefExpr(AccessorDecl *accessorDecl, unsigned index) {
   return paramRefExpr;
 }
 
- CallExpr *
-createAccessorImplCallExpr(FuncDecl *accessorImpl,
-                           Expr *selfExpr,
-                           DeclRefExpr *keyRefExpr) {
+CallExpr *createAccessorImplCallExpr(FuncDecl *accessorImpl, Expr *selfExpr,
+                                     DeclRefExpr *keyRefExpr) {
   ASTContext &ctx = accessorImpl->getASTContext();
 
   auto accessorImplExpr =
@@ -7928,82 +7927,70 @@ synthesizeSubscriptSetterBody(AbstractFunctionDecl *afd, void *context) {
   return { body, /*isTypeChecked=*/true };
 }
 
-
-
-VarDecl *SwiftDeclConverter::makeComputedPropertyFromCXXMethods(FuncDecl *getter, FuncDecl *setter) {
+VarDecl *
+SwiftDeclConverter::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
+                                                       FuncDecl *setter) {
   auto &ctx = Impl.SwiftContext;
   auto dc = getter->getDeclContext();
-  
+
   assert(isa<clang::CXXMethodDecl>(getter->getClangDecl()) &&
          (!setter || isa<clang::CXXMethodDecl>(setter->getClangDecl())) &&
-          "Functions passed to makeProperty must be imported C++ method decls.");
+         "Functions passed to makeProperty must be imported C++ method decls.");
 
-  CXXMethodBridging bridgingInfo(cast<clang::CXXMethodDecl>(getter->getClangDecl()));
+  CXXMethodBridging bridgingInfo(
+      cast<clang::CXXMethodDecl>(getter->getClangDecl()));
   assert(bridgingInfo.classify() == CXXMethodBridging::Kind::getter);
-  
+
   auto importedName = bridgingInfo.importNameAsCamelCaseName();
-  auto result = VarDecl::createImported(ctx, ctx.getIdentifier(importedName), getter->getStartLoc(), getter->getStartLoc(), getter->getResultInterfaceType(), dc, getter->getClangNode());
+  auto result = VarDecl::createImported(
+      ctx, ctx.getIdentifier(importedName), getter->getStartLoc(),
+      getter->getStartLoc(), getter->getResultInterfaceType(), dc,
+      getter->getClangNode());
   result->setAccess(AccessLevel::Public);
   result->setImplInfo(StorageImplInfo::getMutableComputed());
 
-  AccessorDecl *getterDecl = AccessorDecl::create(ctx,
-                                                  getter->getLoc(),
-                                                  getter->getLoc(),
-                                                  AccessorKind::Get,
-                                                  result,
-                                                  SourceLoc(),
-                                                  StaticSpellingKind::None,
-                                                  /*async*/ false, SourceLoc(),
-                                                  /*throws*/ false, SourceLoc(),
-                                                  nullptr,
-                                                  ParameterList::createEmpty(ctx),
-                                                  getter->getResultInterfaceType(),
-                                                  dc);
+  AccessorDecl *getterDecl = AccessorDecl::create(
+      ctx, getter->getLoc(), getter->getLoc(), AccessorKind::Get, result,
+      SourceLoc(), StaticSpellingKind::None,
+      /*async*/ false, SourceLoc(),
+      /*throws*/ false, SourceLoc(), nullptr, ParameterList::createEmpty(ctx),
+      getter->getResultInterfaceType(), dc);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
   getterDecl->setBodySynthesizer(synthesizeGetterBody, getter);
   if (getter->isMutating()) {
-      getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-      result->setIsGetterMutating(true);
+    getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+    result->setIsGetterMutating(true);
   }
 
   AccessorDecl *setterDecl = nullptr;
   if (setter) {
-      auto paramVarDecl =
-              new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
-                                  Identifier(), SourceLoc(),
-                                  ctx.getIdentifier("newValue"), dc);
-      paramVarDecl->setSpecifier(ParamSpecifier::Default);
-      paramVarDecl->setInterfaceType(getter->getResultInterfaceType());
+    auto paramVarDecl =
+        new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                            ctx.getIdentifier("newValue"), dc);
+    paramVarDecl->setSpecifier(ParamSpecifier::Default);
+    paramVarDecl->setInterfaceType(getter->getResultInterfaceType());
 
-      auto setterParamList =
-              ParameterList::create(ctx, { paramVarDecl });
+    auto setterParamList = ParameterList::create(ctx, {paramVarDecl});
 
-      setterDecl = AccessorDecl::create(ctx,
-                                                      setter->getLoc(),
-                                                      setter->getLoc(),
-                                                      AccessorKind::Set,
-                                                      result,
-                                                      SourceLoc(),
-                                                      StaticSpellingKind::None,
-              /*async*/ false, SourceLoc(),
-              /*throws*/ false, SourceLoc(),
-                                                      nullptr,
-                                                      setterParamList,
-                                                      setter->getResultInterfaceType(),
-                                                      dc);
-      setterDecl->setAccess(AccessLevel::Public);
-      setterDecl->setImplicit();
-      setterDecl->setIsDynamic(false);
-      setterDecl->setIsTransparent(true);
-      setterDecl->setBodySynthesizer(synthesizeSetterBody, setter);
+    setterDecl = AccessorDecl::create(
+        ctx, setter->getLoc(), setter->getLoc(), AccessorKind::Set, result,
+        SourceLoc(), StaticSpellingKind::None,
+        /*async*/ false, SourceLoc(),
+        /*throws*/ false, SourceLoc(), nullptr, setterParamList,
+        setter->getResultInterfaceType(), dc);
+    setterDecl->setAccess(AccessLevel::Public);
+    setterDecl->setImplicit();
+    setterDecl->setIsDynamic(false);
+    setterDecl->setIsTransparent(true);
+    setterDecl->setBodySynthesizer(synthesizeSetterBody, setter);
 
-      if (setter->isMutating()) {
-          setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-          result->setIsSetterMutating(true);
-      }
+    if (setter->isMutating()) {
+      setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+      result->setIsSetterMutating(true);
+    }
   }
 
   makeComputed(result, getterDecl, setterDecl);
@@ -9273,18 +9260,24 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     Result = importDecl(UnderlyingDecl, version);
     SkippedOverTypedef = true;
   }
-  // TODO extend Swift classes to it's equivalents from it's ClanDecled attributes
-  
-  if (isa<clang::FunctionDecl>(ClangDecl)) {
-    if (ClangDecl->getDeclName().isIdentifier() && ClangDecl->getName().startswith_insensitive("get")&& ClangDecl->getName().lower() != "getter") {
-      const_cast<clang::NamedDecl *>(ClangDecl)->addAttr(
-          clang::SwiftAttrAttr::CreateImplicit(ClangDecl->getASTContext(), "import_as_getter"));
-    }
-    if (ClangDecl->getDeclName().isIdentifier() && ClangDecl->getName().startswith_insensitive("set")&& ClangDecl->getName().lower() != "setter") {
-      const_cast<clang::NamedDecl *>(ClangDecl)->addAttr(
-          clang::SwiftAttrAttr::CreateImplicit(ClangDecl->getASTContext(), "import_as_setter"));
-    }
+  // TODO extend Swift classes to it's equivalents from it's ClanDecled
+  // attributes
 
+  if (isa<clang::FunctionDecl>(ClangDecl)) {
+    if (ClangDecl->getDeclName().isIdentifier() &&
+        ClangDecl->getName().startswith_insensitive("get") &&
+        ClangDecl->getName().lower() != "getter") {
+      const_cast<clang::NamedDecl *>(ClangDecl)->addAttr(
+          clang::SwiftAttrAttr::CreateImplicit(ClangDecl->getASTContext(),
+                                               "import_as_getter"));
+    }
+    if (ClangDecl->getDeclName().isIdentifier() &&
+        ClangDecl->getName().startswith_insensitive("set") &&
+        ClangDecl->getName().lower() != "setter") {
+      const_cast<clang::NamedDecl *>(ClangDecl)->addAttr(
+          clang::SwiftAttrAttr::CreateImplicit(ClangDecl->getASTContext(),
+                                               "import_as_setter"));
+    }
   }
 
   if (!Result) {
