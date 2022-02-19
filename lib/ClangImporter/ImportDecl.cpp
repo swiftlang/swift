@@ -132,6 +132,66 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
   return TypedPattern::createImplicit(Ctx, P, ty);
 }
 
+static Expr *createSelfExpr(AccessorDecl *accessorDecl) {
+    ASTContext &ctx = accessorDecl->getASTContext();
+
+    auto selfDecl = accessorDecl->getImplicitSelfDecl();
+    auto selfRefExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+            /*implicit*/ true);
+
+    if (!accessorDecl->isMutating()) {
+        selfRefExpr->setType(selfDecl->getInterfaceType());
+        return selfRefExpr;
+    }
+    selfRefExpr->setType(LValueType::get(selfDecl->getInterfaceType()));
+
+    auto inoutSelfExpr = new (ctx) InOutExpr(
+            SourceLoc(), selfRefExpr,
+            accessorDecl->mapTypeIntoContext(selfDecl->getValueInterfaceType()),
+            /*isImplicit*/ true);
+    inoutSelfExpr->setType(InOutType::get(selfDecl->getInterfaceType()));
+    return inoutSelfExpr;
+}
+
+static CallExpr *createAccessorImplCallExpr(FuncDecl *accessorImpl, Expr *selfExpr,
+                                            DeclRefExpr *keyRefExpr = nullptr) {
+    ASTContext &ctx = accessorImpl->getASTContext();
+
+    auto accessorImplExpr =
+            new (ctx) DeclRefExpr(ConcreteDeclRef(accessorImpl),
+                                  DeclNameLoc(),
+                    /*Implicit=*/ true);
+    accessorImplExpr->setType(accessorImpl->getInterfaceType());
+
+    auto accessorImplDotCallExpr =
+            DotSyntaxCallExpr::create(ctx, accessorImplExpr, SourceLoc(), selfExpr);
+    accessorImplDotCallExpr->setType(accessorImpl->getMethodInterfaceType());
+    accessorImplDotCallExpr->setThrows(false);
+
+    ArgumentList *argList;
+    if (keyRefExpr) {
+        argList = ArgumentList::forImplicitUnlabeled(ctx, {keyRefExpr});
+    } else {
+        argList = ArgumentList::forImplicitUnlabeled(ctx, {});
+    }
+    auto *accessorImplCallExpr =
+            CallExpr::createImplicit(ctx, accessorImplDotCallExpr, argList);
+    accessorImplCallExpr->setType(accessorImpl->getResultInterfaceType());
+    accessorImplCallExpr->setThrows(false);
+    return accessorImplCallExpr;
+}
+
+static DeclRefExpr *createParamRefExpr(AccessorDecl *accessorDecl, unsigned index) {
+    ASTContext &ctx = accessorDecl->getASTContext();
+
+    auto paramDecl = accessorDecl->getParameters()->get(index);
+    auto paramRefExpr = new (ctx) DeclRefExpr(paramDecl,
+                                              DeclNameLoc(),
+            /*Implicit=*/ true);
+    paramRefExpr->setType(paramDecl->getType());
+    return paramRefExpr;
+}
+
 /// Create a var member for this struct, along with its pattern binding, and add
 /// it as a member
 static std::pair<VarDecl *, PatternBindingDecl *>
@@ -4424,7 +4484,7 @@ namespace {
       recordObjCOverride(result);
     }
     static std::pair<BraceStmt *, bool>
-    synthesizeGetterBody(AbstractFunctionDecl *afd, void *context) {
+    synthesizeComputedGetterFromCXXMethod(AbstractFunctionDecl *afd, void *context) {
       auto accessor = cast<AccessorDecl>(afd);
       auto method = static_cast<FuncDecl *>(context);
 
@@ -4440,7 +4500,7 @@ namespace {
     }
 
     static std::pair<BraceStmt *, bool>
-    synthesizeSetterBody(AbstractFunctionDecl *afd, void *context) {
+    synthesizeComputedSetterFromCXXMethod(AbstractFunctionDecl *afd, void *context) {
       auto setterDecl = cast<AccessorDecl>(afd);
       auto setterImpl = static_cast<FuncDecl *>(context);
 
@@ -7775,66 +7835,6 @@ SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
   return accessor;
 }
 
-Expr *createSelfExpr(AccessorDecl *accessorDecl) {
-  ASTContext &ctx = accessorDecl->getASTContext();
-
-  auto selfDecl = accessorDecl->getImplicitSelfDecl();
-  auto selfRefExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                           /*implicit*/ true);
-
-  if (!accessorDecl->isMutating()) {
-    selfRefExpr->setType(selfDecl->getInterfaceType());
-    return selfRefExpr;
-  }
-  selfRefExpr->setType(LValueType::get(selfDecl->getInterfaceType()));
-
-  auto inoutSelfExpr = new (ctx) InOutExpr(
-      SourceLoc(), selfRefExpr,
-      accessorDecl->mapTypeIntoContext(selfDecl->getValueInterfaceType()),
-      /*isImplicit*/ true);
-  inoutSelfExpr->setType(InOutType::get(selfDecl->getInterfaceType()));
-  return inoutSelfExpr;
-}
-
-DeclRefExpr *createParamRefExpr(AccessorDecl *accessorDecl, unsigned index) {
-  ASTContext &ctx = accessorDecl->getASTContext();
-
-  auto paramDecl = accessorDecl->getParameters()->get(index);
-  auto paramRefExpr = new (ctx) DeclRefExpr(paramDecl,
-                                            DeclNameLoc(),
-                                            /*Implicit=*/ true);
-  paramRefExpr->setType(paramDecl->getType());
-  return paramRefExpr;
-}
-
-CallExpr *createAccessorImplCallExpr(FuncDecl *accessorImpl, Expr *selfExpr,
-                                     DeclRefExpr *keyRefExpr) {
-  ASTContext &ctx = accessorImpl->getASTContext();
-
-  auto accessorImplExpr =
-      new (ctx) DeclRefExpr(ConcreteDeclRef(accessorImpl),
-                            DeclNameLoc(),
-                            /*Implicit=*/ true);
-  accessorImplExpr->setType(accessorImpl->getInterfaceType());
-
-  auto accessorImplDotCallExpr =
-      DotSyntaxCallExpr::create(ctx, accessorImplExpr, SourceLoc(), selfExpr);
-  accessorImplDotCallExpr->setType(accessorImpl->getMethodInterfaceType());
-  accessorImplDotCallExpr->setThrows(false);
-
-  ArgumentList *argList;
-  if (keyRefExpr) {
-    argList = ArgumentList::forImplicitUnlabeled(ctx, {keyRefExpr});
-  } else {
-    argList = ArgumentList::forImplicitUnlabeled(ctx, {});
-  }
-  auto *accessorImplCallExpr =
-      CallExpr::createImplicit(ctx, accessorImplDotCallExpr, argList);
-  accessorImplCallExpr->setType(accessorImpl->getResultInterfaceType());
-  accessorImplCallExpr->setThrows(false);
-  return accessorImplCallExpr;
-}
-
 /// Synthesizer callback for a subscript getter.
 static std::pair<BraceStmt *, bool>
 synthesizeSubscriptGetterBody(AbstractFunctionDecl *afd, void *context) {
@@ -7959,7 +7959,7 @@ SwiftDeclConverter::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
-  getterDecl->setBodySynthesizer(synthesizeGetterBody, getter);
+  getterDecl->setBodySynthesizer(synthesizeComputedGetterFromCXXMethod, getter);
   if (getter->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
     result->setIsGetterMutating(true);
@@ -7985,7 +7985,7 @@ SwiftDeclConverter::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
     setterDecl->setImplicit();
     setterDecl->setIsDynamic(false);
     setterDecl->setIsTransparent(true);
-    setterDecl->setBodySynthesizer(synthesizeSetterBody, setter);
+    setterDecl->setBodySynthesizer(synthesizeComputedSetterFromCXXMethod, setter);
 
     if (setter->isMutating()) {
       setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);

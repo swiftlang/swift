@@ -74,6 +74,12 @@ struct NonTrivialGetterSetter {
   void setX(NonTrivial v) { value = v; }
 };
 
+struct DifferentTypes {
+  NonTrivial value = {42};
+  NonTrivial getX() { return value; }
+  void setX(int v) { value = {v}; }
+};
+
 struct UTF8Str {
   int getUTF8Str() const { return 42; }
   void setUTF8Str(int) {}
