@@ -684,7 +684,7 @@ public:
   /// This includes all decls that should be displayed to clients of the module.
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
   /// shadowed clang module.
-  void getDisplayDecls(SmallVectorImpl<Decl*> &results);
+  void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false);
 
   StringRef getModuleFilename() const {
     if (!Core->ModuleInterfacePath.empty())

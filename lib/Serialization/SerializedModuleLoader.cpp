@@ -1561,8 +1561,8 @@ SerializedASTFile::getOpaqueReturnTypeDecls(
 }
 
 void
-SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
-  File.getDisplayDecls(results);
+SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive) const {
+  File.getDisplayDecls(results, recursive);
 }
 
 StringRef SerializedASTFile::getFilename() const {
