@@ -209,6 +209,7 @@ bool Expr::isSemanticallyConstExpr() const {
   case ExprKind::BooleanLiteral:
   case ExprKind::FloatLiteral:
   case ExprKind::StringLiteral:
+  case ExprKind::KeyPath:
     return true;
   case ExprKind::Array:
   case ExprKind::Dictionary: {
