@@ -298,8 +298,7 @@ public func _forEachField(
 ///   - options: Options to use when reflecting over `type`.
 ///   - body: A closure to call with information about each field in `type`.
 ///     The parameters to `body` are a pointer to a C string holding the name
-///     of the field, the offset of the field in bytes, the type of the field,
-///     and the `_MetadataKind` of the field's type.
+///     of the field and an erased keypath for it.
 /// - Returns: `true` if every invocation of `body` returns `true`; otherwise,
 ///   `false`.
 @available(SwiftStdlib 5.4, *)
