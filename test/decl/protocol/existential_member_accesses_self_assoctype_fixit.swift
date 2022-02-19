@@ -189,10 +189,10 @@ struct Test {
   }
 
   subscript(p: any P & Q) -> any P {
-    _read { p.method(false) } // expected-error {{member 'method' cannot be used on value of protocol type 'P & Q'; consider using a generic constraint instead}} {{-1:20--1:25=<#generic parameter name#>}} {{-1:16--1:20=}} {{-1:12--1:12=<<#generic parameter name#>: P & Q>}} {{none}}
+    _read { p.method(false) }   // expected-error {{member 'method' cannot be used on value of protocol type 'P & Q'; consider using a generic constraint instead}} {{-1:20--1:25=<#generic parameter name#>}} {{-1:16--1:20=}} {{-1:12--1:12=<<#generic parameter name#>: P & Q>}} {{none}}
     _modify { p.method(false) } // expected-error {{member 'method' cannot be used on value of protocol type 'P & Q'; consider using a generic constraint instead}} {{-2:20--2:25=<#generic parameter name#>}} {{-2:16--2:20=}} {{-2:12--2:12=<<#generic parameter name#>: P & Q>}} {{none}}
-    willSet { p.method(false) } // expected-error {{member 'method' cannot be used on value of protocol type 'P'; consider using a generic constraint instead}} {{-3:20--3:25=<#generic parameter name#>}} {{-3:16--3:20=}} {{-3:12--3:12=<<#generic parameter name#>: P & Q>}} {{none}}
-    didSet { p.method(false) } // expected-error {{member 'method' cannot be used on value of protocol type 'P'; consider using a generic constraint instead}} {{-4:20--4:25=<#generic parameter name#>}} {{-4:16--4:20=}} {{-4:12--4:12=<<#generic parameter name#>: P & Q>}} {{none}}
+    willSet { p.method(false) } // expected-error {{member 'method' cannot be used on value of protocol type 'P & Q'; consider using a generic constraint instead}} {{-3:20--3:25=<#generic parameter name#>}} {{-3:16--3:20=}} {{-3:12--3:12=<<#generic parameter name#>: P & Q>}} {{none}}
+    didSet { p.method(false) }  // expected-error {{member 'method' cannot be used on value of protocol type 'P & Q'; consider using a generic constraint instead}} {{-4:20--4:25=<#generic parameter name#>}} {{-4:16--4:20=}} {{-4:12--4:12=<<#generic parameter name#>: P & Q>}} {{none}}
     // expected-error@-2 {{'willSet' is not allowed in subscripts}}
     // expected-error@-2 {{'didSet' is not allowed in subscripts}}
   }
