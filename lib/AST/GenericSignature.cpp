@@ -994,6 +994,39 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
   }
 }
 
+static Type stripBoundDependentMemberTypes(Type t) {
+  if (auto *depMemTy = t->getAs<DependentMemberType>()) {
+    return DependentMemberType::get(
+      stripBoundDependentMemberTypes(depMemTy->getBase()),
+      depMemTy->getName());
+  }
+
+  return t;
+}
+
+static Requirement stripBoundDependentMemberTypes(Requirement req) {
+  auto subjectType = stripBoundDependentMemberTypes(req.getFirstType());
+
+  switch (req.getKind()) {
+  case RequirementKind::Conformance:
+    return Requirement(RequirementKind::Conformance, subjectType,
+                       req.getSecondType());
+
+  case RequirementKind::Superclass:
+  case RequirementKind::SameType:
+    return Requirement(req.getKind(), subjectType,
+                       req.getSecondType().transform([](Type t) {
+                         return stripBoundDependentMemberTypes(t);
+                       }));
+
+  case RequirementKind::Layout:
+    return Requirement(RequirementKind::Layout, subjectType,
+                       req.getLayoutConstraint());
+  }
+
+  llvm_unreachable("Bad requirement kind");
+}
+
 void swift::validateGenericSignature(ASTContext &context,
                                      GenericSignature sig) {
   llvm::errs() << "Validating generic signature: ";
@@ -1007,7 +1040,7 @@ void swift::validateGenericSignature(ASTContext &context,
 
   SmallVector<Requirement, 2> requirements;
   for (auto requirement : sig.getRequirements())
-    requirements.push_back(requirement);
+    requirements.push_back(stripBoundDependentMemberTypes(requirement));
 
   {
     PrettyStackTraceGenericSignature debugStack("verifying", sig);
@@ -1043,7 +1076,7 @@ void swift::validateGenericSignature(ASTContext &context,
     SmallVector<Requirement, 2> newRequirements;
     for (unsigned i : indices(requirements)) {
       if (i != victimIndex)
-        newRequirements.push_back(requirements[i]);
+        newRequirements.push_back(stripBoundDependentMemberTypes(requirements[i]));
     }
 
     auto newSigWithError = evaluateOrDefault(
