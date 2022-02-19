@@ -77,7 +77,6 @@
 /// TODO: Handle partial_apply, try_apply, and begin_apply.
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
