@@ -4540,10 +4540,10 @@ Type Type::subst(TypeSubstitutionFn substitutions,
   return substType(*this, substitutions, conformances, options);
 }
 
-const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
+DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
   if (!hasTypeParameter()) return nullptr;
 
-  const DependentMemberType *unresolvedDepMemTy = nullptr;
+  DependentMemberType *unresolvedDepMemTy = nullptr;
   Type(this).findIf([&](Type type) -> bool {
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
       if (depMemTy->getAssocType() == nullptr) {
