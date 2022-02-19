@@ -36,7 +36,7 @@ enum class ModuleSearchPathKind {
 
 /// A single module search path that can come from different sources, e.g.
 /// framework search paths, import search path etc.
-struct ModuleSearchPath {
+class ModuleSearchPath {
   /// The actual path of the module search path. References a search path string
   /// stored inside \c SearchPathOptions, which must outlive this reference.
   StringRef Path;
@@ -51,6 +51,18 @@ struct ModuleSearchPath {
   /// user-defined search path order when merging search paths containing
   /// different file names in \c searchPathsContainingFile.
   unsigned Index;
+
+public:
+  ModuleSearchPath(StringRef Path, ModuleSearchPathKind Kind, bool IsSystem,
+                   unsigned Index)
+      : Path(Path), Kind(Kind), IsSystem(IsSystem), Index(Index) {}
+
+  StringRef getPath() const { return Path; }
+  ModuleSearchPathKind getKind() const { return Kind; }
+
+  bool isSystem() const { return IsSystem; }
+
+  unsigned getIndex() const { return Index; }
 
   bool operator<(const ModuleSearchPath &Other) const {
     if (this->Kind == Other.Kind) {

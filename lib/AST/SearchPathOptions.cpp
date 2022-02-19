@@ -19,16 +19,22 @@ void ModuleSearchPathLookup::addFilesInPathToLookupTable(
     llvm::vfs::FileSystem *FS, StringRef SearchPath, ModuleSearchPathKind Kind,
     bool IsSystem, unsigned SearchPathIndex) {
   std::error_code Error;
-  assert(llvm::all_of(LookupTable, [&](const auto &LookupTableEntry) {
-    return llvm::none_of(LookupTableEntry.second, [&](const ModuleSearchPath &ExistingSearchPath) -> bool {
-      return ExistingSearchPath.Kind == Kind && ExistingSearchPath.Index == SearchPathIndex;
-    });
-  }) && "Search path with this kind and index already exists");
+  assert(llvm::all_of(
+             LookupTable,
+             [&](const auto &LookupTableEntry) {
+               return llvm::none_of(
+                   LookupTableEntry.second,
+                   [&](const ModuleSearchPath &ExistingSearchPath) -> bool {
+                     return ExistingSearchPath.getKind() == Kind &&
+                            ExistingSearchPath.getIndex() == SearchPathIndex;
+                   });
+             }) &&
+         "Search path with this kind and index already exists");
   for (auto Dir = FS->dir_begin(SearchPath, Error);
        !Error && Dir != llvm::vfs::directory_iterator(); Dir.increment(Error)) {
     StringRef Filename = llvm::sys::path::filename(Dir->path());
-    LookupTable[Filename].push_back(
-        {SearchPath, Kind, IsSystem, SearchPathIndex});
+    LookupTable[Filename].emplace_back(SearchPath, Kind, IsSystem,
+                                       SearchPathIndex);
   }
 }
 
@@ -92,7 +98,8 @@ ModuleSearchPathLookup::searchPathsContainingFile(
 
   for (auto &Filename : Filenames) {
     for (auto &Entry : LookupTable[Filename]) {
-      if (ResultIds.insert(std::make_pair(Entry.Kind, Entry.Index)).second) {
+      if (ResultIds.insert(std::make_pair(Entry.getKind(), Entry.getIndex()))
+              .second) {
         Result.push_back(&Entry);
       }
     }
