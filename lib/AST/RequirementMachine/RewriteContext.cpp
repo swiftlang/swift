@@ -29,7 +29,6 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
     auto flag = llvm::StringSwitch<Optional<DebugFlags>>(flagStr)
       .Case("simplify", DebugFlags::Simplify)
       .Case("add", DebugFlags::Add)
-      .Case("merge", DebugFlags::Merge)
       .Case("completion", DebugFlags::Completion)
       .Case("property-map", DebugFlags::PropertyMap)
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
