@@ -57,7 +57,7 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
                                          const SymbolGraphOptions &Options) {
   SymbolGraphASTWalker Walker(*M, Options);
   SmallVector<Decl *, 64> ModuleDecls;
-  swift::getTopLevelDeclsForDisplay(M, ModuleDecls);
+  swift::getTopLevelDeclsForDisplay(M, ModuleDecls, /*recursive*/true);
 
   if (Options.PrintMessages)
     llvm::errs() << ModuleDecls.size()
