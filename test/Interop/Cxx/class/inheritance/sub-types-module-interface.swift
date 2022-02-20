@@ -11,10 +11,10 @@
 // CHECK-NEXT:     case ecc
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Enum : Equatable, RawRepresentable {
-// CHECK-NEXT:     init(_ rawValue: UInt32)
-// CHECK-NEXT:     init(rawValue: UInt32)
-// CHECK-NEXT:     var rawValue: UInt32
-// CHECK-NEXT:     typealias RawValue = UInt32
+// CHECK-NEXT:     init(_ rawValue: {{UInt32|Int32}})
+// CHECK-NEXT:     init(rawValue: {{UInt32|Int32}})
+// CHECK-NEXT:     var rawValue: {{UInt32|Int32}}
+// CHECK-NEXT:     typealias RawValue = {{UInt32|Int32}}
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Struct {
 // CHECK-NEXT:     init()
