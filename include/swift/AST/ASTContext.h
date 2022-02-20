@@ -1167,7 +1167,7 @@ public:
   /// conformance itself, along with a bit indicating whether this diagnostic
   /// produces an error.
   struct DelayedConformanceDiag {
-    ValueDecl *Requirement;
+    const ValueDecl *Requirement;
     std::function<void()> Callback;
     bool IsError;
   };
