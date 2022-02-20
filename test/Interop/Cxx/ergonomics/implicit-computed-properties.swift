@@ -42,22 +42,24 @@ ImplicitComputedPropertiesTestSuite.test("setters") {
     expectEqual(Object.x, 1)
 }
 
-ImplicitComputedPropertiesTestSuite.test("ref") {
-    var Object = RefGetterSetter()
-    var i = 2
-    Object.x = UnsafePointer<Int>(&i)
-    expectEqual(Object.x.pointee, 2)
+// TODO: Omar put the radar link here.
+//ImplicitComputedPropertiesTestSuite.test("ref") {
+//    var Object = RefGetterSetter()
+//    var i: CInt = 2
+//    withUnsafePointer(to: &i) { Object.x = $0 }
+//    expectEqual(Object.x.pointee, 2)
+//}
+
+ImplicitComputedPropertiesTestSuite.test("ptr") {
+    var Object = PtrGetterSetter()
+    var i: CInt = 2
+    withUnsafeMutablePointer(to: &i) { Object.x! = $0 }
+    expectEqual(Object.x!.pointee, 2)
 }
 
 ImplicitComputedPropertiesTestSuite.test("non trivial") {
     var Object = NonTrivialGetterSetter()
     Object.x = NonTrivial(value: 20)
-    expectEqual(Object.x.value, 20)
-}
-
-ImplicitComputedPropertiesTestSuite.test("diff types") {
-    var Object = DifferentTypes()
-    Object.x = 20
     expectEqual(Object.x.value, 20)
 }
 

@@ -279,15 +279,35 @@ struct CXXMethodBridging {
         nameKind != NameKind::lower)
       return Kind::unkown;
 
-    if (getClangName().startswith_insensitive("set"))
-      return Kind::setter;
+    if (getClangName().startswith_insensitive("set")) {
+        // Setters only have one parameter.
+        if (method->getNumParams() != 1)
+            return Kind::unkown;
+
+        // TODO: We can't transform getters that return a reference.
+        // TODO: Omar, put the radar link here.
+        if (method->getParamDecl(0)->getType()->isReferenceType())
+            return Kind::unkown;
+        
+        return Kind::setter;
+    }
 
     // Getters and subscripts cannot return void.
     if (method->getReturnType()->isVoidType())
       return Kind::unkown;
 
-    if (getClangName().startswith_insensitive("get"))
-      return Kind::getter;
+    if (getClangName().startswith_insensitive("get")) {
+        // Getters cannot take arguments.
+        if (method->getNumParams() != 0)
+            return Kind::unkown;
+        
+        // TODO: We can't transform getters that return a reference.
+        // TODO: Omar, put the radar link here.
+        if (method->getReturnType()->isReferenceType())
+            return Kind::unkown;
+        
+        return Kind::getter;
+    }
 
     // TODO: classify subscripts.
     return Kind::unkown;
@@ -3616,6 +3636,27 @@ namespace {
       SmallVector<FuncDecl *, 4> methods;
       SmallVector<ConstructorDecl *, 4> ctors;
 
+      // Cxx methods may have the same name but differ in "constness".
+      // In such a case we must differentiate in swift (See VisitFunction).
+      // Before importing the different CXXMethodDecl's we track functions
+      // that differ this way so we can disambiguate later
+      for (auto m : decl->decls()) {
+        if (auto method = dyn_cast<clang::CXXMethodDecl>(m)) {
+          if(method->getDeclName().isIdentifier()) {
+            if(Impl.cxxMethods.find(method->getName()) == Impl.cxxMethods.end()) {
+              Impl.cxxMethods[method->getName()] = {};
+            }
+            if(method->isConst()) {
+              // Add to const set
+              Impl.cxxMethods[method->getName()].first.insert(method);
+            } else {
+              // Add to mutable set
+              Impl.cxxMethods[method->getName()].second.insert(method);
+            }
+          }
+        }
+      }
+
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
       for (auto m : decl->decls()) {
@@ -3792,6 +3833,10 @@ namespace {
           // We cannot make a computed property without a getter.
           if (!getter || getter->getDeclContext() != result)
             continue;
+          
+          // If we have a getter and a setter make sure the types line up.
+          if (setter && !getter->getResultInterfaceType()->isEqual(setter->getParameters()->get(0)->getType()))
+              continue;
 
           auto p = makeComputedPropertyFromCXXMethods(getter, setter);
           // Add computed properties directly because they won't be found from
