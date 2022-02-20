@@ -3421,7 +3421,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
   Size tempSize;
   std::tie(temporary, tempSize) =
       allocateForCoercion(IGF, argTI.getStorageType(), coercedTy, "coerced-arg");
-  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
+//  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Store to a temporary.
   Address tempOfArgTy = IGF.Builder.CreateBitCast(
@@ -3446,7 +3446,7 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
     out.add(IGF.Builder.CreateLoad(coercedAddr));
   }
 
-  IGF.Builder.CreateLifetimeEnd(temporary, tempSize);
+//  IGF.Builder.CreateLifetimeEnd(temporary, tempSize);
 }
 
 namespace {
@@ -3760,7 +3760,7 @@ static void emitDirectForeignParameter(IRGenFunction &IGF, Explosion &in,
                                           coercionTy,
                                           paramTI.getStorageType(),
                                           "");
-  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
+//  IGF.Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Write the input parameters into the temporary:
   Address coercedAddr =
@@ -3954,7 +3954,7 @@ static Address createOpaqueBufferAlloca(IRGenFunction &IGF,
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8Ty, size.getValue());
   auto addr = IGF.createAlloca(ty, align);
   addr = IGF.Builder.CreateStructGEP(addr, 0, Size(0));
-  IGF.Builder.CreateLifetimeStart(addr, size);
+//  IGF.Builder.CreateLifetimeStart(addr, size);
   return addr;
 }
 
@@ -3971,13 +3971,13 @@ Address irgen::emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF) {
 void irgen::emitDeallocYieldOnceCoroutineBuffer(IRGenFunction &IGF,
                                                 Address buffer) {
   auto bufferSize = getYieldOnceCoroutineBufferSize(IGF.IGM);
-  IGF.Builder.CreateLifetimeEnd(buffer, bufferSize);
+//  IGF.Builder.CreateLifetimeEnd(buffer, bufferSize);
 }
 
 void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
                                                 Address buffer) {
   auto bufferSize = getYieldManyCoroutineBufferSize(IGF.IGM);
-  IGF.Builder.CreateLifetimeEnd(buffer, bufferSize);
+//  IGF.Builder.CreateLifetimeEnd(buffer, bufferSize);
 }
 
 void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
@@ -4041,13 +4041,13 @@ Address irgen::emitAllocAsyncContext(IRGenFunction &IGF,
                                      llvm::Value *sizeValue) {
   auto alignment = IGF.IGM.getAsyncContextAlignment();
   auto address = IGF.emitTaskAlloc(sizeValue, alignment);
-  IGF.Builder.CreateLifetimeStart(address, Size(-1) /*dynamic size*/);
+//  IGF.Builder.CreateLifetimeStart(address, Size(-1) /*dynamic size*/);
   return address;
 }
 
 void irgen::emitDeallocAsyncContext(IRGenFunction &IGF, Address context) {
   IGF.emitTaskDealloc(context);
-  IGF.Builder.CreateLifetimeEnd(context, Size(-1) /*dynamic size*/);
+//  IGF.Builder.CreateLifetimeEnd(context, Size(-1) /*dynamic size*/);
 }
 
 Address irgen::emitStaticAllocAsyncContext(IRGenFunction &IGF,
@@ -4055,13 +4055,13 @@ Address irgen::emitStaticAllocAsyncContext(IRGenFunction &IGF,
   auto alignment = IGF.IGM.getAsyncContextAlignment();
   auto &IGM = IGF.IGM;
   auto address = IGF.createAlloca(IGM.Int8Ty, IGM.getSize(size), alignment);
-  IGF.Builder.CreateLifetimeStart(address, size);
+//  IGF.Builder.CreateLifetimeStart(address, size);
   return address;
 }
 
 void irgen::emitStaticDeallocAsyncContext(IRGenFunction &IGF, Address context,
                                           Size size) {
-  IGF.Builder.CreateLifetimeEnd(context, size);
+//  IGF.Builder.CreateLifetimeEnd(context, size);
 }
 
 llvm::Value *irgen::emitYield(IRGenFunction &IGF,
@@ -4109,7 +4109,7 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
     indirectBuffer = IGF.createAlloca(
         bufferStructTy, Alignment(layout->getAlignment().value()));
     indirectBufferSize = Size(layout->getSizeInBytes());
-    IGF.Builder.CreateLifetimeStart(*indirectBuffer, indirectBufferSize);
+//    IGF.Builder.CreateLifetimeStart(*indirectBuffer, indirectBufferSize);
 
     for (size_t i : indices(bufferStructTy->elements())) {
       // Skip padding elements.
@@ -4136,7 +4136,7 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
 
   // We're done with the indirect buffer.
   if (indirectBuffer) {
-    IGF.Builder.CreateLifetimeEnd(*indirectBuffer, indirectBufferSize);
+//    IGF.Builder.CreateLifetimeEnd(*indirectBuffer, indirectBufferSize);
   }
 
   return isUnwind;
@@ -4370,12 +4370,12 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   Address address; Size size;
   std::tie(address, size) = allocateForCoercion(*this, fromTy, toTy,
                                                 value->getName() + ".coercion");
-  Builder.CreateLifetimeStart(address, size);
+//  Builder.CreateLifetimeStart(address, size);
   auto orig = Builder.CreateBitCast(address, fromTy->getPointerTo());
   Builder.CreateStore(value, orig);
   auto coerced = Builder.CreateBitCast(address, toTy->getPointerTo());
   auto loaded = Builder.CreateLoad(coerced);
-  Builder.CreateLifetimeEnd(address, size);
+//  Builder.CreateLifetimeEnd(address, size);
   return loaded;
 }
 
@@ -4559,7 +4559,7 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
   adjustAllocaAlignment(DataLayout, temporary, overlappedCoercionTy);
 
   auto &Builder = IGF.Builder;
-  Builder.CreateLifetimeStart(temporary, tempSize);
+//  Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Store the expanded type elements.
   auto coercionAddr = Builder.CreateElementBitCast(temporary, coercionTy);
@@ -4596,7 +4596,7 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
       temporary, loadableTI.getStorageType()->getPointerTo());
   loadableTI.loadAsTake(IGF, storageAddr, nonNativeExplosion);
 
-  Builder.CreateLifetimeEnd(temporary, tempSize);
+//  Builder.CreateLifetimeEnd(temporary, tempSize);
 
   return nonNativeExplosion;
 }
@@ -4695,7 +4695,7 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
   adjustAllocaAlignment(DataLayout, temporary, overlappedCoercionTy);
 
   auto &Builder = IGF.Builder;
-  Builder.CreateLifetimeStart(temporary, tempSize);
+//  Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Initialize the memory of the temporary.
   Address storageAddr = Builder.CreateBitCast(
@@ -4731,7 +4731,7 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
     loadFromFn(overlappedCoercionTy, overlappedCoercionAddr);
   }
 
-  Builder.CreateLifetimeEnd(temporary, tempSize);
+//  Builder.CreateLifetimeEnd(temporary, tempSize);
 
   // Add the values to the explosion.
   for (auto *val : expandedElts)

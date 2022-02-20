@@ -225,7 +225,7 @@ void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
-  IGF.Builder.CreateLifetimeEnd(alet);
+//  IGF.Builder.CreateLifetimeEnd(alet);
 }
 
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
@@ -254,7 +254,7 @@ void irgen::emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group) {
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
-  IGF.Builder.CreateLifetimeEnd(group);
+//  IGF.Builder.CreateLifetimeEnd(group);
 }
 
 llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {

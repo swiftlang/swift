@@ -67,7 +67,7 @@ StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
 
   Address alloca =
     IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
-  IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
+//  IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
   
   return { alloca };
 }
@@ -82,7 +82,7 @@ void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, StackAddress addr,
                                     SILType T) const {
   if (isKnownEmpty(ResilienceExpansion::Maximal))
     return;
-  IGF.Builder.CreateLifetimeEnd(addr.getAddress(), getFixedSize());
+//  IGF.Builder.CreateLifetimeEnd(addr.getAddress(), getFixedSize());
 }
 
 void TemporarySet::destroyAll(IRGenFunction &IGF) const {

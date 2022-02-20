@@ -5491,7 +5491,7 @@ void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {
       // 2. Avoid tail-call optimization which may convert the call to the final
       //    release to a jump, which is done after the stack frame is
       //    destructed.
-      Builder.CreateLifetimeEnd(selfValue);
+//      Builder.CreateLifetimeEnd(selfValue);
     }
   }
 }
@@ -5678,7 +5678,7 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
     llvm::Value *scratch = createAlloca(IGM.getFixedBufferTy(),
                                         IGM.getPointerAlignment(),
                                         "access-scratch").getAddress();
-    Builder.CreateLifetimeStart(scratch);
+//    Builder.CreateLifetimeStart(scratch);
 
     llvm::Value *pointer =
       Builder.CreateBitCast(addr.getAddress(), IGM.Int8PtrTy);
@@ -5767,7 +5767,7 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
     auto call = Builder.CreateCall(IGM.getEndAccessFn(), { scratch });
     call->setDoesNotThrow();
 
-    Builder.CreateLifetimeEnd(scratch);
+//    Builder.CreateLifetimeEnd(scratch);
     return;
   }
   }
@@ -5978,7 +5978,7 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                   "bitcast");
   
   auto maxSize = std::max(inTI.getFixedSize(), outTI.getFixedSize());
-  IGF.Builder.CreateLifetimeStart(inStorage, maxSize);
+//  IGF.Builder.CreateLifetimeStart(inStorage, maxSize);
   
   // Store the 'in' value.
   inTI.initialize(IGF, in, inStorage, false);
@@ -5987,7 +5987,7 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                         outTI.getStorageType()->getPointerTo());
   outTI.loadAsTake(IGF, outStorage, out);
   
-  IGF.Builder.CreateLifetimeEnd(inStorage, maxSize);
+//  IGF.Builder.CreateLifetimeEnd(inStorage, maxSize);
   return;
 }
 

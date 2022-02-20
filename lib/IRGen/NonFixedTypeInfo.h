@@ -63,14 +63,14 @@ public:
                              const llvm::Twine &name) const override {
     // Allocate memory on the stack.
     auto alloca = IGF.emitDynamicAlloca(T, name);
-    IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
+//    IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
     return alloca.withAddress(
              getAsBitCastAddress(IGF, alloca.getAddressPointer()));
   }
 
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
-    IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
+//    IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
     IGF.emitDeallocateDynamicAlloca(stackAddress);
   }
 

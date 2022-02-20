@@ -276,7 +276,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::EndAsyncLetLifetime) {
-    IGF.Builder.CreateLifetimeEnd(args.claimNext());
+//    IGF.Builder.CreateLifetimeEnd(args.claimNext());
     // Ignore a second operand which is inserted by ClosureLifetimeFixup and
     // only used for dependency tracking.
     (void)args.claimAll();

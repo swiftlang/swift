@@ -465,7 +465,7 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
 
   // End the alloca's lifetime, if we allocated one.
   if (alloca.getAddress()) {
-    IGF.Builder.CreateLifetimeEnd(alloca, allocaSize);
+//    IGF.Builder.CreateLifetimeEnd(alloca, allocaSize);
   }
 }
 
