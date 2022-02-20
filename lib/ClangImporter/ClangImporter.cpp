@@ -17,6 +17,7 @@
 #include "ClangDiagnosticConsumer.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
@@ -4350,6 +4351,416 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
   return result;
 }
 
+// Just create a specialized function decl for "__swift_interopStaticCast"
+// using the types base and derived.
+DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
+                                             const clang::Module *owningModule,
+                                             Type base, Type derived) {
+  // Lookup our static cast helper function.
+  // TODO: change this to stdlib or something.
+  auto wrapperModule =
+      ctx.getClangModuleLoader()->getWrapperForModule(owningModule);
+  SmallVector<ValueDecl *, 1> results;
+  ctx.lookupInModule(wrapperModule, "__swift_interopStaticCast", results);
+  assert(
+      results.size() == 1 &&
+      "Did you forget to define a __swift_interopStaticCast helper function?");
+  FuncDecl *staticCastFn = cast<FuncDecl>(results.back());
+
+  // Now we have to force instanciate this. We can't let the type checker do
+  // this yet because it can't infer the "To" type.
+  auto subst =
+      SubstitutionMap::get(staticCastFn->getGenericSignature(), {derived, base},
+                           ArrayRef<ProtocolConformanceRef>());
+  auto functionTemplate = const_cast<clang::FunctionTemplateDecl *>(
+      cast<clang::FunctionTemplateDecl>(staticCastFn->getClangDecl()));
+  auto spec = ctx.getClangModuleLoader()->instantiateCXXFunctionTemplate(
+      ctx, functionTemplate, subst);
+  auto specializedStaticCastFn =
+      cast<FuncDecl>(ctx.getClangModuleLoader()->importDeclDirectly(spec));
+
+  auto staticCastRefExpr = new (ctx)
+      DeclRefExpr(ConcreteDeclRef(specializedStaticCastFn), DeclNameLoc(),
+                  /*implicit*/ true);
+  staticCastRefExpr->setType(specializedStaticCastFn->getInterfaceType());
+
+  return staticCastRefExpr;
+}
+
+// Create the following expressions:
+// %0 = Builtin.addressof(&self)
+// %1 = Builtin.reinterpretCast<UnsafeMutablePointer<Derived>>(%0)
+// %2 = __swift_interopStaticCast<UnsafeMutablePointer<Base>?>(%1)
+// %3 = %2!
+// return %3.pointee
+MemberRefExpr *getInOutSelfInteropStaticCast(FuncDecl *funcDecl,
+                                             StructDecl *baseStruct,
+                                             StructDecl *derivedStruct) {
+  auto &ctx = funcDecl->getASTContext();
+
+  auto inoutSelf = [&ctx](FuncDecl *funcDecl) {
+    auto inoutSelfDecl = funcDecl->getImplicitSelfDecl();
+
+    auto inoutSelfRef =
+        new (ctx) DeclRefExpr(inoutSelfDecl, DeclNameLoc(), /*implicit*/ true);
+    inoutSelfRef->setType(LValueType::get(inoutSelfDecl->getInterfaceType()));
+
+    auto inoutSelf = new (ctx) InOutExpr(
+        SourceLoc(), inoutSelfRef,
+        funcDecl->mapTypeIntoContext(inoutSelfDecl->getValueInterfaceType()),
+        /*implicit*/ true);
+    inoutSelf->setType(InOutType::get(inoutSelfDecl->getInterfaceType()));
+
+    return inoutSelf;
+  }(funcDecl);
+
+  auto createCallToBuiltin = [&](Identifier name, ArrayRef<Type> substTypes,
+                                 Expr *arg) {
+    auto builtinFn = cast<FuncDecl>(getBuiltinValueDecl(ctx, name));
+    auto substMap =
+        SubstitutionMap::get(builtinFn->getGenericSignature(), substTypes,
+                             ArrayRef<ProtocolConformanceRef>());
+    ConcreteDeclRef builtinFnRef(builtinFn, substMap);
+    auto builtinFnRefExpr =
+        new (ctx) DeclRefExpr(builtinFnRef, DeclNameLoc(), /*implicit*/ true);
+
+    auto fnType = builtinFn->getInterfaceType();
+    if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType.getPointer()))
+      fnType = genericFnType->substGenericArgs(substMap);
+    builtinFnRefExpr->setType(fnType);
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
+    auto callExpr = CallExpr::create(ctx, builtinFnRefExpr, argList, /*implicit*/ true);
+    callExpr->setThrows(false);
+    return callExpr;
+  };
+
+  auto rawSelfPointer =
+      createCallToBuiltin(ctx.getIdentifier("addressof"),
+                          {derivedStruct->getSelfInterfaceType()}, inoutSelf);
+  rawSelfPointer->setType(ctx.TheRawPointerType);
+
+  auto derivedPtrType = derivedStruct->getSelfInterfaceType()->wrapInPointer(
+      PTK_UnsafeMutablePointer);
+  auto selfPointer = createCallToBuiltin(
+      ctx.getIdentifier("reinterpretCast"),
+      {ctx.TheRawPointerType, derivedPtrType}, rawSelfPointer);
+  selfPointer->setType(derivedPtrType);
+
+  auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
+      ctx, baseStruct->getClangDecl()->getOwningModule(),
+      baseStruct->getSelfInterfaceType()->wrapInPointer(
+          PTK_UnsafeMutablePointer),
+      derivedStruct->getSelfInterfaceType()->wrapInPointer(
+          PTK_UnsafeMutablePointer));
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {selfPointer});
+  auto casted = CallExpr::createImplicit(ctx, staticCastRefExpr, argList);
+  // This will be "Optional<UnsafeMutablePointer<Base>>"
+  casted->setType(cast<FunctionType>(staticCastRefExpr->getType().getPointer())
+                      ->getResult());
+  casted->setThrows(false);
+
+  // Now force unwrap the casted pointer.
+  auto unwrapped = new (ctx) ForceValueExpr(casted, SourceLoc());
+  unwrapped->setType(baseStruct->getSelfInterfaceType()->wrapInPointer(
+      PTK_UnsafeMutablePointer));
+
+  SubstitutionMap pointeeSubst = SubstitutionMap::get(
+      ctx.getUnsafeMutablePointerDecl()->getGenericSignature(),
+      {baseStruct->getSelfInterfaceType()}, {});
+  VarDecl *pointeePropertyDecl =
+      ctx.getPointerPointeePropertyDecl(PTK_UnsafeMutablePointer);
+  auto pointeePropertyRefExpr = new (ctx) MemberRefExpr(
+      unwrapped, SourceLoc(),
+      ConcreteDeclRef(pointeePropertyDecl, pointeeSubst), DeclNameLoc(),
+      /*implicit=*/true);
+  pointeePropertyRefExpr->setType(
+      LValueType::get(baseStruct->getSelfInterfaceType()));
+
+  return pointeePropertyRefExpr;
+}
+
+// For const methods generate the following:
+//   %0 = __swift_interopStaticCast<Base>(self)
+//   return %0.fn(args...)
+// For mutating methods we have to pass self as a pointer:
+//   %0 = Builtin.addressof(&self)
+//   %1 = Builtin.reinterpretCast<UnsafeMutablePointer<Derived>>(%0)
+//   %2 = __swift_interopStaticCast<UnsafeMutablePointer<Base>?>(%1)
+//   %3 = %2!
+//   %4 = %3.pointee
+//   return %4.fn(args...)
+static std::pair<BraceStmt *, bool>
+synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
+  ASTContext &ctx = afd->getASTContext();
+
+  auto funcDecl = cast<FuncDecl>(afd);
+  auto derivedStruct =
+      cast<StructDecl>(funcDecl->getDeclContext()->getAsDecl());
+  auto baseMember = static_cast<FuncDecl *>(context);
+  auto baseStruct = cast<StructDecl>(baseMember->getDeclContext()->getAsDecl());
+  auto baseType = baseStruct->getDeclaredType();
+
+  SmallVector<Expr *, 8> forwardingParams;
+  for (auto param : *funcDecl->getParameters()) {
+    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                              /*Implicit=*/true);
+    paramRefExpr->setType(param->getType());
+    forwardingParams.push_back(paramRefExpr);
+  }
+
+  Expr *casted = nullptr;
+  if (funcDecl->isMutating()) {
+    auto pointeeMemberRefExpr =
+        getInOutSelfInteropStaticCast(funcDecl, baseStruct, derivedStruct);
+    casted = new (ctx) InOutExpr(SourceLoc(), pointeeMemberRefExpr, baseType,
+                                 /*implicit*/ true);
+    casted->setType(InOutType::get(baseType));
+  } else {
+    auto *selfDecl = funcDecl->getImplicitSelfDecl();
+    auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                          /*implicit*/ true);
+    selfExpr->setType(selfDecl->getType());
+
+    auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
+        ctx, baseStruct->getClangDecl()->getOwningModule(), baseType,
+        derivedStruct->getDeclaredType());
+
+    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {selfExpr});
+    auto castedCall = CallExpr::createImplicit(ctx, staticCastRefExpr, argList);
+    castedCall->setType(baseType);
+    castedCall->setThrows(false);
+    casted = castedCall;
+  }
+
+  auto *baseMemberExpr =
+      new (ctx) DeclRefExpr(ConcreteDeclRef(baseMember), DeclNameLoc(),
+                            /*Implicit=*/true);
+  baseMemberExpr->setType(baseMember->getInterfaceType());
+
+  auto baseMemberDotCallExpr =
+      DotSyntaxCallExpr::create(ctx, baseMemberExpr, SourceLoc(), casted);
+  baseMemberDotCallExpr->setType(baseMember->getMethodInterfaceType());
+  baseMemberDotCallExpr->setThrows(false);
+
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
+  auto *baseMemberCallExpr = CallExpr::createImplicit(
+      ctx, baseMemberDotCallExpr, argList);
+  baseMemberCallExpr->setType(baseMember->getResultInterfaceType());
+  baseMemberCallExpr->setThrows(false);
+
+  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), baseMemberCallExpr,
+                                         /*implicit=*/true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
+                                /*implicit=*/true);
+  return {body, /*isTypeChecked=*/true};
+}
+
+// Getters are relatively easy. Just cast and return the member:
+//   %0 = __swift_interopStaticCast<Base>(self)
+//   return %0.member
+static std::pair<BraceStmt *, bool>
+synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
+  ASTContext &ctx = afd->getASTContext();
+
+  AccessorDecl *getterDecl = cast<AccessorDecl>(afd);
+  VarDecl *baseClassVar = static_cast<VarDecl *>(context);
+  StructDecl *baseStruct =
+      cast<StructDecl>(baseClassVar->getDeclContext()->getAsDecl());
+  StructDecl *derivedStruct =
+      cast<StructDecl>(getterDecl->getDeclContext()->getAsDecl());
+
+  auto selfDecl = getterDecl->getImplicitSelfDecl();
+  auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                        /*implicit*/ true);
+  selfExpr->setType(selfDecl->getType());
+
+  auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
+      ctx, baseStruct->getClangDecl()->getOwningModule(),
+      baseStruct->getSelfInterfaceType(),
+      derivedStruct->getSelfInterfaceType());
+
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {selfExpr});
+  auto casted = CallExpr::createImplicit(ctx, staticCastRefExpr, argList);
+  casted->setType(baseStruct->getSelfInterfaceType());
+  casted->setThrows(false);
+
+  // If the base class var has a clang decl, that means it's an access into a
+  // stored field. Otherwise, we're looking into another base class, so it's a
+  // another synthesized accessor.
+  AccessSemantics accessKind = baseClassVar->getClangDecl()
+                                   ? AccessSemantics::DirectToStorage
+                                   : AccessSemantics::DirectToImplementation;
+  auto baseMember =
+      new (ctx) MemberRefExpr(casted, SourceLoc(), baseClassVar, DeclNameLoc(),
+                              /*Implicit=*/true, accessKind);
+  baseMember->setType(baseClassVar->getType());
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), baseMember);
+  auto body = BraceStmt::create(ctx, SourceLoc(), {ret}, SourceLoc(),
+                                /*implicit*/ true);
+  return {body, /*isTypeChecked=*/true};
+}
+
+// For setters we have to pass self as a pointer and then emit an assign:
+//   %0 = Builtin.addressof(&self)
+//   %1 = Builtin.reinterpretCast<UnsafeMutablePointer<Derived>>(%0)
+//   %2 = __swift_interopStaticCast<UnsafeMutablePointer<Base>?>(%1)
+//   %3 = %2!
+//   %4 = %3.pointee
+//   assign newValue to %4
+static std::pair<BraceStmt *, bool>
+synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto setterDecl = cast<AccessorDecl>(afd);
+  VarDecl *baseClassVar = static_cast<VarDecl *>(context);
+  ASTContext &ctx = setterDecl->getASTContext();
+
+  StructDecl *baseStruct =
+      cast<StructDecl>(baseClassVar->getDeclContext()->getAsDecl());
+  StructDecl *derivedStruct =
+      cast<StructDecl>(setterDecl->getDeclContext()->getAsDecl());
+
+  auto *pointeePropertyRefExpr =
+      getInOutSelfInteropStaticCast(setterDecl, baseStruct, derivedStruct);
+
+  // If the base class var has a clang decl, that means it's an access into a
+  // stored field. Otherwise, we're looking into another base class, so it's a
+  // another synthesized accessor.
+  AccessSemantics accessKind = baseClassVar->getClangDecl()
+                                   ? AccessSemantics::DirectToStorage
+                                   : AccessSemantics::DirectToImplementation;
+  auto storedRef =
+      new (ctx) MemberRefExpr(pointeePropertyRefExpr, SourceLoc(), baseClassVar,
+                              DeclNameLoc(), /*Implicit=*/true, accessKind);
+  storedRef->setType(LValueType::get(baseClassVar->getType()));
+
+  auto newValueParamRefExpr =
+      new (ctx) DeclRefExpr(setterDecl->getParameters()->get(0), DeclNameLoc(),
+                            /*Implicit=*/true);
+  newValueParamRefExpr->setType(setterDecl->getParameters()->get(0)->getType());
+
+  auto assignExpr =
+      new (ctx) AssignExpr(storedRef, SourceLoc(), newValueParamRefExpr,
+                           /*implicit*/ true);
+  assignExpr->setType(TupleType::getEmpty(ctx));
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assignExpr}, SourceLoc(),
+                                /*implicit*/ true);
+  return {body, /*isTypeChecked=*/true};
+}
+
+static std::array<AccessorDecl *, 2>
+makeBaseClassFieldAccessors(DeclContext *declContext, VarDecl *computedVar,
+                            VarDecl *baseClassVar) {
+  auto &ctx = declContext->getASTContext();
+  auto computedType = computedVar->getInterfaceType();
+
+  auto getterDecl = AccessorDecl::create(
+      ctx,
+      /*FuncLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get, computedVar,
+      /*StaticLoc=*/SourceLoc(),
+      StaticSpellingKind::None, // TODO: we should handle static vars.
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false,
+      /*ThrowsLoc=*/SourceLoc(),
+      /*GenericParams=*/nullptr, ParameterList::createEmpty(ctx), computedType,
+      declContext);
+  getterDecl->setIsTransparent(true);
+  getterDecl->setAccess(AccessLevel::Public);
+  getterDecl->setBodySynthesizer(synthesizeBaseClassFieldGetterBody,
+                                 baseClassVar);
+
+  auto newValueParam =
+      new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                          ctx.getIdentifier("newValue"), declContext);
+  newValueParam->setSpecifier(ParamSpecifier::Default);
+  newValueParam->setInterfaceType(computedType);
+  auto setterDecl = AccessorDecl::create(
+      ctx,
+      /*FuncLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Set, computedVar,
+      /*StaticLoc=*/SourceLoc(),
+      StaticSpellingKind::None, // TODO: we should handle static vars.
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false,
+      /*ThrowsLoc=*/SourceLoc(),
+      /*GenericParams=*/nullptr, ParameterList::create(ctx, {newValueParam}),
+      TupleType::getEmpty(ctx), declContext);
+  setterDecl->setIsTransparent(true);
+  setterDecl->setAccess(AccessLevel::Public);
+  setterDecl->setBodySynthesizer(synthesizeBaseClassFieldSetterBody,
+                                 baseClassVar);
+  setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+
+  return {getterDecl, setterDecl};
+}
+
+ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
+  if (auto fn = dyn_cast<FuncDecl>(decl)) {
+    // TODO: function templates are specialized during type checking so to
+    // support these we need to tell Swift to type check the synthesized bodies.
+    // TODO: we also currently don't support static functions. That shouldn't be
+    // too hard.
+    if (fn->isStatic() ||
+        (fn->getClangDecl() &&
+         isa<clang::FunctionTemplateDecl>(fn->getClangDecl())))
+      return nullptr;
+
+    auto out = FuncDecl::createImplicit(
+        fn->getASTContext(), fn->getStaticSpelling(), fn->getName(),
+        fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
+        fn->getGenericParams(), fn->getParameters(),
+        fn->getResultInterfaceType(), newContext);
+    out->copyFormalAccessFrom(fn);
+    out->setBodySynthesizer(synthesizeBaseClassMethodBody, fn);
+    out->setSelfAccessKind(fn->getSelfAccessKind());
+    return out;
+  }
+
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    auto rawMemory = allocateMemoryForDecl<VarDecl>(var->getASTContext(),
+                                                    sizeof(VarDecl), false);
+    auto out =
+        new (rawMemory) VarDecl(var->isStatic(), var->getIntroducer(),
+                                var->getLoc(), var->getName(), newContext);
+    out->setInterfaceType(var->getInterfaceType());
+    out->setIsObjC(var->isObjC());
+    out->setIsDynamic(var->isDynamic());
+    out->copyFormalAccessFrom(var);
+    out->setAccessors(SourceLoc(),
+                      makeBaseClassFieldAccessors(newContext, out, var),
+                      SourceLoc());
+    out->setImplInfo(StorageImplInfo::getComputed(StorageIsMutable));
+    out->setIsSetterMutating(true);
+    return out;
+  }
+
+  if (auto typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
+    auto rawMemory = allocateMemoryForDecl<TypeAliasDecl>(
+        typeAlias->getASTContext(), sizeof(TypeAliasDecl), false);
+    auto out = new (rawMemory) TypeAliasDecl(
+        typeAlias->getLoc(), typeAlias->getEqualLoc(), typeAlias->getName(),
+        typeAlias->getNameLoc(), typeAlias->getGenericParams(), newContext);
+    out->setUnderlyingType(typeAlias->getUnderlyingType());
+    out->copyFormalAccessFrom(typeAlias);
+    return out;
+  }
+
+  if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
+    auto rawMemory = allocateMemoryForDecl<TypeAliasDecl>(
+        typeDecl->getASTContext(), sizeof(TypeAliasDecl), false);
+    auto out = new (rawMemory) TypeAliasDecl(
+        typeDecl->getLoc(), typeDecl->getLoc(), typeDecl->getName(),
+        typeDecl->getLoc(), nullptr, newContext);
+    out->setUnderlyingType(typeDecl->getInterfaceType());
+    out->copyFormalAccessFrom(typeDecl);
+    return out;
+  }
+
+  return nullptr;
+}
+
 TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
@@ -4369,6 +4780,34 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         recordDecl->getClangDecl()) {
       if (auto import = ctx.getClangModuleLoader()->importDeclDirectly(named))
         result.push_back(cast<ValueDecl>(import));
+    }
+  }
+
+  // If this is a C++ record, look through any base classes.
+  if (auto cxxRecord =
+          dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
+    for (auto base : cxxRecord->bases()) {
+      clang::QualType baseType = base.getType();
+      if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
+        baseType = spectType->desugar();
+      if (!isa<clang::RecordType>(baseType.getCanonicalType()))
+        continue;
+
+      auto *baseRecord = baseType->getAs<clang::RecordType>()->getDecl();
+      if (auto import =
+              ctx.getClangModuleLoader()->importDeclDirectly(baseRecord)) {
+        // If we are looking up the base class, go no further. We will have
+        // already found it during the other lookup.
+        if (cast<ValueDecl>(import)->getName() == name)
+          continue;
+
+        auto baseResults = cast<StructDecl>(import)->lookupDirect(name);
+        for (auto foundInBase : baseResults) {
+          if (auto newDecl = cloneBaseMemberDecl(foundInBase, recordDecl)) {
+            result.push_back(newDecl);
+          }
+        }
+      }
     }
   }
 

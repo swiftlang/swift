@@ -268,7 +268,7 @@ public:
              clang::DeclarationName givenName = clang::DeclarationName()) = 0;
 
   /// Determine the effective Clang context for the given Swift nominal type.
-  EffectiveClangContext virtual getEffectiveClangContext(
+  virtual EffectiveClangContext getEffectiveClangContext(
       const NominalTypeDecl *nominal) = 0;
 };
 
