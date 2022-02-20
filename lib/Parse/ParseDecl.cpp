@@ -6851,6 +6851,10 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
                      SourceLoc TryLoc,
                      bool HasLetOrVarKeyword) {
   assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
+  // Track whether we are parsing an 'async let' pattern.
+  const auto hasAsyncAttr = Attributes.hasAttribute<AsyncAttr>();
+  llvm::SaveAndRestore<bool> AsyncAttr(InPatternWithAsyncAttribute,
+                                       hasAsyncAttr);
 
   if (StaticLoc.isValid()) {
     if (!Flags.contains(PD_HasContainerType)) {

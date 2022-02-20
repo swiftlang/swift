@@ -160,6 +160,9 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
+  /// Whether this context has an async attribute.
+  bool InPatternWithAsyncAttribute = false;
+
   bool InPoundLineEnvironment = false;
   bool InPoundIfEnvironment = false;
   /// Do not call \c addUnvalidatedDeclWithOpaqueResultType when in an inactive

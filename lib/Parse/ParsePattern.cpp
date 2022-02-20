@@ -1111,8 +1111,8 @@ ParserResult<Pattern> Parser::parsePattern() {
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
-    
-  case tok::kw__:
+
+  case tok::kw__: {
     // Normally, '_' is invalid in type context for patterns, but they show up
     // in interface files as the name for type members that are non-public.
     // Treat them as an implicitly synthesized NamedPattern with a nameless
@@ -1126,8 +1126,12 @@ ParserResult<Pattern> Parser::parsePattern() {
       return makeParserResult(NamedPattern::createImplicit(Context, VD));
     }
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
-    return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
-    
+
+    const auto isAsyncLet =
+        InPatternWithAsyncAttribute && introducer == VarDecl::Introducer::Let;
+    return makeParserResult(
+        new (Context) AnyPattern(consumeToken(tok::kw__), isAsyncLet));
+  }
   case tok::identifier: {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;

@@ -369,10 +369,14 @@ public:
 /// bind a name to it.  This is spelled "_".
 class AnyPattern : public Pattern {
   SourceLoc Loc;
+  /// Flag representing if this is an "async let _: Type" pattern since 
+  /// `async let _` is a subPattern of a \c TypedPattern represented 
+  /// as \c AnyPattern
+  bool IsAsyncLet;
 
 public:
-  explicit AnyPattern(SourceLoc Loc)
-      : Pattern(PatternKind::Any), Loc(Loc) { }
+  explicit AnyPattern(SourceLoc Loc, bool IsAsyncLet = false)
+      : Pattern(PatternKind::Any), Loc(Loc), IsAsyncLet(IsAsyncLet) {}
 
   static AnyPattern *createImplicit(ASTContext &Context) {
     auto *AP = new (Context) AnyPattern(SourceLoc());
@@ -382,6 +386,8 @@ public:
 
   SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
+
+  bool isAsyncLet() const { return IsAsyncLet; }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Any;
