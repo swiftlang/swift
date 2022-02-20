@@ -1061,8 +1061,8 @@ void ConformanceLookupTable::lookupConformances(
 }
 
 void ConformanceLookupTable::getAllProtocols(
-       NominalTypeDecl *nominal,
-       SmallVectorImpl<ProtocolDecl *> &scratch) {
+    NominalTypeDecl *nominal, SmallVectorImpl<ProtocolDecl *> &scratch,
+    bool sorted) {
   // We need to expand all implied conformances to find the complete
   // set of protocols to which this nominal type conforms.
   updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
@@ -1075,7 +1075,9 @@ void ConformanceLookupTable::getAllProtocols(
     scratch.push_back(conformance.first);
   }
 
-  // FIXME: sort the protocols in some canonical order?
+  if (sorted) {
+    llvm::array_pod_sort(scratch.begin(), scratch.end(), TypeDecl::compare);
+  }
 }
 
 int ConformanceLookupTable::compareProtocolConformances(

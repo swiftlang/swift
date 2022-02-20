@@ -352,6 +352,9 @@ def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machin
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete type nesting depth before giving up">;
 
+def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
+  HelpText<"Enables dumping type witness systems from associated type inference">;
+
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 
