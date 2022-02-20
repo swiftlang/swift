@@ -1523,6 +1523,11 @@ namespace {
       if (!isSendableClosure(closure, /*forActorIsolation=*/false))
         return;
 
+      // Skip this warning for implicit closures such as async let
+      // implicit generated autoclosures.
+      if (closure->isImplicit())
+        return;
+
       SmallVector<CapturedValue, 2> captures;
       closure->getCaptureInfo().getLocalCaptures(captures);
       for (const auto &capture : captures) {
