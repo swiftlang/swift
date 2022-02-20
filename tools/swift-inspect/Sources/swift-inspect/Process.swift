@@ -12,12 +12,10 @@
 
 #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
 import Darwin
-#endif
 
-internal typealias ProcessIdentifier = pid_t
+internal typealias ProcessIdentifier = DarwinRemoteProcess.ProcessIdentifier
 
 internal func process(matching: String) -> ProcessIdentifier? {
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
   return pidFromHint(matching)
-#endif
 }
+#endif

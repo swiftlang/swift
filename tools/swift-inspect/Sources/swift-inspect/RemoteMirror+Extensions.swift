@@ -23,7 +23,7 @@ extension swift_metadata_allocation_t: Comparable {
     lhs.ptr == rhs.ptr
   }
 
-  public static func < (lhs: self, rhs: Self) -> Bool {
+  public static func < (lhs: Self, rhs: Self) -> Bool {
     lhs.ptr < rhs.ptr
   }
 }
@@ -46,7 +46,7 @@ extension SwiftReflectionContextRef {
   internal var allocations: [swift_metadata_allocation_t] {
     get throws {
       var allocations: [swift_metadata_allocation_t] = []
-      try iterateMetdataAllocations {
+      try iterateMetadataAllocations {
         allocations.append($0)
       }
       return allocations
@@ -56,18 +56,19 @@ extension SwiftReflectionContextRef {
   internal var allocationStacks: [swift_reflection_ptr_t:[swift_reflection_ptr_t]] {
     get throws {
       var stacks: [swift_reflection_ptr_t:[swift_reflection_ptr_t]] = [:]
-      try iterateMetadataAllocationBacktraces { allocation, count, stack, in
-        stacks[allocation] = Aray(UnsafeBufferPointer(start: stack, count: count))
+      try iterateMetadataAllocationBacktraces { allocation, count, stack in
+        stacks[allocation] =
+            Array(UnsafeBufferPointer(start: stack, count: count))
       }
       return stacks
     }
   }
 
   internal func name(type: swift_reflection_ptr_t) -> String? {
-    let typeref: UInt64 = swift_reflection_typeRefForMetadata(self, UInt(type)
+    let typeref: UInt64 = swift_reflection_typeRefForMetadata(self, UInt(type))
     if typeref == 0 { return nil }
 
-    guard let name = swift_reflection_copyDemangled_NameForTypeRef(self, typeref) else {
+    guard let name = swift_reflection_copyDemangledNameForTypeRef(self, typeref) else {
       return nil
     }
     defer { free(name) }

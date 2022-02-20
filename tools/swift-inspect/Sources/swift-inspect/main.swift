@@ -28,14 +28,14 @@ internal struct BacktraceOptions: ParsableArguments {
 
   var style: BacktraceStyle? {
     if backtraceLong { return .long }
-    if backtrace { return .oneLine }
+    if backtrace { return .oneline }
     return nil
   }
 }
 
 
-internal func inspect<Process: RemoteProcess>(process pattern: String,
-                                              _ body: (Process) throws -> Void) throws {
+internal func inspect(process pattern: String,
+                      _ body: (any RemoteProcess) throws -> Void) throws {
   guard let processId = process(matching: pattern) else {
     print("No process found matching \(pattern)")
     return
@@ -53,16 +53,27 @@ internal func inspect<Process: RemoteProcess>(process pattern: String,
 
 @main
 internal struct SwiftInspect: ParsableCommand {
+  // DumpArrays and DumpConcurrency cannot be reliably be ported outside of
+  // Darwin due to the need to iterate the heap.
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+  static let subcommands: [ParsableCommand.Type] = [
+    DumpConformanceCache.self,
+    DumpRawMetadata.self,
+    DumpGenericMetadata.self,
+    DumpCacheNodes.self,
+    DumpArrays.self,
+    DumpConcurrency.self,
+  ]
+#else
+  static let subcommands: [ParsableCommand.Type] = [
+    DumpConformanceCache.self,
+    DumpRawMetadata.self,
+    DumpGenericMetadata.self,
+    DumpCacheNodes.self,
+  ]
+#endif
+
   static let configuration = CommandConfiguration(
     abstract: "Swift runtime debug tool",
-    subcommands: [
-      DumpConformanceCache.self,
-      DumpRawMetadata.self,
-      DumpGenericMetadata.self,
-      DumpCacheNodes.self,
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-      DumpArrays.self,
-      DumpConcurrency.self,
-#endif
-    ])
+    subcommands: subcommands)
 }

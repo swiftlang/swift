@@ -18,7 +18,7 @@ private struct Metadata {
   var allocation: swift_metadata_allocation_t?
 
   let name: String
-  let isArayOfClass: Bool
+  let isArrayOfClass: Bool
 
   var offset: Int? { allocation.map { Int(self.ptr - $0.ptr) } }
 }
@@ -28,7 +28,7 @@ internal struct DumpGenericMetadata: ParsableCommand {
     abstract: "Print the target's generic metadata allocations.")
 
   @OptionGroup()
-  var universalOptions: UniversalOptions
+  var options: UniversalOptions
 
   @OptionGroup()
   var backtraceOptions: BacktraceOptions
@@ -50,7 +50,9 @@ internal struct DumpGenericMetadata: ParsableCommand {
       }
 
       let stacks: [swift_reflection_ptr_t:[swift_reflection_ptr_t]]? =
-          backtrace.style == nil ? nil : try process.context.allocationStacks
+          backtraceOptions.style == nil
+              ? nil
+              : try process.context.allocationStacks
 
       print("Address", "Allocation", "Size", "Offset", "isArrayOfClass", "Name", separator: "\t")
       generics.forEach {
@@ -62,7 +64,7 @@ internal struct DumpGenericMetadata: ParsableCommand {
         }
         print($0.isArrayOfClass, terminator: "\t")
         print($0.name)
-        if let style = backtrace.style, let allocation = $0.allocation {
+        if let style = backtraceOptions.style, let allocation = $0.allocation {
           if let stack = stacks?[allocation.ptr] {
             print(backtrace(stack, style: style, process.symbolicate))
           } else {
