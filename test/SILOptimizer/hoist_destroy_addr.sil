@@ -255,6 +255,21 @@ entry(%instance : @none $TrivialStruct):
     return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @nohoist_inout_aliasable : {{.*}} {
+// CHECK:         apply
+// CHECK:         destroy_addr
+// CHECK-LABEL: } // end sil function 'nohoist_inout_aliasable'
+sil [ossa] @nohoist_inout_aliasable : $@convention(thin) (@inout_aliasable X) -> () {
+entry(%addr : $*X):
+  %value = load [copy] %addr : $*X
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  destroy_addr %addr : $*X
+  store %value to [init] %addr : $*X
+  %tuple = tuple ()
+  return %tuple : $()
+}
+
 // Fold destroy_addr and a load [copy] into a load [take] even when that
 // load [take] is guarded by an access scope.
 //
@@ -397,4 +412,32 @@ entry(%instance : @owned $X):
   dealloc_stack %addr_1 : $*X
 
   return %loaded : $X
+}
+
+// Don't fold a destroy_addr with a load [copy] that occurs within the scope of
+// an access to unrelated storage.
+//
+// CHECK-LABEL: sil [ossa] @nofold_into_unrelated_barrier_scope : {{.*}} {
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'nofold_into_unrelated_barrier_scope'
+sil [ossa] @nofold_into_unrelated_barrier_scope : $@convention(thin) (@owned X) -> (@owned X) {
+entry(%instance : @owned $X):
+  %copy = copy_value %instance : $X
+  %addr_outer = alloc_stack $X
+  %addr_inner = alloc_stack $X
+  store %copy to [init] %addr_outer : $*X
+  store %instance to [init] %addr_inner : $*X
+
+  %access = begin_access [modify] [static] %addr_outer : $*X
+  apply undef(%access) : $@convention(thin) (@inout X) -> ()
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  destroy_addr %access : $*X
+  apply %unknown() : $@convention(thin) () -> ()
+  %value = load [copy] %addr_inner : $*X
+  end_access %access : $*X
+  destroy_addr %addr_inner : $*X
+
+  dealloc_stack %addr_inner : $*X
+  dealloc_stack %addr_outer : $*X
+  return %value : $X
 }
