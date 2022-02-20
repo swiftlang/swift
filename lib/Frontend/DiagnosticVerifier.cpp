@@ -339,12 +339,15 @@ DiagnosticVerifier::renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
   return OS.str();
 }
 
-/// Parse the introductory line-column range of an expected fix-it by consuming
-/// the given input string. The range format is \c ([+-]?N:)?N-([+-]?N:)?N
-/// where \c 'N' is \c [0-9]+.
+/// Parse the introductory line-column location or replacement range of an
+/// expected fix-it by consuming the given input string. The location format is
+/// \c ([+-]?N:)?N where \c N is \c [0-9]+, and the range format is two
+/// locations separated with \c '-'.
 ///
 /// \param DiagnosticLineNo The line number of the associated expected
 /// diagnostic; used to turn line offsets into line numbers.
+///
+/// \returns A line-column range, or \c None if an error ocurred.
 static Optional<LineColumnRange> parseExpectedFixItRange(
     StringRef &Str, unsigned DiagnosticLineNo,
     llvm::function_ref<void(const char *, const Twine &)> diagnoseError) {
@@ -429,11 +432,19 @@ static Optional<LineColumnRange> parseExpectedFixItRange(
     return None;
   }
 
+  // If this is a location, fill in the end values and we're done.
+  if (!Str.empty() && Str.front() == '=') {
+    Range.EndLine = Range.StartLine;
+    Range.EndCol = Range.StartCol;
+
+    return Range;
+  }
+
   if (!Str.empty() && Str.front() == '-') {
     Str = Str.drop_front();
   } else {
-    diagnoseError(Str.data(),
-                  "expected '-' range separator in fix-it verification");
+    diagnoseError(Str.data(), "expected '-' range separator or '=' after "
+                              "location in fix-it verification");
     return None;
   }
 

@@ -24,7 +24,7 @@ func test0Fixits() {
   // CHECK: [[@LINE+1]]:81: error: expected line offset after leading '+' or '-' in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{-}}
 
-  // CHECK: [[@LINE+1]]:81: error: expected '-' range separator in fix-it verification
+  // CHECK: [[@LINE+1]]:81: error: expected '-' range separator or '=' after location in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1}}
 
   // CHECK: [[@LINE+1]]:82: error: expected colon-separated column number after line offset in fix-it verification
@@ -33,16 +33,19 @@ func test0Fixits() {
   // CHECK: [[@LINE+1]]:82: error: expected colon-separated column number after line offset in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1}}
 
+  // CHECK: [[@LINE+1]]:82: error: expected colon-separated column number after line offset in fix-it verification
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{-1=}}
+
   // CHECK: [[@LINE+1]]:82: error: expected column number after ':' in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:}}
 
   // CHECK: [[@LINE+1]]:83: error: expected column number after ':' in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1:}}
 
-  // CHECK: [[@LINE+1]]:83: error: expected '-' range separator in fix-it verification
+  // CHECK: [[@LINE+1]]:83: error: expected '-' range separator or '=' after location in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1}}
 
-  // CHECK: [[@LINE+1]]:84: error: expected '-' range separator in fix-it verification
+  // CHECK: [[@LINE+1]]:84: error: expected '-' range separator or '=' after location in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{-1:1}}
 
   // CHECK: [[@LINE+1]]:83: error: expected column number after ':' in fix-it verification
@@ -92,6 +95,15 @@ func test0Fixits() {
 
   // CHECK: [[@LINE+1]]:89: error: expected '=' after range in fix-it verification
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{+1:1--1:1}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1=a}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1:1=a}}
+
+  // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
+  undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{-1:1=a}}
 
   // CHECK: [[@LINE+1]]:78: error: expected fix-it not seen
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{1-1=}}
@@ -197,22 +209,22 @@ func test1Fixits() {
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{15-18=aa}} {{none}}
 
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{200:15-200:18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{212:15-212:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{202:15-18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{214:15-18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-204:18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-216:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{-0:15-+0:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15--0:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {+0:15-210:18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{+0:15-222:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
   labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{+1:15-+1:18=bb}}
               bbx: 1)
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{216:15-+1:18=bb}}
+  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{228:15-+1:18=bb}}
               bbx: 1)
 
   // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{{{}}15-18=aa}}
@@ -248,4 +260,20 @@ func test2Fixits() {
 
   // CHECK: [[@LINE+1]]:137: error: expected fix-it not seen; actual fix-its seen: {{{{}}15-18=aa}} {{{{}}23-26=bb}}
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=xx}} {{none}}
+}
+
+protocol P {
+  associatedtype A
+}
+func testFixitWithLocation(_: inout Bool) {
+  var bool = true
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  testFixitWithLocation(bool) // expected-error {{passing value of type 'Bool' to an inout parameter requires explicit '&'}} {{25=&}}
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  testFixitWithLocation(bool) // expected-error {{passing value of type 'Bool' to an inout parameter requires explicit '&'}} {{+0:25=&}}
+  // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
+  testFixitWithLocation(bool) // expected-error {{passing value of type 'Bool' to an inout parameter requires explicit '&'}} {{25-25=&}}
+
+  // CHECK: [[@LINE+1]]:126: error: expected fix-it not seen; actual fix-it seen: {{{{}}25-25=&}}
+  testFixitWithLocation(bool) // expected-error {{passing value of type 'Bool' to an inout parameter requires explicit '&'}} {{24-24=&}}
 }
