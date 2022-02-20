@@ -14,6 +14,7 @@
 // slightly differently on other platforms.
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
+// REQUIRES: optimized_stdlib
 
 //////////////////
 // Declarations //
