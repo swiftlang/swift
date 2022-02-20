@@ -590,7 +590,7 @@ private func _wideMaskedShiftLeft<F: FixedWidthInteger>(
   var high = lhs.high &<< F(rhs)
   let rollover = F.Magnitude(F.bitWidth) &- rhs
   high |= F(truncatingIfNeeded: lhs.low &>> rollover)
-  var low = lhs.low &<< rhs
+  let low = lhs.low &<< rhs
   return (high, low)
 }
 
