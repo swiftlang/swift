@@ -74,8 +74,6 @@ extension Clock {
   }
 }
 
-@available(SwiftStdlib 5.7, *)
-@usableFromInline
 enum _ClockID: Int32 {
   case continuous = 1
   case suspending = 2
@@ -83,16 +81,14 @@ enum _ClockID: Int32 {
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_get_time")
-@usableFromInline
 internal func _getTime(
   seconds: UnsafeMutablePointer<Int64>,
   nanoseconds: UnsafeMutablePointer<Int64>,
-  clock: _ClockID)
+  clock: CInt)
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_get_clock_res")
-@usableFromInline
 internal func _getClockRes(
   seconds: UnsafeMutablePointer<Int64>,
   nanoseconds: UnsafeMutablePointer<Int64>,
-  clock: _ClockID)
+  clock: CInt)

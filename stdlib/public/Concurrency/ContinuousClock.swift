@@ -59,7 +59,7 @@ extension ContinuousClock: Clock {
     _getClockRes(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
-      clock: .continuous)
+      clock: _ClockID.continuous.rawValue)
     return .seconds(seconds) + .nanoseconds(nanoseconds)
   }
 
@@ -70,7 +70,7 @@ extension ContinuousClock: Clock {
     _getTime(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
-      clock: .continuous)
+      clock: _ClockID.continuous.rawValue)
     return ContinuousClock.Instant(_value:
       .seconds(seconds) + .nanoseconds(nanoseconds))
   }
