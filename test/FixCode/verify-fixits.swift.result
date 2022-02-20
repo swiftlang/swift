@@ -5,7 +5,7 @@
 func f1() {
   guard true { return } // expected-error {{expected 'else' after 'guard' condition}}
 
-  guard true { return } // expected-error {{expected 'else' after 'guard' condition}} {{14-14=else }} {{none}}
+  guard true { return } // expected-error {{expected 'else' after 'guard' condition}} {{14=else }} {{none}}
 }
 
 func labeledFunc(aa: Int, bb: Int) {}

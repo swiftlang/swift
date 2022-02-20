@@ -317,11 +317,14 @@ DiagnosticVerifier::renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
           OS << ActualRange.StartLine << ':';
         OS << ActualRange.StartCol;
 
-        OS << '-';
+        const bool isMultiline = ActualRange.StartLine != ActualRange.EndLine;
+        if (isMultiline || ActualRange.StartCol != ActualRange.EndCol) {
+          OS << '-';
 
-        if (ActualRange.EndLine != ActualRange.StartLine)
-          OS << ActualRange.EndLine << ':';
-        OS << ActualRange.EndCol;
+          if (isMultiline)
+            OS << ActualRange.EndLine << ':';
+          OS << ActualRange.EndCol;
+        }
 
         OS << '=';
 

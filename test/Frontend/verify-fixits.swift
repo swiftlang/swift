@@ -274,6 +274,6 @@ func testFixitWithLocation(_: inout Bool) {
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
   testFixitWithLocation(bool) // expected-error {{passing value of type 'Bool' to an inout parameter requires explicit '&'}} {{25-25=&}}
 
-  // CHECK: [[@LINE+1]]:126: error: expected fix-it not seen; actual fix-it seen: {{{{}}25-25=&}}
+  // CHECK: [[@LINE+1]]:126: error: expected fix-it not seen; actual fix-it seen: {{{{}}25=&}}
   testFixitWithLocation(bool) // expected-error {{passing value of type 'Bool' to an inout parameter requires explicit '&'}} {{24-24=&}}
 }
