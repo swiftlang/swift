@@ -35,6 +35,8 @@ struct ExpectedFixIt {
 };
 } // end namespace swift
 
+constexpr unsigned LineColumnRange::NoValue;
+
 const LineColumnRange &
 CapturedFixItInfo::getLineColumnRange(const SourceManager &SM,
                                       unsigned BufferID,

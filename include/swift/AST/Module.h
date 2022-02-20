@@ -780,7 +780,7 @@ public:
   /// shadowed clang module. It does not force synthesized top-level decls that
   /// should be printed to be added; use \c swift::getTopLevelDeclsForDisplay()
   /// for that.
-  void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
+  void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
 
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 

@@ -893,19 +893,44 @@ public:
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo,
-                              llvm::Optional<Alignment> _Align, bool Init) {
+                              llvm::Optional<Alignment> _Align, bool Init,
+                              bool WasMoved) {
     auto Align = _Align.getValueOr(IGM.getPointerAlignment());
     unsigned ArgNo = VarInfo.ArgNo;
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
+
     if (!Alloca.isValid())
       Alloca = createAlloca(Storage->getType(), Align, VarInfo.Name + ".debug");
-    assert(canAllocaStoreValue(Alloca.getAddress(), Storage, VarInfo, Scope) &&
+
+    // If our value was ever moved, we may be reinitializing the shadow
+    // copy. Insert the bit cast so that the types line up and we do not get the
+    // duplicate shadow copy error (which triggers based off of type
+    // differences).
+    auto *Address = Alloca.getAddress();
+    if (WasMoved) {
+      auto nonPtrAllocaType =
+          cast<llvm::PointerType>(Address->getType())->getElementType();
+      if (nonPtrAllocaType != Storage->getType())
+        Address = Builder.CreateBitOrPointerCast(
+            Address, llvm::PointerType::get(Storage->getType(), 0));
+    }
+
+    assert(canAllocaStoreValue(Address, Storage, VarInfo, Scope) &&
            "bad scope?");
+
     if (Init) {
+      // Zero init our bare allocation.
       zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
       ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
-      Builder.CreateStore(Storage, Alloca.getAddress(), Align);
+      // But store into the address with maybe bitcast.
+      Builder.CreateStore(Storage, Address, Align);
     }
+
+    // If this allocation was moved at some point, we might be reinitializing a
+    // shadow copy. In such a case, lets insert an identity bit cast so that our
+    // callers will use this address with respect to the place where we
+    // reinit. Otherwise, callers may use the alloca's insert point. The
+    // optimizer will eliminate these later without issue.
     return Alloca.getAddress();
   }
 
@@ -928,7 +953,7 @@ public:
   llvm::Value *emitShadowCopyIfNeeded(llvm::Value *Storage,
                                       const SILDebugScope *Scope,
                                       SILDebugVariable VarInfo,
-                                      bool IsAnonymous,
+                                      bool IsAnonymous, bool WasMoved,
                                       llvm::Optional<Alignment> Align = None) {
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
@@ -950,7 +975,8 @@ public:
     }
 
     // Emit a shadow copy.
-    auto shadow = emitShadowCopy(Storage, Scope, VarInfo, Align, true);
+    auto shadow =
+        emitShadowCopy(Storage, Scope, VarInfo, Align, true, WasMoved);
 
     // Mark variables in async functions for lifetime extension, so they get
     // spilled into the async context.
@@ -969,14 +995,16 @@ public:
   llvm::Value *emitShadowCopyIfNeeded(Address Storage,
                                       const SILDebugScope *Scope,
                                       SILDebugVariable VarInfo,
-                                      bool IsAnonymous) {
+                                      bool IsAnonymous, bool WasMoved) {
     return emitShadowCopyIfNeeded(Storage.getAddress(), Scope, VarInfo,
-                                  IsAnonymous, Storage.getAlignment());
+                                  IsAnonymous, WasMoved,
+                                  Storage.getAlignment());
   }
 
   /// Like \c emitShadowCopyIfNeeded() but takes an exploded value.
   void emitShadowCopyIfNeeded(SILValue &SILVal, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo, bool IsAnonymous,
+                              bool WasMoved,
                               llvm::SmallVectorImpl<llvm::Value *> &copy) {
     Explosion e = getLoweredExplosion(SILVal);
 
@@ -1003,8 +1031,8 @@ public:
       return;
     
     if (e.size() == 1) {
-      copy.push_back(
-        emitShadowCopyIfNeeded(e.claimNext(), Scope, VarInfo, IsAnonymous));
+      copy.push_back(emitShadowCopyIfNeeded(e.claimNext(), Scope, VarInfo,
+                                            IsAnonymous, WasMoved));
       return;
     }
 
@@ -1053,12 +1081,11 @@ public:
   
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
-  void emitDebugVariableDeclaration(StorageType Storage, DebugTypeInfo Ty,
-                                    SILType SILTy, const SILDebugScope *DS,
-                                    SILLocation VarLoc,
-                                    SILDebugVariable VarInfo,
-                                    IndirectionKind Indirection,
-                                    AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
+  void emitDebugVariableDeclaration(
+      StorageType Storage, DebugTypeInfo Ty, SILType SILTy,
+      const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
+      IndirectionKind Indirection,
+      AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
     // TODO: fix demangling for C++ types (SR-13223).
     if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
@@ -1070,15 +1097,18 @@ public:
     }
 
     assert(IGM.DebugInfo && "debug info not enabled");
+
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarLoc,
                                              VarInfo, Indirection, ArtificialKind::RealValue,
                                              DbgInstrKind);
-    } else
-      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarLoc,
-                                             VarInfo, Indirection, ArtificialKind::RealValue,
-                                             DbgInstrKind);
+      return;
+    }
+
+    IGM.DebugInfo->emitVariableDeclaration(
+        Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection,
+        ArtificialKind::RealValue, DbgInstrKind);
   }
 
   void emitFailBB() {
@@ -4787,8 +4817,9 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
       ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext()));
   auto Var = DbgValue->getVarInfo();
   assert(Var && "error result without debug info");
-  auto Storage = emitShadowCopyIfNeeded(ErrorResultSlot.getAddress(),
-                                        getDebugScope(), *Var, false);
+  auto Storage =
+      emitShadowCopyIfNeeded(ErrorResultSlot.getAddress(), getDebugScope(),
+                             *Var, false, false /*was move*/);
   if (!IGM.DebugInfo)
     return;
   auto DbgTy = DebugTypeInfo::getErrorResult(
@@ -4853,7 +4884,8 @@ void IRGenSILFunction::emitPoisonDebugValueInst(DebugValueInst *i) {
   // vs. multi-value explosions.
   llvm::Value *shadowAddress;
   if (singleValueExplosion) {
-    shadowAddress = emitShadowCopy(storage, scope, *varInfo, ptrAlign, false);
+    shadowAddress = emitShadowCopy(storage, scope, *varInfo, ptrAlign, false,
+                                   false /*was moved*/);
   } else {
     assert(refTy->isClassExistentialType() && "unknown multi-value explosion");
     // FIXME: Handling Optional existentials requires TypeInfo
@@ -4984,12 +5016,12 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Put the value into a shadow-copy stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
   if (IsAddrVal)
-    Copy.emplace_back(
-      emitShadowCopyIfNeeded(getLoweredAddress(SILVal).getAddress(),
-                             i->getDebugScope(), *VarInfo, IsAnonymous));
+    Copy.emplace_back(emitShadowCopyIfNeeded(
+        getLoweredAddress(SILVal).getAddress(), i->getDebugScope(), *VarInfo,
+        IsAnonymous, i->getWasMoved()));
   else
     emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
-                           Copy);
+                           i->getWasMoved(), Copy);
 
   bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
@@ -5314,7 +5346,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
       if (!Alloca->isStaticAlloca()) {
         // Store the address of the dynamic alloca on the stack.
         addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment(),
-                              /*init*/ true);
+                              /*init*/ true, i->getWasMoved());
         Indirection =
             InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue;
       }
@@ -5356,17 +5388,18 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
       !isa<llvm::UndefValue>(shadow)) {
     if (ValueVariables.insert(shadow).second)
       ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
-    auto inst = cast<llvm::Instruction>(shadow);
-    llvm::IRBuilder<> builder(inst->getNextNode());
+    auto shadowInst = cast<llvm::Instruction>(shadow);
+    llvm::IRBuilder<> builder(shadowInst->getNextNode());
     addr =
         builder.CreateLoad(shadow->getType()->getPointerElementType(), shadow);
   }
 
   bindArchetypes(DbgTy.getType());
-  if (IGM.DebugInfo)
-    emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS,
-                                 i->getLoc(), *VarInfo,
-                                 Indirection);
+  if (IGM.DebugInfo) {
+    emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo,
+                                 Indirection,
+                                 AddrDbgInstrKind(i->getWasMoved()));
+  }
 }
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
@@ -5585,8 +5618,9 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   auto VarInfo = i->getVarInfo();
   assert(VarInfo && "debug_value without debug info");
 
-  auto Storage = emitShadowCopyIfNeeded(
-      boxWithAddr.getAddress(), i->getDebugScope(), *VarInfo, IsAnonymous);
+  auto Storage =
+      emitShadowCopyIfNeeded(boxWithAddr.getAddress(), i->getDebugScope(),
+                             *VarInfo, IsAnonymous, false /*was moved*/);
 
   if (!IGM.DebugInfo)
     return;

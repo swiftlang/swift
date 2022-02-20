@@ -1316,11 +1316,12 @@ bool NominalTypeDecl::lookupConformance(
            conformances);
 }
 
-SmallVector<ProtocolDecl *, 2> NominalTypeDecl::getAllProtocols() const {
+SmallVector<ProtocolDecl *, 2>
+NominalTypeDecl::getAllProtocols(bool sorted) const {
   prepareConformanceTable();
   SmallVector<ProtocolDecl *, 2> result;
-  ConformanceTable->getAllProtocols(const_cast<NominalTypeDecl *>(this),
-                                    result);
+  ConformanceTable->getAllProtocols(const_cast<NominalTypeDecl *>(this), result,
+                                    sorted);
   return result;
 }
 

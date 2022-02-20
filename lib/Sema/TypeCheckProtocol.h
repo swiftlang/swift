@@ -100,61 +100,6 @@ CheckTypeWitnessResult checkTypeWitness(Type type,
                                         const NormalProtocolConformance *Conf,
                                         SubstOptions options = None);
 
-/// Describes the means of inferring an abstract type witness.
-enum class AbstractTypeWitnessKind : uint8_t {
-  /// The type witness was inferred via a same-type-to-concrete constraint
-  /// in a protocol requirement signature.
-  Fixed,
-
-  /// The type witness was inferred via a defaulted associated type.
-  Default,
-
-  /// The type witness was inferred to a generic parameter of the
-  /// conforming type.
-  GenericParam,
-};
-
-/// A type witness inferred without the aid of a specific potential
-/// value witness.
-class AbstractTypeWitness {
-  AbstractTypeWitnessKind Kind;
-  AssociatedTypeDecl *AssocType;
-  Type TheType;
-
-  /// When this is a default type witness, the declaration responsible for it.
-  /// May not necessarilly match \c AssocType.
-  AssociatedTypeDecl *DefaultedAssocType;
-
-  AbstractTypeWitness(AbstractTypeWitnessKind Kind,
-                      AssociatedTypeDecl *AssocType, Type TheType,
-                      AssociatedTypeDecl *DefaultedAssocType)
-      : Kind(Kind), AssocType(AssocType), TheType(TheType),
-        DefaultedAssocType(DefaultedAssocType) {
-    assert(AssocType && TheType);
-  }
-
-public:
-  static AbstractTypeWitness forFixed(AssociatedTypeDecl *assocType, Type type);
-
-  static AbstractTypeWitness forDefault(AssociatedTypeDecl *assocType,
-                                        Type type,
-                                        AssociatedTypeDecl *defaultedAssocType);
-
-  static AbstractTypeWitness forGenericParam(AssociatedTypeDecl *assocType,
-                                             Type type);
-
-public:
-  AbstractTypeWitnessKind getKind() const { return Kind; }
-
-  AssociatedTypeDecl *getAssocType() const { return AssocType; }
-
-  Type getType() const { return TheType; }
-
-  AssociatedTypeDecl *getDefaultedAssocType() const {
-    return DefaultedAssocType;
-  }
-};
-
 /// The set of associated types that have been inferred by matching
 /// the given value witness to its corresponding requirement.
 struct InferredAssociatedTypesByWitness {
@@ -855,9 +800,8 @@ private:
   ///
   /// \param fn A function to call to emit the actual diagnostic. If
   /// diagnostics are being deferred,
-  void diagnoseOrDefer(
-         ValueDecl *requirement, bool isError,
-         std::function<void(NormalProtocolConformance *)> fn);
+  void diagnoseOrDefer(const ValueDecl *requirement, bool isError,
+                       std::function<void(NormalProtocolConformance *)> fn);
 
   ArrayRef<MissingWitness> getLocalMissingWitness() {
     return GlobalMissingWitnesses.getArrayRef().
@@ -929,6 +873,136 @@ public:
                     llvm::function_ref<bool(AbstractFunctionDecl *)>predicate);
 };
 
+/// A system for recording and probing the intergrity of a type witness solution
+/// for a set of unresolved associated type declarations.
+///
+/// Right now can reason only about abstract type witnesses, i.e., same-type
+/// constraints, default type definitions, and bindings to generic parameters.
+class TypeWitnessSystem final {
+  /// Equivalence classes are used on demand to express equivalences between
+  /// witness candidates and reflect changes to resolved types across their
+  /// members.
+  class EquivalenceClass final {
+    /// The pointer:
+    /// - The resolved type for witness candidates belonging to this equivalence
+    ///   class. The resolved type may be a type parameter, but cannot directly
+    ///   pertain to a name variable in the owning system; instead, witness
+    ///   candidates that should resolve to the same type share an equivalence
+    ///   class.
+    /// The int:
+    /// - A flag indicating whether the resolved type is ambiguous. When set,
+    ///   the resolved type is null.
+    llvm::PointerIntPair<Type, 1, bool> ResolvedTyAndIsAmbiguous;
+
+  public:
+    EquivalenceClass(Type ty) : ResolvedTyAndIsAmbiguous(ty, false) {}
+
+    EquivalenceClass(const EquivalenceClass &) = delete;
+    EquivalenceClass(EquivalenceClass &&) = delete;
+    EquivalenceClass &operator=(const EquivalenceClass &) = delete;
+    EquivalenceClass &operator=(EquivalenceClass &&) = delete;
+
+    Type getResolvedType() const {
+      return ResolvedTyAndIsAmbiguous.getPointer();
+    }
+    void setResolvedType(Type ty);
+
+    bool isAmbiguous() const {
+      return ResolvedTyAndIsAmbiguous.getInt();
+    }
+    void setAmbiguous() {
+      ResolvedTyAndIsAmbiguous = {nullptr, true};
+    }
+  };
+
+  /// A type witness candidate for a name variable.
+  struct TypeWitnessCandidate final {
+    /// The defaulted associated type declaration correlating with this
+    /// candidate, if present.
+    const AssociatedTypeDecl *DefaultedAssocType;
+
+    /// The equivalence class of this candidate.
+    EquivalenceClass *EquivClass;
+  };
+
+  /// The set of equivalence classes in the system.
+  llvm::SmallPtrSet<EquivalenceClass *, 4> EquivalenceClasses;
+
+  /// The mapping from name variables (the names of unresolved associated
+  /// type declarations) to their corresponding type witness candidates.
+  llvm::SmallDenseMap<Identifier, TypeWitnessCandidate, 4> TypeWitnesses;
+
+public:
+  TypeWitnessSystem(ArrayRef<AssociatedTypeDecl *> assocTypes);
+  ~TypeWitnessSystem();
+
+  TypeWitnessSystem(const TypeWitnessSystem &) = delete;
+  TypeWitnessSystem(TypeWitnessSystem &&) = delete;
+  TypeWitnessSystem &operator=(const TypeWitnessSystem &) = delete;
+  TypeWitnessSystem &operator=(TypeWitnessSystem &&) = delete;
+
+  /// Get the resolved type witness for the associated type with the given name.
+  Type getResolvedTypeWitness(Identifier name) const;
+  bool hasResolvedTypeWitness(Identifier name) const;
+
+  /// Get the defaulted associated type relating to the resolved type witness
+  /// for the associated type with the given name, if present.
+  const AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
+
+  /// Record a type witness for the given associated type name.
+  ///
+  /// \note This need not lead to the resolution of a type witness, e.g.
+  /// an associated type may be defaulted to another.
+  void addTypeWitness(Identifier name, Type type);
+
+  /// Record a default type witness.
+  ///
+  /// \param defaultedAssocType The specific associated type declaration that
+  /// defines the given default type.
+  ///
+  /// \note This need not lead to the resolution of a type witness.
+  void addDefaultTypeWitness(Type type,
+                             const AssociatedTypeDecl *defaultedAssocType);
+
+  /// Record the given same-type requirement, if regarded of interest to
+  /// the system.
+  ///
+  /// \note This need not lead to the resolution of a type witness.
+  void addSameTypeRequirement(const Requirement &req);
+
+  void dump(llvm::raw_ostream &out,
+            const NormalProtocolConformance *conformance) const;
+
+private:
+  /// Form an equivalence between the given name variables.
+  void addEquivalence(Identifier name1, Identifier name2);
+
+  /// Merge \p equivClass2 into \p equivClass1.
+  ///
+  /// \note This will delete \p equivClass2 after migrating its members to
+  /// \p equivClass1.
+  void mergeEquivalenceClasses(EquivalenceClass *equivClass1,
+                               const EquivalenceClass *equivClass2);
+
+  /// The result of comparing two resolved types targeting a single equivalence
+  /// class, in terms of their relative impact on solving the system.
+  enum class ResolvedTypeComparisonResult {
+    /// The first resolved type is a better choice than the second one.
+    Better,
+
+    /// The first resolved type is an equivalent or worse choice than the
+    /// second one.
+    EquivalentOrWorse,
+
+    /// Both resolved types are concrete and mutually exclusive.
+    Ambiguity
+  };
+
+  /// Compare the given resolved types as targeting a single equivalence class,
+  /// in terms of the their relative impact on solving the system.
+  static ResolvedTypeComparisonResult compareResolvedTypes(Type ty1, Type ty2);
+};
+
 /// Captures the state needed to infer associated types.
 class AssociatedTypeInference {
   /// The type checker we'll need to validate declarations etc.
@@ -956,7 +1030,7 @@ class AssociatedTypeInference {
     typeWitnesses;
 
   /// Information about a failed, defaulted associated type.
-  AssociatedTypeDecl *failedDefaultedAssocType = nullptr;
+  const AssociatedTypeDecl *failedDefaultedAssocType = nullptr;
   Type failedDefaultedWitness;
   CheckTypeWitnessResult failedDefaultedResult;
 
@@ -1005,23 +1079,20 @@ private:
     ConformanceChecker &checker,
     const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
 
-  /// Compute a "fixed" type witness for an associated type, e.g.,
-  /// if the refined protocol requires it to be equivalent to some other type.
-  Type computeFixedTypeWitness(AssociatedTypeDecl *assocType);
-
   /// Compute the default type witness from an associated type default,
   /// if there is one.
-  Optional<AbstractTypeWitness>
-  computeDefaultTypeWitness(AssociatedTypeDecl *assocType);
+  Optional<std::pair<AssociatedTypeDecl *, Type>>
+  computeDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
 
   /// Compute the "derived" type witness for an associated type that is
   /// known to the compiler.
   std::pair<Type, TypeDecl *>
   computeDerivedTypeWitness(AssociatedTypeDecl *assocType);
 
-  /// Compute a type witness without using a specific potential witness.
-  Optional<AbstractTypeWitness>
-  computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
+  /// Collect abstract type witnesses and feed them to the given system.
+  void collectAbstractTypeWitnesses(
+      TypeWitnessSystem &system,
+      ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const;
 
   /// Substitute the current type witnesses into the given interface type.
   Type substCurrentTypeWitnesses(Type type);
@@ -1040,14 +1111,12 @@ private:
   /// requirements of the given constrained extension.
   bool checkConstrainedExtension(ExtensionDecl *ext);
 
-  /// Validate the current tentative solution represented by \p typeWitnesses
-  /// and attempt to resolve abstract type witnesses for associated types that
-  /// could not be inferred otherwise.
+  /// Attempt to infer abstract type witnesses for the given set of associated
+  /// types.
   ///
   /// \returns \c nullptr, or the associated type that failed.
-  AssociatedTypeDecl *
-  completeSolution(ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
-                   unsigned reqDepth);
+  AssociatedTypeDecl *inferAbstractTypeWitnesses(
+      ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes, unsigned reqDepth);
 
   /// Top-level operation to find solutions for the given unresolved
   /// associated types.

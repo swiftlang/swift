@@ -530,6 +530,9 @@ namespace swift {
     RequirementMachineMode RequirementMachineInferredSignatures =
         RequirementMachineMode::Disabled;
 
+    /// Enables dumping type witness systems from associated type inference.
+    bool DumpTypeWitnessSystems = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
