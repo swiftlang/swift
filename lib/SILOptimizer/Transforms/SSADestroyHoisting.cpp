@@ -634,9 +634,13 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
                                 const KnownStorageUses &knownUses,
                                 const DeinitBarriers &deinitBarriers) {
   if (auto *eai = dyn_cast<EndAccessInst>(barrier)) {
+    auto *bai = eai->getBeginAccess();
+    // Don't hoist a destroy into an unrelated access scope.
+    if (stripAccessMarkers(bai) != stripAccessMarkers(storageRoot))
+      return false;
     SILInstruction *instruction = eai;
     while ((instruction = instruction->getPreviousInstruction())) {
-      if (instruction == eai->getBeginAccess())
+      if (instruction == bai)
         return false;
       if (foldBarrier(instruction, storageRoot))
         return true;
@@ -817,11 +821,17 @@ void SSADestroyHoisting::run() {
   // Arguments enclose everything.
   for (auto *arg : getFunction()->getArguments()) {
     if (arg->getType().isAddress()) {
-      bool isInout = cast<SILFunctionArgument>(arg)
-                         ->getArgumentConvention()
-                         .isInoutConvention();
-      changed |= hoistDestroys(arg, /*ignoreDeinitBarriers=*/
-                               isInout, remainingDestroyAddrs, deleter);
+      auto convention = cast<SILFunctionArgument>(arg)->getArgumentConvention();
+      // This is equivalent to writing
+      //
+      //     convention == SILArgumentConvention::Indirect_Inout
+      //
+      // but communicates the rationale: in order to ignore deinit barriers, the
+      // address must be exclusively accessed and be a modification.
+      bool ignoreDeinitBarriers = convention.isInoutConvention() &&
+                                  convention.isExclusiveIndirectParameter();
+      changed |= hoistDestroys(arg, ignoreDeinitBarriers, remainingDestroyAddrs,
+                               deleter);
     }
   }
 
