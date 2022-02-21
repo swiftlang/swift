@@ -4154,29 +4154,29 @@ public:
       if (proto->existentialRequiresAny()) {
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
-                           proto->getName())
+                           proto->getDeclaredInterfaceType(),
+                           /*isAlias=*/false)
             .limitBehavior(DiagnosticBehavior::Warning);
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
-      type.findIf([&](Type type) -> bool {
-        if (T->isInvalid())
-          return false;
-        if (type->isExistentialType()) {
-          auto layout = type->getExistentialLayout();
-          for (auto *proto : layout.getProtocols()) {
-            auto *protoDecl = proto->getDecl();
-            if (!protoDecl->existentialRequiresAny())
-              continue;
+      // If this is a type alias to a constraint type, the type
+      // alias name must be prefixed with 'any' to be used as an
+      // existential type.
+      if (type->isConstraintType()) {
+        auto layout = type->getExistentialLayout();
+        for (auto *proto : layout.getProtocols()) {
+          auto *protoDecl = proto->getDecl();
+          if (!protoDecl->existentialRequiresAny())
+            continue;
 
-            Ctx.Diags.diagnose(comp->getNameLoc(),
-                               diag::existential_requires_any,
-                               protoDecl->getName())
-                .limitBehavior(DiagnosticBehavior::Warning);
-          }
+          Ctx.Diags.diagnose(comp->getNameLoc(),
+                             diag::existential_requires_any,
+                             alias->getDeclaredInterfaceType(),
+                             /*isAlias=*/true)
+              .limitBehavior(DiagnosticBehavior::Warning);
         }
-        return false;
-      });
+      }
     }
   }
 
@@ -4204,6 +4204,9 @@ void TypeChecker::checkExistentialTypes(Decl *decl) {
   } else if (auto *genericDecl = dyn_cast<GenericTypeDecl>(decl)) {
     checkExistentialTypes(ctx, genericDecl->getGenericParams());
     checkExistentialTypes(ctx, genericDecl->getTrailingWhereClause());
+    if (auto *typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
+      checkExistentialTypes(ctx, typeAlias);
+    }
   } else if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
     checkExistentialTypes(ctx, assocType->getTrailingWhereClause());
   } else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl)) {
@@ -4231,6 +4234,19 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt) {
 
   ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/true);
   stmt->walk(visitor);
+}
+
+void TypeChecker::checkExistentialTypes(ASTContext &ctx,
+                                        TypeAliasDecl *typeAlias) {
+  if (!typeAlias || !typeAlias->getUnderlyingTypeRepr())
+    return;
+
+  // A type alias to a plain constraint type is allowed.
+  if (typeAlias->getUnderlyingType()->isConstraintType())
+    return;
+
+  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/true);
+  typeAlias->getUnderlyingTypeRepr()->walk(visitor);
 }
 
 void TypeChecker::checkExistentialTypes(
