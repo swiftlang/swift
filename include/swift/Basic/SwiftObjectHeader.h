@@ -9,8 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_SIL_SWIFTOBJECTHEADER_H
-#define SWIFT_SIL_SWIFTOBJECTHEADER_H
+#ifndef SWIFT_BASIC_SWIFTOBJECTHEADER_H
+#define SWIFT_BASIC_SWIFTOBJECTHEADER_H
 
 #include "BridgedSwiftObject.h"
 
@@ -24,13 +24,11 @@
 /// the proper constructor, which avoids the header to be uninitialized.
 struct SwiftObjectHeader : BridgedSwiftObject {
   SwiftObjectHeader(SwiftMetatype metatype) {
-     this->metatype = metatype;
-     this->refCounts = ~(uint64_t)0;
+    this->metatype = metatype;
+    this->refCounts = ~(uint64_t)0;
   }
-  
-  bool isBridged() const {
-    return metatype != nullptr;
-  }
+
+  bool isBridged() const { return metatype != nullptr; }
 };
 
 #endif

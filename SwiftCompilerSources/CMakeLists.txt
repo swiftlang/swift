@@ -6,7 +6,6 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-
 # Following function are needed as a workaround until it's possible to compile
 # swift code with cmake's builtin swift support.
 
@@ -19,15 +18,9 @@ function(add_swift_compiler_module module)
   cmake_parse_arguments(ALSM
                         ""
                         ""
-                        "DEPENDS"
+                        "DEPENDS;SOURCES"
                         ${ARGN})
-  set(raw_sources ${ALSM_UNPARSED_ARGUMENTS})
-  set(sources)
-  foreach(raw_source ${raw_sources})
-    get_filename_component(
-      raw_source "${raw_source}" REALPATH BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-    list(APPEND sources "${raw_source}")
-  endforeach()
+  set(raw_sources ${ALSM_SOURCES} ${ALSM_UNPARSED_ARGUMENTS})
 
   set(target_name "SwiftModule${module}")
 
@@ -36,8 +29,9 @@ function(add_swift_compiler_module module)
   # This target is mainly used to add properties, like the list of source files.
   add_custom_target(
       ${target_name}
-      SOURCES ${sources}
       COMMENT "swift compiler module ${module}")
+
+  swift_compiler_sources(${module} ${raw_sources})
 
   set_property(TARGET ${target_name} PROPERTY module_name ${module})
   set_property(TARGET ${target_name} PROPERTY module_depends ${ALSM_DEPENDS})
@@ -54,8 +48,13 @@ function(swift_compiler_sources module)
                         ""
                         ""
                         ${ARGN})
-  set(sources ${LSS_UNPARSED_ARGUMENTS})
-  list(TRANSFORM sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+  set(raw_sources ${LSS_UNPARSED_ARGUMENTS})
+  set(sources)
+  foreach(raw_source ${raw_sources})
+    get_filename_component(
+      raw_source "${raw_source}" REALPATH BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    list(APPEND sources "${raw_source}")
+  endforeach()
 
   set(target_name "SwiftModule${module}")
   set_property(TARGET "SwiftModule${module}" APPEND PROPERTY SOURCES ${sources})
@@ -146,8 +145,11 @@ function(add_swift_compiler_modules_library name)
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
               "-parse-as-library" ${sources}
               "-wmo" ${swift_compile_options}
-              "-I" "${SWIFT_SOURCE_DIR}/include/swift"
-              "-I" "${SWIFT_SOURCE_DIR}/include"
+              # Bridging modules and headers.
+              "-Xcc" "-I" "-Xcc" "${SWIFT_SOURCE_DIR}/include"
+              # Generated C headers.
+              "-Xcc" "-I" "-Xcc" "${CMAKE_BINARY_DIR}/include"
+              # Generated swift modules.
               "-I" "${build_dir}"
       COMMENT "Building swift module ${module}")
 

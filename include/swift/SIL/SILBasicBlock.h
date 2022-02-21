@@ -19,10 +19,10 @@
 
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SwiftObjectHeader.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SwiftObjectHeader.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
