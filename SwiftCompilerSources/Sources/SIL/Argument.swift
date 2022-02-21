@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
 /// A basic block argument.

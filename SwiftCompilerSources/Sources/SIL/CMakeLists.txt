@@ -7,20 +7,23 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 add_swift_compiler_module(SIL
-  ApplySite.swift
-  Argument.swift
-  BasicBlock.swift
-  Builder.swift
-  Effects.swift
-  Function.swift
-  GlobalVariable.swift
-  Instruction.swift
-  Location.swift
-  Operand.swift
-  Registration.swift
-  SmallProjectionPath.swift
-  SubstitutionMap.swift
-  Type.swift
-  Utils.swift
-  Value.swift)
+  DEPENDS
+    Basic
+  SOURCES
+    ApplySite.swift
+    Argument.swift
+    BasicBlock.swift
+    Builder.swift
+    Effects.swift
+    Function.swift
+    GlobalVariable.swift
+    Instruction.swift
+    Location.swift
+    Operand.swift
+    Registration.swift
+    SmallProjectionPath.swift
+    SubstitutionMap.swift
+    Type.swift
+    Utils.swift
+    Value.swift)
 

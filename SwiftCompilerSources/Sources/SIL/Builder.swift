@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
 /// A utility to create new instructions at a given insertion point.
