@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 class Node {
-  var elem: Int64
+  var elem: [Int64] = []
   var next: Node?
 }
 
@@ -9,9 +9,9 @@ class Node {
 // CHECK: [[SELF:%.*]] "self"
 // CHECK: bb0([[SELF]] : @guaranteed $Node):
 // CHECK:   [[ELEM:%.*]] = ref_element_addr [[SELF]] : $Node, #Node.elem
-// CHECK:   [[ELEM_ACCESS:%.*]] = begin_access [deinit] [static] [[ELEM]] : $*Int64
-// CHECK:   destroy_addr [[ELEM_ACCESS]] : $*Int64
-// CHECK:   end_access [[ELEM_ACCESS]] : $*Int64
+// CHECK:   [[ELEM_ACCESS:%.*]] = begin_access [deinit] [static] [[ELEM]] : $*Array<Int64>
+// CHECK:   destroy_addr [[ELEM_ACCESS]] : $*Array<Int64>
+// CHECK:   end_access [[ELEM_ACCESS]] : $*Array<Int64>
 // CHECK:   [[NIL:%.*]] = enum $Optional<Node>, #Optional.none!enumelt
 // CHECK:   [[SELF_NEXT:%.*]] = ref_element_addr [[SELF]] : $Node, #Node.next
 // CHECK:   [[ITER:%.*]] = alloc_stack $Optional<Node>
