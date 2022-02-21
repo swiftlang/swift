@@ -251,6 +251,10 @@ void checkExistentialTypes(Decl *decl);
 /// Check for invalid existential types in the given statement.
 void checkExistentialTypes(ASTContext &ctx, Stmt *stmt);
 
+/// Check for invalid existential types in the underlying type of
+/// the given type alias.
+void checkExistentialTypes(ASTContext &ctx, TypeAliasDecl *typeAlias);
+
 /// Check for invalid existential types in the given generic requirement
 /// list.
 void checkExistentialTypes(ASTContext &ctx,

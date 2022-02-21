@@ -236,3 +236,24 @@ func testAnyTypeExpr() {
 
 func hasInvalidExistential(_: any DoesNotExistIHope) {}
 // expected-error@-1 {{cannot find type 'DoesNotExistIHope' in scope}}
+
+protocol Input {
+  associatedtype A
+}
+protocol Output {
+  associatedtype A
+}
+
+// expected-warning@+2{{protocol 'Input' as a type must be explicitly marked as 'any'}}
+// expected-warning@+1{{protocol 'Output' as a type must be explicitly marked as 'any'}}
+typealias InvalidFunction = (Input) -> Output
+func testInvalidFunctionAlias(fn: InvalidFunction) {}
+
+typealias ExistentialFunction = (any Input) -> any Output
+func testFunctionAlias(fn: ExistentialFunction) {}
+
+typealias Constraint = Input
+func testConstraintAlias(x: Constraint) {} // expected-warning{{'Constraint' (aka 'Input') as a type must be explicitly marked as 'any'}}
+
+typealias Existential = any Input
+func testExistentialAlias(x: Existential, y: any Constraint) {}
