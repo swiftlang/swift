@@ -840,17 +840,17 @@ void SSADestroyHoisting::run() {
     if (!remainingDestroyAddrs.contains(dai))
       continue;
     auto *si = pair.second;
-    if (dai->getNextInstruction() == si) {
-      // No stores should have been rewritten during hoisting.  Their ownership
-      // qualifiers were set to [init] when splitting off the destroy_addrs.
-      assert(si->getOwnershipQualifier() == StoreOwnershipQualifier::Init);
-      // If a newly created destroy_addr has not been hoisted from its previous
-      // location, combine it back together with the store [init] which it was
-      // split off from.
-      deleter.forceDelete(dai);
-      si->setOwnershipQualifier(StoreOwnershipQualifier::Assign);
-      --splitDestroys;
-    }
+    if (dai->getNextInstruction() != si)
+      continue;
+    // No stores should have been rewritten during hoisting.  Their ownership
+    // qualifiers were set to [init] when splitting off the destroy_addrs.
+    assert(si->getOwnershipQualifier() == StoreOwnershipQualifier::Init);
+    // If a newly created destroy_addr has not been hoisted from its previous
+    // location, combine it back together with the store [init] which it was
+    // split off from.
+    deleter.forceDelete(dai);
+    si->setOwnershipQualifier(StoreOwnershipQualifier::Assign);
+    --splitDestroys;
   }
   // If there were any destroy_addrs split off of stores and not recombined
   // with them, then the function has changed.
