@@ -297,11 +297,31 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
       LLVM_DEBUG(llvm::dbgs() << "TODO: Nonescaping partial_apply not yet implemented\n");
       return;
     }
-    
+    if (origTy->getInvocationGenericSignature()) {
+      LLVM_DEBUG(llvm::dbgs() << "TODO: generic partial_apply not yet implemented\n");
+      return;
+    }
+
+    // TODO: SILBoxType is only implemented for a single field right now, so
+    // represent the captures as a tuple.
+#if MULTI_FIELD_BOXES_ARE_SUPPORTED
     auto newBoxLayout = SILLayout::get(C,
        origTy->getInvocationGenericSignature(),
        boxFields,
        /*capturesGenerics*/ !origTy->getInvocationGenericSignature().isNull());
+#else
+    llvm::SmallVector<TupleTypeElt, 4> tupleElts;
+    for (auto field : boxFields) {
+      tupleElts.push_back(TupleTypeElt(field.getLoweredType()));
+    }
+    auto tupleTy = TupleType::get(tupleElts, C)->getCanonicalType();
+    SILField tupleField(tupleTy, /*mutable*/ false);
+    
+    auto newBoxLayout = SILLayout::get(C,
+                                       origTy->getInvocationGenericSignature(),
+                                       tupleField,
+                                       /*capturesGenerics*/ false);
+#endif
     SubstitutionMap identitySubstitutionMap;
     if (auto origSig = origTy->getInvocationGenericSignature()) {
       identitySubstitutionMap = origSig->getIdentitySubstitutionMap();
@@ -358,9 +378,15 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
       for (unsigned i = 0; i < appliedBBArgs.size(); ++i) {
         auto appliedArg = appliedBBArgs[i];
         auto param = partiallyAppliedParams[i];
-        
-        auto proj = B.createProjectBox(loc, boxArg, i);
-        
+
+#if MULTI_FIELD_BOXES_ARE_SUPPORTED
+        SILValue proj = B.createProjectBox(loc, boxArg, i);
+#else
+        SILValue proj = B.createProjectBox(loc, boxArg, 0);
+        if (boxFields.size() > 1) {
+          proj = B.createTupleElementAddr(loc, proj, i);
+        }
+#endif
         // Load the value out of the box according to the current ownership
         // mode of the function and the calling convention for the parameter.
         SILValue projectedArg;
@@ -493,7 +519,14 @@ void PartialApplySimplificationPass::processKnownCallee(SILFunction *callee,
       auto appliedArgs = pa->getArguments();
       for (unsigned i = 0; i < appliedArgs.size(); ++i) {
         auto arg = appliedArgs[i];
-        auto proj = B.createProjectBox(loc, newBox, i);
+#if MULTI_FIELD_BOXES_ARE_SUPPORTED
+        SILValue proj = B.createProjectBox(loc, newBox, i);
+#else
+        SILValue proj = B.createProjectBox(loc, newBox, 0);
+        if (boxFields.size() > 1) {
+          proj = B.createTupleElementAddr(loc, proj, i);
+        }
+#endif
         auto param = partiallyAppliedParams[i];
 
         switch (auto conv = param.getConvention()) {

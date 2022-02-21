@@ -16,7 +16,7 @@ entry(%x : $Int, %y : $Int):
 // CHECK-LABEL: sil @closure_common_uses_user_a
 // CHECK:       bb0([[Y:%.*]] : $Int):
 // CHECK:         [[F:%.*]] = function_ref @closure_common_uses
-// CHECK-NEXT:    [[BOX:%.*]] = alloc_box ${ let Int }
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box [reflection] ${ let Int }
 // CHECK-NEXT:    [[BOX_0:%.*]] = project_box [[BOX]] : ${ let Int }, 0
 // CHECK-NEXT:    store [[Y]] to [[BOX_0]]
 // CHECK-NEXT:    [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[BOX]])
@@ -30,7 +30,7 @@ entry(%y : $Int):
 // CHECK-LABEL: sil @closure_common_uses_user_b
 // CHECK:       bb0([[Y:%.*]] : $Int):
 // CHECK:         [[F:%.*]] = function_ref @closure_common_uses
-// CHECK-NEXT:    [[BOX:%.*]] = alloc_box ${ let Int }
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box [reflection] ${ let Int }
 // CHECK-NEXT:    [[BOX_0:%.*]] = project_box [[BOX]] : ${ let Int }, 0
 // CHECK-NEXT:    store [[Y]] to [[BOX_0]]
 // CHECK-NEXT:    [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[BOX]])
@@ -83,7 +83,7 @@ entry(%r : $*Int, %x : $Int, %y : $Int):
 // CHECK-LABEL: sil @closure_out_param_user
 // CHECK:       bb0([[Y:%.*]] : $Int):
 // CHECK:         [[F:%.*]] = function_ref @closure_out_param
-// CHECK-NEXT:    [[BOX:%.*]] = alloc_box ${ let Int }
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box [reflection] ${ let Int }
 // CHECK-NEXT:    [[BOX_0:%.*]] = project_box [[BOX]] : ${ let Int }, 0
 // CHECK-NEXT:    store [[Y]] to [[BOX_0]]
 // CHECK-NEXT:    [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[BOX]])
@@ -93,3 +93,42 @@ entry(%y : $Int):
   %c = partial_apply [callee_guaranteed] %f(%y) : $@convention(thin) (Int, Int) -> @out Int
   return %c : $@callee_guaranteed (Int) -> @out Int
 }
+
+sil @add : $@convention(thin) (Int, Int) -> Int
+
+// CHECK-LABEL: sil private @closure_multi_capture
+// CHECK-SAME:    : $@convention(method) (Int, @guaranteed { let (Int, Int) }) -> Int
+// CHECK:       bb0([[X:%.*]] : $Int, [[YZ:%.*]] : ${ let (Int, Int) }):
+// CHECK-NEXT:   [[BOX_PROJ:%.*]] = project_box [[YZ]] :
+// CHECK-NEXT:   [[BOX_0:%.*]] = tuple_element_addr [[BOX_PROJ]] : {{.*}}, 0
+// CHECK-NEXT:   [[Y:%.*]] = load [[BOX_0]] : $*Int
+// CHECK-NEXT:   [[BOX_PROJ:%.*]] = project_box [[YZ]] :
+// CHECK-NEXT:   [[BOX_1:%.*]] = tuple_element_addr [[BOX_PROJ]] : {{.*}}, 1
+// CHECK-NEXT:   [[Z:%.*]] = load [[BOX_1]] : $*Int
+// CHECK:   [[ADD:%.*]] = function_ref @add
+// CHECK-NEXT:   apply [[ADD]]([[Y]], [[Z]])
+sil private @closure_multi_capture : $@convention(thin) (Int, Int, Int) -> Int {
+entry(%x : $Int, %y : $Int, %z : $Int):
+  %f = function_ref @add : $@convention(thin) (Int, Int) -> Int
+  %r = apply %f(%y, %z) : $@convention(thin) (Int, Int) -> Int
+  return %r : $Int
+}
+
+// CHECK-LABEL: sil @closure_multi_capture_user
+// CHECK:       bb0([[Y:%.*]] : $Int, [[Z:%.*]] : $Int):
+// CHECK:         [[BOX:%.*]] = alloc_box [reflection] ${ let (Int, Int) }
+// CHECK:         [[BOX_PROJ:%.*]] = project_box [[BOX]]
+// CHECK:         [[BOX_0:%.*]] = tuple_element_addr [[BOX_PROJ]] : {{.*}}, 0
+// CHECK:         store [[Y]] to [[BOX_0]]
+// CHECK:         [[BOX_PROJ:%.*]] = project_box [[BOX]]
+// CHECK:         [[BOX_1:%.*]] = tuple_element_addr [[BOX_PROJ]] : {{.*}}, 1
+// CHECK:         store [[Z]] to [[BOX_1]]
+// CHECK:         [[RESULT:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX]])
+// CHECK:         return [[RESULT]]
+sil @closure_multi_capture_user : $@convention(thin) (Int, Int) -> @owned @callee_guaranteed (Int) -> Int {
+entry(%y : $Int, %z : $Int):
+  %f = function_ref @closure_multi_capture : $@convention(thin) (Int, Int, Int) -> Int
+  %c = partial_apply [callee_guaranteed] %f(%y, %z) : $@convention(thin) (Int, Int, Int) -> Int
+  return %c : $@callee_guaranteed (Int) -> Int
+}
+
