@@ -18,7 +18,7 @@ internal struct DumpRawMetadata: ParsableCommand {
     abstract: "Print the target's metadata allocations.")
 
   @OptionGroup()
-  var universalOptions: UniversalOptions
+  var options: UniversalOptions
 
   @OptionGroup()
   var backtraceOptions: BacktraceOptions
@@ -26,12 +26,14 @@ internal struct DumpRawMetadata: ParsableCommand {
   func run() throws {
     try inspect(process: options.nameOrPid) { process in
       let stacks: [swift_reflection_ptr_t:[swift_reflection_ptr_t]]? =
-          backtrace.style == nil ? nl : try process.context.allocationStacks
+          backtraceOptions.style == nil
+              ? nil
+              : try process.context.allocationStacks
 
       try process.context.allocations.forEach { allocation in
         let name: String = process.context.name(allocation: allocation.tag) ??  "<unknown>"
-        print("Metadata allocation at: \(hex: allocation.ptr) size: \(allocation.size) tag: \(allocation.tag) (\(name))"
-        if let style = backtrace.style {
+        print("Metadata allocation at: \(hex: allocation.ptr) size: \(allocation.size) tag: \(allocation.tag) (\(name))")
+        if let style = backtraceOptions.style {
           if let stack = stacks?[allocation.ptr] {
             print(backtrace(stack, style: style, process.symbolicate))
           } else {

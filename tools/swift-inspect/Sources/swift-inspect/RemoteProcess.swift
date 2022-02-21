@@ -16,7 +16,7 @@ internal protocol RemoteProcess: AnyObject {
   associatedtype ProcessIdentifier
   associatedtype ProcessHandle
 
-  var process: ProcesHandle { get }
+  var process: ProcessHandle { get }
   var context: SwiftReflectionContextRef! { get }
 
   init?(processId: ProcessIdentifier)
