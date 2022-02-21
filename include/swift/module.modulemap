@@ -4,6 +4,11 @@ module BasicBridging {
   export *
 }
 
+module ASTBridging {
+  header "AST/ASTBridging.h"
+  export *
+}
+
 module SILBridging {
   header "SIL/SILBridging.h"
   export *
