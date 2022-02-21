@@ -6,7 +6,7 @@ class Tree {
   var right: Tree?
 }
 
-// CHECK: sil hidden [ossa] @$s16deinit_recursive4TreeCfd : $@convention(method) (@guaranteed Tree) -> @owned Builtin.NativeObject {
+// CHECK: sil hidden [ossa] @$s26deinit_recursive_branching4TreeCfd : $@convention(method) (@guaranteed Tree) -> @owned Builtin.NativeObject {
 // CHECK: // [[SELF:%.*]] "self"
 // CHECK: bb0([[SELF]] : @guaranteed $Tree):
 // CHECK:   [[LEFT:%.*]] = ref_element_addr [[SELF]] : $Tree, #Tree.left
@@ -20,4 +20,4 @@ class Tree {
 // CHECK:   [[SELF_NATIVE:%.*]] = unchecked_ref_cast [[SELF]] : $Tree to $Builtin.NativeObject
 // CHECK:   [[SELF_NATIVE_OWNED:%.*]] = unchecked_ownership_conversion [[SELF_NATIVE]] : $Builtin.NativeObject, @guaranteed to @owned
 // CHECK:   return [[SELF_NATIVE_OWNED]] : $Builtin.NativeObject
-// CHECK: } // end sil function '$s16deinit_recursive4TreeCfd'
+// CHECK: } // end sil function '$s26deinit_recursive_branching4TreeCfd'

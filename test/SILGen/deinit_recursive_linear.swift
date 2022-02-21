@@ -5,7 +5,7 @@ class Node {
   var next: Node?
 }
 
-// CHECK: sil hidden [ossa] @$s16deinit_recursive4NodeCfd : $@convention(method) (@guaranteed Node) -> @owned Builtin.NativeObject {
+// CHECK: sil hidden [ossa] @$s23deinit_recursive_linear4NodeCfd : $@convention(method) (@guaranteed Node) -> @owned Builtin.NativeObject {
 // CHECK: [[SELF:%.*]] "self"
 // CHECK: bb0([[SELF]] : @guaranteed $Node):
 // CHECK:   [[ELEM:%.*]] = ref_element_addr [[SELF]] : $Node, #Node.elem
@@ -62,4 +62,4 @@ class Node {
 // CHECK:   [[SELF_NATIVE:%.*]] = unchecked_ref_cast [[SELF]] : $Node to $Builtin.NativeObject
 // CHECK:   [[SELF_NATIVE_OWNED:%.*]] = unchecked_ownership_conversion [[SELF_NATIVE]] : $Builtin.NativeObject, @guaranteed to @owned
 // CHECK:   return [[SELF_NATIVE_OWNED]] : $Builtin.NativeObject
-// CHECK: } // end sil function '$s16deinit_recursive4NodeCfd'
+// CHECK: } // end sil function '$s23deinit_recursive_linear4NodeCfd'
