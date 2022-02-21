@@ -96,7 +96,7 @@ public struct SuccessorArray : RandomAccessCollection, FormattedLikeArray {
 
   public subscript(_ index: Int) -> BasicBlock {
     precondition(index >= 0 && index < endIndex)
-    let s = BridgedSuccessor(succ: succArray.data + index &* BridgedSuccessorSize);
+    let s = BridgedSuccessor(succ: succArray.data! + index &* BridgedSuccessorSize);
     return SILSuccessor_getTargetBlock(s).block
   }
 }

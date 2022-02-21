@@ -31,7 +31,7 @@ typedef struct {
 } BridgedStringRef;
 
 typedef struct {
-  const void * _Nonnull data;
+  const void * _Nullable data;
   size_t numElements;
 } BridgedArrayRef;
 
