@@ -378,9 +378,12 @@ extension _${U}Int128: FixedWidthInteger {
     % end
   }
 
+  #if false // This triggers an unexpected type checking issue with `~0` in an
+            // lldb test
   internal static prefix func ~(x: Self) -> Self {
     Self(high: ~x.high, low: ~x.low)
   }
+  #endif
 
   internal static func &= (_ lhs: inout Self, _ rhs: Self) {
     lhs.low &= rhs.low
