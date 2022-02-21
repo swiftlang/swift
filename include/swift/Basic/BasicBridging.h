@@ -43,6 +43,19 @@ void OStream_write(BridgedOStream os, BridgedStringRef str);
 
 void freeBridgedStringRef(BridgedStringRef str);
 
+//===----------------------------------------------------------------------===//
+// Source location
+//===----------------------------------------------------------------------===//
+
+typedef struct {
+  const unsigned char * _Nullable pointer;
+} BridgedSourceLoc;
+
+typedef struct {
+  BridgedSourceLoc start;
+  SwiftInt byteLength;
+} BridgedCharSourceRange;
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifdef __cplusplus
