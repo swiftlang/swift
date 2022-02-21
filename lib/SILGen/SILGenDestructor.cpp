@@ -220,9 +220,8 @@ void SILGenFunction::destroyClassMember(SILLocation cleanupLoc,
   }
 }
 
-llvm::SmallSetVector<VarDecl *, 4> findRecursiveLinks(DeclContext *DC,
-                                                      ClassDecl *cd) {
-  auto SelfTy = DC->mapTypeIntoContext(cd->getDeclaredInterfaceType());
+llvm::SmallSetVector<VarDecl *, 4> findRecursiveLinks(ClassDecl *cd) {
+  auto SelfTy = cd->getDeclaredInterfaceType();
 
   // Collect all stored properties that would form a recursive structure,
   // so we can remove the recursion and prevent the call stack from
@@ -262,7 +261,8 @@ void SILGenFunction::emitRecursiveChainDestruction(
 
     // var iter = self.link
     // self.link = nil
-    auto Ty = getTypeLowering(vd->getInterfaceType()).getLoweredType();
+    auto Ty = getTypeLowering(F.mapTypeIntoContext(vd->getInterfaceType()))
+                  .getLoweredType();
     auto optionalNone = B.createOptionalNone(cleanupLoc, Ty);
     SILValue varAddr = B.createRefElementAddr(cleanupLoc, selfValue.getValue(),
                                               vd, Ty.getAddressType());
@@ -375,7 +375,7 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
                                                finishBB);
   }
 
-  auto recursiveLinks = findRecursiveLinks(F.getDeclContext(), cd);
+  auto recursiveLinks = findRecursiveLinks(cd);
 
   /// Destroy all members.
   {
