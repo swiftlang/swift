@@ -24,7 +24,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   public var process: ProcessHandle { task }
   public private(set) var context: SwiftReflectionContextRef!
 
-  private var swiftCore: ??? = ???
+  private var swiftCore: CSTypeRef
 
   static var QueryDataLayout: QueryDataLayoutFunction {
     return { (context, type, _, output) in
@@ -43,7 +43,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
 
       case DLQ_GetObjCReservedLowBits:
         var size: UInt8 = 0
-#if os(macoS)
+#if os(macOS)
         // Only 64-bit macOS reserves pointer bit-packing.
         if MemoryLayout<UnsafeRawPointer>.stride == 8 { size = 1 }
 #endif
@@ -102,7 +102,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     var task: task_t = task_t()
     let result = task_for_pid(mach_task_self_, processId, &task)
     guard result == KERN_SUCCESS else {
-      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(result)) (0x\(String(result, radix: 16)))")
+      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
       return nil
     }
     self.task = task
@@ -154,7 +154,7 @@ extension DarwinRemoteProcess {
           ranges.forEach {
             body(swift_addr_t($0.address), UInt64($0.size))
           }
-        }
+        })
       }
     }
   }
@@ -165,7 +165,7 @@ extension DarwinRemoteProcess {
 
     let result = task_threads(self.task, &threadList, &threadCount)
     guard result == KERN_SUCCESS else {
-      print("unable to gather threads for process: \(String(cString: mach_error_string(result)) (0x\(String(result, radix: 16)))")
+      print("unable to gather threads for process: \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
       return []
     }
 
@@ -195,7 +195,7 @@ extension DarwinRemoteProcess {
               thread_info(threadList![i], thread_flavor_t(THREAD_IDENTIFIER_INFO),
                           $0, &infoCount)
           guard result == ERROR_SUCCESS else {
-            print("unable to get info for thread \(i): \(String(cString: mach_error_string(result)) (0x\(String(result, radix: 16)))")
+            print("unable to get info for thread \(i): \(String(cString: mach_error_string(result))) (0x\(String(result, radix: 16)))")
             return
           }
 

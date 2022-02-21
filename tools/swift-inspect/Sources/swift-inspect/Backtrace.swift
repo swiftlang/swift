@@ -28,10 +28,10 @@ internal func backtrace(_ stack: [swift_reflection_ptr_t], style: BacktraceStyle
   // shallowest, so `main` will be somewhere near the end.
   switch style {
   case .oneline:
-    return self.reversed().map { entry($0) }.joined(separator: " | ")
+    return stack.reversed().map { entry($0) }.joined(separator: " | ")
   case .long:
-    return self.reversed().enumerated().map {
-      " \(String(repeating: " ", count: $0 + 1)\(entry($1))"
-    }.joined(separtor: "\n")
+    return stack.reversed().enumerated().map {
+      " \(String(repeating: " ", count: $0 + 1))\(entry($1))"
+    }.joined(separator: "\n")
   }
 }
