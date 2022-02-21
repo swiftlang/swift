@@ -946,7 +946,13 @@ void Solution::dump(raw_ostream &out) const {
   out << "Fixed score: " << FixedScore << "\n";
 
   out << "Type variables:\n";
-  for (auto binding : typeBindings) {
+  std::vector<std::pair<TypeVariableType *, Type>> bindings(
+      typeBindings.begin(), typeBindings.end());
+  llvm::sort(bindings, [](const std::pair<TypeVariableType *, Type> &lhs,
+                          const std::pair<TypeVariableType *, Type> &rhs) {
+    return lhs.first->getID() < rhs.first->getID();
+  });
+  for (auto binding : bindings) {
     auto &typeVar = binding.first;
     out.indent(2);
     Type(typeVar).print(out, PO);
