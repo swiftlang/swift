@@ -416,6 +416,10 @@ public:
 
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
+  /// If not an empty string, trap intrinsics are lowered to calls to this
+  /// function instead of to trap instructions.
+  std::string TrapFuncName = "";
+
   IRGenOptions()
       : DWARFVersion(2),
         OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
