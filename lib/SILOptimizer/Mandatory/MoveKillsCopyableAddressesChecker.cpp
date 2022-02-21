@@ -1777,7 +1777,9 @@ bool DataflowState::process(
       if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
         debug.markAsMoved();
         if (auto varInfo = debug.getVarInfo()) {
-          builder.createDebugValue(
+          SILBuilderWithScope undefBuilder(builder);
+          undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
+          undefBuilder.createDebugValue(
               debug.inst->getLoc(),
               SILUndef::get(address->getType(), builder.getModule()), *varInfo,
               false /*poison*/, true /*was moved*/);
@@ -1923,7 +1925,9 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
     // Also, mark the alloc_stack as being moved at some point.
     if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
       if (auto varInfo = debug.getVarInfo()) {
-        builder.createDebugValue(
+        SILBuilderWithScope undefBuilder(builder);
+        undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
+        undefBuilder.createDebugValue(
             debug.inst->getLoc(),
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,
@@ -2031,11 +2035,15 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
                            IsInitialization);
     if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
       if (auto varInfo = debug.getVarInfo()) {
-        builder.createDebugValue(
-            debug.inst->getLoc(),
-            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-            false,
+        {
+          SILBuilderWithScope undefBuilder(builder);
+          undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
+          undefBuilder.createDebugValue(
+              debug.inst->getLoc(),
+              SILUndef::get(address->getType(), builder.getModule()), *varInfo,
+              false,
             /*was moved*/ true);
+        }
         {
           // Make sure at the reinit point to create a new debug value after the
           // reinit instruction so we reshow the variable.
@@ -2078,7 +2086,9 @@ static bool performSingleBasicBlockAnalysis(DataflowState &dataflowState,
                dumpBitVector(llvm::dbgs(), bitVector); llvm::dbgs() << '\n');
     if (auto debug = DebugVarCarryingInst::getFromValue(address)) {
       if (auto varInfo = debug.getVarInfo()) {
-        builder.createDebugValue(
+        SILBuilderWithScope undefBuilder(builder);
+        undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
+        undefBuilder.createDebugValue(
             debug.inst->getLoc(),
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,

@@ -10,16 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Foundation
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+import Darwin
+#endif
 
-enum Std {
-  struct File: TextOutputStream {
-    var underlying: UnsafeMutablePointer<FILE>
+internal typealias ProcessIdentifier = pid_t
 
-    mutating func write(_ string: String) {
-      fputs(string, underlying)
-    }
-  }
-  
-  static var err = File(underlying: stderr)
+internal func process(matching: String) -> ProcessIdentifier? {
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+  return pidFromHint(matching)
+#endif
 }
