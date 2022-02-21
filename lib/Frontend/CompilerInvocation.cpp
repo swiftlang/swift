@@ -2202,6 +2202,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.InternalizeAtLink = true;
   }
 
+  Opts.InternalizeSymbols = FrontendOpts.Static;
+
   if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
     Opts.NoPreallocatedInstantiationCaches = true;
   }

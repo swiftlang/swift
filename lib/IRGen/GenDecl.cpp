@@ -2024,7 +2024,9 @@ void IRGenModule::emitVTableStubs() {
     if (F.getEffectiveSymbolLinkage() == SILLinkage::Hidden)
       alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
     else
-      ApplyIRLinkage(IRLinkage::ExternalExport).to(alias);
+      ApplyIRLinkage(IRGen.Opts.InternalizeSymbols
+                        ? IRLinkage::Internal
+                        : IRLinkage::ExternalExport).to(alias);
   }
 }
 
@@ -2094,7 +2096,8 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   switch (linkage) {
   case SILLinkage::Public:
     return {llvm::GlobalValue::ExternalLinkage, PublicDefinitionVisibility,
-            ExportedStorage};
+            info.Internalize ? llvm::GlobalValue::DefaultStorageClass
+                             : ExportedStorage};
 
   case SILLinkage::PublicNonABI:
     return isDefinition ? RESULT(WeakODR, Hidden, Default)
