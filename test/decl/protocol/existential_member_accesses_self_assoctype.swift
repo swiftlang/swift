@@ -225,11 +225,10 @@ protocol P1 {
   subscript(invariantAssocSubscript7 _: any P1 & Class<Q>) -> Void { get }
   subscript(invariantAssocSubscript8 _: Void) -> Struct<Q>.InnerGeneric<Void> { get }
 }
-@available(macOS 10.15, *)
 extension P1 {
-  func invariantSelf1_1() -> some P1 { self }
-  var invariantSelfProp1_1: some P1 { self }
-  subscript(invariantSelfSubscript1_1: Void) -> some P1 { self }
+  func opaqueResultTypeMethod() -> some P1 { self }
+  var opaqueResultTypeProp: some P1 { self }
+  subscript(opaqueResultTypeSubscript _: Bool) -> some P1 { self }
 }
 
 do {
@@ -318,6 +317,10 @@ do {
       { (_: () -> Any?) in }
     ]
 
+    let _: any P1 = arg.opaqueResultTypeMethod()
+    let _: any P1 = arg.opaqueResultTypeProp
+    let _: any P1 = arg[opaqueResultTypeSubscript: true]
+
     arg.contravariantSelf1(0) // expected-error {{member 'contravariantSelf1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
     arg.contravariantSelf2(0) // expected-error {{member 'contravariantSelf2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
     arg.contravariantSelf3(0) // expected-error {{member 'contravariantSelf3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
@@ -342,9 +345,6 @@ do {
     arg.contravariantAssoc11(0) // expected-error {{member 'contravariantAssoc11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
 
     arg.invariantSelf1(0) // expected-error {{member 'invariantSelf1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    if #available(macOS 10.15, *) {
-      _ = arg.invariantSelf1_1()
-    }
     arg.invariantSelf2(0) // expected-error {{member 'invariantSelf2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
     arg.invariantSelf3(0) // expected-error {{member 'invariantSelf3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
     arg.invariantSelf4(0) // expected-error {{member 'invariantSelf4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
@@ -391,9 +391,6 @@ do {
     arg.contravariantAssocProp11 // expected-error {{member 'contravariantAssocProp11' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
 
     arg.invariantSelfProp1 // expected-error {{member 'invariantSelfProp1' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
-    if #available(macOS 10.15, *) {
-      _ = arg.invariantSelfProp1_1
-    }
     arg.invariantSelfProp2 // expected-error {{member 'invariantSelfProp2' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
     arg.invariantSelfProp3 // expected-error {{member 'invariantSelfProp3' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
     arg.invariantSelfProp4 // expected-error {{member 'invariantSelfProp4' cannot be used on value of protocol type 'P1'; consider using a generic constraint instead}}
