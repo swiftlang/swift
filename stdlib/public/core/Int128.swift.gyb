@@ -725,8 +725,9 @@ private func _wideDivide22<F: FixedWidthInteger & UnsignedInteger>(
 
   // Left shift both rhs and lhs, then divide and right shift the remainder.
   let shift = F.Magnitude(rhs.high.leadingZeroBitCount)
+  let rollover = F.Magnitude(F.bitWidth + F.Magnitude.bitWidth) &- shift
   let rhs = _wideMaskedShiftLeft(rhs, shift)
-  let high = _wideMaskedShiftRight(lhs, F.Magnitude(F.bitWidth) &- shift).low
+  let high = _wideMaskedShiftRight(lhs, rollover).low
   let lhs = _wideMaskedShiftLeft(lhs, shift)
   let (quotient, remainder) = _wideDivide32(
     (F(high), F.Magnitude(lhs.high), lhs.low), by: rhs)
