@@ -260,6 +260,7 @@ static void makeComputed(AbstractStorageDecl *storage,
   }
 }
 
+// TODO: Omar, please put this into it's own header.
 struct CXXMethodBridging {
   enum class Kind { unkown, getter, setter, subscript };
 

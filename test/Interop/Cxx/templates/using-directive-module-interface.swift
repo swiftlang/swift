@@ -9,6 +9,7 @@
 // CHECK-NEXT: struct IntWrapper {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(value: Int32)
+// CHECK-NEXT:   var value: Int32 { get }
 // CHECK-NEXT:   func getValue() -> Int32
 // CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }
