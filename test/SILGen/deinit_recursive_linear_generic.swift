@@ -10,45 +10,35 @@ class Node<A, B> {
 // CHECK:   [[NIL:%.*]] = enum $Optional<Node<A, B>>, #Optional.none!enumelt
 // CHECK:   [[SELF_NEXT:%.*]] = ref_element_addr [[SELF]] : $Node<A, B>, #Node.next
 // CHECK:   [[ITER:%.*]] = alloc_stack $Optional<Node<A, B>>
-// CHECK:   [[SELF_NEXT_ACCESS:%.*]] = begin_access [modify] [static] [[SELF_NEXT]] : $*Optional<Node<A, B>>
-// CHECK:   [[SELF_NEXT_COPY:%.*]] = load [copy] [[SELF_NEXT_ACCESS]] : $*Optional<Node<A, B>>
-// CHECK:   store [[NIL]] to [assign] [[SELF_NEXT_ACCESS]] : $*Optional<Node<A, B>>
+// CHECK:   [[SELF_NEXT_ACCESS:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[SELF_NEXT]] : $*Optional<Node<A, B>>
+// CHECK:   [[SELF_NEXT_COPY:%.*]] = load [take] [[SELF_NEXT_ACCESS]] : $*Optional<Node<A, B>>
+// CHECK:   store [[NIL]] to [init] [[SELF_NEXT_ACCESS]] : $*Optional<Node<A, B>>
 // CHECK:   end_access [[SELF_NEXT_ACCESS]] : $*Optional<Node<A, B>>
 // CHECK:   store [[SELF_NEXT_COPY]] to [init] [[ITER]] : $*Optional<Node<A, B>>
 // CHECK:   br [[LOOPBB:bb.*]] //
 
 // CHECK: [[LOOPBB]]:
-// CHECK:   [[ITER_ADDR:%.*]] = load [copy] [[ITER]] : $*Optional<Node<A, B>>
-// CHECK:   [[ITER_COPY:%.*]] = copy_value [[ITER_ADDR]] : $Optional<Node<A, B>>
-// CHECK:   [[ITER_COPY_ADDR:%.*]] = alloc_stack $Optional<Node<A, B>>
-// CHECK:   store [[ITER_COPY]] to [init] [[ITER_COPY_ADDR]] : $*Optional<Node<A, B>>
-// CHECK:   destroy_value [[ITER_ADDR]] : $Optional<Node<A, B>>
-// CHECK:   switch_enum_addr [[ITER_COPY_ADDR]] : $*Optional<Node<A, B>>, case #Optional.some!enumelt: [[IS_SOME_BB:bb.*]], case #Optional.none!enumelt: [[IS_NONE_BB:bb[0-9]+]]
+// CHECK:   switch_enum_addr [[ITER]] : $*Optional<Node<A, B>>, case #Optional.some!enumelt: [[IS_SOME_BB:bb.*]], case #Optional.none!enumelt: [[IS_NONE_BB:bb[0-9]+]]
 
 // CHECK: [[IS_SOME_BB]]:
-// CHECK:   destroy_addr [[ITER_COPY_ADDR]] : $*Optional<Node<A, B>>
-// CHECK:   dealloc_stack [[ITER_COPY_ADDR]] : $*Optional<Node<A, B>>
 // CHECK:   [[IS_UNIQUE:%.*]] = is_unique [[ITER]] : $*Optional<Node<A, B>>
 // CHECK:   cond_br [[IS_UNIQUE]], [[IS_UNIQUE_BB:bb.*]], [[NOT_UNIQUE_BB:bb[0-9]*]]
 
 // CHECK: [[IS_UNIQUE_BB]]:
-// CHECK:   [[ITER_ADDR:%.*]] = load [copy] [[ITER]] : $*Optional<Node<A, B>>
-// CHECK:   [[ITER_BORROW:%.*]] = begin_borrow [[ITER_ADDR]] : $Optional<Node<A, B>>
+// CHECK:   [[ITER_BORROW:%.*]] = load_borrow [[ITER]] : $*Optional<Node<A, B>>
 // CHECK:   [[ITER_UNWRAPPED:%.*]] = unchecked_enum_data [[ITER_BORROW]] : $Optional<Node<A, B>>, #Optional.some!enumelt
 // CHECK:   [[NEXT_ADDR:%.*]] = ref_element_addr [[ITER_UNWRAPPED]] : $Node<A, B>, #Node.next
-// CHECK:   [[NEXT_ADDR_ACCESS:%.*]] = begin_access [read] [static] [[NEXT_ADDR]] : $*Optional<Node<A, B>>
+// CHECK:   [[NEXT_ADDR_ACCESS:%.*]] = begin_access [read] [static] [no_nested_conflict] [[NEXT_ADDR]] : $*Optional<Node<A, B>>
 // CHECK:   [[NEXT_COPY:%.*]] = load [copy] [[NEXT_ADDR_ACCESS]] : $*Optional<Node<A, B>>
 // CHECK:   end_access [[NEXT_ADDR_ACCESS]] : $*Optional<Node<A, B>>
-// CHECK:   store [[NEXT_COPY]] to [assign] [[ITER]] : $*Optional<Node<A, B>>
 // CHECK:   end_borrow [[ITER_BORROW]] : $Optional<Node<A, B>>
-// CHECK:   destroy_value [[ITER_ADDR]] : $Optional<Node<A, B>>
+// CHECK:   store [[NEXT_COPY]] to [assign] [[ITER]] : $*Optional<Node<A, B>>
 // CHECK:   br [[LOOPBB]]
 
 // CHECK: [[NOT_UNIQUE_BB]]:
 // CHECK:   br bb6
 
 // CHECK: [[IS_NONE_BB]]:
-// CHECK:   dealloc_stack [[ITER_COPY_ADDR]] : $*Optional<Node<A, B>>
 // CHECK:   br [[CLEAN_BB:bb[0-9]+]]
 
 // CHECK: [[CLEAN_BB]]:

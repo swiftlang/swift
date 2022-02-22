@@ -220,131 +220,111 @@ void SILGenFunction::destroyClassMember(SILLocation cleanupLoc,
   }
 }
 
-llvm::SmallSetVector<VarDecl *, 4> findRecursiveLinks(ClassDecl *cd) {
+void findRecursiveLinks(ClassDecl *cd, llvm::SmallSetVector<VarDecl*, 4> &result) {
   auto SelfTy = cd->getDeclaredInterfaceType();
 
   // Collect all stored properties that would form a recursive structure,
   // so we can remove the recursion and prevent the call stack from
   // overflowing.
-  llvm::SmallSetVector<VarDecl *, 4> recursiveLinks;
   for (VarDecl *vd : cd->getStoredProperties()) {
     auto Ty = vd->getInterfaceType()->getOptionalObjectType();
     if (Ty && Ty->getCanonicalType() == SelfTy->getCanonicalType()) {
-      recursiveLinks.insert(vd);
+      result.insert(vd);
     }
   }
 
   // NOTE: Right now we only optimize linear recursion, so if there is more than
   // one link, clear out the set and don't perform any recursion optimization.
-  if (recursiveLinks.size() > 1) {
-    recursiveLinks.clear();
+  if (result.size() > 1) {
+    result.clear();
   }
-
-  return recursiveLinks;
 }
 
-void SILGenFunction::emitRecursiveChainDestruction(
-    ManagedValue selfValue, ClassDecl *cd,
-    SmallSetVector<VarDecl *, 4> recursiveLinks, CleanupLocation cleanupLoc) {
+void SILGenFunction::emitRecursiveChainDestruction(ManagedValue selfValue,
+                                                   ClassDecl *cd,
+                                                   VarDecl *recursiveLink,
+                                                   CleanupLocation cleanupLoc) {
   auto SelfTy = F.mapTypeIntoContext(cd->getDeclaredInterfaceType());
 
-  assert(recursiveLinks.size() <= 1 && "Only linear recursion supported.");
-
   auto SelfTyLowered = getTypeLowering(SelfTy).getLoweredType();
-  for (VarDecl *vd : recursiveLinks) {
-    SILBasicBlock *cleanBB = createBasicBlock();
-    SILBasicBlock *noneBB = createBasicBlock();
-    SILBasicBlock *notUniqueBB = createBasicBlock();
-    SILBasicBlock *uniqueBB = createBasicBlock();
-    SILBasicBlock *someBB = createBasicBlock();
-    SILBasicBlock *loopBB = createBasicBlock();
 
-    // var iter = self.link
-    // self.link = nil
-    auto Ty = getTypeLowering(F.mapTypeIntoContext(vd->getInterfaceType()))
-                  .getLoweredType();
-    auto optionalNone = B.createOptionalNone(cleanupLoc, Ty);
-    SILValue varAddr = B.createRefElementAddr(cleanupLoc, selfValue.getValue(),
-                                              vd, Ty.getAddressType());
-    auto iterAddr = B.createAllocStack(cleanupLoc, Ty);
-    SILValue addr =
-        B.createBeginAccess(cleanupLoc, varAddr, SILAccessKind::Modify,
-                            SILAccessEnforcement::Static,
-                            false /*noNestedConflict*/, false /*fromBuiltin*/);
-    SILValue iter =
-        B.createLoad(cleanupLoc, addr, LoadOwnershipQualifier::Copy);
-    B.createStore(cleanupLoc, optionalNone, addr,
-                  StoreOwnershipQualifier::Assign);
-    B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
-    B.createStore(cleanupLoc, iter, iterAddr, StoreOwnershipQualifier::Init);
+  SILBasicBlock *cleanBB = createBasicBlock();
+  SILBasicBlock *noneBB = createBasicBlock();
+  SILBasicBlock *notUniqueBB = createBasicBlock();
+  SILBasicBlock *uniqueBB = createBasicBlock();
+  SILBasicBlock *someBB = createBasicBlock();
+  SILBasicBlock *loopBB = createBasicBlock();
 
-    B.createBranch(cleanupLoc, loopBB);
+  // var iter = self.link
+  // self.link = nil
+  auto Ty = getTypeLowering(F.mapTypeIntoContext(recursiveLink->getInterfaceType())).getLoweredType();
+  auto optionalNone = B.createOptionalNone(cleanupLoc, Ty);
+  SILValue varAddr =
+    B.createRefElementAddr(cleanupLoc, selfValue.getValue(), recursiveLink,
+                           Ty.getAddressType());
+  auto iterAddr = B.createAllocStack(cleanupLoc, Ty);
+  SILValue addr = B.createBeginAccess(
+    cleanupLoc, varAddr, SILAccessKind::Modify, SILAccessEnforcement::Static,
+    true /*noNestedConflict*/, false /*fromBuiltin*/);
+  SILValue iter = B.createLoad(cleanupLoc, addr, LoadOwnershipQualifier::Take);
+  B.createStore(cleanupLoc, optionalNone, addr, StoreOwnershipQualifier::Init);
+  B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
+  B.createStore(cleanupLoc, iter, iterAddr, StoreOwnershipQualifier::Init);
 
-    // while iter != nil {
-    B.emitBlock(loopBB);
-    SILValue operand =
-        B.createLoad(cleanupLoc, iterAddr, LoadOwnershipQualifier::Copy);
-    auto operandCopy = B.createCopyValue(cleanupLoc, operand);
-    auto operandAddr = B.createAllocStack(cleanupLoc, Ty);
-    B.createStore(cleanupLoc, operandCopy, operandAddr,
-                  StoreOwnershipQualifier::Init);
-    B.createDestroyValue(cleanupLoc, operand);
-    B.createSwitchEnumAddr(
-        cleanupLoc, operandAddr, nullptr,
-        {{getASTContext().getOptionalSomeDecl(), someBB},
-         {std::make_pair(getASTContext().getOptionalNoneDecl(), noneBB)}});
+  B.createBranch(cleanupLoc, loopBB);
 
-    // if isKnownUniquelyReferenced(&iter) {
-    B.emitBlock(someBB);
-    B.createDestroyAddr(cleanupLoc, operandAddr);
-    B.createDeallocStack(cleanupLoc, operandAddr);
-    auto isUnique = B.createIsUnique(cleanupLoc, iterAddr);
-    B.createCondBranch(cleanupLoc, isUnique, uniqueBB, notUniqueBB);
+  // while iter != nil {
+  B.emitBlock(loopBB);
+  B.createSwitchEnumAddr(
+      cleanupLoc, iterAddr, nullptr,
+      {{getASTContext().getOptionalSomeDecl(), someBB},
+       {std::make_pair(getASTContext().getOptionalNoneDecl(), noneBB)}});
 
-    // we have a uniquely referenced link, so we need to deinit
-    B.emitBlock(uniqueBB);
+  // if isKnownUniquelyReferenced(&iter) {
+  B.emitBlock(someBB);
+  auto isUnique = B.createIsUnique(cleanupLoc, iterAddr);
+  B.createCondBranch(cleanupLoc, isUnique, uniqueBB, notUniqueBB);
 
-    // NOTE: We increment the ref count of the tail instead of unlinking it,
-    //       because custom deinit implementations of subclasses may access
-    //       it and it would be semantically wrong to unset it before that.
-    //       Making the tail non-uniquely referenced prevents the recursion.
+  // we have a uniquely referenced link, so we need to deinit
+  B.emitBlock(uniqueBB);
 
-    // let tail = iter.unsafelyUnwrapped.next
-    // iter = tail
-    SILValue _iter =
-        B.createLoad(cleanupLoc, iterAddr, LoadOwnershipQualifier::Copy);
-    auto iterBorrow = B.createBeginBorrow(cleanupLoc, _iter);
-    auto *link = B.createUncheckedEnumData(
-        cleanupLoc, iterBorrow, getASTContext().getOptionalSomeDecl(),
-        SelfTyLowered);
-    varAddr = B.createRefElementAddr(cleanupLoc, link, vd, Ty.getAddressType());
+  // NOTE: We increment the ref count of the tail instead of unlinking it,
+  //       because custom deinit implementations of subclasses may access
+  //       it and it would be semantically wrong to unset it before that.
+  //       Making the tail non-uniquely referenced prevents the recursion.
 
-    addr = B.createBeginAccess(
-        cleanupLoc, varAddr, SILAccessKind::Read, SILAccessEnforcement::Static,
-        false /* noNestedConflict */, false /*fromBuiltin*/);
-    iter = B.createLoad(cleanupLoc, addr, LoadOwnershipQualifier::Copy);
-    B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
-    B.createStore(cleanupLoc, iter, iterAddr, StoreOwnershipQualifier::Assign);
+  // let tail = iter.unsafelyUnwrapped.next
+  // iter = tail
+  SILValue iterBorrow = B.createLoadBorrow(cleanupLoc, iterAddr);
+  auto *link = B.createUncheckedEnumData(cleanupLoc, iterBorrow,
+                                         getASTContext().getOptionalSomeDecl(),
+                                         SelfTyLowered);
 
-    B.createEndBorrow(cleanupLoc, iterBorrow);
+  varAddr = B.createRefElementAddr(cleanupLoc, link, recursiveLink,
+                                   Ty.getAddressType());
 
-    B.createDestroyValue(cleanupLoc, _iter);
+  addr = B.createBeginAccess(
+      cleanupLoc, varAddr, SILAccessKind::Read, SILAccessEnforcement::Static,
+      true /* noNestedConflict */, false /*fromBuiltin*/);
+  iter = B.createLoad(cleanupLoc, addr, LoadOwnershipQualifier::Copy);
+  B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
+  B.createEndBorrow(cleanupLoc, iterBorrow);
 
-    B.createBranch(cleanupLoc, loopBB);
+  B.createStore(cleanupLoc, iter, iterAddr, StoreOwnershipQualifier::Assign);
 
-    // the next link in the chain is not unique, so we are done here
-    B.emitBlock(notUniqueBB);
-    B.createBranch(cleanupLoc, cleanBB);
+  B.createBranch(cleanupLoc, loopBB);
 
-    // we reached the end of the chain
-    B.emitBlock(noneBB);
-    B.createDeallocStack(cleanupLoc, operandAddr);
-    B.createBranch(cleanupLoc, cleanBB);
+  // the next link in the chain is not unique, so we are done here
+  B.emitBlock(notUniqueBB);
+  B.createBranch(cleanupLoc, cleanBB);
 
-    B.emitBlock(cleanBB);
-    B.createDestroyAddr(cleanupLoc, iterAddr);
-    B.createDeallocStack(cleanupLoc, iterAddr);
-  }
+  // we reached the end of the chain
+  B.emitBlock(noneBB);
+  B.createBranch(cleanupLoc, cleanBB);
+
+  B.emitBlock(cleanBB);
+  B.createDestroyAddr(cleanupLoc, iterAddr);
+  B.createDeallocStack(cleanupLoc, iterAddr);
 }
 
 void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
@@ -375,7 +355,8 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
                                                finishBB);
   }
 
-  auto recursiveLinks = findRecursiveLinks(cd);
+  llvm::SmallSetVector<VarDecl*, 4> recursiveLinks;
+  findRecursiveLinks(cd, recursiveLinks);
 
   /// Destroy all members.
   {
@@ -388,8 +369,10 @@ void SILGenFunction::emitClassMemberDestruction(ManagedValue selfValue,
       destroyClassMember(cleanupLoc, selfValue, vd);
     }
 
-    if (!recursiveLinks.empty())
-      emitRecursiveChainDestruction(selfValue, cd, recursiveLinks, cleanupLoc);
+    if (!recursiveLinks.empty()) {
+      assert(recursiveLinks.size() == 1 && "Only linear recursion supported.");
+      emitRecursiveChainDestruction(selfValue, cd, recursiveLinks[0], cleanupLoc);
+    }
 
     if (finishBB)
       B.createBranch(cleanupLoc, finishBB);
