@@ -37,6 +37,7 @@
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "GenValueWitness.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
@@ -1012,6 +1013,83 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
   builder.emit();
 }
 
+class MultiPayloadEnumDescriptorBuilder : public ReflectionMetadataBuilder {
+  CanType type;
+  const FixedTypeInfo *ti;
+
+public:
+  MultiPayloadEnumDescriptorBuilder(IRGenModule &IGM,
+                                    const NominalTypeDecl *nominalDecl)
+    : ReflectionMetadataBuilder(IGM) {
+    type = nominalDecl->getDeclaredType()->getCanonicalType();
+    ti = &cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(
+        nominalDecl->getDeclaredTypeInContext()->getCanonicalType()));
+  }
+
+  void layout() override {
+    auto &strategy = getEnumImplStrategy(IGM, getFormalTypeInPrimaryContext(type));
+    bool isMPE = strategy.getElementsWithPayload().size() > 1;
+    assert(isMPE && "Cannot emit Multi-Payload Enum data for an enum that doesn't have multiple payloads");
+
+    const TypeInfo &TI = strategy.getTypeInfo();
+    auto fixedTI = dyn_cast<FixedTypeInfo>(&TI);
+    assert(fixedTI != nullptr
+           && "MPE reflection records can only be emitted for fixed-layout enums");
+
+    // Get the spare bits mask for the enum payloads.
+    SpareBitVector spareBits;
+    for (auto enumCase : strategy.getElementsWithPayload()) {
+      cast<FixedTypeInfo>(enumCase.ti)->applyFixedSpareBitsMask(IGM, spareBits);
+    }
+
+    // Trim leading/trailing zero bytes, then pad to a multiple of 32 bits
+    llvm::APInt bits = spareBits.asAPInt();
+    uint32_t byteOffset = bits.countTrailingZeros() / 8;
+    bits.lshrInPlace(byteOffset * 8); // Trim zero bytes from bottom end
+
+    auto bitsInMask = bits.getActiveBits(); // Ignore high-order zero bits
+    auto usesPayloadSpareBits = bitsInMask > 0;
+    uint32_t bytesInMask = (bitsInMask + 7) / 8;
+    auto wordsInMask = (bytesInMask + 3) / 4;
+    bits = bits.zextOrTrunc(wordsInMask * 32);
+
+    // Never write an MPE descriptor bigger than 16k
+    // The runtime will fall back on its own internal
+    // spare bits calculation for this (very rare) case.
+    if (bytesInMask > 16384) {
+      return;
+    }
+
+    addTypeRef(type, CanGenericSignature());
+
+    // MPE record contents are a multiple of 32-bits
+    uint32_t contentsSizeInWords = 1; /* Size + flags is mandatory */
+    if (wordsInMask > 0) {
+      contentsSizeInWords +=
+        1 /* SpareBits byte count */
+        + wordsInMask;
+    }
+    uint32_t flags = usesPayloadSpareBits ? 1 : 0;
+
+    B.addInt32((contentsSizeInWords << 16) | flags);
+
+    if (bytesInMask > 0) {
+      B.addInt32((byteOffset << 16) | bytesInMask);
+      // TODO: Endianness??
+      for (unsigned i = 0; i < wordsInMask; ++i) {
+        uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
+        B.addInt32(nextWord);
+        bits.lshrInPlace(32);
+      }
+    }
+  }
+
+  llvm::GlobalVariable *emit() {
+    auto section = IGM.getMultiPayloadEnumDescriptorSectionName();
+    return ReflectionMetadataBuilder::emit(None, section);
+  }
+};
+
 /// Builds a constant LLVM struct describing the layout of a fixed-size
 /// SIL @box. These look like closure contexts, but without any necessary
 /// bindings or metadata sources, and only a single captured value.
@@ -1326,6 +1404,12 @@ const char *IRGenModule::getReflectionTypeRefSectionName() {
   return ReflectionTypeRefSection.c_str();
 }
 
+const char *IRGenModule::getMultiPayloadEnumDescriptorSectionName() {
+  if (MultiPayloadEnumDescriptorSection.empty())
+    MultiPayloadEnumDescriptorSection = getReflectionSectionName(*this, "mpenum", "mpen");
+  return MultiPayloadEnumDescriptorSection.c_str();
+}
+
 llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
   auto &entry = FieldNames[Name];
   if (entry.second)
@@ -1439,6 +1523,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   auto T = D->getDeclaredTypeInContext()->getCanonicalType();
 
   bool needsOpaqueDescriptor = false;
+  bool needsMPEDescriptor = false;
   bool needsFieldDescriptor = true;
 
   if (auto *ED = dyn_cast<EnumDecl>(D)) {
@@ -1452,11 +1537,13 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
     }
 
     // If this is a fixed-size multi-payload enum, we have to emit a descriptor
-    // with the size and alignment of the type, because the reflection library
-    // cannot derive this information at runtime.
+    // with the size and alignment of the type and another with the spare bit
+    // mask data, because the reflection library cannot consistently derive this
+    // information at runtime.
     if (strategy.getElementsWithPayload().size() > 1 &&
         !strategy.needsPayloadSizeInMetadata()) {
       needsOpaqueDescriptor = true;
+      needsMPEDescriptor = true;
     }
   }
 
@@ -1493,6 +1580,11 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
     }
     
     FixedTypeMetadataBuilder builder(*this, D);
+    builder.emit();
+  }
+
+  if (needsMPEDescriptor) {
+    MultiPayloadEnumDescriptorBuilder builder(*this, D);
     builder.emit();
   }
 

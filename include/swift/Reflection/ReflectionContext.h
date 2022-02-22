@@ -272,6 +272,8 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findMachOSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
+    auto MPEnumMdSec = findMachOSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -279,7 +281,8 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr)
+        ConformMdSec.first == nullptr &&
+        MPEnumMdSec.first == nullptr)
       return false;
 
     ReflectionInfo info = {
@@ -289,7 +292,8 @@ public:
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
         {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second}};
+        {ConformMdSec.first, ConformMdSec.second},
+        {MPEnumMdSec.first, MPEnumMdSec.second}};
 
     this->addReflectionInfo(info);
 
@@ -394,6 +398,8 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findCOFFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
+    auto MPEnumMdSec = findCOFFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -401,7 +407,8 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr)
+        ConformMdSec.first == nullptr &&
+        MPEnumMdSec.first == nullptr)
       return false;
 
     ReflectionInfo Info = {
@@ -411,7 +418,8 @@ public:
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
         {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second}};
+        {ConformMdSec.first, ConformMdSec.second},
+        {MPEnumMdSec.first, MPEnumMdSec.second}};
     this->addReflectionInfo(Info);
     return true;
   }
@@ -577,6 +585,8 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findELFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
+    auto MPEnumMdSec = findELFSectionByName(
+        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (Error)
       return false;
@@ -589,7 +599,8 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr)
+        ConformMdSec.first == nullptr &&
+        MPEnumMdSec.first == nullptr)
       return false;
 
     ReflectionInfo info = {
@@ -599,7 +610,8 @@ public:
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
         {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second}};
+        {ConformMdSec.first, ConformMdSec.second},
+        {MPEnumMdSec.first, MPEnumMdSec.second}};
 
     this->addReflectionInfo(info);
     return true;
@@ -701,8 +713,7 @@ public:
         ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
         ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
         ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr,
-        ReflectionSectionKind::conform
-    };
+        ReflectionSectionKind::conform, ReflectionSectionKind::mpenum};
 
     llvm::SmallVector<std::pair<RemoteRef<void>, uint64_t>, 6> Pairs;
     for (auto Section : Sections) {
@@ -725,7 +736,7 @@ public:
         {Pairs[0].first, Pairs[0].second}, {Pairs[1].first, Pairs[1].second},
         {Pairs[2].first, Pairs[2].second}, {Pairs[3].first, Pairs[3].second},
         {Pairs[4].first, Pairs[4].second}, {Pairs[5].first, Pairs[5].second},
-        {Pairs[6].first, Pairs[6].second}};
+        {Pairs[6].first, Pairs[6].second}, {Pairs[7].first, Pairs[7].second}};
     this->addReflectionInfo(Info);
     return true;
   }

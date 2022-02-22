@@ -39,6 +39,7 @@ DECLARE_SWIFT_SECTION(swift5_replace)
 DECLARE_SWIFT_SECTION(swift5_replac2)
 DECLARE_SWIFT_SECTION(swift5_builtin)
 DECLARE_SWIFT_SECTION(swift5_capture)
+DECLARE_SWIFT_SECTION(swift5_mpenum)
 DECLARE_SWIFT_SECTION(swift5_accessible_functions)
 }
 
@@ -73,6 +74,7 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_replac2),
       SWIFT_SECTION_RANGE(swift5_builtin),
       SWIFT_SECTION_RANGE(swift5_capture),
+      SWIFT_SECTION_RANGE(swift5_mpenum),
       SWIFT_SECTION_RANGE(swift5_accessible_functions),
   };
 
