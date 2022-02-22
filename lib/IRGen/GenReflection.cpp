@@ -1374,7 +1374,7 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
   if (!normalConf)
     return;
 
-  if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
+  if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::DebuggerOnly)
     return;
 
   SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
