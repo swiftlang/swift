@@ -43,13 +43,13 @@ public struct Duration: Sendable {
   internal var _high: Int64
 
   @inlinable
-  internal init(_low: UInt64, high: Int64) {
-    self._low = _low
-    self._high = high
+  internal init(_high: Int64, low: UInt64) {
+    self._low = low
+    self._high = _high
   }
 
   internal init(_attoseconds: _Int128) {
-    self.init(_low: _attoseconds.low, high: _attoseconds.high)
+    self.init(_high: _attoseconds.high, low: _attoseconds.low)
   }
 
   /// Construct a `Duration` by adding attoseconds to a seconds value.
@@ -193,15 +193,15 @@ extension Duration {
 }
 
 @available(SwiftStdlib 5.7, *)
-extension Duration: Codable { 
+extension Duration: Codable {
   @available(SwiftStdlib 5.7, *)
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     let high = try container.decode(Int64.self)
     let low = try container.decode(UInt64.self)
-    self.init(_attoseconds: _Int128(high: high, low: low))
+    self.init(_high: high, low: low)
   }
-  
+
   @available(SwiftStdlib 5.7, *)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
@@ -211,7 +211,7 @@ extension Duration: Codable {
 }
 
 @available(SwiftStdlib 5.7, *)
-extension Duration: Hashable { 
+extension Duration: Hashable {
   @available(SwiftStdlib 5.7, *)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_attoseconds)
