@@ -2220,8 +2220,12 @@ static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
   return {std::move(FileBufOrErr.get()), Result};
 }
 enum class ConstKind: uint8_t {
-  String = 0,
-  Int,
+  StringLiteral = 0,
+  IntegerLiteral,
+  FloatLiteral,
+  BooleanLiteral,
+  Array,
+  Dictionary,
 };
 
 struct ConstExprInfo {
@@ -2230,9 +2234,11 @@ struct ConstExprInfo {
   unsigned offset = 0;
   unsigned length = 0;
   StringRef value;
+  StringRef referencedD;
   ConstExprInfo(StringRef filePath, ConstKind kind, unsigned offset,
-                unsigned length, StringRef value):
-    filePath(filePath), kind(kind), offset(offset), length(length), value(value) {}
+                unsigned length, StringRef value, StringRef referencedD):
+    filePath(filePath), kind(kind), offset(offset), length(length), value(value),
+    referencedD(referencedD) {}
   ConstExprInfo() = default;
 };
 
@@ -2242,7 +2248,7 @@ class ConstExtractor: public ASTWalker {
   SourceManager &SM;
   std::vector<ConstExprInfo> allConsts;
 
-  void record(Expr *E, ConstKind kind, StringRef Value) {
+  void record(Expr *E, ConstKind kind, StringRef Value, StringRef ReferencedD) {
     auto startLoc = E->getStartLoc();
     // Asserts?
     if (startLoc.isInvalid())
@@ -2254,14 +2260,70 @@ class ConstExtractor: public ASTWalker {
     auto length = SM.getByteDistance(startLoc, endLoc);
     auto file = SM.getIdentifierForBuffer(bufferId);
     auto offset = SM.getLocOffsetInBuffer(startLoc, bufferId);
-    allConsts.emplace_back(file, kind, offset, length, Value);
+    allConsts.emplace_back(file, kind, offset, length, Value, ReferencedD);
   }
 
+  void record(Expr *E, Expr *ValueProvider, StringRef ReferecedD = "") {
+    std::string content;
+    llvm::raw_string_ostream os(content);
+    ValueProvider->printConstExprValue(&os);
+    assert(!content.empty());
+    auto buffered = SCtx.buffer(content);
+    switch(ValueProvider->getKind()) {
+#define CASE(X) case ExprKind::X: record(E, ConstKind::X, buffered, ReferecedD); break;
+      CASE(StringLiteral)
+      CASE(IntegerLiteral)
+      CASE(FloatLiteral)
+      CASE(BooleanLiteral)
+      CASE(Dictionary)
+      CASE(Array)
+#undef CASE
+    default:
+      return;
+    }
+  }
+
+  StringRef getDeclName(Decl *D) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      std::string content;
+      llvm::raw_string_ostream os(content);
+      VD->getName().print(os);
+      return SCtx.buffer(content);
+    }
+    return StringRef();
+  }
+
+  bool handleSimpleReference(Expr *E) {
+    assert(E);
+    Decl *ReferencedDecl = nullptr;
+    if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+      ReferencedDecl = MRE->getDecl().getDecl();
+    } else if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+      ReferencedDecl = DRE->getDecl();
+    } else {
+      return false;
+    }
+    assert(ReferencedDecl);
+    if (auto *VAR = dyn_cast<VarDecl>(ReferencedDecl)) {
+      if (!VAR->getAttrs().hasAttribute<CompileTimeConstAttr>()) {
+        return false;
+      }
+      if (auto *PD = VAR->getParentPatternBinding()) {
+        if (auto *init = PD->getInit(PD->getPatternEntryIndexForVarDecl(VAR))) {
+          record(E, init, getDeclName(ReferencedDecl));
+          return true;
+        }
+      }
+    }
+    return false;
+  }
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (E->isSemanticallyConstExpr()) {
-      if (auto *SL = dyn_cast<StringLiteralExpr>(E)) {
-        record(SL, ConstKind::String, SL->getValue());
-      }
+      record(E, E);
+      return { false, E };
+    }
+    if (handleSimpleReference(E)) {
+      return { false, E };
     }
     return { true, E };
   }
@@ -2279,14 +2341,20 @@ template <> struct swift::json::ObjectTraits<ConstExprInfo> {
     StringRef kind;
     switch(info.kind) {
 #define CASE(X) case ConstKind::X: kind = #X; break;
-    CASE(String)
-    CASE(Int)
+    CASE(StringLiteral)
+    CASE(IntegerLiteral)
+    CASE(FloatLiteral)
+    CASE(BooleanLiteral)
+    CASE(Dictionary)
+    CASE(Array)
 #undef CASE
     }
     out.mapRequired("kind", kind);
     out.mapRequired("offset", info.offset);
     out.mapRequired("length", info.length);
     out.mapRequired("value", info.value);
+    if (!info.referencedD.empty())
+      out.mapRequired("decl", info.referencedD);
   }
 };
 

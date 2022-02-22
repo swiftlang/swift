@@ -491,6 +491,7 @@ public:
     return getSemanticsProvidingExpr()->getKind() == ExprKind::InOut;
   }
 
+  bool printConstExprValue(llvm::raw_ostream *OS) const;
   bool isSemanticallyConstExpr() const;
 
   /// Returns false if this expression needs to be wrapped in parens when
