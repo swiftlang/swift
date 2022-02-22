@@ -1915,12 +1915,193 @@ void DataflowState::init() {
   }
 }
 
+//===----------------------------------------------------------------------===//
+//                              Address Checker
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct MoveKillsCopyableAddressesChecker {
+  SILFunction *fn;
+  UseState useState;
+  DataflowState dataflowState;
+  UseState closureUseState;
+  ClosureArgDataflowState closureUseDataflowState;
+  SILOptFunctionBuilder &funcBuilder;
+  llvm::SmallMapVector<FullApplySite, SmallBitVector, 8>
+      applySiteToPromotedArgIndices;
+  SmallBlotSetVector<SILInstruction *, 8> closureConsumes;
+
+  /// A list of instructions where to work around the behavior of SelectionDAG,
+  /// we break the block. These are debug var carrying insts or debug_value
+  /// associated with reinits. This is initialized when we process all of the
+  /// addresses. Then as a final step after wards we use this as a worklist and
+  /// break blocks at each of these instructions. We update DebugInfo, LoopInfo
+  /// if we found that they already exist.
+  ///
+  /// We on purpose use a set vector to ensure that we only ever split a block
+  /// once.
+  SmallSetVector<SILInstruction *, 8> debugInfoBlockSplitPoints;
+  DominanceInfo *dominanceToUpdate = nullptr;
+  SILLoopInfo *loopInfoToUpdate = nullptr;
+
+  MoveKillsCopyableAddressesChecker(SILFunction *fn,
+                                    SILOptFunctionBuilder &funcBuilder)
+      : fn(fn), useState(),
+        dataflowState(funcBuilder, useState, applySiteToPromotedArgIndices,
+                      closureConsumes),
+        closureUseState(), closureUseDataflowState(closureUseState),
+        funcBuilder(funcBuilder) {}
+
+  void setDominanceToUpdate(DominanceInfo *newInfo) {
+    dominanceToUpdate = newInfo;
+  }
+
+  void setLoopInfoToUpdate(SILLoopInfo *newInfo) { loopInfoToUpdate = newInfo; }
+
+  void cloneDeferCalleeAndRewriteUses(
+      SmallVectorImpl<SILValue> &temporaryStorage,
+      const SmallBitVector &bitVector, FullApplySite oldApplySite,
+      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
+
+  bool check(SILValue address);
+  bool performClosureDataflow(Operand *callerOperand,
+                              ClosureOperandState &calleeOperandState);
+
+  void emitDiagnosticForMove(SILValue borrowedValue,
+                             StringRef borrowedValueName, MoveValueInst *mvi);
+  bool splitBlocksAfterDebugInfoCarryingInst(SILModule &mod) {
+    if (debugInfoBlockSplitPoints.empty())
+      return false;
+
+    SILBuilderContext ctx(mod);
+    do {
+      auto *next = debugInfoBlockSplitPoints.pop_back_val();
+      splitBasicBlockAndBranch(ctx, next->getNextInstruction(),
+                               dominanceToUpdate, loopInfoToUpdate);
+    } while (!debugInfoBlockSplitPoints.empty());
+
+    return true;
+  }
+
+  bool performSingleBasicBlockAnalysis(SILValue address,
+                                       MarkUnresolvedMoveAddrInst *mvi);
+
+  ASTContext &getASTContext() const { return fn->getASTContext(); }
+};
+
+} // namespace
+
+void MoveKillsCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
+    SmallVectorImpl<SILValue> &newArgs, const SmallBitVector &bitVector,
+    FullApplySite oldApplySite,
+    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
+  auto *origCallee = oldApplySite.getReferencedFunctionOrNull();
+  assert(origCallee);
+
+  auto name = getClonedName(origCallee, origCallee->isSerialized(), bitVector);
+
+  SILFunction *newCallee = nullptr;
+  if (auto *fn = origCallee->getModule().lookUpFunction(name)) {
+    newCallee = fn;
+  } else {
+    ClosureArgumentInOutToOutCloner cloner(
+        funcBuilder, origCallee, origCallee->isSerialized(),
+        postDominatingConsumingUsers, bitVector, name);
+    cloner.populateCloned();
+    newCallee = cloner.getCloned();
+  }
+  assert(newCallee);
+
+  // Ok, we now have populated our new callee. We need to create a new full
+  // apply site that calls the new function appropriately.
+  SWIFT_DEFER { newArgs.clear(); };
+
+  // First add all of our old results to newArgs.
+  auto oldConv = oldApplySite.getSubstCalleeConv();
+  for (unsigned i : range(oldConv.getSILArgIndexOfFirstIndirectResult(),
+                          oldConv.getSILArgIndexOfFirstParam())) {
+    newArgs.push_back(oldApplySite->getOperand(i));
+  }
+
+  // Now add all of our new out params.
+  for (int i = bitVector.find_first(); i != -1; i = bitVector.find_next(i)) {
+    unsigned appliedArgIndex =
+        oldApplySite.getOperandIndexOfFirstArgument() + i;
+    newArgs.push_back(oldApplySite->getOperand(appliedArgIndex));
+  }
+
+  // Finally, add all of the rest of our arguments, skipping our new out
+  // parameters.
+  for (unsigned i : range(oldConv.getSILArgIndexOfFirstParam(),
+                          oldConv.getNumSILArguments())) {
+    if (bitVector.test(i))
+      continue;
+    unsigned appliedArgIndex =
+        oldApplySite.getOperandIndexOfFirstArgument() + i;
+    newArgs.push_back(oldApplySite->getOperand(appliedArgIndex));
+  }
+
+  // Then create our new apply.
+  SILBuilderWithScope builder(*oldApplySite);
+  auto *newCalleeRef =
+      builder.createFunctionRef(oldApplySite->getLoc(), newCallee);
+  auto *newApply =
+      builder.createApply(oldApplySite->getLoc(), newCalleeRef,
+                          oldApplySite.getSubstitutionMap(), newArgs);
+  oldApplySite->replaceAllUsesPairwiseWith(newApply);
+  oldApplySite->eraseFromParent();
+}
+
+bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
+    Operand *callerOperand, ClosureOperandState &calleeOperandState) {
+  auto fas = FullApplySite::isa(callerOperand->getUser());
+  auto *func = fas.getCalleeFunction();
+  auto *address =
+      func->begin()->getArgument(fas.getCalleeArgIndex(*callerOperand));
+
+  LLVM_DEBUG(llvm::dbgs() << "Performing closure dataflow on caller use: "
+                          << *callerOperand->getUser());
+  LLVM_DEBUG(llvm::dbgs() << "    Callee: " << func->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "    Callee Argument: " << *address);
+  // We emit an end closure dataflow to make it easier when reading debug output
+  // to make it easy to see when we have returned to analyzing the caller.
+  SWIFT_DEFER {
+    LLVM_DEBUG(llvm::dbgs()
+                   << "Finished performing closure dataflow on Callee: "
+                   << func->getName() << '\n';);
+  };
+  auto accessPathWithBase = AccessPathWithBase::compute(address);
+  auto accessPath = accessPathWithBase.accessPath;
+
+  // Bail on an invalid AccessPath.
+  //
+  // AccessPath completeness is verified independently--it may be invalid in
+  // extraordinary situations. When AccessPath is valid, we know all its uses
+  // are recognizable.
+  //
+  // NOTE: If due to an invalid access path we fail here, we will just error
+  // on the _move since the _move would not have been handled.
+  if (!accessPath.isValid())
+    return false;
+
+  // TODO: Hoist this useState into an ivar that we can reuse in between closure
+  // operands?
+  GatherClosureUseVisitor visitor(closureUseState);
+  SWIFT_DEFER { visitor.clear(); };
+  visitor.reset(address);
+  if (!visitAccessPathUses(visitor, accessPath, fn))
+    return false;
+
+  SWIFT_DEFER { closureUseDataflowState.clear(); };
+  return closureUseDataflowState.process(address, calleeOperandState,
+                                         closureConsumes);
+}
+
 // Returns true if we emitted a diagnostic and handled the single block
 // case. Returns false if we visited all of the uses and seeded the UseState
 // struct with the information needed to perform our interprocedural dataflow.
-static bool performSingleBasicBlockAnalysis(
-    DataflowState &dataflowState,
-    SmallSetVector<SILInstruction *, 8> &debugInfoBlockSplitPoints,
+bool MoveKillsCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     SILValue address, MarkUnresolvedMoveAddrInst *mvi) {
   // First scan downwards to make sure we are move out of this block.
   auto &useState = dataflowState.useState;
@@ -2150,186 +2331,6 @@ static bool performSingleBasicBlockAnalysis(
   return false;
 }
 
-//===----------------------------------------------------------------------===//
-//                              Address Checker
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct MoveKillsCopyableAddressesChecker {
-  SILFunction *fn;
-  UseState useState;
-  DataflowState dataflowState;
-  UseState closureUseState;
-  ClosureArgDataflowState closureUseDataflowState;
-  SILOptFunctionBuilder &funcBuilder;
-  llvm::SmallMapVector<FullApplySite, SmallBitVector, 8>
-      applySiteToPromotedArgIndices;
-  SmallBlotSetVector<SILInstruction *, 8> closureConsumes;
-
-  /// A list of instructions where to work around the behavior of SelectionDAG,
-  /// we break the block. These are debug var carrying insts or debug_value
-  /// associated with reinits. This is initialized when we process all of the
-  /// addresses. Then as a final step after wards we use this as a worklist and
-  /// break blocks at each of these instructions. We update DebugInfo, LoopInfo
-  /// if we found that they already exist.
-  ///
-  /// We on purpose use a set vector to ensure that we only ever split a block
-  /// once.
-  SmallSetVector<SILInstruction *, 8> debugInfoBlockSplitPoints;
-  DominanceInfo *dominanceToUpdate = nullptr;
-  SILLoopInfo *loopInfoToUpdate = nullptr;
-
-  MoveKillsCopyableAddressesChecker(SILFunction *fn,
-                                    SILOptFunctionBuilder &funcBuilder)
-      : fn(fn), useState(),
-        dataflowState(funcBuilder, useState, applySiteToPromotedArgIndices,
-                      closureConsumes),
-        closureUseState(), closureUseDataflowState(closureUseState),
-        funcBuilder(funcBuilder) {}
-
-  void setDominanceToUpdate(DominanceInfo *newInfo) {
-    dominanceToUpdate = newInfo;
-  }
-
-  void setLoopInfoToUpdate(SILLoopInfo *newInfo) { loopInfoToUpdate = newInfo; }
-
-  void cloneDeferCalleeAndRewriteUses(
-      SmallVectorImpl<SILValue> &temporaryStorage,
-      const SmallBitVector &bitVector, FullApplySite oldApplySite,
-      SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
-
-  bool check(SILValue address);
-  bool performClosureDataflow(Operand *callerOperand,
-                              ClosureOperandState &calleeOperandState);
-
-  void emitDiagnosticForMove(SILValue borrowedValue,
-                             StringRef borrowedValueName, MoveValueInst *mvi);
-  bool splitBlocksAfterDebugInfoCarryingInst(SILModule &mod) {
-    if (debugInfoBlockSplitPoints.empty())
-      return false;
-
-    SILBuilderContext ctx(mod);
-    do {
-      auto *next = debugInfoBlockSplitPoints.pop_back_val();
-      splitBasicBlockAndBranch(ctx, next->getNextInstruction(),
-                               dominanceToUpdate, loopInfoToUpdate);
-    } while (!debugInfoBlockSplitPoints.empty());
-
-    return true;
-  }
-
-  ASTContext &getASTContext() const { return fn->getASTContext(); }
-};
-
-} // namespace
-
-void MoveKillsCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
-    SmallVectorImpl<SILValue> &newArgs, const SmallBitVector &bitVector,
-    FullApplySite oldApplySite,
-    SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
-  auto *origCallee = oldApplySite.getReferencedFunctionOrNull();
-  assert(origCallee);
-
-  auto name = getClonedName(origCallee, origCallee->isSerialized(), bitVector);
-
-  SILFunction *newCallee = nullptr;
-  if (auto *fn = origCallee->getModule().lookUpFunction(name)) {
-    newCallee = fn;
-  } else {
-    ClosureArgumentInOutToOutCloner cloner(
-        funcBuilder, origCallee, origCallee->isSerialized(),
-        postDominatingConsumingUsers, bitVector, name);
-    cloner.populateCloned();
-    newCallee = cloner.getCloned();
-  }
-  assert(newCallee);
-
-  // Ok, we now have populated our new callee. We need to create a new full
-  // apply site that calls the new function appropriately.
-  SWIFT_DEFER { newArgs.clear(); };
-
-  // First add all of our old results to newArgs.
-  auto oldConv = oldApplySite.getSubstCalleeConv();
-  for (unsigned i : range(oldConv.getSILArgIndexOfFirstIndirectResult(),
-                          oldConv.getSILArgIndexOfFirstParam())) {
-    newArgs.push_back(oldApplySite->getOperand(i));
-  }
-
-  // Now add all of our new out params.
-  for (int i = bitVector.find_first(); i != -1; i = bitVector.find_next(i)) {
-    unsigned appliedArgIndex =
-        oldApplySite.getOperandIndexOfFirstArgument() + i;
-    newArgs.push_back(oldApplySite->getOperand(appliedArgIndex));
-  }
-
-  // Finally, add all of the rest of our arguments, skipping our new out
-  // parameters.
-  for (unsigned i : range(oldConv.getSILArgIndexOfFirstParam(),
-                          oldConv.getNumSILArguments())) {
-    if (bitVector.test(i))
-      continue;
-    unsigned appliedArgIndex =
-        oldApplySite.getOperandIndexOfFirstArgument() + i;
-    newArgs.push_back(oldApplySite->getOperand(appliedArgIndex));
-  }
-
-  // Then create our new apply.
-  SILBuilderWithScope builder(*oldApplySite);
-  auto *newCalleeRef =
-      builder.createFunctionRef(oldApplySite->getLoc(), newCallee);
-  auto *newApply =
-      builder.createApply(oldApplySite->getLoc(), newCalleeRef,
-                          oldApplySite.getSubstitutionMap(), newArgs);
-  oldApplySite->replaceAllUsesPairwiseWith(newApply);
-  oldApplySite->eraseFromParent();
-}
-
-bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
-    Operand *callerOperand, ClosureOperandState &calleeOperandState) {
-  auto fas = FullApplySite::isa(callerOperand->getUser());
-  auto *func = fas.getCalleeFunction();
-  auto *address =
-      func->begin()->getArgument(fas.getCalleeArgIndex(*callerOperand));
-
-  LLVM_DEBUG(llvm::dbgs() << "Performing closure dataflow on caller use: "
-                          << *callerOperand->getUser());
-  LLVM_DEBUG(llvm::dbgs() << "    Callee: " << func->getName() << '\n');
-  LLVM_DEBUG(llvm::dbgs() << "    Callee Argument: " << *address);
-  // We emit an end closure dataflow to make it easier when reading debug output
-  // to make it easy to see when we have returned to analyzing the caller.
-  SWIFT_DEFER {
-    LLVM_DEBUG(llvm::dbgs()
-                   << "Finished performing closure dataflow on Callee: "
-                   << func->getName() << '\n';);
-  };
-  auto accessPathWithBase = AccessPathWithBase::compute(address);
-  auto accessPath = accessPathWithBase.accessPath;
-
-  // Bail on an invalid AccessPath.
-  //
-  // AccessPath completeness is verified independently--it may be invalid in
-  // extraordinary situations. When AccessPath is valid, we know all its uses
-  // are recognizable.
-  //
-  // NOTE: If due to an invalid access path we fail here, we will just error
-  // on the _move since the _move would not have been handled.
-  if (!accessPath.isValid())
-    return false;
-
-  // TODO: Hoist this useState into an ivar that we can reuse in between closure
-  // operands?
-  GatherClosureUseVisitor visitor(closureUseState);
-  SWIFT_DEFER { visitor.clear(); };
-  visitor.reset(address);
-  if (!visitAccessPathUses(visitor, accessPath, fn))
-    return false;
-
-  SWIFT_DEFER { closureUseDataflowState.clear(); };
-  return closureUseDataflowState.process(address, calleeOperandState,
-                                         closureConsumes);
-}
-
 bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   auto accessPathWithBase = AccessPathWithBase::compute(address);
   auto accessPath = accessPathWithBase.accessPath;
@@ -2394,8 +2395,7 @@ bool MoveKillsCopyableAddressesChecker::check(SILValue address) {
   // diagnostic.
   bool emittedSingleBBDiagnostic = false;
   for (auto *mvi : useState.markMoves) {
-    emittedSingleBBDiagnostic |= performSingleBasicBlockAnalysis(
-        dataflowState, debugInfoBlockSplitPoints, address, mvi);
+    emittedSingleBBDiagnostic |= performSingleBasicBlockAnalysis(address, mvi);
   }
 
   if (emittedSingleBBDiagnostic) {
