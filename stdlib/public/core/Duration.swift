@@ -86,16 +86,18 @@ public struct Duration: Sendable {
   internal var _attoseconds: _Int128 {
     _Int128(high: _high, low: _low)
   }
+}
 
+@available(SwiftStdlib 5.7, *)
+extension Duration {
   /// The composite components of the `Duration`.
   ///
   /// This is intended for facilitating conversions to existing time types. The
   /// attoseconds value will not exceed 1e18 or be lower than -1e18.
+  @available(SwiftStdlib 5.7, *)
   public var components: (seconds: Int64, attoseconds: Int64) {
-    let seconds = _attoseconds / 1_000_000_000_000_000_000
-    let attoseconds =
-      Int64((_attoseconds - seconds * 1_000_000_000_000_000_000))
-    return (Int64(seconds), attoseconds)
+    let (seconds, attoseconds) = _attoseconds.dividedBy1e18()
+    return (Int64(seconds), Int64(attoseconds))
   }
 }
 
@@ -109,8 +111,8 @@ extension Duration {
   /// - Returns: A `Duration` representing a given number of seconds.
   @available(SwiftStdlib 5.7, *)
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
-    return Duration(_attoseconds: _Int128(seconds) *
-                                 1_000_000_000_000_000_000)
+    return Duration(_attoseconds:
+      _Int128(seconds).multiplied(by: 1_000_000_000_000_000_000 as UInt64))
   }
 
   /// Construct a `Duration` given a number of seconds represented as a 
@@ -121,8 +123,7 @@ extension Duration {
   /// - Returns: A `Duration` representing a given number of seconds.
   @available(SwiftStdlib 5.7, *)
   public static func seconds(_ seconds: Double) -> Duration {
-    return Duration(_attoseconds: _Int128(seconds *
-                                 1_000_000_000_000_000_000))
+    return Duration(_attoseconds: _Int128(seconds * 1_000_000_000_000_000_000))
   }
 
   /// Construct a `Duration` given a number of milliseconds represented as a 
@@ -135,8 +136,8 @@ extension Duration {
   public static func milliseconds<T: BinaryInteger>(
     _ milliseconds: T
   ) -> Duration {
-    return Duration(_attoseconds: _Int128(milliseconds) *
-                                 1_000_000_000_000_000)
+    return Duration(_attoseconds:
+      _Int128(milliseconds).multiplied(by: 1_000_000_000_000_000 as UInt64))
   }
 
   /// Construct a `Duration` given a number of seconds milliseconds as a 
@@ -147,8 +148,8 @@ extension Duration {
   /// - Returns: A `Duration` representing a given number of milliseconds.
   @available(SwiftStdlib 5.7, *)
   public static func milliseconds(_ milliseconds: Double) -> Duration {
-    return Duration(_attoseconds: _Int128(milliseconds *
-                                 1_000_000_000_000_000))
+    return Duration(_attoseconds:
+      _Int128(milliseconds * 1_000_000_000_000_000))
   }
 
   /// Construct a `Duration` given a number of microseconds represented as a 
@@ -161,8 +162,8 @@ extension Duration {
   public static func microseconds<T: BinaryInteger>(
     _ microseconds: T
   ) -> Duration {
-    return Duration(_attoseconds: _Int128(microseconds) *
-                                 1_000_000_000_000)
+    return Duration(_attoseconds:
+      _Int128(microseconds).multiplied(by: 1_000_000_000_000 as UInt64))
   }
 
   /// Construct a `Duration` given a number of seconds microseconds as a 
@@ -173,8 +174,8 @@ extension Duration {
   /// - Returns: A `Duration` representing a given number of microseconds.
   @available(SwiftStdlib 5.7, *)
   public static func microseconds(_ microseconds: Double) -> Duration {
-    return Duration(_attoseconds: _Int128(microseconds *
-                                 1_000_000_000_000))
+    return Duration(_attoseconds:
+      _Int128(microseconds * 1_000_000_000_000))
   }
 
   /// Construct a `Duration` given a number of nanoseconds represented as a 
@@ -187,8 +188,8 @@ extension Duration {
   public static func nanoseconds<T: BinaryInteger>(
     _ nanoseconds: T
   ) -> Duration {
-    return Duration(_attoseconds: _Int128(nanoseconds) *
-                                 1_000_000_000)
+    return Duration(_attoseconds:
+      _Int128(nanoseconds).multiplied(by: 1_000_000_000))
   }
 }
 
