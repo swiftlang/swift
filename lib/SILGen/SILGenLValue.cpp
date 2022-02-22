@@ -2663,8 +2663,8 @@ namespace {
     }
 
     void emitUsingAccessor(AccessorKind accessorKind, bool isDirect) {
-      auto accessor =
-        SGF.SGM.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
+      auto accessor = SGF.SGM.getAccessorDeclRef(
+          Storage->getSynthesizedAccessor(accessorKind));
 
       switch (accessorKind) {
       case AccessorKind::Get:
@@ -3148,7 +3148,7 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
 
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor: {
-    auto accessor = member->getOpaqueAccessor(strategy.getAccessor());
+    auto accessor = member->getSynthesizedAccessor(strategy.getAccessor());
     return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
   }
     
