@@ -1951,9 +1951,9 @@ static bool performSingleBasicBlockAnalysis(
       if (auto varInfo = debug.getVarInfo()) {
         SILBuilderWithScope undefBuilder(builder);
         debugInfoBlockSplitPoints.insert(*debug);
-        undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
+        undefBuilder.setCurrentDebugScope(debug->getDebugScope());
         undefBuilder.createDebugValue(
-            debug.inst->getLoc(),
+            debug->getLoc(),
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,
             /*was moved*/ true);
@@ -2063,9 +2063,9 @@ static bool performSingleBasicBlockAnalysis(
         {
           debugInfoBlockSplitPoints.insert(*debug);
           SILBuilderWithScope undefBuilder(builder);
-          undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
+          undefBuilder.setCurrentDebugScope(debug->getDebugScope());
           undefBuilder.createDebugValue(
-              debug.inst->getLoc(),
+              debug->getLoc(),
               SILUndef::get(address->getType(), builder.getModule()), *varInfo,
               false,
             /*was moved*/ true);
@@ -2076,7 +2076,7 @@ static bool performSingleBasicBlockAnalysis(
           auto *next = interestingUser->getNextInstruction();
           SILBuilderWithScope reinitBuilder(next);
           reinitBuilder.setCurrentDebugScope(debug->getDebugScope());
-          auto *dvi = reinitBuilder.createDebugValue(debug.inst->getLoc(),
+          auto *dvi = reinitBuilder.createDebugValue(debug->getLoc(),
                                                      address, *varInfo, false,
                                                      /*was moved*/ true);
           debugInfoBlockSplitPoints.insert(dvi);
@@ -2117,9 +2117,9 @@ static bool performSingleBasicBlockAnalysis(
       if (auto varInfo = debug.getVarInfo()) {
         debugInfoBlockSplitPoints.insert(*debug);
         SILBuilderWithScope undefBuilder(builder);
-        undefBuilder.setCurrentDebugScope(debug.inst->getDebugScope());
+        undefBuilder.setCurrentDebugScope(debug->getDebugScope());
         undefBuilder.createDebugValue(
-            debug.inst->getLoc(),
+            debug->getLoc(),
             SILUndef::get(address->getType(), builder.getModule()), *varInfo,
             false,
             /*was moved*/ true);
