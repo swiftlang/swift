@@ -229,8 +229,26 @@ class TypeMatcher {
     }
 
     TRIVIAL_CASE(ModuleType)
-    TRIVIAL_CASE(DynamicSelfType)
     TRIVIAL_CASE(ArchetypeType)
+
+    bool visitDynamicSelfType(CanDynamicSelfType firstDynamicSelf,
+                              Type secondType,
+                              Type sugaredFirstType) {
+      if (auto secondDynamicSelf = secondType->getAs<DynamicSelfType>()) {
+        auto firstBase = firstDynamicSelf->getSelfType();
+        auto secondBase = secondDynamicSelf->getSelfType();
+        auto firstSugaredBase = sugaredFirstType->getAs<DynamicSelfType>()
+            ->getSelfType();
+
+        if (!this->visit(CanType(firstBase), secondBase, firstSugaredBase))
+          return false;
+
+        return true;
+      }
+
+      return mismatch(firstDynamicSelf.getPointer(), secondType,
+                      sugaredFirstType);
+    }
 
     bool visitDependentMemberType(CanDependentMemberType firstType,
                                    Type secondType,
