@@ -145,9 +145,29 @@ static bool isDefaultActorType(CanType actorType, ModuleDecl *M,
   return false;
 }
 
-static bool isDefaultDistributedActorType(CanType actorType) {
-  if (auto cls = actorType.getClassOrBoundGenericClass())
-    return cls->isDistributedActor();
+static bool isDefaultDistributedActorType(CanType actorType, SILFunction *F) {
+  auto *DC = F->getDeclContext();
+
+  if (auto classDecl = dyn_cast<ClassDecl>(DC)) {
+    return classDecl->isDistributedActor();
+  }
+
+  auto selfTy = F->getSelfArgument()->getDecl()->getInterfaceType();
+  if (auto archetype = dyn_cast<PrimaryArchetypeType>(actorType)) {
+    GenericSignature signature = DC->getGenericSignatureOfContext();
+    for (auto req : signature.getRequirements()) {
+      if (req.getFirstType()->isEqual(selfTy)) {
+        // It is a Self requirement on the actor where decl,
+        // check if it requires tha it is a distributed actor:
+        if (auto proto = req.getProtocolDecl()) {
+          if (proto->inheritsFromDistributedActor()) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
   return false;
 }
 
@@ -184,8 +204,9 @@ SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor,
   // If the actor type is a default actor, go ahead and devirtualize here.
   auto module = F->getModule().getSwiftModule();
   SILValue unmarkedExecutor;
+  fprintf(stderr, "[%s:%d] (%s) isDefaultDistributedActorType(actorType) = %d\n", __FILE__, __LINE__, __FUNCTION__, isDefaultDistributedActorType(actorType, F));
   if (isDefaultActorType(actorType, module, F->getResilienceExpansion()) ||
-      isDefaultDistributedActorType(actorType)) {
+      isDefaultDistributedActorType(actorType, F)) {
     auto builtinName = ctx.getIdentifier(
       getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
     auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));

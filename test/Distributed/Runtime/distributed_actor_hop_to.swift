@@ -26,21 +26,27 @@ protocol LifecycleWatch: DistributedActor where ActorSystem == FakeRoundtripActo
 extension LifecycleWatch {
   func watch() async throws {
     // nothing here
+    print("executed: \(#function)")
   }
 
   distributed func test() async throws {
+    print("executed: \(#function)")
     try await self.watch()
+    print("done executed: \(#function)")
   }
 }
 
 distributed actor Worker: LifecycleWatch {
-
 }
 
 @main struct Main {
   static func main() async {
     let worker: any LifecycleWatch = Worker(system: DefaultDistributedActorSystem())
     try! await worker.test()
+
+    // CHECK: executed: test()
+    // CHECK: executed: watch()
+    // CHECK: done executed: test()
 
     print("OK") // CHECK: OK
   }
