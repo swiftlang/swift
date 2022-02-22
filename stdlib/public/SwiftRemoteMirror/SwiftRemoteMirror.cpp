@@ -244,7 +244,8 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
     sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
     sectionFromInfo<const void *>(Info, Info.type_references),
     sectionFromInfo<const void *>(Info, Info.reflection_strings),
-    ReflectionSection<const void *>(nullptr, 0)};
+    ReflectionSection<const void *>(nullptr, 0),
+    ReflectionSection<MultiPayloadEnumDescriptorIterator>(0, 0)};
   
   Context->addReflectionInfo(ContextInfo);
 }
@@ -264,7 +265,9 @@ void swift_reflection_addReflectionMappingInfo(
           Info.capture),
       reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
       reflectionSectionFromLocalAndRemote<const void *>(Info.reflection_strings),
-      ReflectionSection<const void *>(nullptr, 0)};
+      ReflectionSection<const void *>(nullptr, 0),
+      MultiPayloadEnumSection(0, 0)
+  };
 
   Context->addReflectionInfo(ContextInfo);
 }
@@ -490,7 +493,7 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   if (!TI)
     return {};
 
-  const FieldInfo *FieldInfo;
+  const FieldInfo *FieldInfo = nullptr;
   if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
     FieldInfo = &(EnumTI->getCases()[Index]);
   } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {

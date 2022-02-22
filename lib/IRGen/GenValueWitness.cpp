@@ -408,7 +408,7 @@ static CanType getFormalTypeInContext(CanType abstractType, DeclContext *dc) {
 /// Given an abstract type --- a type possibly expressed in terms of
 /// unbound generic types --- return the formal type within the type's
 /// primary defining context.
-static CanType getFormalTypeInContext(CanType abstractType) {
+CanType irgen::getFormalTypeInPrimaryContext(CanType abstractType) {
   if (auto nominal = abstractType.getAnyNominal())
     return getFormalTypeInContext(abstractType, nominal);
   return abstractType;
@@ -419,7 +419,7 @@ void irgen::getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
   assert(arg->getType() == IGF.IGM.TypeMetadataPtrTy &&
          "Self argument is not a type?!");
 
-  auto formalType = getFormalTypeInContext(abstractType);
+  auto formalType = getFormalTypeInPrimaryContext(abstractType);
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, arg,
                                         MetadataState::Complete);
 }
@@ -1039,7 +1039,7 @@ static void addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
 /// Currently, this is true if the size and/or alignment of the type is
 /// dependent on its generic parameters.
 bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
-  return !IGM.getTypeInfoForUnlowered(getFormalTypeInContext(ty)).isFixedSize();
+  return !IGM.getTypeInfoForUnlowered(getFormalTypeInPrimaryContext(ty)).isFixedSize();
 }
 
 static void addValueWitnessesForAbstractType(IRGenModule &IGM,
@@ -1048,7 +1048,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                              bool &canBeConstant) {
   Optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
   if (auto boundGenericType = dyn_cast<BoundGenericType>(abstractType)) {
-    CanType concreteFormalType = getFormalTypeInContext(abstractType);
+    CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 
     auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
     const auto *boundConcreteTI = &IGM.getTypeInfo(concreteLoweredType);
@@ -1059,7 +1059,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
     abstractType =
         boundGenericType->getDecl()->getDeclaredType()->getCanonicalType();
   }
-  CanType concreteFormalType = getFormalTypeInContext(abstractType);
+  CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 
   auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
   auto &concreteTI = IGM.getTypeInfo(concreteLoweredType);
@@ -1101,7 +1101,7 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
  
   auto &C = IGM.Context;
 
-  type = getFormalTypeInContext(type);
+  type = getFormalTypeInPrimaryContext(type);
   
   auto &ti = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(), type);
 

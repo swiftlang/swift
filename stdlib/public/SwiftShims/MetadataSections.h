@@ -82,6 +82,7 @@ struct MetadataSections {
   MetadataSectionRange swift5_replac2;
   MetadataSectionRange swift5_builtin;
   MetadataSectionRange swift5_capture;
+  MetadataSectionRange swift5_mpenum;
   MetadataSectionRange swift5_accessible_functions;
 };
 
