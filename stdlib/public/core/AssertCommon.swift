@@ -58,6 +58,17 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 #endif
 }
 
+@_transparent
+@_alwaysEmitIntoClient // Introduced in 5.7
+public // @testable
+func _isStdlibDebugChecksEnabled() -> Bool {
+#if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  return !_isFastAssertConfiguration()
+#else
+  return _isDebugAssertConfiguration()
+#endif
+}
+
 @usableFromInline @_transparent
 internal func _fatalErrorFlags() -> UInt32 {
   // The current flags are:

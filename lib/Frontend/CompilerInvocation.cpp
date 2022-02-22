@@ -1929,6 +1929,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.StackPromotionSizeLimit = limit;
   }
 
+  if (Args.hasArg(OPT_trap_function))
+    Opts.TrapFuncName = Args.getLastArgValue(OPT_trap_function).str();
+
   Opts.FunctionSections = Args.hasArg(OPT_function_sections);
 
   if (Args.hasArg(OPT_autolink_force_load))
@@ -2201,6 +2204,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_internalize_at_link)) {
     Opts.InternalizeAtLink = true;
   }
+
+  Opts.InternalizeSymbols = FrontendOpts.Static;
 
   if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
     Opts.NoPreallocatedInstantiationCaches = true;

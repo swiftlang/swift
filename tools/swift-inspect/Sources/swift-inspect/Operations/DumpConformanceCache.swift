@@ -20,7 +20,7 @@ internal struct DumpConformanceCache: ParsableCommand {
   var options: UniversalOptions
 
   func run() throws {
-    try inspec(process: options.nameOrPid) { process in
+    try inspect(process: options.nameOrPid) { process in
       try process.context.iterateConformanceCache { type, proto in
         let type: String = process.context.name(type: type) ?? "<unknown>"
         let conformance: String = process.context.name(protocol: proto) ?? "<unknown>"

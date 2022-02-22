@@ -13,7 +13,9 @@
 #ifndef SWIFT_SIL_SILBRIDGING_H
 #define SWIFT_SIL_SILBRIDGING_H
 
-#include "BridgedSwiftObject.h"
+#include "swift/Basic/BasicBridging.h"
+#include "swift/Basic/BridgedSwiftObject.h"
+#include <stdbool.h>
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -21,18 +23,6 @@ extern "C" {
 #endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
-
-typedef intptr_t SwiftInt;
-
-typedef struct {
-  const unsigned char * _Nullable data;
-  size_t length;
-} BridgedStringRef;
-
-typedef struct {
-  const unsigned char * _Nonnull data;
-  size_t numElements;
-} BridgedArrayRef;
 
 enum {
   BridgedOperandSize = 4 * sizeof(uintptr_t),
@@ -48,10 +38,6 @@ enum ChangeNotificationKind {
 typedef struct {
   const void * _Nonnull opaqueCtxt;
 } BridgedPassContext;
-
-typedef struct {
-  void * _Nonnull streamAddr;
-} BridgedOStream;
 
 typedef struct {
   void * _Null_unspecified word0;
@@ -186,10 +172,6 @@ void Function_register(SwiftMetatype metatype,
             FunctionWriteFn writeFn, FunctionParseFn parseFn,
             FunctionCopyEffectsFn copyEffectsFn,
             FunctionGetEffectFlagsFn hasEffectsFn);
-
-void OStream_write(BridgedOStream os, BridgedStringRef str);
-
-void freeBridgedStringRef(BridgedStringRef str);
 
 void PassContext_notifyChanges(BridgedPassContext passContext,
                                enum ChangeNotificationKind changeKind);

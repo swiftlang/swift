@@ -46,6 +46,7 @@ class UniversalLinkageInfo {
 public:
   bool IsELFObject;
   bool UseDLLStorage;
+  bool Internalize;
 
   /// True iff are multiple llvm modules.
   bool HasMultipleIGMs;
@@ -57,7 +58,7 @@ public:
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool forcePublicDecls);
+                       bool forcePublicDecls, bool isStaticLibrary);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.

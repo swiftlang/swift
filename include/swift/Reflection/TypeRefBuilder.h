@@ -24,6 +24,8 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
+#include <iomanip>
+#include <iostream>
 #include <ostream>
 #include <unordered_map>
 #include <vector>
@@ -84,6 +86,7 @@ public:
 template<typename Self, typename Descriptor>
 class ReflectionSectionIteratorBase
   : public std::iterator<std::forward_iterator_tag, Descriptor> {
+  uint64_t OriginalSize;
 protected:
   Self &asImpl() {
     return *static_cast<Self *>(this);
@@ -91,12 +94,23 @@ protected:
 public:
   RemoteRef<void> Cur;
   uint64_t Size;
+  std::string Name;
     
-  ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size)
-    : Cur(Cur), Size(Size) {
-    if (Size != 0 && Self::getCurrentRecordSize(this->operator*()) > Size) {
-      fputs("reflection section too small!\n", stderr);
-      abort();
+  ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size, std::string Name)
+    : OriginalSize(Size), Cur(Cur), Size(Size), Name(Name) {
+    if (Size != 0) {
+      auto NextRecord = this->operator*();
+      auto NextSize = Self::getCurrentRecordSize(NextRecord);
+      if (NextSize > Size) {
+        std::cerr << "!!! Reflection section too small to contain first record\n" << std::endl;
+        std::cerr << "Section Type: " << Name << std::endl;
+        std::cerr << "Section size: "
+                  << Size
+                  << ", size of first record: "
+                  << NextSize
+                  << std::endl;
+        abort();
+      }
     }
   }
 
@@ -116,7 +130,25 @@ public:
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
-        fputs("reflection section too small!\n", stderr);
+        int offset = (int)(OriginalSize - Size);
+        std::cerr << "!!! Reflection section too small to contain next record\n" << std::endl;
+        std::cerr << "Section Type: " << Name << std::endl;
+        std::cerr << "Remaining section size: " << Size
+                  << ", total section size: " << OriginalSize
+                  << ", offset in section: " << offset
+                  << ", size of next record: " << NextSize
+                  << std::endl;
+        const uint8_t *p = reinterpret_cast<const uint8_t *>(Cur.getLocalBuffer());
+        std::cerr << "Last bytes of previous record: ";
+        for (int i = std::max(-8, -offset); i < 0; i++) {
+          std::cerr << std::hex << std::setw(2) << (int)p[i] << " ";
+        }
+        std::cerr << std::endl;
+        std::cerr << "Next bytes in section: ";
+        for (unsigned i = 0; i < Size && i < 16; i++) {
+          std::cerr << std::hex << std::setw(2) << (int)p[i] << " ";
+        }
+        std::cerr << std::endl;
         abort();
       }
     }
@@ -139,7 +171,7 @@ class FieldDescriptorIterator
 {
 public:
   FieldDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "FieldDescriptor")
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
@@ -154,7 +186,7 @@ class AssociatedTypeIterator
 {
 public:
   AssociatedTypeIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "AssociatedType")
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<AssociatedTypeDescriptor> ATR){
@@ -169,7 +201,7 @@ class BuiltinTypeDescriptorIterator
                                          BuiltinTypeDescriptor> {
 public:
   BuiltinTypeDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "BuiltinTypeDescriptor")
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR){
@@ -183,7 +215,7 @@ class CaptureDescriptorIterator
                                          CaptureDescriptor> {
 public:
   CaptureDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "CaptureDescriptor")
   {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR){
@@ -193,6 +225,21 @@ public:
   }
 };
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
+
+class MultiPayloadEnumDescriptorIterator
+  : public ReflectionSectionIteratorBase<MultiPayloadEnumDescriptorIterator,
+                                         MultiPayloadEnumDescriptor> {
+public:
+  MultiPayloadEnumDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size, "MultiPayloadEnum")
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
+    return MPER->getSizeInBytes();
+  }
+};
+using MultiPayloadEnumSection = ReflectionSection<MultiPayloadEnumDescriptorIterator>;
+
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
@@ -203,6 +250,7 @@ struct ReflectionInfo {
   GenericSection TypeReference;
   GenericSection ReflectionString;
   GenericSection Conformance;
+  MultiPayloadEnumSection MultiPayloadEnum;
 };
 
 struct ClosureContextInfo {
@@ -688,6 +736,7 @@ private:
   using ByteReader = std::function<remote::MemoryReader::ReadBytesResult (remote::RemoteAddress, unsigned)>;
   using StringReader = std::function<bool (remote::RemoteAddress, std::string &)>;
   using PointerReader = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress, unsigned)>;
+  using IntVariableReader = std::function<llvm::Optional<uint64_t> (std::string, unsigned)>;
 
   // These fields are captured from the MetadataReader template passed into the
   // TypeRefBuilder struct, to isolate its template-ness from the rest of
@@ -700,7 +749,8 @@ private:
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
   PointerReader OpaquePointerReader;
-  
+  IntVariableReader OpaqueIntVariableReader;
+
 public:
   template<typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader)
@@ -725,8 +775,37 @@ public:
       }),
       OpaquePointerReader([&reader](remote::RemoteAddress address, unsigned size) -> llvm::Optional<remote::RemoteAbsolutePointer> {
         return reader.Reader->readPointer(address, size);
+      }),
+      OpaqueIntVariableReader(
+        [&reader](std::string symbol, unsigned size) -> llvm::Optional<uint64_t> {
+          llvm::Optional<uint64_t> result;
+          if (auto Reader = reader.Reader) {
+            auto Addr = Reader->getSymbolAddress(symbol);
+            if (Addr) {
+              switch (size) {
+              case 8: {
+                uint64_t i;
+                if (Reader->readInteger(Addr, &i)) {
+                  result = i;
+                }
+                break;
+              }
+              case 4: {
+                uint32_t i;
+                if (Reader->readInteger(Addr, &i)) {
+                  result = i;
+                }
+                break;
+              }
+              default: {
+                assert(false && "Can only read 4- or 8-byte integer variables from image");
+              }
+              }
+            }
+          }
+          return result;
       })
-  {}
+  { }
 
   Demangle::Node *demangleTypeRef(RemoteRef<char> string,
                                   bool useOpaqueTypeSymbolicReferences = true) {
@@ -760,6 +839,40 @@ public:
   /// Get the unsubstituted capture types for a closure context.
   ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
 
+  /// Get the multipayload enum projection information for a given TR
+  RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR);
+
+private:
+  llvm::Optional<uint64_t> multiPayloadEnumPointerMask;
+
+public:
+  /// Retrieve the MPE pointer mask from the target
+  // If it can't read it, it will make an educated guess
+  // Note: This is a pointer-sized value stored in a uint64_t
+  // If the target is 32 bits, the mask is in the lower 32 bits
+  uint64_t getMultiPayloadEnumPointerMask() {
+    unsigned pointerSize = TC.targetPointerSize();
+    if (!multiPayloadEnumPointerMask.hasValue()) {
+      // Ask the target for the spare bits mask
+      multiPayloadEnumPointerMask
+        = OpaqueIntVariableReader("_swift_debug_multiPayloadEnumPointerSpareBitsMask", pointerSize);
+    }
+    if (!multiPayloadEnumPointerMask.hasValue()) {
+      if (pointerSize == sizeof(void *)) {
+        // Most reflection tools run on the target machine,
+        // in which case, they use the same configuration:
+        multiPayloadEnumPointerMask = _swift_abi_SwiftSpareBitsMask;
+      } else if (pointerSize == 4) {
+        // All 32-bit platforms are the same, so this is always correct.
+        multiPayloadEnumPointerMask = SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK;
+      } else {
+        // This is not always correct.  But we can't do any better?
+        multiPayloadEnumPointerMask = SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK;
+      }
+    }
+    return multiPayloadEnumPointerMask.getValue();
+  }
+
   ///
   /// Dumping typerefs, field declarations, associated types
   ///
@@ -770,6 +883,7 @@ public:
   void dumpAssociatedTypeSection(std::ostream &stream);
   void dumpBuiltinTypeSection(std::ostream &stream);
   void dumpCaptureSection(std::ostream &stream);
+  void dumpMultiPayloadEnumSection(std::ostream &stream);
 
   ///
   /// Extraction of protocol conformances
@@ -1280,6 +1394,10 @@ public:
     stream << "CONFORMANCES:\n";
     stream << "=============\n";
     dumpConformanceSection<ObjCInteropKind, PointerSize>(stream);
+    stream << "\n";
+    stream << "MULTI-PAYLOAD ENUM DESCRIPTORS:\n";
+    stream << "===============================\n";
+    dumpMultiPayloadEnumSection(stream);
     stream << "\n";
   }
 };

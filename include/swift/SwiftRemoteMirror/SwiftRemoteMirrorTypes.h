@@ -91,6 +91,8 @@ typedef struct swift_reflection_mapping_info {
   swift_reflection_section_mapping_t capture;
   swift_reflection_section_mapping_t type_references;
   swift_reflection_section_mapping_t reflection_strings;
+  // New fields cannot be added here without breaking ABI.
+  // Use swift_reflection_addImage instead.
 } swift_reflection_mapping_info_t;
 
 /// The layout kind of a Swift type.

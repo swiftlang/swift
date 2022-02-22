@@ -42,9 +42,14 @@ public struct Duration: Sendable {
   @usableFromInline
   internal var _high: Int64
 
+  @inlinable
+  internal init(_low: UInt64, high: Int64) {
+    self._low = _low
+    self._high = high
+  }
+
   internal init(_attoseconds: _Int128) {
-    self._low = _attoseconds.low
-    self._high = _attoseconds.high
+    self.init(_low: _attoseconds.low, high: _attoseconds.high)
   }
 
   /// Construct a `Duration` by adding attoseconds to a seconds value.

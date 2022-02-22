@@ -594,6 +594,10 @@ def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocate
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Avoid preallocating metadata instantiation caches in globals">;
 
+def trap_function
+  : Separate<["-"], "trap-function">, MetaVarName<"<name>">,
+    HelpText<"Lower traps to calls to this function instead of trap instructions">;
+
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,

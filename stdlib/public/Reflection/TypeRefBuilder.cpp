@@ -309,6 +309,47 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   return nullptr;
 }
 
+RemoteRef<MultiPayloadEnumDescriptor>
+TypeRefBuilder::getMultiPayloadEnumInfo(const TypeRef *TR) {
+  std::string MangledName;
+  if (auto B = dyn_cast<BuiltinTypeRef>(TR))
+    MangledName = B->getMangledName();
+  else if (auto N = dyn_cast<NominalTypeRef>(TR))
+    MangledName = N->getMangledName();
+  else if (auto B = dyn_cast<BoundGenericTypeRef>(TR))
+    MangledName = B->getMangledName();
+  else
+    return nullptr;
+
+  for (auto Info : ReflectionInfos) {
+    for (auto MultiPayloadEnumDescriptor : Info.MultiPayloadEnum) {
+
+      // Assert that descriptor size is sane...
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() >= 1);
+      // We're limited to 64k of spare bits mask...
+      assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() < 16384);
+      assert(MultiPayloadEnumDescriptor->getSizeInBytes() ==
+             4 + MultiPayloadEnumDescriptor->getContentsSizeInWords() * 4);
+      // Must have a non-empty spare bits mask iff spare bits are used...
+      assert(MultiPayloadEnumDescriptor->usesPayloadSpareBits()
+             == (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() != 0));
+      // BitMask must fit within the advertised size...
+      if (MultiPayloadEnumDescriptor->usesPayloadSpareBits()) {
+        assert(MultiPayloadEnumDescriptor->getContentsSizeInWords()
+               >= 2 + (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() + 3) / 4);
+      }
+
+      auto CandidateMangledName =
+        readTypeRef(MultiPayloadEnumDescriptor, MultiPayloadEnumDescriptor->TypeName);
+      if (!reflectionNameMatches(CandidateMangledName, MangledName))
+        continue;
+      return MultiPayloadEnumDescriptor;
+    }
+  }
+
+  return nullptr;
+}
+
 RemoteRef<CaptureDescriptor>
 TypeRefBuilder::getCaptureDescriptor(uint64_t RemoteAddress) {
   for (auto Info : ReflectionInfos) {
@@ -492,6 +533,40 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
     for (const auto descriptor : sections.Capture) {
       auto info = getClosureContextInfo(descriptor);
       info.dump(stream);
+    }
+  }
+}
+
+void TypeRefBuilder::dumpMultiPayloadEnumSection(std::ostream &stream) {
+  for (const auto &sections : ReflectionInfos) {
+    for (const auto descriptor : sections.MultiPayloadEnum) {
+      auto typeNode =
+          demangleTypeRef(readTypeRef(descriptor, descriptor->TypeName));
+      auto typeName = nodeToString(typeNode);
+      clearNodeFactory();
+
+      stream << "\n- " << typeName << ":\n";
+      stream << "  Descriptor Size: " << descriptor->getSizeInBytes() << "\n";
+      stream << "  Flags: " << std::hex << descriptor->getFlags() << std::dec;
+      if (descriptor->usesPayloadSpareBits()) {
+        stream << " usesPayloadSpareBits";
+      }
+      stream << "\n";
+      auto maskBytes = descriptor->getPayloadSpareBitMaskByteCount();
+      auto maskOffset = descriptor->getPayloadSpareBitMaskByteOffset();
+      if (maskBytes > 0) {
+        if (maskOffset > 0) {
+          stream << "  Spare bit mask: (offset " << maskOffset << " bytes) 0x";
+        } else {
+          stream << "  Spare bit mask: 0x";
+        }
+        const uint8_t *p = descriptor->getPayloadSpareBits();
+        for (unsigned i = 0; i < maskBytes; i++) {
+          stream << std::hex << std::setw(2) << std::setfill('0') << p[i];
+        }
+        stream << std::dec << "\n";
+      }
+      stream << "\n";
     }
   }
 }

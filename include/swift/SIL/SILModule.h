@@ -363,7 +363,7 @@ private:
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
 
-#if NDEBUG
+#ifndef NDEBUG
   BasicBlockNameMapType basicBlockNames;
 #endif
 
@@ -456,20 +456,20 @@ public:
   bool isSerialized() const { return serialized; }
 
   void setBasicBlockName(const SILBasicBlock *block, StringRef name) {
-    #if NDEBUG
+#ifndef NDEBUG
     basicBlockNames[block] = name.str();
-    #endif
+#endif
   }
   Optional<StringRef> getBasicBlockName(const SILBasicBlock *block) {
-    #if NDEBUG
+#ifndef NDEBUG
     auto Known = basicBlockNames.find(block);
     if (Known == basicBlockNames.end())
       return None;
 
     return StringRef(Known->second);
-    #else
+#else
     return None;
-    #endif
+#endif
   }
 
   /// Serialize a SIL module using the configured SerializeSILAction.
