@@ -70,6 +70,7 @@ static SILValue emitActorPropertyOrWitnessReference(
     SILLocation loc, SILValue base,
     NominalTypeDecl *selfTyDecl,
     SILType propertyType, Identifier identifier) {
+  fprintf(stderr, "[%s:%d] (%s) emitActorPropertyOrWitnessReference !!!\n", __FILE__, __LINE__, __FUNCTION__);
   /// If we're a class, just get the local property VarDecl and refer to it
   if (auto clazz = dyn_cast<ClassDecl>(selfTyDecl)) {
     return emitActorPropertyReference(
@@ -127,9 +128,8 @@ static SILValue emitActorPropertyOrWitnessReference(
 
     // === Make a reference to the getter
     // --- buffer for the system to be stored
-    Optional<SILValue> temporaryResultBuffer;
     auto buf = B.createAllocStack(loc, propertyType, None);
-    temporaryResultBuffer = SILValue(buf);
+    SILValue temporaryResultBuffer = SILValue(buf);
 
     //   %5 = witness_method $Self, #DistributedActor.actorSystem!getter : <Self where Self : DistributedActor> (Self) -> () -> Self.ActorSystem : $@convention(witness_method: DistributedActor) <τ_0_0 where τ_0_0 : DistributedActor> (@in_guaranteed τ_0_0) -> @out τ_0_0.ActorSystem
     auto witnessMethod = B.createWitnessMethod(
@@ -163,27 +163,35 @@ static SILValue emitActorPropertyOrWitnessReference(
       subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
     }
 
-    SmallVector<SILValue, 2> allArgs;
-    if (temporaryResultBuffer.hasValue()) {
-      allArgs.push_back(temporaryResultBuffer.getValue());
-    }
-    allArgs.push_back(base); // self
+    SmallVector<SILValue, 2> allArgs = {
+      temporaryResultBuffer, // buffer for the property to be read into
+      base, // self
+    };
 
     // --- Apply the getter
     //   %6 = apply %5<Self>(%4, %2) : $@convention(witness_method: DistributedActor) <τ_0_0 where τ_0_0 : DistributedActor> (@in_guaranteed τ_0_0) -> @out τ_0_0.ActorSystem
     auto apply = B.createApply( loc, witnessMethod, subs, allArgs);
     apply->dump();
 
+
+
+    auto loadedProperty = B.emitLoadValueOperation(loc, temporaryResultBuffer, LoadOwnershipQualifier::Take);
+    fprintf(stderr, "[%s:%d] (%s) THE LOAD TAKE\n", __FILE__, __LINE__, __FUNCTION__);
+    loadedProperty->dump();
+
+//    SGF.enterDestroyCleanup(loadedProperty);
+    SGF.enterDeallocStackCleanup(temporaryResultBuffer);
+
     // --- Cleanup base buffer
-    if (temporaryResultBuffer) {
-      auto value = B.emitLoadValueOperation(
-          loc, *temporaryResultBuffer, LoadOwnershipQualifier::Take);
-      B.emitDestroyValueOperation(loc, value);
-      B.createDeallocStack(loc, *temporaryResultBuffer);
-    }
+//    if (temporaryResultBuffer) {
+//      auto value = B.emitLoadValueOperation(
+//          loc, *temporaryResultBuffer, LoadOwnershipQualifier::Take);
+//      B.emitDestroyValueOperation(loc, value);
+//      B.createDeallocStack(loc, *temporaryResultBuffer);
+//    }
 
     // %7 = load [trivial] %4 : $*SYSTEM_IMPL
-    return B.emitLoadValueOperation(loc, *temporaryResultBuffer, LoadOwnershipQualifier::Take);
+    return loadedProperty;
   }
 
   llvm_unreachable("Unsupported self type decl!");
@@ -956,29 +964,31 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       //     %4 = alloc_stack $SYSTEM_IMPL                   // users: %9, %7, %6
       //     %5 = witness_method $Self, #DistributedActor.actorSystem!getter : <Self where Self : DistributedActor> (Self) -> () -> Self.ActorSystem : $@convention(witness_method: DistributedActor) <τ_0_0 where τ_0_0 : DistributedActor> (@in_guaranteed τ_0_0) -> @out τ_0_0.ActorSystem // user: %6
       //     %6 = apply %5<Self>(%4, %2) : $@convention(witness_method: DistributedActor) <τ_0_0 where τ_0_0 : DistributedActor> (@in_guaranteed τ_0_0) -> @out τ_0_0.ActorSystem
+      fprintf(stderr, "[%s:%d] (%s) GET PROP FOR MAKE INVOCATIOn\n", __FILE__, __LINE__, __FUNCTION__);
       auto systemRef = emitActorPropertyOrWitnessReference(
           *this, B, loc,
           selfValue.getValue(), selfTyDecl,
           systemSILTy, ctx.Id_actorSystem);
       assert(systemRef && "Could not find actorSystem property or requirement");
-
+      fprintf(stderr, "[%s:%d] (%s) SYSTEM REF\n", __FILE__, __LINE__, __FUNCTION__);
+      systemRef->dump();
       auto actorSystemTy = systemRef->getType();
 
       // FIXME: this is wrong for struct with values, and classes?
       // %17 = load %16 : $*FakeActorSystem // users: %21, %20, %18
-      SILValue systemLoaded;
-      if (actorSystemTy.isAddressOnly(F)) {
-        assert(false && "isAddressOnly");
-      } else {
-        if (actorSystemTy.isAddress()) {
-          systemLoaded = B.createTrivialLoadOr(
-              loc, systemRef, LoadOwnershipQualifier::Copy);
-        } else {
-          systemLoaded = B.emitCopyValueOperation(loc, systemRef);
-//          actorSystemTy.dump();
-//          llvm_unreachable("Cannot support non address actor system here?");
-        }
-      }
+//      SILValue systemLoaded;
+//      if (actorSystemTy.isAddressOnly(F)) {
+//        assert(false && "isAddressOnly");
+//      } else {
+//        if (actorSystemTy.isAddress()) {
+//          systemLoaded = B.createTrivialLoadOr(
+//              loc, systemRef, LoadOwnershipQualifier::Copy);
+//        } else {
+//          systemLoaded = B.emitCopyValueOperation(loc, systemRef);
+////          actorSystemTy.dump();
+////          llvm_unreachable("Cannot support non address actor system here?");
+//        }
+//      }
 
       // function_ref FakeActorSystem.makeInvocationEncoder()
       // %19 = function_ref @$s27FakeDistributedActorSystems0aC6SystemV21makeInvocationEncoderAA0aG0VyF : $@convention(method) (@guaranteed FakeActorSystem) -> FakeInvocation // user: %20
@@ -991,11 +1001,18 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
       ApplyInst *invocationEncoderValue = B.createApply(
           loc, makeInvocationEncoderFn,
           /*subs=*/SubstitutionMap(),
-          /*args=*/{systemLoaded});
+//          /*args=*/{systemLoaded});
+          /*args=*/{systemRef});
 
-      if (!systemLoaded->getType().isTrivial(F))
-        B.createDestroyValue(loc, systemLoaded);
-        // B.createEndLifetime(loc, systemLoaded);
+//      if (!systemLoaded->getType().isTrivial(F) ||
+//          ((!actorSystemTy.isAddressOnly(F)) && (!actorSystemTy.isAddress()))) {
+//        fprintf(stderr, "[%s:%d] (%s) DESTROY\n", __FILE__, __LINE__, __FUNCTION__);
+//        B.createDestroyValue(loc, systemLoaded);
+//        // B.createEndLifetime(loc, systemLoaded);
+//      }
+
+      B.emitDestroyValueOperation(loc, systemRef);
+//      B.createDeallocStack(loc, systemRef);
 
       // FIXME(distributed): cannot deal with class yet
       // TODO(distributed): make into "emit apropriate store"
@@ -1529,12 +1546,12 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 //      auto systemRef = emitActorPropertyReference(
 //          *this, loc, selfValue.getValue(),
 //          lookupProperty(selfTyDecl, ctx.Id_actorSystem));
+      fprintf(stderr, "[%s:%d] (%s) GET PROP FOR REMOTE CALL\n", __FILE__, __LINE__, __FUNCTION__);
       systemRef = emitActorPropertyOrWitnessReference(
           *this, B, loc,
           selfValue.getValue(), selfTyDecl,
           systemSILTy, ctx.Id_actorSystem);
       assert(systemRef);
-      F.dump();
 //      remoteCallSystemSelf = B.createTrivialLoadOr(loc, systemRef, LoadOwnershipQualifier::Copy);
 
       // --- Prepare 'throwing' type, Error or Never depending on throws of the target
@@ -1672,6 +1689,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 //        B.createDestroyValue(loc, remoteCallSystemSelf);
 //      if (remoteCallSystemSelf->getType().isAddress())
 //        B.createEndLifetime(loc, remoteCallSystemSelf);
+      B.emitDestroyValueOperation(loc, systemRef);
 
       B.createEndAccess(loc, invocationEncoderAccess, /*aborted=*/false);
       Cleanups.emitCleanupsForReturn(CleanupLocation(loc), NotForUnwind);
@@ -1695,6 +1713,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 //        B.createDestroyValue(loc, remoteCallSystemSelf);
 //      if (remoteCallSystemSelf->getType().isAddress())
 //        B.createEndLifetime(loc, remoteCallSystemSelf);
+      B.emitDestroyValueOperation(loc, systemRef);
 
       Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
 
