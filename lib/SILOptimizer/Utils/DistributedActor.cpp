@@ -65,7 +65,7 @@ void emitDistributedActorSystemWitnessCall(
   auto &C = F.getASTContext();
 
   // Dig out the conformance to DistributedActorSystem.
-  ProtocolDecl *DAS = C.getDistributedActorDecl();
+  ProtocolDecl *DAS = C.getDistributedActorSystemDecl();
   assert(DAS);
   auto systemASTType = base->getType().getASTType();
   auto *module = M.getSwiftModule();
@@ -81,6 +81,8 @@ void emitDistributedActorSystemWitnessCall(
         OpenedExistentialAccess::Immutable);
   }
 
+  fprintf(stderr, "[%s:%d] (%s) systemASTType\n", __FILE__, __LINE__, __FUNCTION__);
+  systemASTType.dump();
   if (systemASTType->isTypeParameter() || systemASTType->is<ArchetypeType>()) {
     systemConfRef = ProtocolConformanceRef(DAS);
   } else {

@@ -103,7 +103,6 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *actor) const {
   auto &C = actor->getASTContext();
   auto module = actor->getParentModule();
-//  auto module = C.getStdlibModule();
 
   auto sys = C.getProtocol(KnownProtocolKind::DistributedActorSystem);
   sys->dump();
@@ -114,10 +113,14 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   if (!C.getLoadedModule(C.Id_Distributed))
     return nullptr;
 
+  auto classDecl = dyn_cast<ClassDecl>(actor);
+  if (!classDecl)
+    return nullptr;
+
   if (!actor->isDistributedActor())
     return nullptr;
 
-  auto expectedSystemType = getDistributedActorSystemType(actor);
+  auto expectedSystemType = getDistributedActorSystemType(classDecl);
   fprintf(stderr, "[%s:%d] (%s) expectedSystemType\n", __FILE__, __LINE__, __FUNCTION__);
   expectedSystemType.dump();
   auto DistSystemProtocol =

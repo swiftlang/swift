@@ -1258,24 +1258,25 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
   return getBinaryComparisonOperatorIntDecl(*this, "==", getImpl().EqualIntDecl);
 }
 
-AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
-    NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
-  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
-  const NominalTypeDecl *system = actorOrSystem;
-  if (actorOrSystem->isDistributedActor()) {
-    auto var = actorOrSystem->getDistributedActorSystemProperty();
-    system = var->getInterfaceType()->getAnyNominal();
-  }
-
-  if (!system)
-    system = getProtocol(KnownProtocolKind::DistributedActorSystem);
-
-  auto mutableSystem = const_cast<NominalTypeDecl *>(system);
-  return evaluateOrDefault(
-      system->getASTContext().evaluator,
-      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem, /*isVoidReturn=*/isVoidReturn},
-      nullptr);
-}
+//AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
+//    NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
+//  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
+//  const NominalTypeDecl *system = actorOrSystem;
+//  if (actorOrSystem->isDistributedActor()) {
+//
+//    auto var = actorOrSystem->getDistributedActorSystemProperty();
+//    system = var->getInterfaceType()->getAnyNominal();
+//  }
+//
+//  if (!system)
+//    system = getProtocol(KnownProtocolKind::DistributedActorSystem);
+//
+//  auto mutableSystem = const_cast<NominalTypeDecl *>(system);
+//  return evaluateOrDefault(
+//      system->getASTContext().evaluator,
+//      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem, /*isVoidReturn=*/isVoidReturn},
+//      nullptr);
+//}
 
 FuncDecl *ASTContext::getMakeInvocationEncoderOnDistributedActorSystem(
     AbstractFunctionDecl *thunk) const {

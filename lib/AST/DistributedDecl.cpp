@@ -70,7 +70,18 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
   auto *DC = member->getDeclContext();
   auto DA = C.getDistributedActorDecl();
 
-  if (auto *protocol = DC->getSelfProtocolDecl()) {
+  // === When declared inside a n actor, we can get the type directly
+  if (auto classDecl = dyn_cast<ClassDecl>(DC)) {
+    return getDistributedActorSystemType(classDecl);
+  }
+
+  /// === Maybe the value is declared in a protocol?
+  ProtocolDecl *protocol = dyn_cast<ProtocolDecl>(member);
+  if (!protocol) {
+    protocol = DC->getSelfProtocolDecl();
+  }
+
+  if (protocol) {
     GenericSignature signature;
     if (auto *genericContext = member->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
@@ -84,30 +95,25 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
     auto systemTy = signature->getConcreteType(ActorSystemAssocType);
     assert(systemTy && "couldn't find concrete type for actor system");
     return systemTy;
-  } else if (auto classDecl = dyn_cast<ClassDecl>(DC)) {
-      if (!classDecl)
-        return Type();
-
-      return getDistributedActorSystemType(classDecl);
   }
 
   llvm_unreachable("Unable to fetch ActorSystem type!");
 }
 
-Type swift::getDistributedActorSystemType(NominalTypeDecl *nominal) {
-  assert(!isa<ProtocolDecl>(nominal) && "FIXME: we should deal with it here too or collapse the two impls");
-  assert(nominal->isDistributedActor());
-  auto &C = nominal->getASTContext();
-  auto *DC = nominal->getDeclContext();
+Type swift::getDistributedActorSystemType(ClassDecl *actor) {
+//  assert(!isa<ProtocolDecl>(nominal) && "FIXME: we should deal with it here too or collapse the two impls");
+  assert(actor->isDistributedActor());
+  auto &C = actor->getASTContext();
+  auto *DC = actor->getDeclContext();
 
-  auto DAP = C.getDistributedActorDecl();
-  if (!DAP)
+  auto DA = C.getDistributedActorDecl();
+  if (!DA)
     return ErrorType::get(C);
 
   // Dig out the actor system type.
-  auto module = nominal->getParentModule();
-  Type selfType = nominal->getSelfInterfaceType();
-  auto conformance = module->lookupConformance(selfType, DAP);
+  auto module = actor->getParentModule();
+  Type selfType = actor->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, DA);
   return conformance.getTypeWitnessByName(selfType, C.Id_ActorSystem);
 }
 
@@ -1053,6 +1059,31 @@ NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
       GetDistributedRemoteCallTargetInitFunctionRequest(mutableThis), nullptr);
+}
+
+AbstractFunctionDecl *ASTContext::getRemoteCallOnDistributedActorSystem(
+    NominalTypeDecl *actorOrSystem, bool isVoidReturn) const {
+  assert(actorOrSystem && "distributed actor (or system) decl must be provided");
+  const NominalTypeDecl *system = actorOrSystem;
+  if (actorOrSystem->isDistributedActor()) {
+    auto systemTy = getConcreteReplacementForProtocolActorSystemType(actorOrSystem);
+    fprintf(stderr, "[%s:%d] (%s) systemTy\n", __FILE__, __LINE__, __FUNCTION__);
+    systemTy.dump();
+
+    system = systemTy->getNominalOrBoundGenericNominal();
+    system->dump();
+//    auto var = actorOrSystem->getDistributedActorSystemProperty();
+//    system = var->getInterfaceType()->getAnyNominal();
+  }
+
+  if (!system)
+    system = getProtocol(KnownProtocolKind::DistributedActorSystem);
+
+  auto mutableSystem = const_cast<NominalTypeDecl *>(system);
+  return evaluateOrDefault(
+      system->getASTContext().evaluator,
+      GetDistributedActorSystemRemoteCallFunctionRequest{mutableSystem, /*isVoidReturn=*/isVoidReturn},
+      nullptr);
 }
 
 /******************************************************************************/
