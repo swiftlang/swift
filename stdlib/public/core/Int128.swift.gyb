@@ -149,7 +149,7 @@ extension _${U}Int128: Numeric {
 
     // Is 'source' entirely representable in Low?
     if let low = Low(exactly: source.magnitude) {
-      self.init(source._isNegative ? (~0, ~low &+ 1) : (0, low))
+      self.init(source._isNegative ? (~0, low._twosComplement) : (0, low))
     } else {
       // At this point we know source.bitWidth > High.bitWidth, or else we
       // would've taken the first branch.
@@ -260,7 +260,7 @@ extension _${U}Int128: FixedWidthInteger {
     let isNegative = (self._isNegative != rhs._isNegative)
     let (p, overflow) = self.magnitude.multipliedReportingOverflow(
       by: rhs.magnitude)
-    let r = _Int128(bitPattern: isNegative ? ~(p &- .one) : p)
+    let r = _Int128(bitPattern: isNegative ? p._twosComplement : p)
     return (r, overflow || (isNegative != r._isNegative))
     % else:
     let h1 = self.high.multipliedReportingOverflow(by: rhs.low)
@@ -273,6 +273,31 @@ extension _${U}Int128: FixedWidthInteger {
       || h1.overflow || h2.overflow || h3.overflow || high.overflow)
     return (Self(high: high.partialValue, low: l), overflow)
     % end
+  }
+
+  /// Returns the product of this value and the given 64-bit value, along with a
+  /// Boolean value indicating whether overflow occurred in the operation.
+  internal func multipliedReportingOverflow(
+    by other: UInt64
+  ) -> (partialValue: Self, overflow: Bool) {
+    % if signed:
+    let isNegative = self._isNegative
+    let (p, overflow) = self.magnitude.multipliedReportingOverflow(by: other)
+    let r = _Int128(bitPattern: isNegative ? p._twosComplement : p)
+    return (r, overflow || (isNegative != r._isNegative))
+    % else:
+    let h1 = self.high.multipliedReportingOverflow(by: other)
+    let (h2, l) = self.low.multipliedFullWidth(by: other)
+    let high = h1.partialValue.addingReportingOverflow(h2)
+    let overflow = h1.overflow || high.overflow
+    return (Self(high: high.partialValue, low: l), overflow)
+    % end
+  }
+
+  internal func multiplied(by other: UInt64) -> Self {
+    let r = multipliedReportingOverflow(by: other)
+    _precondition(!r.overflow, "Overflow in multiplication")
+    return r.partialValue
   }
 
   internal func quotientAndRemainder(
@@ -513,6 +538,13 @@ extension _${U}Int128: Sendable {}
 extension BinaryInteger {
   @inline(__always)
   fileprivate var _isNegative: Bool { self < Self.zero }
+}
+
+extension FixedWidthInteger {
+  @inline(__always)
+  fileprivate var _twosComplement: Self {
+    ~self &+ 1
+  }
 }
 
 private typealias _Wide2<F: FixedWidthInteger> =
