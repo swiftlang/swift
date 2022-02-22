@@ -434,6 +434,10 @@ option(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING
   "Build stdlibCore with exclusivity checking enabled"
   FALSE)
 
+option(SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
+  "Enable _debugPrecondition checks in the stdlib in Release configurations"
+  FALSE)
+
 option(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING
   "Enable experimental Swift differentiable programming features"
   FALSE)
