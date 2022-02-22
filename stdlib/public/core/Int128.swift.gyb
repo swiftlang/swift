@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 % for signed in [False, True]:
-%   U = 'U' if signed else ''
+%   U = '' if signed else 'U'
+%   Self = '_Int128' if signed else '_UInt128'
+%   Other = '_UInt128' if signed else '_Int128'
 /// A 128-bit ${'signed' if signed else 'unsigned'} integer type.
 internal struct _${U}Int128 {
   internal typealias High = ${U}Int64
@@ -40,6 +42,13 @@ internal struct _${U}Int128 {
   internal init() {
     self.init(high: 0, low: 0)
   }
+
+  internal init(bitPattern v: ${Other}) {
+    self.init(high: High(bitPattern: v.high), low: v.low)
+  }
+
+  internal static var zero: Self { Self(high: 0, low: 0) }
+  internal static var one: Self { Self(high: 0, low: 1) }
 }
 
 extension _${U}Int128: CustomStringConvertible {
@@ -82,9 +91,9 @@ extension _${U}Int128 {
 
 extension _${U}Int128: AdditiveArithmetic {
   internal static func - (_ lhs: Self, _ rhs: Self) -> Self {
-    var lhs = lhs
-    lhs -= rhs
-    return lhs
+    let (result, overflow) = lhs.subtractingReportingOverflow(rhs)
+    _precondition(!overflow, "Overflow in -")
+    return result
   }
 
   internal static func -= (_ lhs: inout Self, _ rhs: Self) {
@@ -94,9 +103,9 @@ extension _${U}Int128: AdditiveArithmetic {
   }
 
   internal static func + (_ lhs: Self, _ rhs: Self) -> Self {
-    var lhs = lhs
-    lhs += rhs
-    return lhs
+    let (result, overflow) = lhs.addingReportingOverflow(rhs)
+    _precondition(!overflow, "Overflow in +")
+    return result
   }
 
   internal static func += (_ lhs: inout Self, _ rhs: Self) {
@@ -110,7 +119,15 @@ extension _${U}Int128: Numeric {
   internal typealias Magnitude = _UInt128
 
   internal var magnitude: Magnitude {
-    Magnitude(_wideMagnitude22(self.components))
+    % if signed:
+    var result = _UInt128(bitPattern: self)
+    guard high._isNegative else { return result }
+    result.high = ~result.high
+    result.low = ~result.low
+    return result.addingReportingOverflow(.one).partialValue
+    % else:
+    return self
+    % end
   }
 
   internal init(_ magnitude: Magnitude) {
@@ -148,9 +165,9 @@ extension _${U}Int128: Numeric {
   }
 
   internal static func * (_ lhs: Self, _ rhs: Self) -> Self {
-    var lhs = lhs
-    lhs *= rhs
-    return lhs
+    let (result, overflow) = lhs.multipliedReportingOverflow(by: rhs)
+    _precondition(!overflow, "Overflow in *")
+    return result
   }
 
   internal static func *= (_ lhs: inout Self, _ rhs: Self) {
@@ -160,57 +177,49 @@ extension _${U}Int128: Numeric {
   }
 }
 
-
-% if signed:
-extension _Int128 {
-  internal typealias Words = _UInt128.Words
-}
-% else:
-extension _UInt128 {
+extension _${U}Int128 {
   internal struct Words {
-    internal var high: High.Words
-    internal var low: Low.Words
+    internal var _value: _${U}Int128
 
-    internal init(_ value: _UInt128) {
-      self.init(high: value.high.words, low: value.low.words)
-    }
-
-    internal init(_ value: _Int128) {
-      self.init(_UInt128(truncatingIfNeeded: value))
-    }
-
-    internal init(high: High.Words, low: Low.Words) {
-      self.high = high
-      self.low = low
+    internal init(_ value: _${U}Int128) {
+      self._value = value
     }
   }
 }
 
-extension _UInt128.Words: RandomAccessCollection {
+extension _${U}Int128.Words: RandomAccessCollection {
+  internal typealias Element = UInt
   internal typealias Index = Int
+  internal typealias Indices = Range<Int>
+  internal typealias SubSequence = Slice<Self>
 
-  internal var startIndex: Index {
-    0
-  }
+  internal var count: Int { 128 / UInt.bitWidth }
+  internal var startIndex: Int { 0 }
+  internal var endIndex: Int { count }
+  internal var indices: Indices { startIndex ..< endIndex }
+  internal func index(after i: Int) -> Int { i + 1 }
+  internal func index(before i: Int) -> Int { i - 1 }
 
-  internal var endIndex: Index {
-    count
-  }
+  internal subscript(position: Int) -> UInt {
+    get {
+      _precondition(position >= 0 && position < endIndex,
+        "Word index out of range")
+      let shift = position &* UInt.bitWidth
+      _internalInvariant(shift < _${U}Int128.bitWidth)
 
-  internal var count: Int {
-    low.count + high.count
-  }
-
-  internal subscript(_ i: Index) -> UInt {
-    if i < low.count {
-      return low[i + low.startIndex]
+      let r = _wideMaskedShiftRight(
+        _value.components, UInt64(truncatingIfNeeded: shift))
+      return r.low._lowWord
     }
-    return high[i - low.count + high.startIndex]
   }
 }
-% end
 
 extension _${U}Int128: FixedWidthInteger {
+  @_transparent
+  internal var _lowWord: UInt {
+    low._lowWord
+  }
+
   internal var words: Words {
     Words(self)
   }
@@ -227,9 +236,7 @@ extension _${U}Int128: FixedWidthInteger {
     self.init(high: High.min, low: Low.min)
   }
 
-  internal static var bitWidth: Int {
-    High.bitWidth + Low.bitWidth
-  }
+  internal static var bitWidth: Int { 128 }
 
   internal func addingReportingOverflow(
     _ rhs: Self
@@ -249,15 +256,23 @@ extension _${U}Int128: FixedWidthInteger {
   internal func multipliedReportingOverflow(
     by rhs: Self
   ) -> (partialValue: Self, overflow: Bool) {
-    let (carry, product) = multipliedFullWidth(by: rhs)
-    let result = Self(truncatingIfNeeded: product)
-
-    let isNegative = Self.isSigned && (self._isNegative != rhs._isNegative)
-    let didCarry = isNegative ? carry != ~Self.zero : carry != Self.zero
-    let hadPositiveOverflow = Self.isSigned &&
-                              !isNegative && product.leadingZeroBitCount == 0
-
-    return (result, didCarry || hadPositiveOverflow)
+    % if signed:
+    let isNegative = (self._isNegative != rhs._isNegative)
+    let (p, overflow) = self.magnitude.multipliedReportingOverflow(
+      by: rhs.magnitude)
+    let r = _Int128(bitPattern: isNegative ? ~(p &- .one) : p)
+    return (r, overflow || (isNegative != r._isNegative))
+    % else:
+    let h1 = self.high.multipliedReportingOverflow(by: rhs.low)
+    let h2 = self.low.multipliedReportingOverflow(by: rhs.high)
+    let h3 = h1.partialValue.addingReportingOverflow(h2.partialValue)
+    let (h, l) = self.low.multipliedFullWidth(by: rhs.low)
+    let high = h3.partialValue.addingReportingOverflow(h)
+    let overflow = (
+      (self.high != 0 && rhs.high != 0)
+      || h1.overflow || h2.overflow || h3.overflow || high.overflow)
+    return (Self(high: high.partialValue, low: l), overflow)
+    % end
   }
 
   internal func quotientAndRemainder(
@@ -333,7 +348,7 @@ extension _${U}Int128: FixedWidthInteger {
       low: mid1.high + mid2.low)
 
     if isNegative {
-      let (lowComplement, overflow) = (~low).addingReportingOverflow(1)
+      let (lowComplement, overflow) = (~low).addingReportingOverflow(.one)
       return (~high + (overflow ? 1 : 0), lowComplement)
     } else {
       return (high, low)
@@ -343,15 +358,10 @@ extension _${U}Int128: FixedWidthInteger {
   internal func dividingFullWidth(
     _ dividend: (high: Self, low: Self.Magnitude)
   ) -> (quotient: Self, remainder: Self) {
+    % if signed:
     let m = _wideMagnitude22(dividend)
-    let (q, r) = _wideDivide42(
-      (m.high.components, m.low.components),
-      by: self.magnitude.components)
-    let quotient = Self.Magnitude(q)
-    let remainder = Self.Magnitude(r)
-    guard Self.isSigned else {
-      return (Self(quotient), Self(remainder))
-    }
+    let (quotient, remainder) = self.magnitude.dividingFullWidth(m)
+
     let isNegative = (self.high._isNegative != dividend.high.high._isNegative)
     let quotient_ = (isNegative
       ? (quotient == Self.min.magnitude ? Self.min : 0 - Self(quotient))
@@ -360,13 +370,20 @@ extension _${U}Int128: FixedWidthInteger {
       ? 0 - Self(remainder)
       : Self(remainder))
     return (quotient_, remainder_)
+    % else:
+    let (q, r) = _wideDivide42(
+      (dividend.high.components, dividend.low.components),
+      by: self.components)
+    return (Self(q), Self(r))
+    % end
   }
 
-/* disabled since it causes a compile failure in LLDB
+  #if false // This triggers an unexpected type checking issue with `~0` in an
+            // lldb test
   internal static prefix func ~(x: Self) -> Self {
     Self(high: ~x.high, low: ~x.low)
   }
-*/
+  #endif
 
   internal static func &= (_ lhs: inout Self, _ rhs: Self) {
     lhs.low &= rhs.low
@@ -413,11 +430,19 @@ extension _${U}Int128: FixedWidthInteger {
     lhs &>>= rhs
   }
 
-  internal static func &<<= (_ lhs: inout Self, _ rhs: Self) {
+  internal static func &<< (lhs: Self, rhs: Self) -> Self {
+    Self(_wideMaskedShiftLeft(lhs.components, rhs.low))
+  }
+
+  internal static func &>> (lhs: Self, rhs: Self) -> Self {
+    Self(_wideMaskedShiftRight(lhs.components, rhs.low))
+  }
+
+  internal static func &<<= (lhs: inout Self, rhs: Self) {
     _wideMaskedShiftLeft(&lhs.components, rhs.low)
   }
 
-  internal static func &>>= (_ lhs: inout Self, _ rhs: Self) {
+  internal static func &>>= (lhs: inout Self, rhs: Self) {
     _wideMaskedShiftRight(&lhs.components, rhs.low)
   }
 
@@ -590,7 +615,7 @@ private func _wideMaskedShiftLeft<F: FixedWidthInteger>(
   var high = lhs.high &<< F(rhs)
   let rollover = F.Magnitude(F.bitWidth) &- rhs
   high |= F(truncatingIfNeeded: lhs.low &>> rollover)
-  var low = lhs.low &<< rhs
+  let low = lhs.low &<< rhs
   return (high, low)
 }
 

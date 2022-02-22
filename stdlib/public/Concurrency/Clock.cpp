@@ -89,6 +89,8 @@ void swift_get_time(
 #endif
       break;
     }
+    default:
+      abort();
   }
 }
 
@@ -136,5 +138,7 @@ switch (clock_id) {
 #endif
       break;
     }
+   default:
+     abort();
   }
 }

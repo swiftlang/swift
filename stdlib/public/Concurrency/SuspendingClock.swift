@@ -60,7 +60,7 @@ extension SuspendingClock: Clock {
     _getTime(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
-      clock: .suspending)
+      clock: _ClockID.suspending.rawValue)
     return SuspendingClock.Instant(_value:
       .seconds(seconds) + .nanoseconds(nanoseconds))
   }
@@ -73,7 +73,7 @@ extension SuspendingClock: Clock {
     _getClockRes(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
-      clock: .suspending)
+      clock: _ClockID.suspending.rawValue)
     return .seconds(seconds) + .nanoseconds(nanoseconds)
   }
 
