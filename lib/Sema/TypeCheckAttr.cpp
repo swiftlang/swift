@@ -5592,22 +5592,15 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
     }
 
     // distributed func must be declared inside an distributed actor
-    if (dc->getSelfClassDecl() &&
-        !dc->getSelfClassDecl()->isDistributedActor()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::distributed_actor_func_not_in_distributed_actor);
-      return;
-    } else if (auto protoDecl = dc->getSelfProtocolDecl()){
-      if (!protoDecl->inheritsFromDistributedActor()) {
-        auto diag = diagnoseAndRemoveAttr(
-            attr, diag::distributed_actor_func_not_in_distributed_actor);
-        diagnoseDistributedFunctionInNonDistributedActorProtocol(
-            protoDecl, diag);
-        return;
+    auto selfTy = dc->getSelfTypeInContext();
+    if (!selfTy->isDistributedActor()) {
+      auto diagnostic = diagnoseAndRemoveAttr(
+        attr, diag::distributed_actor_func_not_in_distributed_actor);
+
+      if (auto *protoDecl = dc->getSelfProtocolDecl()) {
+        diagnoseDistributedFunctionInNonDistributedActorProtocol(protoDecl,
+                                                                 diagnostic);
       }
-    } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::distributed_actor_func_not_in_distributed_actor);
       return;
     }
   }

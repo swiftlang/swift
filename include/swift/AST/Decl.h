@@ -4472,10 +4472,6 @@ public:
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
 
-  /// Is a protocol that can only be conformed by distributed actors.
-  /// Such protocols are allowed to contain distributed functions.
-  bool inheritsFromDistributedActor() const;
-
 private:
   void computeKnownProtocolKind() const;
 
