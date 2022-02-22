@@ -489,9 +489,12 @@ extension UnsafeRawPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func alignedUp(toMultipleOf alignment: Int) -> Self {
-    let mask = alignment &- 1
-    _debugPrecondition(alignment & mask == 0)
-    let bits = (Int(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 
@@ -507,9 +510,12 @@ extension UnsafeRawPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func alignedDown(toMultipleOf alignment: Int) -> Self {
-    let mask = alignment &- 1
-    _debugPrecondition(alignment & mask == 0)
-    let bits = Int(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 }
@@ -1260,9 +1266,12 @@ extension UnsafeMutableRawPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func alignedUp(toMultipleOf alignment: Int) -> Self {
-    let mask = alignment &- 1
-    _debugPrecondition(alignment & mask == 0)
-    let bits = (Int(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 
@@ -1278,9 +1287,12 @@ extension UnsafeMutableRawPointer {
   @inlinable
   @_alwaysEmitIntoClient
   public func alignedDown(toMultipleOf alignment: Int) -> Self {
-    let mask = alignment &- 1
-    _debugPrecondition(alignment & mask == 0)
-    let bits = Int(Builtin.ptrtoint_Word(_rawValue)) & ~mask
+    let mask = UInt(alignment._builtinWordValue) &- 1
+    _debugPrecondition(
+      alignment > 0 && UInt(alignment._builtinWordValue) & mask == 0,
+      "alignment must be a whole power of 2."
+    )
+    let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
   }
 }
