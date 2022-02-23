@@ -55,6 +55,7 @@ struct CompletionInstanceResult {
 struct CodeCompleteResult {
   CodeCompletionResultSink &ResultSink;
   SwiftCompletionInfo &Info;
+  ImportDepth ImportDep;
 };
 
 /// The results returned from \c CompletionInstance::typeContextInfo.

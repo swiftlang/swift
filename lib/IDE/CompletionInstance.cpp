@@ -577,14 +577,17 @@ void swift::ide::CompletionInstance::codeComplete(
   struct ConsumerToCallbackAdapter
       : public SimpleCachingCodeCompletionConsumer {
     SwiftCompletionInfo SwiftContext;
+    ImportDepth ImportDep;
     std::shared_ptr<std::atomic<bool>> CancellationFlag;
     llvm::function_ref<void(ResultType)> Callback;
     bool HandleResultsCalled = false;
 
     ConsumerToCallbackAdapter(
+        ImportDepth ImportDep,
         std::shared_ptr<std::atomic<bool>> CancellationFlag,
         llvm::function_ref<void(ResultType)> Callback)
-        : CancellationFlag(CancellationFlag), Callback(Callback) {}
+        : ImportDep(ImportDep), CancellationFlag(CancellationFlag),
+          Callback(Callback) {}
 
     void setContext(swift::ASTContext *context,
                     const swift::CompilerInvocation *invocation,
@@ -602,7 +605,7 @@ void swift::ide::CompletionInstance::codeComplete(
         Callback(ResultType::cancelled());
       } else {
         assert(SwiftContext.swiftASTContext);
-        Callback(ResultType::success({context.getResultSink(), SwiftContext}));
+        Callback(ResultType::success({context.getResultSink(), SwiftContext, ImportDep}));
       }
     }
   };
@@ -616,7 +619,9 @@ void swift::ide::CompletionInstance::codeComplete(
                                                     auto DeliverTransformed) {
               CompletionContext.ReusingASTContext = Result.DidReuseAST;
               CompilerInstance &CI = Result.CI;
-              ConsumerToCallbackAdapter Consumer(CancellationFlag,
+              ImportDepth ImportDep{CI.getASTContext(),
+                                    CI.getInvocation().getFrontendOptions()};
+              ConsumerToCallbackAdapter Consumer(ImportDep, CancellationFlag,
                                                  DeliverTransformed);
 
               std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
@@ -628,7 +633,7 @@ void swift::ide::CompletionInstance::codeComplete(
                                          &CI.getInvocation(),
                                          &CompletionContext};
                 CodeCompletionResultSink ResultSink;
-                DeliverTransformed(ResultType::success({ResultSink, Info}));
+                DeliverTransformed(ResultType::success({ResultSink, Info, ImportDep}));
                 return;
               }
 
@@ -646,7 +651,7 @@ void swift::ide::CompletionInstance::codeComplete(
                                          &CI.getInvocation(),
                                          &CompletionContext};
                 CodeCompletionResultSink ResultSink;
-                DeliverTransformed(ResultType::success({ResultSink, Info}));
+                DeliverTransformed(ResultType::success({ResultSink, Info, ImportDep}));
               }
             },
             Callback);
