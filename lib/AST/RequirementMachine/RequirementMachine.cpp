@@ -36,38 +36,46 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
 
 RequirementMachine::~RequirementMachine() {}
 
-static void checkCompletionResult(const RequirementMachine &machine,
-                                  CompletionResult result) {
+/// Checks the result of a completion in a context where we can't diagnose
+/// failure, either when building a rewrite system from an existing
+/// minimal signature (which should have been checked when it was
+/// minimized) or from AbstractGenericSignatureRequest (where failure
+/// is fatal).
+void RequirementMachine::checkCompletionResult(CompletionResult result) const {
   switch (result) {
   case CompletionResult::Success:
     break;
 
   case CompletionResult::MaxRuleCount:
     llvm::errs() << "Rewrite system exceeded maximum rule count\n";
-    machine.dump(llvm::errs());
+    dump(llvm::errs());
     abort();
 
   case CompletionResult::MaxRuleLength:
     llvm::errs() << "Rewrite system exceeded rule length limit\n";
-    machine.dump(llvm::errs());
+    dump(llvm::errs());
     abort();
 
   case CompletionResult::MaxConcreteNesting:
     llvm::errs() << "Rewrite system exceeded concrete type nesting depth limit\n";
-    machine.dump(llvm::errs());
+    dump(llvm::errs());
     abort();
   }
 }
 
 /// Build a requirement machine for the requirements of a generic signature.
 ///
+/// In this mode, minimization is not going to be performed, so rewrite loops
+/// are not recorded.
+///
 /// This must only be called exactly once, before any other operations are
 /// performed on this requirement machine.
 ///
 /// Used by ASTContext::getOrCreateRequirementMachine().
 ///
-/// Asserts if completion fails within the configured number of steps.
-void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
+/// Returns failure if completion fails within the configured number of steps.
+std::pair<CompletionResult, unsigned>
+RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   Sig = sig;
   Params.append(sig.getGenericParams().begin(),
                 sig.getGenericParams().end());
@@ -92,16 +100,20 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
                     std::move(builder.RequirementRules));
 
   auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
-  checkCompletionResult(*this, result.first);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
   }
+
+  return result;
 }
 
 /// Build a requirement machine for the structural requirements of a set
 /// of protocols, which are understood to form a strongly-connected component
 /// (SCC) of the protocol dependency graph.
+///
+/// In this mode, minimization will be performed, so rewrite loops are recorded
+/// during completion.
 ///
 /// This must only be called exactly once, before any other operations are
 /// performed on this requirement machine.
@@ -139,54 +151,15 @@ RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
 }
 
 /// Build a requirement machine from a set of generic parameters and
-/// (possibly non-canonical or non-minimal) abstract requirements.
-///
-/// This must only be called exactly once, before any other operations are
-/// performed on this requirement machine.
-///
-/// Used by AbstractGenericSignatureRequest.
-///
-/// Asserts if completion fails within the configured number of steps.
-void RequirementMachine::initWithAbstractRequirements(
-    ArrayRef<GenericTypeParamType *> genericParams,
-    ArrayRef<Requirement> requirements) {
-  Params.append(genericParams.begin(), genericParams.end());
-
-  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
-
-  if (Dump) {
-    llvm::dbgs() << "Adding generic parameters:";
-    for (auto *paramTy : genericParams)
-      llvm::dbgs() << " " << Type(paramTy);
-    llvm::dbgs() << "\n";
-  }
-
-  // Collect the top-level requirements, and all transtively-referenced
-  // protocol requirement signatures.
-  RuleBuilder builder(Context, System.getProtocolMap());
-  builder.addRequirements(requirements);
-
-  // Add the initial set of rewrite rules to the rewrite system.
-  System.initialize(/*recordLoops=*/true,
-                    /*protos=*/ArrayRef<const ProtocolDecl *>(),
-                    std::move(builder.PermanentRules),
-                    std::move(builder.RequirementRules));
-
-  auto result = computeCompletion(RewriteSystem::AllowInvalidRequirements);
-  checkCompletionResult(*this, result.first);
-
-  if (Dump) {
-    llvm::dbgs() << "}\n";
-  }
-}
-
-/// Build a requirement machine from a set of generic parameters and
 /// structural requirements.
 ///
+/// In this mode, minimization will be performed, so rewrite loops are recorded
+/// during completion.
+///
 /// This must only be called exactly once, before any other operations are
 /// performed on this requirement machine.
 ///
-/// Used by InferredGenericSignatureRequest.
+/// Used by AbstractGenericSignatureRequest and InferredGenericSignatureRequest.
 ///
 /// Returns failure if completion fails within the configured number of steps.
 std::pair<CompletionResult, unsigned>
