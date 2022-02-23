@@ -367,7 +367,7 @@ private:
     bool checkReachablePhiBarrier(SILBasicBlock *block) {
       bool isBarrier =
           llvm::any_of(block->getPredecessorBlocks(), [&](auto *predecessor) {
-            return result.isBarrier(block->getTerminator());
+            return result.isBarrier(predecessor->getTerminator());
           });
       if (isBarrier) {
         // If there's a barrier preventing us from hoisting out of this block,
