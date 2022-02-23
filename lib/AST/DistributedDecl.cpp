@@ -70,18 +70,13 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
   auto *DC = member->getDeclContext();
   auto DA = C.getDistributedActorDecl();
 
-  // === When declared inside a n actor, we can get the type directly
-  if (auto classDecl = dyn_cast<ClassDecl>(DC)) {
+  // === When declared inside an actor, we can get the type directly
+  if (auto classDecl = DC->getSelfClassDecl()) {
     return getDistributedActorSystemType(classDecl);
   }
 
   /// === Maybe the value is declared in a protocol?
-  ProtocolDecl *protocol = dyn_cast<ProtocolDecl>(member);
-  if (!protocol) {
-    protocol = DC->getSelfProtocolDecl();
-  }
-
-  if (protocol) {
+  if (auto protocol = DC->getSelfProtocolDecl()) {
     GenericSignature signature;
     if (auto *genericContext = member->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
